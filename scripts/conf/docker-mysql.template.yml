@@ -1,0 +1,43 @@
+services:
+  # MySQL Database
+  <<MYSQL_SERVICE_NAME>>:
+    image: <<MYSQL_DOCKER_IMAGE>>
+    pull_policy: if_not_present
+    container_name: <<MYSQL_DOCKER_NAME>>
+    restart: unless-stopped
+    environment:
+      # Extract credentials from DATABASE_URL for MySQL container
+      MYSQL_ROOT_PASSWORD: <<DB_ROOT_PASSWORD>>
+      MYSQL_DATABASE: <<AGENT_DB_NAME>>
+    env_file:
+      - ../.env
+    ports:
+      - "<<MYSQL_HOST_PORT>>:3306"
+    volumes:
+      - <<MYSQL_VOLUME>>:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-S",
+          "/var/run/mysqld/mysqld.sock",
+          "--silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - <<JIUWEN_NETWORK_NAME>>
+
+volumes:
+  <<MYSQL_VOLUME>>:
+
+networks:
+  <<JIUWEN_NETWORK_NAME>>:
+    driver: bridge

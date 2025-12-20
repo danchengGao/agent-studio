@@ -1,0 +1,65 @@
+services:
+  <<BACKEND_SERVICE_NAME>>:
+    image: <<BACKEND_DOCKER_IMAGE>>
+    pull_policy: if_not_present
+    container_name: <<BACKEND_DOCKER_NAME>>
+    ports:
+      - "<<BACKEND_HOST_PORT>>:<<BACKEND_PORT>>"
+    environment:
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - https_proxy
+      - http_proxy
+      - <<no_proxy_str>>
+      - <<NO_PROXY_STR>>
+    env_file:
+      - ../.env
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ../examples:<<BACKEND_PATH>>/examples
+      - ./config.yaml:<<BACKEND_PATH>>/config.yaml
+      - ./config.json:<<BACKEND_PATH>>/config.json
+      - ../logs/run:/app/logs/run
+      - ../logs/performance:/app/logs/performance
+      - ../logs/interface:/app/logs/interface
+    networks:
+      - <<JIUWEN_NETWORK_NAME>>
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  <<FRONTEND_SERVICE_NAME>>:
+    image: <<FRONTEND_DOCKER_IMAGE>>
+    pull_policy: if_not_present
+    container_name: <<FRONTEND_DOCKER_NAME>>
+    ports:
+      - "<<FRONTEND_HOST_PORT>>:<<FRONTEND_PORT>>"
+    environment:
+      - SSL_PASSWORD
+    env_file:
+      - ../.env
+    volumes:
+      - ../ssl:/etc/nginx/ssl
+      - /etc/localtime:/etc/localtime:ro
+      - ./config.json:/usr/share/nginx/html/config.json
+      - ./<<NGINX_FILE_NAME>>:/etc/nginx/nginx.conf
+    depends_on:
+      <<BACKEND_SERVICE_NAME>>:
+        condition: service_healthy
+    networks:
+      - <<JIUWEN_NETWORK_NAME>>
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:<<FRONTEND_PORT>>/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  <<JIUWEN_NETWORK_NAME>>:
+    driver: bridge
