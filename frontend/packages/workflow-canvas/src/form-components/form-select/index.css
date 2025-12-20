@@ -1,0 +1,84 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+/* 统一字体大小 */
+.gedit-m-form-select,
+.gedit-m-form-select * {
+  font-size: 12px !important;
+}
+
+/* 主容器 */
+.gedit-m-form-select {
+  width: 100%;
+}
+
+/* 输入框样式 */
+.gedit-m-form-select .semi-input-wrapper {
+  height: 24px;
+  min-height: 24px;
+}
+
+.gedit-m-form-select .semi-select-selection {
+  min-height: 24px;
+}
+
+.gedit-m-form-select .semi-select-single-value,
+.gedit-m-form-select .semi-select-placeholder {
+  line-height: 22px;
+}
+
+/* 多选模式样式 */
+.gedit-m-form-select-multiple .semi-select-selection {
+  min-height: 24px;
+  padding: 2px 4px;
+}
+
+.gedit-m-form-select-multiple .semi-select-tag {
+  height: 20px;
+  line-height: 18px;
+  margin: 1px;
+  padding: 0 4px;
+}
+
+.gedit-m-form-select-multiple .semi-select-multiple-value {
+  line-height: 18px;
+}
+
+/* 下拉选项样式 */
+.gedit-m-form-select .semi-select-option,
+.gedit-m-form-select .semi-select-list-item {
+  line-height: 20px;
+  padding: 6px 12px;
+  min-height: 32px;
+}
+
+.gedit-m-form-select .semi-select-option:hover,
+.gedit-m-form-select .semi-select-list-item:hover {
+  background-color: var(--semi-color-fill-1);
+}
+
+.gedit-m-form-select .semi-select-option-selected,
+.gedit-m-form-select .semi-select-list-item-selected {
+  background-color: var(--semi-color-primary-light-default);
+  color: var(--semi-color-primary-light-active);
+}
+
+/* 自定义底部插槽 */
+.gedit-m-form-select .semi-select-dropdown-inner-bottom {
+  padding: 0;
+}
+
+.gedit-m-form-select-custom-option {
+  padding: 8px 12px;
+  color: var(--semi-color-link);
+  cursor: pointer;
+  border-top: 1px solid var(--semi-color-border);
+  background-color: var(--semi-color-fill-0);
+  transition: background-color 0.2s;
+}
+
+.gedit-m-form-select-custom-option:hover {
+  background-color: var(--semi-color-fill-1);
+}
