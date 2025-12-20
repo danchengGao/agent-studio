@@ -1,0 +1,485 @@
+from functools import wraps
+
+from fastapi import status
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
+
+from app.core.database import jiuwen_db_logger, milliseconds
+from app.core.manager.repositories import JiuwenBaseRepository
+from app.core.manager.repositories.jiuwen_base_repository import get_db_jw
+from app.models import knowledge_base as kb_models
+from app.models import knowledge_base_document as kb_doc_models
+from app.schemas.common import ResponseModel
+from app.schemas.knowledge_base import KnowledgeBaseGet
+
+
+class KnowledgeBaseRepository:
+    def __init__(self) -> None:
+        pass
+
+    def with_exception_handling(func_):
+        @wraps(func_)
+        def wrapper(self, *args, **kwargs):
+            try:
+                return func_(self, *args, **kwargs)
+            except Exception as e:
+                jiuwen_db_logger.error("Error: knowledge base db data preprocessing error")
+                jiuwen_db_logger.debug(f"Exception details: {type(e).__name__}", exc_info=True)
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Error: knowledge base db data preprocessing error: {type(e).__name__}"
+                )
+        return wrapper
+
+    '''
+    description: 创建知识库
+    param {dict} kb_data  待创建的知识库数据
+    return {*}
+    '''
+    @with_exception_handling
+    def knowledge_base_create(self, kb_data: dict, db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            if not kb_data:
+                jiuwen_db_logger.debug(f"No knowledge base data to register: \ndata: {kb_data}")
+                return ResponseModel(code=status.HTTP_400_BAD_REQUEST, message="No knowledge base data to register")
+            
+            find_id = {
+                "kb_id": kb_data["kb_id"],
+            }
+            timestamp = milliseconds()
+            if "create_time" not in kb_data or not kb_data["create_time"]:
+                kb_data["create_time"] = timestamp
+            if "update_time" not in kb_data or not kb_data["update_time"]:
+                kb_data["update_time"] = timestamp
+            
+            return kb_db.register_dl_in_sql(find_id=find_id, dl=kb_data)
+
+    '''
+    description: 从数据库获取知识库
+    param {KnowledgeBaseGet} kb_get  知识库查询条件
+    return {*}
+    '''
+    @with_exception_handling
+    def knowledge_base_get(self, kb_get: KnowledgeBaseGet, db_session: Session | None = None) -> ResponseModel[dict | None]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            find_id = {
+                "space_id": kb_get.space_id,
+                "kb_id": kb_get.kb_id,
+            }
+            return kb_db.get_dl_in_sql(find_id=find_id, return_first_item=True)
+
+    '''
+    description: 删除知识库
+    param {KnowledgeBaseGet} kb_get  知识库查询条件
+    return {*}
+    '''
+    @with_exception_handling
+    def knowledge_base_delete(self, kb_get: KnowledgeBaseGet, db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            find_id = {
+                "space_id": kb_get.space_id,
+                "kb_id": kb_get.kb_id,
+            }
+            return kb_db.unregister_dl_in_sql(find_id=find_id)
+
+    '''
+    description: 更新知识库
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {str} name  新的名字
+    param {str} description  新的描述
+    return {*}
+    '''
+    @with_exception_handling
+    def knowledge_base_update(self, space_id: str, kb_id: str, name: str, description: str | None, db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            find_id = {
+                "space_id": space_id,
+                "kb_id": kb_id,
+            }
+            # 由于 update_dl_in_sql 使用 exclude_invalid=True 会过滤 None 和空字符串，
+            # 如果 description 是 None 或空字符串，我们需要直接使用 SQLAlchemy 的 update 语句
+            if description is None or description == "":
+                from sqlalchemy import update as sql_update
+                stmt = (
+                    sql_update(kb_models.KnowledgeBaseDB)
+                    .values(
+                        name=name,
+                        description=None if description is None else "",
+                        update_time=milliseconds()
+                    )
+                    .where(
+                        kb_models.KnowledgeBaseDB.space_id == space_id,
+                        kb_models.KnowledgeBaseDB.kb_id == kb_id
+                    )
+                )
+                db.execute(stmt)
+                db.commit()
+                return ResponseModel(code=status.HTTP_200_OK, message="Knowledge base updated successfully")
+            else:
+                # 如果 description 有值，使用正常的更新流程
+                update_data = {
+                    "name": name,
+                    "description": description,
+                    "update_time": milliseconds(),
+                }
+                return kb_db.update_dl_in_sql(find_id=find_id, update_dl=update_data)
+
+    '''
+    description: 创建知识库文档
+    param {dict} doc_data  待创建的文档数据
+    return {*}
+    '''
+    @with_exception_handling
+    def document_create(self, doc_data: dict, db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
+            if not doc_data:
+                jiuwen_db_logger.debug(f"No document data to register: \ndata: {doc_data}")
+                return ResponseModel(code=status.HTTP_400_BAD_REQUEST, message="No document data to register")
+            
+            find_id = {
+                "doc_id": doc_data["doc_id"],
+            }
+            timestamp = milliseconds()
+            if "create_time" not in doc_data or not doc_data["create_time"]:
+                doc_data["create_time"] = timestamp
+            if "update_time" not in doc_data or not doc_data["update_time"]:
+                doc_data["update_time"] = timestamp
+            
+            return doc_db.register_dl_in_sql(find_id=find_id, dl=doc_data)
+
+    '''
+    description: 从数据库获取知识库文档
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {str} doc_id  文档ID
+    return {*}
+    '''
+    @with_exception_handling
+    def document_get(self, space_id: str, kb_id: str, doc_id: str, db_session: Session | None = None) -> ResponseModel[dict | None]:
+        with get_db_jw(db_session) as db:
+            doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
+            find_id = {
+                "space_id": space_id,
+                "kb_id": kb_id,
+                "doc_id": doc_id,
+            }
+            return doc_db.get_dl_in_sql(find_id=find_id, return_first_item=True)
+
+    '''
+    description: 删除知识库文档
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {str} doc_id  文档ID
+    return {*}
+    '''
+    @with_exception_handling
+    def document_delete(self, space_id: str, kb_id: str, doc_id: str, db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
+            find_id = {
+                "space_id": space_id,
+                "kb_id": kb_id,
+                "doc_id": doc_id,
+            }
+            return doc_db.unregister_dl_in_sql(find_id=find_id)
+
+    '''
+    description: 更新文档状态
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {str} doc_id  文档ID
+    param {str} doc_status  新状态
+    param {dict} process_info  处理信息（可选）
+    return {*}
+    '''
+    @with_exception_handling
+    def document_update_status(self, space_id: str, kb_id: str, doc_id: str, doc_status: str, 
+                              process_info: dict | None = None, 
+                              es_index_name: str | None = None,
+                              chunk_count: int | None = None,
+                              db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
+            find_id = {
+                "space_id": space_id,
+                "kb_id": kb_id,
+                "doc_id": doc_id,
+            }
+            
+            update_data = {
+                "status": doc_status,
+                "update_time": milliseconds(),
+            }
+            
+            if process_info is not None:
+                update_data["process_info"] = process_info
+            
+            # 如果提供了索引信息，一起更新
+            if es_index_name is not None:
+                update_data["es_index_id"] = None
+                update_data["es_index_name"] = es_index_name
+                update_data["indexed_time"] = milliseconds()
+            
+            if chunk_count is not None:
+                update_data["chunk_count"] = chunk_count
+            
+            return doc_db.update_dl_in_sql(find_id=find_id, update_dl=update_data)
+
+    '''
+    description: 更新文档信息（当前只支持更新文档名称）
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {str} doc_id  文档ID
+    param {str} name  新的文档名称
+    return {*}
+    '''
+    @with_exception_handling
+    def document_update(self, space_id: str, kb_id: str, doc_id: str, name: str, db_session: Session | None = None) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
+            find_id = {
+                "space_id": space_id,
+                "kb_id": kb_id,
+                "doc_id": doc_id,
+            }
+            update_data = {
+                "name": name,
+                "update_time": milliseconds(),
+            }
+            return doc_db.update_dl_in_sql(find_id=find_id, update_dl=update_data)
+
+    '''
+    description: 查询知识库（查询词出现在名称或描述中，支持分页）
+    param {str} space_id  空间ID
+    param {str} query  查询词（查询词完整出现在知识库名称或描述中，大小写不敏感）
+    param {int} page  页码，从1开始
+    param {int} page_size  每页大小
+    return {*}
+    '''
+    @with_exception_handling
+    def knowledge_base_search(
+        self,
+        space_id: str,
+        query: str,
+        page: int = 1,
+        page_size: int = 10,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            
+            # 构建查询条件：查询词完整出现在名称或描述中（大小写不敏感）
+            # 使用 func.lower() 实现大小写不敏感匹配
+            query_lower = query.lower()
+            search_conditions = or_(
+                func.lower(kb_models.KnowledgeBaseDB.name).contains(query_lower),
+                func.lower(kb_models.KnowledgeBaseDB.description).contains(query_lower)
+            )
+            
+            # 构建基础查询条件
+            find_id = {
+                "space_id": space_id,
+            }
+            
+            # 验证分页参数
+            page = max(1, page)
+            page_size = max(1, min(page_size, 100))  # 限制最大100
+            
+            # 计算 offset 和 limit
+            offset = (page - 1) * page_size
+            return_range = [offset, page_size]
+            
+            # 先获取总数（不分页）
+            count_result = kb_db.get_dl_in_sql(
+                find_id=find_id,
+                other_sqlalchemy_limitations=[search_conditions],
+                return_first_item=False
+            )
+            
+            if count_result.code != status.HTTP_200_OK:
+                return count_result
+            
+            total = len(count_result.data) if count_result.data else 0
+            
+            # 获取分页数据
+            search_result = kb_db.get_dl_in_sql(
+                find_id=find_id,
+                other_sqlalchemy_limitations=[search_conditions],
+                return_range=return_range,
+                return_first_item=False
+            )
+            
+            if search_result.code != status.HTTP_200_OK:
+                return search_result
+            
+            knowledge_bases = search_result.data or []
+            
+            # 计算总页数
+            total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
+            
+            # 返回分页结果
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Search knowledge bases successfully",
+                data={
+                    "knowledge_bases": knowledge_bases,
+                    "total": total,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages
+                }
+            )
+
+    '''
+    description: 获取知识库列表（支持分页）
+    param {str} space_id  空间ID
+    param {int} page  页码，从1开始
+    param {int} size  每页大小
+    return {*}
+    '''
+    @with_exception_handling
+    def knowledge_base_list(self, space_id: str, page: int = 1, size: int = 10, db_session: Session | None = None) -> ResponseModel[dict]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            
+            # 构建查询条件
+            find_id = {
+                "space_id": space_id,
+            }
+            
+            # 计算分页参数
+            offset = (page - 1) * size
+            
+            # 查询总数
+            count_result = kb_db.get_dl_in_sql(find_id=find_id, return_first_item=False)
+            if count_result.code == status.HTTP_404_NOT_FOUND:
+                # 空数据是正常情况，返回空列表
+                return ResponseModel(
+                    code=status.HTTP_200_OK,
+                    message="Get knowledge base list success",
+                    data={"items": [], "total": 0}
+                )
+            elif count_result.code != status.HTTP_200_OK:
+                return ResponseModel(
+                    code=count_result.code,
+                    message=count_result.message,
+                    data={"items": [], "total": 0}
+                )
+            
+            total = len(count_result.data) if count_result.data else 0
+            
+            # 查询分页数据
+            query = db.query(kb_models.KnowledgeBaseDB).filter(
+                kb_models.KnowledgeBaseDB.space_id == space_id
+            ).order_by(
+                kb_models.KnowledgeBaseDB.create_time.desc()
+            ).offset(offset).limit(size)
+            
+            kb_list = query.all()
+            
+            # 转换为字典列表
+            items = []
+            for kb in kb_list:
+                items.append({
+                    "kb_id": kb.kb_id,
+                    "space_id": kb.space_id,
+                    "name": kb.name,
+                    "description": kb.description,
+                    "embedding_model_config_id": kb.embedding_model_config_id,
+                    "config": kb.config,
+                    "create_time": kb.create_time,
+                    "update_time": kb.update_time,
+                })
+            
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Get knowledge base list success",
+                data={
+                    "items": items,
+                    "total": total
+                }
+            )
+
+    '''
+    description: 获取知识库文档列表（支持分页）
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {int} page  页码，从1开始
+    param {int} size  每页大小
+    return {*}
+    '''
+    @with_exception_handling
+    def document_list(self, space_id: str, kb_id: str, page: int = 1, size: int = 10, db_session: Session | None = None) -> ResponseModel[dict]:
+        with get_db_jw(db_session) as db:
+            doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
+            
+            # 构建查询条件
+            find_id = {
+                "space_id": space_id,
+                "kb_id": kb_id,
+            }
+            
+            # 计算分页参数
+            offset = (page - 1) * size
+            
+            # 查询总数
+            count_result = doc_db.get_dl_in_sql(find_id=find_id, return_first_item=False)
+            if count_result.code == status.HTTP_404_NOT_FOUND:
+                # 空数据是正常情况，返回空列表
+                return ResponseModel(
+                    code=status.HTTP_200_OK,
+                    message="Get document list success",
+                    data={"items": [], "total": 0, "page": page, "size": size}
+                )
+            elif count_result.code != status.HTTP_200_OK:
+                return ResponseModel(
+                    code=count_result.code,
+                    message=count_result.message,
+                    data={"items": [], "total": 0, "page": page, "size": size}
+                )
+            
+            total = len(count_result.data) if count_result.data else 0
+            
+            # 查询分页数据
+            query = db.query(kb_doc_models.KnowledgeBaseDocumentDB).filter(
+                kb_doc_models.KnowledgeBaseDocumentDB.space_id == space_id,
+                kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kb_id
+            ).order_by(
+                kb_doc_models.KnowledgeBaseDocumentDB.create_time.desc()
+            ).offset(offset).limit(size)
+            
+            doc_list = query.all()
+            
+            # 转换为字典列表
+            items = []
+            for doc in doc_list:
+                items.append({
+                    "doc_id": doc.doc_id,
+                    "name": doc.name,
+                    "status": doc.status,
+                    "process_info": doc.process_info if doc.process_info else {},
+                    "create_time": doc.create_time,
+                    "update_time": doc.update_time,
+                })
+            
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Get document list success",
+                data={
+                    "items": items,
+                    "total": total,
+                    "page": page,
+                    "size": size
+                }
+            )
+
+
+# 创建全局实例
+knowledge_base_repository = KnowledgeBaseRepository()
+
