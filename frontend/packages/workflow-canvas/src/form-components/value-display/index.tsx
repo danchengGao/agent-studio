@@ -1,0 +1,21 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { ValueDisplayStyle } from './styles'
+
+export interface ValueDisplayProps {
+  value: string
+  placeholder?: string
+  hasError?: boolean
+}
+
+export function ValueDisplay(props: ValueDisplayProps) {
+  return (
+    <ValueDisplayStyle className={props.hasError ? 'has-error' : ''}>
+      {props.value}
+      {props.value === undefined || props.value === '' ? <span>{props.placeholder || '--'}</span> : null}
+    </ValueDisplayStyle>
+  )
+}

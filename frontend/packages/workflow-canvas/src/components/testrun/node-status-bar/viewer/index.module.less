@@ -1,0 +1,186 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.dataStructureViewer {
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #333;
+  background: #fafafa;
+  border-radius: 4px;
+  padding: 2px 2px 2px 0;
+  margin: 1px 0;
+  border: 1px solid #e1e4e8;
+  overflow: hidden;
+
+  &.dataStructureViewerLarge {
+    font-size: 14px;
+    padding: 8px 8px 8px 0;
+    margin: 6px 0;
+    border-radius: 6px;
+  }
+
+  .treeNode {
+    margin: 1px 0;
+
+    &.treeNodeLarge {
+      margin: 2px 0;
+    }
+
+    &Header {
+      display: flex;
+      align-items: flex-start;
+      gap: 2px;
+      min-height: 16px;
+      padding: 1px 0;
+      border-radius: 2px;
+      transition: background-color 0.15s ease;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+      }
+
+      &.treeNodeHeaderLarge {
+        gap: 4px;
+        min-height: 20px;
+        padding: 2px 0;
+      }
+    }
+
+    &Children {
+      margin-left: 6px;
+      padding-left: 6px;
+      position: relative;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: #e1e4e8;
+      }
+
+      &.treeNodeChildrenLarge {
+        margin-left: 8px;
+        padding-left: 8px;
+      }
+    }
+  }
+
+  .expandButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 8px;
+    color: #666;
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+    padding: 0;
+    margin: 0;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.1);
+      color: #333;
+    }
+
+    &.expandButtonLarge {
+      font-size: 10px;
+      width: 16px;
+      height: 16px;
+    }
+
+    &.expanded {
+      transform: rotate(90deg);
+    }
+
+    &.collapsed {
+      transform: rotate(0deg);
+    }
+  }
+
+  .expandPlaceholder {
+    width: 12px;
+    height: 12px;
+    display: inline-block;
+    flex-shrink: 0;
+
+    &.expandPlaceholderLarge {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .nodeLabel {
+    color: #0969da;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: auto;
+    margin-right: 2px;
+    font-size: 12px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &.nodeLabelLarge {
+      font-size: 14px;
+      margin-right: 4px;
+    }
+  }
+
+  .nodeValue {
+    margin-left: 2px;
+
+    &.nodeValueLarge {
+      margin-left: 4px;
+    }
+  }
+
+  .primitiveValue {
+    cursor: pointer;
+    user-select: all;
+    padding: 0px 2px;
+    border-radius: 2px;
+    transition: background-color 0.15s ease;
+    font-size: 12px;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    &Quote {
+      color: #8f8f8f;
+    }
+
+    &.string {
+      color: #032f62;
+      background-color: rgba(3, 47, 98, 0.05);
+    }
+
+    &.number {
+      color: #005cc5;
+      background-color: rgba(0, 92, 197, 0.05);
+    }
+
+    &.boolean {
+      color: #e36209;
+      background-color: rgba(227, 98, 9, 0.05);
+    }
+
+    &.null,
+    &.undefined {
+      color: #6a737d;
+      font-style: italic;
+      background-color: rgba(106, 115, 125, 0.05);
+    }
+  }
+}

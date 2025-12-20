@@ -1,0 +1,57 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { Field } from '@flowgram.ai/free-layout-editor'
+
+import { useIsSidebar } from '../../hooks'
+import { FormItem, FormDisplay } from '../../form-components'
+import { JsonSchemaEditor, DisplayOutputs, IJsonSchema } from '../../form-materials'
+
+export interface FormOutputProps {
+  name?: string
+  outputName?: string
+  showAddButton?: boolean
+  defaultFields?: string[]
+  minProperties?: number
+  expandable?: boolean
+  readonly?: boolean
+}
+
+export function FormOutput({
+  name = '输出',
+  outputName = 'outputs',
+  showAddButton,
+  defaultFields,
+  minProperties,
+  expandable = false,
+  readonly = false,
+}: FormOutputProps) {
+  const isSidebar = useIsSidebar()
+
+  if (!isSidebar) {
+    return <Field<IJsonSchema> name={outputName}>{({ field }) => <FormDisplay label={name} content={<DisplayOutputs value={field.value} />} />}</Field>
+  }
+
+  return (
+    <>
+      <FormItem name={name} vertical>
+        <Field<IJsonSchema> name={outputName}>
+          {({ field }) => (
+            <JsonSchemaEditor
+              value={field.value}
+              onChange={value => field.onChange(value)}
+              showAddButton={showAddButton}
+              defaultFields={defaultFields}
+              minProperties={minProperties}
+              config={{ addButtonText: '' }}
+              expandable={expandable}
+              readonly={readonly}
+            />
+          )}
+        </Field>
+      </FormItem>
+    </>
+  )
+}

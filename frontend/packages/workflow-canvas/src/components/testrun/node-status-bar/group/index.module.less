@@ -1,0 +1,41 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.node-status-group {
+  padding: 6px;
+  font-weight: 500;
+  color: #333;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+
+  &.node-status-group-large {
+    padding: 8px;
+    font-size: 14px;
+  }
+
+  &-icon {
+    transform: rotate(-90deg);
+    transition: transform 0.2s;
+    cursor: pointer;
+    margin-right: 4px;
+    width: 14px;
+    height: 14px;
+
+    &.node-status-group-icon-large {
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+    }
+
+    &-expanded {
+      transform: rotate(0deg);
+    }
+  }
+
+  &-tag {
+    margin-left: 4px;
+  }
+}
