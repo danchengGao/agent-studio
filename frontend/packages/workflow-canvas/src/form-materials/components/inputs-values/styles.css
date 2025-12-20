@@ -1,0 +1,33 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.gedit-m-inputs-values-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.gedit-m-inputs-values-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.gedit-m-inputs-values-ellipsis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background-color: #f8f9fa;
+  color: #6c757d;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: default;
+  user-select: none;
+  border: 1px dashed #dee2e6;
+  font-style: italic;
+  margin: 4px 0;
+}
