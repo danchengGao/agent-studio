@@ -1,0 +1,367 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.testrun-panel-form {
+
+  .testrun-panel-input {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 12px 8px 0;
+
+    .title {
+      font-size: 15px;
+      font-weight: 500;
+      color: #333;
+      flex: 1;
+    }
+  }
+
+
+  .error {
+    color: red;
+    font-size: 14px;
+  }
+
+  // 校验失败提示样式
+  .validation-errors {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+
+    .validation-errors-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      color: #dc2626;
+      font-weight: 500;
+      font-size: 14px;
+
+      .validation-errors-icon {
+        flex-shrink: 0;
+      }
+    }
+
+    .validation-errors-content {
+      color: #7f1d1d;
+      font-size: 14px;
+      line-height: 1.4;
+
+      .validation-errors-list {
+        margin: 4px 0 0 16px;
+        padding: 0;
+
+        li {
+          margin-bottom: 2px;
+        }
+      }
+    }
+  }
+
+  .code-editor-container {
+    min-height: 200px;
+    max-height: 400px;
+    background: #fff;
+    padding: 8px 8px 8px 4px;
+    border-radius: 4px;
+    border: 1px solid #52649a0f;
+
+    :global(.cm-editor) {
+      height: 100% !important;
+      overflow: auto !important;
+    }
+
+    :global(.cm-scroller) {
+      min-height: 200px !important;
+      max-height: 400px !important;
+    }
+
+    :global(.cm-content) {
+      min-height: 200px !important;
+      max-height: 400px !important;
+    }
+  }
+}
+
+.testrun-panel-running {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 12px;
+
+  .running-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+
+    .text {
+      font-size: 14px;
+      font-weight: 500;
+      color: #333;
+    }
+  }
+
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+
+  .stream-messages-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 4px;
+
+    .node-message-container {
+      border: 1px solid rgba(82, 100, 154, 0.13);
+      border-radius: 4px;
+      background: #fff;
+      overflow: hidden;
+      min-height: 120px;
+      max-height: 200px;
+
+      .node-message-header {
+        background: rgba(82, 100, 154, 0.05);
+        padding: 8px 12px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #5766a0;
+        border-bottom: 1px solid rgba(82, 100, 154, 0.13);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .node-message-textarea {
+        width: 100%;
+        height: calc(100% - 32px);
+        min-height: 88px;
+        padding: 8px 12px;
+        font-size: 14px;
+        line-height: 1.5;
+        color: #333;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-y: auto;
+        background: #fff;
+        border: none;
+        outline: none;
+        resize: none;
+        font-family: inherit;
+        scroll-behavior: smooth;
+      }
+    }
+  }
+
+  // 兼容旧的单个消息容器样式
+  .stream-message-container {
+    flex: 1;
+    min-height: 150px;
+    max-height: 300px;
+    border: 1px solid rgba(82, 100, 154, 0.13);
+    border-radius: 4px;
+    background: #fff;
+    overflow: hidden;
+
+    .stream-message-textarea {
+      width: 100%;
+      height: 100%;
+      min-height: 150px;
+      padding: 8px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-y: auto;
+      background: #fff;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: inherit;
+      scroll-behavior: smooth;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button {
+  border-radius: 8px;
+  width: 358px;
+  height: 40px;
+
+  &.running {
+    background-color: rgba(87, 104, 161, 0.08) !important; // override semi style
+    color: rgba(15, 21, 40, 0.82);
+  }
+
+  &.default {
+    background-color: rgba(0, 178, 60, 1) !important; // override semi style
+    color: #fff;
+  }
+
+  &.resume {
+    background-color: rgba(0, 122, 255, 1) !important; // override semi style
+    color: #fff;
+  }
+
+  &.save {
+    background-color: rgba(0, 122, 255, 1) !important; // override semi style
+    color: #fff;
+  }
+
+  &.disabled {
+    background-color: rgba(229, 231, 235, 1) !important; // override semi style
+    color: #9ca3af;
+    cursor: not-allowed;
+  }
+}
+
+// 输入中断相关样式
+// 中断恢复表单样式
+.input-interruption-form {
+  margin: 12px 0;
+}
+
+// 中断恢复头部样式
+.interruption-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+
+  .interruption-icon {
+    color: #007bff;
+    margin-right: 8px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  span {
+    text-align: center;
+  }
+}
+
+
+// 通用样式类
+.mr-2 {
+  margin-right: 8px;
+}
+
+.text-gray-600 {
+  color: #666;
+}
+
+.hover\:text-red-6:hover {
+  color: #dc2626;
+}
+
+.text-red-600 {
+  color: #dc2626;
+}
+
+.text-blue-600 {
+  color: #007bff;
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+.testrun-panel-container {
+  background: rgb(255, 255, 255);
+  border-radius: 8px;
+  height: 100%;
+  width: 100%;
+  border: 1px solid rgba(82, 100, 154, 0.13);
+  padding: 8px 0 8px 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+
+  .testrun-panel-header {
+    background: var(#fcfcff);
+    border-bottom: 1px solid rgba(82, 100, 154, 0.13);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    display: flex;
+    height: 40px;
+    justify-content: space-between;
+    min-height: 40px;
+    width: 100%;
+    align-items: center;
+
+    .testrun-panel-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin: 8px 8px 8px 16px;
+    }
+
+    .testrun-panel-close {
+      margin: 8px 16px 8px 8px;
+    }
+  }
+
+  .testrun-panel-content {
+    height: calc(100% - 40px);
+    margin: 8px 8px 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: auto;
+    margin-bottom: 72px;
+  }
+
+  .testrun-panel-footer {
+    border-top: 1px solid rgba(82, 100, 154, 0.13);
+    height: 40px;
+    position: absolute;
+    background: #fbfbfb;
+    height: 62px;
+    bottom: 0;
+    border-radius: 0 0 8px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+}

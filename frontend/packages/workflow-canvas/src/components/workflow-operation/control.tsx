@@ -1,0 +1,161 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Save, Upload, Download, ArrowLeft, Tag, History } from 'lucide-react'
+import { Tooltip, Divider, IconButton, Toast, Typography } from '@douyinfe/semi-ui'
+import { WorkflowOperationContainer, WorkflowControlSection } from './styles'
+import { HistoryVersionTag } from '../../styles/styles'
+import PublishDialog from '../history-panel/publish-dialog'
+import { useWorkflowStore } from '../../stores/useWorkflowStore'
+
+interface WorkflowControlProps {
+  onSave: () => void
+  onImport: () => void
+  onExport: () => void
+  workflowId?: string
+  spaceId?: string
+  asyncSaveRef?: React.RefObject<(() => Promise<void>) | null>
+  canvasData?: any
+}
+
+export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceId, asyncSaveRef, canvasData }: WorkflowControlProps) => {
+  const navigate = useNavigate()
+  const [showPublishDialog, setShowPublishDialog] = useState(false)
+  const selectedVersion = useWorkflowStore(s => s.selectedVersion)
+
+  // 获取工作流名称 - 改进逻辑，支持多种数据结构
+  const workflowName = canvasData?.name ||
+                       canvasData?.workflow?.name ||
+                       canvasData?.data?.workflow?.name ||
+                       (workflowId ? `工作流-${workflowId}` : '未命名工作流')
+
+  // 调试日志 - 临时注释，需要时可以启用
+  // React.useEffect(() => {
+  //   console.log('WorkflowControl debug:')
+  //   console.log('- canvasData:', canvasData)
+  //   console.log('- workflowName:', workflowName)
+  //   console.log('- workflowId:', workflowId)
+  //   console.log('- spaceId:', spaceId)
+  // }, [canvasData, workflowName, workflowId, spaceId])
+
+  // 调试日志 - 临时禁用以避免过多日志
+  // React.useEffect(() => {
+  //   console.log('WorkflowControl canvasData:', canvasData)
+  //   console.log('WorkflowControl workflow name:', canvasData?.name)
+  //   console.log('WorkflowControl final workflowName:', workflowName)
+  // }, [canvasData, workflowName])
+
+  const handleBack = () => {
+    try {
+      const reset = useWorkflowStore.getState().resetStore
+      reset()
+    } catch {}
+    navigate('/dashboard/workflows')
+  }
+
+  const handlePublishClick = () => {
+    setShowPublishDialog(true)
+  }
+
+  const handleVersionHistoryClick = async () => {
+    if (!workflowId || !spaceId) {
+      Toast.error('工作流信息不存在')
+      return
+    }
+    // 使用 store 打开右侧版本历史面板，并传递上下文
+    const openHistoryPanel = useWorkflowStore.getState().openHistoryPanel
+    openHistoryPanel({ workflowId, spaceId })
+  }
+
+  return (
+    <>
+      <WorkflowOperationContainer>
+        <WorkflowControlSection>
+          {/* 工作流名称显示 */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginRight: '12px',
+            padding: '4px 12px',
+            backgroundColor: 'var(--semi-color-bg-2)',
+            borderRadius: '6px',
+            border: '1px solid var(--semi-color-border)',
+            height: '32px'
+          }}>
+            <Typography.Text
+              type="secondary"
+              style={{
+                fontWeight: 'bold',
+                fontSize: '13px',
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                lineHeight: '24px'
+              }}
+              title={workflowName || '工作流名称'}
+            >
+              {workflowName || '未命名工作流'}
+            </Typography.Text>
+          </div>
+
+          {/* 新增的发布和版本历史按钮 */}
+          <Tooltip content="提交新版本">
+            <IconButton type="tertiary" theme="borderless" icon={<Tag size="small" />} onClick={handlePublishClick} disabled={!workflowId || !spaceId} />
+          </Tooltip>
+
+          <Tooltip content="版本历史">
+            <IconButton
+              type="tertiary"
+              theme="borderless"
+              icon={<History size="small" />}
+              onClick={handleVersionHistoryClick}
+              disabled={!workflowId || !spaceId}
+            />
+          </Tooltip>
+
+          {/* 当前展示版本：仅当为历史版本时显示 */}
+          {selectedVersion && selectedVersion !== 'draft' && <HistoryVersionTag>历史版本 {selectedVersion}</HistoryVersionTag>}
+
+          <Divider layout="vertical" style={{ height: '20px' }} margin={3} />
+
+          {/* 原有的保存、导入、导出按钮 */}
+          <Tooltip content="保存工作流">
+            <IconButton type="tertiary" theme="borderless" icon={<Save size="small" />} onClick={onSave} />
+          </Tooltip>
+
+          <Tooltip content="导入工作流">
+            <IconButton type="tertiary" theme="borderless" icon={<Upload size="small" />} onClick={onImport} />
+          </Tooltip>
+
+          <Tooltip content="导出工作流">
+            <IconButton type="tertiary" theme="borderless" icon={<Download size="small" />} onClick={onExport} />
+          </Tooltip>
+
+          <Divider layout="vertical" style={{ height: '16px' }} margin={3} />
+
+          <Tooltip content="返回工作流列表">
+            <IconButton type="danger" theme="borderless" icon={<ArrowLeft size="small" />} onClick={handleBack} />
+          </Tooltip>
+        </WorkflowControlSection>
+      </WorkflowOperationContainer>
+
+      {/* 发布对话框 */}
+      {showPublishDialog && (
+        <PublishDialog
+          open={showPublishDialog}
+          workflowId={workflowId}
+          spaceId={spaceId}
+          onSave={onSave}
+          asyncSaveRef={asyncSaveRef}
+          onClose={() => setShowPublishDialog(false)}
+          defaultVersion="v0.0.1"
+        />
+      )}
+    </>
+  )
+}
