@@ -1,0 +1,26 @@
+{
+  "plugins": {
+    "weather_plugin": {
+      "name": "demo plugin",
+      "description": "plugin description",
+      "api_prefix": "/demo",
+      "icon_uri": "🌤️",
+      "plugin_type": 1,
+      "tools": [
+        {
+          "name": "run demo",
+          "path": "/demo/run",
+          "method": "GET",
+          "description": "tool description",
+          "request_params": {
+            "query": {
+              "type": "string",
+              "description": "param description",
+              "required": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}
