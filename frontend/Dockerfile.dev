@@ -1,0 +1,37 @@
+# Development Dockerfile for frontend
+FROM node:18-alpine
+
+# Add necessary tools
+RUN apk add --no-cache curl
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files first
+COPY package*.json ./
+COPY packages/ ./packages/
+
+# Copy scripts directory first (needed for postinstall scripts)
+COPY scripts/ ./scripts/
+
+# Install dependencies
+RUN npm install --legacy-peer-deps --no-scripts --verbose && \
+    npm cache clean --force && \
+    rm -rf /tmp/* /var/tmp/* /root/.npm /root/.cache
+
+# Build packages to ensure they are properly compiled
+# Only build api-client package since workflow-canvas doesn't have a build script
+# RUN cd packages/api-client && npm run build
+
+# Copy source code
+COPY . .
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Expose port
+EXPOSE 3000
+
+# Start development server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
