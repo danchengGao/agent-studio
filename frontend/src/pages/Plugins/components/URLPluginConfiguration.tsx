@@ -1,0 +1,713 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '../../../stores/useAuthStore'
+import { ENV_CONFIG } from '../../../config/environment'
+import { usePluginListApi, usePluginCreateApi, usePluginDeleteApi, useUpdatePlugin, type PluginApiInfo } from '@test-agentstudio/api-client'
+import CloudPluginFormDialog from '../../../components/Plugins/CloudPluginFormDialog'
+import ToolFormDialog from '../../../components/Plugins/ToolFormDialog'
+import PluginVersionHistory from '../../../components/Plugins/PluginVersionHistory'
+import UnifiedSnackbar, { useUnifiedSnackbar } from '../../../Common/UnifiedSnackbar'
+import { Settings, ArrowLeft, Info, Code, Edit, Plus, Trash2, Rocket, History } from 'lucide-react'
+import { Card, Typography, Button, TextField, Select, MenuItem, FormControl, Chip, IconButton, Tabs, Tab, CircularProgress } from '@mui/material'
+import { validateToolPath, validateHttpUrlRealtime, getHttpUrlHelpText } from '../../../utils/validationUtils'
+
+interface Plugin {
+  id: string
+  plugin_id?: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  status: 'active' | 'inactive' | 'error' | 'updating'
+  version: string
+  author: string
+  installDate: string
+  lastUpdate: string
+  usageCount: number
+  rating: number
+  downloadCount: number
+  tags: string[]
+  dependencies: string[]
+  config: {
+    apiKey?: string
+    baseUrl?: string
+    timeout?: number
+    retryCount?: number
+    url?: string
+    authMethod?: string
+  }
+  permissions: string[]
+  size: string
+}
+
+interface URLPluginConfigurationProps {
+  plugin: Plugin
+  pluginConfigData: Record<string, unknown> | null
+  loading: boolean
+  plugin_id: string
+  configForm: {
+    name: string
+    desc: string
+    icon_uri: string
+    url: string
+    authMethod: string
+  }
+  toolsLoading: boolean
+  iconOptions: string[]
+  toolsQuery: any
+  setConfigForm: (config: any) => void
+  handleSaveConfig: () => void
+  handleIconSelect: (icon: string) => void
+  handleNameChange: (name: string) => void
+  editingPlugin: Plugin | null
+  setEditingPlugin: (plugin: Plugin | null) => void
+  resetForm: () => void
+  cloudPluginForm: any
+  handleCloudPluginFormChange: (field: string, value: string | number) => void
+  handleHeaderChange: (index: number, field: string, value: string) => void
+  addHeaderRow: () => void
+  removeHeaderRow: (index: number) => void
+  isEditDialogOpen: boolean
+  setIsEditDialogOpen: (open: boolean) => void
+  handlePluginSubmit: (isEditing: boolean) => void
+  isPublishDialogOpen: boolean
+  setIsPublishDialogOpen: (open: boolean) => void
+  isReadOnly?: boolean
+}
+
+const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
+  plugin,
+  pluginConfigData,
+  loading,
+  plugin_id,
+  configForm,
+  toolsLoading,
+  iconOptions,
+  toolsQuery,
+  setConfigForm,
+  handleSaveConfig,
+  handleIconSelect,
+  handleNameChange,
+  editingPlugin,
+  setEditingPlugin,
+  resetForm,
+  cloudPluginForm,
+  handleCloudPluginFormChange,
+  handleHeaderChange,
+  addHeaderRow,
+  removeHeaderRow,
+  isEditDialogOpen,
+  setIsEditDialogOpen,
+  handlePluginSubmit,
+  isPublishDialogOpen,
+  setIsPublishDialogOpen,
+  isReadOnly = false,
+}) => {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
+  const { user } = useAuthStore()
+
+  const getDefaultSpaceId = () => {
+    return user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
+  }
+
+  const [configTabValue, setConfigTabValue] = useState('basic')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [tempName, setTempName] = useState('')
+
+  // URL validation state
+  const [urlError, setUrlError] = useState('')
+
+  // API工具列表查询 - only for URL plugins and not in read-only mode
+  const urlToolsQuery = usePluginListApi(
+    {
+      space_id: getDefaultSpaceId(),
+      plugin_id: plugin_id || '',
+      page: 1,
+      size: 20,
+    },
+    { enabled: configTabValue === 'advanced' && !isReadOnly },
+  )
+
+  // Use the provided toolsQuery in read-only mode, otherwise use the API query
+  const currentToolsQuery = isReadOnly && toolsQuery ? toolsQuery : urlToolsQuery
+
+  // Tool creation state for URL plugins
+  const [isToolDialogOpen, setIsToolDialogOpen] = useState(false)
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false)
+  const [toolForm, setToolForm] = useState({
+    name: '',
+    description: '',
+    path: '',
+    method: '',
+  })
+
+  // Tool creation API
+  const createToolApi = usePluginCreateApi()
+
+  // Tool deletion API
+  const deleteToolApi = usePluginDeleteApi()
+
+  // Plugin update API
+  const updatePluginApi = useUpdatePlugin()
+
+  const handleToolFormChange = (field: keyof typeof toolForm, value: string) => {
+    setToolForm(prev => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  // Handle URL input change with validation
+  const handleUrlChange = (url: string) => {
+    setConfigForm(prev => ({ ...prev, url }))
+
+    // Real-time validation
+    const error = validateHttpUrlRealtime(url)
+    setUrlError(error)
+  }
+
+  // Handle name editing
+  const handleEditName = () => {
+    if (isReadOnly) return
+    setTempName(configForm.name || plugin.name)
+    setIsEditingName(true)
+  }
+
+  const handleNameSubmit = () => {
+    if (tempName.trim() && tempName.length <= 20) {
+      handleNameChange(tempName.trim())
+    }
+    setIsEditingName(false)
+  }
+
+  const handleNameCancel = () => {
+    setTempName(configForm.name || plugin.name)
+    setIsEditingName(false)
+  }
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleNameSubmit()
+    } else if (e.key === 'Escape') {
+      handleNameCancel()
+    }
+  }
+
+  const handleToolDialogCancel = () => {
+    setIsToolDialogOpen(false)
+    setToolForm({
+      name: '',
+      description: '',
+      path: '',
+      method: '',
+    })
+  }
+
+  const handleToolSubmit = async () => {
+    // Validate form
+    if (!toolForm.name.trim() || !toolForm.description.trim() || !toolForm.path.trim() || !toolForm.method) {
+      showError('请填写所有必填字段')
+      return
+    }
+
+    // Validate path
+    const pathValidation = validateToolPath(toolForm.path.trim())
+    if (!pathValidation.isValid) {
+      showError(pathValidation.error)
+      return
+    }
+
+    // Method mapping: 1=GET, 2=POST, 3=PUT, 4=DELETE, 5=PATCH
+    const methodMap: Record<string, number> = {
+      GET: 1,
+      POST: 2,
+      PUT: 3,
+      DELETE: 4,
+      PATCH: 5,
+    }
+
+    const methodNumber = methodMap[toolForm.method.toUpperCase()]
+    if (!methodNumber) {
+      showError('不支持的请求方法，仅支持 GET、POST')
+      return
+    }
+
+    try {
+      const createRequest = {
+        space_id: getDefaultSpaceId(),
+        plugin_id: plugin_id || '',
+        name: toolForm.name.trim(),
+        desc: toolForm.description.trim(),
+        path: toolForm.path.trim(),
+        method: methodNumber,
+      }
+
+      console.log('Creating tool with API:', createRequest)
+
+      // Call the API
+      const response = await createToolApi.mutateAsync(createRequest)
+
+      if (response.code === 200) {
+        showSuccess(`工具"${toolForm.name.trim()}"创建成功`)
+        setIsToolDialogOpen(false)
+
+        // Reset form
+        setToolForm({
+          name: '',
+          description: '',
+          path: '',
+          method: '',
+        })
+
+        // Refresh tool list
+        urlToolsQuery.refetch()
+
+        // Navigate to tool configuration page
+        if (response.data?.tool_id) {
+          navigate(`/dashboard/plugins/${plugin_id}/tools/${response.data.tool_id}`, {
+            state: {
+              source: 'plugin',
+              pluginType: 'api',
+            },
+          })
+        }
+      } else {
+        showError(`创建失败: ${response.message || '未知错误'}`)
+      }
+    } catch (error: unknown) {
+      console.error('创建工具失败:', error)
+      const errorMessage = error.response?.data?.message || error.message || '创建工具失败，请稍后重试'
+      showError(errorMessage)
+    }
+  }
+
+  const handleDeleteTool = async (tool: PluginApiInfo) => {
+    if (!plugin_id || !tool?.tool_id) return
+
+    try {
+      const deleteRequest = {
+        space_id: getDefaultSpaceId(),
+        plugin_id,
+        tool_id: tool.tool_id,
+      }
+
+      const response = await deleteToolApi.mutateAsync(deleteRequest)
+
+      if (response.code === 200) {
+        showSuccess(`工具"${tool.name || '未命名工具'}"删除成功`)
+        // Refresh the tool list after successful deletion
+        setTimeout(() => {
+          urlToolsQuery.refetch()
+        }, 500) // Small delay to ensure backend processes deletion
+      } else {
+        showError(`删除失败: ${response.message || '未知错误'}`)
+      }
+    } catch (error: unknown) {
+      console.error('删除工具失败:', error)
+      const errorMessage = error?.response?.data?.message || error?.message || '删除工具失败，请稍后重试'
+      showError(errorMessage)
+    }
+  }
+
+  const getMethodString = (methodNumber: number): string => {
+    const methodMap: Record<number, string> = {
+      1: 'GET',
+      2: 'POST',
+      3: 'PUT',
+      4: 'DELETE',
+      5: 'PATCH',
+    }
+    return methodMap[methodNumber] || 'UNKNOWN'
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <CircularProgress size={48} className="mb-4" />
+          <Typography variant="body1" color="text.secondary">
+            {t('plugins.config.loading')}
+          </Typography>
+        </div>
+      </div>
+    )
+  }
+
+  if (!plugin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Code className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
+          <Typography variant="h6" className="mb-2">
+            插件未找到
+          </Typography>
+          <Typography variant="body2" color="text.secondary" className="mb-4">
+            请检查插件ID是否正确
+          </Typography>
+          <Button variant="contained" onClick={() => navigate('/dashboard/plugins')}>
+            返回插件管理
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="mb-6 flex items-center justify-between">
+            <Button variant="outlined" startIcon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/dashboard/plugins')}>
+              返回插件管理
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<History className="w-4 h-4" />}
+              onClick={() => setIsHistoryDialogOpen(true)}
+              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+            >
+              版本历史
+            </Button>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl bg-gray-100">{plugin.icon}</div>
+            <div>
+              {isEditingName ? (
+                <div className="flex items-center space-x-2">
+                  <TextField
+                    value={tempName}
+                    onChange={e => setTempName(e.target.value)}
+                    onKeyDown={handleNameKeyDown}
+                    onBlur={handleNameSubmit}
+                    size="small"
+                    variant="outlined"
+                    placeholder="插件名称"
+                    inputProps={{ maxLength: 20, style: { fontSize: '2rem', fontWeight: 'bold' } }}
+                    className="font-bold text-gray-900"
+                    autoFocus
+                  />
+                  <Typography variant="body2" color="text.secondary">
+                    ({tempName.length}/20)
+                  </Typography>
+                </div>
+              ) : (
+                <div className="cursor-pointer hover:text-blue-600 transition-colors" onClick={handleEditName} title="点击编辑插件名称">
+                  <Typography variant="h4" className="font-bold text-gray-900 hover:text-blue-600">
+                    {configForm.name || plugin.name}
+                  </Typography>
+                </div>
+              )}
+              <Typography variant="body1" color="text.secondary">
+                {plugin.description}
+              </Typography>
+            </div>
+          </div>
+        </div>
+
+        {/* Configuration Content */}
+        <div className="space-y-6">
+          {/* Plugin Basic Information */}
+          <Card className="p-6">
+            <Typography variant="h6" className="mb-4 flex items-center">
+              <Info className="w-5 h-5 mr-2 text-blue-600" />
+              基本信息
+            </Typography>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <Typography variant="subtitle2" color="text.secondary">
+                  插件名称
+                </Typography>
+                <Typography variant="body1">{plugin.name}</Typography>
+              </div>
+              <div>
+                <Typography variant="subtitle2" color="text.secondary">
+                  插件类型
+                </Typography>
+                <Typography variant="div" component="div">
+                  <Chip label={plugin.category} size="small" />
+                </Typography>
+              </div>
+
+              <div>
+                <Typography variant="subtitle2" color="text.secondary">
+                  插件图标
+                </Typography>
+                <Typography variant="body1">{pluginConfigData?.icon_uri || '☁️'}</Typography>
+              </div>
+            </div>
+          </Card>
+
+          {/* Plugin Configuration Tabs */}
+          <Card className="p-6">
+            <Typography variant="h6" className="mb-4 flex items-center">
+              <Settings className="w-5 h-5 mr-2 text-purple-600" />
+              配置选项
+            </Typography>
+
+            <Tabs value={configTabValue} onChange={(e, newValue) => setConfigTabValue(newValue)} className="mb-6">
+              <Tab label="基本配置" value="basic" />
+              <Tab label="工具设置" value="advanced" />
+            </Tabs>
+
+            {/* Tab Content */}
+            {configTabValue === 'basic' && (
+              <div className="space-y-6">
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-3">插件描述</label>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={4}
+                      value={configForm.desc}
+                      onChange={e => setConfigForm(prev => ({ ...prev, desc: e.target.value }))}
+                      placeholder="详细描述插件的功能、用途和特性..."
+                      helperText={`详细描述插件的功能和行为，帮助用户了解插件的作用 (${configForm.desc.length}/40)`}
+                      inputProps={{ maxLength: 40 }}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-800 mb-3">插件图标</label>
+
+                    {/* Icon selection grid - Hidden in read-only mode */}
+                    {!isReadOnly && (
+                      <>
+                        <div className="grid grid-cols-10 gap-3 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                          {iconOptions.map((icon, index) => (
+                            <IconButton
+                              key={index}
+                              onClick={() => handleIconSelect(icon)}
+                              className={`w-14 h-14 text-2xl hover:bg-white hover:shadow-sm transition-all duration-200 ${
+                                configForm.icon_uri === icon ? 'bg-blue-100 border-2 border-blue-500 shadow-sm scale-110' : 'hover:scale-105'
+                              }`}
+                            >
+                              {icon}
+                            </IconButton>
+                          ))}
+                        </div>
+
+                        {/* Current selection display */}
+                        <div className="mt-4 text-center">
+                          <Typography variant="body2" className="text-gray-500">
+                            当前选择: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
+                          </Typography>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* API Configuration */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <Typography variant="h6" className="mb-4 flex items-center">
+                    <Code className="w-5 h-5 mr-2 text-green-600" />
+                    API 配置
+                  </Typography>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Typography variant="subtitle2" className="mb-2">
+                        服务地址
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        value={configForm.url}
+                        onChange={e => handleUrlChange(e.target.value)}
+                        placeholder="https://api.example.com"
+                        helperText={urlError || getHttpUrlHelpText()}
+                        error={!!urlError}
+                        disabled={isReadOnly}
+                        InputProps={{
+                          sx: {
+                            '&.Mui-error': {
+                              borderColor: 'error.main',
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {configTabValue === 'advanced' && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-4">
+                  <Typography variant="subtitle2" className="font-medium">
+                    API工具列表
+                  </Typography>
+                  {toolsLoading && <CircularProgress size={20} />}
+                </div>
+
+                {currentToolsQuery?.isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <CircularProgress size={24} className="mr-2" />
+                    <Typography variant="body2" color="text.secondary">
+                      加载工具列表...
+                    </Typography>
+                  </div>
+                ) : currentToolsQuery?.isError ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                    <Typography variant="body2" color="error">
+                      加载工具列表失败
+                    </Typography>
+                    {!isReadOnly && (
+                      <Button size="small" variant="outlined" onClick={() => urlToolsQuery.refetch()} className="mt-2">
+                        重试
+                      </Button>
+                    )}
+                  </div>
+                ) : !currentToolsQuery?.data?.data?.api_info || currentToolsQuery.data?.data?.api_info.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-8 text-center">
+                    <Typography variant="body1" color="text.secondary" className="mb-4">
+                      暂无工具配置
+                    </Typography>
+                    {!isReadOnly && (
+                      <Button variant="contained" startIcon={<Plus className="w-4 h-4" />} onClick={() => setIsToolDialogOpen(true)}>
+                        添加工具
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {currentToolsQuery.data.data.api_info.map((tool: PluginApiInfo) => (
+                      <Card key={tool.tool_id} className="p-4 border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <Typography variant="subtitle1" className="font-medium mb-1">
+                              {tool.name || '未命名工具'}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" className="mb-2">
+                              {tool.desc || '暂无描述'}
+                            </Typography>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                              <span>方法: {getMethodString(tool.method)}</span>
+                              <span>路径: {tool.path || '/'}</span>
+                              <Chip label="启用" size="small" color="success" />
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {!isReadOnly && (
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  navigate(`/dashboard/plugins/${plugin_id}/tools/${tool.tool_id}`, {
+                                    state: {
+                                      source: 'plugin',
+                                      pluginType: 'api',
+                                    },
+                                  })
+                                }}
+                                title="编辑工具"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </IconButton>
+                            )}
+                            {!isReadOnly && (
+                              <IconButton size="small" onClick={() => handleDeleteTool(tool)} title="删除工具" disabled={deleteToolApi.isLoading}>
+                                {deleteToolApi.isLoading ? <CircularProgress size={16} /> : <Trash2 className="w-4 h-4 text-red-500 hover:text-red-700" />}
+                              </IconButton>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {!isReadOnly && (
+                      <div className="flex justify-center mt-4">
+                        <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => setIsToolDialogOpen(true)}>
+                          添加新工具
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Action Buttons - Disabled for read-only mode */}
+        {!isReadOnly && (
+          <div className="mt-8 flex justify-end space-x-3">
+            <Button variant="outlined" onClick={() => navigate('/dashboard/plugins')}>
+              取消
+            </Button>
+            <Button
+              variant="contained"
+              color="success"
+              onClick={() => setIsPublishDialogOpen(true)}
+              startIcon={<Rocket className="w-4 h-4" />}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 mr-3"
+            >
+              发布插件
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleSaveConfig}
+              disabled={updatePluginApi.isLoading}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              {updatePluginApi.isLoading ? (
+                <div className="flex items-center">
+                  <CircularProgress size={16} className="mr-2" />
+                  保存中...
+                </div>
+              ) : (
+                '保存配置'
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Unified Snackbar */}
+      <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />
+
+      {/* Shared Cloud Plugin Form Dialog */}
+      <CloudPluginFormDialog
+        open={isEditDialogOpen}
+        isEditing={true}
+        form={cloudPluginForm}
+        editingPlugin={editingPlugin}
+        onFormChange={handleCloudPluginFormChange}
+        onHeaderChange={handleHeaderChange}
+        onAddHeader={addHeaderRow}
+        onRemoveHeader={removeHeaderRow}
+        onSubmit={handlePluginSubmit}
+        onCancel={() => {
+          setIsEditDialogOpen(false)
+          setEditingPlugin(null)
+          resetForm()
+        }}
+      />
+
+      {/* Tool Form Dialog */}
+      <ToolFormDialog
+        open={isToolDialogOpen}
+        loading={createToolApi.isLoading}
+        form={toolForm}
+        onFormChange={handleToolFormChange}
+        onSubmit={handleToolSubmit}
+        onCancel={handleToolDialogCancel}
+      />
+
+      {/* Plugin Version History Dialog */}
+      <PluginVersionHistory
+        open={isHistoryDialogOpen}
+        onClose={() => setIsHistoryDialogOpen(false)}
+        pluginId={plugin_id}
+        spaceId={getDefaultSpaceId()}
+        pluginName={plugin.name}
+      />
+    </div>
+  )
+}
+
+export default URLPluginConfiguration
