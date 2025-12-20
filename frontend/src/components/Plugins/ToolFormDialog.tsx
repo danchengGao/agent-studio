@@ -1,0 +1,166 @@
+import React, { useState } from 'react'
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  Button,
+  IconButton,
+  Tooltip,
+  CircularProgress,
+} from '@mui/material'
+import { Info, Plus, Trash } from 'lucide-react'
+import { validateToolPath, getPathHelpText } from '../../utils/validationUtils'
+
+interface ToolForm {
+  name: string
+  description: string
+  path: string
+  method: string
+}
+
+interface ToolFormDialogProps {
+  open: boolean
+  loading?: boolean
+  form: ToolForm
+  onFormChange: (_field: keyof ToolForm, _value: string) => void
+  onSubmit: () => void
+  onCancel: () => void
+}
+
+const ToolFormDialog: React.FC<ToolFormDialogProps> = ({ open, loading = false, form, onFormChange, onSubmit, onCancel }) => {
+  const [pathError, setPathError] = useState<string>('')
+
+  // 校验路径
+  const validatePath = (path: string) => {
+    const validation = validateToolPath(path)
+    setPathError(validation.error)
+    return validation.isValid
+  }
+
+  // 处理路径变化
+  const handlePathChange = (value: string) => {
+    onFormChange('path', value)
+    if (value.trim()) {
+      validatePath(value)
+    } else {
+      setPathError('')
+    }
+  }
+
+  // 表单是否有效
+  const isFormValid = form.name.trim() && form.description.trim() && form.path.trim() && form.method && !pathError
+
+  return (
+    <Dialog open={open} onClose={onCancel} maxWidth="md" fullWidth>
+      <DialogTitle>创建工具</DialogTitle>
+      <DialogContent>
+        <div className="space-y-6">
+          {/* Basic Info Section */}
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <h3 className="text-lg font-medium text-gray-900">基本信息</h3>
+              <div className="ml-2 h-px bg-gray-300 flex-1"></div>
+            </div>
+
+            {/* Tool Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                工具名称 <span className="text-red-500 ml-1">*</span>
+              </label>
+              <TextField
+                value={form.name}
+                onChange={e => onFormChange('name', e.target.value)}
+                fullWidth
+                required
+                placeholder="例如：获取用户信息、查询天气数据"
+                helperText={`建议使用简洁明了的名称，便于识别和使用 (${form.name.length}/20)`}
+                inputProps={{ maxLength: 20 }}
+              />
+            </div>
+
+            {/* Tool Description */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                工具描述 <span className="text-red-500 ml-1">*</span>
+              </label>
+              <TextField
+                value={form.description}
+                onChange={e => onFormChange('description', e.target.value)}
+                fullWidth
+                required
+                multiline
+                rows={3}
+                placeholder="详细描述工具的功能、用途、参数说明等..."
+                helperText={`建议包含：主要功能、输入参数、输出结果、使用示例等信息 (${form.description.length}/40)`}
+                inputProps={{ maxLength: 40 }}
+              />
+            </div>
+          </div>
+
+          {/* More Info Section */}
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <h3 className="text-lg font-medium text-gray-900">更多信息</h3>
+              <div className="ml-2 h-px bg-gray-300 flex-1"></div>
+            </div>
+
+            {/* Tool Path */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                工具路径 <span className="text-red-500 ml-1">*</span>
+                <Tooltip title={getPathHelpText()} placement="top" arrow>
+                  <Info className="w-4 h-4 ml-2 text-gray-400 hover:text-gray-600 cursor-help" />
+                </Tooltip>
+              </label>
+              <TextField
+                value={form.path}
+                onChange={e => handlePathChange(e.target.value)}
+                fullWidth
+                required
+                placeholder="例如：/api/users/get"
+                helperText={pathError || '请提供完整的API接口路径，以/开头，只能包含英文、数字、下划线、连字符和斜杠'}
+                error={!!pathError}
+              />
+            </div>
+
+            {/* Request Method */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                请求方法 <span className="text-red-500 ml-1">*</span>
+              </label>
+              <FormControl fullWidth required>
+                <Select value={form.method} onChange={e => onFormChange('method', e.target.value)} displayEmpty>
+                  <MenuItem value="" disabled>
+                    请选择请求方法
+                  </MenuItem>
+                  <MenuItem value="GET">GET</MenuItem>
+                  <MenuItem value="POST">POST</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onCancel}>取消</Button>
+        <Button onClick={onSubmit} variant="contained" color="primary" disabled={!isFormValid || loading}>
+          {loading ? (
+            <>
+              <CircularProgress size={16} className="mr-2" />
+              创建中...
+            </>
+          ) : (
+            '创建'
+          )}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+export default ToolFormDialog
