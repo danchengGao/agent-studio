@@ -12,7 +12,7 @@ RUN echo "INDEX_URL: ${INDEX_URL}"
 WORKDIR /app
 COPY backend .
 RUN pip install uv -i ${INDEX_URL}
-RUN sed -i "s#openjiuwen @ git+https://gitcode.com/openJiuwen/test-agentcore.git@release/0.4.0#openjiuwen==${OPENJIUWEN_VERSION}#g" pyproject.toml
+RUN sed -i "s#openjiuwen==0.1.0#openjiuwen==${OPENJIUWEN_VERSION}#g" pyproject.toml
 RUN sed -i "s#url = \"https://mirrors.aliyun.com/pypi/simple/\"#url = \"${INDEX_URL}\"#g" pyproject.toml
 RUN uv venv
 RUN /app/.venv/bin/python3 -m ensurepip --upgrade
