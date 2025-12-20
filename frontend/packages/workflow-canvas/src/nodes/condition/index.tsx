@@ -1,0 +1,67 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { GitBranch } from 'lucide-react'
+
+import { FlowNodeRegistry } from '../../typings'
+import { customNanoid } from '../../utils/nanoid-custom'
+import { WorkflowNodeType } from '../constants'
+import { formMeta } from './form-meta'
+
+export const ConditionNodeRegistry: FlowNodeRegistry = {
+  type: WorkflowNodeType.Condition,
+  info: {
+    icon: <GitBranch size={16} className="text-orange-600" />,
+    description: '连接多个下游分支。只有满足设定条件的对应分支才会被执行。',
+  },
+  meta: {
+    defaultPorts: [{ type: 'input' }],
+    useDynamicPort: true,
+    size: {
+      width: 360,
+      height: 210,
+    },
+  },
+  formMeta,
+  onAdd() {
+    return {
+      id: `condition_${customNanoid(5)}`,
+      type: WorkflowNodeType.Condition,
+      data: {
+        title: '选择器',
+        branches: [
+          {
+            conditions: [
+              {
+                left: {
+                  type: 'ref',
+                  content: [],
+                },
+                operator: 'eq',
+                right: {
+                  type: 'constant',
+                  content: '',
+                  schema: {
+                    type: 'string',
+                    extra: {
+                      weak: true,
+                    },
+                  },
+                },
+              },
+            ],
+            logic: 2,
+            branchId: `branch_${customNanoid(5)}`,
+          },
+          {
+            conditions: [],
+            logic: 2,
+            branchId: `branch_${customNanoid(5)}`,
+          },
+        ],
+      },
+    }
+  },
+}
