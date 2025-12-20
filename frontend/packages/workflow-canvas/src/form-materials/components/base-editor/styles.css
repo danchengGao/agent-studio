@@ -1,0 +1,157 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+.base-editor-container {
+  position: relative;
+  width: 100%;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.base-editor-container.dark {
+  border-color: #30363d;
+}
+
+.base-editor {
+  width: 100%;
+}
+
+.base-editor .cm-editor {
+  min-height: 200px;
+}
+
+.base-editor .cm-scroller {
+  min-height: 200px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.base-editor .cm-content {
+  padding: 4px;
+  min-height: 192px; /* 200px - 8px padding */
+}
+
+.base-editor .cm-line {
+  padding: 0 0 0 4px;
+}
+
+.base-editor .cm-gutters {
+  background-color: #f6f8fa;
+  border-right: 1px solid #e1e4e8;
+  min-height: 192px; /* 与 cm-content 保持一致 (200px - 8px padding) */
+}
+
+.base-editor.dark .cm-gutters {
+  background-color: #24292e;
+  border-right-color: #30363d;
+}
+
+.base-editor .cm-lineNumbers {
+  color: #1f2937;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  .cm-gutterElement {
+    text-align: right !important;
+    padding-right: 0.5em;
+    min-width: 2.5em;
+    line-height: 1.5;
+  }
+}
+
+.base-editor.dark .cm-lineNumbers {
+  color: #6e7681;
+}
+
+.base-editor .cm-activeLine {
+  background-color: #f6f8fa;
+}
+
+.base-editor.dark .cm-activeLine {
+  background-color: #2d333b;
+}
+
+.base-editor .cm-cursor {
+  border-left: 2px solid #044289;
+}
+
+.base-editor.dark .cm-cursor {
+  border-left-color: #c8e1ff;
+}
+
+.base-editor .cm-selectionBackground {
+  background-color: #0366d625;
+}
+
+.base-editor.dark .cm-selectionBackground {
+  background-color: #3392ff44;
+}
+
+.base-editor .cm-focused {
+  outline: none;
+}
+
+.base-editor .cm-placeholder {
+  color: #9ca3af;
+  font-style: italic;
+  pointer-events: none;
+}
+
+.base-editor.dark .cm-placeholder {
+  color: #6e7681;
+}
+
+/* Word wrap styles for enableWordWrap=true */
+.base-editor.word-wrap .cm-content {
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  max-width: 100% !important;
+}
+
+.base-editor.word-wrap .cm-scroller {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.base-editor.word-wrap .cm-line {
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
+/* Mini editor styles */
+.mini-editor {
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+}
+
+.mini-editor .cm-editor {
+  min-height: 24px !important;
+}
+
+.mini-editor .cm-scroller {
+  min-height: 24px !important;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.mini-editor .cm-content {
+  padding: 2px 4px;
+  min-height: 20px !important; /* 24px - 4px padding */
+}
+
+.mini-editor .cm-gutters {
+  display: none; /* mini模式下隐藏行号 */
+}
+
+.mini-editor .cm-line {
+  padding: 0;
+}
+
+.mini-editor.dark {
+  border-color: #30363d;
+}

@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+# Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+from typing import Any, Dict, Optional
+from fastapi import status
+from openjiuwen.core.common.logging import logger
+from app.core.common.dsl import RestfulApiSchema as DlRestfulApiSchema
+from app.core.common.dsl import Plugin as DlPlugin
+from app.core.common.dsl import PluginCodeConfig as DlPluginCodeConfig
+from app.core.common.dsl import PluginType
+from app.core.executor.plugin.plugin_tools import CodeTool, ServiceTool
+import app.core.manager.plugin as mgr
+from app.schemas.plugin import ToolId, PluginId
+from app.core.common.exceptions import JiuWenExecuteException
+from app.core.common.status_code import StatusCode
+from app.core.manager.convertor.components.plugin import plugin_type_mapping
+from app.core.manager.convertor.plugin import plugin_tool_convert
+
+async def _fetch_plugin_dl(
+    tool_id: str,
+    space_id: str,
+    plugin_id: str,
+    version: str,
+    current_user: Optional[Dict[str, Any]]
+) -> Any:
+    if not current_user:
+        import os
+        from app.core.utils.file import read_file_to_string
+        path = os.path.dirname(__file__)
+        file_path = os.path.join(path, '../../../tests/resources/plugin_dl.json')
+        dl_str = read_file_to_string(file_path)
+        plugin = DlPlugin.model_validate_json(dl_str)
+        return plugin
+    plugin_dl = None
+    if version == "draft" or version == "":
+        req = {"tool_id": tool_id, "space_id": space_id}
+        res = mgr.plugin_convert(ToolId(**req), current_user)
+        if res.code != status.HTTP_200_OK:
+            raise JiuWenExecuteException(
+                StatusCode.PLUGIN_DL_FETCH_FAILED.code,
+                message=StatusCode.PLUGIN_DL_FETCH_FAILED.errmsg.format(msg=str(res.message)),
+                node_id=tool_id
+            )
+        plugin_dl = res.data
+    else:
+        req = {"plugin_id": plugin_id, "space_id": space_id, "plugin_version": version}
+        res = mgr.plugin_publish_get(PluginId(**req), current_user)
+        plugin_publish_dsl = res.data
+        if plugin_publish_dsl is None:
+            raise JiuWenExecuteException(
+                error_code=StatusCode.PLUGIN_DL_FETCH_FAILED.code,
+                message=StatusCode.PLUGIN_DL_FETCH_FAILED.errmsg.format(msg=str(f"fetch plugin failed with version: {version}")),
+                node_id=tool_id
+            )
+        tools = plugin_publish_dsl.plugin_info.tools
+        for tool in tools:
+            if tool.get("tool_id") == tool_id:
+                convert_tools = plugin_tool_convert(plugin_publish_dsl.plugin_info, tool)
+                plugin_dl= DlPlugin(
+                    plugin_id=plugin_id,
+                    plugin_name=plugin_publish_dsl.plugin_info.name,
+                    plugin_description=plugin_publish_dsl.plugin_info.desc,
+                    plugin_type=plugin_type_mapping[plugin_publish_dsl.plugin_info.plugin_type],
+                    tools=convert_tools,
+                    plugin_version=plugin_publish_dsl.plugin_info.plugin_version,
+                )
+    if plugin_dl is None:
+        raise JiuWenExecuteException(
+            error_code=StatusCode.PLUGIN_DL_FETCH_FAILED.code,
+            message=StatusCode.PLUGIN_DL_FETCH_FAILED.errmsg.format(msg=str("fetch plugin dl failed")),
+            node_id=tool_id
+        )
+    logger.warning(f"fetch plugin dl: {plugin_dl.model_dump_json()}")
+    return plugin_dl
+
+
+class PluginManager:
+    def __init__(self) -> None:
+        pass
+
+    async def get_tool(
+        self,
+        tool_id: str,
+        space_id: str,
+        plugin_id: str,
+        version: str,
+        current_user: Optional[Dict[str, Any]]
+    ) -> Any:
+        logger.warning(f"get_tool: tool_id={tool_id}")
+        plugin = await _fetch_plugin_dl(tool_id, space_id, plugin_id, version, current_user)
+        tool = None
+        for tool_dl in plugin.tools:
+            logger.warning(f"tool_dl: {tool_dl}, type: {type(tool_dl)}")
+            if tool_dl["tool_id"] == tool_id:
+                if plugin.plugin_type == PluginType.SERVICE:
+                    tool = ServiceTool(DlRestfulApiSchema.model_validate(tool_dl))
+                else:
+                    tool = CodeTool(DlPluginCodeConfig.model_validate(tool_dl))
+                break
+        return tool
+
+    async def get_compiled_tool(
+        self,
+        plugin_id: str,
+        tool_id: str,
+        space_id: str,
+        version: str,
+        current_user: Optional[Dict[str, Any]]
+    ) -> Any:
+        logger.warning(f"get_compiled_tool: plugin_id={plugin_id} tool_id={tool_id}")
+        tool = await self.get_tool(tool_id, space_id, plugin_id, version, current_user)
+        if not tool:
+            raise JiuWenExecuteException(
+                error_code=StatusCode.PLUGIN_COMPILE_FAILED.code,
+                message=StatusCode.PLUGIN_COMPILE_FAILED.errmsg.format(
+                    msg=str(f"can not find tool with plugin_id={plugin_id} tool_id={tool_id}")),
+                node_id=tool_id
+            )
+        compiled_tool = tool.compile()
+        return compiled_tool
+
+    async def run(
+        self,
+        plugin_id: str,
+        tool_id: str,
+        inputs: Any,
+        space_id: str,
+        version: str,
+        current_user: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        tool = await self.get_compiled_tool(plugin_id, tool_id, space_id, version, current_user)
+        data = await tool.ainvoke(inputs)
+        return PluginManager.result_convert(data)
+
+    @staticmethod
+    def result_convert(data: Any) -> Dict[str, Any]:
+        from app.core.common.message import ExecuteResponseType, ExecuteResponse
+        return ExecuteResponse(
+            type=ExecuteResponseType.Plugin,
+            payload={
+                "error_code": data.get("errCode"),
+                "error_message": data.get("errMessage"),
+                "output": data.get("data"),
+            }
+        ).model_dump()
+
+
+plugin_mgr = PluginManager()
