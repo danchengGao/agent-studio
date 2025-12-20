@@ -1,0 +1,13 @@
+FROM node:20-slim
+
+WORKDIR /sandbox
+COPY sandbox_server/js_server/kernel.js kernel.js
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 5002
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
+    CMD curl -f http://localhost:5002/health || exit 1
+
+CMD ["node", "kernel.js"]

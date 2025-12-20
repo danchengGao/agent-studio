@@ -1,0 +1,43 @@
+# builder image
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS builder
+
+ARG INDEX_URL
+RUN echo "INDEX_URL: ${INDEX_URL}"
+WORKDIR /app
+COPY plugin_server .
+RUN pip install uv -i ${INDEX_URL}
+RUN sed -i "s#url = \"https://mirrors.aliyun.com/pypi/simple/\"#url = \"${INDEX_URL}\"#g" pyproject.toml
+RUN uv venv
+RUN /app/.venv/bin/python3 -m ensurepip --upgrade
+RUN UV_HTTP_TIMEOUT=700 \
+    UV_INDEX_URL=${INDEX_URL} \
+    uv sync --no-cache
+RUN uv build --out-dir /app/dist
+
+
+# runtime image
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS runtime
+
+ARG INDEX_URL
+ARG TRUSTED_HOST
+RUN echo "INDEX_URL: ${INDEX_URL}"
+RUN echo "TRUSTED_HOST: ${TRUSTED_HOST}"
+RUN useradd --create-home --shell /bin/bash app
+RUN mkdir -p /app/dist
+RUN chown -R app:app /app
+
+USER app
+WORKDIR /app
+COPY --from=builder /app/dist/openjiuwen_studio_plugin_server-0.1.0-py3-none-any.whl /app/dist
+RUN pip3 install /app/dist/openjiuwen_studio_plugin_server-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/app/site-packages --retries=5 --timeout=120
+ENV PYTHONPATH=/app/site-packages/openjiuwen_studio_plugin_server:/app/site-packages
+ENV PATH=/app/site-packages/bin:$PATH
+
+EXPOSE 8185
+# Health check with configurable port
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
+    CMD curl -f http://localhost:8185/system/health || exit 1
+
+CMD ["openjiuwen-studio-plugin-server", "--port", "8185"]
