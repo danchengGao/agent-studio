@@ -1,0 +1,13 @@
+prompt_template:
+  messages: [
+    {
+      content: "",
+      role: "system"
+    }
+  ]
+  template_type: "normal"
+prompt_model_config:
+  max_tokens: 4096
+  models_id: "1"
+  temperature: 0.8
+  top_p: 0
