@@ -1,0 +1,49 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { customNanoid } from '../../utils/nanoid-custom'
+import { FlowNodeRegistry } from '../../typings'
+import { Download } from 'lucide-react'
+import { formMeta } from './form-meta'
+import { WorkflowNodeType } from '../constants'
+
+export const OutputNodeRegistry: FlowNodeRegistry = {
+  type: WorkflowNodeType.Output,
+  meta: {
+    defaultPorts: [{ type: 'input' }, { type: 'output' }],
+    size: {
+      width: 360,
+      height: 211,
+    },
+    // 确保节点在面板中可见
+    nodePanelVisible: true,
+  },
+  info: {
+    icon: <Download size={16} className="text-blue-600" />,
+    description: '输出节点，用于输出工作流执行过程中的中间结果或最终结果。',
+  },
+  formMeta,
+  onAdd() {
+    return {
+      id: `output_${customNanoid(5)}`,
+      type: WorkflowNodeType.Output,
+      data: {
+        title: '输出',
+        inputs: {
+          inputParameters: {
+            output: {
+              type: 'ref',
+            },
+          },
+          content: {
+            type: 'template',
+            content: '{{output}}',
+          },
+          streaming: false,
+        },
+      },
+    }
+  },
+}

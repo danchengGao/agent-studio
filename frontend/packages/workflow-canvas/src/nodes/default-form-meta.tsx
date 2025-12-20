@@ -1,0 +1,77 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import { FormRenderProps, FormMeta, ValidateTrigger } from '@flowgram.ai/free-layout-editor'
+import { Divider } from '@douyinfe/semi-ui'
+
+import { FlowNodeJSON } from '../typings'
+import { FormHeader, FormContent, FormInput } from '../form-components'
+import {
+  DisplayOutputs,
+  provideJsonSchemaOutputs,
+  syncVariableTitle,
+  validateFlowValue,
+  validateWhenVariableSync,
+  listenRefSchemaChange,
+  autoRenameRefEffect,
+} from '../form-materials'
+
+export const renderForm = ({}: FormRenderProps<FlowNodeJSON>) => (
+  <>
+    <FormHeader />
+    <FormContent>
+      <FormInput />
+      <Divider />
+      <DisplayOutputs displayFromScope />
+    </FormContent>
+  </>
+)
+
+export const defaultFormMeta: FormMeta<FlowNodeJSON> = {
+  render: renderForm,
+  validateTrigger: ValidateTrigger.onChange,
+  /**
+   * Supported writing as:
+   * 1: validate as options: { title: () => {} , ... }
+   * 2: validate as dynamic function: (values,  ctx) => ({ title: () => {}, ... })
+   */
+  validate: {
+    title: ({ value }) => (value ? undefined : '标题是必需的'),
+    'inputsValues.*': ({ value, context, formValues, name }) => {
+      const valuePropertyKey = name.replace(/^inputsValues\./, '')
+      const required = formValues.inputs?.required || []
+
+      return validateFlowValue(value, {
+        node: context.node,
+        required: required.includes(valuePropertyKey),
+        errorMessages: {
+          required: `${valuePropertyKey} 是必需的`,
+        },
+      })
+    },
+  },
+  /**
+   * Initialize (fromJSON) data transformation
+   * 初始化(fromJSON) 数据转换
+   * @param value
+   * @param ctx
+   */
+  formatOnInit: (value, _ctx) => value,
+  /**
+   * Save (toJSON) data transformation
+   * 保存(toJSON) 数据转换
+   * @param value
+   * @param ctx
+   */
+  formatOnSubmit: (value, _ctx) => value,
+  effect: {
+    title: syncVariableTitle,
+    outputs: provideJsonSchemaOutputs,
+    inputsValues: [...autoRenameRefEffect, ...validateWhenVariableSync({ scope: 'public' })],
+    'inputsValues.*': listenRefSchemaChange(params => {
+      console.log(`[${params.context.node.id}][${params.name}] Schema Of Ref Updated`)
+    }),
+  },
+}
