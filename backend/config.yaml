@@ -1,0 +1,44 @@
+db:
+  "log":
+    "version": 1
+    "handlers":
+      "dbmanager_fileHandler":
+        "class": "logging.handlers.RotatingFileHandler"
+        "level": "DEBUG"
+        "formatter": "myFormatter"
+        "filename": "./logs/run/db_run.log"
+        "mode": "w+"
+        "maxBytes": 20971520
+        "backupCount": 5
+        "encoding": "utf8"
+    "formatters":
+      "myFormatter":
+        "format": "%(asctime)s - %(levelname)s - %(filename)s[:%(lineno)d] - %(message)s"
+    "loggers":
+      "db_manager":
+        "level": "DEBUG"
+        "handlers":
+          - "dbmanager_fileHandler"
+
+logging:
+  level: "DEBUG"
+
+  backup_count: 20
+  max_bytes: 20971520
+
+  format: "%(asctime)s | %(log_type)s | %(filename)s | %(lineno)d | %(funcName)s | %(trace_id)s | %(levelname)s | %(message)s"
+
+  log_path: "./logs/"
+
+  log_file: "run/openjiuwen.log"
+
+  output: [ "console", "file" ]
+
+  interface_log_file: "interface/jiuwen_interface.log"
+  interface_output: [ "console", "file" ]
+
+  prompt_builder_interface_log_file: "interface/jiuwen_prompt_builder_interface.log"
+
+  performance_log_file: "performance/jiuwen_performance.log"
+  performance_output: [ "console", "file" ]
+

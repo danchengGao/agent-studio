@@ -1,0 +1,129 @@
+/**
+ * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
+ * SPDX-License-Identifier: MIT
+ */
+
+import * as React from 'react'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+
+import { cn } from '../../lib/utils'
+
+const Sheet = DialogPrimitive.Root
+
+const SheetTrigger = DialogPrimitive.Trigger
+
+const SheetPortal = DialogPrimitive.Portal
+
+const SheetClose = DialogPrimitive.Close
+
+const SheetOverlay = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay> & {
+    showMask?: boolean
+  }
+>(({ className, showMask = true, ...props }, ref) => (
+  <DialogPrimitive.Overlay
+    ref={ref}
+    className={cn(
+      showMask
+        ? 'fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0'
+        : 'fixed inset-0 z-50 bg-transparent data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      className,
+    )}
+    {...props}
+  />
+))
+SheetOverlay.displayName = DialogPrimitive.Overlay.displayName
+
+const SheetContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    side?: 'left' | 'right' | 'top' | 'bottom'
+    width?: string | number
+    showMask?: boolean
+    showCloseButton?: boolean
+  }
+>(({ className, children, side = 'right', width = 400, showMask = true, showCloseButton = true, ...props }, ref) => (
+  <SheetPortal>
+    {showMask && <SheetOverlay showMask={showMask} />}
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        'fixed z-50 bg-background shadow-sm transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500 p-0',
+        // Side-specific positioning
+        side === 'right' && [
+          'inset-y-0 right-0 h-full w-[400px] max-w-full border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:rounded-l-lg',
+          typeof width === 'string' ? `w-[${width}]` : width !== 400 ? `w-[${width}px]` : '',
+        ],
+        side === 'left' && [
+          'inset-y-0 left-0 h-full w-[400px] max-w-full border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:rounded-r-lg',
+          typeof width === 'string' ? `w-[${width}]` : width !== 400 ? `w-[${width}px]` : '',
+        ],
+        side === 'top' && [
+          'inset-x-0 top-0 h-auto max-h-[50vh] w-full border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top sm:rounded-b-lg',
+        ],
+        side === 'bottom' && [
+          'inset-x-0 bottom-0 h-auto max-h-[50vh] w-full border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-top sm:rounded-t-lg',
+        ],
+        className,
+      )}
+      style={{
+        ...(side === 'right' || side === 'left'
+          ? {
+              width: typeof width === 'number' ? `${width}px` : width,
+            }
+          : {}),
+      }}
+      {...props}
+    >
+      {children}
+      {/* Only show close button if showCloseButton is true */}
+      {showCloseButton && (
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+          >
+            <path d="m18 6-12 12" />
+            <path d="M6 6l12 12" />
+          </svg>
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
+    </DialogPrimitive.Content>
+  </SheetPortal>
+))
+SheetContent.displayName = DialogPrimitive.Content.displayName
+
+const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)} {...props} />
+)
+SheetHeader.displayName = 'SheetHeader'
+
+const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)} {...props} />
+)
+SheetFooter.displayName = 'SheetFooter'
+
+const SheetTitle = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Title>, React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>>(
+  ({ className, ...props }, ref) => (
+    <DialogPrimitive.Title ref={ref} className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props} />
+  ),
+)
+SheetTitle.displayName = DialogPrimitive.Title.displayName
+
+const SheetDescription = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(({ className, ...props }, ref) => <DialogPrimitive.Description ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />)
+SheetDescription.displayName = DialogPrimitive.Description.displayName
+
+export { Sheet, SheetPortal, SheetOverlay, SheetClose, SheetTrigger, SheetContent, SheetHeader, SheetFooter, SheetTitle, SheetDescription }
