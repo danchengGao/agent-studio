@@ -178,7 +178,7 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
         # 使用component_name_map映射组件名称
         component_name = data.component_name
         if mapping and data.invoke_id in mapping:
-                component_name = mapping[data.invoke_id]
+            component_name = mapping[data.invoke_id]
         
         # 将映射后的组件名称设置回data中，确保trace log使用正确的名称
         data.component_name = component_name

@@ -47,21 +47,26 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
         if 'nodes' in schema_part and isinstance(schema_part['nodes'], list):
             # 遍历所有节点
             for node in schema_part['nodes']:
-                if isinstance(node, dict) and 'id' in node and 'data' in node and 'title' in node['data']:
-                    node_id = node['id']
-                    node_title = node['data']['title']
-                    
-                    # 添加基础ID映射（如code_MsmmT -> 代码）
-                    name_map[node_id] = node_title
-                    
-                    # 生成并添加完整的层级组件ID映射
-                    # （如workflow_cLjMT.workflow_fV0Wb.code_MsmmT -> 代码）
-                    if parent_component_ids:
-                        full_node_id = f"{'.'.join(parent_component_ids)}.{node_id}"
-                        name_map[full_node_id] = node_title
+                if isinstance(node, dict) and 'id' in node:
+                    if 'data' in node and 'title' in node['data']:
+                        node_id = node['id']
+                        node_title = node['data']['title']
+                        
+                        # 添加基础ID映射（如code_MsmmT -> 代码）
+                        name_map[node_id] = node_title
+                        
+                        # 生成并添加完整的层级组件ID映射
+                        # （如workflow_cLjMT.workflow_fV0Wb.code_MsmmT -> 代码）
+                        if parent_component_ids:
+                            full_node_id = f"{'.'.join(parent_component_ids)}.{node_id}"
+                            name_map[full_node_id] = node_title
         
         # 特殊处理子工作流组件
-        if 'type' in schema_part and (schema_part['type'] == '14' or 'subWorkflow' in schema_part.get('data', {}).get('configs', {})):
+        if (
+            'type' in schema_part
+            and (schema_part['type'] == '14'
+                or 'subWorkflow' in schema_part.get('data', {}).get('configs', {}))
+        ):
             # 14 是ComponentType.COMPONENT_TYPE_SUB_WORKFLOW的值
             sub_wf_config = schema_part.get('data', {})
             
@@ -83,7 +88,12 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
                     sub_wf_schema = json.loads(sub_wf_schema_str)
                     if sub_wf_schema:
                         # 递归提取子工作流的组件名称，传入更新后的父组件ID列表
-                        extract_component_names(sub_wf_schema, name_map, f"{parent_path}.sub_workflow.{current_component_id}", new_parent_ids)
+                        extract_component_names(
+                            sub_wf_schema,
+                            name_map,
+                            f"{parent_path}.sub_workflow.{current_component_id}",
+                            new_parent_ids
+                        )
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse embedded sub-workflow schema: {e}")
             
@@ -217,18 +227,11 @@ class WorkflowRunner(IWorkflowLoader):
         component_name_map = None
         try:
             # 获取workflow的schema数据
-            from app.core.manager.repositories.workflow_repository import workflow_repository
             workflow_res = workflow_repository.workflow_get(flow_index)
             if workflow_res.code == 200 and workflow_res.data:
                 workflow = workflow_res.data
                 # 使用新的方法生成组件名称映射
                 component_name_map = self.generate_component_name_map(workflow)
-                with open("workflow_schema.json", "w") as f:
-                    # Handle both Pydantic model (with .schema attribute) and dict (with 'schema' key)
-                    workflow_schema = workflow.schema if hasattr(workflow, 'schema') else workflow.get('schema')
-                    if isinstance(workflow_schema, str):
-                        workflow_schema = json.loads(workflow_schema)
-                    json.dump(workflow_schema, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to generate component_name_map: {e}", exc_info=True)
 
