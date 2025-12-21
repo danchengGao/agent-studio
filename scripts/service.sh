@@ -1033,35 +1033,9 @@ clean() {
     #rm -f "${CONFIG["PLUGIN_COMPOSE_FILE"]}"
 }
 
-# ==================== Main function ====================
-main() {
-    detect_os
-    info "${CONFIG["OS_TYPE"]}"
-    info "Executing command: $@"
-    parse_args "$@"
+show_deploy_prompt() {
     local cmd1=${ARGS["CMD1"]}
     local cmd2=${ARGS["CMD2"]}
-
-    if [ "${cmd1}" == "conf" ]; then
-        check_source_code_dir
-        generate_setup_cfg
-    elif [ "${cmd1}" == "up" ]; then
-        process_env
-        check_docker
-        generate_config_files
-        exec_service
-    elif [ "${cmd1}" == "down" ]; then
-        process_env
-        check_docker
-        generate_config_files
-        exec_service
-        clean ${cmd1}
-    elif [ "${cmd1}" == "milvus" -o "${cmd1}" == "jiuwen" -o "${cmd1}" == "mysql" -o "${cmd1}" == "plugin"]; then
-        process_env
-        check_docker
-        generate_config_files
-        up_down_service
-    fi
 
     if [[ "${cmd1}" == "up" || "${cmd2}" == "up"  ]]; then
         local env_file=${CONFIG["ENV_FILE"]}
@@ -1081,6 +1055,66 @@ main() {
             info "\tNetwork access: https://${ip_addr}:${frontend_port}"
         fi
     fi
+
+    if [[ "${cmd1}" == "mysql" && "${cmd2}" == "up"  ]]; then
+        success "MYSQL Server started"
+        info "To use it, please set the following value in .env:"
+        echo "DB_HOST=localhost"
+        echo "DB_PORT=${ENV_VARS["MYSQL_HOST_PORT"]}"
+        echo "DB_USER=root"
+        echo "DB_PASSWORD=${ENV_VARS["DB_ROOT_PASSWORD"]}"
+        info ""
+    fi
+
+    if [[ "${cmd1}" == "milvus" && "${cmd2}" == "up"  ]]; then
+        success "Milvus Server started"
+        info "To use it, please set the following value in .env:"
+        echo "MILVUS_HOST=localhost"
+        echo "MILVUS_PORT=${ENV_VARS["MILVUS_HOST_PORT"]}"
+        info ""
+    fi
+}
+
+
+# ==================== Main function ====================
+main() {
+    detect_os
+    info "${CONFIG["OS_TYPE"]}"
+    info "Executing command: $@"
+    parse_args "$@"
+    local cmd=${ARGS["CMD1"]}
+
+    case "${cmd}" in
+        "conf")
+            check_source_code_dir
+            generate_setup_cfg
+            ;;
+        "up")
+            process_env
+            check_docker
+            generate_config_files
+            exec_service
+            ;;
+        "down")
+            process_env
+            check_docker
+            generate_config_files
+            exec_service
+            clean "${cmd}"
+            ;;
+
+        "milvus"|"jiuwen"|"mysql"|"plugin")
+            process_env
+            check_docker
+            generate_config_files
+            up_down_service
+            ;;
+        *)
+            info "Unsupported command: ${cmd}"
+            ;;
+    esac
+
+    show_deploy_prompt
 }
 
 # Execute main function
