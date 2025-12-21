@@ -967,12 +967,12 @@ export class TestRunRuntimeService implements ITestRunRuntimeService {
       const code = getEventProperty(executionEvent, 'code')
       const isUserCanceled = getEventProperty(executionEvent, 'isUserCanceled')
 
-      if (message && message !== 'Workflow execution failed') {
+      if (error) {
+        errorMessage = error
+      }else if (message && message !== 'Workflow execution failed') {
         errorMessage = message
       } else if (description && description !== 'Workflow execution failed') {
         errorMessage = description
-      } else if (error) {
-        errorMessage = error
       }
 
       if (code) {
