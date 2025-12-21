@@ -93,7 +93,13 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
         inputs: {
           loopParam: {
             type: LoopType.NUM_LOOP,
-            loopNum: 5,
+            loopNum: {
+              type: 'constant',
+              content: 5,
+              schema: {
+                type: 'integer',
+              },
+            },
           },
         },
         outputs: {
