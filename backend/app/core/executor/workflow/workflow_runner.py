@@ -2,7 +2,8 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
-from typing import Any, Dict, AsyncGenerator
+import json
+from typing import Any, Dict, AsyncGenerator, Optional
 
 from fastapi import status
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
@@ -19,6 +20,110 @@ from app.core.executor.workflow.workflow import Workflow, IWorkflowLoader
 from app.core.executor.util.utils import result_convert, save_execution_traces, handle_stream_error
 from app.schemas import WorkflowId
 from app.core.common.exceptions import JiuWenComponentException, JiuWenExecuteException
+from app.core.manager.repositories.workflow_repository import workflow_repository
+
+
+
+def extract_component_names(schema_part, name_map, parent_path="", parent_component_ids=None):
+    """递归提取所有组件名称，包括嵌套结构和层级关系"""
+    if parent_component_ids is None:
+        parent_component_ids = []
+        
+    if isinstance(schema_part, dict):
+        # 1. 提取当前节点的组件信息（包括子工作流节点本身）
+        if 'id' in schema_part and 'data' in schema_part and 'title' in schema_part['data']:
+            component_id = schema_part['id']
+            component_title = schema_part['data']['title']
+            
+            # 添加基础ID映射（如workflow_cLjMT -> AI天气查询）
+            name_map[component_id] = component_title
+            
+            # 生成并添加完整的层级组件ID映射（如workflow_cLjMT.workflow_fV0Wb -> 子工作流标题）
+            if parent_component_ids:
+                full_component_id = f"{'.'.join(parent_component_ids)}.{component_id}"
+                name_map[full_component_id] = component_title
+        
+        # 2. 处理完整的工作流schema（包含nodes和edges）
+        if 'nodes' in schema_part and isinstance(schema_part['nodes'], list):
+            # 遍历所有节点
+            for node in schema_part['nodes']:
+                if isinstance(node, dict) and 'id' in node and 'data' in node and 'title' in node['data']:
+                    node_id = node['id']
+                    node_title = node['data']['title']
+                    
+                    # 添加基础ID映射（如code_MsmmT -> 代码）
+                    name_map[node_id] = node_title
+                    
+                    # 生成并添加完整的层级组件ID映射
+                    # （如workflow_cLjMT.workflow_fV0Wb.code_MsmmT -> 代码）
+                    if parent_component_ids:
+                        full_node_id = f"{'.'.join(parent_component_ids)}.{node_id}"
+                        name_map[full_node_id] = node_title
+        
+        # 特殊处理子工作流组件
+        if 'type' in schema_part and (schema_part['type'] == '14' or 'subWorkflow' in schema_part.get('data', {}).get('configs', {})):
+            # 14 是ComponentType.COMPONENT_TYPE_SUB_WORKFLOW的值
+            sub_wf_config = schema_part.get('data', {})
+            
+            # 获取当前子工作流节点ID
+            current_component_id = schema_part.get('id', '')
+            
+            # 创建新的父组件ID列表，用于子工作流的节点
+            new_parent_ids = parent_component_ids.copy()
+            if current_component_id:
+                new_parent_ids.append(current_component_id)
+            
+            # 方法1: 直接从workflow字段获取完整子工作流定义（已包含schema）
+            sub_wf_full = sub_wf_config.get('workflow', {})
+            sub_wf_schema_str = sub_wf_full.get('schema', '')
+            
+            if sub_wf_schema_str:
+                # 直接使用已包含的schema，无需查询数据库
+                try:
+                    sub_wf_schema = json.loads(sub_wf_schema_str)
+                    if sub_wf_schema:
+                        # 递归提取子工作流的组件名称，传入更新后的父组件ID列表
+                        extract_component_names(sub_wf_schema, name_map, f"{parent_path}.sub_workflow.{current_component_id}", new_parent_ids)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse embedded sub-workflow schema: {e}")
+            
+            # 方法2: 从configs.subWorkflow中获取子工作流信息（备用）
+            sub_wf_info = sub_wf_config.get('configs', {}).get('subWorkflow', {})
+            sub_wf_id = sub_wf_info.get('workflowId') or sub_wf_info.get('workflow_id') or sub_wf_info.get('id')
+            sub_wf_version = sub_wf_info.get('workflowVersion') or sub_wf_info.get('version')
+            
+            if sub_wf_id and not sub_wf_schema_str:
+                # 如果没有嵌入式schema，则查询数据库
+                # 暂时跳过数据库查询，避免报错
+                logger.error(f"Skipping database query for sub-workflow {sub_wf_id} because space_id is not available")
+        
+        # 特殊处理循环节点
+        if 'type' in schema_part and schema_part['type'] == 'loop':
+            # 循环节点处理
+            current_component_id = schema_part.get('id', '')
+            new_parent_ids = parent_component_ids.copy()
+            if current_component_id:
+                new_parent_ids.append(current_component_id)
+        else:
+            # 非循环节点，使用原有父组件ID列表
+            new_parent_ids = parent_component_ids.copy()
+            # 如果当前有ID且不是特殊节点类型，添加到父组件ID列表
+            current_component_id = schema_part.get('id', '')
+            if current_component_id and 'type' in schema_part and schema_part['type'] not in ['start', 'end']:
+                new_parent_ids.append(current_component_id)
+        
+        # 特殊处理循环体、分支条件等嵌套结构
+        nested_keys = ['loop_body', 'branches', 'branch_body', 'sub_workflow', 'components']
+        for key, value in schema_part.items():
+            new_path = f"{parent_path}.{key}" if parent_path else key
+            # 递归处理所有嵌套结构，特别是已知的嵌套组件容器
+            if key in nested_keys or isinstance(value, (dict, list)):
+                extract_component_names(value, name_map, new_path, new_parent_ids)
+    elif isinstance(schema_part, list):
+        # 递归处理列表中的每个元素
+        for idx, item in enumerate(schema_part):
+            new_path = f"{parent_path}[{idx}]" if parent_path else f"[{idx}]"
+            extract_component_names(item, name_map, new_path, parent_component_ids.copy())
 
 
 async def _fetch_workflow_dl(
@@ -57,6 +162,23 @@ async def _fetch_workflow_dl(
 class WorkflowRunner(IWorkflowLoader):
     def __init__(self) -> None:
         pass
+    
+    def generate_component_name_map(self, workflow_dl: Any) -> Optional[Dict[str, str]]:
+        """
+        从workflow的schema中提取组件id到name的映射
+        """
+        component_name_map = None
+        try:
+            # Handle both Pydantic model (with .schema attribute) and dict (with 'schema' key)
+            workflow_schema_str = workflow_dl.schema if hasattr(workflow_dl, 'schema') else workflow_dl.get('schema')
+            workflow_schema = json.loads(workflow_schema_str) if workflow_schema_str else {}
+            
+            if isinstance(workflow_schema, dict):
+                component_name_map = {}
+                extract_component_names(workflow_schema, component_name_map)
+        except (json.JSONDecodeError, TypeError, KeyError, ImportError) as e:
+            logger.warning(f"Failed to parse workflow schema for component names: {e}", exc_info=True)
+        return component_name_map
 
     async def get_flow(
         self, id: str, version: str, space_id: str, current_user: Dict[str, Any]
@@ -91,6 +213,25 @@ class WorkflowRunner(IWorkflowLoader):
         last_chunk = None  # 用于异常时回溯
         # trace_id = None  # 暂时保留 trace_id 用于 trace_summary 创建
 
+        # 生成component_name_map
+        component_name_map = None
+        try:
+            # 获取workflow的schema数据
+            from app.core.manager.repositories.workflow_repository import workflow_repository
+            workflow_res = workflow_repository.workflow_get(flow_index)
+            if workflow_res.code == 200 and workflow_res.data:
+                workflow = workflow_res.data
+                # 使用新的方法生成组件名称映射
+                component_name_map = self.generate_component_name_map(workflow)
+                with open("workflow_schema.json", "w") as f:
+                    # Handle both Pydantic model (with .schema attribute) and dict (with 'schema' key)
+                    workflow_schema = workflow.schema if hasattr(workflow, 'schema') else workflow.get('schema')
+                    if isinstance(workflow_schema, str):
+                        workflow_schema = json.loads(workflow_schema)
+                    json.dump(workflow_schema, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to generate component_name_map: {e}", exc_info=True)
+
         try:
             flow = await self.get_compiled_workflow(Context(), id, version, space_id, current_user)
 
@@ -108,7 +249,7 @@ class WorkflowRunner(IWorkflowLoader):
                 last_chunk = chunk
 
                 rsp, trace_log, _ = result_convert(
-                    chunk, business_type="WORKFLOW"
+                    chunk, business_type="WORKFLOW", mapping=component_name_map
                 )
                 # if trace_detail:
                 #     await save_trace_detail(flow_index, trace_detail)

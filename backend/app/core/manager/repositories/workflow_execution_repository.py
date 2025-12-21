@@ -55,8 +55,7 @@ class WorkflowExecutionRepository():
     @staticmethod
     def _extract_summary_execution_info_from_log(
         log_data: list[TraceWorkflowSpan],
-        execute_start_time: datetime | None = None,
-        component_name_map: dict[str, str] | None = None
+        execute_start_time: datetime | None = None
     ) -> list[InvokeExecuteInfo] | None:
         """
         description: 从workflow的某次执行log_data中，提取总的执行信息, WfComponentsExecuteInfo类型
@@ -140,31 +139,8 @@ class WorkflowExecutionRepository():
 
         for log in log_data:
             # 统计单个组件的执行信息
-            # 获取组件名称，如果有映射则使用映射值
+            # 获取组件名称
             component_name = log.component_name
-            
-            # 1. 尝试使用完整的invoke_id作为主键查找（最准确，包含层级关系）
-            if component_name_map and log.invoke_id in component_name_map:
-                component_name = component_name_map[log.invoke_id]
-            # 2. 尝试使用component_type作为主键查找
-            elif component_name_map and log.component_type in component_name_map:
-                component_name = component_name_map[log.component_type]
-            # 3. 对于嵌套的子工作流节点，尝试逐级匹配（从完整路径到直接父级）
-            elif component_name_map and '.' in log.invoke_id:
-                type_parts = log.invoke_id.split('.')
-                # 对于workflow_cLjMT.workflow_fV0Wb，尝试匹配workflow_cLjMT.workflow_fV0Wb和workflow_fV0Wb
-                for i in range(1, len(type_parts) + 1):
-                    # 从末尾开始匹配，例如：workflow_cLjMT.workflow_fV0Wb -> workflow_fV0Wb
-                    partial_type = '.'.join(type_parts[-i:])
-                    if partial_type in component_name_map:
-                        component_name = component_name_map[partial_type]
-                        jiuwen_db_logger.debug(f"Mapped using partial invoke_id match: {partial_type} -> {component_name} for {log.invoke_id}")
-                        break
-            # 4. 尝试使用invoke_id的基础部分查找（如workflow_cLjMT -> workflow）
-            elif component_name_map and '_' in log.invoke_id:
-                base_type = log.invoke_id.split('_')[0]
-                if component_name_map and base_type in component_name_map:
-                    component_name = component_name_map[base_type]
             
             # 组件开始
             if log.status == ComponentExecuteStatus.start:
@@ -212,143 +188,9 @@ class WorkflowExecutionRepository():
         """
         description: 创建 WorkflowExecutionDB 数据
         """
-        # 从workflow的schema中提取组件id到name的映射
-        component_name_map = None
-        try:
-            import json
-            from app.core.manager.repositories.workflow_repository import \
-                workflow_repository
-            
-            def extract_component_names(schema_part, name_map, parent_path="", parent_component_ids=None):
-                """递归提取所有组件名称，包括嵌套结构和层级关系"""
-                if parent_component_ids is None:
-                    parent_component_ids = []
-                    
-                if isinstance(schema_part, dict):
-                    # 1. 提取当前节点的组件信息（包括子工作流节点本身）
-                    if 'id' in schema_part and 'data' in schema_part and 'title' in schema_part['data']:
-                        component_id = schema_part['id']
-                        component_title = schema_part['data']['title']
-                        
-                        # 添加基础ID映射（如workflow_cLjMT -> AI天气查询）
-                        name_map[component_id] = component_title
-                        
-                        # 生成并添加完整的层级组件ID映射（如workflow_cLjMT.workflow_fV0Wb -> 子工作流标题）
-                        if parent_component_ids:
-                            full_component_id = f"{'.'.join(parent_component_ids)}.{component_id}"
-                            name_map[full_component_id] = component_title
-                            jiuwen_db_logger.debug(f"Extracted hierarchical component: {full_component_id} -> {component_title} (path: {parent_path})")
-                    
-                    # 2. 处理完整的工作流schema（包含nodes和edges）
-                    if 'nodes' in schema_part and isinstance(schema_part['nodes'], list):
-                        # 遍历所有节点
-                        for node in schema_part['nodes']:
-                            if isinstance(node, dict) and 'id' in node and 'data' in node and 'title' in node['data']:
-                                node_id = node['id']
-                                node_title = node['data']['title']
-                                
-                                # 添加基础ID映射（如code_MsmmT -> 代码）
-                                name_map[node_id] = node_title
-                                
-                                # 生成并添加完整的层级组件ID映射
-                                # （如workflow_cLjMT.workflow_fV0Wb.code_MsmmT -> 代码）
-                                if parent_component_ids:
-                                    full_node_id = f"{'.'.join(parent_component_ids)}.{node_id}"
-                                    name_map[full_node_id] = node_title
-                                    jiuwen_db_logger.debug(f"Extracted full node: {full_node_id} -> {node_title} (path: {parent_path})")
-                    
-                    # 特殊处理子工作流组件
-                    if 'type' in schema_part and (schema_part['type'] == '14' or 'subWorkflow' in schema_part.get('data', {}).get('configs', {})):
-                        # 14 是ComponentType.COMPONENT_TYPE_SUB_WORKFLOW的值
-                        sub_wf_config = schema_part.get('data', {})
-                        
-                        # 获取当前子工作流节点ID
-                        current_component_id = schema_part.get('id', '')
-                        
-                        # 创建新的父组件ID列表，用于子工作流的节点
-                        new_parent_ids = parent_component_ids.copy()
-                        if current_component_id:
-                            new_parent_ids.append(current_component_id)
-                        
-                        # 方法1: 直接从workflow字段获取完整子工作流定义（已包含schema）
-                        sub_wf_full = sub_wf_config.get('workflow', {})
-                        sub_wf_schema_str = sub_wf_full.get('schema', '')
-                        
-                        if sub_wf_schema_str:
-                            # 直接使用已包含的schema，无需查询数据库
-                            try:
-                                sub_wf_schema = json.loads(sub_wf_schema_str)
-                                jiuwen_db_logger.debug(f"Using embedded sub-workflow schema for node {current_component_id} at path: {parent_path}")
-                                if sub_wf_schema:
-                                    # 递归提取子工作流的组件名称，传入更新后的父组件ID列表
-                                    extract_component_names(sub_wf_schema, name_map, f"{parent_path}.sub_workflow.{current_component_id}", new_parent_ids)
-                            except json.JSONDecodeError as e:
-                                jiuwen_db_logger.warning(f"Failed to parse embedded sub-workflow schema: {e}")
-                        
-                        # 方法2: 从configs.subWorkflow中获取子工作流信息（备用）
-                        sub_wf_info = sub_wf_config.get('configs', {}).get('subWorkflow', {})
-                        sub_wf_id = sub_wf_info.get('workflowId') or sub_wf_info.get('workflow_id') or sub_wf_info.get('id')
-                        sub_wf_version = sub_wf_info.get('workflowVersion') or sub_wf_info.get('version')
-                        
-                        if sub_wf_id and not sub_wf_schema_str:
-                            # 如果没有嵌入式schema，则查询数据库
-                            jiuwen_db_logger.debug(f"Found sub-workflow: {sub_wf_id} (version: {sub_wf_version}) for node {current_component_id} at path: {parent_path}")
-                            # 查询子工作流的定义
-                            sub_wf_id_obj = WorkflowId(
-                                workflow_id=sub_wf_id,
-                                space_id=workflow.space_id,
-                                workflow_version=sub_wf_version or ""
-                            )
-                            # 使用workflow_repository获取子工作流的详细信息
-                            sub_wf_res = workflow_repository.workflow_get(sub_wf_id_obj)
-                            if sub_wf_res.code == 200 and sub_wf_res.data:
-                                sub_wf = sub_wf_res.data
-                                # 提取子工作流的schema
-                                sub_wf_schema = json.loads(sub_wf.schema) if hasattr(
-                                    sub_wf, 'schema') and sub_wf.schema else {}
-                                if sub_wf_schema:
-                                    # 递归提取子工作流的组件名称，传入更新后的父组件ID列表
-                                    extract_component_names(sub_wf_schema, name_map, f"{parent_path}.sub_workflow.{current_component_id}", new_parent_ids)
-                    
-                    # 特殊处理循环节点
-                    if 'type' in schema_part and schema_part['type'] == 'loop':
-                        # 循环节点处理
-                        current_component_id = schema_part.get('id', '')
-                        new_parent_ids = parent_component_ids.copy()
-                        if current_component_id:
-                            new_parent_ids.append(current_component_id)
-                    else:
-                        # 非循环节点，使用原有父组件ID列表
-                        new_parent_ids = parent_component_ids.copy()
-                        # 如果当前有ID且不是特殊节点类型，添加到父组件ID列表
-                        current_component_id = schema_part.get('id', '')
-                        if current_component_id and 'type' in schema_part and schema_part['type'] not in ['start', 'end']:
-                            new_parent_ids.append(current_component_id)
-                    
-                    # 特殊处理循环体、分支条件等嵌套结构
-                    nested_keys = ['loop_body', 'branches', 'branch_body', 'sub_workflow', 'components']
-                    for key, value in schema_part.items():
-                        new_path = f"{parent_path}.{key}" if parent_path else key
-                        # 递归处理所有嵌套结构，特别是已知的嵌套组件容器
-                        if key in nested_keys or isinstance(value, (dict, list)):
-                            extract_component_names(value, name_map, new_path, new_parent_ids)
-                elif isinstance(schema_part, list):
-                    # 递归处理列表中的每个元素
-                    for idx, item in enumerate(schema_part):
-                        new_path = f"{parent_path}[{idx}]" if parent_path else f"[{idx}]"
-                        extract_component_names(item, name_map, new_path, parent_component_ids.copy())
-            
-            workflow_schema = json.loads(workflow.schema) if workflow.schema else {}
-            if isinstance(workflow_schema, dict):
-                component_name_map = {}
-                extract_component_names(workflow_schema, component_name_map)
-        except (json.JSONDecodeError, TypeError, KeyError, ImportError) as e:
-            jiuwen_db_logger.warning(f"Failed to parse workflow schema for component names: {e}", exc_info=True)
-        
         # 本次workflow执行的所有component执行数据
         components_execute_info = WorkflowExecutionRepository._extract_summary_execution_info_from_log(log_data=log_data,
-                                                                                execute_start_time=execute_start_time,
-                                                                                component_name_map=component_name_map)
+                                                                                execute_start_time=execute_start_time)
         # 将workflow的本次执行的总信息构造成最外层的InvokeExecuteInfo
         execute_info = InvokeExecuteInfo(
             invoke_id=workflow.workflow_id,
