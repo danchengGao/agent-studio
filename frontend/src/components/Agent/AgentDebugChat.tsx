@@ -114,7 +114,12 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
   }, [openingRemarks])
 
   const appendUserMessage = (content: string) => {
-    const msg: ChatMessage = { role: 'user', content, timestamp: Date.now(), kind: 'normal' }
+    const msg: ChatMessage = {
+      role: 'user',
+      content,
+      timestamp: Date.now(),
+      kind: 'normal',
+    }
     setChatHistory(prev => [...prev, msg])
   }
 
@@ -129,20 +134,6 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
     }
     setChatHistory(prev => [...prev, msg])
     return ts
-  }
-
-  const mergeStreamText = (prev: string, incoming: string) => {
-    if (!prev) return incoming
-    if (!incoming) return prev
-    if (incoming.startsWith(prev)) return incoming
-    if (prev.startsWith(incoming)) return prev
-    const maxOverlap = Math.min(prev.length, incoming.length)
-    for (let len = maxOverlap; len > 0; len--) {
-      if (prev.endsWith(incoming.slice(0, len))) {
-        return prev + incoming.slice(len)
-      }
-    }
-    return prev + incoming
   }
 
   const normalizeStreamEvent = (
@@ -207,10 +198,13 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
       const existingIdx = nextChunks.findIndex(c => c.type === safeType && c.nodeId === safeNodeId)
       if (existingIdx >= 0) {
         const existing = nextChunks[existingIdx]
+        // 直接拼接，不再使用 mergeStreamText
+        const newContent = (existing.content || '') + incoming
+
         nextChunks[existingIdx] = {
           ...existing,
           nodeName: existing.nodeName || safeNodeName,
-          content: mergeStreamText(existing.content || '', incoming),
+          content: newContent,
           status: 'streaming',
         }
       } else {
@@ -224,7 +218,7 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
         })
       }
 
-      const aggregated = nextChunks.length > 0 ? nextChunks.map(c => c.content).join('') : mergeStreamText(msg.content || '', incoming)
+      const aggregated = nextChunks.length > 0 ? nextChunks.map(c => c.content).join('') : (msg.content || '') + incoming
       updated[idx] = { ...msg, content: aggregated, chunks: nextChunks }
       return updated
     })
@@ -238,7 +232,11 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
       const updated = [...prev]
       const msg = updated[idx]
       const doneChunks = msg.chunks ? msg.chunks.map(c => ({ ...c, status: 'done' as const })) : msg.chunks
-      updated[idx] = { ...msg, chunks: doneChunks, detailInfo: { ...(msg.detailInfo || {}), streaming: false } }
+      updated[idx] = {
+        ...msg,
+        chunks: doneChunks,
+        detailInfo: { ...(msg.detailInfo || {}), streaming: false },
+      }
       return updated
     })
   }
@@ -259,7 +257,11 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
       if (content.length > 0) {
         const updated = [...prev]
         const doneChunks = msg.chunks ? msg.chunks.map(c => ({ ...c, status: 'done' as const })) : msg.chunks
-        updated[idx] = { ...msg, chunks: doneChunks, detailInfo: { ...(msg.detailInfo || {}), streaming: false } }
+        updated[idx] = {
+          ...msg,
+          chunks: doneChunks,
+          detailInfo: { ...(msg.detailInfo || {}), streaming: false },
+        }
         return updated
       }
       return prev.filter(m => !(m.timestamp === ts && m.role === 'assistant'))
@@ -456,14 +458,16 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
     const trimmed = inputMessage.trim()
     if (!trimmed) return
 
-    // if (isInterrupted && isSimpleInteraction) {
-    //   appendUserMessage(trimmed)
-    //   setInputMessage('')
-    //   await resumeAgentInteraction(JSON.stringify({ input_value: trimmed }))
-    //   return
-    // }
-
-    setChatHistory(prev => prev.map(m => (m.kind === 'interaction' ? { ...m, detailInfo: { ...(m.detailInfo || {}), isHistorical: true } } : m)))
+    setChatHistory(prev =>
+      prev.map(m =>
+        m.kind === 'interaction'
+          ? {
+              ...m,
+              detailInfo: { ...(m.detailInfo || {}), isHistorical: true },
+            }
+          : m,
+      ),
+    )
     appendUserMessage(trimmed)
     setInputMessage('')
     resetInteractionState()
@@ -490,7 +494,16 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
     const inputObj = JSON.parse(userInput)
     const inputValue = inputObj && typeof inputObj === 'object' && 'input_value' in inputObj ? (inputObj as any).input_value : inputObj
     let hasNewInteraction = false
-    setChatHistory(prev => prev.map(m => (m.kind === 'interaction' ? { ...m, detailInfo: { ...(m.detailInfo || {}), isHistorical: true } } : m)))
+    setChatHistory(prev =>
+      prev.map(m =>
+        m.kind === 'interaction'
+          ? {
+              ...m,
+              detailInfo: { ...(m.detailInfo || {}), isHistorical: true },
+            }
+          : m,
+      ),
+    )
     startStreamCycle()
     return new Promise<void>((resolve, reject) => {
       ExecutionService.handleAgentUserInput(
@@ -558,7 +571,10 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
       if (idx === -1) return prev
       const updated = [...prev]
       const msg = updated[idx]
-      updated[idx] = { ...msg, detailInfo: { ...(msg.detailInfo || {}), submittedValue: value } }
+      updated[idx] = {
+        ...msg,
+        detailInfo: { ...(msg.detailInfo || {}), submittedValue: value },
+      }
       return updated
     })
     try {
