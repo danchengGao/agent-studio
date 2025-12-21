@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Bot, Workflow, FileText, Brain, X, ChevronDown, Zap, Lock, Unlock, MessageSquare, Plug } from 'lucide-react'
 import DashboardIcon from '@/assets/icons/dashboard.svg?react'
+import packageJson from '@/../package.json'
 
 interface SidebarProps {
   isOpen: boolean
@@ -219,7 +220,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
           `}
           >
             <span className={`whitespace-nowrap ${isCollapsed ? 'text-blue-600 font-medium' : 'text-gray-500 text-xs'}`}>
-              openJiuwen v1.0.0 ({t('layout.sidebar.version')})
+              openJiuwen v{packageJson.version} ({t('layout.sidebar.version')})
             </span>
           </div>
         </div>

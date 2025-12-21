@@ -1,31 +1,17 @@
 {
   "name": "jiuwen-agent-studio",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Jiuwen Agent Studio - A comprehensive LLM agent development platform",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "NODE_OPTIONS='--max-old-space-size=8192 --max-semi-space-size=256' vite build --mode production",
-    "build-with-check": "npm run type-check && npm run lint && vite build",
-    "build:prod": "npm run build",
-    "build:fast": "NODE_OPTIONS='--max-old-space-size=4096' vite build --mode production",
     "build:clean": "rm -rf dist .vite-cache && npm run build",
-    "build:monitor": "./scripts/monitor-build.sh",
-    "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "setup-hooks": "node scripts/setup-hooks.js",
-    "serve": "npx serve -s dist -l 3000",
-    "serve:prod": "npx serve -s dist -l 80",
-    "serve:test": "./scripts/test-serve.sh",
-    "deploy": "npm run build && npm run serve",
-    "deploy:fast": "npm run build:fast && npm run serve",
-    "deploy:clean": "npm run build:clean && npm run serve",
-    "prepare": "node scripts/setup-hooks.js",
-    "postinstall": "node scripts/setup-hooks.js"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
@@ -121,7 +107,6 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
       "prettier --write"
     ],
     "*.{json,css,md}": [
