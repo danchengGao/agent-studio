@@ -24,7 +24,7 @@ class TraceDetail(BaseModel):
     platform_type: Optional[str] = Field(None, max_length=50)
     start_time_micros: Optional[int] = Field(0, description="开始时间微秒戳")
     end_time_micros: Optional[int] = Field(0, description="结束时间微秒戳")
-    status_code: Optional[str] = Field(None, max_length=10)
+    status_code: Optional[str] = Field(None, max_length=20)
     input: Optional[str] = Field(None)
     output: Optional[str] = Field(None)
     attributes: Optional[Dict[str, Any]] = Field({})
