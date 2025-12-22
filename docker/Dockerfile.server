@@ -2,9 +2,12 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS builder
 
-
-ARG OPENJIUWEN_VERSION
 ARG INDEX_URL
+
+ARG UPDATE_OPENJIUWEN_VERSION=false
+ARG OPENJIUWEN_VERSION
+
+RUN echo "UPDATE_OPENJIUWEN_VERSION: ${UPDATE_OPENJIUWEN_VERSION}"
 RUN echo "OPENJIUWEN_VERSION: ${OPENJIUWEN_VERSION}"
 RUN echo "INDEX_URL: ${INDEX_URL}"
 
@@ -12,8 +15,12 @@ RUN echo "INDEX_URL: ${INDEX_URL}"
 WORKDIR /app
 COPY backend .
 RUN pip install uv -i ${INDEX_URL}
-RUN sed -i "s#openjiuwen==0.1.0#openjiuwen==${OPENJIUWEN_VERSION}#g" pyproject.toml
-RUN sed -i "s#url = \"https://mirrors.aliyun.com/pypi/simple/\"#url = \"${INDEX_URL}\"#g" pyproject.toml
+
+RUN if [ "$UPDATE_OPENJIUWEN_VERSION" = "true" ]; then \
+    sed -i "s#\"openjiuwen==[^\"]*\"#\"openjiuwen==${OPENJIUWEN_VERSION}\"#g" pyproject.toml; \
+fi
+
+RUN sed -i "s#url = \"[^\"]*\"#url = \"${INDEX_URL}\"#g" pyproject.toml
 RUN uv venv
 RUN /app/.venv/bin/python3 -m ensurepip --upgrade
 RUN UV_HTTP_TIMEOUT=700 \
