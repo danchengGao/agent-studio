@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from sqlalchemy import (JSON, BigInteger, ForeignKey, String, UniqueConstraint,
-                        and_, func, select)
+                        and_, func, select, Integer)
 from sqlalchemy.orm import (Mapped, declarative_mixin, foreign, mapped_column,
                             relationship)
 
@@ -10,6 +10,7 @@ from app.core.database import milliseconds
 from app.models.db_fun_base import Base, DBFunBase
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
+from ops.config import settings
 
 if TYPE_CHECKING:
     from app.models.agent_execution import AgentExecutionDB
@@ -18,8 +19,12 @@ if TYPE_CHECKING:
 
 
 @declarative_mixin
-class AgentDBMixin:    
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+class AgentDBMixin:
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     space_id: Mapped[str] = mapped_column(String(100), nullable=False)
     agent_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(String(2000), nullable=True)

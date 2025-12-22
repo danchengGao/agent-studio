@@ -9,7 +9,7 @@ from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
 
 from app.models.agent import AgentBaseDB, AgentPublishDB
 from app.models.db_fun_base import Base, DBFunBase
-
+from ops.config import settings
 # ==================== agent_execution ====================
 
 
@@ -20,7 +20,12 @@ class AgentExecutionDB(Base, DBFunBase):
         Index("agent_id_version", "agent_id", "agent_version"),
         {"comment": "某次agent执行的总结信息"}
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     space_id: Mapped[str | None] = mapped_column(String(100), nullable=False)
     # 与agent的多态关联字段
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -101,7 +106,10 @@ class AgentExecutionDetailsDB(Base, DBFunBase):
     __table_args__ = {"comment": "某次agent执行每个步骤的详细信息"}
 
     # 主键
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    else:
+        id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     # 业务主键：trace_id + invoke_id 联合唯一（如需要可改成联合主键）
     trace_id: Mapped[str] = mapped_column(String(100),

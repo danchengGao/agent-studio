@@ -1,13 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-
 from sqlalchemy import (JSON, BigInteger, ForeignKey, Index, String, Text,
-                        UniqueConstraint, and_, func, select)
+                        UniqueConstraint, and_, func, select, Integer)
 from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
                             foreign, mapped_column, relationship)
-
 from app.core.database import milliseconds
 from app.models.db_fun_base import Base, DBFunBase
+from ops.config import settings
 
 if TYPE_CHECKING:
     from app.models.awp_relation import AgentWorkflowRelationDB
@@ -17,7 +16,11 @@ if TYPE_CHECKING:
 
 @declarative_mixin
 class WorkflowDBMixin:
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     name: Mapped[str | None] = mapped_column(String(255), nullable=True, name="workflow_name")
     desc: Mapped[str | None] = mapped_column(String(512), nullable=True, name="description")
     space_id: Mapped[str | None] = mapped_column(String(100), nullable=True)

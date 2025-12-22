@@ -1,8 +1,9 @@
-from sqlalchemy import BigInteger, JSON, String, UniqueConstraint, Index
+from sqlalchemy import BigInteger, JSON, String, UniqueConstraint, Index, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.db_fun_base import Base, DBFunBase
 from app.models.workflow import WorkflowBaseDB, WorkflowPublishDB
 from app.models.agent import AgentBaseDB, AgentPublishDB
+from ops.config import settings
 
 '''
 the relation between agent/workflow/plugin
@@ -17,7 +18,12 @@ class AgentWorkflowRelationDB(Base, DBFunBase):
         Index("idx_agent", "space_id", "agent_id", "agent_version"),
         Index("idx_workflow", "space_id", "workflow_id", "workflow_version"),
     )
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     space_id: Mapped[str] = mapped_column(String(100), nullable=False)
     agent_id: Mapped[str] = mapped_column(String(100), nullable=False)
     agent_version: Mapped[str] = mapped_column(String(100), nullable=False)

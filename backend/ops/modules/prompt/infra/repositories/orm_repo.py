@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from ops.modules.prompt.domain.entities import LLMModelInfo
 from ops.modules.prompt.infra.database import Base, BaseAgent
 from ops.modules.prompt.domain import entities
+from ops.config import settings
 
 
 # ORM模型
@@ -60,7 +61,11 @@ class UserModel(Base):
 class PromptUserDraftModel(Base):
     __tablename__ = "prompt_user_draft"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+
     space_id = Column(BigInteger, nullable=False, default=0, comment="空间ID")
     prompt_id = Column(BigInteger, nullable=False, comment="Prompt ID")
     user_id = Column(String(128), nullable=False, default="", comment="用户ID")
@@ -85,7 +90,11 @@ class PromptCommitModel(Base):
                          name='uq_space_prompt_commit'),
     )
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+
     space_id = Column(BigInteger, nullable=False, default=0, comment="空间ID")
     prompt_id = Column(BigInteger, nullable=False, comment="Prompt ID")
     prompt_key = Column(String(128), nullable=False, default="", comment="Prompt key")
@@ -145,8 +154,13 @@ class AgentModel(BaseAgent):
                          name='unique_prompt_id_version_aw_id_version'),
     )
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True,
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True,
                 comment='Primary Key ID, Auto Increment')
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True,
+                comment='Primary Key ID, Auto Increment')
+
     space_id = Column(String(100), nullable=True)
     prompt_id = Column(String(100), nullable=True)
     prompt_version = Column(String(100), nullable=True)
@@ -163,7 +177,11 @@ class AgentModel(BaseAgent):
 class User(BaseAgent):
     __tablename__ = 'user'
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='Primary Key ID')
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True, comment='Primary Key ID')
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True, comment='Primary Key ID')
+
     user_id = Column(String(100), nullable=False, unique=True, comment='USER ID')
     email = Column(String(128), nullable=False, unique=True)
     user_unique_name = Column(String(128), nullable=False, unique=True)
@@ -238,13 +256,20 @@ class ModelConfig(BaseAgent):
 class JobUserDraftModel(Base):
     __tablename__ = "job_user_draft"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+
     space_id = Column(String(128), nullable=False, comment="空间ID")
     user_id = Column(String(128), nullable=False, comment="用户ID")
     name = Column(String(64), comment="任务名称")
     desc = Column(String(256), comment="任务描述")
     rawTemplates = Column(Text, comment="原始模板信息")
-    optimizeInfo = Column(MEDIUMTEXT, comment="优化配置")
+    if settings.DB_TYPE.lower() == "sqlite":
+        optimizeInfo = Column(Text, comment="优化配置")
+    else:
+        optimizeInfo = Column(MEDIUMTEXT, comment="优化配置")
     modelInfo = Column(Text, comment="调优大模型配置")
     assistantInfo = Column(Text, comment="调优大模型配置")
     agentTools = Column(Text, comment="调优工具")
@@ -256,7 +281,11 @@ class JobUserDraftModel(Base):
 class JobUserInfoModel(Base):
     __tablename__ = "job_user_info"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+
     job_id = Column(String(128), nullable=False, comment="任务ID")
     space_id = Column(String(128), nullable=False, comment="空间ID")
     user_id = Column(String(128), nullable=False, comment="用户ID")
@@ -269,7 +298,10 @@ class JobUserInfoModel(Base):
     history = Column(JSON, nullable=True, comment="历史记录信息")
     success_rate = Column(DECIMAL(5, 4), nullable=True, comment="最优任务成功率")
     progress_rate = Column(DECIMAL(5, 4), nullable=True, comment="任务进展")
-    optimizeInfo = Column(MEDIUMTEXT, nullable=True, comment="优化配置")
+    if settings.DB_TYPE.lower() == "sqlite":
+        optimizeInfo = Column(Text, nullable=True, comment="优化配置")
+    else:
+        optimizeInfo = Column(MEDIUMTEXT, nullable=True, comment="优化配置")
     modelInfo = Column(Text, nullable=True, comment="调优大模型配置")
     assistantInfo = Column(Text, nullable=True, comment="助手模型配置")
     agentTools = Column(Text, nullable=True, comment="调优工具")

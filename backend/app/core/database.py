@@ -13,9 +13,18 @@ from app.core.config import settings
 
 def get_database_url() -> str:
     """根据数据库类型生成数据库连接URL"""
-    return (f"mysql+pymysql://{settings.db_user}:{settings.db_password}@"
+    if settings.db_type.lower() == "mysql":
+        return (f"mysql+pymysql://{settings.db_user}:{settings.db_password}@"
                    f"{settings.db_host}:{settings.db_port}/{settings.agent_db_name}?charset=utf8mb4")
 
+    elif settings.db_type.lower() == "sqlite":
+        # 确保数据库目录存在
+        db_path = Path(settings.sqlite_db_path)
+        db_path.mkdir(parents=True, exist_ok=True)
+        return f"sqlite:///{db_path}/{settings.agent_sqlite_db}"
+
+    else:
+        raise ValueError(f"Unsupported database type: {settings.db_type.lower()}")
 
 database_url = get_database_url()
 

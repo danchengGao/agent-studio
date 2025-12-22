@@ -3,6 +3,7 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
 import logging
+from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -20,30 +21,57 @@ if not logger.handlers:
 
 
 def get_database_url(db_name: str = None) -> str:
-    """生成数据库连接URL"""
-    if db_name == "ops":
-        return (f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@"
-               f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.OPS_DB_NAME}?charset=utf8mb4")
-    elif db_name == "agent":
-        return (f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@"
-               f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.AGENT_DB_NAME}?charset=utf8mb4")
+    """根据数据库类型生成数据库连接URL"""
+    if settings.DB_TYPE.lower() == "mysql":
+        if db_name == "ops":
+            return (f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@"
+                   f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.OPS_DB_NAME}?charset=utf8mb4")
+        elif db_name == "agent":
+            return (f"mysql+pymysql://{settings.DB_USER}:{settings.DB_PASSWORD}@"
+                   f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.AGENT_DB_NAME}?charset=utf8mb4")
+        else:
+            raise ValueError(f"Unknown database name: {db_name}")
+    elif settings.DB_TYPE.lower() == "sqlite":
+        # 确保数据库目录存在
+        db_path = Path(settings.SQLITE_DB_PATH)
+        db_path.mkdir(parents=True, exist_ok=True)
+
+        if db_name == "ops":
+            return f"sqlite:///{db_path}/{settings.OPS_SQLITE_DB}"
+        elif db_name == "agent":
+            return f"sqlite:///{db_path}/{settings.AGENT_SQLITE_DB}"
+        else:
+            raise ValueError(f"Unknown database name: {db_name}")
     else:
-        raise ValueError(f"Unknown database name: {db_name}")
+        raise ValueError(f"Unsupported database type: {settings.DB_TYPE}")
 
 
 def get_async_database_url(db_url: str) -> str:
     """将同步数据库URL转换为异步URL"""
-    return db_url.replace("pymysql", "aiomysql")
+    if "mysql+pymysql" in db_url:
+        return db_url.replace("pymysql", "aiomysql")
+    elif "sqlite" in db_url:
+        return db_url.replace("sqlite://", "sqlite+aiosqlite://")
+    else:
+        raise ValueError(f"Unsupported database URL for async: {db_url}")
 
 
 def _check_async_drivers():
     """检查异步数据库驱动是否可用"""
-    try:
-        import aiomysql
-        return True
-    except ImportError:
-        return False
+    if settings.DB_TYPE.lower() == "sqlite":
+        try:
+            import aiosqlite
+            return True
+        except ImportError:
+            pass
+    elif settings.DB_TYPE.lower() == "mysql":
+        try:
+            import aiomysql
+            return True
+        except ImportError:
+            pass
 
+    return False
 
 # 延迟初始化的数据库引擎和会话工厂
 engine = None
@@ -58,11 +86,19 @@ AsyncSessionLocalAgent = None
 
 def _get_engine_kwargs():
     """获取数据库引擎参数"""
-    return {
-        "pool_pre_ping": True,
-        "pool_recycle": 3600,
-        "echo": settings.DEBUG
-    }
+    if settings.DB_TYPE.lower() == "mysql":
+        return {
+            "pool_pre_ping": True,
+            "pool_recycle": 3600,
+            "echo": settings.DEBUG
+        }
+    elif settings.DB_TYPE.lower() == "sqlite":
+        return {
+            "connect_args": {"check_same_thread": False},
+            "echo": settings.DEBUG
+        }
+    else:
+        raise ValueError(f"Unsupported database type: {settings.DB_TYPE}")
 
 
 def _init_engines():
@@ -92,6 +128,8 @@ def _init_engines():
         # 异步引擎配置（仅在驱动可用时初始化）
         if _check_async_drivers():
             async_engine_kwargs = engine_kwargs.copy()
+            if settings.DB_TYPE.lower() == "sqlite":
+                async_engine_kwargs.pop("connect_args", None)
 
             # 异步数据库URL
             ASYNC_DATABASE_URL_OPS = get_async_database_url(DATABASE_URL_OPS)
@@ -115,15 +153,17 @@ def _init_engines():
 
     except ImportError as e:
         # 处理缺少驱动的情况
-        if "pymysql" in str(e):
+        if settings.DB_TYPE.lower() == "mysql" and "pymysql" in str(e):
             logger.warning(f"警告: MySQL驱动不可用，请安装 pymysql: pip install pymysql")
             logger.warning("继续运行，但数据库功能将不可用")
+        elif settings.DB_TYPE.lower() == "sqlite" and "sqlite3" in str(e):
+            logger.warning(f"警告: SQLite驱动不可用: {e}")
         else:
             logger.warning(f"数据库初始化警告: {e}")
-            raise
+            raise e
     except Exception as e:
         logger.error(f"数据库初始化失败: {e}")
-        raise
+        raise e
 
 
 def get_database_url_cached(db_name: str = None) -> str:
@@ -183,7 +223,7 @@ def create_database_tables():
     """创建数据库表"""
     try:
         _init_engines()  # 确保引擎已初始化
-        logger.info("Creating tables for mysql database...")
+        logger.info(f"Creating tables for {settings.DB_TYPE} database...")
 
         # 创建OPS数据库表
         Base.metadata.create_all(bind=engine)
@@ -201,7 +241,9 @@ def create_database_tables():
         error_str = str(e).lower()
         if "pymysql" in error_str:
             logger.error("提示: 请安装MySQL驱动: pip install pymysql")
-        elif "aiomysql" in error_str:
+        elif "sqlite3" in error_str:
+            logger.error("提示: SQLite驱动问题，请检查Python环境")
+        elif "aiosqlite" in error_str or "aiomysql" in error_str:
             logger.warning("提示: 异步驱动不可用，但不影响同步功能")
         else:
             logger.error(f"未知错误: {e}")
@@ -214,7 +256,7 @@ def get_database_info():
     DATABASE_URL_AGENT = get_database_url("agent")
 
     return {
-        "type": "mysql",
+        "type": settings.DB_TYPE,
         "ops_url": DATABASE_URL_OPS.split("://")[0] + "://***",  # 隐藏密码
         "agent_url": DATABASE_URL_AGENT.split("://")[0] + "://***",  # 隐藏密码
         "debug": settings.DEBUG
@@ -224,4 +266,9 @@ def get_database_info():
 # 导出便利函数
 def is_mysql() -> bool:
     """检查是否使用MySQL"""
-    return True
+    return settings.DB_TYPE.lower() == "mysql"
+
+
+def is_sqlite() -> bool:
+    """检查是否使用SQLite"""
+    return settings.DB_TYPE.lower() == "sqlite"

@@ -10,6 +10,7 @@ from ops.modules.prompt.domain.debug_entity import DebugContext, DebugCore, Debu
     DebugToolCall, ToolCall, FunctionCall, ContentPart, ContentType, ImageURL, Role, ToolType, Message, VariableType, \
     MockTool
 from ops.modules.prompt.domain.debug_repository import DebugLogRepository, DebugContextRepository
+from ops.config import settings
 
 
 class PromptDebugContext(Base):
@@ -20,7 +21,11 @@ class PromptDebugContext(Base):
     __tablename__ = "prompt_debug_context"
     __table_args__ = {"extend_existing": True, "mysql_charset": "utf8mb4"}
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True)
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True)
+
     prompt_id = Column(BigInteger, nullable=False, index=True)
     user_id = Column(String(128), nullable=False)
     mock_contexts = Column(JSON)
@@ -40,7 +45,11 @@ class PromptDebugLog(Base):
     __tablename__ = "prompt_debug_log"
     __table_args__ = {"extend_existing": True, "mysql_charset": "utf8mb4"}
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    if settings.DB_TYPE.lower() == "sqlite":
+        id = Column(Integer, primary_key=True, autoincrement=True)
+    else:
+        id = Column(BigInteger, primary_key=True, autoincrement=True)
+
     prompt_id = Column(BigInteger, nullable=False, index=True)
     space_id = Column(BigInteger, nullable=False)
     prompt_key = Column(String(128), nullable=False)

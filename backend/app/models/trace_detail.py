@@ -1,8 +1,9 @@
 
 from typing import Optional, Dict, Any
-from sqlalchemy import Column, String, BigInteger, Text, JSON
+from sqlalchemy import Column, String, BigInteger, Text, JSON, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.db_fun_base import Base, DBFunBase
+from ops.config import settings
 
 
 class TraceDetailDB(Base, DBFunBase):
@@ -10,7 +11,10 @@ class TraceDetailDB(Base, DBFunBase):
     __tablename__ = "trace_detail"
 
     # 主键字段
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    else:
+        id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
 
     # 业务字段
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="空间ID")

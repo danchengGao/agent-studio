@@ -6,12 +6,11 @@ Trace Summary 数据库模型
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-
 from sqlalchemy import (JSON, BigInteger, Column, DateTime, Integer, String,
                         Text)
 from sqlalchemy.orm import Mapped, mapped_column
-
 from app.models.db_fun_base import Base, DBFunBase
+from ops.config import settings
 
 
 class TraceSummaryDB(Base, DBFunBase):
@@ -19,7 +18,10 @@ class TraceSummaryDB(Base, DBFunBase):
     __tablename__ = "trace_summary"
 
     # 主键字段
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="主键ID")
+    else:
+        id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
 
     # 业务字段
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="空间ID")

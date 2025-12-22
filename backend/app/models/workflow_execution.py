@@ -1,18 +1,16 @@
 from __future__ import annotations
 from datetime import datetime
 from typing import Any
-
 from sqlalchemy import (JSON, BigInteger, DateTime, ForeignKey, Index, Integer,
                         String, Text, UniqueConstraint, func)
 from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
                             mapped_column, relationship)
-
 from app.models.db_fun_base import Base, DBFunBase
 from app.models.workflow import WorkflowBaseDB, WorkflowPublishDB
+from ops.config import settings
+
 
 # ==================== workflow_execution ====================
-
-
 class WorkflowExecutionDB(Base, DBFunBase):
     __tablename__ = "workflow_execution"
     __table_args__ = (
@@ -20,7 +18,12 @@ class WorkflowExecutionDB(Base, DBFunBase):
         Index("workflow_id_version", "workflow_id", "workflow_version"),
         {"comment": "某次workflow执行的总结信息"}      
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     space_id: Mapped[str | None] = mapped_column(String(100), nullable=False)
     # 与workflow的多态关联字段
     workflow_id: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -117,7 +120,10 @@ class WorkflowExecutionDetailsDB(Base, DBFunBase):
     __table_args__ = {"comment": "某次workflow执行每个步骤的详细信息"}
     
     # 主键
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    else:
+        id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     # 关联至workflow_execution的主键id
     workflow_execution_id: Mapped[int] = mapped_column(BigInteger, 

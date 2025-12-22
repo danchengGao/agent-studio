@@ -1,12 +1,13 @@
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (BigInteger, Column, ForeignKey, Index, String, Table,
-                        UniqueConstraint)
+                        UniqueConstraint, Integer)
 from sqlalchemy.orm import (Mapped, declarative_mixin, mapped_column,
                             relationship)
 
 from app.core.database import Base as meta_base
 from app.models.db_fun_base import Base, DBFunBase
+from ops.config import settings
 
 # Workflow-Tag 关联表
 workflow_tag_association = Table(
@@ -27,7 +28,11 @@ workflow_tag_association = Table(
 @declarative_mixin
 class TagDBMixin:
     """标签基础字段混入"""
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     space_id: Mapped[str] = mapped_column(String(100), nullable=False)
     tag_name: Mapped[str] = mapped_column(String(100), nullable=False)
     tag_color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # 颜色代码，如 #FF5733

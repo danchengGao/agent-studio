@@ -1,8 +1,9 @@
-from sqlalchemy import BigInteger, String, UniqueConstraint, Index, Boolean
+from sqlalchemy import BigInteger, String, UniqueConstraint, Index, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.db_fun_base import Base, DBFunBase
 from app.models.workflow import WorkflowBaseDB, WorkflowPublishDB
 from app.models.agent import AgentBaseDB, AgentPublishDB
+from ops.config import settings
 
 
 # ==================== user 表 ====================
@@ -17,9 +18,14 @@ class PromptRelationDB(Base, DBFunBase):
     )
 
     # 主键
-    primary_id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID", name="id"
-    )
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(
+            Integer, primary_key=True, autoincrement=True, comment="Primary Key ID", name="id"
+        )
+    else:
+        primary_id: Mapped[int] = mapped_column(
+            BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID", name="id"
+        )
 
     space_id: Mapped[str | None] = mapped_column(String(100), default=None, nullable=True)
     prompt_id: Mapped[str | None] = mapped_column(String(100), default=None, nullable=True)

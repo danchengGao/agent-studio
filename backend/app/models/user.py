@@ -1,6 +1,7 @@
 from sqlalchemy import BigInteger, Boolean, Integer, JSON, String, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.db_fun_base import Base, DBFunBase
+from ops.config import settings
 
 
 # ==================== user 表 ====================
@@ -13,10 +14,15 @@ class UserDB(Base, DBFunBase):
         UniqueConstraint("session_key", name="idx_session_key", ),
     )
 
-    # 主键
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID"
-    )
+    # 主键 
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(
+            Integer, primary_key=True, autoincrement=True, comment="Primary Key ID"
+        )
+    else:
+        id: Mapped[int] = mapped_column(
+            BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID"
+        )
 
     # 必填字段
     user_id_str: Mapped[str] = mapped_column(String(100), comment="USER ID", nullable=False, name="user_id")
@@ -65,9 +71,14 @@ class SpaceDB(Base, DBFunBase):
         Index("idx_owner_id", "owner_id"),
     )
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID"
-    )
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(
+            Integer, primary_key=True, autoincrement=True, comment="Primary Key ID"
+        )
+    else:
+        id: Mapped[int] = mapped_column(
+            BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID"
+        )
 
     space_id: Mapped[str] = mapped_column(String(100), nullable=False)
     user_id_str: Mapped[str] = mapped_column(String(100), nullable=False, name="owner_id")
@@ -98,9 +109,14 @@ class SpaceUserDB(Base, DBFunBase):
         Index("idx_user_id", "user_id"),
     )
 
-    id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID"
-    )
+    if settings.DB_TYPE.lower() == "sqlite":
+        id: Mapped[int] = mapped_column(
+            Integer, primary_key=True, autoincrement=True, comment="Primary Key ID"
+        )
+    else:
+        id: Mapped[int] = mapped_column(
+            BigInteger, primary_key=True, autoincrement=True, comment="Primary Key ID"
+        )
 
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="Space ID")
     user_id_str: Mapped[str] = mapped_column(String(100), nullable=False, comment="User ID", name="user_id")

@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     db_password: str = ""
     agent_db_name: str = ""
 
+     # sqlite配置
+    sqlite_db_path: str = "data/databases"
+    agent_sqlite_db: str = "agent.db"
+
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"

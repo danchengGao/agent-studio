@@ -1,6 +1,7 @@
-from sqlalchemy import BigInteger, String, UniqueConstraint
+from sqlalchemy import BigInteger, String, UniqueConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from app.models.db_fun_base import Base, DBFunBase
+from ops.config import settings
 
 
 class ReferenceDB(Base, DBFunBase):
@@ -9,8 +10,11 @@ class ReferenceDB(Base, DBFunBase):
         UniqueConstraint("space_id", "referenced_type", "referenced_id", "referenced_version",
                         "referer_type", "referer_id", "referer_version", name="uix_reference"),
     )
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
 
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
     space_id: Mapped[str] = mapped_column(String(100), nullable=False)
     referenced_type: Mapped[str] = mapped_column(String(20), nullable=False)
     referenced_id: Mapped[str] = mapped_column(String(100), nullable=False)

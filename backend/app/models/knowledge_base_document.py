@@ -2,10 +2,10 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from sqlalchemy import JSON, BigInteger, Index, String, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, Index, String, UniqueConstraint, Integer
 from sqlalchemy.orm import (Mapped, declarative_mixin, mapped_column,
                             relationship)
-
+from ops.config import settings
 from app.models.db_fun_base import Base, DBFunBase
 
 if TYPE_CHECKING:
@@ -26,7 +26,10 @@ class DocumentStatus(str, enum.Enum):
 @declarative_mixin
 class KnowledgeBaseDocumentDBMixin:
     """知识库文档数据模型 Mixin"""
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
     
     # 关联字段
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="空间ID，用于多租户隔离")

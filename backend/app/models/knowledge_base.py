@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
+from ops.config import settings
 from sqlalchemy import (JSON, BigInteger, ForeignKey, Index, Integer, String,
                         Text, UniqueConstraint)
 from sqlalchemy.orm import (Mapped, declarative_mixin, foreign, mapped_column,
@@ -15,7 +15,11 @@ if TYPE_CHECKING:
 @declarative_mixin
 class KnowledgeBaseDBMixin:
     """知识库数据模型 Mixin，包含共享字段"""
-    primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+    if settings.DB_TYPE.lower() == "sqlite":
+        primary_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, name="id")
+    else:
+        primary_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True, name="id")
+
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="空间ID，用于多租户隔离")
     kb_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="知识库ID，唯一标识")
     name: Mapped[str] = mapped_column(String(200), nullable=False, comment="知识库名称")

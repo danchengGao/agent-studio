@@ -21,6 +21,9 @@ def find_env_file():
 
 
 class Settings(BaseSettings):
+    # 数据库类型配置 (mysql/sqlite)
+    DB_TYPE: str = Field(..., env="DB_TYPE")
+
     # mysql配置
     DB_HOST: str = Field(..., env="DB_HOST")
     DB_PORT: int = Field(..., env="DB_PORT")
@@ -28,6 +31,11 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = Field(..., env="DB_PASSWORD")
     OPS_DB_NAME: str = Field(..., env="OPS_DB_NAME")
     AGENT_DB_NAME: str = Field(..., env="AGENT_DB_NAME")
+
+    # sqlite配置
+    SQLITE_DB_PATH: str = Field(..., env="SQLITE_DB_PATH")
+    OPS_SQLITE_DB: str = Field(..., env="OPS_SQLITE_DB")
+    AGENT_SQLITE_DB: str = Field(..., env="AGENT_SQLITE_DB")
 
     # 应用配置
     DEBUG: bool = Field(False, env="DEBUG")
