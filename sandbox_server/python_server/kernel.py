@@ -4,8 +4,9 @@ import json
 import os
 import traceback
 from multiprocessing import Process, Queue
-
-from flask import Flask, request, jsonify
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 
 # ========== 子进程执行函数 ==========
@@ -81,42 +82,50 @@ def exec_code(code: str, inputs: dict, timeout: float = 10.0):
         return {"return": None, "error": "Execution failed silently."}
 
 
-# ========== Flask 接口 ==========
-app = Flask(__name__)
+# ========== FastAPI 接口 ==========
+app = FastAPI()
 
-@app.route("/run", methods=["POST"])
-def run():
-    data = request.get_json()
+
+@app.post("/run")
+async def run(request: Request):
+    data = await request.json()
     if not data:
-        return jsonify({"return": None, "error": "Invalid JSON payload."}), 400
+        return JSONResponse({"return": None, "error": "Invalid JSON payload."}, status_code=400)
 
     code = data.get("code", "")
     inputs = data.get("inputs", {})
     timeout = data.get("timeout", 10)
 
     if not isinstance(code, str) or not isinstance(inputs, dict):
-        return jsonify({"return": None, "error": "'code' must be string and 'inputs' must be dict."}), 400
+        return JSONResponse(
+            {
+                "return": None,
+                "error": "'code' must be string and 'inputs' must be dict.",
+            },
+            status_code=400,
+        )
     if not isinstance(timeout, (int, float)):
-        return jsonify({"return": None, "error": "'timeout' must be a number."}), 400
+        return JSONResponse({"return": None, "error": "'timeout' must be a number."}, status_code=400)
 
     if not code.strip():
-        return jsonify({"return": None, "error": "No code provided."})
+        return JSONResponse({"return": None, "error": "No code provided."})
 
     try:
         result = exec_code(code, inputs, timeout=float(timeout))
     except Exception as e:
         result = {"return": None, "error": traceback.format_exc()}
 
-    return jsonify(result)
+    return JSONResponse(result)
 
-@app.route("/health", methods=["GET"])
+
+@app.get("/health")
 def health_check():
-    return jsonify({"status": "ok"})
+    return JSONResponse({"status": "ok"})
 
 def main():
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 5001))
-    app.run(host=host, port=port, threaded=True)
+    uvicorn.run(app, host=host, port=port)
 
 if __name__ == "__main__":
     main()

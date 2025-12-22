@@ -3,8 +3,8 @@ import os
 
 import httpx
 
-PYTHON_URL = os.getenv("PYTHON_SANDBOX_URL", "")
-JS_URL     = os.getenv("JS_SANDBOX_URL", "")
+PYTHON_URL = os.getenv("PYTHON_SANDBOX_URL", "http://localhost:5001/run")
+JS_URL = os.getenv("JS_SANDBOX_URL", "http://localhost:5002/run")
 
 TIMEOUT = 10   # 建立连接超时
 

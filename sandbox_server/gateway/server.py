@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-import asyncio, json, sys, os
-from quart import Quart, request, jsonify
+import os
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from app.gateway import remote_python, remote_javascript
 
-app = Quart(__name__)
+app = FastAPI()
 
-@app.route("/run", methods=["POST"])
-async def run_code():
-    data = await request.get_json() or {}
+
+@app.post("/run")
+async def run_code(request: Request):
+    data = await request.json() or {}
     lang   = data.get("language", "python")
     code   = data.get("code", "")
     inputs = data.get("inputs", {})
@@ -20,14 +23,17 @@ async def run_code():
         result = await remote_javascript(code, inputs, session, timeout)
     else:
         result = {"return": None, "error": f"Unsupported language: {lang}"}
-    return jsonify({"output": result})
+    return JSONResponse({"output": result})
 
-@app.route("/health", methods=["GET"])
+
+@app.get("/health")
 def health_check():
-    return jsonify({"status": "ok"})
+    return JSONResponse({"status": "ok"})
 
 def main():
-    app.run(host=os.getenv("HOST", "0.0.0.0"), port=os.getenv("PORT", 8188))
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8188))
+    uvicorn.run(app, host=host, port=port)
 
 if __name__ == "__main__":
     main()
