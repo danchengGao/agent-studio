@@ -27,7 +27,7 @@ scripts/
 
 对于启停(up/down)功能，无需拉取完整项目代码，仅需下载 scripts 目录即可执行启停操作。
 
-服务启动时，系统会自动整合配置（.env.default +.env.custom ），并生成最终生效的 .env 文件, 并将该.env 文件备份成.env.<五位随机串>（该文件是容器运行的核心配置，请勿删除），服务关停流程的正常执行同样依赖此文件。
+服务启动时，系统会自动整合配置（.env.default +.env.custom ），并生成最终生效的 .env 文件（该文件是当前服务运行的核心配置）, 并将该.env 文件备份成.envs/env.<五位随机串>（该文件是对应服务启动、运行和重启的核心配置，请勿删除）。
 
 ## 核心功能
 
@@ -58,13 +58,13 @@ cd scripts
 ./service.sh up
 
 # 如需重启已有服务
-./service.sh up -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh up -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 
 # 一键卸载.env文件指定的服务（停止并删除容器）
 ./service.sh down
 
 # 一键卸载指定的服务（停止并删除容器）
-./service.sh down -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh down -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 ```
 
 ## 独立启停/卸载 MYSQL 服务
@@ -77,14 +77,14 @@ cd scripts
 ./service.sh mysql up
 
 # 如需重启已有的MYSQL服务
-./service.sh mysql up -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh mysql up -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 
 
 # 一键卸载.env文件指定的MYSQL服务（停止并删除容器）
 ./service.sh mysql down
 
 # 一键卸载指定的MYSQL服务（停止并删除容器）
-./service.sh mysql down -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh mysql down -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 ```
 
 ## 独立启停/卸载 Milvus 服务
@@ -98,13 +98,13 @@ cd scripts
 ./service.sh milvus up
 
 # 如需重启已有的Milvus服务
-./service.sh milvus up -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh milvus up -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 
 # 一键卸载.env文件指定的Milvus服务（停止并删除容器）
 ./service.sh milvus down
 
 # 一键卸载指定的Milvus服务（停止并删除容器）
-./service.sh milvus down -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh milvus down -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 ```
 
 ## 独立启停/卸载 前后端 服务
@@ -117,13 +117,13 @@ cd scripts
 ./service.sh jiuwen up
 
 # 如需重启已有的前后端服务
-./service.sh jiuwen up -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh jiuwen up -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 
 # 一键卸载.env文件指定的前后端服务（停止并删除容器）
 ./service.sh jiuwen down
 
 # 一键卸载指定的前后端服务（停止并删除容器)
-./service.sh jiuwen down -f <之前启动时脚本自动备份的配置文件：.env.<五位随机串>文件>
+./service.sh jiuwen down -f <之前启动时脚本自动备份的配置文件：.envs/env.<五位随机串>文件>
 ```
 
 ## 动态生成配置文件 backend/setup.cfg

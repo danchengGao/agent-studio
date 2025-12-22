@@ -69,8 +69,8 @@ chmod 600 "$SSL_DIR/private.key"
 chmod 644 "$SSL_DIR/certificate.crt"
 
 # Output paths for Nginx
-echo "ssl_cert_key_file=$SSL_DIR/private.key"
-echo "ssl_cert_file=$SSL_DIR/certificate.crt"
-# echo "ssl_password=$SSL_PASSWORD"
+# echo "ssl_cert_key_file=$SSL_DIR/private.key"
+# echo "ssl_cert_file=$SSL_DIR/certificate.crt"
+# echo "SSL_PASSWORD=$SSL_PASSWORD"
 echo "Note: Private key is encrypted with AES-256. Use ssl_password to decrypt."
 echo "SSL files generated successfully in: $SSL_DIR"

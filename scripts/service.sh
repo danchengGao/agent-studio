@@ -13,6 +13,7 @@ declare -A CONFIG=(
     ["BACKEND_DIR"]="${PROJECT_DIR}/backend"
     ["SETUPCFG_TEMPLATE_FILE"]="${PROJECT_DIR}/backend/setup.cfg.template"
     ["SETUPCFG_FILE"]="${PROJECT_DIR}/backend/setup.cfg"
+    ["ENV_DIR"]="${SCRIPT_DIR}/.envs"
     ["ENV_FILE"]="${SCRIPT_DIR}/.env"
     ["DEFAULT_ENV_FILE"]="${SCRIPT_DIR}/.env.default"
     ["CUSTOM_ENV_FILE"]="${SCRIPT_DIR}/.env.custom"
@@ -419,10 +420,10 @@ generate_env() {
 
 write_env_to_file() {
     local env_file=$1
-    local name_suffix=${ENV_VARS["NAME_SUFFIX"]}
-
+    local env_dirs=${CONFIG["ENV_DIR"]}
+    local backup_env_file="${env_dirs}/env.${ENV_VARS["NAME_SUFFIX"]}"
+    
     info "Writing variable array ENV_VARS to file: ${env_file}"
-
     > "${env_file}"
     printf "%s\n" "${!ENV_VARS[@]}" | sort | while read -r key; do
         if [[ -n "${key}" ]]; then
@@ -430,8 +431,9 @@ write_env_to_file() {
         fi
     done
 
-    info "Copy ${env_file} to ${env_file}.${name_suffix}"
-    cp ${env_file} ${env_file}.${name_suffix}
+    info "Copy ${env_file} to ${backup_env_file}"
+    mkdir -p ${env_dirs}
+    cp ${env_file} ${backup_env_file}
 }
 
 # ======== Read all .env variables into ENV_VARS associative array ========
@@ -920,7 +922,6 @@ up_down_service() {
     elif [ ${cmd} == "down" ]; then
         eval "${exec_cmd} down" || error "down ${service} failed"
         eval "${exec_cmd} rm -f" || error "remove ${service} failed"
-        clean ${service}
     else
         error "Invalid operation: ${cmd}! Only supports: up/down"
     fi
@@ -945,8 +946,10 @@ generate_config_files() {
     local plugin_template_file=${CONFIG["PLUGIN_COMPOSE_TEMPLATE_FILE"]}
     local plugin_compose_file=${CONFIG["PLUGIN_COMPOSE_FILE"]}
     local nginx_template_file=${CONFIG["NGINX_TEMPLE_FILE"]}
-    local nginx_file="${CONFIG["CONFIG_DIR"]}/${ENV_VARS["NGINX_FILE_NAME"]}"
+    local nginx_dir="${CONFIG["CONFIG_DIR"]}/.nginx-files"
+    local nginx_file="${nginx_dir}/${ENV_VARS["NGINX_FILE_NAME"]}"
 
+    mkdir -p ${nginx_dir}
     generate_config_file ${jiuwen_template_file} ${jiuwen_compose_file}
     generate_config_file ${milvus_template_file} ${milvus_compose_file}
     generate_config_file ${mysql_template_file} ${mysql_compose_file}
@@ -1013,43 +1016,20 @@ process_env() {
 
 }
 
-clean() {
-    local env_file="${CONFIG["ENV_FILE"]}.${ENV_VARS["NAME_SUFFIX"]}"
-    local config_dir="${CONFIG["CONFIG_DIR"]}"
-    local milvus_dir="${config_dir}/${ENV_VARS["MILVUS_VOLUME"]}"
-    local nginx_file="${config_dir}/${ENV_VARS["NGINX_FILE_NAME"]}"
-    local phase="$1"
-
-    if [ ${phase} == "down" -o ${phase} == "milvus" ]; then
-        if [ -d ${milvus_dir} ]; then
-            rm -rf ${milvus_dir}
-        fi
-    fi
-    rm -f "${env_file}"
-    rm -f "${nginx_file}"
-    #rm -f "${CONFIG["JIUWEN_COMPOSE_FILE"]}"
-    #rm -f "${CONFIG["MYSQL_COMPOSE_FILE"]}"
-    #rm -f "${CONFIG["MILVUS_COMPOSE_FILE"]}"
-    #rm -f "${CONFIG["PLUGIN_COMPOSE_FILE"]}"
-}
-
 show_deploy_prompt() {
     local cmd1=${ARGS["CMD1"]}
     local cmd2=${ARGS["CMD2"]}
 
     if [[ "${cmd1}" == "up" || "${cmd2}" == "up"  ]]; then
-        local env_file=${CONFIG["ENV_FILE"]}
-        local name_suffix=${ENV_VARS["NAME_SUFFIX"]}
-
-        #cp ${env_file} ${env_file}.${name_suffix}
-        info "Backup ENV file: ${env_file}.${name_suffix}"
+        local backup_env_file="${CONFIG["ENV_DIR"]}/env.${ENV_VARS["NAME_SUFFIX"]}"
+        info "Backup ENV file: ${backup_env_file}"
     fi
 
     if [[ "${cmd1}" == "up" || ( "${cmd1}" == "jiuwen" && "${cmd2}" == "up" ) ]]; then
         get_local_ip
         local frontend_port=${ENV_VARS["FRONTEND_HOST_PORT"]}
         local ip_addr=${ENV_VARS["IP"]}
-        info "OpenJiuwen Intelligent Platform:"
+        info "openJiuwen Agent Platform:"
         info "\tLocal access: https://localhost:${frontend_port}"
         if [ -n "${ip_addr}" ]; then
             info "\tNetwork access: https://${ip_addr}:${frontend_port}"
@@ -1100,7 +1080,6 @@ main() {
             check_docker
             generate_config_files
             exec_service
-            clean "${cmd}"
             ;;
 
         "milvus"|"jiuwen"|"mysql"|"plugin")
