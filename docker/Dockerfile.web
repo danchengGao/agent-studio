@@ -1,17 +1,11 @@
 # Multi-stage build for production
 FROM node:18-alpine AS builder
 
-ARG VERSION
-RUN echo "VERSION: ${VERSION}"
-
 # Set working directory
 WORKDIR /app
 
 # Copy source code
 COPY frontend .
-
-# Change product version
-RUN sed -i "s#\"version\": \"[^\"]*\"#\"version\": \"${VERSION}\"#g" package.json
 
 # Build the application
 RUN npm install && npm run build
