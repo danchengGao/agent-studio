@@ -34,7 +34,6 @@ declare -A CONFIG=(
     ["OS_TYPE"]=""
 )
 
-
 declare -A NAMES=(
     ["MYSQL_SERVICE_NAME"]="mysql"
     ["MYSQL_DOCKER_NAME"]="jiuwen-mysql"
@@ -64,6 +63,7 @@ declare -A NAMES=(
     ["JS_SERVER_DOCKER_NAME"]="jiuwen-js-server"
 )
 
+
 declare -ga PORTS=(
     MYSQL_HOST_PORT
     ETCD_HOST_PORT
@@ -76,6 +76,29 @@ declare -ga PORTS=(
     SANDBOX_GATEWAY_HOST_PORT
     PYTHON_SERVER_HOST_PORT
     JS_SERVER_HOST_PORT
+)
+
+declare -ga CONTAINERS_ADDRS=(
+    MYSQL_SERVICE_NAME
+    MYSQL_DOCKER_NAME
+    ETCD_SERVICE_NAME
+    ETCD_DOCKER_NAME
+    MINIO_SERVICE_NAME
+    MINIO_DOCKER_NAME
+    MILVUS_SERVICE_NAME
+    MILVUS_DOCKER_NAME
+    FRONTEND_SERVICE_NAME
+    FRONTEND_DOCKER_NAME
+    BACKEND_SERVICE_NAME
+    BACKEND_DOCKER_NAME
+    PLUGIN_SERVER_SERVICE_NAME
+    PLUGIN_SERVER_DOCKER_NAME
+    SANDBOX_GATEWAY_SERVICE_NAME
+    SANDBOX_GATEWAY_DOCKER_NAME
+    PYTHON_SERVER_SERVICE_NAME
+    PYTHON_SERVER_DOCKER_NAME
+    JS_SERVER_SERVICE_NAME
+    JS_SERVER_DOCKER_NAME
 )
 
 # ==== Global associative array: Stores all variables from .env (key=variable name, value=variable value) ====
@@ -386,7 +409,6 @@ generate_final_names() {
     local name_suffix=$(generate_random_chars)
     ENV_VARS["NAME_SUFFIX"]=${name_suffix}
 
-
     for key in "${!NAMES[@]}"; do
         info "Generating name for ${key}"
         local value="${NAMES[$key]}" # Predefined default value
@@ -475,6 +497,37 @@ read_env_from_file() {
     done < "${env_file}"
 }
 
+setup_no_proxy_vars() {
+    local no_proxy_addrs="localhost,127.0.0.1"
+
+    # Public IP Address of host machine
+    if [[ -n "${ENV_VARS["IP"]:-}" ]]; then
+        no_proxy_addrs="${no_proxy_addrs},${ENV_VARS["IP"]}"
+    fi
+
+    # all containers
+    for addr in "${CONTAINERS_ADDRS[@]}"; do
+        if [[ -n "${ENV_VARS[$addr]:-}" ]]; then
+            no_proxy_addrs="${no_proxy_addrs},${ENV_VARS[$addr]}"
+        fi
+    done
+
+    if [ -n "${no_proxy:-}" ]; then
+        no_proxy_str="no_proxy=${no_proxy_addrs},${no_proxy}"
+    else
+        no_proxy_str="no_proxy=${no_proxy_addrs}"
+    fi
+
+    if [ -n "${NO_PROXY:-}" ]; then
+        NO_PROXY_STR="NO_PROXY=${no_proxy_addrs},${NO_PROXY}"
+    else
+        NO_PROXY_STR="NO_PROXY=${no_proxy_addrs}"
+    fi
+
+    ENV_VARS["no_proxy_str"]="${no_proxy_str}"
+    ENV_VARS["NO_PROXY_STR"]="${NO_PROXY_STR}"
+}
+
 setup_env_vars() {
     # Detect free ports, assign port numbers to undefined ports
     count_undefined_ports
@@ -484,23 +537,8 @@ setup_env_vars() {
     # If service names, container names, volume names not set, generate non-conflicting names
     generate_final_names
 
-    # Set no_proxy, NO_PROXY values, backend connects to milvus container without proxy
-    local milvus_service_name=${ENV_VARS["MILVUS_SERVICE_NAME"]}
-    local plugin_service_name=${ENV_VARS["PLUGIN_SERVER_SERVICE_NAME"]}
-    local sandbox_gateway_service_name=${ENV_VARS["SANDBOX_GATEWAY_SERVICE_NAME"]}
-
-    local no_proxy_str="no_proxy=${milvus_service_name},${plugin_service_name},${sandbox_gateway_service_name}"
-    local NO_PROXY_STR="NO_PROXY=${milvus_service_name},${plugin_service_name},${sandbox_gateway_service_name}"
-
-    if [ -n "${no_proxy:-}" ]; then
-        no_proxy_str="${no_proxy_str},${no_proxy:-}"
-    fi
-    if [ -n "${NO_PROXY:-}" ]; then
-        NO_PROXY_STR="${NO_PROXY_STR},${NO_PROXY:-}"
-    fi
-
-    ENV_VARS["no_proxy_str"]="${no_proxy_str}"
-    ENV_VARS["NO_PROXY_STR"]="${NO_PROXY_STR}"
+    # Set no_proxy, NO_PROXY values, backend/plugin-server connects to other containers/host-machine without proxy
+    setup_no_proxy_vars
 
     if [[ -z "${ENV_VARS["VITE_API_PROXY_TARGET"]:-}" ]]; then
         local backend_service=${ENV_VARS["BACKEND_SERVICE_NAME"]}
@@ -743,8 +781,8 @@ exec_service() {
         source "${SCRIPT_DIR}/build_SSL_files.sh"
         local cmd_args="-d"  # -d only as argument for up, placed after up
 
-        # Use local MYSQL
-        if [ ${ENV_VARS["DB_HOST"]} == ${ENV_VARS["MYSQL_SERVICE_NAME"]} ]; then
+        # Use local MYSQL or User SQLITE
+        if [ "${ENV_VARS["DB_HOST"]:-}" == "${ENV_VARS["MYSQL_SERVICE_NAME"]}" ]; then
             ## Start mysql container
             eval "${exec_cmd} -f ${mysql_compose_file} ${cmd} ${cmd_args}" || error "${cmd} mysql container failed"
 
@@ -1000,8 +1038,9 @@ process_env() {
     local cmd1=${ARGS["CMD1"]}
     local cmd2=${ARGS["CMD2"]}
 
+    get_local_ip
     if [ "${cmd1}" == "up" -o "${cmd2}" == "up" ]; then
-         if [ -z ${ARGS["ENV_FILE"]} ]; then
+        if [ -z ${ARGS["ENV_FILE"]} ]; then
             generate_env
         else
             read_env_from_file ${ARGS["ENV_FILE"]}
@@ -1026,7 +1065,6 @@ show_deploy_prompt() {
     fi
 
     if [[ "${cmd1}" == "up" || ( "${cmd1}" == "jiuwen" && "${cmd2}" == "up" ) ]]; then
-        get_local_ip
         local frontend_port=${ENV_VARS["FRONTEND_HOST_PORT"]}
         local ip_addr=${ENV_VARS["IP"]}
         info "openJiuwen Agent Platform:"

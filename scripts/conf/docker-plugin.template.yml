@@ -8,10 +8,10 @@ services:
     environment:
       - HTTP_PROXY
       - HTTPS_PROXY
-      - NO_PROXY
       - http_proxy
       - https_proxy
-      - no_proxy
+      - <<no_proxy_str>>
+      - <<NO_PROXY_STR>>
     networks:
       - <<JIUWEN_NETWORK_NAME>>
     restart: unless-stopped
