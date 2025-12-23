@@ -23,6 +23,7 @@ export interface ToolSettingsPanelProps {
   enableAutoSave?: boolean
   isReadOnly?: boolean
   showDefaultValue?: boolean
+  showToolFunctionHint?: boolean // 控制是否显示工具函数提示信息，默认为 true
 }
 
 const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({
@@ -38,6 +39,7 @@ const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({
   enableAutoSave = false,
   isReadOnly = false,
   showDefaultValue = true,
+  showToolFunctionHint = true,
 }) => {
   const { t } = useTranslation()
   // 使用本地状态立即更新 UI，避免等待父组件状态更新导致的延迟
@@ -256,11 +258,13 @@ const ToolSettingsPanel: React.FC<ToolSettingsPanelProps> = ({
       </div>
 
       {/* 页签底部提示文本 */}
-      <div className="mt-6">
-        <Alert severity="info">
-          <Typography variant="body2">{t('components.prompts.toolEditDialog.toolFunctionHint')}</Typography>
-        </Alert>
-      </div>
+      {showToolFunctionHint && (
+        <div className="mt-6">
+          <Alert severity="info">
+            <Typography variant="body2">{t('components.prompts.toolEditDialog.toolFunctionHint')}</Typography>
+          </Alert>
+        </div>
+      )}
     </div>
   )
 }

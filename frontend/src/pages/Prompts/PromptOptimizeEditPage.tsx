@@ -2493,7 +2493,9 @@ const PromptOptimizeEditPage: React.FC = () => {
   }, [currentOptimizedVersion, optimizedPrompt, optimizedVersions])
 
   return (
-    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40" style={{ minHeight: '93vh' }}>
+    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40" style={{ minHeight: '93vh', overflowX: 'auto' }}>
+      {/* 页面容器 */}
+      <div style={{ margin: '0 auto', minWidth: '1100px' }}>
       {/* 页面头部 */}
       <div className="flex items-center justify-between bg-white/60 backdrop-blur-sm p-4 border border-gray-200/60 shadow-sm">
         <div className="flex items-center space-x-4">
@@ -2581,10 +2583,24 @@ const PromptOptimizeEditPage: React.FC = () => {
       </div>
 
       {/* 主体内容 - 三列布局 */}
-      <div className="resizable-columns-container flex h-[calc(100vh-190px)]">
+      <div className="resizable-columns-container flex h-[calc(100vh-180px)]" style={{ minWidth: '1100px' }}>
         {/* Column 1: 基本信息 */}
-        <div style={{ width: `${visibleModules.actualWidths[0]}%` }}>
-          <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
+        <div
+          style={{
+            width: `${visibleModules.actualWidths[0]}%`,
+            minWidth: '320px',
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflowY: 'auto',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
+          className="flex flex-col h-full"
+        >
+          {/* 隐藏滚动条（Webkit） */}
+          <style>{`.basic-info-scroll::-webkit-scrollbar { display: none; }`}</style>
+          <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
             <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-3">
@@ -2633,7 +2649,11 @@ const PromptOptimizeEditPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
+              {/* 基本信息主体内容：单独做一个可滚动区域，隐藏滚动条 */}
+              <div
+                className="flex-1 flex flex-col space-y-4 basic-info-scroll"
+                style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
                 {/* 任务信息配置 */}
                 <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex-shrink-0 space-y-4">
                   <Typography variant="subtitle1" className="mb-3 font-bold text-gray-800 flex items-center space-x-3">
@@ -2748,27 +2768,26 @@ const PromptOptimizeEditPage: React.FC = () => {
                 <Divider className="flex-shrink-0" />
 
                 {/* Original Prompt */}
-                <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex-1 flex flex-col min-h-0">
+                <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col flex-shrink-0">
                   <Typography variant="subtitle1" className="mb-3 font-bold text-gray-800 flex items-center space-x-3 flex-shrink-0 relative">
                     <Zap className="w-5 h-5 text-indigo-600" />
                     <span>{t('prompts.optimizeEditPage.basicInfo.originalPrompt')}</span>
                     <span className="text-gray-700 ml-1">*</span>
                   </Typography>
                   <div className="h-4"></div>
-                  <div className="flex-1 flex flex-col space-y-4 min-h-0">
+                  <div className="flex flex-col" style={{ minHeight: '660px' }}>
                     <FormattedPromptEditor
                       fullWidth
                       placeholder={t('prompts.optimizeEditPage.basicInfo.originalPromptPlaceholder')}
                       value={originalPrompt}
                       onChange={value => setOriginalPromptWithAutoSave(value)}
                       className="bg-white"
-                      size="small"
                       sx={{
                         flex: 1,
-                        minHeight: 0,
-                        overflow: 'hidden',
+                        minHeight: '350px',
                         '& .cm-editor': {
                           height: '100%',
+                          minHeight: '350px',
                         },
                         '& .cm-scroller': {
                           overflow: 'auto',
@@ -2817,9 +2836,21 @@ const PromptOptimizeEditPage: React.FC = () => {
 
         {/* Column 2: 优化配置 */}
         {!moduleCollapsed.optimizationConfig && (
-          <div style={{ width: `${visibleModules.actualWidths[1]}%` }}>
-            <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
-              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
+          <div
+            style={{
+              width: `${visibleModules.actualWidths[1]}%`,
+              minWidth: '360px',
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              overflowY: 'auto',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+            className="flex flex-col h-full"
+          >
+            <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
+              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
@@ -2835,7 +2866,12 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </IconButton>
                   </Tooltip>
                 </div>
-                <div className="flex-1 flex flex-col overflow-hidden">
+                {/* 优化结果主体内容：单独做一个可滚动区域，隐藏滚动条 */}
+                <style>{`.optimization-result-scroll::-webkit-scrollbar { display: none; }`}</style>
+                <div
+                  className="flex-1 flex flex-col optimization-result-scroll min-h-0"
+                  style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
                   {/* Tab标签 */}
                   <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Tabs
@@ -2843,10 +2879,23 @@ const PromptOptimizeEditPage: React.FC = () => {
                       onChange={(e, newValue) => setOptimizationConfigTab(newValue)}
                       aria-label={t('prompts.optimizeEditPage.optimizationConfig.title')}
                       className="bg-white/60 rounded-t-lg"
+                      variant="scrollable"
+                      scrollButtons="auto"
+                      allowScrollButtonsMobile
+                      sx={{
+                        '& .MuiTabs-scroller': {
+                          overflowX: 'auto',
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none',
+                          '&::-webkit-scrollbar': {
+                            display: 'none',
+                          },
+                        },
+                      }}
                     >
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 whitespace-nowrap">
                             <FileText className="w-4 h-4" />
                             <span>{t('prompts.optimizeEditPage.optimizationConfig.testCasesConfig')}</span>
                             <Chip label={testCases.length} size="small" className="bg-blue-100 text-blue-700 text-xs" />
@@ -2855,7 +2904,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                       />
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 whitespace-nowrap">
                             <Brain className="w-4 h-4" />
                             <span>{t('prompts.optimizeEditPage.optimizationConfig.optimizationStrategy')}</span>
                           </div>
@@ -2863,7 +2912,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                       />
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 whitespace-nowrap">
                             <BarChart className="w-4 h-4" />
                             <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteria')}</span>
                           </div>
@@ -2871,7 +2920,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                       />
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 whitespace-nowrap">
                             <Code className="w-4 h-4" />
                             <span>工具设置</span>
                             <Chip label={tools.length} size="small" className="bg-green-100 text-green-700 text-xs" />
@@ -2882,21 +2931,37 @@ const PromptOptimizeEditPage: React.FC = () => {
                   </Box>
 
                   {/* Tab内容区域 */}
-                  <div className="flex-1 bg-gradient-to-r from-gray-50/50 to-slate-50/50 border border-gray-100/60 border-t-0 rounded-b-lg p-4 overflow-hidden">
+                  <div
+                    className="flex-1 bg-gradient-to-r from-gray-50/50 to-slate-50/50 border border-gray-100/60 border-t-0 rounded-b-lg p-4"
+                    style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {/* 隐藏滚动条（Webkit） */}
+                    <style>{`
+                      .optimization-tab-scroll::-webkit-scrollbar { display: none; }
+                    `}</style>
                     {/* 用例集配置 Tab */}
-                    <div role="tabpanel" hidden={optimizationConfigTab !== 0} className="h-full">
+                    <div
+                      role="tabpanel"
+                      hidden={optimizationConfigTab !== 0}
+                      className="h-full optimization-tab-scroll"
+                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
                       {optimizationConfigTab === 0 && (
-                        <div className="h-full flex flex-col max-h-[70vh]">
-                          <div className="flex-1 flex flex-col space-y-3 min-h-0">
+                        <div
+                          className="h-full flex flex-col optimization-tab-scroll"
+                          style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
+                          <div className="flex flex-col space-y-3">
                             {/* 操作按钮 */}
-                            <div className="flex gap-2 flex-shrink-0 items-center">
+                            <div className="flex gap-2 flex-shrink-0 items-center flex-wrap">
                               <Button
                                 variant="outlined"
                                 size="small"
                                 startIcon={<Plus className="w-4 h-4" />}
                                 onClick={handleAddCase}
                                 disabled={testCases.length >= MAX_TEST_CASES}
-                                className="border-blue-300 text-blue-700 text-xs"
+                                className="border-blue-300 text-blue-700 text-xs whitespace-nowrap"
+                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
                               >
                                 {t('prompts.optimizeEditPage.testCases.add')}
                               </Button>
@@ -2905,7 +2970,8 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 size="small"
                                 startIcon={<Upload className="w-4 h-4" />}
                                 component="label"
-                                className="border-blue-300 text-blue-700 text-xs"
+                                className="border-blue-300 text-blue-700 text-xs whitespace-nowrap"
+                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
                               >
                                 {t('prompts.optimizeEditPage.common.uploadFile')}
                                 <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
@@ -2915,8 +2981,9 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 size="small"
                                 startIcon={<Trash className="w-4 h-4" />}
                                 onClick={handleClearCases}
-                                className="border-red-300 text-red-700 text-xs hover:bg-red-50"
+                                className="border-red-300 text-red-700 text-xs hover:bg-red-50 whitespace-nowrap"
                                 disabled={testCases.length === 0}
+                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
                               >
                                 {t('prompts.optimizeEditPage.testCases.clear')}
                               </Button>
@@ -2925,13 +2992,14 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 size="small"
                                 startIcon={<Download className="w-4 h-4" />}
                                 onClick={handleDownloadSample}
-                                className="border-green-300 text-green-700 text-xs hover:bg-green-50"
+                                className="border-green-300 text-green-700 text-xs hover:bg-green-50 whitespace-nowrap"
+                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
                               >
                                 {t('prompts.optimizeEditPage.testCases.downloadExample')}
                               </Button>
                               {/* 用例数量显示 */}
-                              <div className="ml-auto flex items-center space-x-2">
-                                <Typography variant="body2" className="text-xs font-medium text-gray-600">
+                              <div className="ml-auto flex items-center space-x-2 flex-shrink-0">
+                                <Typography variant="body2" className="text-xs font-medium text-gray-600 whitespace-nowrap">
                                   {t('prompts.optimizeEditPage.testCases.count', {
                                     max: MAX_TEST_CASES,
                                   })}
@@ -2940,16 +3008,24 @@ const PromptOptimizeEditPage: React.FC = () => {
                             </div>
 
                             {/* 用例表格 */}
-                            <div className="flex-1 min-h-0">
-                              <TableContainer className="bg-white rounded border border-gray-200 h-full">
-                                <Table size="small" stickyHeader>
+                            <div className="flex flex-col" style={{ minHeight: '300px' }}>
+                              <TableContainer 
+                                className="bg-white rounded border border-gray-200" 
+                                style={{ 
+                                  overflowX: 'auto',
+                                  overflowY: 'auto',
+                                  minHeight: '300px',
+                                  width: '100%'
+                                }}
+                              >
+                                <Table size="small" stickyHeader sx={{ minWidth: '400px' }}>
                                   <TableHead>
                                     <TableRow>
-                                      <TableCell width="60" className="bg-gray-50 font-medium text-xs">
+                                      <TableCell width="60" className="bg-gray-50 font-medium text-xs" sx={{ minWidth: '60px' }}>
                                         编号
                                       </TableCell>
-                                      <TableCell className="bg-gray-50 font-medium text-xs">用例</TableCell>
-                                      <TableCell width="80" align="center" className="bg-gray-50 font-medium text-xs">
+                                      <TableCell className="bg-gray-50 font-medium text-xs" sx={{ minWidth: '200px' }}>用例</TableCell>
+                                      <TableCell width="80" align="center" className="bg-gray-50 font-medium text-xs" sx={{ minWidth: '120px' }}>
                                         {t('prompts.optimizeEditPage.testCases.actions')}
                                       </TableCell>
                                     </TableRow>
@@ -2961,7 +3037,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                         <TableRow key={testCase.id} hover>
                                           <TableCell className="text-xs">{testCase.id}</TableCell>
                                           <TableCell className="text-xs cursor-pointer hover:bg-gray-50" onClick={() => handleViewCase(testCase)}>
-                                            <div className="max-w-xs overflow-hidden">
+                                            <div className="min-w-[200px] max-w-none overflow-hidden">
                                               {(() => {
                                                 const formattedCase = formatTestCaseForDisplay(testCase)
                                                 const isLongContent = formattedCase.length > 200
@@ -3020,30 +3096,39 @@ const PromptOptimizeEditPage: React.FC = () => {
 
                             {/* 分页控件 */}
                             <div className="flex items-center justify-end flex-shrink-0 border-t pt-4">
-                              <div className="flex items-center space-x-4">
-                                <Typography variant="body2" className="text-gray-700">
-                                  {t('prompts.optimizeEditPage.pagination.itemsPerPage')}
+                              <div className="flex items-center flex-wrap gap-2 justify-end">
+                                {/* 每页显示条数 */}
+                                <div className="flex items-center whitespace-nowrap">
+                                  <Typography variant="body2" className="text-gray-700 text-xs">
+                                    {t('prompts.optimizeEditPage.pagination.itemsPerPage')}
+                                  </Typography>
                                   <select
                                     value={testCaseRowsPerPage}
                                     onChange={e => {
                                       setTestCaseRowsPerPage(parseInt(e.target.value, 10))
                                       setTestCasePage(0)
                                     }}
-                                    className="text-sm border border-gray-300 rounded px-1 py-0.5 bg-white mx-1"
+                                    className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white mx-1"
                                   >
                                     <option value={5}>5</option>
                                     <option value={10}>10</option>
                                     <option value={15}>15</option>
                                     <option value={20}>20</option>
                                   </select>
-                                  {t('prompts.optimizeEditPage.pagination.items')}
-                                </Typography>
+                                  <Typography variant="body2" className="text-gray-700 text-xs">
+                                    {t('prompts.optimizeEditPage.pagination.items')}
+                                  </Typography>
+                                </div>
 
-                                <Typography variant="body2" className="text-gray-700">
-                                  {t('prompts.optimizeEditPage.pagination.total', { count: testCases.length })}
-                                </Typography>
+                                {/* 总条数 */}
+                                <div className="flex items-center whitespace-nowrap">
+                                  <Typography variant="body2" className="text-gray-700 text-xs">
+                                    {t('prompts.optimizeEditPage.pagination.total', { count: testCases.length })}
+                                  </Typography>
+                                </div>
 
-                                <div className="flex items-center space-x-1">
+                                {/* 分页按钮和页码 */}
+                                <div className="flex items-center space-x-1 flex-shrink-0">
                                   <Button
                                     size="small"
                                     onClick={handleFirstPage}
@@ -3065,17 +3150,17 @@ const PromptOptimizeEditPage: React.FC = () => {
                                     <ChevronLeft className="w-3 h-3" />
                                   </Button>
 
-                                  <div className="flex items-center mx-2 text-gray-700">
-                                    <Typography variant="body2">{t('prompts.optimizeEditPage.common.page')}</Typography>
+                                  <div className="flex items-center mx-1 text-gray-700 whitespace-nowrap">
+                                    <Typography variant="body2" className="text-xs">{t('prompts.optimizeEditPage.common.page')}</Typography>
                                     <input
                                       type="text"
                                       value={currentPageInput}
                                       onChange={handlePageInputChange}
                                       onKeyPress={handlePageInputKeyPress}
                                       onBlur={handlePageInputBlur}
-                                      className="w-8 text-center border border-gray-300 rounded px-1 py-0.5 text-sm bg-white"
+                                      className="w-8 text-center border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
                                     />
-                                    <Typography variant="body2">{t('prompts.optimizeEditPage.common.of', { total: totalPages })}</Typography>
+                                    <Typography variant="body2" className="text-xs">{t('prompts.optimizeEditPage.common.of', { total: totalPages })}</Typography>
                                   </div>
 
                                   <Button
@@ -3107,10 +3192,22 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </div>
 
                     {/* 优化策略配置 Tab */}
-                    <div role="tabpanel" hidden={optimizationConfigTab !== 1} className="h-full">
+                    <div
+                      role="tabpanel"
+                      hidden={optimizationConfigTab !== 1}
+                      className="h-full optimization-tab-scroll"
+                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
                       {optimizationConfigTab === 1 && (
                         <div className="h-full flex flex-col">
-                          <div className="space-y-4 overflow-y-auto">
+                          <div 
+                            className="space-y-4 optimization-tab-scroll"
+                            style={{ 
+                              overflowY: 'auto', 
+                              scrollbarWidth: 'none', 
+                              msOverflowStyle: 'none'
+                            }}
+                          >
                             {/* 优化参数 */}
                             <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60">
                               <Typography variant="subtitle2" className="font-bold text-gray-800 mb-6 flex items-center space-x-3">
@@ -3396,9 +3493,14 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </div>
 
                     {/* 评价标准配置 Tab */}
-                    <div role="tabpanel" hidden={optimizationConfigTab !== 2} className="h-full">
+                    <div
+                      role="tabpanel"
+                      hidden={optimizationConfigTab !== 2}
+                      className="h-full optimization-tab-scroll"
+                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
                       {optimizationConfigTab === 2 && (
-                        <div className="h-full flex flex-col space-y-2">
+                        <div className="flex flex-col space-y-2">
                           {/* 评价类型选择 */}
                           <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60">
                             <Typography variant="subtitle2" className="font-bold text-gray-800 mb-3 flex items-center space-x-3">
@@ -3445,12 +3547,12 @@ const PromptOptimizeEditPage: React.FC = () => {
                           {/* 分割线 */}
                           <div className="border-t border-gray-200 my-4"></div>
 
-                          {/* 评价标准 - 50% */}
+                          {/* 评价标准 */}
                           <div
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col"
-                            style={{ height: '50%' }}
+                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col flex-shrink-0"
+                            style={{ minHeight: '350px' }}
                           >
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center justify-between mb-3 flex-shrink-0">
                               <div className="flex items-center space-x-3">
                                 <Typography variant="subtitle2" className="font-bold text-gray-800 flex items-center">
                                   <BarChart className="w-5 h-5 text-blue-600" />
@@ -3470,10 +3572,11 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 </Tooltip>
                               </div>
                             </div>
-                            <div className="flex-1 min-h-0">
+                            <div className="flex flex-col" style={{ minHeight: '300px' }}>
                               <TextField
                                 fullWidth
                                 multiline
+                                rows={12}
                                 value={evaluationCriteria}
                                 onChange={e => setEvaluationCriteriaWithAutoSave(e.target.value)}
                                 placeholder={
@@ -3483,17 +3586,11 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 }
                                 size="small"
                                 className="bg-white"
-                                InputProps={{
-                                  style: { height: '100%', alignItems: 'flex-start' },
-                                }}
                                 sx={{
-                                  height: '100%',
                                   '& .MuiInputBase-root': {
-                                    height: '100%',
                                     alignItems: 'flex-start',
                                   },
                                   '& .MuiInputBase-input': {
-                                    height: '100% !important',
                                     overflow: 'auto !important',
                                   },
                                 }}
@@ -3504,12 +3601,12 @@ const PromptOptimizeEditPage: React.FC = () => {
                           {/* 分割线 */}
                           <div className="border-t border-gray-200 my-4"></div>
 
-                          {/* 背景知识 - 40% */}
+                          {/* 背景知识 */}
                           <div
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col"
-                            style={{ height: '40%' }}
+                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col flex-shrink-0"
+                            style={{ minHeight: '350px' }}
                           >
-                            <div className="flex items-center space-x-3 mb-3">
+                            <div className="flex items-center space-x-3 mb-3 flex-shrink-0">
                               <Typography variant="subtitle2" className="font-bold text-gray-800 flex items-center">
                                 <Info className="w-5 h-5 text-blue-600" />
                                 <span className="ml-2">{t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledge')}</span>
@@ -3520,26 +3617,21 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 </IconButton>
                               </Tooltip>
                             </div>
-                            <div className="flex-1 min-h-0">
+                            <div className="flex flex-col" style={{ minHeight: '300px' }}>
                               <TextField
                                 fullWidth
                                 multiline
+                                rows={12}
                                 value={backgroundKnowledge}
                                 onChange={e => setBackgroundKnowledgeWithAutoSave(e.target.value)}
                                 placeholder={t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledgePlaceholder')}
                                 size="small"
                                 className="bg-white"
-                                InputProps={{
-                                  style: { height: '100%', alignItems: 'flex-start' },
-                                }}
                                 sx={{
-                                  height: '100%',
                                   '& .MuiInputBase-root': {
-                                    height: '100%',
                                     alignItems: 'flex-start',
                                   },
                                   '& .MuiInputBase-input': {
-                                    height: '100% !important',
                                     overflow: 'auto !important',
                                   },
                                 }}
@@ -3551,9 +3643,17 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </div>
 
                     {/* 工具设置配置 Tab */}
-                    <div role="tabpanel" hidden={optimizationConfigTab !== 3} className="h-full">
+                    <div
+                      role="tabpanel"
+                      hidden={optimizationConfigTab !== 3}
+                      className="h-full optimization-tab-scroll"
+                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    >
                       {optimizationConfigTab === 3 && (
-                        <div className="h-full">
+                        <div
+                          className="h-full optimization-tab-scroll"
+                          style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                        >
                           <ToolSettingsPanel
                             tools={tools}
                             toolsEnabled={toolsEnabled}
@@ -3567,6 +3667,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                             enableAutoSave={true}
                             isReadOnly={false}
                             showDefaultValue={false}
+                            showToolFunctionHint={false}
                           />
                         </div>
                       )}
@@ -3595,10 +3696,19 @@ const PromptOptimizeEditPage: React.FC = () => {
 
         {/* Column 3: 优化结果 */}
         {!moduleCollapsed.optimizationResult && (
-          <div style={{ width: `${visibleModules.actualWidths[2]}%` }}>
-            <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
-              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-6">
+          <div
+            style={{
+              width: `${visibleModules.actualWidths[2]}%`,
+              minWidth: '320px',
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+            }}
+            className="flex flex-col h-full"
+          >
+            <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
+              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
+                <div className="flex items-center justify-between mb-6 flex-shrink-0">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-sm">
                       <BarChart className="w-4 h-4 text-white" />
@@ -3615,7 +3725,16 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </IconButton>
                   </Tooltip>
                 </div>
-                <div className="flex-1 flex flex-col overflow-hidden">
+                {/* 优化结果主体内容：单独做一个可滚动区域，隐藏滚动条 */}
+                <style>{`.optimization-result-scroll::-webkit-scrollbar { display: none; }`}</style>
+                <div
+                  className="flex-1 flex flex-col optimization-result-scroll min-h-0"
+                  style={{ 
+                    overflowY: 'auto', 
+                    scrollbarWidth: 'none', 
+                    msOverflowStyle: 'none'
+                  }}
+                >
                   {/* 错误信息卡片 - 当任务失败时显示 */}
                   {taskStatus === 'failed' && (
                     <div className="mb-4 flex-shrink-0">
@@ -3645,7 +3764,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </div>
                   )}
                   {optimizationHistory && optimizationHistory.length > 0 ? (
-                    <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
+                    <div className="flex flex-col space-y-4">
                       {/* 优化评分趋势 */}
                       <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex-shrink-0">
                         <div className="flex items-center justify-between mb-3">
@@ -3692,7 +3811,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                       <Divider className="flex-shrink-0" />
 
                       {/* 提示词对比 */}
-                      <div className="bg-gradient-to-r from-slate-50/50 to-gray-50/50 rounded-xl p-4 border border-slate-100/60 flex-1 flex flex-col min-h-0 max-h-[calc(100vh-580px)]">
+                      <div className="bg-gradient-to-r from-slate-50/50 to-gray-50/50 rounded-xl p-4 border border-slate-100/60 flex flex-col flex-shrink-0">
                         <div className="flex items-center justify-between mb-3 flex-shrink-0">
                           <Typography variant="subtitle1" className="font-bold text-gray-800 flex items-center space-x-3">
                             <Zap className="w-5 h-5 text-amber-600" />
@@ -3739,8 +3858,8 @@ const PromptOptimizeEditPage: React.FC = () => {
                           </Box>
                         </div>
 
-                        <div className="flex-1 min-h-0">
-                          <Card variant="outlined" className="bg-white overflow-hidden h-full flex flex-col">
+                        <div className="flex flex-col" style={{ minHeight: '400px' }}>
+                          <Card variant="outlined" className="bg-white overflow-hidden flex flex-col">
                             {/* 标题栏 */}
                             <Box className="bg-gray-100 border-b flex-shrink-0">
                               <div className="flex w-full">
@@ -3841,7 +3960,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                             </Box>
 
                             {/* Diff 内容区 */}
-                            <Box className="flex-1 overflow-auto">
+                            <Box className="flex-1 overflow-auto" style={{ minHeight: '580px' }}>
                               <DiffViewer oldContent={historicalOriginalPrompt} newContent={currentOptimizedPrompt} />
                             </Box>
                           </Card>
@@ -4545,6 +4664,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         showDefaultValue={false}
       />
 
+      </div>
       {/* Snackbar提示 */}
       <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }} />
     </div>
