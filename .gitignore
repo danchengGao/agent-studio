@@ -79,7 +79,25 @@ jspm_packages/
 # TypeScript cache
 *.tsbuildinfo
 
+uv.lock
 *.pyc
 *.db
 backend/venv/*
 .conda/*
+openjiuwen_studio_server.egg-info
+
+# Deployment
+scripts/.env.custom
+scripts/.envs
+scripts/build_AES_master_key.ps1
+scripts/build_AES_master_key.sh
+scripts/conf/.nginx-files/
+scripts/conf/config.json
+scripts/conf/config.yaml
+scripts/conf/docker-jiuwen.yml
+scripts/conf/docker-milvus.yml
+scripts/conf/docker-mysql.yml
+scripts/conf/docker-plugin.yml
+scripts/conf/docker-sandbox.yml
+scripts/examples
+scripts/ssl

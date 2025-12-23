@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import os
-from pathlib import Path
-from typing import Dict, List, Any
 from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import yaml
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings
-from pydantic import Field
 
 
 def find_env_file():
@@ -25,20 +26,56 @@ class Settings(BaseSettings):
     DB_TYPE: str = Field(default="mysql", env="DB_TYPE")
 
     # mysql配置
-    DB_HOST: str = Field(..., env="DB_HOST")
-    DB_PORT: int = Field(..., env="DB_PORT")
-    DB_USER: str = Field(..., env="DB_USER")
-    DB_PASSWORD: str = Field(..., env="DB_PASSWORD")
-    OPS_DB_NAME: str = Field(..., env="OPS_DB_NAME")
-    AGENT_DB_NAME: str = Field(..., env="AGENT_DB_NAME")
+    DB_HOST: Optional[str] = Field(default=None, env="DB_HOST")
+    DB_PORT: Optional[int] = Field(default=None, env="DB_PORT")
+    DB_USER: Optional[str] = Field(default=None, env="DB_USER")
+    DB_PASSWORD: Optional[str] = Field(default=None, env="DB_PASSWORD")
+    OPS_DB_NAME: Optional[str] = Field(default=None, env="OPS_DB_NAME")
+    AGENT_DB_NAME: Optional[str] = Field(default=None, env="AGENT_DB_NAME")
 
     # sqlite配置
-    SQLITE_DB_PATH: str = Field(..., env="SQLITE_DB_PATH")
-    OPS_SQLITE_DB: str = Field(..., env="OPS_SQLITE_DB")
-    AGENT_SQLITE_DB: str = Field(..., env="AGENT_SQLITE_DB")
+    SQLITE_DB_PATH: Optional[str] = Field(default=None, env="SQLITE_DB_PATH")
+    OPS_SQLITE_DB: Optional[str] = Field(default=None, env="OPS_SQLITE_DB")
+    AGENT_SQLITE_DB: Optional[str] = Field(default=None, env="AGENT_SQLITE_DB")
 
     # 应用配置
     DEBUG: bool = Field(False, env="DEBUG")
+
+     # 按 DB_TYPE 校验必选字段
+    @model_validator(mode="after")
+    def validate_db_config(self):
+        db_type = self.DB_TYPE.lower()
+
+        # MySQL 场景：校验 MySQL 配置必选
+        if db_type == "mysql":
+            required_fields = [
+                ("DB_HOST", self.DB_HOST),
+                ("DB_PORT", self.DB_PORT),
+                ("DB_USER", self.DB_USER),
+                ("DB_PASSWORD", self.DB_PASSWORD),
+                ("OPS_DB_NAME", self.OPS_DB_NAME),
+                ("AGENT_DB_NAME", self.AGENT_DB_NAME)
+            ]
+            for field_name, field_value in required_fields:
+                if field_value is None:
+                    raise ValueError(f"【MySQL】字段 {field_name} 为必选，请配置环境变量")
+
+        # SQLite 场景：校验 SQLite 配置必选
+        elif db_type == "sqlite":
+            required_fields = [
+                ("SQLITE_DB_PATH", self.SQLITE_DB_PATH),
+                ("OPS_SQLITE_DB", self.OPS_SQLITE_DB),
+                ("AGENT_SQLITE_DB", self.AGENT_SQLITE_DB)
+            ]
+            for field_name, field_value in required_fields:
+                if field_value is None:
+                    raise ValueError(f"【SQLite】字段 {field_name} 为必选，请配置环境变量")
+
+        # 不支持的数据库类型
+        else:
+            raise ValueError(f"不支持的数据库类型：{self.DB_TYPE}，仅支持 mysql/sqlite")
+
+        return self
 
     class Config:
         env_file = find_env_file()

@@ -16,6 +16,9 @@ from openjiuwen.core.memory.store.impl.milvus_semantic_store import \
     MilvusSemanticStore
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ops.modules.prompt.infra.database import get_database_url
+from ops.modules.prompt.infra.database import get_async_database_url
+
 
 class MemoryEngineManager:
     _instance: MemoryEngine | None = None
@@ -55,13 +58,11 @@ class MemoryEngineManager:
             embed_model=embed_model,
             token=os.getenv("MILVUS_TOKEN", None)
         )
-        db_user = os.getenv("DB_USER")
-        db_passport = os.getenv("DB_PASSWORD")
-        db_host = os.getenv("DB_HOST")
-        db_port = os.getenv("DB_PORT")
-        agent_db_name = os.getenv("AGENT_DB_NAME")
+
+        agent_database_url = get_database_url("agent")
+        async_agent_database_url = get_async_database_url(agent_database_url)
         db_store = DefaultDbStore(create_async_engine(
-            f"mysql+aiomysql://{db_user}:{db_passport}@{db_host}:{db_port}/{agent_db_name}?charset=utf8mb4",
+            async_agent_database_url,
             pool_size=20,
             max_overflow=20
         ))

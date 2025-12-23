@@ -32,6 +32,8 @@ declare -A CONFIG=(
     ["END_PORT"]="65535"
     ["ALLOC_PORT_NUM"]="7"
     ["OS_TYPE"]=""
+    ["HAS_MYSQL_CONTAINER"]="false"
+    ["HAS_MILVUS_CONTAINER"]="false"
 )
 
 declare -A NAMES=(
@@ -546,14 +548,6 @@ setup_env_vars() {
         ENV_VARS["VITE_API_PROXY_TARGET"]="http://${backend_service}:${backend_port}/"
     fi
 
-    if [[ -z "${ENV_VARS["DB_HOST"]:-}" ]]; then
-        ENV_VARS["DB_HOST"]=${ENV_VARS["MYSQL_SERVICE_NAME"]}
-    fi
-
-    if [[ -z "${ENV_VARS["MILVUS_HOST"]:-}" ]]; then
-        ENV_VARS["MILVUS_HOST"]=${ENV_VARS["MILVUS_SERVICE_NAME"]}
-    fi
-
     if [[ -z "${ENV_VARS["CODE_SANDBOX_URL"]:-}" ]]; then
         local gateway_service=${ENV_VARS["SANDBOX_GATEWAY_SERVICE_NAME"]}
         local gateway_port=${ENV_VARS["SANDBOX_GATEWAY_PORT"]}
@@ -773,16 +767,17 @@ exec_service() {
     local python_server_container=${ENV_VARS["PYTHON_SERVER_DOCKER_NAME"]}
     local js_server_container=${ENV_VARS["JS_SERVER_DOCKER_NAME"]}
     local frontend_container=${ENV_VARS["FRONTEND_DOCKER_NAME"]}
-
     local cmd=${ARGS["CMD1"]}
+    local has_mysql=${CONFIG["HAS_MYSQL_CONTAINER"]}
+    local has_milvus=${CONFIG["HAS_MILVUS_CONTAINER"]}
 
     if [ "${cmd}" = "up" ]; then
         ## Build SSL certificates if script exists
         source "${SCRIPT_DIR}/build_SSL_files.sh"
         local cmd_args="-d"  # -d only as argument for up, placed after up
 
-        # Use local MYSQL or User SQLITE
-        if [ "${ENV_VARS["DB_HOST"]:-}" == "${ENV_VARS["MYSQL_SERVICE_NAME"]}" ]; then
+        # Use local MYSQL
+        if [ "${has_mysql}" == "true"  ]; then
             ## Start mysql container
             eval "${exec_cmd} -f ${mysql_compose_file} ${cmd} ${cmd_args}" || error "${cmd} mysql container failed"
 
@@ -790,8 +785,9 @@ exec_service() {
             create_db_if_not_exist
         fi
 
+        echo ""
         # Use local MILVUS
-        if [ ${ENV_VARS["MILVUS_HOST"]} == ${ENV_VARS["MILVUS_SERVICE_NAME"]} ]; then
+        if [ ${has_milvus} == "true" ]; then
             ## Start milvus container cluster
             eval "${exec_cmd} -f ${milvus_compose_file} ${cmd} ${cmd_args}" || warning "Milvus container cluster ${cmd} operation failed: The system's memory functionality is disabled, but the other system features still works"
             #wait_for_container_healthy ${milvus_container}
@@ -812,12 +808,12 @@ exec_service() {
         local compose_files="-f ${jiuwen_compose_file} -f ${plugin_compose_file}"
 
         # Use local MILVUS
-        if [ ${ENV_VARS["MILVUS_HOST"]} == ${ENV_VARS["MILVUS_SERVICE_NAME"]} ]; then
+        if [ ${has_milvus} == "true"  ]; then
             compose_files="${compose_files} -f ${milvus_compose_file}"
         fi
 
         # Use local MYSQL
-        if [ ${ENV_VARS["DB_HOST"]} == ${ENV_VARS["MYSQL_SERVICE_NAME"]} ]; then
+        if [ "${has_mysql}" == "true"  ]; then
             compose_files="${compose_files} -f ${mysql_compose_file}"
         fi
 
@@ -1053,6 +1049,21 @@ process_env() {
         fi
     fi
 
+    if [[ "${ENV_VARS["DB_TYPE"]:-}" == "mysql" ]]; then
+        if [ -z "${ENV_VARS["DB_HOST"]:-}" ]; then
+            ENV_VARS["DB_HOST"]=${ENV_VARS["MYSQL_SERVICE_NAME"]}
+            CONFIG["HAS_MYSQL_CONTAINER"]="true"
+        elif [ "${ENV_VARS["DB_HOST"]}" == "${ENV_VARS["MYSQL_SERVICE_NAME"]}" ]; then
+            CONFIG["HAS_MYSQL_CONTAINER"]="true"
+        fi
+    fi
+
+    if [[ -z "${ENV_VARS["MILVUS_HOST"]:-}" ]]; then
+        ENV_VARS["MILVUS_HOST"]=${ENV_VARS["MILVUS_SERVICE_NAME"]}
+        CONFIG["HAS_MILVUS_CONTAINER"]="true"
+    elif [ "${ENV_VARS["MILVUS_HOST"]}" == "${ENV_VARS["MILVUS_SERVICE_NAME"]}" ]; then
+        CONFIG["HAS_MILVUS_CONTAINER"]="true"
+    fi
 }
 
 show_deploy_prompt() {
