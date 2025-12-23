@@ -2,6 +2,7 @@ import { TextField, InputAdornment, IconButton, Tooltip, Button, Divider } from 
 import type { ChatMessage } from './chatTypes'
 import { useMemo, useState } from 'react'
 import { Type, Hash, List, Braces, ToggleLeft, Calendar, Info, X } from 'lucide-react'
+import { MessageContent } from './NormalMessage'
 
 type InteractionField = { input_name: string; description?: string; type?: string; required?: boolean }
 
@@ -120,114 +121,126 @@ export function InteractionMessage({
   }
 
   return (
-    <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm min-h-40">
-      <div className="flex items-center justify-between mb-3">
-        {isSubmitted ? (
-          <span className={`px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700 border border-green-200`}>已提交</span>
-        ) : isExpired ? (
-          <span className={`px-2 py-0.5 rounded-full text-xs bg-gray-50 text-gray-500 border border-gray-200`}>已失效</span>
-        ) : (
-          <span className={`px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200`}>请在此卡片中填写并提交</span>
-        )}
-      </div>
-      <div className="space-y-4">
-        {fields.length === 0 ? (
-          <div className="space-y-2">
-            <div className="w-full">
-              {(() => {
-                const v = getValue('input')
-                return (
-                  <TextField
-                    value={v}
-                    onChange={e => handleChange('input', e.target.value)}
-                    placeholder="请输入..."
-                    size="small"
-                    disabled={isSubmitted || isExpired}
-                    fullWidth
-                    autoComplete="off"
-                    autoFocus={!isSubmitted && !isExpired && Boolean(inputFocused)}
-                    inputProps={{ autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }}
-                    InputProps={{
-                      endAdornment:
-                        !isSubmitted && !isExpired && String(v).length > 0 ? (
-                          <InputAdornment position="end">
-                            <IconButton aria-label="clear input" size="small" onClick={() => handleChange('input', '')} className="clear-btn">
-                              <X className="w-4 h-4" />
-                            </IconButton>
-                          </InputAdornment>
-                        ) : null,
-                    }}
-                    sx={{
-                      '& .clear-btn': { opacity: 0, transition: 'opacity 0.15s' },
-                      '& .MuiInputBase-root:hover .clear-btn': { opacity: 1 },
-                    }}
-                  />
-                )
-              })()}
+    <div className="w-full">
+      {(message.content || (message.chunks && message.chunks.length > 0)) && (
+        <div className="mb-2 text-gray-800 overflow-x-hidden w-fit max-w-full">
+          <MessageContent message={message} />
+        </div>
+      )}
+      <div className="w-full rounded-xl border border-gray-200 bg-white p-4 shadow-sm min-h-40">
+        <div className="flex items-center justify-between mb-3">
+          {isSubmitted ? (
+            <span className={`px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700 border border-green-200`}>已提交</span>
+          ) : isExpired ? (
+            <span className={`px-2 py-0.5 rounded-full text-xs bg-gray-50 text-gray-500 border border-gray-200`}>已失效</span>
+          ) : (
+            <span className={`px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200`}>请在此卡片中填写并提交</span>
+          )}
+        </div>
+        <div className="space-y-4">
+          {fields.length === 0 ? (
+            <div className="space-y-2">
+              <div className="w-full">
+                {(() => {
+                  const v = getValue('input')
+                  return (
+                    <TextField
+                      value={v}
+                      onChange={e => handleChange('input', e.target.value)}
+                      placeholder="请输入..."
+                      size="small"
+                      disabled={isSubmitted || isExpired}
+                      fullWidth
+                      autoComplete="off"
+                      autoFocus={!isSubmitted && !isExpired && Boolean(inputFocused)}
+                      inputProps={{ autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }}
+                      InputProps={{
+                        endAdornment:
+                          !isSubmitted && !isExpired && String(v).length > 0 ? (
+                            <InputAdornment position="end">
+                              <IconButton aria-label="clear input" size="small" onClick={() => handleChange('input', '')} className="clear-btn">
+                                <X className="w-4 h-4" />
+                              </IconButton>
+                            </InputAdornment>
+                          ) : null,
+                      }}
+                      sx={{
+                        '& .clear-btn': { opacity: 0, transition: 'opacity 0.15s' },
+                        '& .MuiInputBase-root:hover .clear-btn': { opacity: 1 },
+                      }}
+                    />
+                  )
+                })()}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {fields.map((field, index) => (
-              <div key={field.input_name} className="space-y-1">
-                <div className="text-sm text-gray-700 flex items-center gap-1">
-                  {field.required ? <span className="text-red-500">*</span> : null}
-                  <span>{field.input_name}</span>
-                  {field.description ? (
-                    <Tooltip title={field.description} placement="top">
-                      <Info className="w-4 h-4 text-gray-500" />
-                    </Tooltip>
-                  ) : null}
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-full">
-                    {(() => {
-                      const v = getValue(field.input_name)
-                      return (
-                        <TextField
-                          value={v}
-                          onChange={e => handleChange(field.input_name, e.target.value)}
-                          size="small"
-                          disabled={isSubmitted || isExpired}
-                          fullWidth
-                          autoComplete="off"
-                          autoFocus={!isSubmitted && !isExpired && index === 0 && Boolean(inputFocused)}
-                          inputProps={{ autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }}
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <div className="flex items-center gap-2">
-                                  {!isSubmitted && !isExpired && String(v).length > 0 ? (
-                                    <IconButton aria-label="clear input" size="small" onClick={() => handleChange(field.input_name, '')} className="clear-btn">
-                                      <X className="w-4 h-4" />
-                                    </IconButton>
-                                  ) : null}
-                                  <Divider orientation="vertical" flexItem />
-                                  <TypeBadge type={field.type} />
-                                </div>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{
-                            '& .clear-btn': { opacity: 0, transition: 'opacity 0.15s' },
-                            '& .MuiInputBase-root:hover .clear-btn': { opacity: 1 },
-                          }}
-                        />
-                      )
-                    })()}
+          ) : (
+            <div className="space-y-3">
+              {fields.map((field, index) => (
+                <div key={field.input_name} className="space-y-1">
+                  <div className="text-sm text-gray-700 flex items-center gap-1">
+                    {field.required ? <span className="text-red-500">*</span> : null}
+                    <span>{field.input_name}</span>
+                    {field.description ? (
+                      <Tooltip title={field.description} placement="top">
+                        <Info className="w-4 h-4 text-gray-500" />
+                      </Tooltip>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-full">
+                      {(() => {
+                        const v = getValue(field.input_name)
+                        return (
+                          <TextField
+                            value={v}
+                            onChange={e => handleChange(field.input_name, e.target.value)}
+                            size="small"
+                            disabled={isSubmitted || isExpired}
+                            fullWidth
+                            autoComplete="off"
+                            autoFocus={!isSubmitted && !isExpired && index === 0 && Boolean(inputFocused)}
+                            inputProps={{ autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'none', spellCheck: false }}
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <div className="flex items-center gap-2">
+                                    {!isSubmitted && !isExpired && String(v).length > 0 ? (
+                                      <IconButton
+                                        aria-label="clear input"
+                                        size="small"
+                                        onClick={() => handleChange(field.input_name, '')}
+                                        className="clear-btn"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </IconButton>
+                                    ) : null}
+                                    <Divider orientation="vertical" flexItem />
+                                    <TypeBadge type={field.type} />
+                                  </div>
+                                </InputAdornment>
+                              ),
+                            }}
+                            sx={{
+                              '& .clear-btn': { opacity: 0, transition: 'opacity 0.15s' },
+                              '& .MuiInputBase-root:hover .clear-btn': { opacity: 1 },
+                            }}
+                          />
+                        )
+                      })()}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {!isSubmitted ? (
-          <div className="flex items-center justify-end">
-            <Button variant="contained" color="primary" onClick={handleSubmit} disabled={isExpired || !canSubmitValues(formValues, fields)}>
-              提交
-            </Button>
-          </div>
-        ) : null}
+              ))}
+            </div>
+          )}
+          {!isSubmitted ? (
+            <div className="flex items-center justify-end">
+              <Button variant="contained" color="primary" onClick={handleSubmit} disabled={isExpired || !canSubmitValues(formValues, fields)}>
+                提交
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   )

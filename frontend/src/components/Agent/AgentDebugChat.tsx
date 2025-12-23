@@ -241,12 +241,6 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
     })
   }
 
-  const removeAssistantStreamingPlaceholder = (ts: number | null) => {
-    if (!ts) return
-    setChatHistory(prev => prev.filter(m => !(m.timestamp === ts && m.role === 'assistant' && m.detailInfo?.streaming)))
-    streamingMsgTsRef.current = null
-  }
-
   const finalizeOrRemoveAssistantStreaming = (ts: number | null) => {
     if (!ts) return
     setChatHistory(prev => {
@@ -393,7 +387,10 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
       })
     }
     setIsInterrupted(true)
-    removeAssistantStreamingPlaceholder(streamingMsgTsRef.current)
+
+    const ts = streamingMsgTsRef.current
+    streamingMsgTsRef.current = null
+
     try {
       const raw = event?.interaction_msg
       let simple = false
@@ -406,16 +403,75 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
         }
       }
       if (simple) {
+        finalizeOrRemoveAssistantStreaming(ts)
         const content = String(event?.interaction_msg || event?.output_text || '')
         setChatHistory(prev => [...prev, { role: 'assistant', content, timestamp: Date.now(), kind: 'normal' }])
         setIsSimpleInteraction(true)
       } else {
-        appendInteractionMessage({ ...event, simple: false })
         setIsSimpleInteraction(false)
+        const interactionData = { ...event, simple: false }
+
+        setChatHistory(prev => {
+          const idx = prev.findIndex(m => m.timestamp === ts && m.role === 'assistant')
+          if (idx !== -1) {
+            const msg = prev[idx]
+            const doneChunks = msg.chunks ? msg.chunks.map(c => ({ ...c, status: 'done' as const })) : msg.chunks
+            const updatedMsg: ChatMessage = {
+              ...msg,
+              chunks: doneChunks,
+              detailInfo: {
+                ...(msg.detailInfo || {}),
+                streaming: false,
+                ...interactionData,
+              },
+              kind: 'interaction',
+            }
+            const updated = [...prev]
+            updated[idx] = updatedMsg
+            return updated
+          }
+          // No streaming message found, append new
+          const newMsg: ChatMessage = {
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            kind: 'interaction',
+            detailInfo: { ...interactionData },
+          }
+          return [...prev, newMsg]
+        })
       }
     } catch {
-      appendInteractionMessage(event)
+      // Fallback for error case: treat as complex interaction
       setIsSimpleInteraction(false)
+      const interactionData = { ...event }
+      setChatHistory(prev => {
+        // Same fallback logic: try to merge if possible, or append
+        const idx = prev.findIndex(m => m.timestamp === ts && m.role === 'assistant')
+        if (idx !== -1) {
+          const msg = prev[idx]
+          const doneChunks = msg.chunks ? msg.chunks.map(c => ({ ...c, status: 'done' as const })) : msg.chunks
+          const updatedMsg: ChatMessage = {
+            ...msg,
+            chunks: doneChunks,
+            detailInfo: { ...(msg.detailInfo || {}), streaming: false, ...interactionData },
+            kind: 'interaction',
+          }
+          const updated = [...prev]
+          updated[idx] = updatedMsg
+          return updated
+        }
+        return [
+          ...prev,
+          {
+            role: 'assistant',
+            content: '',
+            timestamp: Date.now(),
+            kind: 'interaction',
+            detailInfo: { ...interactionData },
+          },
+        ]
+      })
     }
     setIsProcessing(false)
   }
@@ -702,6 +758,8 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
             disabled={!inputMessage.trim() || isProcessing || modelNotConfigured || chatBlocked}
             inputDisabled={modelNotConfigured || chatBlocked}
             onClearChat={async () => {
+              // 重置交互状态
+              resetInteractionState()
               // 清空聊天记录
               const trimmed = openingRemarks.trim()
               setChatHistory(() => {

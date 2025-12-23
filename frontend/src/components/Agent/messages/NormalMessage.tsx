@@ -1,7 +1,7 @@
 import { Markdown } from '@test-agentstudio/base-ui'
 import type { ChatMessage } from './chatTypes'
 
-export function NormalMessage({ message }: { message: ChatMessage }) {
+export function MessageContent({ message }: { message: ChatMessage }) {
   const isOpening = message.kind === 'opening'
 
   const renderContent = (content: string) => {
@@ -68,11 +68,7 @@ export function NormalMessage({ message }: { message: ChatMessage }) {
   }
 
   return (
-    <div
-      className={`p-3 rounded-xl shadow-sm overflow-x-hidden ${
-        message.role === 'user' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
-      }`}
-    >
+    <>
       {message.role === 'assistant' && message.detailInfo?.streaming && !(message.content || '').trim() ? (
         <div className="flex items-center justify-center space-x-2">
           <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
@@ -82,6 +78,25 @@ export function NormalMessage({ message }: { message: ChatMessage }) {
       ) : (
         renderContent(message.content)
       )}
+    </>
+  )
+}
+
+export function NormalMessage({ message }: { message: ChatMessage }) {
+  const isAssistantWithChunks = message.role === 'assistant' && message.chunks && message.chunks.length > 0
+  
+  // If it has chunks, MessageContent already renders the containers/bubbles.
+  if (isAssistantWithChunks) {
+    return <MessageContent message={message} />
+  }
+
+  return (
+    <div
+      className={`p-3 rounded-xl shadow-sm overflow-x-hidden ${
+        message.role === 'user' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
+      }`}
+    >
+      <MessageContent message={message} />
     </div>
   )
 }
