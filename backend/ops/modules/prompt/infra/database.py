@@ -233,6 +233,9 @@ def create_database_tables():
         BaseAgent.metadata.create_all(bind=engine_agent)
         logger.info("Agent database tables created successfully")
 
+        # Reset all tasks with status 'running' to 'failed' to prevent orphaned zombie tasks after service restart
+        reset_orphaned_running_jobs(engine)
+
         logger.info("Evaluation database tables creation completed")
 
     except Exception as e:
@@ -272,3 +275,42 @@ def is_mysql() -> bool:
 def is_sqlite() -> bool:
     """检查是否使用SQLite"""
     return settings.DB_TYPE.lower() == "sqlite"
+
+
+def reset_orphaned_running_jobs(ops_engine):
+    """
+    Reset all 'running' jobs in job_user_info table to 'failed' after unexpected shutdown.
+    Uses raw SQL to avoid ORM/model dependency and circular import risks.
+    """
+    from sqlalchemy import inspect, text
+
+    try:
+        inspector = inspect(ops_engine)
+        if "job_user_info" not in inspector.get_table_names():
+            logger.warning("Table 'job_user_info' does not exist. Skipping job reset.")
+            return 0
+
+        with ops_engine.connect() as conn:
+            update_sql = """
+                UPDATE job_user_info 
+                SET status = :status,
+                    errorMsg = :errorMsg,
+                    updated_at = NOW()
+                WHERE status = :old_status
+            """
+            result = conn.execute(
+                text(update_sql),
+                {
+                    "status": "failed",
+                    "errorMsg": "System terminated abnormally",
+                    "old_status": "running"
+                }
+            )
+            conn.commit()
+            count = result.rowcount
+            logger.info(f"Successfully reset {count} orphaned running job(s) to 'failed'.")
+            return count
+
+    except Exception as e:
+        logger.error(f"Failed to reset orphaned jobs: {e}")
+        return 0
