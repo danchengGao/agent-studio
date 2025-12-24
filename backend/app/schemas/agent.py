@@ -23,6 +23,7 @@ class AgentCreate(BaseModel):
     description: str = Field(..., min_length=1, max_length=500, title="agent description", alias="desc")
     icon: str = Field(..., max_length=2000)
     model_config = ConfigDict(populate_by_name=True)
+    agent_type: str = Field(..., min_length=1, max_length=30, alias="type")
 
 
 class AgentResponseCreate(BaseModel):
@@ -100,7 +101,6 @@ class AgentMemoryConfig(BaseModel):
 class AgentDisplayInfo(AgentCreate):
     agent_id: str = Field(..., min_length=1, max_length=100, alias="id")
     agent_version: Optional[str] = Field(None, max_length=100, alias="version")
-    agent_type: str = Field(..., min_length=1, max_length=30, alias="type")
     configs: Dict[str, Any] = Field(default_factory=dict)
     edit_mode: str = Field(..., max_length=100, alias="mode")
     plugins: list[AgentPlugin] = Field(default_factory=list)

@@ -12,7 +12,7 @@ from openjiuwen.core.common.logging import logger
 from pydantic import BaseModel, ValidationError
 
 import app.core.manager.convertor.agent as convert
-from app.core.common.dsl import AgentEditMode, AgentType
+from app.core.common.dsl import AgentEditMode
 from app.core.common.status_code import StatusCode
 from app.core.database import milliseconds
 from app.core.manager.internal.agent import (AgentItem, AgentListInfo,
@@ -183,7 +183,7 @@ def create_agent_react_info(req: AgentCreate) -> AgentBaseDBPd:
         agent_name=req.agent_name,
         space_id=req.space_id,
         description=req.description,
-        agent_type=AgentType.ReAct,
+        agent_type=req.agent_type,
         # configs=configs,  # 待configs功能完善后再获取
         icon=req.icon,
         edit_mode=AgentEditMode.Manual,
