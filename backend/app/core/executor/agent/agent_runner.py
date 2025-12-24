@@ -19,7 +19,7 @@ Agent Runner - Agent执行管理器
 
 - 完善的错误处理机制
 """
-
+import asyncio
 import json
 from typing import Any, Dict, AsyncGenerator, Union
 
@@ -489,9 +489,14 @@ class AgentRunner:
             raise
 
         except BaseException as e:
-            # 7d. 处理其他系统异常
-            logger.warning(f"Agent execution error: {str(e)}")
-            await handle_trace_error(trace_context, 499, f"Execution error: {str(e)}")
+            if isinstance(e, asyncio.exceptions.CancelledError):
+                # 7d. 处理运行取消/中断
+                logger.warning(f"Agent execution interrupted: {type(e)}: {str(e)}")
+                await handle_trace_error(trace_context, -2, f"Agent Execution interrupted: {type(e)}")
+            else:
+                # 7e. 处理其他基础异常
+                logger.error(f"Agent execution error: {type(e)}: {str(e)}")
+                await handle_trace_error(trace_context, -3, f"Execution error: {type(e)}")
             raise
 
 

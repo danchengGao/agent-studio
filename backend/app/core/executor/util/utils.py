@@ -394,14 +394,20 @@ async def handle_stream_error(
     business_type = "WORKFLOW" if isinstance(index, WorkflowId) else "AGENT"
     trace_id: Optional[str] = None
     if last_chunk is not None and hasattr(last_chunk, "payload"):
-        rsp, trace_data, trace_detail = result_convert(last_chunk, business_type)
+        _, trace_data, trace_detail = result_convert(last_chunk, business_type)
         if trace_detail is not None:
+            if error_code == -2:
+                trace_detail.output = f"Agent execution interrupted: {error_msg}"
+                trace_detail.status_code = 'interrupted'
+            else:
+                trace_detail.output = f"Agent execution error: {error_msg}"
+                trace_detail.status_code = 'error'
             await save_trace_detail(index, trace_detail)
             trace_id = trace_detail.trace_id
-        if trace_data is not None:
+        if trace_logs and trace_data is not None:
             if hasattr(trace_data, 'error') and hasattr(trace_data, 'status'):
                 trace_data.status = "error"
-                trace_data.error = {error_code: error_msg}
+                trace_data.error = {str(error_code): error_msg}
                 trace_logs.append(trace_data)
 
     if not trace_logs:

@@ -37,7 +37,7 @@ class TraceDetailDB(Base, DBFunBase):
     # 执行信息
     start_time_micros: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, comment="开始时间微秒戳")
     end_time_micros: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, comment="结束时间微秒戳")
-    status_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, comment="状态码 (如: '0'表示成功)")
+    status_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, comment="状态码 (如: '0'表示成功)")
 
     # 数据字段
     input: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="输入数据")

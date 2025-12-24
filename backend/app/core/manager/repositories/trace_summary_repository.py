@@ -172,6 +172,8 @@ def _extract_summary_execution_info_from_trace_detail(
             status_code = detail.get("status_code")
             if status_code == "0" or status_code == "finish":
                 component_execute_info.status = "finish"
+            elif status_code == "interrupted":
+                component_execute_info.status = "interrupted"
             elif status_code and status_code != "start":
                 component_execute_info.status = "error"
             else:
@@ -195,7 +197,7 @@ def _extract_summary_execution_info_from_trace_detail(
             
             component_execute_info.outputs = _normalize_dict_field(detail.get("output"))
         else:
-            component_execute_info.status = "running"
+            component_execute_info.status = "interrupted"
 
         # 获取父组件ID
         parent_id = _get_parent_component_id(component_execute_info.invoke_id)
@@ -341,6 +343,8 @@ def _extract_agent_execution_info_from_trace_detail(
             sc = detail.get("status_code")
             if sc == "0" or sc == "finish":
                 component_execute_info.status = "finish"
+            elif sc == "interrupted":
+                component_execute_info.status = "interrupted"
             elif sc and sc != "start":
                 component_execute_info.status = "error"
             else:
@@ -363,7 +367,7 @@ def _extract_agent_execution_info_from_trace_detail(
                     component_execute_info.duration = duration
             component_execute_info.outputs = _normalize_dict_field(detail.get("output"))
         else:
-            component_execute_info.status = "running"
+            component_execute_info.status = "interrupted"
 
         # For any workflow component, add its associated studio_agent_workflow components
         if (detail and 
@@ -447,6 +451,8 @@ def _extract_agent_execution_info_from_trace_detail(
                             invoke_status = status_map[comp.invoke_id]
                             if invoke_status == "0" or invoke_status == "finish":
                                 comp.status = "finish"
+                            elif invoke_status == "interrupted":
+                                comp.status = "interrupted"
                             elif invoke_status != "start":
                                 comp.status = "error"
                         # Recursively update children
@@ -673,11 +679,16 @@ class TraceSummaryRepository:
                 }
 
             has_error = any(
-                any(x not in ("start", "finish") for x in v)
+                any(x not in ("start", "finish", "interrupted") for x in v)
                 for v in span_status_map.values()
+            )
+            has_interrupted = any(
+                "interrupted" in v for v in span_status_map.values()
             )
             if has_error:
                 overall_status = "error"
+            elif has_interrupted:
+                overall_status = "interrupted"
             else:
                 all_finished = (
                     all("finish" in v for v in span_status_map.values())

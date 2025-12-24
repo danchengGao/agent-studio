@@ -94,7 +94,6 @@ async def process_chunk_trace(
     Returns:
         Tuple[Optional[Any], bool]: (响应数据, 是否有响应)
     """
-    trace_context.last_chunk = chunk
 
     # 检查是否为需要过滤的workflow trace chunk
     if isinstance(chunk, TraceSchema) and chunk.type == "tracer_workflow":
@@ -108,6 +107,8 @@ async def process_chunk_trace(
 
     # 保存详细的追踪信息
     if trace_detail:
+        # 保存最后一个trace chunk，用于错误处理
+        trace_context.last_chunk = chunk
         await save_trace_detail(trace_context.agent_id, trace_detail)
         if trace_context.trace_id is None:
             trace_context.trace_id = trace_detail.trace_id
