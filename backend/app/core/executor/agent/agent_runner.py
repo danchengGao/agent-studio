@@ -484,8 +484,14 @@ class AgentRunner:
             raise
 
         except Exception as e:
-            # 7b. 处理未预期的异常
+            # 7c. 处理未预期的异常
             await handle_trace_error(trace_context, -1, str(e))
+            raise
+
+        except BaseException as e:
+            # 7d. 处理其他系统异常
+            logger.warning(f"Agent execution error: {str(e)}")
+            await handle_trace_error(trace_context, 499, f"Execution error: {str(e)}")
             raise
 
 

@@ -87,7 +87,7 @@ def with_exception_handling(func: Callable) -> Callable:
             error_msg = ", ".join(
                 [f"{'.'.join(map(str, err['loc'])) if isinstance(err['loc'], tuple) else str(err['loc'])}: {err['msg']}" for err in e.errors()])
             logger.error(
-                f"{operation_tag}] Validation failed - User: {user_id}, Duration: {execution_time:.3f}s, Errors: {e.errors()}")
+                f"{operation_tag} Validation failed - User: {user_id}, Duration: {execution_time:.3f}s, Errors: {e.errors()}")
 
             return ResponseModel(
                 code=StatusCode.AGENT_VALIDATION_ERROR.code,

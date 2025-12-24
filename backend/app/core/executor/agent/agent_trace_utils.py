@@ -164,6 +164,7 @@ async def handle_trace_error(
     # 处理流式错误
     try:
         trace_id = await handle_stream_error(
+            [],
             trace_context.last_chunk,
             error_code,
             error_message,
