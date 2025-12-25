@@ -161,13 +161,13 @@ class ComponentExecutor(WorkflowRunner):
             logger.error(f"component run got JiuWen error: {e}")
             code = _run_err_code(int(target_comp.type))
             msg = f"{_type_cn(int(target_comp.type))}组件[{component_id}]: {getattr(e, 'message', str(e))}"
-            await handle_stream_error(trace_logs, data, code, msg, flow_index)
+            await handle_stream_error(trace_logs, [], data, code, msg, flow_index)
             raise JiuWenComponentException(code, msg, component_id, int(target_comp.type), error_stage="execute") from e
         except Exception as e:
             logger.error(f"component run got Exception error: {e}")
             code = _run_err_code(int(target_comp.type))
             msg = f"{_type_cn(int(target_comp.type))}组件[{component_id}]: {str(e)}"
-            await handle_stream_error(trace_logs, data, code, msg, flow_index)
+            await handle_stream_error(trace_logs, [], data, code, msg, flow_index)
             raise JiuWenComponentException(code, msg, component_id, int(target_comp.type), error_stage="execute") from e
 
     def result_convert(self, data: Any) -> Dict[str, Any]:

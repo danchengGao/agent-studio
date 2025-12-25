@@ -269,17 +269,17 @@ class WorkflowRunner(IWorkflowLoader):
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
         except JiuWenExecuteException as e:
-            await handle_stream_error(trace_logs, last_chunk, e.error_code, e.message, flow_index)
+            await handle_stream_error(trace_logs, [], last_chunk, e.error_code, e.message, flow_index)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
             raise JiuWenExecuteException(e.error_code, e.message, workflow_id=id, node_id=e.node_id, connection=e.connection)
         except (JiuWenBaseException, JiuWenGraphException) as e:
-            await handle_stream_error(trace_logs, last_chunk, e.error_code, e.message, flow_index)
+            await handle_stream_error(trace_logs, [], last_chunk, e.error_code, e.message, flow_index)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
             raise JiuWenExecuteException(e.error_code, e.message, workflow_id=id) from e
         except Exception as e:
-            await handle_stream_error(trace_logs, last_chunk, -1, str(e), flow_index)
+            await handle_stream_error(trace_logs, [], last_chunk, -1, str(e), flow_index)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
             raise JiuWenExecuteException(

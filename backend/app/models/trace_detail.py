@@ -20,7 +20,7 @@ class TraceDetailDB(Base, DBFunBase):
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="空间ID")
     business_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="业务ID（workflow_id/agent_id）")
     business_type: Mapped[str] = mapped_column(String(20), nullable=False, comment="业务类型（WORKFLOW/AGENT）")
-    trace_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, comment="追踪ID，单次执行唯一标识")
+    trace_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="追踪ID，单次执行唯一标识")
 
     # Span字段
     span_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="Span ID，执行单元唯一标识")

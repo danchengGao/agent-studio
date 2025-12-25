@@ -493,10 +493,6 @@ class AgentRunner:
                 # 7d. 处理运行取消/中断
                 logger.warning(f"Agent execution interrupted: {type(e)}: {str(e)}")
                 await handle_trace_error(trace_context, -2, f"Agent Execution interrupted: {type(e)}")
-            else:
-                # 7e. 处理其他基础异常
-                logger.error(f"Agent execution error: {type(e)}: {str(e)}")
-                await handle_trace_error(trace_context, -3, f"Execution error: {type(e)}")
             raise
 
 

@@ -60,6 +60,30 @@ class TraceDetailRepository:
             return base_repo.register_dl_in_sql(find_id=None, dl=trace_dict)
 
     @with_exception_handling
+    def create_trace_details(self, trace_data_list: List[TraceDetail]) -> ResponseModel:
+        """Batch create trace detail records for performance optimization
+
+        Args:
+            trace_data_list: List of TraceDetail model data
+
+        Returns:
+            ResponseModel: Batch creation result
+        """
+        if not trace_data_list:
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="No trace details to save",
+                data=None
+            )
+        
+        with get_db_jw() as db:
+            base_repo = JiuwenBaseRepository(db, TraceDetailDB)
+
+            # Convert Pydantic models to dictionaries
+            trace_dicts = [trace_data.model_dump() for trace_data in trace_data_list]
+            return base_repo.bulk_register_dl(trace_dicts)
+
+    @with_exception_handling
     def get_trace_details_by_trace_id(self, trace_id: str) -> ResponseModel:
         """Get trace detail record list by trace_id
 

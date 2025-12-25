@@ -26,14 +26,14 @@ from openjiuwen.core.common.logging import logger
 
 from app.core.executor.util.utils import (
     result_convert,
-    save_execution_traces,
     handle_stream_error,
-    save_trace_detail,
+    save_trace_details,
 )
 from app.core.manager.repositories.trace_summary_repository import (
     trace_summary_repository,
 )
 from app.schemas.agent import AgentId
+from app.schemas.trace_detail import TraceDetail
 
 
 @dataclass
@@ -46,12 +46,13 @@ class TraceContext:
         last_chunk: 最后一个chunk，用于错误处理
         trace_id: 追踪ID，用于创建执行摘要
         mapping: 映射表，用于存储invoke_type到invoke_name的映射
+        trace_details: 批量收集的trace_detail，用于性能优化
     """
-    # trace_logs: List[TraceWorkflowSpan | TraceAgentSpan]
     agent_id: AgentId
     last_chunk: Any = None
     trace_id: Optional[str] = None
     mapping: Dict[str, str] = field(default_factory=dict)
+    trace_details: List[TraceDetail] = field(default_factory=list)
 
 
 def initialize_trace_context(
@@ -70,7 +71,7 @@ def initialize_trace_context(
         TraceContext: 初始化的追踪上下文
     """
     return TraceContext(
-        # trace_logs=[],
+        trace_details=[],
         agent_id=AgentId(
             space_id=space_id,
             agent_id=agent_id,
@@ -109,7 +110,7 @@ async def process_chunk_trace(
     if trace_detail:
         # 保存最后一个trace chunk，用于错误处理
         trace_context.last_chunk = chunk
-        await save_trace_detail(trace_context.agent_id, trace_detail)
+        trace_context.trace_details.append(trace_detail)
         if trace_context.trace_id is None:
             trace_context.trace_id = trace_detail.trace_id
             logger.debug(f"Set trace_id: {trace_context.trace_id}")
@@ -129,7 +130,16 @@ async def finalize_trace(trace_context: TraceContext) -> None:
     Args:
         trace_context: 追踪上下文
     """
-    logger.info(f"Finalizing trace for agent: {trace_context.agent_id.agent_id}, ")
+    logger.info(f"Finalizing trace for agent: {trace_context.agent_id.agent_id}, "
+               f"details size: {len(trace_context.trace_details)}")
+
+    # 批量保存所有收集的trace details
+    if trace_context.trace_details:
+        try:
+            await save_trace_details(trace_context.agent_id, trace_context.trace_details)
+            logger.debug(f"Successfully saved {len(trace_context.trace_details)} trace details")
+        except Exception as e:
+            logger.error(f"Failed to save trace details: {e}")
 
     # 保存执行追踪日志
     # if trace_context.trace_logs:
@@ -166,6 +176,7 @@ async def handle_trace_error(
     try:
         trace_id = await handle_stream_error(
             [],
+            trace_context.trace_details,
             trace_context.last_chunk,
             error_code,
             error_message,

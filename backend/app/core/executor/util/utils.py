@@ -3,7 +3,7 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import json
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from openjiuwen.core.common.logging import logger
 from openjiuwen.core.stream.writer import TraceSchema, OutputSchema
 from openjiuwen.core.tracer.span import TraceWorkflowSpan, TraceAgentSpan
@@ -355,14 +355,27 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
     return None, None, None
 
 
-async def save_trace_detail(index: WorkflowId | AgentId, tracedetail: TraceDetail) -> None:
-    tracedetail.space_id = index.space_id
-    if tracedetail.business_type == "WORKFLOW":
-        tracedetail.business_id = index.workflow_id
-    else:
-        tracedetail.business_id = index.agent_id
-
-    trace_detail_repository.create_trace_detail(tracedetail)
+async def save_trace_details(index: WorkflowId | AgentId, tracedetails: List[TraceDetail]) -> None:
+    """
+    批量保存trace details，优化性能
+    
+    Args:
+        index: WorkflowId或AgentId
+        tracedetails: TraceDetail列表
+    """
+    if not tracedetails:
+        return
+    
+    # 设置space_id和business_id
+    for tracedetail in tracedetails:
+        tracedetail.space_id = index.space_id
+        if tracedetail.business_type == "WORKFLOW":
+            tracedetail.business_id = index.workflow_id
+        else:
+            tracedetail.business_id = index.agent_id
+    
+    # 使用批量保存
+    trace_detail_repository.create_trace_details(tracedetails)
 
 
 # 保存执行日志
@@ -386,6 +399,7 @@ async def save_execution_traces(
 # 处理错误
 async def handle_stream_error(
         trace_logs: list[TraceWorkflowSpan | TraceAgentSpan],
+        trace_details: list[TraceDetail],
         last_chunk: Any,
         error_code: int,
         error_msg: str,
@@ -395,20 +409,27 @@ async def handle_stream_error(
     trace_id: Optional[str] = None
     if last_chunk is not None and hasattr(last_chunk, "payload"):
         _, trace_data, trace_detail = result_convert(last_chunk, business_type)
-        if trace_detail is not None:
+        if trace_details and trace_detail is not None:
             if error_code == -2:
                 trace_detail.output = f"Agent execution interrupted: {error_msg}"
                 trace_detail.status_code = 'interrupted'
             else:
                 trace_detail.output = f"Agent execution error: {error_msg}"
                 trace_detail.status_code = 'error'
-            await save_trace_detail(index, trace_detail)
+            trace_details.append(trace_detail)
             trace_id = trace_detail.trace_id
         if trace_logs and trace_data is not None:
             if hasattr(trace_data, 'error') and hasattr(trace_data, 'status'):
                 trace_data.status = "error"
                 trace_data.error = {str(error_code): error_msg}
                 trace_logs.append(trace_data)
+
+    # 批量保存错误追踪详情
+    if trace_details:
+        try:
+            await save_trace_details(index, trace_details)
+        except Exception as e:
+            logger.error(f"Failed to save trace details batch: {e}")
 
     if not trace_logs:
         logger.error(f"Workflow/Agent failed before any trace was emitted: {error_msg}")
