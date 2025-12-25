@@ -36,4 +36,4 @@ if [ -f "/app/site-packages/openjiuwen_studio_server/config.json" ]; then
 fi
 
 chown -R app:app /app/logs
-exec runuser -u app -- "$@"
+exec su app -s /bin/sh -c 'export PYTHONPATH="$PYTHONPATH" PATH="$PATH"; exec "$@"' -- sh "$@"
