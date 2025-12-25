@@ -34,7 +34,14 @@ export const OutputNodeRegistry: FlowNodeRegistry = {
         inputs: {
           inputParameters: {
             output: {
-              type: 'ref',
+              type: 'constant',
+              content: '',
+              schema: {
+                type: 'string',
+              },
+              extra: {
+                index: 0,
+              },
             },
           },
           content: {

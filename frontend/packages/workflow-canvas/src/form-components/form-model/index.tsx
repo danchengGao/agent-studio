@@ -4,12 +4,12 @@
  */
 
 import { Field, FieldRenderProps } from '@flowgram.ai/free-layout-editor'
-import { Typography, Spin, Tag } from '@douyinfe/semi-ui'
+import { Typography, Spin, Tag, Switch } from '@douyinfe/semi-ui'
 import { useSearchParams } from 'react-router-dom'
 import { AlertCircle } from 'lucide-react'
 
 import { useIsSidebar } from '../../hooks'
-import { FormItem, ValueDisplay, FormDisplay, FormSelect } from '../../form-components'
+import { FormItem, FormDisplay, FormSelect } from '../../form-components'
 import { useModels, type FrontendModelConfig } from '@test-agentstudio/api-client'
 
 const { Text } = Typography
@@ -22,11 +22,11 @@ interface Model {
 
 export interface FormModelProps {
   name?: string
-  modelName?: string
+  fieldPrefix?: string
   required?: boolean
 }
 
-export function FormModel({ name = '模型', modelName = 'inputs.llmParam.model', required = true }: FormModelProps) {
+export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = true }: FormModelProps) {
   const isSidebar = useIsSidebar()
   const [searchParams] = useSearchParams()
   const spaceId = searchParams.get('spaceId')
@@ -90,7 +90,7 @@ export function FormModel({ name = '模型', modelName = 'inputs.llmParam.model'
         : { id: '', name: '', type: '' }
 
     return (
-      <Field<{ id: string; name: string; type: string }> name={modelName} defaultValue={defaultModel}>
+      <Field<{ id: string; name: string; type: string }> name={`${fieldPrefix}.llmParam.model`} defaultValue={defaultModel}>
         {({ field }: FieldRenderProps<{ id: string; name: string; type: string }>) => {
           const modelName = field.value?.name || '未选择'
           const isUnselected = !field.value?.id || field.value?.id === ''
@@ -138,58 +138,77 @@ export function FormModel({ name = '模型', modelName = 'inputs.llmParam.model'
   }
 
   return (
-    <>
-      <FormItem name={name} required={required} vertical>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Field<{ id: string; name: string; type: string }>
-            name={modelName}
-            defaultValue={
-              models.length > 0
-                ? {
-                    id: models[0]?.id || '',
-                    name: models[0]?.name || '',
-                    type: models[0]?.type || '',
-                  }
-                : { id: '', name: '', type: '' }
+    <Field<{ id: string; name: string; type: string }>
+      name={`${fieldPrefix}.llmParam.model`}
+      defaultValue={
+        models.length > 0
+          ? {
+              id: models[0]?.id || '',
+              name: models[0]?.name || '',
+              type: models[0]?.type || '',
+            }
+          : { id: '', name: '', type: '' }
+      }
+    >
+      {({ field }: FieldRenderProps<{ id: string; name: string; type: string }>) => {
+        const modelId = field.value?.id || ''
+        const isModelMissing = modelId && !availableModelIds.has(modelId) && modelsData
+        const currentValue = modelId && availableModelIds.has(modelId) ? modelId : ''
+
+        return (
+          <FormItem
+            name={name}
+            required={required}
+            vertical
+            customComponent={
+              <Field<boolean> name={`${fieldPrefix}.historyEnable`} defaultValue={false}>
+                {({ field }) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px' }}>启用对话历史</span>
+                    <Switch
+                      checked={field.value ?? false}
+                      onChange={field.onChange}
+                      size="small"
+                      style={
+                        {
+                          '--semi-color-success': '#1890ff',
+                          '--semi-color-success-hover': '#40a9ff',
+                          '--semi-color-success-active': '#096dd9',
+                        } as React.CSSProperties
+                      }
+                    />
+                  </div>
+                )}
+              </Field>
             }
           >
-            {({ field }: FieldRenderProps<{ id: string; name: string; type: string }>) => {
-              const currentValue = field.value?.id || ''
-              const modelId = field.value?.id || ''
-              const modelName = field.value?.name || ''
-              const isModelMissing = modelId && !availableModelIds.has(modelId) && modelsData // 模型列表已加载但模型不在可用列表中（可能已被禁用）
-
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                  <FormSelect
-                    value={currentValue}
-                    onChange={(value: string | string[]) => {
-                      const modelId = Array.isArray(value) ? value[0] || '' : value
-                      const selectedModel = models.find(m => m.id === modelId)
-                      field.onChange({
-                        id: selectedModel?.id || '',
-                        name: selectedModel?.name || '',
-                        type: selectedModel?.type || '',
-                      })
-                    }}
-                    options={models.map((model: Model) => ({
-                      label: `${model.name}`,
-                      value: model.id,
-                    }))}
-                  />
-                  {/* 模型不存在提醒 */}
-                  {isModelMissing && (
-                    <span className="inline-flex items-center text-xs text-amber-600 leading-[18px]">
-                      <AlertCircle className="w-4 h-4 mr-1" />
-                      模型不存在，请重新选择
-                    </span>
-                  )}
-                </div>
-              )
-            }}
-          </Field>
-        </div>
-      </FormItem>
-    </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              <FormSelect
+                value={currentValue}
+                onChange={(value: string | string[]) => {
+                  const newModelId = Array.isArray(value) ? value[0] || '' : value
+                  const selectedModel = models.find(m => m.id === newModelId)
+                  field.onChange({
+                    id: selectedModel?.id || '',
+                    name: selectedModel?.name || '',
+                    type: selectedModel?.type || '',
+                  })
+                }}
+                options={models.map((model: Model) => ({
+                  label: `${model.name}`,
+                  value: model.id,
+                }))}
+              />
+              {isModelMissing && (
+                <span className="inline-flex items-center text-xs text-amber-600 leading-[18px]">
+                  <AlertCircle className="w-4 h-4 mr-1" />
+                  模型不存在，请重新选择
+                </span>
+              )}
+            </div>
+          </FormItem>
+        )
+      }}
+    </Field>
   )
 }
