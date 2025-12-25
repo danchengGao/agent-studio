@@ -175,9 +175,9 @@ const PluginManagementPage: React.FC = () => {
     }
   }
 
-  // Get unique categories from both installed and market plugins - using plugin_type as category
-  const allCategories = [...plugins.map(p => getPluginTypeText(p.plugin_type)), ...marketPlugins.map(p => getPluginTypeText(p.plugin_type))]
-  const categories = ['all', ...Array.from(new Set(allCategories))]
+  // Get all plugin type categories - always show all available plugin types regardless of current filters
+  const pluginTypeCategories = ['云侧服务', '本地代码插件']
+  const categories = ['all', ...pluginTypeCategories]
 
   // Filter plugins - Apply search and filter to all fetched plugins
   // When searching, we fetch all data (up to 1000) so we can search across all plugins
