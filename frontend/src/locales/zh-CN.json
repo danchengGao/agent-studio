@@ -1297,6 +1297,8 @@
         "exampleCountTooltip": "每轮优化时使用的示例数量。优化时会按照一定策略从用例集选取若干个示例拼接到提示词最后作为样本示例，用于指导优化方向。",
         "targetAccuracyTooltip": "在优化过程中，如果达到目标准确率会提前结束优化任务。",
         "maxRoundsTooltip": "优化任务运行的最大轮次。若未达到目标准确率，优化任务会在完成最大优化轮次后结束。",
+        "llmParallel": "最大并发数",
+        "llmParallelTooltip": "优化任务使用用例集进行训练时的最大并发数。",
         "optimizeModelTooltip": "用于优化提示词的模型，建议使用模型能力相对优秀的模型。",
         "runModelTooltip": "提示词实际运行时使用的模型，建议使用和真实场景一致的模型。",
         "evaluationCriteriaTooltip": "定义{{type}}评价的具体标准",

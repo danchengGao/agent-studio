@@ -1335,6 +1335,7 @@ export interface CreateAgentRequest {
   space_id: string
   agent_name: string
   description: string
+  agent_type: string
   icon?: string
 }
 

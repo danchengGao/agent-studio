@@ -15,7 +15,7 @@ import WorkflowsPage from './pages/Workflows/WorkflowsPage'
 import PromptsPage from './pages/Prompts/PromptsPage'
 
 // 懒加载非核心页面
-const AgentEditorEntryPage = React.lazy(() => import('./pages/Agents/AgentEditorEntryPage'))
+const AgentCreatePage = React.lazy(() => import('./pages/Agents/AgentCreatePage'))
 const AgentEditorEditPage = React.lazy(() => import('./pages/Agents/AgentEditorEditPage'))
 const WorkflowCreationPage = React.lazy(() => import('./pages/Workflows/WorkflowCreationPage'))
 const PromptEditPage = React.lazy(() => import('./pages/Prompts/PromptEditPage'))
@@ -74,7 +74,7 @@ const App: React.FC = () => {
               path="agents/new"
               element={
                 <Suspense fallback={<LoadingFallback />}>
-                  <AgentEditorEntryPage />
+                  <AgentCreatePage />
                 </Suspense>
               }
             />

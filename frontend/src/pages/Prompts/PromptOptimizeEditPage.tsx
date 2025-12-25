@@ -162,6 +162,7 @@ const PromptOptimizeEditPage: React.FC = () => {
 
   // 优化配置状态
   const [maxRounds, setMaxRounds] = useState(5)
+  const [llmParallel, setLlmParallel] = useState(1)
   const [exampleCount, setExampleCount] = useState(0)
   const [evaluationMetrics, setEvaluationMetrics] = useState<string[]>([])
   const [evaluationCriteria, setEvaluationCriteria] = useState('')
@@ -503,6 +504,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     description: '',
     originalPrompt: '',
     maxRounds: 5,
+    llmParallel: 1,
     targetAccuracy: 90,
     exampleCount: 0,
     evaluationType: 'objective',
@@ -556,6 +558,7 @@ const PromptOptimizeEditPage: React.FC = () => {
           // 设置优化配置
           if (content.optimizeInfo) {
             setMaxRounds(content.optimizeInfo.num_iter || 5)
+            setLlmParallel(content.optimizeInfo.llm_parallel || 1)
             setTargetAccuracy((content.optimizeInfo.early_stop_score || 0.9) * 100)
             setExampleCount(content.optimizeInfo.example_num || 0)
             setEvaluationType(content.optimizeInfo.user_compare_options === t('prompts.optimizeEditPage.evaluationType.objective') ? 'objective' : 'subjective')
@@ -689,9 +692,9 @@ const PromptOptimizeEditPage: React.FC = () => {
 
             // 优化配置
             setMaxRounds(jobDetailData.optimizeInfo.num_iter)
+            setLlmParallel(jobDetailData.optimizeInfo.llm_parallel || 1)
             setTargetAccuracy((jobDetailData.optimizeInfo.early_stop_score || 0.9) * 100)
             setExampleCount(jobDetailData.optimizeInfo.example_num)
-            // setParallelCount(jobDetailData.optimizeInfo.llm_parallel) // 并行数量暂时不设置
             setEvaluationCriteria(jobDetailData.optimizeInfo.user_compare_rules)
             setEvaluationMetrics([jobDetailData.optimizeInfo.user_compare_options])
             setBackgroundKnowledge(jobDetailData.optimizeInfo.external_knowledge)
@@ -1038,6 +1041,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       description,
       originalPrompt,
       maxRounds,
+      llmParallel,
       targetAccuracy,
       exampleCount,
       evaluationType,
@@ -1065,7 +1069,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         early_stop_score: (data.targetAccuracy || 90) / 100,
         example_num: data.exampleCount,
         placeholder: [],
-        llm_parallel: 2,
+        llm_parallel: data.llmParallel || 1,
         user_compare_options: isDraft
           ? data.evaluationType === 'objective'
             ? '客观评价'
@@ -1187,6 +1191,7 @@ const PromptOptimizeEditPage: React.FC = () => {
   const setDescriptionWithAutoSave = createAutoSaveSetter(setDescription, 'description')
   const setOriginalPromptWithAutoSave = createAutoSaveSetter(setOriginalPrompt, 'originalPrompt')
   const setMaxRoundsWithAutoSave = createAutoSaveSetter(setMaxRounds, 'maxRounds')
+  const setLlmParallelWithAutoSave = createAutoSaveSetter(setLlmParallel, 'llmParallel')
   const setTargetAccuracyWithAutoSave = createAutoSaveSetter(setTargetAccuracy, 'targetAccuracy')
   const setExampleCountWithAutoSave = createAutoSaveSetter(setExampleCount, 'exampleCount')
   const setEvaluationTypeWithAutoSave = createAutoSaveSetter(setEvaluationType, 'evaluationType')
@@ -1207,6 +1212,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       description,
       originalPrompt,
       maxRounds,
+      llmParallel,
       targetAccuracy,
       exampleCount,
       evaluationType,
@@ -1225,6 +1231,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     description,
     originalPrompt,
     maxRounds,
+    llmParallel,
     targetAccuracy,
     exampleCount,
     evaluationType,
@@ -3400,6 +3407,63 @@ const PromptOptimizeEditPage: React.FC = () => {
                                     }}
                                   />
                                 </div>
+
+                                {/* 最大并发数 */}
+                                <div className="flex items-center gap-3">
+                                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
+                                    <Typography variant="subtitle2" className="text-gray-700">
+                                      {t('prompts.optimizeEditPage.optimizationConfig.llmParallel')}
+                                    </Typography>
+                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.llmParallelTooltip')}>
+                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
+                                        <HelpCircle className="w-4 h-4" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  </div>
+                                  <div className="flex-1 flex items-center gap-2">
+                                    <Typography variant="caption" className="text-gray-500 text-right" sx={{ minWidth: '40px', width: '40px' }}>
+                                      1
+                                    </Typography>
+                                    <Slider
+                                      value={llmParallel}
+                                      onChange={(_, value) => setLlmParallelWithAutoSave(value as number)}
+                                      min={1}
+                                      max={20}
+                                      step={1}
+                                      valueLabelDisplay="auto"
+                                      sx={{ flex: 1 }}
+                                      className="bg-white/60 p-2 rounded"
+                                    />
+                                    <Typography variant="caption" className="text-gray-500 text-left" sx={{ minWidth: '40px', width: '40px' }}>
+                                      20
+                                    </Typography>
+                                  </div>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={llmParallel}
+                                    onChange={e => {
+                                      const value = parseInt(e.target.value)
+                                      if (!isNaN(value)) {
+                                        if (value >= 1 && value <= 20) {
+                                          setLlmParallelWithAutoSave(value)
+                                        }
+                                      }
+                                    }}
+                                    inputProps={{
+                                      min: 1,
+                                      max: 20,
+                                      step: 1,
+                                    }}
+                                    sx={{
+                                      width: '80px',
+                                      '& .MuiOutlinedInput-input': {
+                                        padding: '4px 8px',
+                                        textAlign: 'center',
+                                      },
+                                    }}
+                                  />
+                                </div>
                               </div>
                             </div>
 
@@ -4307,71 +4371,247 @@ const PromptOptimizeEditPage: React.FC = () => {
       </Dialog>
 
       {/* 详情对话框 */}
-      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="lg" fullWidth>
-        <DialogTitle>
+      <Dialog 
+        open={detailDialogOpen} 
+        onClose={() => setDetailDialogOpen(false)} 
+        maxWidth="lg" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            background: 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95))',
+            backdropFilter: 'blur(10px)',
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+            background: 'linear-gradient(to right, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8))',
+            py: 2.5
+          }}
+        >
           <Box className="flex items-center justify-between">
-            <Typography variant="h6">
+            <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
               {detailDialogType === 'original'
                 ? t('prompts.optimizeEditPage.optimizationResult.originalPrompt')
                 : t('prompts.optimizeEditPage.optimizationResult.optimizedPrompt')}
               {t('prompts.optimizeEditPage.optimizationResult.evaluationDetail')}
             </Typography>
-            <IconButton onClick={() => setDetailDialogOpen(false)} size="small">
-              <ChevronRight className="w-5 h-5" />
+            <IconButton 
+              onClick={() => setDetailDialogOpen(false)} 
+              size="small"
+              sx={{
+                color: '#6b7280',
+                '&:hover': {
+                  color: '#ef4444',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <X className="w-5 h-5" />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent>
-          <TableContainer component={Paper} className="mt-2">
+        <DialogContent sx={{ p: 3, bgcolor: 'transparent' }}>
+          <TableContainer 
+            component={Paper} 
+            className="mt-2"
+            sx={{
+              borderRadius: '12px',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+            }}
+          >
             <Table size="small">
               <TableHead>
-                <TableRow>
-                  <TableCell width="60" className="font-semibold">
+                <TableRow sx={{ backgroundColor: '#f9fafb' }}>
+                  <TableCell 
+                    width="60" 
+                    className="font-semibold"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      borderBottom: '2px solid #e5e7eb',
+                    }}
+                  >
                     {t('prompts.optimizeEditPage.testCaseDialog.sequenceNumberColumn')}
                   </TableCell>
-                  <TableCell width="20%" className="font-semibold">
+                  <TableCell 
+                    width="20%" 
+                    className="font-semibold"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      borderBottom: '2px solid #e5e7eb',
+                    }}
+                  >
                     用户输入
                   </TableCell>
-                  <TableCell width="25%" className="font-semibold">
+                  <TableCell 
+                    width="25%" 
+                    className="font-semibold"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      borderBottom: '2px solid #e5e7eb',
+                    }}
+                  >
                     模型回答
                   </TableCell>
-                  <TableCell width="25%" className="font-semibold">
+                  <TableCell 
+                    width="25%" 
+                    className="font-semibold"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      borderBottom: '2px solid #e5e7eb',
+                    }}
+                  >
                     参照回答
                   </TableCell>
-                  <TableCell width="100" className="font-semibold text-center">
+                  <TableCell 
+                    width="100" 
+                    className="font-semibold text-center"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      borderBottom: '2px solid #e5e7eb',
+                    }}
+                  >
                     模型评分
                   </TableCell>
-                  <TableCell width="20%" className="font-semibold">
+                  <TableCell 
+                    width="20%" 
+                    className="font-semibold"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#374151',
+                      fontSize: '0.875rem',
+                      borderBottom: '2px solid #e5e7eb',
+                    }}
+                  >
                     评分原因
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {getEvaluationData().map((item, index) => (
-                  <TableRow key={index} hover>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="text-sm">{item.userInput}</TableCell>
-                    <TableCell className="text-sm whitespace-pre-wrap">{item.modelAnswer}</TableCell>
-                    <TableCell className="text-sm whitespace-pre-wrap">{item.referenceAnswer}</TableCell>
-                    <TableCell align="center">
-                      <Chip label={item.score} size="small" color={item.score >= 80 ? 'success' : item.score >= 60 ? 'warning' : 'error'} />
+                  <TableRow 
+                    key={index} 
+                    hover
+                    sx={{
+                      '&:hover': {
+                        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                      },
+                      '&:last-child td': {
+                        borderBottom: 'none',
+                      },
+                    }}
+                  >
+                    <TableCell 
+                      sx={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {index + 1}
                     </TableCell>
-                    <TableCell className="text-sm">{item.reason}</TableCell>
+                    <TableCell 
+                      className="text-sm"
+                      sx={{
+                        color: '#374151',
+                        fontSize: '0.875rem',
+                        maxWidth: '200px',
+                      }}
+                    >
+                      {item.userInput}
+                    </TableCell>
+                    <TableCell 
+                      className="text-sm whitespace-pre-wrap"
+                      sx={{
+                        color: '#374151',
+                        fontSize: '0.875rem',
+                        maxWidth: '250px',
+                      }}
+                    >
+                      {item.modelAnswer}
+                    </TableCell>
+                    <TableCell 
+                      className="text-sm whitespace-pre-wrap"
+                      sx={{
+                        color: '#374151',
+                        fontSize: '0.875rem',
+                        maxWidth: '250px',
+                      }}
+                    >
+                      {item.referenceAnswer}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip 
+                        label={item.score} 
+                        size="small" 
+                        color={item.score >= 80 ? 'success' : item.score >= 60 ? 'warning' : 'error'}
+                        sx={{
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell 
+                      className="text-sm"
+                      sx={{
+                        color: '#6b7280',
+                        fontSize: '0.875rem',
+                        maxWidth: '200px',
+                      }}
+                    >
+                      {item.reason}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
 
-          <Box className="mt-4 p-3 bg-gray-50 rounded">
-            <Typography variant="body2" className="text-gray-700">
-              <strong>平均得分：</strong> {Math.round(getEvaluationData().reduce((sum, item) => sum + item.score, 0) / getEvaluationData().length)} 分
+          <Box 
+            className="mt-4 rounded-xl border"
+            sx={{
+              p: 3,
+              background: 'linear-gradient(to right, rgba(249, 250, 251, 0.8), rgba(243, 244, 246, 0.8))',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              borderRadius: '12px',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            }}
+          >
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: '#374151',
+                fontSize: '0.9375rem',
+                fontWeight: 500,
+              }}
+            >
+              <strong style={{ color: '#1f2937', fontWeight: 600 }}>平均得分：</strong>{' '}
+              <span style={{ 
+                color: '#3b82f6', 
+                fontWeight: 700,
+                fontSize: '1.125rem',
+              }}>
+                {Math.round(getEvaluationData().reduce((sum, item) => sum + item.score, 0) / getEvaluationData().length)}
+              </span>
+              <span style={{ color: '#6b7280', marginLeft: '4px' }}>分</span>
             </Typography>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailDialogOpen(false)}>{t('prompts.optimizeEditPage.testCaseDialog.close')}</Button>
-        </DialogActions>
       </Dialog>
 
       {/* 清空确认对话框 */}
