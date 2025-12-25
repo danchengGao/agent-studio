@@ -1,8 +1,14 @@
 import React, { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Bot, Workflow, FileText, Brain, X, ChevronDown, Zap, Lock, Unlock, MessageSquare, Plug } from 'lucide-react'
+import { X, ChevronDown, Lock, Unlock, MessageSquare, Layers } from 'lucide-react'
 import DashboardIcon from '@/assets/icons/dashboard.svg?react'
+import AgentIcon from '@/assets/icons/agent.svg?react'
+import WorkflowIcon from '@/assets/icons/workflow.svg?react'
+import PromptTemplateIcon from '@/assets/icons/promptTemplate.svg?react'
+import PromptOptimizeIcon from '@/assets/icons/promptOptimze.svg?react'
+import ModelIcon from '@/assets/icons/modelManagement.svg?react'
+import PluginIcon from '@/assets/icons/plugin.svg?react'
 import packageJson from '@/../package.json'
 
 interface SidebarProps {
@@ -30,18 +36,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
   const navigation: NavigationItem[] = [
     { name: t('layout.navigation.dashboard'), href: '/dashboard', icon: DashboardIcon },
     // { name: t('layout.navigation.apps'), href: '/dashboard/apps', icon: Layers },
-    { name: t('layout.navigation.agents'), href: '/dashboard/agents', icon: Bot },
-    { name: t('layout.navigation.workflows'), href: '/dashboard/workflows', icon: Workflow },
+    { name: t('layout.navigation.agents'), href: '/dashboard/agents', icon: AgentIcon },
+    { name: t('layout.navigation.workflows'), href: '/dashboard/workflows', icon: WorkflowIcon },
     {
       name: t('layout.navigation.promptManagement'),
       icon: MessageSquare,
       children: [
-        { name: t('layout.navigation.promptTemplates'), href: '/dashboard/prompts', icon: FileText },
-        { name: t('layout.navigation.promptOptimization'), href: '/dashboard/prompts/optimize', icon: Zap },
+        { name: t('layout.navigation.promptTemplates'), href: '/dashboard/prompts', icon: PromptTemplateIcon },
+        { name: t('layout.navigation.promptOptimization'), href: '/dashboard/prompts/optimize', icon: PromptOptimizeIcon },
       ],
     },
-    { name: t('layout.navigation.models'), href: '/dashboard/models', icon: Brain },
-    { name: t('layout.navigation.plugins'), href: '/dashboard/plugins', icon: Plug },
+    { name: t('layout.navigation.models'), href: '/dashboard/models', icon: ModelIcon },
+    { name: t('layout.navigation.plugins'), href: '/dashboard/plugins', icon: PluginIcon },
   ]
 
   const toggleExpanded = (itemName: string) => {
@@ -131,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
                   <item.icon
                     className={`
                       transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
-                      h-6 w-6
+                      h-5 w-5
                       ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-blue-600'}
                       ${isActive ? 'scale-110' : 'group-hover:scale-105'}
                     `}

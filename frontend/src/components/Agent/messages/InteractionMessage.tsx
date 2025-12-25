@@ -179,12 +179,7 @@ export function InteractionMessage({
                 <div key={field.input_name} className="space-y-1">
                   <div className="text-sm text-gray-700 flex items-center gap-1">
                     {field.required ? <span className="text-red-500">*</span> : null}
-                    <span>{field.input_name}</span>
-                    {field.description ? (
-                      <Tooltip title={field.description} placement="top">
-                        <Info className="w-4 h-4 text-gray-500" />
-                      </Tooltip>
-                    ) : null}
+                    <span>{field.description || field.input_name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-full">

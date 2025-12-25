@@ -47,7 +47,6 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
   // 提供给MemoryEngine
   const userIdForMem = getDefaultSpaceId()
   const groupIdForMem = agentId
-
   // 状态管理
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
