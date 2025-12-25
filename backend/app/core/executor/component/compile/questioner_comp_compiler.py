@@ -30,13 +30,14 @@ class QuestionerCompCompiler(BaseCompCompiler):
 
             field_infos.append(field_info)
 
-        # 获取 max_response 配置，有默认值保护
+        # 获取 max_response 配置和 with_chat_history配置，有默认值保护
         max_response = self.questioner_comp_config_dict.get('max_response', 3)
+        with_chat_history = self.questioner_comp_config_dict.get('with_chat_history', False)
 
         questioner_comp_config = QuestionerConfig(
             model=model_config,
             field_names=field_infos,
-            with_chat_history=False,
+            with_chat_history=with_chat_history,
             max_response=max_response
         )
 

@@ -93,12 +93,14 @@ def _intent_configs_convert(inputs: Inputs, space_id: str) -> dict:
         index += 1
 
     model = _intent_configs_model_convert(int(llm_params.model.id), space_id)
+    enable_history = inputs.enable_history
 
     converted_configs = dsl.IntentDetectionConfig(
         user_prompt=user_prompt,  # 添加 user_prompt 字段
         category_list=category_list,
         category_name_list=category_name_list,
-        model=model
+        model=model,
+        enable_history=enable_history,
     )
 
     return converted_configs.model_dump()

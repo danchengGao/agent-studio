@@ -33,6 +33,7 @@ class IntentDetectionCompCompiler(BaseCompCompiler):
             category_name_list=self.config_dict.get('category_name_list'),
             model=model_config,
             user_prompt=self.config_dict.get('user_prompt'),
+            enable_history=self.config_dict.get('enable_history'),
         )
         intent_comp = IntentDetectionComponent(config)
 

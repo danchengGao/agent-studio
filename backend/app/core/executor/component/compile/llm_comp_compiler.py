@@ -46,6 +46,7 @@ class LLMCompCompiler(BaseCompCompiler):
                 "type": self.llm_config_dl.response_format_type,
             },
             output_config=self.llm_config_dl.output_config,
+            enable_history=self.llm_config_dl.enable_history,
         )
 
         return LLMComponent(llm_comp_config)

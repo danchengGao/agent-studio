@@ -150,6 +150,7 @@ class LLMConfig(BaseModel):
     template_content: List[Dict] = Field(default_factory=list)
     response_format_type: LLMResponseFormatType = Field(LLMResponseFormatType.Text)
     output_config: Dict[str, Any] = Field(default_factory=dict)
+    enable_history: bool = Field(default=False)
 
 
 class BaseMessage(BaseModel):
@@ -200,7 +201,7 @@ class QuestionerConfig(BaseModel):
     extract_fields_from_response: bool = Field(default=True)
     field_names: List[FieldInfo] = Field(default_factory=list)
     max_response: int = Field(default=3)
-    with_chat_history: bool = Field(default=True)
+    with_chat_history: bool = Field(default=False)
     chat_history_max_rounds: int = Field(default=5)
     prompt_template: List[dict] = Field(default_factory=list)
     extra_prompt_for_fields_extraction: str = Field(default="")

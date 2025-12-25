@@ -83,7 +83,8 @@ def llm_convert(node: Node, space_id: str) -> dsl.Component:
             template_content=[
                 {"role": "system", "content": llm_params.system_prompt.content},
                 {"role": "user", "content": llm_params.prompt.content},
-            ]
+            ],
+            enable_history=inputs.enable_history,
         )
 
         model_id = int(llm_params.model.id)

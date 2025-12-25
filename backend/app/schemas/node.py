@@ -138,6 +138,8 @@ class Inputs(BaseModel):
     plugin_param: Optional[PluginParam] = Field(None, alias="pluginParam")
     streaming: Optional[bool] = Field(False)
     max_response: Optional[int] = Field(3, alias="max_response")
+    enable_history: Optional[bool] = Field(False, alias="historyEnable")
+
 
     class Config:
         populate_by_name = True

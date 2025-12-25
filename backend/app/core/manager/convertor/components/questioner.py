@@ -74,7 +74,8 @@ def questioner_convert(node: Node, space_id: str) -> dsl.Component:
         questioner_configs = dsl.QuestionerConfig(
             model=model,
             field_names=converted_fields,
-            max_response=inputs.max_response
+            max_response=inputs.max_response,
+            with_chat_history=inputs.enable_history,
         )
 
         model_id = int(llm_params.model.id)
