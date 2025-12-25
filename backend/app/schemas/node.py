@@ -160,14 +160,9 @@ class Inputs(BaseModel):
 
     @model_validator(mode='after')
     def check_variable_merge_inputs(self) -> 'Inputs':
-        # 只有当 variable_merge 存在才验证，验证2点：key为Gropu*格式，同一个Group中的输入存在且格式相同
+        # 只有当 variable_merge 存在才验证
         if self.variable_merge is not None:
-            import re
-            pattern = re.compile(r'^Group\d+$')
             for group in self.variable_merge:
-                # 验证key为Gropu*格式, *为数字
-                if not pattern.match(group.name):
-                    raise ValueError(f"variable_merge: group name {group.name} donot match Group*.")
                 for var in group.items:
                     # Group中的输入在input_parameters中存在
                     if var not in self.input_parameters:
