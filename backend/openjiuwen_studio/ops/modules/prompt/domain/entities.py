@@ -638,6 +638,7 @@ class HistoryItem(BaseModel):
     iteration_round: Optional[int] = Field(None, description="迭代轮次")
     optimized_prompt: Optional[str] = Field(None, description="优化后的提示")
     success_rate: Optional[float] = Field(None, description="成功率")
+    evaluate_cases: Optional[List[Dict[str, Any]]] = Field(None, description="用例集运行情况")
 
 
 # 定义Progress模型
@@ -701,3 +702,9 @@ class OptBadCaseInfoRequest(BaseModel):
     badcases: Optional[List[dict]] = Field(default=True, description="优化要求")
     stream: bool = Field(default=True, description="是否流式")
     templateInfo: TemplateInfo = Field(default=TemplateInfo(), description="元模版配置信息")
+
+
+class GetOptimizeResponse(BaseResponse):
+    history: Optional[List[HistoryItem]] = Field(None, description="历史记录")
+    msg: str = "Success"
+    code: int = 0

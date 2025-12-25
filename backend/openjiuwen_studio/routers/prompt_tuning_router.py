@@ -146,7 +146,7 @@ class OptimizationCallbacks(Callbacks):
         self.start_time = time.time()
         super().__init__()
 
-    def on_train_epoch_end(self, agent, progress: Progress):
+    def on_train_epoch_end(self, agent, progress: Progress, eval_info: List[EvaluatedCase]):
         """每个epoch结束回调"""
         try:
             # 计算耗时
@@ -155,20 +155,17 @@ class OptimizationCallbacks(Callbacks):
 
             # 获取当前最优提示词
             current_prompt = get_prompt_content(agent.get_llm_calls().get("llm_call").get_system_prompt().content)
-
-            # 首轮需要填充基线历史
-            if progress.current_epoch == 1:
-                self.history_records.append({
-                    "iteration_round": 0,
-                    "success_rate": float(progress.val_baseline_score),
-                    "optimized_prompt": ""
-                })
-
+            # on_train_end也需要加eval_info
+            eval_info_list = []
+            for elem in eval_info:
+                eval_info_list.append(elem.model_dump())
+                logger.info(f"on_train_epoch_end eval_info: {elem.model_dump()}")
             # 构建历史记录
             history_record = {
                 "iteration_round": progress.current_epoch,
-                "success_rate": float(progress.best_batch_score),
-                "optimized_prompt": current_prompt
+                "success_rate": float(progress.current_epoch_score),
+                "optimized_prompt": current_prompt,
+                "evaluate_cases": eval_info_list
             }
 
             # 计算进度
@@ -201,7 +198,7 @@ class OptimizationCallbacks(Callbacks):
         except Exception as e:
             logger.warning(f"更新数据库失败: {e}")
 
-    def on_train_end(self, agent, progress: Progress):
+    def on_train_end(self, agent, progress: Progress, eval_info: List[EvaluatedCase]):
         """训练结束回调"""
         try:
             total_time = int(time.time() - self.start_time)
@@ -215,15 +212,42 @@ class OptimizationCallbacks(Callbacks):
                 "errorMsg": "job successfully finished",
             }
 
-            # 特殊情况：第0轮就达到early_stop,需要填充基线
-            if progress.current_epoch == 0:
-                self.history_records.append({
-                    "iteration_round": 0,
-                    "success_rate": float(progress.val_baseline_score),
-                    "optimized_prompt": ""
-                })
-                update_data["history"] = json.dumps(self.history_records)
+            eval_info_list = []
+            for elem in eval_info:
+                eval_info_list.append(elem.model_dump())
+                logger.info(f"on_train_end eval_info: {elem.model_dump()}")
 
+            logger.info(f"训练完成! 最终分数: {progress.best_score:.4f}, 总耗时: {total_time}秒")
+            self._update_job_info(update_data)
+
+        except Exception as e:
+            logger.info(f"训练结束更新数据库失败: {e}")
+
+    def on_train_begin(self, agent, progress: Progress, eval_info: List[EvaluatedCase]):
+        """训练结束回调"""
+        try:
+            total_time = int(time.time() - self.start_time)
+
+            # 最终更新数据
+            update_data = {
+                "status": "running",
+                "progress_rate": 0,
+                "timeCost": total_time,
+                "updated_at": get_china_datetime(),
+                "success_rate": float(progress.current_epoch_score),
+            }
+
+            eval_info_list = []
+            for elem in eval_info:
+                eval_info_list.append(elem.model_dump())
+            # 首轮需要填充基线历史
+            self.history_records.append({
+                "iteration_round": 0,
+                "success_rate": float(progress.current_epoch_score),
+                "optimized_prompt": "",
+                "evaluate_cases": eval_info_list
+            })
+            update_data["history"] = json.dumps(self.history_records)
             logger.info(f"训练完成! 最终分数: {progress.best_score:.4f}, 总耗时: {total_time}秒")
             self._update_job_info(update_data)
 
@@ -490,12 +514,13 @@ class OptimizationTaskExecutor:
             model_config=config,
             metric=metric
         )
-
+        optimize_config.num_parallel = optimize_config.get("llm_parallel", 1)
+        logger.info(f"_create_trainer optimize_config: {optimize_config}")
         # 创建训练器
         trainer = Trainer(
             evaluator=evaluator,
             optimizer=optimizer,
-            num_parallel=optimize_config.get("llm_parallel", 1)
+            **optimize_config
         )
 
         return trainer
@@ -838,6 +863,47 @@ def get_draft(
         raise ValueError(f"draft with user_id {user_id} and space_id: {workspace_id} not found")
 
     return draft
+
+
+@router.get("/templates_optimization/job_history/{job_id}", response_model=entities.GetOptimizeResponse)
+@handle_exceptions(response_model=entities.GetOptimizeResponse)
+def get_history(
+        job_id: str,
+        workspace_id: str = Query(..., title="space ID"),
+        user_id: str = Query(..., title="User ID"),
+        page_num: int = Query(default=0, description="页码"),
+        page_size: int = Query(default=5, description="每页数量"),
+        iteration_round: int = Query(default=None, description="迭代轮次"),
+        service: JobService = Depends(get_job_service)):
+    """
+    获取用户job任务草稿
+    """
+    if iteration_round is None:
+        return entities.GetOptimizeResponse(code=404, msg=f"缺少关键参数iteration_round", history=[])
+    job_info = service.get_job_info(workspace_id, user_id, job_id)
+
+    if not job_info or not hasattr(job_info, 'history') or not job_info.history:
+        return entities.GetOptimizeResponse(history=[])
+
+    history_data = job_info.history
+
+    # 查找指定轮次的数据
+    for item in history_data:
+        if item.iteration_round == iteration_round:
+            # 对找到的item的evaluate_cases进行分页处理
+            cases = item.evaluate_cases
+            total_cases = len(cases)
+            start_idx = (page_num - 1) * page_size
+            end_idx = start_idx + page_size
+
+            # 检查分页索引是否超出范围
+            if start_idx >= total_cases or start_idx < 0:
+                return entities.GetOptimizeResponse(code=400, msg="Page number out of range", history=[])
+
+            paged_cases = cases[start_idx:end_idx]
+            item.evaluate_cases = paged_cases
+            return entities.GetOptimizeResponse(history=[item])
+    return entities.GetOptimizeResponse(code=200, msg=f"未找到iteration_round为{iteration_round}的历史记录", history=[])
 
 
 def wrap_sse_generator(original_generator):
