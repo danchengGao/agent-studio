@@ -9,7 +9,6 @@ from typing import Dict, Any, Optional, AsyncGenerator, List
 import logging
 import asyncio
 
-from clickhouse_connect.driver.errors import error_messages
 from jinja2 import Environment, BaseLoader, TemplateError, UndefinedError
 from openai import OpenAIError
 
