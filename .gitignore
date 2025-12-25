@@ -101,3 +101,6 @@ scripts/conf/docker-plugin.yml
 scripts/conf/docker-sandbox.yml
 scripts/examples
 scripts/ssl
+scripts/.ssl-dirs/*
+scripts/.envs/*
+scripts/conf/.nginx-files/*

@@ -43,7 +43,7 @@ services:
     env_file:
       - ../.envs/env.<<NAME_SUFFIX>>
     volumes:
-      - ../ssl:/etc/nginx/ssl
+      - ../.ssl-dirs/<<SSL_DIR_NAME>>:/etc/nginx/ssl
       - /etc/localtime:/etc/localtime:ro
       - ./config.json:/usr/share/nginx/html/config.json
       - ./.nginx-files/<<NGINX_FILE_NAME>>:/etc/nginx/nginx.conf
