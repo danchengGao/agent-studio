@@ -467,6 +467,7 @@ class AgentRunner:
             # 6. 执行Agent流式推理
             inputs["user_id"] = space_id
             inputs["group_id"] = agent_config.id
+            trace_context.agent_input = {'inputs': inputs.get('query')}
             async for chunk in invokable_agent.stream(inputs):
                 # 处理单个chunk的追踪信息
                 rsp = await process_chunk_trace(chunk, trace_context)

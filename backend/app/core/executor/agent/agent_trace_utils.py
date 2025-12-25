@@ -20,8 +20,8 @@ Agent Trace Utils - Agent通用追踪工具模块
 from dataclasses import dataclass, field
 from typing import Any, Optional, List, Dict
 
-from openjiuwen.core.tracer.span import TraceWorkflowSpan, TraceAgentSpan
-from openjiuwen.core.stream.writer import TraceSchema
+from openjiuwen.core.tracer.span import TraceWorkflowSpan
+from openjiuwen.core.stream.writer import TraceSchema, OutputSchema
 from openjiuwen.core.common.logging import logger
 
 from app.core.executor.util.utils import (
@@ -53,6 +53,8 @@ class TraceContext:
     trace_id: Optional[str] = None
     mapping: Dict[str, str] = field(default_factory=dict)
     trace_details: List[TraceDetail] = field(default_factory=list)
+    agent_ouput: Optional[dict] = None
+    agent_input: Optional[dict] = None
 
 
 def initialize_trace_context(
@@ -77,7 +79,9 @@ def initialize_trace_context(
             agent_id=agent_id,
             agent_version=agent_version
         ),
-        mapping=mapping or {}
+        mapping=mapping or {},
+        agent_ouput={},
+        agent_input={},
     )
 
 
@@ -102,6 +106,12 @@ async def process_chunk_trace(
         # 检查条件：有workflowId字段且invokeId == workflowId
         if hasattr(wf, 'workflow_id') and wf.invoke_id == wf.workflow_id:
             return None
+
+    if isinstance(chunk, OutputSchema) and chunk.type == "answer":
+        payload = chunk.payload
+        if 'output' in payload:
+            trace_context.agent_ouput = {'outputs': payload.get('output')}
+        return None
 
     # 转换chunk为响应格式和追踪信息
     rsp, _, trace_detail = result_convert(chunk, business_type=business_type, mapping=trace_context.mapping)
@@ -141,18 +151,14 @@ async def finalize_trace(trace_context: TraceContext) -> None:
         except Exception as e:
             logger.error(f"Failed to save trace details: {e}")
 
-    # 保存执行追踪日志
-    # if trace_context.trace_logs:
-    #     try:
-    #         await save_execution_traces(trace_context.agent_id, trace_context.trace_logs)
-    #         logger.debug(f"Saved {len(trace_context.trace_logs)} trace logs")
-    #     except Exception as e:
-    #         logger.error(f"Failed to save execution traces: {e}")
-
     # 创建执行摘要
     if trace_context.trace_id is not None:
         try:
-            trace_summary_repository.create_trace_summary_by_trace_id(trace_context.trace_id)
+            trace_summary_repository.create_trace_summary_by_trace_id(
+                trace_context.trace_id, 
+                trace_context.agent_input, 
+                trace_context.agent_ouput
+            )
             logger.debug(f"Created trace summary for trace_id: {trace_context.trace_id}")
         except Exception as e:
             logger.error(f"Failed to create trace summary: {e}")
@@ -190,7 +196,11 @@ async def handle_trace_error(
     # 确保错误情况下也能保存追踪摘要
     if trace_context.trace_id is not None:
         try:
-            trace_summary_repository.create_trace_summary_by_trace_id(trace_context.trace_id)
+            trace_summary_repository.create_trace_summary_by_trace_id(
+                trace_context.trace_id, 
+                trace_context.agent_input, 
+                trace_context.agent_ouput
+            )
             logger.debug(f"Created trace summary after error for trace_id: {trace_context.trace_id}")
         except Exception as e:
             logger.error(f"Failed to create trace summary after error: {e}")

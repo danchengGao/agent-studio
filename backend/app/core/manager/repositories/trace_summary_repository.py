@@ -562,7 +562,12 @@ class TraceSummaryRepository:
         pass
 
     @with_exception_handling
-    def create_trace_summary_by_trace_id(self, trace_id: str) -> ResponseModel[None]:
+    def create_trace_summary_by_trace_id(
+        self, 
+        trace_id: str, 
+        input: Optional[dict] = None, 
+        output: Optional[dict] = None
+    ) -> ResponseModel[None]:
         """
         Create TraceSummary record from TraceDetail data
 
@@ -602,19 +607,26 @@ class TraceSummaryRepository:
             business_id = first_detail.get("business_id")
             business_type = first_detail.get("business_type")
             if business_type == "AGENT":
-                inp = None
-                for d in trace_details:
-                    if d.get("platform_type") == "studio_agent":
-                        inp = _normalize_dict_field(d.get("input"))
-                        break
-                inputs = inp
-                outp = None
-                for d in reversed(trace_details):
-                    if d.get("platform_type") == "studio_agent":
-                        outp = _normalize_dict_field(d.get("output"))
-                        if outp is not None:
+                if not input:
+                    inp = None
+                    for d in trace_details:
+                        if d.get("platform_type") == "studio_agent":
+                            inp = _normalize_dict_field(d.get("input"))
                             break
-                outputs = outp
+                    inputs = inp
+                else:
+                    inputs = input
+                
+                if not output:
+                    outp = None
+                    for d in reversed(trace_details):
+                        if d.get("platform_type") == "studio_agent":
+                            outp = _normalize_dict_field(d.get("output"))
+                            if outp is not None:
+                                break
+                    outputs = outp
+                else:
+                    outputs = output
             else:
                 inputs = _normalize_dict_field(first_detail.get("input"))
                 outputs = _normalize_dict_field(trace_details[-1].get("output"))
