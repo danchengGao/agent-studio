@@ -12,17 +12,15 @@ import { X, Loader2, MessageSquare } from 'lucide-react'
 
 import { NodeInputPanel } from '../node-input-panel'
 import { testRunRuntimeService } from '../runtime/testrun-runtime-service'
-import { InputInterruption, type StreamResponse, UnifiedExecutionParams } from '../runtime/types'
+import { InputInterruption, type StreamResponse, type UnifiedExecutionParams } from '../runtime/types'
 import { useExecutionContext } from '../../../context'
-import { useInputFormMeta } from '../hooks/use-input-form-meta'
 import { useFormMeta } from '../hooks/use-form-meta'
-import type { TestRunFormMetaItem } from '../testrun-form/type'
 import { useService } from '@flowgram.ai/free-layout-core'
 import { WorkflowDocument } from '@flowgram.ai/free-layout-editor'
 import { FlowNodeRegistry } from '../../../typings'
-import { WorkflowNodeType } from '../../../nodes/constants'
 import { validateRequiredFields, validateBasicTypes } from '../utils/validation'
 import { findNodeRecursively } from '../../../utils'
+import { parseInteractionMsgToFormMeta } from '../utils/parseInteractionMsg'
 
 import styles from './index.module.less'
 
@@ -59,83 +57,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
   const [streamMessages, setStreamMessages] = useState<Map<string, { message: string; nodeName: string }>>(new Map())
   const streamMessageRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
-  const inputFormMeta = useInputFormMeta(inputInterruption?.nodeId ?? '')
-
-  const isSimpleStringMsg = useCallback((raw: any): boolean => {
-    if (typeof raw !== 'string') return false
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return false
-      if (parsed && typeof parsed === 'object') return false
-      return true
-    } catch {
-      return true
-    }
-  }, [])
-
-  const parseInteractionMsgToFormMeta = useCallback((msg: any): TestRunFormMetaItem[] => {
-    const normalizeType = (t?: string): TestRunFormMetaItem['type'] => {
-      const s = String(t || '').toLowerCase()
-      if (s.includes('boolean')) return 'boolean'
-      if (s.includes('integer')) return 'integer'
-      if (s.includes('number')) return 'number'
-      if (s.includes('array')) return 'array'
-      if (s.includes('object')) return 'object'
-      return 'string'
-    }
-
-    const items: TestRunFormMetaItem[] = []
-
-    if (!msg) return items
-
-    if (Array.isArray(msg)) {
-      for (const f of msg) {
-        const name = String(f?.input_name || f?.name || f?.label || '').trim()
-        if (!name) continue
-        items.push({
-          name,
-          type: normalizeType(f?.type),
-          defaultValue: f?.default ?? '',
-          required: Boolean(f?.required),
-          itemsType: undefined,
-        })
-      }
-      return items
-    }
-
-    if (typeof msg === 'string') {
-      const name = msg.trim() || 'input'
-      items.push({ name, type: 'string', defaultValue: '', required: false })
-      return items
-    }
-
-    if (msg && typeof msg === 'object') {
-      if (msg.properties && typeof msg.properties === 'object') {
-        const requiredArr: string[] = Array.isArray(msg.required) ? msg.required : []
-        for (const [name, prop] of Object.entries<any>(msg.properties)) {
-          const type = normalizeType(prop?.type)
-          const itemsType = prop?.items?.type ? normalizeType(prop.items.type) : undefined
-          items.push({
-            name,
-            type,
-            itemsType,
-            defaultValue: prop?.default ?? '',
-            required: requiredArr.includes(name),
-          })
-        }
-        return items
-      }
-
-      for (const [name, val] of Object.entries<any>(msg)) {
-        const type = typeof val === 'string' ? normalizeType(val) : normalizeType(val?.type)
-        items.push({ name, type, defaultValue: '', required: false })
-      }
-      return items
-    }
-
-    return items
-  }, [])
-
   useEffect(() => {
     streamMessages.forEach((_, nodeId) => {
       const ref = streamMessageRefs.current.get(nodeId)
@@ -163,6 +84,10 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
       return <span className={styles['interruption-icon']}>{icon}</span>
     }
   }, [inputInterruption?.nodeId, document.root.blocks])
+
+  const interruptionFormMeta = useMemo(() => {
+    return inputInterruption ? parseInteractionMsgToFormMeta(inputInterruption.message) : undefined
+  }, [inputInterruption?.message])
 
   const [inputJSONMode, _setInputJSONMode] = useState(() => {
     const savedMode = localStorage.getItem('testrun-input-json-mode')
@@ -228,7 +153,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
       return
     }
 
-    // 验证输入参数类型是否正确
     const typeValidationErrors = validateBasicTypes(values, formMeta)
     if (typeValidationErrors.length > 0) {
       setErrors(typeValidationErrors)
@@ -369,49 +293,34 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
   const handleInputResume = async () => {
     if (!inputInterruption) return
 
-    const isQ = isQuestionerInterruption(inputInterruption.nodeId)
-    if (isQ) {
-      if (isSimpleStringMsg(inputInterruption.message)) {
-        const msgName = typeof inputInterruption.message === 'string' ? inputInterruption.message.trim() || 'input' : 'input'
-        const v = (inputValues as any)[msgName] ?? (inputValues as any)['input'] ?? ''
-        if (!String(v).trim()) {
-          setErrors([`请填写必填字段: ${msgName}`])
-          return
-        }
-      }
-    } else {
-      const metaForValidation = normalizedInterruptionFormMeta || []
-      const missingRequired = validateRequiredFields(inputValues, metaForValidation)
-      if (missingRequired.length > 0) {
-        setErrors([`请填写必填字段: ${missingRequired.join(', ')}`])
-        return
-      }
-
-      // 验证输入参数类型是否正确
-      const typeValidationErrors = validateBasicTypes(inputValues, metaForValidation)
-      if (typeValidationErrors.length > 0) {
-        setErrors(typeValidationErrors)
-        return
-      }
+    const metaForValidation = interruptionFormMeta || []
+    const missingRequired = validateRequiredFields(inputValues, metaForValidation)
+    if (missingRequired.length > 0) {
+      setErrors([`请填写必填字段: ${missingRequired.join(', ')}`])
+      return
     }
 
+    const typeValidationErrors = validateBasicTypes(inputValues, metaForValidation)
+    if (typeValidationErrors.length > 0) {
+      setErrors(typeValidationErrors)
+      return
+    }
+
+    const nodeId = inputInterruption.nodeId
+    const values = inputValues
+
+    setInputInterruption(null)
+    setIsStreamExecuting(true)
+    setInputValues({})
+    setErrors(undefined)
+
     try {
-      const simple = isSimpleStringMsg(inputInterruption.message)
-      let payload: any = inputValues
-      if (simple) {
-        const msgName = typeof inputInterruption.message === 'string' ? inputInterruption.message.trim() || 'input' : 'input'
-        const v = (inputValues as any)[msgName] ?? (inputValues as any)['input'] ?? ''
-        payload = v
-      }
       await testRunRuntimeService.resumeStreamExecution({
-        node_id: inputInterruption.nodeId,
-        input_value: payload,
+        node_id: nodeId,
+        input_value: values,
       })
-      setInputInterruption(null)
-      setIsStreamExecuting(true)
-      setInputValues({})
-      setErrors(undefined)
     } catch (error) {
+      setIsStreamExecuting(false)
       setErrors([error instanceof Error ? error.message : 'Resume execution failed'])
     }
   }
@@ -432,7 +341,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
       const streamData = streamMessages.get(nodeId)
       if (streamData?.nodeName) return streamData.nodeName
 
-      // 回退到查找节点注册表中的名称
       const node = findNodeRecursively(document.root.blocks, nodeId)
       if (!node) return nodeId
 
@@ -470,38 +378,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
     </div>
   )
 
-  const effectiveInputFormMeta: TestRunFormMetaItem[] | undefined = useMemo(() => {
-    if (!inputInterruption) return undefined
-
-    if (isSimpleStringMsg(inputInterruption.message)) {
-      return parseInteractionMsgToFormMeta(inputInterruption.message)
-    }
-
-    return inputFormMeta && inputFormMeta.length > 0 ? inputFormMeta : parseInteractionMsgToFormMeta(inputInterruption.message)
-  }, [inputInterruption, inputFormMeta])
-
-  const isQuestionerInterruption = useCallback(
-    (nodeId?: string): boolean => {
-      if (!nodeId) return false
-      const node = findNodeRecursively(document.root.blocks, nodeId)
-      const n = node as { getNodeRegistry?: () => unknown; type?: string; data?: { type?: string } } | null
-      const registry = n?.getNodeRegistry?.()
-      const type = (registry as Partial<FlowNodeRegistry>)?.type ?? n?.type ?? n?.data?.type
-      return type === WorkflowNodeType.Questioner
-    },
-    [document.root.blocks],
-  )
-
-  const normalizedInterruptionFormMeta: TestRunFormMetaItem[] | undefined = useMemo(() => {
-    if (!effectiveInputFormMeta) return undefined
-
-    const isQ = isQuestionerInterruption(inputInterruption?.nodeId)
-    if (!isQ) return effectiveInputFormMeta
-
-    const isSimple = isSimpleStringMsg(inputInterruption?.message)
-    return effectiveInputFormMeta.map(i => ({ ...i, required: isSimple }))
-  }, [effectiveInputFormMeta, inputInterruption?.nodeId, inputInterruption?.message, isQuestionerInterruption])
-
   const renderForm = (
     <div className={styles['testrun-panel-form']}>
       <NodeInputPanel
@@ -510,7 +386,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
         nodeIconFallback={<MessageSquare size={16} className={styles['interruption-icon']} />}
         values={inputInterruption ? inputValues : values}
         setValues={inputInterruption ? setInputValues : setValues}
-        inputFormMeta={normalizedInterruptionFormMeta}
+        inputFormMeta={interruptionFormMeta}
         inputJSONMode={inputInterruption ? false : inputJSONMode}
         setInputJSONMode={inputInterruption ? undefined : setInputJSONMode}
         isInterruptionMode={!!inputInterruption}

@@ -11,6 +11,7 @@ export interface TestRunFormMetaItem {
   defaultValue: unknown
   required: boolean
   itemsType?: JsonSchemaBasicType
+  description?: string
 }
 
 export type TestRunFormMeta = TestRunFormMetaItem[]

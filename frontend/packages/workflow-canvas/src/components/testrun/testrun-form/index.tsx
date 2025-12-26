@@ -119,7 +119,7 @@ export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputForm
       {fields.map(field => (
         <div key={field.name} className={styles.fieldGroup}>
           <label htmlFor={field.name} className={styles.fieldLabel}>
-            {field.name}
+            {field.description || field.name}
             {field.required && <span className={styles.requiredIndicator}>*</span>}
             <span className={styles.fieldTypeIndicator}>
               <DisplaySchemaTag

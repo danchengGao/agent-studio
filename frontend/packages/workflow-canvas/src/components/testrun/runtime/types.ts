@@ -49,7 +49,7 @@ export interface NodeStatus {
 // 输入中断接口
 export interface InputInterruption {
   nodeId: string
-  message?: string
+  message?: InteractionMessage
   requiredInputs?: string[]
 }
 
@@ -145,6 +145,16 @@ export interface ExecuteResult {
   error?: string
 }
 
+// 中断消息格式
+export interface InteractionMessageItem {
+  input_name?: string
+  description?: string
+  type?: string
+  required?: boolean
+}
+
+export type InteractionMessage = string | InteractionMessageItem[]
+
 // 执行事件类型，支持当前实际使用的消息格式
 export type ExecutionEventWrapper =
   | WorkflowExecutionEvent
@@ -157,7 +167,7 @@ export type ExecutionEventWrapper =
           | AgentExecutionEvent
           | {
               interaction_node?: string
-              interaction_msg?: string
+              interaction_msg?: InteractionMessage
             }
       }
     }
