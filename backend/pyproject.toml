@@ -23,6 +23,8 @@ dependencies = [
     "jinja2==3.1.6",
     "requests==2.32.3",
     "aiosqlite==0.21.0",
+    "pycryptodome==3.23.0",
+    "python-jose[cryptography]==3.3.0",
 ]
 
 
