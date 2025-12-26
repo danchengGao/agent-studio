@@ -1760,7 +1760,7 @@
         "provider": "API协议",
         "providerHint": "选择 API 调用协议类型，决定请求方式和响应解析规则",
         "type": "模型标识符",
-        "typeHint": "调用API时指定的模型ID，需与服务端一致",
+        "typeHint": "调用API时指定的模型ID，需与服务端一致（如 \"deepseek-chat\"）",
         "version": "版本",
         "description": "描述"
       },
@@ -1836,10 +1836,10 @@
       "reset": "重置",
       "startTest": "开始测试",
       "testing": "测试中...",
-      "testPrompt": "测试提示词",
+      "testPrompt": "提示词",
       "promptPlaceholder": "输入要测试的提示词...",
       "testResult": "测试结果",
-      "commonTestPrompts": "常用测试语句"
+      "commonTestPrompts": "常用语句"
     }
   },
   "plugins": {

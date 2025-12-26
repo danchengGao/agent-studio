@@ -1195,7 +1195,7 @@ const ModelsPage: React.FC = () => {
                 }}
                 placeholder=""
                 variant="outlined"
-                error={(newModel.name || '').length > 100}
+                error={(newModel.modelId || '').length > 100}
                 helperText={
                   (newModel.modelId || '').length > 80 ? (
                     <span style={{ color: 'orange' }}>模型标识符过长，请控制在100字符以内.字符数：{newModel.modelId?.length || 0}/100</span>
@@ -1339,11 +1339,7 @@ const ModelsPage: React.FC = () => {
                 variant="outlined"
                 error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
                 helperText={
-                  (newModel.description || '').length > 450 ? (
-                    <span style={{ color: 'orange' }}>描述过长，请控制在500字符以内.字符数：{newModel.description?.length || 0}/500</span>
-                  ) : (
-                    <span style={{ color: '#666' }}>字符数：{newModel.description?.length || 0}/500</span>
-                  )
+                  <span style={{ color: '#666' }}>字符数：{newModel.description?.length || 0}/500</span>
                 }
               />
             </Grid>
@@ -1566,10 +1562,10 @@ const ModelsPage: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <div className="space-y-4 pt-4">
-            {/* 常用测试语句 */}
+            {/* 常用语句 */}
             <div>
               <Typography variant="subtitle2" className="text-gray-700 mb-2 font-medium">
-                常用测试语句
+                常用语句
               </Typography>
               <div className="flex flex-wrap gap-2 mb-3">
                 <Chip
@@ -1600,7 +1596,7 @@ const ModelsPage: React.FC = () => {
               fullWidth
               multiline
               rows={4}
-              label="测试提示词"
+              label="提示词"
               value={testPrompt}
               onChange={e => setTestPrompt(e.target.value)}
               placeholder=""
