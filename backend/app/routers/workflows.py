@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
 from openjiuwen.core.common.logging import logger
 
+from app.core.common.exceptions import JiuWenComponentException
 from app.core.manager.internal.workflow import WorkflowResponsePublish
 from app.core.manager.login_manager.user import get_current_user
 from app.routers.common import handle_response, validate_request
@@ -121,6 +122,18 @@ async def workflow_get(
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed"
+        ) from e
+    except JiuWenComponentException as e:
+        logger.info(f"JiuWenComponentException: {repr(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": e.error_code,
+                "message": e.message,
+                "component_id": e.component_id,
+                "component_type": e.component_type,
+                "error_stage": e.error_stage
+            }
         ) from e
 
 

@@ -17,8 +17,10 @@ from app.schemas.workflow import WorkflowBase
 from app.core.manager.convertor.component import component_convert
 from app.core.manager.convertor.connection import connection_convert
 from pydantic import ValidationError
+
 from app.core.common.exceptions import JiuWenComponentException
 from app.core.common.status_code import StatusCode
+from app.core.manager.convertor.validators import validate_canvas_nodes
 
 
 def extract_inputs_and_outputs_from_canvas(canvas_data: dict) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -148,6 +150,10 @@ def workflow_convert(workflow_info: WorkflowBase) -> dsl.Workflow:
                 component_type=component_type,
                 error_stage="validate"
             ) from e
+        # 2. 业务逻辑校验（在 Pydantic 验证后、DSL 转换前）
+        validate_canvas_nodes(canvas)
+
+        # 3. DSL 转换
         nodes = canvas.nodes
         components = component_convert(canvas.edges, nodes, workflow_info.space_id, False)
 

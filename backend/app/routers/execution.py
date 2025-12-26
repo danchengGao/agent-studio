@@ -122,6 +122,17 @@ async def handler(
             message=e.message,
             data=None
         ).model_dump_json()
+    except JiuWenComponentException as e:
+        log_exception(e)
+        yield ResponseModel(
+            code=e.error_code,
+            message=e.message,
+            data={
+                "component_id": e.component_id,
+                "component_type": e.component_type,
+                "error_stage": e.error_stage
+            }
+        ).model_dump_json()
     except JiuWenBaseException as e:
         log_exception(e)
         yield ResponseModel(
@@ -280,6 +291,17 @@ async def validate_workflow(
             code=e.error_code,
             message=e.message,
             data=None
+        )
+    except JiuWenComponentException as e:
+        logger.info(f"JiuWenComponentException: {repr(e)}")
+        return ResponseModel(
+            code=e.error_code,
+            message=e.message,
+            data={
+                "component_id": e.component_id,
+                "component_type": e.component_type,
+                "error_stage": e.error_stage
+            }
         )
     except Exception as e:
         raise handle_http_exception(e, "Workflow validation failed") from e
