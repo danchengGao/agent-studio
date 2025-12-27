@@ -3,6 +3,5 @@
  * SPDX-License-Identifier: MIT
  */
 
-export { useFields } from './use-fields'
-export { useFormMeta } from './use-form-meta'
-export { useSyncDefault } from './use-sync-default'
+export { useFormMeta, useNodeInputMeta, useFields, useSyncDefault } from './form'
+export { useInputFormMeta } from './use-input-form-meta'

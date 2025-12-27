@@ -44,6 +44,7 @@ export function TestRunButton(props: { disabled: boolean; workflowId?: string; s
         try {
           await testRunRuntimeService.saveWorkflow({
             workflow_id: props.workflowId,
+            version: '',
             space_id: props.spaceId,
             schema: JSON.stringify(workflowData),
           })
