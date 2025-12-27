@@ -267,30 +267,28 @@ def knowledges_retrieval_config_convert(configs: dict[str, Any]):
     retrieval_config = configs["retrieval_config"]
     logger.warning(f"knowledges_retrieval_config_convert retrieval_config: {retrieval_config}")
 
-    if retrieval_config["graph_mode"] == RetrievalGraphMode.USE_NORMAL_GRAPH:
+    # 从配置中获取 use_agent 和 use_sync（前端直接传递）
+    use_agent = retrieval_config.get("use_agent", False)
+    use_sync = retrieval_config.get("use_sync", False)
+    
+    # 如果 use_agent 或 use_sync 中有一个为 True，则设置 use_graph 和 graph_expansion 为 True
+    if use_agent or use_sync:
         use_graph = True
         graph_expansion = True
-        use_agent = False
-        use_sync = True
-    elif retrieval_config["graph_mode"] == RetrievalGraphMode.USE_AGENTIC_GRAPH:
-        use_graph = True
-        graph_expansion = False
-        use_agent = True
-        use_sync = True
     else:
         use_graph = False
         graph_expansion = False
-        use_agent = False
-        use_sync = False
 
-    kb_retrieval_config = KBRetrievalConfig(retrieval_type=retrieval_config["retrieval_type"],
+    kb_retrieval_config = KBRetrievalConfig(
+        retrieval_type=retrieval_config["retrieval_type"],
                                             use_graph=use_graph,
-                                            source=retrieval_config["source"],
+        source=retrieval_config.get("source", 1),
                                             topk=retrieval_config["topk"],
                                             score_threshold=retrieval_config["score_threshold"],
                                             graph_expansion=graph_expansion,
                                             use_agent=use_agent,
-                                            use_sync=use_sync)
+        use_sync=use_sync
+    )
     return kb_retrieval_config
 
 

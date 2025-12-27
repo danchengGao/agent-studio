@@ -4,11 +4,12 @@ import MuiAccordion, { AccordionProps } from '@mui/material/Accordion'
 import MuiAccordionSummary, { AccordionSummaryProps, accordionSummaryClasses } from '@mui/material/AccordionSummary'
 import MuiAccordionDetails from '@mui/material/AccordionDetails'
 import Typography from '@mui/material/Typography'
-import { AgentDetailResponse, AgentPlugin, SaveAgentRequest, useModels, type PluginApiInfo } from '@test-agentstudio/api-client'
+import { AgentDetailResponse, AgentPlugin, SaveAgentRequest, useModels, KnowledgeBaseService, type PluginApiInfo } from '@test-agentstudio/api-client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { AlertCircle, RefreshCcw, Trash2 } from 'lucide-react'
+import { AlertCircle, RefreshCcw, Trash2, Settings } from 'lucide-react'
 import { ModelDetail, WorkflowDetail, WorkflowSelectDetail } from '../../types/agentTypes'
-import { Select, Button, Alert, MenuItem, TextField, Box, IconButton, List, ListItem, ListItemText, Switch, FormControlLabel, Tooltip } from '@mui/material'
+import { Select, Button, Alert, MenuItem, TextField, Box, IconButton, List, ListItem, ListItemText, Switch, FormControlLabel, Tooltip, Popover, RadioGroup, Radio, Slider } from '@mui/material'
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
 import { Link } from 'react-router-dom'
 import ModelDetailForm from './ModelDetailForm'
 import WorkflowSelector from './WorkflowSelector'
@@ -17,10 +18,12 @@ import PluginSelector from '../../../packages/workflow-canvas/src/components/Plu
 import AddButton from './AddButton'
 import WorkflowList from './WorkflowList'
 import PluginList from './PluginList'
+import KnowledgeBaseSelector from './KnowledgeBaseSelector'
+import KnowledgeBaseList from './KnowledgeBaseList'
+import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { useAuthStore } from '../../stores/useAuthStore'
 import axios from 'axios'
 import { useWorkflowValidation } from '@/hooks/useWorkflowValidation'
-import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { useScopedTranslation } from '@/i18n'
 
 // 保留其他 Accordion 样式用于其他部分
@@ -36,7 +39,7 @@ const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters
   '&.Mui-expanded': {
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', // 添加阴影效果
   },
-}))
+})) // theme is used in border property
 
 const AccordionSummary = styled((props: AccordionSummaryProps) => {
   // 提取children和其他props
@@ -67,8 +70,8 @@ const AccordionSummary = styled((props: AccordionSummaryProps) => {
   },
 }))
 
-const AccordionDetails = styled(MuiAccordionDetails)(({ theme }) => ({
-  padding: theme.spacing(2),
+const AccordionDetails = styled(MuiAccordionDetails)(() => ({
+  padding: 16,
   borderTop: '1px solid rgba(0, 0, 0, .125)',
   backgroundColor: '#fff',
 }))
@@ -97,12 +100,12 @@ const AgentModelSelector = (props: {
   onLongTermChange?: (enabled: boolean) => void
 }) => {
   const { agentDetailResponse, saveAgentRequest, onLongTermChange } = props
-  const { updateModelDetail, updateWorkflowDetail, updatePluginDetail, updateGreeting, updateMemoryConfig } = useAgentStore()
+  const { updateModelDetail, updateWorkflowDetail, updatePluginDetail, updateKnowledgeDetail, updateRetrievalConfig, updateGreeting, updateMemoryConfig } = useAgentStore()
   const readonly = useAgentStore(s => s.readonly)
   const { user } = useAuthStore()
   const { t } = useScopedTranslation('agents.agentEditor.orchestration')
-  const user_id = saveAgentRequest.space_id
-  const group_id = saveAgentRequest.agent_id
+  const user_id = saveAgentRequest?.space_id || ''
+  const group_id = saveAgentRequest?.agent_id || ''
 
   const [selectedModelName, setSelectedModelName] = useState<string>('')
   const [selectedModel, setSelectedModel] = useState<ModelDetail | null>(null)
@@ -124,6 +127,9 @@ const AgentModelSelector = (props: {
   const [workflowListRefreshToken, setWorkflowListRefreshToken] = useState<number>(0)
   const [pluginObjects, setPluginObjects] = useState<AgentPlugin[]>([])
   const [showPluginSelector, setShowPluginSelector] = useState(false)
+  const [knowledgeBaseObjects, setKnowledgeBaseObjects] = useState<Array<{ id: string; name: string; description?: string; has_graph_enhancement?: boolean }>>([])
+  const [showKnowledgeBaseSelector, setShowKnowledgeBaseSelector] = useState(false)
+  const [knowledgeSettingsAnchorEl, setKnowledgeSettingsAnchorEl] = useState<HTMLElement | null>(null)
   const [greeting, setGreeting] = useState<string>('')
 
   const spaceId = getDefaultSpaceId() || ''
@@ -147,6 +153,21 @@ const AgentModelSelector = (props: {
     }, 200)
     return () => clearTimeout(t)
   }, [workflowObjects, spaceId, validateWorkflows])
+
+  // 知识库设置状态
+  const [graphEnhancement, setGraphEnhancement] = useState<'off' | 'normal' | 'agent'>('off')
+  const [graphRetrievalStrategy, setGraphRetrievalStrategy] = useState<'base' | 'agentic'>('base')
+  const [enableGraphRetrieval, setEnableGraphRetrieval] = useState<boolean>(false)
+  // 检查是否有图增强文档
+  const hasGraphEnhancementDocs = knowledgeBaseObjects.some(kb => kb.has_graph_enhancement)
+  const [retrievalSource, setRetrievalSource] = useState<'hybrid' | 'text' | 'triple'>('hybrid')
+  const [maxRecallCount, setMaxRecallCount] = useState<number>(5)
+  const [minMatchScore, setMinMatchScore] = useState<number>(0.5)
+  // 使用 ref 保存最小匹配分数的原始输入字符串（用于处理中间状态如 "0."）
+  const minMatchScoreInputRef = useRef<string>('')
+
+  // 使用 ref 跟踪是否已经初始化完成，避免初始化时触发保存
+  const isRetrievalConfigInitializedRef = useRef(false)
 
   // 记忆配置状态
   const [memoryVariables, setMemoryVariables] = useState<MemoryVariable[]>([])
@@ -270,13 +291,123 @@ const AgentModelSelector = (props: {
         initVariables.map((v: { id?: string; name?: string; description?: string; enabled?: boolean }, index: number) => ({
           id: v.id || `var_${Date.now()}_${index}`,
           name: v.name || '',
-          description: v.description,
+          description: v.description || '',
           enabled: v.enabled !== undefined ? v.enabled : true, // 默认启用
         })),
       )
       setLongTermMemoryEnabled(initLongTermMemory)
+
+      // 初始化检索配置
+      const retrievalConfig = saveAgentRequest?.configs?.retrieval_config as { use_agent?: boolean; use_sync?: boolean; source?: number; topk?: number; score_threshold?: number | null } | undefined
+      if (retrievalConfig) {
+        // 根据 use_agent 和 use_sync 判断图检索策略
+        if (retrievalConfig.use_agent) {
+          setGraphRetrievalStrategy('agentic')
+          setGraphEnhancement('agent')
+          setEnableGraphRetrieval(true)
+        } else if (retrievalConfig.use_sync) {
+          setGraphRetrievalStrategy('base')
+          setGraphEnhancement('normal')
+          setEnableGraphRetrieval(true)
+        } else {
+          setGraphRetrievalStrategy('base')
+          setGraphEnhancement('off')
+          setEnableGraphRetrieval(false)
+        }
+
+        // 映射 source 数字到字符串
+        const sourceMap: Record<number, 'hybrid' | 'text' | 'triple'> = { 1: 'hybrid', 2: 'text', 3: 'triple' }
+        setRetrievalSource(sourceMap[retrievalConfig.source || 1] || 'hybrid')
+        setMaxRecallCount(retrievalConfig.topk || 5)
+        setMinMatchScore(retrievalConfig.score_threshold || 0.5)
+      }
+      // 标记初始化完成
+      isRetrievalConfigInitializedRef.current = true
     }
   }, [agentDetailResponse, saveAgentRequest, modelsData])
+
+  // 使用 ref 来跟踪知识库是否已经初始化
+  const knowledgeBaseInitializedRef = useRef(false)
+  const lastAgentIdRef = useRef<string | null>(null)
+
+  // 初始化知识库列表，使用列表API获取知识库信息
+  useEffect(() => {
+    if (!agentDetailResponse || !agentDetailResponse.data) {
+      return
+    }
+
+    // 如果切换了智能体，重置初始化标记
+    const currentAgentId = agentDetailResponse.data.agent_info?.agent_id
+    if (currentAgentId && lastAgentIdRef.current !== currentAgentId) {
+      knowledgeBaseInitializedRef.current = false
+      lastAgentIdRef.current = currentAgentId
+    }
+
+    // 只在初始化时执行一次
+    if (knowledgeBaseInitializedRef.current) {
+      return
+    }
+
+    const initKnowledgeIds = saveAgentRequest?.knowledge || []
+    if (initKnowledgeIds.length > 0) {
+      // 调用列表API获取知识库信息
+      const fetchKnowledgeBaseInfo = async () => {
+        try {
+          const spaceId = getDefaultSpaceId()
+          if (!spaceId) {
+            // 如果没有spaceId，只使用ID
+            setKnowledgeBaseObjects(initKnowledgeIds.map(id => ({ id, name: id, description: undefined })))
+            knowledgeBaseInitializedRef.current = true
+            return
+          }
+
+          // 调用列表API，获取足够多的知识库（假设最多100个）
+          const response = await KnowledgeBaseService.getKnowledgeBases({
+            space_id: spaceId,
+            page: 1,
+            size: 100,
+          })
+
+          if (response.code === 200 && response.data?.items) {
+            // 创建ID到知识库信息的映射
+            const kbMap = new Map<string, { name: string; desc: string | null; has_graph_enhancement?: boolean }>()
+            response.data.items.forEach((item: { id: string; name: string; desc: string | null; has_graph_enhancement?: boolean }) => {
+              kbMap.set(item.id, { name: item.name, desc: item.desc, has_graph_enhancement: item.has_graph_enhancement })
+            })
+
+            // 根据ID列表匹配知识库信息
+            const knowledgeBaseObjects = initKnowledgeIds.map(id => {
+              const kbInfo = kbMap.get(id)
+              if (kbInfo) {
+                return {
+                  id,
+                  name: kbInfo.name,
+                  description: kbInfo.desc || undefined,
+                  has_graph_enhancement: kbInfo.has_graph_enhancement,
+                }
+              }
+              // 如果找不到，使用ID作为名称
+              return { id, name: id, description: undefined, has_graph_enhancement: false }
+            })
+            setKnowledgeBaseObjects(knowledgeBaseObjects)
+          } else {
+            // API调用失败，只使用ID
+            setKnowledgeBaseObjects(initKnowledgeIds.map(id => ({ id, name: id, description: undefined })))
+          }
+          knowledgeBaseInitializedRef.current = true
+        } catch (error) {
+          console.error('获取知识库列表失败:', error)
+          // 出错时，只使用ID
+          setKnowledgeBaseObjects(initKnowledgeIds.map(id => ({ id, name: id, description: undefined })))
+          knowledgeBaseInitializedRef.current = true
+        }
+      }
+      fetchKnowledgeBaseInfo()
+    } else {
+      setKnowledgeBaseObjects([])
+      knowledgeBaseInitializedRef.current = true
+    }
+  }, [agentDetailResponse, saveAgentRequest?.knowledge])
 
   // 当模型列表更新时，如果当前选择的模型在列表中，更新为最新数据
   // 注意：只在初始化时同步，避免覆盖用户的修改
@@ -325,11 +456,11 @@ const AgentModelSelector = (props: {
   }
 
   // 处理折叠面板展开/收起状态变化
-  const handleAccordionChange = (event: React.SyntheticEvent, isExpanded: boolean) => {
+  const handleAccordionChange = (_event: React.SyntheticEvent, isExpanded: boolean) => {
     setModelExpanded(isExpanded)
   }
 
-  const handleWorkflowConfirm = (workflowsIds: string[], workflowObjects: WorkflowSelectDetail[]) => {
+  const handleWorkflowConfirm = (_workflowsIds: string[], workflowObjects: WorkflowSelectDetail[]) => {
     const workflowDetails = workflowObjects.map(workflow => ({
       workflow_id: workflow.workflow_id,
       workflow_name: workflow.name || '',
@@ -407,7 +538,7 @@ const AgentModelSelector = (props: {
   }, [validateWorkflows, workflowObjects])
 
   // 处理插件操作（删除）
-  const handlePluginOperation = (operate: 'delete', pluginId: string, toolId: string) => {
+  const handlePluginOperation = (operate: 'delete', _pluginId: string, toolId: string) => {
     if (operate === 'delete') {
       setPluginObjects(prevPlugins => {
         const updatedPlugins = prevPlugins.filter(plugin => plugin.tool_id !== toolId)
@@ -417,6 +548,129 @@ const AgentModelSelector = (props: {
       })
     }
   }
+
+  // 处理知识库选择确认
+  const handleKnowledgeBaseConfirm = async (selectedIds: string[]) => {
+    // selectedIds 已经包含了所有选中的知识库ID（包括之前已选中的）
+    const existingIds = knowledgeBaseObjects.map(kb => kb.id)
+    const newIds = selectedIds.filter(id => !existingIds.includes(id))
+    const removedIds = existingIds.filter(id => !selectedIds.includes(id))
+
+    // 更新知识库对象列表
+    if (newIds.length > 0 || removedIds.length > 0) {
+      // 如果有新增的知识库，从列表API获取信息
+      if (newIds.length > 0) {
+        try {
+          const spaceId = getDefaultSpaceId()
+          if (spaceId) {
+            // 调用列表API获取知识库信息
+            const response = await KnowledgeBaseService.getKnowledgeBases({
+              space_id: spaceId,
+              page: 1,
+              size: 100,
+            })
+
+            if (response.code === 200 && response.data?.items) {
+              // 创建ID到知识库信息的映射
+              const kbMap = new Map<string, { name: string; desc: string | null; has_graph_enhancement?: boolean }>()
+              response.data.items.forEach((item: { id: string; name: string; desc: string | null; has_graph_enhancement?: boolean }) => {
+                kbMap.set(item.id, { name: item.name, desc: item.desc, has_graph_enhancement: item.has_graph_enhancement })
+              })
+
+              // 获取新增知识库的信息
+              const newKnowledgeBases = newIds.map(id => {
+                const kbInfo = kbMap.get(id)
+                if (kbInfo) {
+                  return {
+                    id,
+                    name: kbInfo.name,
+                    description: kbInfo.desc || undefined,
+                    has_graph_enhancement: kbInfo.has_graph_enhancement,
+                  }
+                }
+                // 如果找不到，使用ID作为名称
+                return { id, name: id, description: undefined, has_graph_enhancement: false }
+              })
+
+              // 合并新的和保留的（排除被移除的）
+              const updated = [...knowledgeBaseObjects.filter(kb => !removedIds.includes(kb.id)), ...newKnowledgeBases]
+              setKnowledgeBaseObjects(updated)
+            } else {
+              // API调用失败，只使用ID
+              const newKnowledgeBases = newIds.map(id => ({ id, name: id, description: undefined, has_graph_enhancement: false }))
+              const updated = [...knowledgeBaseObjects.filter(kb => !removedIds.includes(kb.id)), ...newKnowledgeBases]
+              setKnowledgeBaseObjects(updated)
+            }
+          } else {
+            // 没有spaceId，只使用ID
+            const newKnowledgeBases = newIds.map(id => ({ id, name: id, description: undefined, has_graph_enhancement: false }))
+            const updated = [...knowledgeBaseObjects.filter(kb => !removedIds.includes(kb.id)), ...newKnowledgeBases]
+            setKnowledgeBaseObjects(updated)
+          }
+        } catch (error) {
+          console.error('获取知识库列表失败:', error)
+          // 出错时，只使用ID
+          const newKnowledgeBases = newIds.map(id => ({ id, name: id, description: undefined, has_graph_enhancement: false }))
+          const updated = [...knowledgeBaseObjects.filter(kb => !removedIds.includes(kb.id)), ...newKnowledgeBases]
+          setKnowledgeBaseObjects(updated)
+        }
+      } else {
+        // 只移除，没有新增
+        const updated = knowledgeBaseObjects.filter(kb => !removedIds.includes(kb.id))
+        setKnowledgeBaseObjects(updated)
+      }
+      updateKnowledgeDetail(selectedIds)
+    }
+    setShowKnowledgeBaseSelector(false)
+  }
+
+  // 处理知识库操作（删除/设置）
+  const handleKnowledgeBaseOperation = (operate: 'delete' | 'setting', knowledgeBaseId: string) => {
+    if (operate === 'delete') {
+      setKnowledgeBaseObjects(prev => {
+        const updated = prev.filter(kb => kb.id !== knowledgeBaseId)
+        const updatedIds = updated.map(kb => kb.id)
+        updateKnowledgeDetail(updatedIds)
+        return updated
+      })
+    } else if (operate === 'setting') {
+      // 打开知识库设置页面（新窗口，页面会自己获取知识库数据）
+      window.open(`/dashboard/knowledge-bases/${knowledgeBaseId}/edit`, '_blank')
+    }
+  }
+
+  // 保存知识库设置到 store
+  const saveRetrievalConfig = useCallback(() => {
+    if (!agentDetailResponse || readonly || !isRetrievalConfigInitializedRef.current) return
+
+    // 映射值到数字
+    const sourceMap: Record<'hybrid' | 'text' | 'triple', number> = { hybrid: 1, text: 2, triple: 3 }
+
+    // 根据文档图检索策略设置 use_agent 和 use_sync
+    // 如果文档图检索开关关闭，则 use_agent 和 use_sync 都为 false
+    // "基础" (base) -> use_agent=False, use_sync=True
+    // "Agentic" (agentic) -> use_agent=True, use_sync=True
+    // 未启用/禁用 -> use_agent=False, use_sync=False
+    const useAgent = enableGraphRetrieval && graphRetrievalStrategy === 'agentic' && hasGraphEnhancementDocs
+    const useSync = enableGraphRetrieval && graphRetrievalStrategy === 'base' && hasGraphEnhancementDocs
+
+    updateRetrievalConfig({
+      retrieval_type: 2, // 固定为 2 (vector/semantic)，因为 Chroma 只支持向量检索
+      use_agent: useAgent,
+      use_sync: useSync,
+      source: sourceMap[retrievalSource],
+      topk: maxRecallCount,
+      score_threshold: minMatchScore === -1 ? 0.5 : minMatchScore, // 始终设置最小匹配分数，如果为空则使用默认值
+    })
+  }, [graphRetrievalStrategy, enableGraphRetrieval, hasGraphEnhancementDocs, retrievalSource, maxRecallCount, minMatchScore, agentDetailResponse, readonly, updateRetrievalConfig])
+
+  // 当知识库设置改变时，自动保存
+  useEffect(() => {
+    if (agentDetailResponse && isRetrievalConfigInitializedRef.current && !readonly) {
+      saveRetrievalConfig()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graphEnhancement, retrievalSource, maxRecallCount, minMatchScore, graphRetrievalStrategy, enableGraphRetrieval, hasGraphEnhancementDocs])
 
   // 检查变量名是否重复
   useEffect(() => {
@@ -462,7 +716,7 @@ const AgentModelSelector = (props: {
 
   const handleDeleteMemoryVariable = async (id: string) => {
     const target = memoryVariables.find(v => v.id === id)
-    const backup = memoryVariables // 预留，考虑失败回滚
+    if (!target) return
     const updatedVariables = memoryVariables.filter(variable => variable.id !== id)
     setMemoryVariables(updatedVariables)
     const req = {
@@ -754,13 +1008,6 @@ const AgentModelSelector = (props: {
               >
                 {workflowObjects.length}
               </span>
-              {workflowValidationErrorCount > 0 && (
-                <Tooltip title={`所选工作流存在校验不通过（${workflowValidationErrorCount} 个），请跳转对应工作流进行修改`} arrow>
-                  <span className="inline-flex items-center ml-2">
-                    <AlertCircle className="w-[20px] h-[20px] text-red-500" />
-                  </span>
-                </Tooltip>
-              )}
             </Typography>
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
               <Tooltip title="刷新工作流信息" arrow>
@@ -788,18 +1035,7 @@ const AgentModelSelector = (props: {
           </AccordionSummary>
           <AccordionDetails>
             {/* 工作流列表 */}
-            <WorkflowList
-              workflowObjects={workflowObjects}
-              onClick={handleWorkflowOperation}
-              disabled={readonly}
-              refreshToken={workflowListRefreshToken}
-              validationResults={validationResults}
-            />
-            {workflowObjects.length === 0 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                暂无工作流，点击上方按钮添加工作流
-              </Alert>
-            )}
+            <WorkflowList workflowObjects={workflowObjects} onClick={handleWorkflowOperation} disabled={readonly} />
           </AccordionDetails>
         </Accordion>
 
@@ -835,6 +1071,58 @@ const AgentModelSelector = (props: {
           <AccordionDetails>
             {/* 插件列表 */}
             <PluginList pluginObjects={pluginObjects} onClick={handlePluginOperation} disabled={readonly} />
+          </AccordionDetails>
+        </Accordion>
+      </div>
+
+      <div className="knowledge-form mb-2 p-2">
+        <div className="flex items-center justify-between mb-2">
+          <Typography>知识</Typography>
+          <IconButton
+            size="small"
+            onClick={e => setKnowledgeSettingsAnchorEl(e.currentTarget)}
+            disabled={readonly}
+            sx={{
+              color: 'text.secondary',
+              '&:hover': { color: 'primary.main', backgroundColor: 'action.hover' },
+            }}
+          >
+            <Settings className="w-4 h-4" />
+          </IconButton>
+        </div>
+
+        <Accordion>
+          <AccordionSummary aria-controls="knowledge-content" id="knowledge-header">
+            <Typography component="span" className="flex items-center">
+              文本
+              <span
+                className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
+                  knowledgeBaseObjects.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
+                }`}
+              >
+                {knowledgeBaseObjects.length}
+              </span>
+            </Typography>
+            <AddButton
+              options={[
+                { label: '添加已有知识库', value: 'existing' },
+                { label: '创建新知识库', value: 'new' },
+              ]}
+              onSelect={addType => {
+                if (addType === 'existing') {
+                  // 打开知识库选择器
+                  setShowKnowledgeBaseSelector(true)
+                } else if (addType === 'new') {
+                  // 导航到知识库管理页面
+                  window.open('/dashboard/knowledge-bases', '_blank')
+                }
+              }}
+              disabled={readonly}
+            />
+          </AccordionSummary>
+          <AccordionDetails>
+            {/* 知识库列表 */}
+            <KnowledgeBaseList knowledgeBaseObjects={knowledgeBaseObjects} onClick={handleKnowledgeBaseOperation} disabled={readonly} />
           </AccordionDetails>
         </Accordion>
       </div>
@@ -880,6 +1168,314 @@ const AgentModelSelector = (props: {
       {showPluginSelector && !readonly && (
         <PluginSelector open={showPluginSelector} onClose={() => setShowPluginSelector(false)} onConfirm={handlePluginConfirm} initialSelected={[]} />
       )}
+      {showKnowledgeBaseSelector && !readonly && (
+        <KnowledgeBaseSelector
+          open={showKnowledgeBaseSelector}
+          onClose={() => setShowKnowledgeBaseSelector(false)}
+          onConfirm={handleKnowledgeBaseConfirm}
+          initialSelected={knowledgeBaseObjects.map(kb => kb.id)}
+        />
+      )}
+
+      {/* 知识库设置 Popover */}
+      <Popover
+        open={Boolean(knowledgeSettingsAnchorEl)}
+        anchorEl={knowledgeSettingsAnchorEl}
+        onClose={() => setKnowledgeSettingsAnchorEl(null)}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        PaperProps={{
+          sx: {
+            p: 3,
+            minWidth: 480,
+            maxWidth: 550,
+          },
+        }}
+      >
+        <Typography variant="h6" sx={{ mb: 2, fontSize: '1rem', fontWeight: 'bold' }}>
+          知识库设置
+        </Typography>
+
+        {/* 文档图检索策略 */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant="body2" sx={{ fontWeight: 'medium', color: hasGraphEnhancementDocs ? 'text.primary' : 'text.disabled' }}>
+                文档图检索策略
+              </Typography>
+              <Tooltip title="选择文档图增强检索的方式，仅在知识库中有图增强构建的文档时可用。" arrow placement="top">
+                <HelpOutlineIcon sx={{ fontSize: 16, color: hasGraphEnhancementDocs ? 'text.secondary' : 'text.disabled', cursor: 'help' }} />
+              </Tooltip>
+            </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={enableGraphRetrieval}
+                  onChange={e => {
+                    const checked = e.target.checked
+                    setEnableGraphRetrieval(checked)
+                    if (!checked) {
+                      setGraphRetrievalStrategy('base')
+                      setGraphEnhancement('off')
+                    }
+                    if (isRetrievalConfigInitializedRef.current && !readonly) {
+                      saveRetrievalConfig()
+                    }
+                  }}
+                  disabled={readonly || !hasGraphEnhancementDocs}
+                />
+              }
+              label={enableGraphRetrieval ? '已启用' : '未启用'}
+              sx={{
+                margin: 0,
+                '& .MuiFormControlLabel-label': {
+                  fontSize: '0.875rem',
+                  color: hasGraphEnhancementDocs ? 'text.primary' : 'text.disabled'
+                }
+              }}
+            />
+          </Box>
+          <RadioGroup
+            value={graphRetrievalStrategy}
+            onChange={e => {
+              const value = e.target.value as 'base' | 'agentic'
+              setGraphRetrievalStrategy(value)
+              setGraphEnhancement(value === 'base' ? 'normal' : 'agent')
+              if (isRetrievalConfigInitializedRef.current && !readonly) {
+                saveRetrievalConfig()
+              }
+            }}
+            row
+            sx={{
+              opacity: enableGraphRetrieval && hasGraphEnhancementDocs ? 1 : 0.5,
+              pointerEvents: enableGraphRetrieval && hasGraphEnhancementDocs ? 'auto' : 'none'
+            }}
+          >
+            <Tooltip title="利用知识图谱的实体与关系网络做推理，擅长跨段、跨文档的复杂问题，能给出更有逻辑的回答。" arrow placement="top">
+              <FormControlLabel
+                value="base"
+                control={<Radio size="small" />}
+                label="基础"
+                disabled={readonly || !enableGraphRetrieval || !hasGraphEnhancementDocs}
+              />
+            </Tooltip>
+            <Tooltip title="由检索智能体自动决策和多步查询，适合开放性或多步推理的问题，兼顾准确度与灵活性，效果更好。" arrow placement="top">
+              <FormControlLabel
+                value="agentic"
+                control={<Radio size="small" />}
+                label="Agentic"
+                disabled={readonly || !enableGraphRetrieval || !hasGraphEnhancementDocs}
+              />
+            </Tooltip>
+          </RadioGroup>
+          {!hasGraphEnhancementDocs && (
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
+              当前知识库中没有图增强构建的文档，文档图检索策略不可用
+            </Typography>
+          )}
+        </Box>
+
+        {/* 最大召回数量 */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+              最大召回数量
+            </Typography>
+            <Tooltip title="从知识中返回给大模型的最大段落数，数值越大返回的内容越多。" arrow placement="top">
+              <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+            </Tooltip>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Slider
+                value={maxRecallCount}
+                onChange={(_, value) => {
+                  setMaxRecallCount(value as number)
+                  if (isRetrievalConfigInitializedRef.current && !readonly) {
+                    saveRetrievalConfig()
+                  }
+                }}
+                min={1}
+                max={10}
+                step={1}
+                marks
+                valueLabelDisplay="auto"
+                disabled={readonly}
+              />
+            </Box>
+            <Box sx={{ width: 80, minWidth: 80, maxWidth: 80 }}>
+              <TextField
+                type="text"
+                value={maxRecallCount === -1 ? '' : maxRecallCount}
+                onChange={e => {
+                  const inputValue = e.target.value
+                  // 允许用户清空输入框
+                  if (inputValue === '') {
+                    setMaxRecallCount(-1 as any)
+                    return
+                  }
+                  // 只允许数字输入（不允许负号）
+                  if (/^\d*$/.test(inputValue)) {
+                    const value = parseInt(inputValue, 10)
+                    if (!isNaN(value)) {
+                      // 允许输入任何数字，不进行范围限制
+                      setMaxRecallCount(value)
+                      if (isRetrievalConfigInitializedRef.current && !readonly) {
+                        saveRetrievalConfig()
+                      }
+                    }
+                  }
+                }}
+                onBlur={e => {
+                  const inputValue = e.target.value
+                  if (inputValue === '') {
+                    // 如果为空，设置为默认值
+                    setMaxRecallCount(5)
+                    if (isRetrievalConfigInitializedRef.current && !readonly) {
+                      saveRetrievalConfig()
+                    }
+                    return
+                  }
+                  const value = parseInt(inputValue, 10)
+                  if (isNaN(value) || value < 1) {
+                    setMaxRecallCount(1)
+                    if (isRetrievalConfigInitializedRef.current && !readonly) {
+                      saveRetrievalConfig()
+                    }
+                  } else if (value > 10) {
+                    setMaxRecallCount(10)
+                    if (isRetrievalConfigInitializedRef.current && !readonly) {
+                      saveRetrievalConfig()
+                    }
+                  }
+                }}
+                size="small"
+                disabled={readonly}
+                inputProps={{ min: 1, max: 10 }}
+              />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* 最小匹配分数 */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+              最小匹配分数
+            </Typography>
+            <Tooltip title="向量检索时，只有相似度分数大于此值的段落才会被返回。" arrow placement="top">
+              <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+            </Tooltip>
+          </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Slider
+                  value={minMatchScore === -1 ? 0.5 : minMatchScore}
+                  onChange={(_, value) => {
+                    setMinMatchScore(value as number)
+                    minMatchScoreInputRef.current = '' // 清空 ref，因为 Slider 设置的是完整数字
+                    if (isRetrievalConfigInitializedRef.current && !readonly) {
+                      saveRetrievalConfig()
+                    }
+                  }}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  marks={[
+                    { value: 0, label: '0' },
+                    { value: 0.5, label: '0.5' },
+                    { value: 1, label: '1' },
+                  ]}
+                  valueLabelDisplay="auto"
+                  disabled={readonly}
+                />
+              </Box>
+              <Box sx={{ width: 80, minWidth: 80, maxWidth: 80 }}>
+                <TextField
+                  type="text"
+                  value={minMatchScoreInputRef.current || (minMatchScore === -1 ? '' : String(minMatchScore))}
+                  onChange={e => {
+                    const inputValue = e.target.value
+                    // 允许用户清空输入框
+                    if (inputValue === '') {
+                      setMinMatchScore(-1 as any)
+                      minMatchScoreInputRef.current = ''
+                      return
+                    }
+                    // 允许数字、小数点和最多一位小数（不允许负号）
+                    // 允许：纯数字（如 "0", "1"）、数字加小数点（如 "0.", "1."）、数字加小数点和数字（如 "0.5"）、小数点开头加数字（如 ".5"）
+                    if (/^(\d+\.?|\d*\.\d{0,1})$/.test(inputValue)) {
+                      // 保存原始输入到 ref（用于显示中间状态）
+                      minMatchScoreInputRef.current = inputValue
+                      // 尝试转换为数字
+                      const value = parseFloat(inputValue)
+                      if (!isNaN(value) && !inputValue.endsWith('.') && !inputValue.startsWith('.')) {
+                        // 如果是完整数字（不是中间状态），更新状态并清空 ref
+                        setMinMatchScore(value)
+                        minMatchScoreInputRef.current = '' // 清空 ref，因为已经是完整数字
+                        if (isRetrievalConfigInitializedRef.current && !readonly) {
+                          saveRetrievalConfig()
+                        }
+                      } else {
+                        // 如果是中间状态（如 "0." 或 ".5"），设置为 -1 标记，保留 ref 中的原始输入
+                        setMinMatchScore(-1 as any)
+                      }
+                    }
+                  }}
+                  onBlur={e => {
+                    const inputValue = e.target.value
+                    if (inputValue === '') {
+                      // 如果为空，设置为默认值
+                      setMinMatchScore(0.5)
+                      minMatchScoreInputRef.current = ''
+                      if (isRetrievalConfigInitializedRef.current && !readonly) {
+                        saveRetrievalConfig()
+                      }
+                      return
+                    }
+                    const value = parseFloat(inputValue)
+                    if (isNaN(value) || value < 0) {
+                      setMinMatchScore(0)
+                      minMatchScoreInputRef.current = ''
+                      if (isRetrievalConfigInitializedRef.current && !readonly) {
+                        saveRetrievalConfig()
+                      }
+                    } else if (value > 1) {
+                      setMinMatchScore(1)
+                      minMatchScoreInputRef.current = ''
+                      if (isRetrievalConfigInitializedRef.current && !readonly) {
+                        saveRetrievalConfig()
+                      }
+                    } else {
+                      // 格式化值为一位小数
+                      const formattedValue = Math.round(value * 10) / 10
+                      setMinMatchScore(formattedValue)
+                      minMatchScoreInputRef.current = ''
+                      if (isRetrievalConfigInitializedRef.current && !readonly) {
+                        saveRetrievalConfig()
+                      }
+                    }
+                  }}
+                  size="small"
+                  disabled={readonly}
+                  inputProps={{ min: 0, max: 1, step: 0.1 }}
+                />
+              </Box>
+            </Box>
+            {minMatchScore !== -1 && minMatchScore === 1 && (
+              <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, display: 'block' }}>
+                设置为1可能过滤所有结果
+              </Typography>
+            )}
+        </Box>
+      </Popover>
     </div>
   )
 }

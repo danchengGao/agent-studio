@@ -1,28 +1,35 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+import os
 import uuid
 import time
 import inspect
 import asyncio
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union, Tuple
 from fastapi import status, UploadFile
-from functools import lru_cache
-
-# from openjiuwen.integrations.retriever.doc_process.parse import parse_doc
-# from openjiuwen.integrations.retriever.doc_process.chunking import chunk_doc
-# from openjiuwen.integrations.retriever.doc_process.indexing import IndexConfig, build_doc_index_from_chunks
-# from openjiuwen.integrations.retriever.config.configuration import GraphRAGConfig
-# from openjiuwen.integrations.retriever.doc_process.deletion import delete_document
-# from openjiuwen.integrations.retriever.retrieval.embed_models.api import APIEmbedModel
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.utils.llm.model_library.openai import OpenAILLM
+
+from openjiuwen.core.retrieval.indexing.processor.parser.auto_file_parser import AutoFileParser
+from openjiuwen.core.retrieval.indexing.processor.chunker.chunking import TextChunker
+from openjiuwen.core.retrieval.indexing.processor.extractor.triple_extractor import TripleExtractor
+from openjiuwen.core.retrieval.indexing.indexer.milvus_indexer import MilvusIndexer
+from openjiuwen.core.retrieval.vector_store.milvus_store import MilvusVectorStore
+from openjiuwen.core.retrieval.simple_knowledge_base import SimpleKnowledgeBase
+from openjiuwen.core.retrieval.graph_knowledge_base import GraphKnowledgeBase
+from openjiuwen.core.retrieval.common.config import (
+    KnowledgeBaseConfig,
+    EmbeddingConfig,
+    VectorStoreConfig,
+)
+from openjiuwen.core.retrieval.common.document import Document
+from openjiuwen.core.retrieval.embedding.api_embedding import APIEmbedding
 
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import knowledge_base_repository
+from openjiuwen_studio.core.manager.repositories.agent_repository import agent_repository
 from openjiuwen_studio.core.manager.repositories import EmbeddingModelConfigRepository
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 from openjiuwen_studio.core.database import SessionLocal
@@ -57,35 +64,146 @@ from openjiuwen_studio.schemas.knowledge_base import (
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.models.knowledge_base_document import DocumentStatus
+from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
+from openjiuwen_studio.core.manager.model_manager.managers import ModelConfigManager
+from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
+from openjiuwen_studio.ops.modules.llm.llm_manager import get_llm_client_by_protocol
 
 
-def _parse_milvus_uri_from_env() -> tuple[str | None, str | None]:
-    """从环境变量解析 Milvus URI 和 Token
-    
+# ==================== GraphRAG 配置和模型管理 ====================
+
+def _create_llm_client_from_db(llm_model_id: str, space_id: str):
+    """从数据库创建 LLM 客户端
+
+    从数据库读取 LLM 模型配置，解密 API key，并创建 LLM 客户端实例。
+
+    Args:
+        llm_model_id: LLM 模型配置ID（必填）
+        space_id: 空间ID，用于从数据库查询模型配置（必填）
+
     Returns:
-        tuple[str | None, str | None]: (Milvus URI, Token)
-            - URI 格式: http://host:port，如果环境变量无效则返回 None
-            - Token 如果环境变量未设置则返回 None（可选）
+        Tuple[LLM客户端实例, model_type]: (LLM客户端, 模型类型名称)
+
+    Raises:
+        ValueError: 如果数据库查询失败或配置无效
     """
-    milvus_host = os.getenv("MILVUS_HOST")
-    milvus_port = os.getenv("MILVUS_PORT")
-    milvus_token = os.getenv("MILVUS_TOKEN")
-    if not milvus_host or not milvus_port:
-        return None, None
-    
-    # 验证端口号是否为有效数字
+    logger.info(f"[LLM_CLIENT] Creating LLM client from database - Model ID: {llm_model_id}, Space ID: {space_id}")
+
+    # 从数据库获取模型配置
+    with get_db_jw() as db:
+        manager = ModelConfigManager(db)
+        model_config = manager.get_config_by_id(int(llm_model_id), space_id)
+
+        # 解密 API key
+        security_utils = SecurityUtils()
+        api_key = None
+        if model_config.api_key:
+            try:
+                api_key = security_utils.decrypt_api_key(model_config.api_key)
+            except Exception as e:
+                logger.warning(f"[LLM_CLIENT] Failed to decrypt API key for model {llm_model_id}: {str(e)}")
+                raise ValueError(f"Failed to decrypt API key for model {llm_model_id}: {str(e)}") from e
+
+        # 获取 timeout 配置，图增强索引时最小 120s
+        timeout = model_config.timeout or 60
+        if timeout < 120:
+            logger.warning(f"[LLM_CLIENT] Timeout {timeout}s may be too short for graph indexing, using 120s instead")
+            timeout = 120
+
+        # 构建 protocol 配置
+        protocol_config = {
+            "provider": model_config.provider,
+            "api_key": api_key or "",
+            "base_url": model_config.base_url or "",
+            "timeout": timeout
+        }
+        # 使用 get_llm_client_by_protocol 创建 LLM 客户端（不需要初始化）
+        llm_client = get_llm_client_by_protocol(protocol_config)
+        logger.info(
+            f"[LLM_CLIENT] LLM client created successfully from database - "
+            f"Model Type: {model_config.model_type}, Timeout: {timeout}s")
+
+        return llm_client, model_config.model_type
+
+
+def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
+    """创建 Embedding 模型
+
+    从数据库读取知识库关联的 embedding 模型配置。
+
+    Args:
+        kb_id: 知识库ID，用于从数据库查询 embedding 模型配置（必填）
+        space_id: 空间ID，用于从数据库查询知识库和 embedding 模型配置（必填）
+
+    Returns:
+        APIEmbedding 实例
+
+    Raises:
+        ValueError: 如果数据库查询失败或配置无效
+    """
+    # 默认的 timeout 和 max_retries（与 APIEmbedClient 的默认值一致）
+    default_timeout = 60
+    default_max_retries = 3
+
+    # 从数据库读取知识库的 embedding 模型配置
+    db = SessionLocal()
     try:
-        port_int = int(milvus_port)
-        if port_int <= 0 or port_int > 65535:
-            logger.warning(f"[GRAG_CONFIG] Invalid MILVUS_PORT: {milvus_port}, must be between 1 and 65535")
-            return None, None
-    except ValueError:
-        logger.warning(f"[GRAG_CONFIG] Invalid MILVUS_PORT: {milvus_port}, must be a number")
-        return None, None
-    
-    milvus_uri = f"http://{milvus_host}:{milvus_port}"
-    logger.info(f"[GRAG_CONFIG] Using Milvus from env: {milvus_uri}")
-    return milvus_uri, milvus_token
+        # 1. 查询知识库，获取 embedding_model_config_id
+        kb_get = KnowledgeBaseGet(space_id=space_id, kb_id=kb_id)
+        kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+
+        if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+            raise ValueError(f"Knowledge base not found (KB: {kb_id}, Space: {space_id})")
+
+        embedding_model_config_id = kb_result.data.get("embedding_model_config_id")
+
+        if not embedding_model_config_id:
+            raise ValueError(f"Knowledge base {kb_id} has no embedding_model_config_id")
+
+        # 2. 查询 embedding 模型配置
+        embed_repo = EmbeddingModelConfigRepository(db)
+        embed_model_config = embed_repo.get_by_id(embedding_model_config_id)
+
+        if not embed_model_config:
+            raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
+
+        if not embed_model_config.is_active:
+            raise ValueError(f"Embedding model config is not active (ID: {embedding_model_config_id})")
+
+        logger.info(
+            f"[EMBED_MODEL] Using embedding model from database - "
+            f"KB: {kb_id}, Model: {embed_model_config.model_name} (ID: {embed_model_config.id})"
+        )
+
+        # 3. 解密 API key
+        security_utils = SecurityUtils()
+        api_key = None
+        if embed_model_config.api_key:
+            try:
+                api_key = security_utils.decrypt_api_key(embed_model_config.api_key)
+            except Exception as e:
+                raise ValueError(f"Failed to decrypt API key for model {embed_model_config.id}: {str(e)}") from e
+
+        # 4. 使用数据库配置创建 Embedding 模型
+        # 数据库字段：api_base, model_id, api_key, max_batch_size
+        # APIEmbedding 需要：config (EmbeddingConfig), timeout, max_retries, max_batch_size
+        # timeout 和 max_retries 使用默认值（60 和 3）
+        embed_config = EmbeddingConfig(
+            model_name=embed_model_config.model_id,  # 使用 model_id 作为模型名称
+            api_key=api_key,
+            base_url=embed_model_config.api_base,
+        )
+        embed_model = APIEmbedding(
+            config=embed_config,
+            timeout=default_timeout,  # 使用默认值
+            max_retries=default_max_retries,  # 使用默认值
+            max_batch_size=embed_model_config.max_batch_size,
+        )
+        logger.debug(f"[EMBED_MODEL] Embed model created from database successfully")
+        return embed_model
+
+    finally:
+        db.close()
 
 
 # ==================== 异常处理装饰器 ====================
@@ -128,12 +246,31 @@ def knowledge_base_create(
     user_id = current_user.get('user_id', 'unknown')
 
     logger.info(
-        f"[KB_CREATE] Creating knowledge base - User: {user_id}, Name: {req.name}, Embedding Model Config ID: {req.embedding_model_config_id}")
+        f"[KB_CREATE] Creating knowledge base - User: {user_id}, Name: {req.name}, "
+        f"Embedding Model Config ID: {req.embedding_model_config_id}")
 
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 验证 embedding_model_config_id 是否存在且属于该 space_id
+    # 2. 检查知识库名称是否已存在（区分大小写）
+    name_exists_result = knowledge_base_repository.knowledge_base_check_name_exists(
+        space_id=req.space_id,
+        name=req.name
+    )
+    if name_exists_result.code != status.HTTP_200_OK:
+        logger.error(f"[KB_CREATE] Failed to check name existence - Error: {name_exists_result.message}")
+        return ResponseModel(
+            code=name_exists_result.code,
+            message=name_exists_result.message,
+        )
+    if name_exists_result.data:
+        logger.warning(f"[KB_CREATE] Knowledge base name already exists - Name: {req.name}, Space: {req.space_id}")
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=f"知识库名称 '{req.name}' 已存在",
+        )
+
+    # 3. 验证 embedding_model_config_id 是否存在且属于该 space_id
     db = SessionLocal()
     try:
         embedding_repo = EmbeddingModelConfigRepository(db)
@@ -146,7 +283,8 @@ def knowledge_base_create(
             )
         if embedding_model.space_id != req.space_id:
             logger.error(
-                f"[KB_CREATE] Embedding model config space mismatch - Config Space: {embedding_model.space_id}, Request Space: {req.space_id}")
+                f"[KB_CREATE] Embedding model config space mismatch - "
+                f"Config Space: {embedding_model.space_id}, Request Space: {req.space_id}")
             return ResponseModel(
                 code=status.HTTP_403_FORBIDDEN,
                 message="Embedding model config does not belong to this space",
@@ -158,15 +296,30 @@ def knowledge_base_create(
                 message="Embedding model config is not active",
             )
         logger.info(
-            f"[KB_CREATE] Embedding model config validated - ID: {req.embedding_model_config_id}, Model: {embedding_model.model_name}")
+            f"[KB_CREATE] Embedding model config validated - ID: {req.embedding_model_config_id}, "
+            f"Model: {embedding_model.model_name}")
     finally:
         db.close()
 
-    # 3. 生成知识库ID（使用去掉连字符的 UUID，保证仅字母数字，Milvus 索引名合规）
+    # 4. 检查 Milvus 连接性
+    logger.info(f"[KB_CREATE] Checking Milvus connection...")
+    milvus_connected, milvus_error = _check_milvus_connection()
+    if not milvus_connected:
+        logger.error(f"[KB_CREATE] Milvus connection check failed - Error: {milvus_error}")
+        return ResponseModel(
+            code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            message=(
+                f"无法连接到 Milvus 服务，请检查 Milvus 配置和连接状态。"
+                f"错误信息: {milvus_error}"
+            ),
+        )
+    logger.info(f"[KB_CREATE] Milvus connection check passed")
+
+    # 5. 生成知识库ID（使用去掉连字符的 UUID，保证仅字母数字，Milvus 索引名合规）
     kb_id = uuid.uuid4().hex
     logger.debug(f"[KB_CREATE] Generated KB ID: {kb_id}")
 
-    # 4. 准备知识库数据
+    # 6. 准备知识库数据
     kb_data = {
         "space_id": req.space_id,
         "kb_id": kb_id,
@@ -178,7 +331,7 @@ def knowledge_base_create(
         "update_time": milliseconds(),
     }
 
-    # 4. 保存到数据库
+    # 7. 保存到数据库
     create_result = knowledge_base_repository.knowledge_base_create(kb_data)
 
     if create_result.code != status.HTTP_200_OK:
@@ -188,14 +341,14 @@ def knowledge_base_create(
             message=create_result.message,
         )
 
-    # 5. 准备响应数据
+    # 8. 准备响应数据
     response_data = KnowledgeBaseResponseCreate(id=kb_id)
 
     logger.info(
         f"[KB_CREATE] Knowledge base created - ID: {kb_id}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 6. 返回创建结果
+    # 9. 返回创建结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="create knowledge base success",
@@ -204,7 +357,45 @@ def knowledge_base_create(
 
 
 @with_exception_handling
-def knowledge_base_delete(
+def knowledge_base_get_referencing_agents(
+        req: KnowledgeBaseGet,
+        current_user: dict
+) -> ResponseModel:
+    """获取引用该知识库的智能体列表"""
+    user_id = current_user.get('user_id', 'unknown')
+
+    logger.info(f"[KB_GET_REF_AGENTS] Getting agents referencing KB - User: {user_id}, KB ID: {req.kb_id}")
+
+    # 1. 验证用户空间权限
+    _ = check_user_space(req.space_id, current_user)
+
+    # 2. 获取引用该知识库的智能体列表
+    result = agent_repository.get_agents_referencing_knowledge_base(
+        space_id=req.space_id,
+        kb_id=req.kb_id
+    )
+
+    if result.code != status.HTTP_200_OK:
+        logger.error(f"[KB_GET_REF_AGENTS] Failed to get referencing agents - Error: {result.message}")
+        return result
+
+    agent_names = result.data.get("agent_names", []) if result.data else []
+    count = result.data.get("count", 0) if result.data else 0
+
+    logger.info(f"[KB_GET_REF_AGENTS] Found {count} agent(s) referencing KB {req.kb_id}")
+
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Get agents referencing knowledge base successfully",
+        data={
+            "agent_names": agent_names,
+            "count": count
+        }
+    )
+
+
+@with_exception_handling
+async def knowledge_base_delete(
         req: KnowledgeBaseGet,
         current_user: dict
 ) -> ResponseModel:
@@ -226,7 +417,39 @@ def knowledge_base_delete(
             message="Knowledge base not found"
         )
 
-    # 3. 删除知识库
+    # 3. 从所有包含该知识库的agent中移除该知识库信息
+    try:
+        logger.info(f"[KB_DELETE] Removing KB {req.kb_id} from related agents - Space: {req.space_id}")
+        remove_result = agent_repository.remove_knowledge_base_from_agents(req.space_id, req.kb_id)
+
+        if remove_result.code == status.HTTP_200_OK and remove_result.data:
+            updated_count = remove_result.data.get("updated_count", 0)
+            failed_count = remove_result.data.get("failed_count", 0)
+            if updated_count > 0:
+                logger.info(
+                    f"[KB_DELETE] Removed KB {req.kb_id} from {updated_count} agent(s) - "
+                    f"Space: {req.space_id}, Failed: {failed_count}"
+                )
+            if failed_count > 0:
+                errors = remove_result.data.get("errors", [])
+                logger.warning(
+                    f"[KB_DELETE] Failed to remove KB {req.kb_id} from {failed_count} agent(s) - "
+                    f"Errors: {errors}"
+                )
+        else:
+            logger.warning(
+                f"[KB_DELETE] Failed to remove KB {req.kb_id} from agents - "
+                f"Error: {remove_result.message}"
+            )
+    except Exception as e:
+        # 即使移除agent中的知识库信息失败，也继续删除知识库
+        logger.error(
+            f"[KB_DELETE] Exception while removing KB {req.kb_id} from agents - "
+            f"Error: {str(e)}",
+            exc_info=True
+        )
+
+    # 4. 删除知识库
     delete_result = knowledge_base_repository.knowledge_base_delete(req)
 
     if delete_result.code != status.HTTP_200_OK:
@@ -237,10 +460,11 @@ def knowledge_base_delete(
         )
 
     logger.info(
-        f"[KB_DELETE] Knowledge base deleted - ID: {req.kb_id}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+        f"[KB_DELETE] Knowledge base deleted - ID: {req.kb_id}, User: {user_id}, "
+        f"Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 4. 删除本地知识库文件
+    # 5. 删除本地知识库文件
     kb_storage_path = _get_storage_path(req.space_id, req.kb_id)
     try:
         if kb_storage_path.exists():
@@ -256,7 +480,27 @@ def knowledge_base_delete(
             f"[KB_DELETE] Failed to delete local knowledge base directory - Path: {kb_storage_path}, Error: {str(e)}",
             exc_info=True)
 
-    # 5. 返回删除结果
+    # 6. 删除 Milvus 向量索引（循环删除每个文档的索引）
+    try:
+        milvus_result = await _delete_kb_indices(req.kb_id, req.space_id)
+        if milvus_result["success_count"] > 0:
+            logger.info(
+                f"[KB_DELETE] Milvus indices deleted - KB ID: {req.kb_id}, "
+                f"Success: {milvus_result['success_count']}, Failed: {milvus_result['failed_count']}"
+            )
+        if milvus_result["errors"]:
+            logger.warning(
+                f"[KB_DELETE] Some Milvus indices failed to delete - KB ID: {req.kb_id}, "
+                f"Errors: {milvus_result['errors']}"
+            )
+    except Exception as e:
+        # Milvus 删除失败不影响整体删除结果
+        logger.error(
+            f"[KB_DELETE] Failed to delete Milvus indices - KB ID: {req.kb_id}, Error: {str(e)}",
+            exc_info=True
+        )
+
+    # 7. 返回删除结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="delete knowledge base success",
@@ -274,7 +518,8 @@ def knowledge_base_update(
     user_id = current_user.get('user_id', 'unknown')
 
     logger.info(
-        f"[KB_UPDATE] Updating knowledge base - User: {user_id}, KB ID: {req.kb_id}, Name: {req.name}, Desc: {repr(req.desc)}")
+        f"[KB_UPDATE] Updating knowledge base - User: {user_id}, KB ID: {req.kb_id}, "
+        f"Name: {req.name}, Desc: {repr(req.desc)}")
 
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
@@ -288,12 +533,36 @@ def knowledge_base_update(
             code=status.HTTP_404_NOT_FOUND,
             message="Knowledge base not found"
         )
-    
-    # 获取当前知识库的描述，用于对比
-    current_desc = get_result.data.get("description", "")
+
+    # 获取当前知识库的信息
+    current_kb = get_result.data
+    current_name = current_kb.get("name", "")
+    current_desc = current_kb.get("description", "")
     logger.info(f"[KB_UPDATE] Current description: {repr(current_desc)}, New description: {repr(req.desc)}")
 
-    # 3. 更新知识库
+    # 3. 如果名称改变，检查新名称是否已存在（排除当前知识库，区分大小写）
+    if req.name != current_name:
+        name_exists_result = knowledge_base_repository.knowledge_base_check_name_exists(
+            space_id=req.space_id,
+            name=req.name,
+            exclude_kb_id=req.kb_id
+        )
+        if name_exists_result.code != status.HTTP_200_OK:
+            logger.error(f"[KB_UPDATE] Failed to check name existence - Error: {name_exists_result.message}")
+            return ResponseModel(
+                code=name_exists_result.code,
+                message=name_exists_result.message,
+            )
+        if name_exists_result.data:
+            logger.warning(
+                f"[KB_UPDATE] Knowledge base name already exists - Name: {req.name}, "
+                f"Space: {req.space_id}, KB ID: {req.kb_id}")
+            return ResponseModel(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=f"知识库名称 '{req.name}' 已存在",
+            )
+
+    # 4. 更新知识库
     # 如果 desc 是空字符串，转换为 None 以便正确清空数据库字段
     description_value = req.desc if req.desc else None
     update_result = knowledge_base_repository.knowledge_base_update(
@@ -311,10 +580,11 @@ def knowledge_base_update(
         )
 
     logger.info(
-        f"[KB_UPDATE] Knowledge base updated - ID: {req.kb_id}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+        f"[KB_UPDATE] Knowledge base updated - ID: {req.kb_id}, User: {user_id}, "
+        f"Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 4. 返回更新结果
+    # 5. 返回更新结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="update knowledge base message success",
@@ -436,8 +706,8 @@ def _get_corrected_file_path(original_path: str) -> str:
     return original_path
 
 
-async def _parse_file(doc_path: str, parsing_strategy, doc_id: str) -> List[Dict[str, Any]]:
-    """调用 agentcore 解析文件，返回段落列表"""
+async def _parse_file(doc_path: str, parsing_strategy, doc_id: str, file_name: str = None) -> List[Document]:
+    """调用新的知识库系统解析文件，返回Document列表"""
     logger.debug(
         f"[PARSE] Parsing file - Path: {doc_path}, "
         f"Strategy type: {parsing_strategy.strategy_type}"
@@ -458,21 +728,21 @@ async def _parse_file(doc_path: str, parsing_strategy, doc_id: str) -> List[Dict
         temp_file_created = True
 
     try:
-        # 调用 parse_doc 解析文件
-        # paragraphs = await parse_doc(
-        #     doc=corrected_path,
-        #     parsing_strategy=parsing_strategy,
-        #     doc_id=doc_id
-        # )
-        paragraphs = [{}]
+        # 使用新的 AutoFileParser 解析文件
+        parser = AutoFileParser()
+        documents = await parser.parse(
+            doc=corrected_path,
+            doc_id=doc_id,
+            file_name=file_name or Path(corrected_path).name
+        )
 
-        if not paragraphs:
+        if not documents:
             raise ValueError(f"No content parsed from file: {doc_path}")
 
         logger.debug(
-            f"[PARSE] Parsed file - Path: {doc_path}, Paragraphs: {len(paragraphs)}"
+            f"[PARSE] Parsed file - Path: {doc_path}, Documents: {len(documents)}"
         )
-        return paragraphs
+        return documents
     finally:
         # 清理临时文件
         if temp_file_created:
@@ -490,7 +760,7 @@ async def _parse_file(doc_path: str, parsing_strategy, doc_id: str) -> List[Dict
 def _resolve_chunking_config(segmentation_strategy) -> tuple[int, float, Dict[str, bool]]:
     """提取分段配置，兼容前端字段命名"""
     cfg = segmentation_strategy.strategy_config or {}
-    chunk_size = int(cfg.get("max_tokens") or cfg.get("chunk_size") or 500)
+    chunk_size = int(cfg.get("max_tokens") or cfg.get("chunk_size") or 512)
     overlap_percent = float(cfg.get("chunk_overlap_percent") or cfg.get("chunk_overlap") or 0)
     preprocess_options = {
         "normalize_whitespace": bool(cfg.get("remove_extra_spaces") or cfg.get("normalize_whitespace") or False),
@@ -499,54 +769,422 @@ def _resolve_chunking_config(segmentation_strategy) -> tuple[int, float, Dict[st
     return chunk_size, overlap_percent, preprocess_options
 
 
-async def _chunk_text(paragraphs: List[Dict[str, Any]], segmentation_strategy, doc_id: str) -> List[Dict[str, Any]]:
-    """调用 agentcore 切分文本，返回 chunk 列表"""
+def _create_chunker(segmentation_strategy, embed_model=None) -> TextChunker:
+    """创建 Chunker 实例"""
     chunk_size, overlap_percent, preprocess_options = _resolve_chunking_config(segmentation_strategy)
 
-    logger.debug(
-        f"[CHUNK] Chunking paragraphs - Paragraphs: {len(paragraphs)}, "
-        f"Strategy type: {segmentation_strategy.strategy_type}, "
-        f"Chunk size: {chunk_size}, Overlap percent: {overlap_percent}"
-    )
+    # 根据 strategy_type 确定 chunk_unit
+    # strategy_type="1" 表示自动分段，使用字符分块
+    # strategy_type="2" 表示自定义，需要检查配置
+    chunk_unit = "char"  # 默认使用字符分块
+    strategy_config = segmentation_strategy.strategy_config or {}
+    if "chunk_unit" in strategy_config:
+        chunk_unit = strategy_config.get("chunk_unit", "char")
 
-    # 调用 chunk_doc 切分文本
-    # chunks = await chunk_doc(
-    #     paragraphs=paragraphs,
-    #     chunk_size=chunk_size,
-    #     chunk_overlap_percent=overlap_percent,
-    #     doc_id=doc_id,
-    #     preprocess_options=preprocess_options if any(preprocess_options.values()) else None
-    # )
-    chunks = [{}]
-
-    if not chunks:
-        raise ValueError("Chunking produced no chunks")
+    # 计算 chunk_overlap（绝对值，不是百分比）
+    chunk_overlap = int(chunk_size * (overlap_percent / 100)) if overlap_percent > 0 else 0
 
     logger.debug(
-        f"[CHUNK] Text chunked - Doc ID: {doc_id}, Chunks: {len(chunks)}"
+        f"[CHUNK] Creating chunker - Chunk size: {chunk_size}, Overlap: {chunk_overlap} ({overlap_percent}%), "
+        f"Unit: {chunk_unit}, Preprocess: {preprocess_options}"
     )
-    return chunks
+
+    # 如果使用 token 分块，需要提供 embed_model
+    chunker = TextChunker(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        chunk_unit=chunk_unit,
+        embed_model=embed_model if chunk_unit == "token" else None,
+        preprocess_options=preprocess_options if any(preprocess_options.values()) else None,
+    )
+
+    return chunker
 
 
-async def _index_chunks(
-        chunks: List[Dict[str, Any]],
+def _check_milvus_connection() -> Tuple[bool, str]:
+    """检查 Milvus 连接性
+
+    Returns:
+        tuple[bool, str]: (是否连接成功, 错误信息)
+    """
+    try:
+        from pymilvus import connections, utility
+
+        milvus_host = os.getenv("MILVUS_HOST", "localhost")
+        milvus_port = os.getenv("MILVUS_PORT", "19530")
+        milvus_token = os.getenv("MILVUS_TOKEN", None)
+
+        # 尝试连接 Milvus
+        alias = "kb_connection_test"
+        try:
+            # 如果连接已存在，先断开
+            if connections.has_connection(alias):
+                connections.disconnect(alias)
+        except Exception as e:
+            logger.warning(f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(e)}")
+
+        # 建立新连接
+        connections.connect(
+            alias=alias,
+            host=milvus_host,
+            port=int(milvus_port),
+            token=milvus_token
+        )
+
+        # 验证连接是否有效（尝试列出集合）
+        try:
+            _ = utility.list_collections(using=alias)
+        except Exception as e:
+            try:
+                connections.disconnect(alias)
+            except Exception as disconnect_error:
+                logger.warning(
+                    f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(disconnect_error)}")
+            return False, f"无法访问 Milvus 服务: {str(e)}"
+
+        # 断开测试连接
+        try:
+            connections.disconnect(alias)
+        except Exception as e:
+            logger.warning(f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(e)}")
+        return True, ""
+
+    except ImportError:
+        # 如果没有 pymilvus，尝试使用 MilvusIndexer 来测试
+        try:
+            index_manager = _create_milvus_index_manager()
+            # 如果 MilvusIndexer 创建成功，假设连接可用
+            # 注意：这是一个简化的检查，实际连接可能在后续操作时才验证
+            return True, ""
+        except Exception as e:
+            return False, f"无法连接到 Milvus: {str(e)}"
+    except Exception as e:
+        error_msg = str(e)
+        # 清理连接
+        try:
+            alias = "kb_connection_test"
+            from pymilvus import connections
+            if connections.has_connection(alias):
+                connections.disconnect(alias)
+        except Exception as disconnect_error:
+            logger.warning(
+                f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(disconnect_error)}")
+        return False, f"Milvus 连接失败: {error_msg}"
+
+
+def _create_milvus_index_manager() -> MilvusIndexer:
+    """创建 Milvus 索引管理器
+
+    从环境变量读取 Milvus 配置参数。
+
+    Returns:
+        MilvusIndexer: Milvus 索引管理器实例
+    """
+    milvus_host = os.getenv("MILVUS_HOST", "localhost")
+    milvus_port = os.getenv("MILVUS_PORT", "19530")
+    milvus_token = os.getenv("MILVUS_TOKEN", None)
+
+    # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
+    # 默认使用 http:// 协议
+    milvus_uri = f"http://{milvus_host}:{milvus_port}"
+
+    return MilvusIndexer(
+        milvus_uri=milvus_uri,
+        milvus_token=milvus_token
+    )
+
+
+async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
+    """删除知识库下所有文档的 chunks 和 triples 索引
+
+    获取知识库下的所有文档，然后循环删除每个文档的 chunks 和 triples 索引数据
+    """
+    result = {
+        "success_count": 0,
+        "failed_count": 0,
+        "errors": []
+    }
+
+    try:
+        # 获取知识库下的所有文档（分页获取，每页最多100条）
+        all_documents = []
+        page = 1
+        page_size = 100
+
+        while True:
+            doc_list_result = knowledge_base_repository.document_list(
+                space_id=space_id,
+                kb_id=kb_id,
+                page=page,
+                size=page_size
+            )
+
+            if doc_list_result.code != status.HTTP_200_OK or not doc_list_result.data:
+                break
+
+            items = doc_list_result.data.get("items", [])
+            if not items:
+                break
+
+            all_documents.extend(items)
+
+            # 如果返回的数量小于 page_size，说明已经是最后一页
+            if len(items) < page_size:
+                break
+
+            page += 1
+
+        if not all_documents:
+            logger.debug(f"[KB_DELETE] No documents to delete indices for KB {kb_id}")
+            return result
+
+        documents = all_documents
+        logger.info(f"[KB_DELETE] Deleting indices for {len(documents)} documents in KB {kb_id}")
+
+        # 创建索引管理器
+        index_manager = _create_milvus_index_manager()
+        chunk_index = f"kb_{kb_id}_chunks"
+        triple_index = f"kb_{kb_id}_triples"
+
+        # 循环删除每个文档的索引
+        for doc in documents:
+            doc_id = doc.get("doc_id") or doc.get("id")
+            if not doc_id:
+                continue
+
+            try:
+                # 删除 chunks 索引
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=chunk_index,
+                    doc_id=doc_id,
+                    kb_id=kb_id,
+                    index_type="chunks"
+                )
+
+                # 删除 triples 索引（如果有图增强）
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=triple_index,
+                    doc_id=doc_id,
+                    kb_id=kb_id,
+                    index_type="triples"
+                )
+
+                result["success_count"] += 1
+            except Exception as e:
+                result["failed_count"] += 1
+                result["errors"].append(f"Doc {doc_id}: {str(e)}")
+                logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
+
+        logger.info(
+            f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "
+            f"Success: {result['success_count']}, Failed: {result['failed_count']}"
+        )
+
+    except Exception as e:
+        error_msg = f"Failed to delete KB indices: {str(e)}"
+        result["errors"].append(error_msg)
+        logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+
+    return result
+
+
+def _create_milvus_vector_store(
+        collection_name: str,
+) -> MilvusVectorStore:
+    """创建 Milvus 向量存储
+
+    从环境变量读取 Milvus 配置参数。
+
+    Args:
+        collection_name: 集合名称
+
+    Returns:
+        MilvusVectorStore: Milvus 向量存储实例
+    """
+    milvus_host = os.getenv("MILVUS_HOST", "localhost")
+    milvus_port = os.getenv("MILVUS_PORT", "19530")
+    milvus_token = os.getenv("MILVUS_TOKEN", None)
+
+    # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
+    # 默认使用 http:// 协议
+    milvus_uri = f"http://{milvus_host}:{milvus_port}"
+
+    vector_store_config = VectorStoreConfig(
+        collection_name=collection_name,
+    )
+    return MilvusVectorStore(
+        config=vector_store_config,
+        milvus_uri=milvus_uri,
+        milvus_token=milvus_token
+    )
+
+
+async def create_knowledge_base_for_retrieval(
+        kb_id: str,
+        space_id: str,
+        use_graph: bool,
+        llm_client=None,
+        model_name: str = None
+) -> Union[SimpleKnowledgeBase, GraphKnowledgeBase]:
+    """创建知识库实例用于检索
+
+    从数据库读取知识库配置，创建知识库实例用于检索操作。
+
+    Args:
+        kb_id: 知识库ID
+        space_id: 空间ID
+        use_graph: 是否启用图检索
+        llm_client: LLM客户端（可选，如果知识库有图增强文档则需要）
+        model_name: LLM模型名称（可选，用于初始化TripleExtractor，如果未提供则使用默认值）
+
+    Returns:
+        SimpleKnowledgeBase 或 GraphKnowledgeBase 实例
+
+    Raises:
+        ValueError: 如果知识库不存在或配置无效
+    """
+    # 1. 从数据库获取知识库信息
+    kb_get = KnowledgeBaseGet(space_id=space_id, kb_id=kb_id)
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        raise ValueError(f"Knowledge base not found (KB: {kb_id}, Space: {space_id})")
+
+    # 3. 创建 embedding 模型
+    embed_model = _create_embed_model(kb_id=kb_id, space_id=space_id)
+    if not embed_model:
+        raise ValueError(f"Failed to create embedding model for knowledge base {kb_id}")
+
+    # 4. 创建向量存储
+    chunk_index = f"kb_{kb_id}_chunks"
+    vector_store = _create_milvus_vector_store(
+        collection_name=chunk_index,
+    )
+
+    # 5. 创建三元组提取器（如果使用图索引）
+    extractor = None
+    if use_graph:
+        if not llm_client:
+            raise ValueError(f"LLM client is required for knowledge base {kb_id} with graph enhancement")
+        # 使用传入的 model_name，如果未提供则使用配置中的值或默认值
+        extractor = TripleExtractor(
+            llm_client=llm_client,
+            model_name=model_name,
+        )
+
+    # 6. 创建知识库配置
+    # 索引类型为 vector（使用 Milvus 向量存储）
+    kb_config = KnowledgeBaseConfig(
+        kb_id=kb_id,
+        index_type="vector",
+        use_graph=use_graph,
+        chunk_size=512,  # 检索时不需要，使用默认值
+        chunk_overlap=50,  # 检索时不需要，使用默认值
+    )
+
+    # 8. 创建知识库实例（检索时不需要 parser 和 chunker）
+    if use_graph:
+        knowledge_base = GraphKnowledgeBase(
+            config=kb_config,
+            vector_store=vector_store,
+            embed_model=embed_model,
+            parser=None,
+            chunker=None,
+            extractor=extractor,
+            index_manager=None,
+            llm_client=llm_client,
+            llm_model_name=model_name,
+        )
+    else:
+        knowledge_base = SimpleKnowledgeBase(
+            config=kb_config,
+            vector_store=vector_store,
+            embed_model=embed_model,
+            parser=None,
+            chunker=None,
+            index_manager=None,
+            llm_client=llm_client,
+        )
+
+    logger.debug(
+        f"[KB_RETRIEVAL] Created knowledge base instance for retrieval - KB ID: {kb_id}, Has graph: {use_graph}")
+    return knowledge_base
+
+
+async def _delete_document_from_index(
+        index_manager: MilvusIndexer,
+        index_name: str,
+        doc_id: str,
+        kb_id: str,
+        index_type: str = "chunks"
+) -> bool:
+    """从索引中删除指定 doc_id 的数据
+
+    Args:
+        index_manager: Milvus 索引管理器
+        index_name: 索引名称
+        doc_id: 文档ID
+        kb_id: 知识库ID
+        index_type: 索引类型（"chunks" 或 "triples"），用于日志
+
+    Returns:
+        bool: 是否成功删除（如果索引不存在或数据不存在，返回 True）
+    """
+    try:
+        # 检查索引是否存在
+        index_exists = await index_manager.index_exists(index_name)
+        if not index_exists:
+            logger.debug(f"[DOC_DELETE] {index_type.capitalize()} index does not exist: {index_name}")
+            return True
+
+        # 使用 MilvusIndexer 的 delete_index 方法删除数据
+        deleted = await index_manager.delete_index(
+            doc_id=doc_id,
+            index_name=index_name
+        )
+
+        if deleted:
+            logger.info(f"[DOC_DELETE] Deleted {index_type} from index - Index: {index_name}, Doc ID: {doc_id}")
+        else:
+            logger.debug(f"[DOC_DELETE] No {index_type} found for doc_id: {doc_id} in index: {index_name}")
+
+        return True
+
+    except Exception as delete_error:
+        error_msg = str(delete_error)
+        # 如果数据不存在，不算错误
+        if "not exist" in error_msg.lower() or "not found" in error_msg.lower():
+            logger.debug(f"[DOC_DELETE] No {index_type} found for doc_id: {doc_id} in index: {index_name}")
+            return True
+        else:
+            logger.warning(
+                f"[DOC_DELETE] Failed to delete {index_type} - Doc ID: {doc_id}, KB ID: {kb_id}, Error: {delete_error}"
+            )
+            return False
+
+
+async def _index_documents(
+        documents: List[Document],
         indexing_strategy,
+        segmentation_strategy,
         space_id: str,
         kb_id: str,
         doc_id: str,
         process_info: dict
 ) -> dict:
-    """调用 agentcore 将 chunks 写入索引，并更新文档状态为INDEXING"""
+    """使用新的知识库系统将文档写入 Milvus 索引，并更新文档状态为INDEXING"""
     # 1. 更新状态为INDEXING
     update_indexing_result = knowledge_base_repository.document_update_status(
         space_id=space_id,
         kb_id=kb_id,
         doc_id=doc_id,
-        status=DocumentStatus.INDEXING.value,
+        doc_status=DocumentStatus.INDEXING.value,
         process_info={
             **process_info,
-            "chunking_completed": True,
-            "chunk_count": len(chunks)
+            "parsing_completed": True,
+            "document_count": len(documents)
         }
     )
 
@@ -555,59 +1193,134 @@ async def _index_chunks(
 
     logger.info(f"[INDEX] Document status updated to INDEXING - Doc ID: {doc_id}")
 
-    # 2. 加载配置和创建模型客户端
-    # cfg = _get_grag_config()
+    # 2. 加载配置
     use_graph = bool(getattr(indexing_strategy, "enable_graph_enhancement", False))
     chunk_index = f"kb_{kb_id}_chunks"
-    triple_index = f"kb_{kb_id}_triples"
+    triple_index = f"kb_{kb_id}_triples" if use_graph else None
 
     logger.debug(
-        f"[INDEX] Indexing chunks - KB ID: {kb_id}, Doc ID: {doc_id}, "
-        f"Chunks: {len(chunks)}, Use graph: {use_graph}, "
+        f"[INDEX] Indexing documents - KB ID: {kb_id}, Doc ID: {doc_id}, "
+        f"Documents: {len(documents)}, Use graph: {use_graph}, "
         f"Chunk index: {chunk_index}, Triple index: {triple_index}"
     )
 
-    # # 3. 创建模型客户端（仅在需要时创建）
-    # llm_client = None
-    # if use_graph:
-    #     llm_client = _create_llm_client(cfg)
-    #     if not llm_client:
-    #         raise ValueError("llm_client is required when use_graph=True")
+    # 3. 创建模型客户端（仅在需要时创建）
+    llm_client = None
+    model_name = None
+    if use_graph:
+        llm_client, model_name = _create_llm_client_from_db(indexing_strategy.llm_model_id, space_id)
+        logger.info(
+            f"[INDEX] LLM client created successfully from database - "
+            f"Model ID: {indexing_strategy.llm_model_id}, Model Type: {model_name}")
+        if not llm_client:
+            raise ValueError("llm_client is required when use_graph=True")
 
-    # 4. 创建 embedding 模型（hybrid/vector 索引类型需要）
-    # embed_model = _create_embed_model(kb_id=kb_id, space_id=space_id)
+    # 4. 创建 embedding 模型（vector 索引类型需要）
+    embed_model = _create_embed_model(kb_id=kb_id, space_id=space_id)
 
-    # 5. 调用 build_doc_index_from_chunks 构建索引
-    # idx_cfg = IndexConfig(
-    #     kb_id=kb_id,
-    #     index_type="hybrid",
-    #     use_graph=use_graph,
-    #     chunk_index=chunk_index,
-    #     triple_index=triple_index,
-    #     external_config=cfg,
-    # )
-    # index_success = await build_doc_index_from_chunks(
-    #     doc_id=doc_id,
-    #     chunks=chunks,
-    #     index_config=idx_cfg,
-    #     llm_client=llm_client,  # use_graph=True 时必填
-    #     embed_model=embed_model,  # hybrid/vector 索引类型必填
-    # )
-    index_success = [{}]
+    # 验证 embedding 模型是否创建成功（对于 vector 索引类型，embedding 模型是必需的）
+    if not embed_model:
+        raise ValueError(
+            f"Failed to create embedding model for knowledge base {kb_id}. "
+            f"Embedding model is required for vector index type."
+        )
 
-    if not index_success:
-        raise RuntimeError("Index build failed")
+    # 5. 创建组件
+    # 5.1 创建分块器（用于 add_documents 内部自动分块）
+    strategy_config = segmentation_strategy.strategy_config or {}
+    chunk_unit = strategy_config.get("chunk_unit", "char")
+    chunker = _create_chunker(segmentation_strategy, embed_model=embed_model if chunk_unit == "token" else None)
 
-    logger.debug(
-        f"[INDEX] Indexing completed - KB ID: {kb_id}, Doc ID: {doc_id}, "
-        f"Chunk index: {chunk_index}, Triple index: {triple_index}"
+    # 5.2 创建索引管理器
+    index_manager = _create_milvus_index_manager()
+
+    # 5.3 创建向量存储
+    vector_store = _create_milvus_vector_store(
+        collection_name=chunk_index,
     )
 
-    return {
-        "chunk_index": chunk_index,
-        "triple_index": triple_index if use_graph else None,
-        "chunk_count": len(chunks),
-    }
+    # 5.4 创建三元组提取器（如果使用图索引）
+    extractor = None
+    if use_graph and llm_client:
+        extractor = TripleExtractor(
+            llm_client=llm_client,
+            model_name=model_name,
+        )
+
+    # 6. 创建知识库配置
+    kb_config = KnowledgeBaseConfig(
+        kb_id=kb_id,
+        index_type="vector",
+        use_graph=use_graph,
+        chunk_size=chunker.chunk_size,
+        chunk_overlap=chunker.chunk_overlap,
+    )
+
+    # 7. 创建知识库实例
+    if use_graph:
+        knowledge_base = GraphKnowledgeBase(
+            config=kb_config,
+            vector_store=vector_store,
+            embed_model=embed_model,
+            parser=None,
+            chunker=chunker,
+            extractor=extractor,
+            index_manager=index_manager,
+            llm_client=llm_client,
+        )
+    else:
+        knowledge_base = SimpleKnowledgeBase(
+            config=kb_config,
+            vector_store=vector_store,
+            embed_model=embed_model,
+            parser=None,
+            chunker=chunker,
+            index_manager=index_manager,
+            llm_client=llm_client,
+        )
+
+    # 8. 调用 add_documents 构建索引（会自动进行分块和索引构建）
+    try:
+        doc_ids = await knowledge_base.add_documents(documents)
+
+        if not doc_ids:
+            raise RuntimeError("Index build failed: no document IDs returned")
+
+        # 获取实际创建的chunk数量
+        chunk_count = 0
+        try:
+            # 尝试通过分块器估算chunk数量
+            # 注意：这里只是估算，实际数量可能因为分块策略而有所不同
+            total_text_length = sum(len(doc.text) for doc in documents)
+            if chunker.chunk_size > 0:
+                # 粗略估算：总文本长度 / chunk_size（不考虑重叠）
+                estimated_chunks = max(1, total_text_length // chunker.chunk_size)
+                chunk_count = estimated_chunks
+                logger.debug(
+                    f"[INDEX] Estimated chunk count: {chunk_count} "
+                    f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})")
+        except Exception as e:
+            logger.warning(f"[INDEX] Failed to estimate chunk count: {str(e)}")
+            # 如果估算失败，使用文档数量作为fallback
+            chunk_count = len(documents)
+
+        logger.debug(
+            f"[INDEX] Indexing completed - KB ID: {kb_id}, Doc ID: {doc_id}, "
+            f"Chunk index: {chunk_index}, Triple index: {triple_index}, "
+            f"Estimated chunks: {chunk_count}"
+        )
+
+        return {
+            "chunk_index": chunk_index,
+            "triple_index": triple_index,
+            "chunk_count": chunk_count,
+        }
+    finally:
+        # 清理资源
+        try:
+            await knowledge_base.close()
+        except Exception as e:
+            logger.warning(f"[INDEX] Failed to close knowledge base: {str(e)}")
 
 
 async def _process_single_document(
@@ -626,23 +1339,18 @@ async def _process_single_document(
 
         # 1. 解析文件
         try:
-            paragraphs = await _parse_file(file_path, parsing_strategy, doc_id)
+            file_name = Path(file_path).name
+            documents = await _parse_file(file_path, parsing_strategy, doc_id, file_name=file_name)
         except Exception as parse_error:
             logger.error(f"[DOC_PROCESS_BG] File parsing failed - Doc ID: {doc_id}, KB ID: {kb_id}", exc_info=True)
             raise Exception("File parsing failed") from parse_error
 
-        # 2. 切分文本
+        # 2. 索引文档（内部会进行分块和索引构建，并更新状态为INDEXING）
         try:
-            chunks = await _chunk_text(paragraphs, segmentation_strategy, doc_id)
-        except Exception as chunk_error:
-            logger.error(f"[DOC_PROCESS_BG] Text chunking failed - Doc ID: {doc_id}, KB ID: {kb_id}", exc_info=True)
-            raise Exception("Text chunking failed") from chunk_error
-
-        # 3. 索引chunks（内部会更新状态为INDEXING）
-        try:
-            index_result = await _index_chunks(
-                chunks=chunks,
+            index_result = await _index_documents(
+                documents=documents,
                 indexing_strategy=indexing_strategy,
+                segmentation_strategy=segmentation_strategy,
                 space_id=space_id,
                 kb_id=kb_id,
                 doc_id=doc_id,
@@ -664,7 +1372,7 @@ async def _process_single_document(
             space_id=space_id,
             kb_id=kb_id,
             doc_id=doc_id,
-            status=DocumentStatus.INDEXED.value,
+            doc_status=DocumentStatus.INDEXED.value,
             process_info=final_process_info,
             es_index_name=index_result.get("chunk_index"),
             chunk_count=index_result.get("chunk_count")
@@ -694,7 +1402,7 @@ async def _process_single_document(
                 space_id=space_id,
                 kb_id=kb_id,
                 doc_id=doc_id,
-                status=DocumentStatus.FAILED.value,
+                doc_status=DocumentStatus.FAILED.value,
                 process_info={
                     **process_info,
                     "error": error_message,
@@ -765,7 +1473,6 @@ async def _process_documents_sequentially(
                 f"Doc ID: {doc_id}, Task ID: {task_id}, Error: {str(e)}",
                 exc_info=True
             )
-            # _process_single_document 内部已经处理了状态更新，这里只记录日志
             continue
 
     logger.info(
@@ -807,7 +1514,10 @@ async def document_upload(
     storage_path = _get_storage_path(space_id, kb_id)
 
     # 4. 允许的文件类型
-    allowed_file_extensions = {'.pdf', '.doc', '.docx', '.txt', '.md'}
+    ALLOWED_FILE_EXTENSIONS = {'.pdf', '.doc', '.docx', '.txt', '.md'}
+
+    # 文件大小限制：20MB
+    MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
 
     # 5. 处理每个文件
     uploaded_docs = []
@@ -822,16 +1532,16 @@ async def document_upload(
             # 5.2 获取文件信息并验证文件类型
             filename = file.filename or f"unnamed_{doc_id}"
             file_ext = Path(filename).suffix.lower()
-            
+
             # 验证文件类型
-            if file_ext not in allowed_file_extensions:
+            if file_ext not in ALLOWED_FILE_EXTENSIONS:
                 failed_count += 1
                 logger.warning(
                     f"[DOC_UPLOAD] Unsupported file type - File: {filename}, Extension: {file_ext}, "
                     f"User: {user_id}, KB ID: {kb_id}"
                 )
                 continue
-            
+
             file_type = _get_file_type(filename)
             mime_type = _get_mime_type(file_type)
 
@@ -843,6 +1553,17 @@ async def document_upload(
             # 读取文件内容并保存（异步读取）
             file_content = await file.read()
             file_size = len(file_content)
+
+            # 验证文件大小
+            if file_size > MAX_FILE_SIZE:
+                failed_count += 1
+                file_size_mb = file_size / (1024 * 1024)
+                max_size_mb = MAX_FILE_SIZE / (1024 * 1024)
+                logger.warning(
+                    f"[DOC_UPLOAD] File size exceeds limit - File: {filename}, Size: {file_size_mb:.2f}MB, "
+                    f"Limit: {max_size_mb}MB, User: {user_id}, KB ID: {kb_id}"
+                )
+                continue
 
             with open(file_path, 'wb') as f:
                 f.write(file_content)
@@ -916,12 +1637,12 @@ async def document_upload(
 
 
 def _timestamp_to_date_str(timestamp: int | None) -> str:
-    """将时间戳（毫秒）转换为日期字符串（YYYY-MM-DD）"""
+    """将时间戳（毫秒）转换为日期时间字符串（YYYY-MM-DD HH:MM:SS）"""
     if not timestamp:
-        return datetime.now().strftime("%Y-%m-%d")
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # 时间戳是毫秒，需要除以1000
     dt = datetime.fromtimestamp(timestamp / 1000)
-    return dt.strftime("%Y-%m-%d")
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 @with_exception_handling
@@ -963,20 +1684,28 @@ def knowledge_base_search(
     total = result_data.get("total", 0)
     total_pages = result_data.get("total_pages", 1)
 
-    # 4. 转换响应数据
-    knowledge_bases = [
-        KnowledgeBaseInfo(
-            id=kb.get("kb_id", ""),
-            space_id=kb.get("space_id", ""),
-            name=kb.get("name", ""),
-            description=kb.get("description"),
-            embedding_model_config_id=kb.get("embedding_model_config_id"),
-            config=kb.get("config"),
-            create_time=kb.get("create_time"),
-            update_time=kb.get("update_time")
+    # 4. 转换响应数据，并检查是否有图增强文档
+    knowledge_bases = []
+    for kb in knowledge_bases_data:
+        kb_id = kb.get("kb_id", "")
+        # 检查是否有图增强文档
+        has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
+            space_id=req.space_id,
+            kb_id=kb_id
         )
-        for kb in knowledge_bases_data
-    ]
+        knowledge_bases.append(
+            KnowledgeBaseInfo(
+                id=kb_id,
+                space_id=kb.get("space_id", ""),
+                name=kb.get("name", ""),
+                description=kb.get("description"),
+                embedding_model_config_id=kb.get("embedding_model_config_id"),
+                config=kb.get("config"),
+                create_time=kb.get("create_time"),
+                update_time=kb.get("update_time"),
+                has_graph_enhancement=has_graph_enhancement
+            )
+        )
 
     response_data = KnowledgeBaseSearchResponse(
         knowledge_bases=knowledge_bases,
@@ -996,7 +1725,7 @@ def knowledge_base_search(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="Search knowledge bases successfully",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=True)  # 使用 by_alias=True 以返回 "id" 而不是 "kb_id"
     )
 
 
@@ -1010,7 +1739,8 @@ def knowledge_base_list(
     user_id = current_user.get('user_id', 'unknown')
 
     logger.info(
-        f"[KB_LIST] Getting knowledge base list - User: {user_id}, Space ID: {req.space_id}, Page: {req.page}, Size: {req.size}")
+        f"[KB_LIST] Getting knowledge base list - User: {user_id}, Space ID: {req.space_id}, "
+        f"Page: {req.page}, Size: {req.size}")
 
     # 1. 验证用户空间权限（如果 space_id 为空或验证失败，返回空列表）
     if not req.space_id:
@@ -1025,7 +1755,7 @@ def knowledge_base_list(
                 size=req.size
             ).model_dump(by_alias=False)
         )
-    
+
     try:
         _ = check_user_space(req.space_id, current_user)
     except Exception as e:
@@ -1051,7 +1781,8 @@ def knowledge_base_list(
 
     if list_result.code != status.HTTP_200_OK:
         logger.warning(
-            f"[KB_LIST] Database query failed, returning empty list - Space ID: {req.space_id}, Error: {list_result.message}")
+            f"[KB_LIST] Database query failed, returning empty list - "
+            f"Space ID: {req.space_id}, Error: {list_result.message}")
         return ResponseModel(
             code=status.HTTP_200_OK,
             message="get knowledge base list success",
@@ -1063,17 +1794,25 @@ def knowledge_base_list(
             ).model_dump(by_alias=False)
         )
 
-    # 3. 转换数据格式
+    # 3. 转换数据格式，并检查是否有图增强文档
     items = []
     for kb_data in list_result.data.get("items", []):
+        kb_id = kb_data.get("kb_id", "")
+        # 检查是否有图增强文档
+        has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
+            space_id=req.space_id,
+            kb_id=kb_id
+        )
+
         items.append(KnowledgeBaseListItem(
             name=kb_data.get("name", ""),
             desc=kb_data.get("description"),
-            id=kb_data.get("kb_id", ""),
+            id=kb_id,
             type="text",
             embedding_model_config_id=kb_data.get("embedding_model_config_id"),
             created_at=_timestamp_to_date_str(kb_data.get("create_time")),
-            updated_at=_timestamp_to_date_str(kb_data.get("update_time"))
+            updated_at=_timestamp_to_date_str(kb_data.get("update_time")),
+            has_graph_enhancement=has_graph_enhancement
         ))
 
     # 4. 获取分页信息
@@ -1254,7 +1993,7 @@ def document_update(
 
 
 @with_exception_handling
-def document_delete(
+async def document_delete(
         req: DocumentDeleteRequest,
         current_user: dict
 ) -> ResponseModel:
@@ -1332,13 +2071,41 @@ def document_delete(
                 except Exception as e:
                     logger.warning(f"[DOC_DELETE] Failed to delete local file - Path: {file_path}, Error: {str(e)}")
 
-            # 同步删除 ES 索引中的数据
+            # 同步删除索引中的数据（使用新的知识库系统）
             try:
-                # asyncio.run(delete_document(kb_id=req.kb_id, doc_id=doc_id, use_graph=True))
-                pass
+                # 获取文档的索引信息，判断是否使用图增强
+                doc_data = doc_get_result.data
+                process_info = doc_data.get("process_info", {})
+                indexing_strategy = process_info.get("indexing_strategy", {}) if isinstance(process_info, dict) else {}
+                use_graph = indexing_strategy.get("enable_graph_enhancement", False) if isinstance(indexing_strategy,
+                                                                                                   dict) else False
+
+                # 创建索引管理器并删除索引数据
+                index_manager = _create_milvus_index_manager()
+
+                # 删除chunk索引中的数据
+                chunk_index = f"kb_{req.kb_id}_chunks"
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=chunk_index,
+                    doc_id=doc_id,
+                    kb_id=req.kb_id,
+                    index_type="chunks"
+                )
+
+                # 如果使用图增强，还需要删除triple索引中的数据
+                if use_graph:
+                    triple_index = f"kb_{req.kb_id}_triples"
+                    await _delete_document_from_index(
+                        index_manager=index_manager,
+                        index_name=triple_index,
+                        doc_id=doc_id,
+                        kb_id=req.kb_id,
+                        index_type="triples"
+                    )
             except Exception as e:  # noqa: BLE001
                 logger.warning(
-                    f"[DOC_DELETE] ES index cleanup failed - Doc ID: {doc_id}, KB ID: {req.kb_id}, Error: {e}"
+                    f"[DOC_DELETE] Index cleanup failed - Doc ID: {doc_id}, KB ID: {req.kb_id}, Error: {e}"
                 )
 
     logger.info(
@@ -1393,13 +2160,18 @@ def document_get_status_batch(
             doc_data = doc_result.data
             status_value = doc_data.get("status", DocumentStatus.UPLOADING.value)
             doc_name = doc_data.get("name")
-            
-            # 从 process_info 中提取错误信息
+
+            # 从 process_info 中提取错误信息和图增强标识
             error_msg = None
+            enable_graph_enhancement = None
             process_info = doc_data.get("process_info")
             if isinstance(process_info, dict):
                 error_msg = process_info.get("error")
-            
+                # 从 indexing_strategy 中提取 enable_graph_enhancement
+                indexing_strategy = process_info.get("indexing_strategy")
+                if isinstance(indexing_strategy, dict):
+                    enable_graph_enhancement = indexing_strategy.get("enable_graph_enhancement", False)
+
             # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
             if status_value == DocumentStatus.FAILED.value and not error_msg:
                 error_msg = "Processing failed with unknown error"
@@ -1408,7 +2180,8 @@ def document_get_status_batch(
                 id=doc_id,
                 status=status_value,
                 name=doc_name,
-                error_msg=error_msg
+                error_msg=error_msg,
+                enable_graph_enhancement=enable_graph_enhancement
             ))
         else:
             # 文档不存在，仍然返回但状态为空或标记为不存在
@@ -1501,19 +2274,16 @@ async def document_process(
                         space_id=req.space_id,
                         kb_id=req.kb_id,
                         doc_id=doc_id,
-                        status=DocumentStatus.FAILED.value,
+                        doc_status=DocumentStatus.FAILED.value,
                         process_info={
                             **process_info_base,
                             "error": "Document not found",
                             "failed_time": milliseconds()
                         }
                     )
-                except Exception as exc:
+                except Exception:
                     # 如果文档不存在，无法更新状态，这是正常的
-                    logger.error(
-                        "Unexpected error while updating doc status - doc_id=%s error=%s",
-                        doc_id, exc, exc_info=True
-                    )
+                    pass
                 continue
 
             current_status = doc_result.data.get("status")
@@ -1527,7 +2297,7 @@ async def document_process(
                         space_id=req.space_id,
                         kb_id=req.kb_id,
                         doc_id=doc_id,
-                        status=DocumentStatus.FAILED.value,
+                        doc_status=DocumentStatus.FAILED.value,
                         process_info={
                             **process_info_base,
                             "error": "Document status invalid",
@@ -1549,7 +2319,7 @@ async def document_process(
                     space_id=req.space_id,
                     kb_id=req.kb_id,
                     doc_id=doc_id,
-                    status=DocumentStatus.FAILED.value,
+                    doc_status=DocumentStatus.FAILED.value,
                     process_info={
                         **process_info_base,
                         "error": "File path not found",
@@ -1563,7 +2333,7 @@ async def document_process(
                 space_id=req.space_id,
                 kb_id=req.kb_id,
                 doc_id=doc_id,
-                status=DocumentStatus.PROCESSING.value,
+                doc_status=DocumentStatus.PROCESSING.value,
                 process_info=process_info_base
             )
 
@@ -1571,13 +2341,14 @@ async def document_process(
                 failed_count += 1
                 failed_docs.append(doc_id)
                 logger.error(
-                    f"[DOC_PROCESS] Failed to update document status - Doc ID: {doc_id}, Error: {update_result.message}")
+                    f"[DOC_PROCESS] Failed to update document status - "
+                    f"Doc ID: {doc_id}, Error: {update_result.message}")
                 try:
                     knowledge_base_repository.document_update_status(
                         space_id=req.space_id,
                         kb_id=req.kb_id,
                         doc_id=doc_id,
-                        status=DocumentStatus.FAILED.value,
+                        doc_status=DocumentStatus.FAILED.value,
                         process_info={
                             **process_info_base,
                             "error": "Failed to update document status",
@@ -1612,7 +2383,7 @@ async def document_process(
                     space_id=req.space_id,
                     kb_id=req.kb_id,
                     doc_id=doc_id,
-                    status=DocumentStatus.FAILED.value,
+                    doc_status=DocumentStatus.FAILED.value,
                     process_info={
                         **process_info_base,
                         "error": "Document validation failed",

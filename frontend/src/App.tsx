@@ -22,6 +22,8 @@ const PromptEditPage = React.lazy(() => import('./pages/Prompts/PromptEditPage')
 const PromptOptimizePage = React.lazy(() => import('./pages/Prompts/PromptOptimizePage'))
 const PromptOptimizeEditPage = React.lazy(() => import('./pages/Prompts/PromptOptimizeEditPage'))
 const ModelsPage = React.lazy(() => import('./pages/Models/ModelsPage'))
+const KnowledgeBasePage = React.lazy(() => import('./pages/KnowledgeBase/KnowledgeBasePage'))
+const KnowledgeBaseSettingsPage = React.lazy(() => import('./pages/KnowledgeBase/KnowledgeBaseEditorPage'))
 const PluginManagementPage = React.lazy(() => import('./pages/Plugins').then(module => ({ default: module.PluginManagementPage })))
 const PluginConfigurationPage = React.lazy(() => import('./pages/Plugins/PluginConfigurationPage'))
 const PluginVersionPage = React.lazy(() => import('./pages/Plugins/PluginVersionPage'))
@@ -149,6 +151,22 @@ const App: React.FC = () => {
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <ModelsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="knowledge-bases/:id/edit"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <KnowledgeBaseSettingsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="knowledge-bases"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <KnowledgeBasePage />
                 </Suspense>
               }
             />

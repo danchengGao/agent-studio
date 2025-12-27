@@ -1,13 +1,16 @@
+import json
 from functools import wraps
 from typing import Callable
 
 from fastapi import status
+from sqlalchemy import func, literal
 from sqlalchemy.orm import Session
 
 from openjiuwen_studio.core.database import jiuwen_db_logger, milliseconds
 from openjiuwen_studio.core.manager.repositories import JiuwenBaseRepository
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import (
     get_db_jw, get_val_from_dict)
+from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.models import agent as agent
 from openjiuwen_studio.schemas.agent import AgentId
 from openjiuwen_studio.schemas.common import ResponseModel
@@ -21,7 +24,8 @@ class AgentRepository():
     # def __init__(self, db: Session) -> None:
     #     # 关键：显式写出 [A] 和 [B]
     #     self._agent_db: JiuwenBaseRepository[agent.AgentBaseDB] = JiuwenBaseRepository(db, agent.AgentBaseDB)
-    #     self._agent_publish_db: JiuwenBaseRepository[agent.AgentPublishDB] = JiuwenBaseRepository(db, agent.AgentPublishDB)
+    #     self._agent_publish_db: JiuwenBaseRepository[agent.AgentPublishDB] = \
+    #         JiuwenBaseRepository(db, agent.AgentPublishDB)
 
     def with_exception_handling(func) -> Callable:
         @wraps(func)
@@ -85,7 +89,11 @@ class AgentRepository():
     return {*}
     '''
     @with_exception_handling
-    def create_agent_db(self, agent_info: agent.AgentBaseDBPd, db_session: Session | None = None) -> ResponseModel[None]:
+    def create_agent_db(
+        self,
+        agent_info: agent.AgentBaseDBPd,
+        db_session: Session | None = None
+    ) -> ResponseModel[None]:
         with get_db_jw(db_session) as db:
             agent_info_dict = agent_info.model_dump()
             if not agent_info_dict.get("agent_version", None):
@@ -339,6 +347,235 @@ class AgentRepository():
             # 更新至数据库
             agent_db.update(agent_draft, {})
             return delete_res
+
+    def _build_knowledge_base_query_condition(self, kb_id: str, knowledge_col):
+        """构建查询引用指定知识库的agent的条件"""
+        if settings.db_type.lower() == "sqlite":
+            # SQLite: 用 LIKE 模糊匹配（JSON数组中包含该ID）
+            return knowledge_col.like(f'%"{kb_id}"%')
+        else:
+            # MySQL: 用 JSON_CONTAINS
+            json_value = literal(json.dumps(kb_id))
+            return func.json_contains(knowledge_col, json_value)
+
+    def _query_agents_referencing_kb(self, db, space_id: str, kb_id: str, cols_find: list, agent_db, knowledge_col):
+        """查询引用指定知识库的agent"""
+        find_id = {"space_id": space_id}
+        json_contains_condition = self._build_knowledge_base_query_condition(kb_id, knowledge_col)
+
+        result = agent_db.get_dl_in_sql_with_cols(
+            find_id=find_id,
+            cols_find=cols_find,
+            other_sqlalchemy_limitations=[json_contains_condition],
+            return_first_item=False
+        )
+        return result
+
+    '''
+    description: 从所有包含指定知识库ID的agent中移除该知识库ID（包括draft和publish版本）
+    param {str} space_id 空间ID
+    param {str} kb_id 要移除的知识库ID
+    param {Session} db_session 数据库会话，可选
+    return {ResponseModel} 更新结果
+    '''
+    @with_exception_handling
+    def remove_knowledge_base_from_agents(
+        self,
+        space_id: str,
+        kb_id: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
+        """从所有包含该知识库的agent中移除该知识库ID"""
+        with get_db_jw(db_session) as db:
+            updated_count = 0
+            failed_count = 0
+            errors = []
+
+            cols_find = ["agent_id", "agent_version", "agent_name", "knowledge"]
+
+            # 查询并更新draft版本的agent
+            agent_db = JiuwenBaseRepository(db, agent.AgentBaseDB)
+            knowledge_col = agent.AgentBaseDB.knowledge
+            result = self._query_agents_referencing_kb(db, space_id, kb_id, cols_find, agent_db, knowledge_col)
+
+            if result.code == status.HTTP_200_OK and result.data:
+                for agent_data in result.data:
+                    try:
+                        agent_id = agent_data.get("agent_id")
+                        agent_version = agent_data.get("agent_version")
+                        knowledge_list = agent_data.get("knowledge", [])
+
+                        if not isinstance(knowledge_list, list):
+                            knowledge_list = []
+
+                        # 移除指定的知识库ID
+                        if kb_id in knowledge_list:
+                            knowledge_list.remove(kb_id)
+
+                            # 更新draft版本 - 需要先获取完整的agent数据以确保所有字段都被保留
+                            agent_query = AgentId(
+                                space_id=space_id,
+                                agent_id=agent_id,
+                                agent_version=agent.AgentBaseDB.__version_none__
+                            )
+                            get_result = self.get_agent_db(agent_query, db)
+
+                            if get_result.code == status.HTTP_200_OK and get_result.data:
+                                agent_full_data = get_result.data
+                                # 更新knowledge字段，确保空列表也能被正确更新
+                                agent_full_data["knowledge"] = knowledge_list  # 直接使用列表，即使是空列表
+                                agent_full_data["update_time"] = milliseconds()
+
+                                # 使用update_dl_in_sql更新，确保knowledge字段被正确更新
+                                agent_db = JiuwenBaseRepository(db, agent.AgentBaseDB)
+                                find_id = {
+                                    "space_id": space_id,
+                                    "agent_id": agent_id,
+                                    "agent_version": agent.AgentBaseDB.__version_none__
+                                }
+                                # 只更新knowledge和update_time字段，确保空列表也能被更新
+                                update_dl = {
+                                    "knowledge": knowledge_list,
+                                    "update_time": milliseconds()
+                                }
+                                update_result = agent_db.update_dl_in_sql(find_id=find_id, update_dl=update_dl)
+                            else:
+                                update_result = ResponseModel(
+                                    code=status.HTTP_404_NOT_FOUND,
+                                    message=f"Agent not found: {agent_id}"
+                                )
+
+                            if update_result.code == status.HTTP_200_OK:
+                                updated_count += 1
+                                jiuwen_db_logger.info(
+                                    f"[KB_DELETE] Removed KB {kb_id} from agent {agent_id} (draft version)"
+                                )
+                            else:
+                                failed_count += 1
+                                error_msg = f"Failed to update agent {agent_id} (draft): {update_result.message}"
+                                errors.append(error_msg)
+                                jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}")
+
+                    except Exception as e:
+                        failed_count += 1
+                        error_msg = f"Error processing agent {agent_data.get('agent_id', 'unknown')} (draft): {str(e)}"
+                        errors.append(error_msg)
+                        jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+
+            # 查询并更新publish版本的agent
+            agent_publish_db = JiuwenBaseRepository(db, agent.AgentPublishDB)
+            knowledge_col_publish = agent.AgentPublishDB.knowledge
+            result_publish = self._query_agents_referencing_kb(
+                db, space_id, kb_id, cols_find, agent_publish_db, knowledge_col_publish
+            )
+
+            if result_publish.code == status.HTTP_200_OK and result_publish.data:
+                for agent_data in result_publish.data:
+                    try:
+                        agent_id = agent_data.get("agent_id")
+                        agent_version = agent_data.get("agent_version")
+                        knowledge_list = agent_data.get("knowledge", [])
+
+                        if not isinstance(knowledge_list, list):
+                            knowledge_list = []
+
+                        # 移除指定的知识库ID
+                        if kb_id in knowledge_list:
+                            knowledge_list.remove(kb_id)
+
+                            # 更新publish版本 - 直接更新knowledge字段，确保空列表也能被正确更新
+                            # 构建find_id用于定位记录
+                            find_id_publish = {
+                                "space_id": space_id,
+                                "agent_id": agent_id,
+                                "agent_version": agent_version
+                            }
+                            # 只更新knowledge和update_time字段，确保空列表也能被更新
+                            update_dl = {
+                                "knowledge": knowledge_list,  # 直接使用列表，即使是空列表
+                                "update_time": milliseconds()
+                            }
+                            update_result = agent_publish_db.update_dl_in_sql(
+                                find_id=find_id_publish,
+                                update_dl=update_dl
+                            )
+
+                            if update_result.code == status.HTTP_200_OK:
+                                updated_count += 1
+                                jiuwen_db_logger.info(
+                                    f"[KB_DELETE] Removed KB {kb_id} from agent {agent_id} "
+                                    f"(publish version: {agent_version})"
+                                )
+                            else:
+                                failed_count += 1
+                                error_msg = (
+                                    f"Failed to update agent {agent_id} version {agent_version} "
+                                    f"(publish): {update_result.message}"
+                                )
+                                errors.append(error_msg)
+                                jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}")
+
+                    except Exception as e:
+                        failed_count += 1
+                        error_msg = (
+                            f"Error processing agent {agent_data.get('agent_id', 'unknown')} "
+                            f"(publish): {str(e)}"
+                        )
+                        errors.append(error_msg)
+                        jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Removed knowledge base from agents: {updated_count} updated, {failed_count} failed",
+                data={
+                    "updated_count": updated_count,
+                    "failed_count": failed_count,
+                    "errors": errors if errors else None
+                }
+            )
+
+    '''
+    description: 获取所有引用指定知识库ID的智能体列表（只查询，不删除）
+    param {str} space_id 空间ID
+    param {str} kb_id 知识库ID
+    param {Session} db_session 数据库会话，可选
+    return {ResponseModel} 包含智能体名称列表的响应
+    '''
+    @with_exception_handling
+    def get_agents_referencing_knowledge_base(
+        self,
+        space_id: str,
+        kb_id: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
+        """获取所有引用该知识库的智能体名称列表"""
+        with get_db_jw(db_session) as db:
+            cols_find = ["agent_id", "agent_name"]
+
+            # 查询draft版本的agent
+            agent_db = JiuwenBaseRepository(db, agent.AgentBaseDB)
+            knowledge_col = agent.AgentBaseDB.knowledge
+            result = self._query_agents_referencing_kb(db, space_id, kb_id, cols_find, agent_db, knowledge_col)
+
+            agent_names = []
+            if result.code == status.HTTP_200_OK and result.data:
+                # 收集draft版本的智能体名称（去重）
+                seen_agent_ids = set()
+                for agent_data in result.data:
+                    agent_id = agent_data.get("agent_id")
+                    agent_name = agent_data.get("agent_name", "")
+                    if agent_id and agent_id not in seen_agent_ids:
+                        agent_names.append(agent_name or f"智能体 {agent_id}")
+                        seen_agent_ids.add(agent_id)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Get agents referencing knowledge base successfully",
+                data={
+                    "agent_names": agent_names,
+                    "count": len(agent_names)
+                }
+            )
 
 
 agent_repository = AgentRepository()

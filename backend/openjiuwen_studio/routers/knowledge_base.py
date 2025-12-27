@@ -53,6 +53,45 @@ async def knowledge_base_create(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="knowledge base create failed") from e
 
 
+@knowledge_base_router.post("/get-referencing-agents", response_model=ResponseModel[dict])
+async def knowledge_base_get_referencing_agents(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取引用指定知识库的智能体列表
+    
+    Args:
+        request (dict): 包含知识库查询条件的请求体，需符合KnowledgeBaseGet模型定义
+        current_user (dict): 执行此操作的用户上下文信息
+    
+    Returns:
+        ResponseModel[dict]: 包含智能体名称列表和数量的响应
+    """
+    try:
+        req = validate_request(request, KnowledgeBaseGet)
+        res = kb_mgr.knowledge_base_get_referencing_agents(req, current_user)
+        return handle_response(res)
+    except ValidationError as e:
+        logger.error(
+            f"[KB_GET_REF_AGENTS] Validation failed - User: {current_user.get('user_id', 'unknown')}, "
+            f"Errors: {e.errors()}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Validation error: {e.errors()}"
+        ) from e
+    except Exception as e:
+        logger.error(
+            f"[KB_GET_REF_AGENTS] Unexpected error - User: {current_user.get('user_id', 'unknown')}, "
+            f"Error: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        ) from e
+
+
 @knowledge_base_router.post("/delete", response_model=ResponseModel[dict])
 async def knowledge_base_delete(
         request: dict,
@@ -71,7 +110,7 @@ async def knowledge_base_delete(
     """
     try:
         req = validate_request(request, KnowledgeBaseGet)
-        res = kb_mgr.knowledge_base_delete(req, current_user)
+        res = await kb_mgr.knowledge_base_delete(req, current_user)
         if res.code == status.HTTP_200_OK:
             logger.info(
                 f"[KB_DELETE] Knowledge base deleted - ID: {req.kb_id}, "
@@ -183,6 +222,8 @@ async def knowledge_base_upload_documents(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"不支持的文件类型: {', '.join(invalid_files)}。仅支持: {', '.join(sorted(allowed_file_extensions))}"
             )
+        
+        # 注意：文件大小限制在 Manager 层检查，因为需要读取文件内容后才能获取实际大小
 
         # 解析元数据（如果提供）
         doc_metadata = None
@@ -578,7 +619,7 @@ async def document_delete(
     """
     try:
         req = validate_request(request, DocumentDeleteRequest)
-        res = kb_mgr.document_delete(req, current_user)
+        res = await kb_mgr.document_delete(req, current_user)
         if res.code == status.HTTP_200_OK:
             logger.info(
                 f"[DOC_DELETE] Documents deleted - Doc IDs: {req.document_ids}, KB ID: {req.kb_id}, "

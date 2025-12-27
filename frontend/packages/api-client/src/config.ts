@@ -292,6 +292,29 @@ export const API_ENDPOINTS = {
     TRACE_LIST: '/observability/spans/list',
     TRACE_TREE: '/observability/traces',
   },
+
+  // 知识库管理
+  KNOWLEDGE_BASES: {
+    LIST: '/knowledge-base/list',
+    DETAIL: '/knowledge-bases/:id',
+    CREATE: '/knowledge-base/create',
+    UPDATE: '/knowledge-base/update',
+    DELETE: '/knowledge-base/delete',
+    GET_REFERENCING_AGENTS: '/knowledge-base/get-referencing-agents',
+    SEARCH: '/knowledge-base/search',
+    STATISTICS: '/knowledge-bases/statistics',
+    UPLOAD: '/knowledge-base/upload',
+    PROCESS: '/knowledge-base/process',
+    STATUS: '/knowledge-base/documents/status',
+    FILE_SETTINGS: '/knowledge-base/filesettings',
+    DOCUMENTS_LIST: '/knowledge-base/documents/list',
+    DOCUMENTS: '/knowledge-bases/:id/documents',
+    DOCUMENT_DELETE: '/knowledge-bases/:id/documents/:documentId',
+    REPROCESS: '/knowledge-bases/:id/reprocess',
+    EXPORT: '/knowledge-bases/:id/export',
+    SHARE: '/knowledge-bases/:id/share',
+    UNSHARE: '/knowledge-bases/:id/share/:userId',
+  },
 }
 
 // HTTP状态码常量

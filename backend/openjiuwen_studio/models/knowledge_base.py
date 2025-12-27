@@ -22,7 +22,7 @@ class KnowledgeBaseDBMixin:
 
     space_id: Mapped[str] = mapped_column(String(100), nullable=False, comment="空间ID，用于多租户隔离")
     kb_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="知识库ID，唯一标识")
-    name: Mapped[str] = mapped_column(String(200), nullable=False, comment="知识库名称")
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="知识库名称")
     description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="知识库描述")
     
     # Embedding 模型配置ID（关联到 embedding_model_configs 表）

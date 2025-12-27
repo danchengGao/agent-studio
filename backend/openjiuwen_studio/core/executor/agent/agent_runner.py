@@ -21,36 +21,39 @@ Agent Runner - Agent执行管理器
 """
 import asyncio
 import json
-from typing import Any, Dict, AsyncGenerator, Union
-
-from openjiuwen.agent.config.react_config import ReActAgentConfig
-from openjiuwen.agent.config.workflow_config import WorkflowAgentConfig
+from typing import Any, AsyncGenerator, Dict, List, Union
 
 from fastapi import status
-from openjiuwen_studio.memory_engine_start import MemoryEngineManager
+from openjiuwen.agent.config.react_config import ReActAgentConfig
+from openjiuwen.agent.config.workflow_config import WorkflowAgentConfig
+from openjiuwen.core.agent.agent import Agent as InvokableAgent
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.agent.agent import Agent as InvokableAgent
+from openjiuwen.core.retrieval.common.config import RetrievalConfig
+from openjiuwen.core.retrieval.graph_knowledge_base import GraphKnowledgeBase
+from openjiuwen.core.retrieval.simple_knowledge_base import (
+    retrieve_multi_kb,
+    SimpleKnowledgeBase
+)
 from openjiuwen.core.runtime.interaction.interactive_input import InteractiveInput
-# from openjiuwen.integrations.retriever.retrieval.retrieval_tool import KnowledgeBaseRetriever
-# from openjiuwen.integrations.retriever.config.configuration import GraphRAGConfig
+from openjiuwen.core.utils.llm.model_utils.model_factory import ModelFactory
 
 import openjiuwen_studio.core.manager.agent as mgr
 from openjiuwen_studio.core.common.status_code import StatusCode
-from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
-from openjiuwen_studio.core.executor.workflow.workflow_runner import WorkflowRunner
-from openjiuwen_studio.core.executor.workflow.pregel_graph_adapter import JiuWenGraphException
 from openjiuwen_studio.core.executor.agent.agent_trace_utils import (
-    initialize_trace_context,
-    process_chunk_trace,
     finalize_trace,
-    handle_trace_error
+    handle_trace_error,
+    initialize_trace_context,
+    process_chunk_trace
 )
+from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
+from openjiuwen_studio.core.executor.workflow.pregel_graph_adapter import JiuWenGraphException
+from openjiuwen_studio.core.executor.workflow.workflow_runner import WorkflowRunner
+from openjiuwen_studio.core.manager.knowledge_base import create_knowledge_base_for_retrieval
+from openjiuwen_studio.memory_engine_start import MemoryEngineManager
 from openjiuwen_studio.schemas import AgentGetVersion
 from .agent import Agent
 from .agent_dl_adapter import AgentDlAdapter
-# from openjiuwen_studio.core.manager.knowledge_base import _parse_milvus_uri_from_env, _create_embed_model
-
 
 
 def get_memory_engine():
@@ -451,6 +454,101 @@ class AgentRunner:
         agent_config = AgentDlAdapter.convert_to_agent_config(agent_dl_json)
         memory_engine = get_memory_engine()
         memory_engine.set_group_llm_config(agent_config.id, agent_config.model)
+
+        # 2.1 使用知识库检索（如果配置了知识库）
+        kb_ids, retrieval_config = AgentDlAdapter.get_knowledge_config(agent_dl_json)
+        if kb_ids:
+            logger.debug(
+                f"[KB_RETRIEVAL] Start to use knowledge retrieval - KB IDs: {kb_ids}, "
+                f"Retrieval config: {retrieval_config}")
+            try:
+                # 创建知识库实例列表
+                kb_instances: List[Union[SimpleKnowledgeBase, GraphKnowledgeBase]] = []
+
+                # 检查是否需要 LLM 客户端（如果使用图检索或 Agentic 检索）
+                llm_client = None
+                model_name = None
+                if retrieval_config.use_graph:
+                    # 从 agent_config 中获取 LLM 配置
+                    if hasattr(agent_config, 'model') and hasattr(agent_config.model, 'model_info'):
+                        model_info = agent_config.model.model_info
+                        llm_client = ModelFactory().get_model(
+                            model_provider=agent_config.model.model_provider,
+                            api_base=model_info.api_base,
+                            api_key=model_info.api_key,
+                            timeout=model_info.timeout or 120,
+                            temperature=model_info.temperature,
+                            top_p=model_info.top_p,
+                        )
+                        model_name = model_info.model_name
+                        logger.debug(f"[KB_RETRIEVAL] Created LLM client for graph/agentic retrieval")
+
+                # 为每个知识库创建实例
+                for kb_id in kb_ids:
+                    try:
+                        kb_instance = await create_knowledge_base_for_retrieval(
+                            kb_id=kb_id,
+                            space_id=space_id,
+                            use_graph=retrieval_config.use_graph,
+                            llm_client=llm_client,
+                            model_name=model_name,
+                        )
+                        kb_instances.append(kb_instance)
+                        logger.debug(f"[KB_RETRIEVAL] Created knowledge base instance - KB ID: {kb_id}")
+                    except Exception as e:
+                        logger.error(f"[KB_RETRIEVAL] Failed to create knowledge base instance for {kb_id}: {str(e)}",
+                                     exc_info=True)
+                        # 继续处理其他知识库，不中断整个流程
+                        continue
+
+                if kb_instances:
+                    # 创建 RetrievalConfig
+                    score_threshold = retrieval_config.score_threshold
+                    openjiuwen_retrieval_config = RetrievalConfig(
+                        top_k=retrieval_config.topk or 5,
+                        use_graph=retrieval_config.use_sync or retrieval_config.use_agent,
+                        graph_expansion=retrieval_config.use_sync,
+                        agentic=retrieval_config.use_agent,
+                        score_threshold=score_threshold,
+                    )
+
+                    # 执行多知识库检索
+                    query = inputs.get("query", "")
+                    if query:
+                        logger.debug(
+                            f"[KB_RETRIEVAL] Executing multi-KB retrieval - Query: {query}, "
+                            f"KB count: {len(kb_instances)}")
+                        kb_results = await retrieve_multi_kb(
+                            kbs=kb_instances,
+                            query=query,
+                            config=openjiuwen_retrieval_config,
+                            top_k=retrieval_config.topk or 5
+                        )
+
+                        # 将检索结果添加到 agent_config 的 prompt_template
+                        if kb_results:
+                            logger.debug(f"[KB_RETRIEVAL] Retrieved {kb_results} results from knowledge bases")
+                            for result_text in kb_results:
+                                if result_text:
+                                    agent_config.prompt_template.append({
+                                        "role": "system",
+                                        "content": result_text,
+                                    })
+                        else:
+                            logger.debug(f"[KB_RETRIEVAL] No results retrieved from knowledge bases")
+                    else:
+                        logger.warning(f"[KB_RETRIEVAL] Query is empty, skipping knowledge base retrieval")
+
+                # 清理知识库实例
+                for kb_instance in kb_instances:
+                    try:
+                        await kb_instance.close()
+                    except Exception as e:
+                        logger.warning(f"[KB_RETRIEVAL] Failed to close knowledge base instance: {str(e)}")
+
+            except Exception as e:
+                # 知识库检索失败不应该中断整个 Agent 执行流程
+                logger.error(f"[KB_RETRIEVAL] Knowledge base retrieval failed: {str(e)}", exc_info=True)
 
         # 3. 获取Agent实例（带缓存机制）
         invokable_agent: InvokableAgent = await self.get_agent_instance(

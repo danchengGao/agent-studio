@@ -1,5 +1,7 @@
 {
   "common": {
+    "cancel": "Cancel",
+    "saving": "Saving...",
     "buttons": {
       "save": "Save",
       "cancel": "Cancel",
@@ -33,8 +35,7 @@
       "select": "Select",
       "selectAll": "Select All",
       "deselectAll": "Deselect All",
-      "add": "Add",
-      "cancel": "Cancel"
+      "add": "Add"
     },
     "tooltips": {
       "clickToEditName": "Click to edit name",
@@ -1436,6 +1437,10 @@
   "models": {
     "title": "Models",
     "subtitle": "Configure and manage your LLM models, including API keys, parameter settings, and performance monitoring",
+    "tabs": {
+      "llm": "LLM Models",
+      "embedding": "Embedding Models"
+    },
     "addModel": "Add Model",
     "saveModel": "Save Model",
     "editModel": "Edit Model",
@@ -1497,11 +1502,14 @@
         "charNum": "Char Number: ",
         "name": "Model Name",
         "nameHint": "Friendly name for the model, used for display purposes (e.g., \"General Large Model v3\")",
+        "embeddingNameHint": "Friendly name for the Embedding model, used for display purposes (e.g., \"Text Embedding Model v2\")",
         "nameError": "Model name is too long, Please keep it under 100 characters",
         "provider": "Provider",
         "providerHint": "Select the API protocol type, which determines the request method and response parsing rules",
+        "embeddingProviderHint": "Embedding models only support OpenAI protocol",
         "type": "Model Type",
         "typeHint": "The model ID specified when calling the API must match the server-side configuration (e.g., \"deepseek-chat\")",
+        "embeddingTypeHint": "The Embedding model ID specified when calling the API must match the server-side configuration (e.g., \"text-embedding-ada-002\")",
         "version": "Version",
         "tags": "Tags",
         "tagsNum": "Tags Number",
@@ -1557,7 +1565,51 @@
       "apiKeyCopied": "API key copied to clipboard",
       "apiKeyEmpty": "API key is empty",
       "apiKeyFailed": "Failed to get API key",
-      "removeTagFailed": "Failed to remove tag!"
+      "removeTagFailed": "Failed to remove tag!",
+      "nameMaxLength": "Model name cannot exceed 100 characters",
+      "modelIdMaxLength": "Model ID cannot exceed 100 characters",
+      "descriptionMaxLength": "Description cannot exceed 500 characters",
+      "timeoutRange": "Timeout must be between 1-300 seconds",
+      "fillRequiredFields": "Please fill in all required fields",
+      "fieldNames": {
+        "name": "Model Name",
+        "modelId": "Model ID",
+        "apiKey": "API Key",
+        "provider": "API Protocol",
+        "baseUrl": "Base Service Address",
+        "description": "Description"
+      },
+      "validationErrors": {
+        "minLength": "At least 1 character required",
+        "maxLength": "Maximum {{max}} characters",
+        "required": "This field is required",
+        "invalidUrl": "Please enter a valid URL address",
+        "invalidEmail": "Please enter a valid email address",
+        "alreadyExists": "This value already exists",
+        "invalidFormat": "Invalid format",
+        "incorrectFormat": "Incorrect format",
+        "formatError": "Format error"
+      },
+      "embeddingModel": {
+        "updateFailed": "Failed to update Embedding model",
+        "createFailed": "Failed to create Embedding model",
+        "updateSuccess": "Embedding model updated successfully",
+        "createSuccess": "Embedding model created successfully",
+        "testFailed": "Test failed, please check configuration",
+        "testSuccess": "Test successful! Model: {{model}}, Vector dimension: {{dimension}}, Tokens used: {{tokens}}",
+        "disableFailed": "Failed to disable Embedding model",
+        "modelDisabled": "Model disabled"
+      },
+      "tagsLimit": "Tag count cannot exceed 10",
+      "apiKeyEditHint": "Currently showing masked key. Leave empty to keep unchanged, enter new key to update",
+      "apiKeyEmptyHint": "Leave empty to keep key unchanged",
+      "embeddingBaseUrlHint": "Root address of the model API service (e.g.: https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings)",
+      "maxBatchSize": "Max Batch Size",
+      "maxBatchSizeHint": "Maximum number of texts processed per request, range: 1-10",
+      "maxTokens": "Max Output Tokens",
+      "inUse": "In use",
+      "testText": "Hello, World!",
+      "showAllTags": "Show all tags"
     },
     "dialog": {
       "addNewModel": "Add New Model",
@@ -3060,6 +3112,7 @@
       "name": "Knowledge Base Name",
       "namePlaceholder": "Enter knowledge base name",
       "nameRequired": "Knowledge base name is required",
+      "nameExists": "Knowledge base name already exists",
       "description": "Description",
       "descriptionPlaceholder": "Enter knowledge base description",
       "type": "Knowledge Base Type",
@@ -3069,6 +3122,19 @@
       "supportedFormats": "Support PDF, Word, TXT, Markdown and other formats",
       "selectedFiles": "Selected Files",
       "embeddingModel": "Embedding Model",
+      "embeddingModelRequired": "Embedding Model",
+      "loadingModels": "Loading models...",
+      "noModels": "No available Embedding models",
+      "createModelLink": "Please create Embedding model first",
+      "selectModel": "Please select Embedding model",
+      "noModelsError": "Please create Embedding model first",
+      "selectModelError": "Please select Embedding model",
+      "modelUnavailable": "Selected model is unavailable",
+      "testText": "Hello, world!",
+      "testFailed": "Test failed",
+      "testFailedDisableFailed": "Test failed and failed to disable the model",
+      "saveFailed": "Save failed",
+      "limitReached": "Knowledge base limit reached (100), cannot create more knowledge bases",
       "chunkSize": "Chunk Size",
       "chunkOverlap": "Chunk Overlap",
       "maxTokens": "Max Tokens",
@@ -3090,17 +3156,94 @@
     },
     "delete": {
       "title": "Delete Knowledge Base",
-      "message": "Are you sure you want to delete knowledge base \"{{name}}\"? This action cannot be undone."
+      "message": "Are you sure you want to delete knowledge base \"{{name}}\"? This action cannot be undone.",
+      "referencedByAgents": "This knowledge base is referenced by the following agents:",
+      "deleteWarning": "After deletion, these agents will not be able to use this knowledge base.",
+      "confirmDelete": "Are you sure you want to delete?",
+      "confirmMessage": "Are you sure you want to delete knowledge base",
+      "cannotUndo": "? This action cannot be undone."
     },
     "empty": {
       "title": "No Knowledge Bases",
       "description": "Create your first knowledge base and start building an intelligent knowledge management system"
+    },
+    "search": {
+      "searching": "Searching...",
+      "loading": "Loading...",
+      "noResults": "No matching knowledge bases found",
+      "tryOtherKeywords": "Please try other search keywords",
+      "results": "Search Results"
+    },
+    "limit": {
+      "reached": "Knowledge base limit reached"
+    },
+    "settings": {
+      "addDocument": "Add Document",
+      "status": "Status",
+      "errorInfo": "Error Info",
+      "documentAdded": "Document processing task submitted",
+      "notFound": "Knowledge base not found",
+      "fetchError": "Failed to fetch knowledge base information"
+    },
+    "editor": {
+      "loading": "Loading knowledge base information...",
+      "documentList": "Document List",
+      "autoRefresh": "Auto-refreshing document status",
+      "stopAutoRefresh": "Stop auto-refreshing document status",
+      "startAutoRefresh": "Start auto-refreshing document status",
+      "noAutoRefreshHint": "No documents in processing, auto-refresh not needed",
+      "refreshing": "Refreshing...",
+      "refreshStatus": "Refresh Status",
+      "processing": "Documents processing ({{count}} documents)",
+      "loadingDocuments": "Loading document list...",
+      "noDocuments": "No documents",
+      "addDocument": "Add Document",
+      "documentName": "Document Name",
+      "createdAt": "Created At",
+      "actions": "Actions",
+      "refreshDocumentStatus": "Refresh document status",
+      "status": {
+        "uploading": "Uploading",
+        "uploaded": "Uploaded",
+        "processing": "Processing",
+        "indexing": "Indexing",
+        "indexed": "Indexed",
+        "failed": "Failed",
+        "deleted": "Deleted"
+      },
+      "graphEnhancement": "Graph Enhancement",
+      "maxLengthReached": "Maximum length reached",
+      "nameMaxLength": "Document name cannot exceed {{max}} characters",
+      "updateSuccess": "Document name updated successfully",
+      "updateFailed": "Failed to update document name",
+      "deleteTitle": "Delete Document",
+      "deleteMessage": "Are you sure you want to delete document \"{{name}}\"? This action cannot be undone.",
+      "deleteDocument": "Delete Document",
+      "deleteSuccess": "Document deleted successfully",
+      "deleteFailed": "Failed to delete document",
+      "batchDeleteTitle": "Batch Delete Documents",
+      "batchDeleteMessage": "Are you sure you want to delete {{count}} selected documents? This action cannot be undone.",
+      "batchDeleteButton": "Delete {{count}} documents",
+      "batchDeleteSuccess": "Successfully deleted {{count}} documents",
+      "batchDeleteFailed": "Failed to batch delete documents",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "deleteSelected": "Delete Selected ({{count}})",
+      "refreshSuccess": "Document status refreshed successfully",
+      "refreshFailed": "Failed to refresh document status",
+      "refreshAllSuccess": "All document statuses refreshed successfully",
+      "refreshAllFailed": "Failed to refresh all document statuses",
+      "autoRefreshError": "Failed to auto-refresh document status"
     },
     "marketplace": {
       "comingSoon": "Coming Soon",
       "description": "Knowledge base marketplace is under development, stay tuned"
     },
     "documents": "documents",
-    "noDescription": "No description"
+    "noDescription": "No description",
+    "card": {
+      "documentType": "Document Knowledge Base",
+      "embeddingModel": "Embedding Model"
+    }
   }
 }

@@ -11,6 +11,7 @@ from openjiuwen_studio.models import knowledge_base as kb_models
 from openjiuwen_studio.models import knowledge_base_document as kb_doc_models
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.knowledge_base import KnowledgeBaseGet
+from openjiuwen_studio.core.config import settings
 
 
 class KnowledgeBaseRepository:
@@ -61,7 +62,9 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def knowledge_base_get(self, kb_get: KnowledgeBaseGet, db_session: Session | None = None) -> ResponseModel[dict | None]:
+    def knowledge_base_get(
+        self, kb_get: KnowledgeBaseGet, db_session: Session | None = None
+    ) -> ResponseModel[dict | None]:
         with get_db_jw(db_session) as db:
             kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
             find_id = {
@@ -86,6 +89,40 @@ class KnowledgeBaseRepository:
             return kb_db.unregister_dl_in_sql(find_id=find_id)
 
     '''
+    description: 检查知识库名称是否已存在
+    param {str} space_id  空间ID
+    param {str} name  知识库名称
+    param {str} exclude_kb_id  排除的知识库ID（用于更新时排除当前知识库）
+    return {ResponseModel[bool]}  True表示名称已存在，False表示不存在
+    '''
+    @with_exception_handling
+    def knowledge_base_check_name_exists(
+        self,
+        space_id: str,
+        name: str,
+        exclude_kb_id: str | None = None,
+        db_session: Session | None = None
+    ) -> ResponseModel[bool]:
+        """检查知识库名称是否已存在（区分大小写）"""
+        with get_db_jw(db_session) as db:
+            # SQLite 默认区分大小写，MySQL 需要用 BINARY
+            if settings.db_type.lower() == "sqlite":
+                query = db.query(kb_models.KnowledgeBaseDB).filter(
+                    kb_models.KnowledgeBaseDB.space_id == space_id,
+                    kb_models.KnowledgeBaseDB.name == name
+                )
+            else:
+                query = db.query(kb_models.KnowledgeBaseDB).filter(
+                    kb_models.KnowledgeBaseDB.space_id == space_id,
+                    func.binary(kb_models.KnowledgeBaseDB.name) == func.binary(name)
+                )
+            if exclude_kb_id:
+                query = query.filter(kb_models.KnowledgeBaseDB.kb_id != exclude_kb_id)
+
+            exists = db.query(query.exists()).scalar()
+            return ResponseModel(code=status.HTTP_200_OK, message="Success", data=exists)
+
+    '''
     description: 更新知识库
     param {str} space_id  空间ID
     param {str} kb_id  知识库ID
@@ -94,7 +131,14 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def knowledge_base_update(self, space_id: str, kb_id: str, name: str, description: str | None, db_session: Session | None = None) -> ResponseModel[None]:
+    def knowledge_base_update(
+        self,
+        space_id: str,
+        kb_id: str,
+        name: str,
+        description: str | None,
+        db_session: Session | None = None
+    ) -> ResponseModel[None]:
         with get_db_jw(db_session) as db:
             kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
             find_id = {
@@ -161,7 +205,13 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def document_get(self, space_id: str, kb_id: str, doc_id: str, db_session: Session | None = None) -> ResponseModel[dict | None]:
+    def document_get(
+        self,
+        space_id: str,
+        kb_id: str,
+        doc_id: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict | None]:
         with get_db_jw(db_session) as db:
             doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
             find_id = {
@@ -179,7 +229,13 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def document_delete(self, space_id: str, kb_id: str, doc_id: str, db_session: Session | None = None) -> ResponseModel[None]:
+    def document_delete(
+        self,
+        space_id: str,
+        kb_id: str,
+        doc_id: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[None]:
         with get_db_jw(db_session) as db:
             doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
             find_id = {
@@ -240,7 +296,14 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def document_update(self, space_id: str, kb_id: str, doc_id: str, name: str, db_session: Session | None = None) -> ResponseModel[None]:
+    def document_update(
+        self,
+        space_id: str,
+        kb_id: str,
+        doc_id: str,
+        name: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[None]:
         with get_db_jw(db_session) as db:
             doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
             find_id = {
@@ -302,10 +365,13 @@ class KnowledgeBaseRepository:
                 return_first_item=False
             )
             
-            if count_result.code != status.HTTP_200_OK:
+            # 如果返回 404 且消息是 "Data not found."，视为空结果
+            if count_result.code == status.HTTP_404_NOT_FOUND and count_result.message == "Data not found.":
+                total = 0
+            elif count_result.code != status.HTTP_200_OK:
                 return count_result
-            
-            total = len(count_result.data) if count_result.data else 0
+            else:
+                total = len(count_result.data) if count_result.data else 0
             
             # 获取分页数据
             search_result = kb_db.get_dl_in_sql(
@@ -315,10 +381,13 @@ class KnowledgeBaseRepository:
                 return_first_item=False
             )
             
-            if search_result.code != status.HTTP_200_OK:
+            # 如果返回 404 且消息是 "Data not found."，视为空结果
+            if search_result.code == status.HTTP_404_NOT_FOUND and search_result.message == "Data not found.":
+                knowledge_bases = []
+            elif search_result.code != status.HTTP_200_OK:
                 return search_result
-            
-            knowledge_bases = search_result.data or []
+            else:
+                knowledge_bases = search_result.data or []
             
             # 计算总页数
             total_pages = max(1, (total + page_size - 1) // page_size) if total > 0 else 1
@@ -344,7 +413,13 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def knowledge_base_list(self, space_id: str, page: int = 1, size: int = 10, db_session: Session | None = None) -> ResponseModel[dict]:
+    def knowledge_base_list(
+        self,
+        space_id: str,
+        page: int = 1,
+        size: int = 10,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
         with get_db_jw(db_session) as db:
             kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
             
@@ -415,7 +490,14 @@ class KnowledgeBaseRepository:
     return {*}
     '''
     @with_exception_handling
-    def document_list(self, space_id: str, kb_id: str, page: int = 1, size: int = 10, db_session: Session | None = None) -> ResponseModel[dict]:
+    def document_list(
+        self,
+        space_id: str,
+        kb_id: str,
+        page: int = 1,
+        size: int = 10,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
         with get_db_jw(db_session) as db:
             doc_db = JiuwenBaseRepository(db, kb_doc_models.KnowledgeBaseDocumentDB)
             
@@ -478,6 +560,34 @@ class KnowledgeBaseRepository:
                     "size": size
                 }
             )
+
+    '''
+    description: 检查知识库是否有图增强构建的文档
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    return {bool} 是否有图增强文档
+    '''
+    @with_exception_handling
+    def has_graph_enhancement_documents(self, space_id: str, kb_id: str, db_session: Session | None = None) -> bool:
+        """检查知识库中是否有图增强构建的文档"""
+        with get_db_jw(db_session) as db:
+            # 查询该知识库下所有已索引的文档
+            docs = db.query(kb_doc_models.KnowledgeBaseDocumentDB).filter(
+                kb_doc_models.KnowledgeBaseDocumentDB.space_id == space_id,
+                kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kb_id,
+                kb_doc_models.KnowledgeBaseDocumentDB.status == "indexed"
+            ).all()
+
+            # 检查是否有文档使用了图增强
+            for doc in docs:
+                if doc.process_info and isinstance(doc.process_info, dict):
+                    indexing_strategy = doc.process_info.get("indexing_strategy")
+                    if isinstance(indexing_strategy, dict):
+                        enable_graph_enhancement = indexing_strategy.get("enable_graph_enhancement", False)
+                        if enable_graph_enhancement:
+                            return True
+
+            return False
 
 
 # 创建全局实例

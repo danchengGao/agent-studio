@@ -5,6 +5,8 @@ import { persist } from 'zustand/middleware'
 interface UIState {
   // 插件管理页面显示模式
   pluginViewMode: 'grid' | 'list'
+  // 知识库管理页面显示模式
+  knowledgeBaseViewMode: 'grid' | 'list'
 
   // 其他可以扩展的UI状态
   // 例如：主题模式、侧边栏状态、面板大小等
@@ -16,6 +18,8 @@ interface UIState {
 interface UIActions {
   // 插件显示模式操作
   setPluginViewMode: (mode: 'grid' | 'list') => void
+  // 知识库显示模式操作
+  setKnowledgeBaseViewMode: (mode: 'grid' | 'list') => void
 
   // 主题相关操作
   setTheme: (theme: 'light' | 'dark' | 'auto') => void
@@ -32,6 +36,7 @@ interface UIActions {
 
 const initialState: UIState = {
   pluginViewMode: 'grid', // 默认为网格模式
+  knowledgeBaseViewMode: 'grid', // 默认为网格模式
   theme: 'light',
   sidebarCollapsed: false,
   mainLayoutSize: 100,
@@ -46,6 +51,12 @@ export const useUIStore = create<UIState & UIActions>()(
       setPluginViewMode: (mode: 'grid' | 'list') => {
         console.log(`🎨 [UIStore] Plugin view mode changed to: ${mode}`)
         set({ pluginViewMode: mode })
+      },
+
+      // 设置知识库显示模式
+      setKnowledgeBaseViewMode: (mode: 'grid' | 'list') => {
+        console.log(`🎨 [UIStore] Knowledge base view mode changed to: ${mode}`)
+        set({ knowledgeBaseViewMode: mode })
       },
 
       // 设置主题
@@ -77,6 +88,7 @@ export const useUIStore = create<UIState & UIActions>()(
       partialize: state => ({
         // 只持久化需要保存的状态
         pluginViewMode: state.pluginViewMode,
+        knowledgeBaseViewMode: state.knowledgeBaseViewMode,
         theme: state.theme,
         sidebarCollapsed: state.sidebarCollapsed,
         mainLayoutSize: state.mainLayoutSize,

@@ -6,11 +6,11 @@ export interface DeleteConfirmationDialogProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
-  itemType?: 'agent' | 'workflow' | 'model' | 'plugin'
+  itemType?: 'agent' | 'workflow' | 'model' | 'plugin' | 'knowledgeBase'
   itemName?: string
   isLoading?: boolean
   title?: string
-  message?: string
+  message?: string | React.ReactNode
   confirmButtonText?: string
   cancelButtonText?: string
   iconType?: 'danger' | 'warning'
@@ -42,6 +42,8 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         return t('common.confirmDialog.titles.model')
       case 'plugin':
         return t('common.confirmDialog.titles.plugin')
+      case 'knowledgeBase':
+        return '删除知识库'
       default:
         return t('common.confirmDialog.titles.default')
     }
@@ -57,6 +59,8 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         return t('common.confirmDialog.messages.model', { name: itemName })
       case 'plugin':
         return t('common.confirmDialog.messages.plugin', { name: itemName })
+      case 'knowledgeBase':
+        return `确定要删除知识库"${itemName}"吗？此操作无法撤销。`
       default:
         return t('common.confirmDialog.messages.default', { name: itemName })
     }
@@ -72,6 +76,8 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         return t('common.confirmDialog.buttons.deleteModel')
       case 'plugin':
         return t('common.confirmDialog.buttons.deletePlugin')
+      case 'knowledgeBase':
+        return '删除知识库'
       default:
         return t('common.confirmDialog.buttons.delete')
     }
@@ -106,7 +112,11 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         {/* Content */}
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold text-gray-900 mb-4">{displayTitle}</h3>
-          <p className="text-gray-600 text-lg leading-relaxed">{displayMessage}</p>
+          {typeof displayMessage === 'string' ? (
+            <p className="text-gray-600 text-lg leading-relaxed">{displayMessage}</p>
+          ) : (
+            <div className="text-gray-600 text-lg leading-relaxed">{displayMessage}</div>
+          )}
         </div>
 
         {/* Actions */}

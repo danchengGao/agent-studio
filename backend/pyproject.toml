@@ -9,14 +9,14 @@ description = "OpenJiuwen Studio offers an all-in-one AI Agent development platf
 requires-python = "==3.11.4"
 dependencies = [
     "fastapi==0.115.11",
-    "uvicorn[standard]==0.34.0",
-    "pydantic==2.11.5",
-    "pydantic[email]==2.11.5",
+    "uvicorn[standard]>=0.35",
+    "pydantic==2.11.7",
+    "pydantic[email]==2.11.7",
     "python-dotenv==1.1.1",
     "sqlalchemy==2.0.41",
     "pyjwt==2.10.1",
     "networkx==3.4.2",
-    "openjiuwen==0.1.1",
+    "openjiuwen==0.1.2",
     "pydantic-settings==2.5.2",
     "aiomysql==0.2.0",
     "jinja2==3.1.6",

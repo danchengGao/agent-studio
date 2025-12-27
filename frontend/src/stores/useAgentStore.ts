@@ -31,6 +31,8 @@ interface AgentActions {
   updateModelDetail: (modelDetail: ModelDetail) => void
   updateWorkflowDetail: (workflowDetail: WorkflowDetail[]) => void
   updatePluginDetail: (pluginDetail: AgentPlugin[]) => void
+  updateKnowledgeDetail: (knowledgeIds: string[]) => void
+  updateRetrievalConfig: (retrievalConfig: { retrieval_type: number; use_agent?: boolean; use_sync?: boolean; source?: number; topk: number; score_threshold: number | null }) => void
   updateGreeting: (greeting: string) => void
   updateSaveAgentRequest: (updates: Partial<SaveAgentRequest>) => void
   updateMemoryConfig: (memoryConfig: Memory) => void
@@ -90,6 +92,29 @@ export const useAgentStore = create<AgentState & AgentActions>((set, get) => ({
         tool_name: p.tool_name || undefined,
       }))
     get().updateSaveAgentRequest({ plugins: sanitized })
+  },
+
+  // 更新知识库
+  updateKnowledgeDetail: (knowledgeIds: string[]) => {
+    if (get().readonly) {
+      return
+    }
+    get().updateSaveAgentRequest({ knowledge: knowledgeIds })
+  },
+
+  updateRetrievalConfig: (retrievalConfig: { retrieval_type: number; use_agent?: boolean; use_sync?: boolean; source?: number; topk: number; score_threshold: number | null }) => {
+    if (get().readonly) {
+      return
+    }
+    const currentConfigs = get().saveAgentRequest.configs || {}
+    // 移除 source 字段，因为后端 KBRetrievalConfig 中不包含此字段
+    const { source, ...configWithoutSource } = retrievalConfig
+    get().updateSaveAgentRequest({
+      configs: {
+        ...currentConfigs,
+        retrieval_config: configWithoutSource,
+      },
+    })
   },
 
   // 更新开场白

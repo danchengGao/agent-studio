@@ -1,19 +1,46 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+import re
 from enum import IntEnum
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+# 知识库名称中不允许的特殊字符正则表达式
+INVALID_KB_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def validate_kb_name(name: str) -> str:
+    """验证知识库名称，不允许包含特殊字符"""
+    if not name or not name.strip():
+        raise ValueError("知识库名称不能为空")
+    
+    trimmed_name = name.strip()
+    
+    if trimmed_name != name:
+        raise ValueError("知识库名称不能以空格开头或结尾")
+    
+    if INVALID_KB_NAME_CHARS.search(trimmed_name):
+        raise ValueError('知识库名称不能包含以下字符: < > : " / \\ | ? * 以及控制字符')
+    
+    return name
 
 
 class KnowledgeBaseCreate(BaseModel):
     """创建知识库请求"""
     space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
-    name: str = Field(..., min_length=1, max_length=200, description="知识库名称")
+    name: str = Field(..., min_length=1, max_length=100, description="知识库名称")
     description: Optional[str] = Field(None, max_length=2000, description="知识库描述")
     embedding_model_config_id: int = Field(..., description="Embedding 模型配置ID（必填，知识库创建时选择，后续不可更改）")
     config: Optional[Dict[str, Any]] = Field(None, description="知识库配置信息")
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """验证知识库名称"""
+        return validate_kb_name(v)
 
 
 class KnowledgeBaseResponseCreate(BaseModel):
@@ -34,8 +61,14 @@ class KnowledgeBaseUpdateRequest(BaseModel):
     """更新知识库请求"""
     space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
     kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
-    name: str = Field(..., min_length=1, max_length=200, description="新的名字")
+    name: str = Field(..., min_length=1, max_length=100, description="新的名字")
     desc: str = Field(..., description="新的描述")
+
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """验证知识库名称"""
+        return validate_kb_name(v)
 
 
 class KnowledgeBaseInfo(BaseModel):
@@ -48,6 +81,7 @@ class KnowledgeBaseInfo(BaseModel):
     config: Optional[Dict[str, Any]] = Field(None, description="知识库配置")
     create_time: Optional[int] = Field(None, description="创建时间")
     update_time: Optional[int] = Field(None, description="更新时间")
+    has_graph_enhancement: Optional[bool] = Field(None, description="是否有图增强构建的文档")
     
     class Config:
         populate_by_name = True
@@ -111,6 +145,7 @@ class KnowledgeBaseListItem(BaseModel):
     embedding_model_config_id: int | None = Field(None, description="Embedding 模型配置ID")
     created_at: str = Field(..., description="创建时间，格式：YYYY-MM-DD")
     updated_at: str = Field(..., description="更新时间，格式：YYYY-MM-DD")
+    has_graph_enhancement: Optional[bool] = Field(None, description="是否有图增强构建的文档")
 
 
 class KnowledgeBaseListResponse(BaseModel):
@@ -141,6 +176,7 @@ class DocumentStatusResponse(BaseModel):
     status: str = Field(..., description="文档状态")
     name: Optional[str] = Field(None, description="文档名称")
     error_msg: Optional[str] = Field(None, description="错误信息（如果有）")
+    enable_graph_enhancement: Optional[bool] = Field(None, description="是否启用图增强")
     
     class Config:
         populate_by_name = True
@@ -166,6 +202,7 @@ class SegmentationStrategy(BaseModel):
 class IndexingStrategy(BaseModel):
     """索引策略"""
     enable_graph_enhancement: bool = Field(False, description="是否启用图增强")
+    llm_model_id: Optional[int] = Field(None, description="LLM模型ID，启用图增强时使用")
 
 
 class DocumentProcessRequest(BaseModel):
@@ -215,7 +252,29 @@ class DocumentUpdateRequest(BaseModel):
     space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
     kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
     document_id: str = Field(..., min_length=1, max_length=100, description="文档ID")
-    document_name: str = Field(..., min_length=1, max_length=500, description="新的名字")
+    document_name: str = Field(..., min_length=1, max_length=150, description="新的名字（文件名部分最多100字符，加上扩展名最多150字符）")
+    
+    @field_validator('document_name')
+    @classmethod
+    def validate_document_name_length(cls, v: str) -> str:
+        """验证文档名称长度（不含扩展名）"""
+        if not v:
+            raise ValueError("文档名称不能为空")
+        
+        # 分离文件名和扩展名
+        last_dot_index = v.rfind('.')
+        if last_dot_index == -1 or last_dot_index == len(v) - 1:
+            # 没有扩展名或点号在最后
+            name_without_ext = v
+        else:
+            name_without_ext = v[:last_dot_index]
+        
+        # 检查文件名部分（不含扩展名）的长度
+        MAX_NAME_LENGTH = 100
+        if len(name_without_ext) > MAX_NAME_LENGTH:
+            raise ValueError(f"文档名称不能超过 {MAX_NAME_LENGTH} 个字符，当前为 {len(name_without_ext)} 个字符")
+        
+        return v
 
 
 class DocumentDeleteRequest(BaseModel):
