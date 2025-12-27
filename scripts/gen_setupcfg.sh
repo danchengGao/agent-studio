@@ -17,16 +17,16 @@ SETUPCFG_TEMPLATE_FILE="${SCRIPT_DIR}/conf/setup.cfg.template"
 declare -ga ALL_MODULES=("JIUWEN")
 
 declare -A PROJECTS=(
-    ["PLUGIN"]="openjiuwen-studio-plugin-server"
+    ["PLUGIN"]="openjiuwen-plugin-server"
     ["GATEWAY"]="openjiuwen-sandbox-gateway"
     ["PYSEVER"]="openjiuwen-py-server"
     ["JIUWEN"]="openjiuwen-studio-server"
 )
 
 declare -A PACKAGES=(
-    ["PLUGIN"]="openjiuwen_studio_plugin_server"
+    ["PLUGIN"]="openjiuwen_plugin_server"
     ["GATEWAY"]="openjiuwen_sandbox_gateway"
-    ["PYSEVER"]="openjiuwen_py_server"
+    ["PYSEVER"]="openjiuwen_sandbox_pyserver"
     ["JIUWEN"]="openjiuwen_studio_server"
 )
 

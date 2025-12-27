@@ -14,8 +14,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # 导入模块化路由
-from routers.demo_router import demo_router
-from routers.system_router import system_router
+from openjiuwen_plugin_server.routers.demo_router import demo_router
+from openjiuwen_plugin_server.routers.system_router import system_router
+
 
 # 创建FastAPI应用
 app = FastAPI(

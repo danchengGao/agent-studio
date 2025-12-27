@@ -8,11 +8,8 @@ WORKDIR /sandbox
 COPY sandbox_server/gateway .
 RUN pip install uv -i ${INDEX_URL}
 RUN sed -i "s#url = \"https://mirrors.aliyun.com/pypi/simple/\"#url = \"${INDEX_URL}\"#g" pyproject.toml
-RUN uv venv
-RUN /sandbox/.venv/bin/python3 -m ensurepip --upgrade
-RUN UV_HTTP_TIMEOUT=700 \
-    UV_INDEX_URL=${INDEX_URL} \
-    uv sync --no-cache
+
+RUN uv sync --group dev
 RUN uv build --out-dir /sandbox/dist
 
 
@@ -34,11 +31,10 @@ COPY --from=builder /sandbox/dist/openjiuwen_sandbox_gateway-0.1.0-py3-none-any.
 RUN pip3 install /sandbox/dist/openjiuwen_sandbox_gateway-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
 
 ENV PYTHONPATH=/sandbox/site-packages/openjiuwen_sandbox_gateway:/sandbox/site-packages
-ENV PATH=/sandbox/site-packages/bin:$PATH
 
 EXPOSE 8188
 # Health check with configurable port
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
     CMD curl -f http://localhost:8188/health || exit 1
 
-CMD ["openjiuwen-sandbox-gateway", "--port", "8188"]
+CMD ["python", "-m", "openjiuwen_sandbox_gateway.server", "--port", "8188"]

@@ -3,7 +3,7 @@ import os
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from app.gateway import remote_python, remote_javascript
+from openjiuwen_sandbox_gateway.app.gateway import remote_python, remote_javascript
 
 app = FastAPI()
 

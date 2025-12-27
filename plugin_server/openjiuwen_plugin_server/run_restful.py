@@ -4,7 +4,7 @@
 import uvicorn
 from dotenv import load_dotenv
 
-from restful_tool_router import app
+from openjiuwen_plugin_server.restful_tool_router import app
 
 # Load environment variables from .env file
 load_dotenv()

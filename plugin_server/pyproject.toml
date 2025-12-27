@@ -3,10 +3,11 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openjiuwen-studio-plugin-server"
+name = "openjiuwen-plugin-server"
 version = "0.1.0"
 requires-python = ">=3.11.4"
 dependencies = [
+    "uvicorn[standard]==0.34.0",
     "fastapi==0.118.2",
     "pypinyin==0.55.0",
     "fastmcp==2.12.4",
@@ -15,9 +16,6 @@ dependencies = [
     "requests==2.31.0",
     "pytz==2025.2",
 ]
-[project.scripts]
-openjiuwen-studio-plugin-server = "openjiuwen_studio_plugin_server.run_restful:main"
-
 
 [tool.uv]
 default-groups = ['dev']

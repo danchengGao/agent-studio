@@ -12,10 +12,12 @@ dependencies = [
     "httpx==0.28.1",
 ]
 
-[project.scripts]
-openjiuwen-sandbox-gateway = "openjiuwen_sandbox_gateway.server:main"
+[tool.uv]
+default-groups = ['dev']
 
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple/"
 
-
+[dependency-groups]
+dev = [
+]
