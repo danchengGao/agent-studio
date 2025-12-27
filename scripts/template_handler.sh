@@ -11,15 +11,17 @@ extract_placeholders() {
 # ==== Replaces <<variable>> placeholder with its value ===
 replace_placeholder() {
     local placeholder="$1"
-    local destfile="$2" 
-    local os_type=${CONFIG["OS_TYPE"]}
+    local destfile="$2"
+    local vars_arr_name=$3
     local var_name=$(echo "${placeholder}" | sed -e 's/^<<//' -e 's/>>$//')
+    local arr_key_ref="${vars_arr_name}[${var_name}]"
+    local var_value="${!arr_key_ref:-}"
+    local os_type=${CONFIG["OS_TYPE"]}
 
     # Get value from associative array (error if not found)
-    if [ -z "${ENV_VARS["${var_name:-}"]:-}" ]; then
-        error "Variable [${var_name}] not found! Please define in .env file"
-    fi
-    local var_value="${ENV_VARS["${var_name}"]}"
+    # if [ -z "${var_value}" ]; then  # 直接判断间接引用拿到的值
+    #     error "Variable [${var_name}] not found! Please define in .env file"
+    # fi 
 
     #info "  Replacing placeholder: ${placeholder} → ${var_value}"
     if [[ "$os_type" == "macos" ]]; then
@@ -38,6 +40,7 @@ replace_placeholder() {
 generate_config_file() {
     local templatefile="$1"
     local destfile="$2"
+    local var_name="$3"
     # Verify template file exists
     if [ ! -f "${templatefile}" ]; then
         error "Template file does not exist: ${templatefile}"
@@ -56,7 +59,7 @@ generate_config_file() {
     # Loop to replace each placeholder
     info "Starting placeholder replacement..."
     for placeholder in "${placeholders[@]}"; do
-        replace_placeholder "${placeholder}" "${destfile}"
+        replace_placeholder "${placeholder}" "${destfile}" "${var_name}"
     done
 
     success "Final file: ${destfile}"
@@ -69,14 +72,14 @@ generate_config_files() {
     local nginx_file="${nginx_dir}/${ENV_VARS["NGINX_FILE_NAME"]}"
 
     mkdir -p ${nginx_dir}
-    generate_config_file ${nginx_template_file} ${nginx_file}
+    generate_config_file ${nginx_template_file} ${nginx_file} "ENV_VARS"
 
     for module in "${ALL_MODULES[@]}"; do
         local has_it="${ENV_VARS["HAS_${module}_CONTAINER"]}"
         if [ "${has_it}" == "true" ]; then
             local template_file=${COMPOSE_TEMPLATE_FILES["${module}"]}
             local compose_file=${COMPOSE_FILES["${module}"]}
-            generate_config_file ${template_file} ${compose_file}
+            generate_config_file ${template_file} ${compose_file} "ENV_VARS"
         fi
     done
 }

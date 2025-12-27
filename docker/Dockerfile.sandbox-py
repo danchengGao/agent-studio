@@ -30,10 +30,10 @@ RUN chown -R app:app /sandbox
 
 USER app
 WORKDIR /sandbox
-COPY --from=builder /sandbox/dist/jiuwen_py_server-0.1.0-py3-none-any.whl /sandbox/dist
-RUN pip3 install /sandbox/dist/jiuwen_py_server-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
+COPY --from=builder /sandbox/dist/openjiuwen_py_server-0.1.0-py3-none-any.whl /sandbox/dist
+RUN pip3 install /sandbox/dist/openjiuwen_py_server-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
 
-ENV PYTHONPATH=/sandbox/site-packages/jiuwen_py_server:/sandbox/site-packages
+ENV PYTHONPATH=/sandbox/site-packages/openjiuwen_py_server:/sandbox/site-packages
 ENV PATH=/sandbox/site-packages/bin:$PATH
 
 EXPOSE 5001
@@ -41,4 +41,4 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
     CMD curl -f http://localhost:5001/health || exit 1
 
-CMD ["jiuwen-py-server", "--port", "5001"]
+CMD ["openjiuwen-py-server", "--port", "5001"]

@@ -8,13 +8,13 @@ source "./gen_ssl.sh"
 source "./ports_handler.sh"
 source "./envfile_handler.sh"
 source "./template_handler.sh"
-source "./gen_setupcfg.sh"
 source "./container_handler.sh"
 source "./vars_handler.sh"
 source "./prompt_handler.sh"
 
 # ==== Executes Docker Compose commands (up/down/stop) for enabled modules ====
 exec_service() {
+    local cmd=${ARGS["CMD"]}
     local exec_cmd=${CONFIG["DOCKER_COMPOSE_CMD"]}
 
     local cmd_args=""
@@ -65,24 +65,11 @@ main() {
     info "Operating System: ${CONFIG["OS_TYPE"]}"
     info "Executing command: $@"
     parse_args "$@"
-    local cmd=${ARGS["CMD"]}
-
-    case "${cmd}" in
-        conf)
-            check_source_code_dir
-            generate_setup_cfg
-            ;;
-        up|down|stop)
-            check_docker
-            process_env_file
-            generate_config_files
-            exec_service
-            show_deploy_prompt
-            ;;
-        *)
-            info "Unsupported command: ${cmd}"
-            ;;
-    esac
+    check_docker
+    process_env_file
+    generate_config_files
+    exec_service
+    show_deploy_prompt
 }
 
 # Execute main function

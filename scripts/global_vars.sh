@@ -9,10 +9,6 @@ PROJECT_DIR="${SCRIPT_DIR}/.."
 
 # ===== Core project configuration (paths, ports, commands, OS info) =====
 declare -A CONFIG=(
-    ["PACKAGE_PREFIX"]="openjiuwen_studio_server"
-    ["BACKEND_DIR"]="${PROJECT_DIR}/backend"
-    ["SETUPCFG_TEMPLATE_FILE"]="${PROJECT_DIR}/backend/setup.cfg.template"
-    ["SETUPCFG_FILE"]="${PROJECT_DIR}/backend/setup.cfg"
     ["ENV_DIR"]="${SCRIPT_DIR}/.envs"
     ["ENV_FILE"]="${SCRIPT_DIR}/.env"
     ["DEFAULT_ENV_FILE"]="${SCRIPT_DIR}/.env.default"

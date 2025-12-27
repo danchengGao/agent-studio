@@ -30,10 +30,10 @@ RUN chown -R app:app /sandbox
 
 USER app
 WORKDIR /sandbox
-COPY --from=builder /sandbox/dist/jiuwen_sandbox_gateway-0.1.0-py3-none-any.whl /sandbox/dist
-RUN pip3 install /sandbox/dist/jiuwen_sandbox_gateway-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
+COPY --from=builder /sandbox/dist/openjiuwen_sandbox_gateway-0.1.0-py3-none-any.whl /sandbox/dist
+RUN pip3 install /sandbox/dist/openjiuwen_sandbox_gateway-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
 
-ENV PYTHONPATH=/sandbox/site-packages/jiuwen_sandbox_gateway:/sandbox/site-packages
+ENV PYTHONPATH=/sandbox/site-packages/openjiuwen_sandbox_gateway:/sandbox/site-packages
 ENV PATH=/sandbox/site-packages/bin:$PATH
 
 EXPOSE 8188
@@ -41,4 +41,4 @@ EXPOSE 8188
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
     CMD curl -f http://localhost:8188/health || exit 1
 
-CMD ["jiuwen-sandbox-gateway", "--port", "8188"]
+CMD ["openjiuwen-sandbox-gateway", "--port", "8188"]
