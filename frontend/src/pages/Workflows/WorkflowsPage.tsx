@@ -1,4 +1,5 @@
-import { AlertCircle, Check, Copy, Edit, Plus, Search, Trash2, Workflow as WorkflowIcon, X } from 'lucide-react'
+import { AlertCircle, Check, Copy, Edit, Plus, Search, Trash2, X } from 'lucide-react'
+import WorkflowIcon from '@/assets/icons/workflow.svg?react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router-dom'

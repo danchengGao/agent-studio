@@ -304,7 +304,7 @@
     }
   },
   "dashboard": {
-    "title": "工作空间看板",
+    "title": "工作空间",
     "subtitle": "欢迎回到 openJiuwen，探索您的AI智能体之旅",
     "quickStats": {
       "agents": {

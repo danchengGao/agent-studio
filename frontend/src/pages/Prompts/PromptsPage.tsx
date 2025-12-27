@@ -1,24 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  MessageSquare,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  Copy,
-  Tag,
-  Key,
-  AlertCircle,
-  RefreshCw,
-  Check,
-  Grid,
-  List,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-} from 'lucide-react'
+import PromptTemplateIcon from '@/assets/icons/promptTemplate.svg?react'
+import { Plus, Search, Edit, Trash2, Copy, Tag, Key, AlertCircle, RefreshCw, Check, Grid, List, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { IconButton, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Tooltip } from '@mui/material'
 import { PromptBasicInfoDialog, AssociationsDialog, ConditionalTooltip, DeletePromptDialog, Pagination } from '@/components/Prompts'
 import { ApiError, PromptService, type Prompt, type RelationObj } from '@test-agentstudio/api-client'
@@ -376,7 +360,7 @@ const PromptsPage: React.FC = () => {
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 border border-blue-200">
-              <MessageSquare className="w-6 h-6 text-blue-600" />
+              <PromptTemplateIcon className="w-6 h-6 text-blue-600" />
             </div>
             <div>
               <div className="flex items-center space-x-2 mb-1">
@@ -863,7 +847,7 @@ const PromptsPage: React.FC = () => {
       {!loading && !error && filteredPrompts.length === 0 && (
         <div className="text-center py-16">
           <div className="w-24 h-24 bg-gradient-to-r from-blue-100 to-indigo-200 rounded-full flex items-center justify-center mx-auto mb-6">
-            <MessageSquare className="w-12 h-12 text-blue-400" />
+            <PromptTemplateIcon className="w-12 h-12 text-blue-400" />
           </div>
           <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-blue-900 mb-3">
             {prompts.length === 0 ? t('prompts.promptList.noPrompts') : t('apps.empty.noTemplates')}
