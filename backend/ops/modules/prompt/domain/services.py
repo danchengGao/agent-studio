@@ -7,7 +7,7 @@ from typing import Optional, List
 
 from pydantic import ValidationError
 
-from app.routers.models import logger
+from openjiuwen_studio.routers.models import logger
 from ops.common.date_time_util import get_china_datetime
 from ops.modules.prompt.domain import entities
 from ops.modules.prompt.domain.entities import BatchGetPromptRequest, BatchPromptResponseItem, PromptCommit, \

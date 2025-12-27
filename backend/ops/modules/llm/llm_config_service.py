@@ -11,7 +11,7 @@ from ops.modules.llm.model import ModelConfig, ListModelResponse
 from ops.modules.llm.schema import ListModelRequest
 from ops.modules.prompt.domain.repositories import AgentRepository
 from ops.modules.prompt.infra.repositories import orm_repo
-from app.core.manager.model_manager.utils import SecurityUtils
+from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 
 
 logger = logging.getLogger(__name__)
