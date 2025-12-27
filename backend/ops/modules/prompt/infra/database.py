@@ -9,6 +9,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from ops.config import settings
+from ops.common.date_time_util import get_china_datetime
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -289,13 +290,13 @@ def reset_orphaned_running_jobs(ops_engine):
         if "job_user_info" not in inspector.get_table_names():
             logger.warning("Table 'job_user_info' does not exist. Skipping job reset.")
             return 0
-
+        current_time = get_china_datetime()
         with ops_engine.connect() as conn:
             update_sql = """
                 UPDATE job_user_info 
                 SET status = :status,
                     errorMsg = :errorMsg,
-                    updated_at = NOW()
+                    updated_at = :updated_at
                 WHERE status = :old_status
             """
             result = conn.execute(
@@ -303,7 +304,9 @@ def reset_orphaned_running_jobs(ops_engine):
                 {
                     "status": "failed",
                     "errorMsg": "System terminated abnormally",
-                    "old_status": "running"
+                    "old_status": "running",
+                    "updated_at": current_time
+
                 }
             )
             conn.commit()
