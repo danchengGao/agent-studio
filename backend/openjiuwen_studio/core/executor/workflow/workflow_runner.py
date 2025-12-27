@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
+import asyncio
 import json
 from typing import Any, Dict, AsyncGenerator, Optional
 
@@ -21,28 +22,29 @@ from openjiuwen_studio.core.executor.util.utils import result_convert, save_exec
 from openjiuwen_studio.schemas import WorkflowId
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException, JiuWenExecuteException
 from openjiuwen_studio.core.manager.repositories.workflow_repository import workflow_repository
-
+from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager, \
+    WorkflowExecutionRegistration
 
 
 def extract_component_names(schema_part, name_map, parent_path="", parent_component_ids=None):
     """递归提取所有组件名称，包括嵌套结构和层级关系"""
     if parent_component_ids is None:
         parent_component_ids = []
-        
+
     if isinstance(schema_part, dict):
         # 1. 提取当前节点的组件信息（包括子工作流节点本身）
         if 'id' in schema_part and 'data' in schema_part and 'title' in schema_part['data']:
             component_id = schema_part['id']
             component_title = schema_part['data']['title']
-            
+
             # 添加基础ID映射（如workflow_cLjMT -> AI天气查询）
             name_map[component_id] = component_title
-            
+
             # 生成并添加完整的层级组件ID映射（如workflow_cLjMT.workflow_fV0Wb -> 子工作流标题）
             if parent_component_ids:
                 full_component_id = f"{'.'.join(parent_component_ids)}.{component_id}"
                 name_map[full_component_id] = component_title
-        
+
         # 2. 处理完整的工作流schema（包含nodes和edges）
         if 'nodes' in schema_part and isinstance(schema_part['nodes'], list):
             # 遍历所有节点
@@ -51,37 +53,37 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
                     if 'data' in node and 'title' in node['data']:
                         node_id = node['id']
                         node_title = node['data']['title']
-                        
+
                         # 添加基础ID映射（如code_MsmmT -> 代码）
                         name_map[node_id] = node_title
-                        
+
                         # 生成并添加完整的层级组件ID映射
                         # （如workflow_cLjMT.workflow_fV0Wb.code_MsmmT -> 代码）
                         if parent_component_ids:
                             full_node_id = f"{'.'.join(parent_component_ids)}.{node_id}"
                             name_map[full_node_id] = node_title
-        
+
         # 特殊处理子工作流组件
         if (
-            'type' in schema_part
-            and (schema_part['type'] == '14'
-                or 'subWorkflow' in schema_part.get('data', {}).get('configs', {}))
+                'type' in schema_part
+                and (schema_part['type'] == '14'
+                     or 'subWorkflow' in schema_part.get('data', {}).get('configs', {}))
         ):
             # 14 是ComponentType.COMPONENT_TYPE_SUB_WORKFLOW的值
             sub_wf_config = schema_part.get('data', {})
-            
+
             # 获取当前子工作流节点ID
             current_component_id = schema_part.get('id', '')
-            
+
             # 创建新的父组件ID列表，用于子工作流的节点
             new_parent_ids = parent_component_ids.copy()
             if current_component_id:
                 new_parent_ids.append(current_component_id)
-            
+
             # 方法1: 直接从workflow字段获取完整子工作流定义（已包含schema）
             sub_wf_full = sub_wf_config.get('workflow', {})
             sub_wf_schema_str = sub_wf_full.get('schema', '')
-            
+
             if sub_wf_schema_str:
                 # 直接使用已包含的schema，无需查询数据库
                 try:
@@ -96,17 +98,17 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
                         )
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse embedded sub-workflow schema: {e}")
-            
+
             # 方法2: 从configs.subWorkflow中获取子工作流信息（备用）
             sub_wf_info = sub_wf_config.get('configs', {}).get('subWorkflow', {})
             sub_wf_id = sub_wf_info.get('workflowId') or sub_wf_info.get('workflow_id') or sub_wf_info.get('id')
             sub_wf_version = sub_wf_info.get('workflowVersion') or sub_wf_info.get('version')
-            
+
             if sub_wf_id and not sub_wf_schema_str:
                 # 如果没有嵌入式schema，则查询数据库
                 # 暂时跳过数据库查询，避免报错
                 logger.error(f"Skipping database query for sub-workflow {sub_wf_id} because space_id is not available")
-        
+
         # 特殊处理循环节点
         if 'type' in schema_part and schema_part['type'] == 'loop':
             # 循环节点处理
@@ -121,7 +123,7 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
             current_component_id = schema_part.get('id', '')
             if current_component_id and 'type' in schema_part and schema_part['type'] not in ['start', 'end']:
                 new_parent_ids.append(current_component_id)
-        
+
         # 特殊处理循环体、分支条件等嵌套结构
         nested_keys = ['loop_body', 'branches', 'branch_body', 'sub_workflow', 'components']
         for key, value in schema_part.items():
@@ -137,7 +139,7 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
 
 
 async def _fetch_workflow_dl(
-    id: str, version: str, space_id: str, current_user: Dict[str, Any]
+        id: str, version: str, space_id: str, current_user: Dict[str, Any]
 ) -> Any:
     req = {"workflow_id": id, "space_id": space_id, "version": version}
     res = mgr.workflow_convert(WorkflowId(**req), current_user)
@@ -172,7 +174,7 @@ async def _fetch_workflow_dl(
 class WorkflowRunner(IWorkflowLoader):
     def __init__(self) -> None:
         pass
-    
+
     def generate_component_name_map(self, workflow_dl: Any) -> Optional[Dict[str, str]]:
         """
         从workflow的schema中提取组件id到name的映射
@@ -182,7 +184,7 @@ class WorkflowRunner(IWorkflowLoader):
             # Handle both Pydantic model (with .schema attribute) and dict (with 'schema' key)
             workflow_schema_str = workflow_dl.schema if hasattr(workflow_dl, 'schema') else workflow_dl.get('schema')
             workflow_schema = json.loads(workflow_schema_str) if workflow_schema_str else {}
-            
+
             if isinstance(workflow_schema, dict):
                 component_name_map = {}
                 extract_component_names(workflow_schema, component_name_map)
@@ -191,28 +193,46 @@ class WorkflowRunner(IWorkflowLoader):
         return component_name_map
 
     async def get_flow(
-        self, id: str, version: str, space_id: str, current_user: Dict[str, Any]
+            self, id: str, version: str, space_id: str, current_user: Dict[str, Any]
     ) -> Workflow:
         flow = Workflow(await _fetch_workflow_dl(id, version, space_id, current_user), space_id, current_user)
         return flow
 
     async def get_compiled_workflow(
-        self, context: Context,
-        id: str, version: str, space_id: str, current_user: Dict[str, Any]
+            self, context: Context,
+            id: str, version: str, space_id: str, current_user: Dict[str, Any]
     ) -> InvokableWorkflow:
         workflow = await self.get_flow(id, version, space_id, current_user)
         compiled = await workflow.compile(context, self)
         return compiled
 
     async def run(
-        self,
-        id: str,
-        version: str,
-        inputs: Any,
-        conversation_id: str,
-        space_id: str,
-        current_user: Dict[str, Any],
+            self,
+            id: str,
+            version: str,
+            inputs: Any,
+            conversation_id: str,
+            space_id: str,
+            current_user: Dict[str, Any],
     ) -> AsyncGenerator[Any, None]:
+
+        # 检查当前conversation_id是否处于执行状态
+        if workflow_execution_manager.is_executing(conversation_id):
+            all_execution_infos = workflow_execution_manager.list_executions()
+            logger.info(f"Now existing workflow executions: {all_execution_infos}")
+            logger.error(
+                f"Workflow execution conflict detected: "
+                f"conversation_id={conversation_id}, workflow_id={id}"
+            )
+            # 如果存在执行id, 可直接停止当前会话id
+            cancel_success = await workflow_execution_manager.cancel_execution(conversation_id)
+            if not cancel_success:
+                raise JiuWenExecuteException(
+                    error_code=StatusCode.WORKFLOW_EXECUTION_CONFLICT_ERROR.code,
+                    message=StatusCode.WORKFLOW_EXECUTION_CONFLICT_ERROR.errmsg.format(msg=conversation_id),
+                    workflow_id=id,
+                )
+
         # 收集一次执行的所有 trace log
         trace_logs: list[TraceWorkflowSpan] = []
         flow_index = WorkflowId(
@@ -240,8 +260,25 @@ class WorkflowRunner(IWorkflowLoader):
 
             from openjiuwen.core.runtime.workflow import WorkflowRuntime
 
-            runtime = WorkflowRuntime(session_id="default")
+            # session_id，确保唯一性
+            runtime = WorkflowRuntime(session_id=conversation_id)
+            task = asyncio.current_task()
+            # 注册执行任务
+            registration = WorkflowExecutionRegistration(
+                conversation_id=conversation_id,
+                workflow_id=id,
+                workflow_version=version,
+                space_id=space_id,
+                runtime=runtime,
+                task=task
+            )
+            workflow_execution_manager.register_execution(registration)
             async for chunk in flow.stream(inputs=inputs, runtime=runtime):
+                # 检查任务是否被取消
+                if task and task.cancelled():
+                    logger.warning(f"Workflow execution has been cancelled: conversation_id={conversation_id}")
+                    break
+
                 # 检查是否为需要过滤的workflow trace chunk
                 if isinstance(chunk, TraceSchema) and chunk.type == "tracer_workflow":
                     wf = TraceWorkflowSpan.model_validate(chunk.payload)
@@ -268,11 +305,15 @@ class WorkflowRunner(IWorkflowLoader):
                 await save_execution_traces(flow_index, trace_logs)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
+        except asyncio.CancelledError:
+            logger.error(f"Workflow execution cancelled: conversation_id={conversation_id}")
+            raise
         except JiuWenExecuteException as e:
             await handle_stream_error(trace_logs, [], last_chunk, e.error_code, e.message, flow_index)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
-            raise JiuWenExecuteException(e.error_code, e.message, workflow_id=id, node_id=e.node_id, connection=e.connection)
+            e.set_workflow_id(id)
+            raise e
         except (JiuWenBaseException, JiuWenGraphException) as e:
             await handle_stream_error(trace_logs, [], last_chunk, e.error_code, e.message, flow_index)
             # if trace_id is not None:
@@ -287,13 +328,16 @@ class WorkflowRunner(IWorkflowLoader):
                 StatusCode.WORKFLOW_RUNNER_ERROR.errmsg.format(msg=str(e)),
                 workflow_id=id,
             ) from e
+        finally:
+            # 取消注册执行任务
+            workflow_execution_manager.unregister_execution(conversation_id)
 
     async def validate(
-        self,
-        id: str,
-        version: str,
-        space_id: str,
-        current_user: Dict[str, Any]
+            self,
+            id: str,
+            version: str,
+            space_id: str,
+            current_user: Dict[str, Any]
     ) -> bool:
         Workflow(await _fetch_workflow_dl(id, version, space_id, current_user), space_id, current_user)
         return True

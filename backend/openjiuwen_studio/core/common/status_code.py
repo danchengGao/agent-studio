@@ -56,6 +56,14 @@ class StatusCode(Enum):
                                          "工作流嵌套深度超过最大限制: {msg}",
                                          "Workflow nesting depth exceeds the maximum limit: {msg}")
 
+    WORKFLOW_EXECUTION_CONFLICT_ERROR = (BASE_CODE + 2008,
+                                         "该会话正在执行中，请等待完成, conversation_id: {msg}",
+                                         "This session: {msg} is still running, please try again later.")
+
+    WORKFLOW_EXECUTION_CANCEL_ERROR = (BASE_CODE + 2009,
+                                         "该会话取消执行失败, conversation_id: {msg}",
+                                         "This session: {msg} cannot be canceled by some error.")
+
     # Component模块 3001~3999
     COMPONENT_UNSUPPORT_RUN_ERROR = (BASE_CODE + 3001, "不支持该组件单独运行",
                                      "Unsupported component type for single component run")

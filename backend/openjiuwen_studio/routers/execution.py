@@ -28,9 +28,9 @@ from openjiuwen_studio.core.manager.memory import delete_user_variable, delete_l
     update_longterm_mem, get_longterm_mem, get_user_variable
 from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, WorkflowErrorData, ErrorNodeInfo
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
-execution_router = APIRouter()
-
 from openjiuwen_studio.core.common.message import ExecuteResponse, ExecuteResponseType
+from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
+execution_router = APIRouter()
 
 
 class BaseParas(BaseModel):
@@ -66,6 +66,10 @@ class PluginExecuteParas(ExecuteParas):
 
 class UserInputParas(BaseParas):
     inputs: UserInput = Field(default={}, description="Input parameters")
+
+
+class CancelExecutionParas(BaseParas):
+    force: bool = Field(default=True, description="是否强制停止线程")
 
 
 def get_error_info_in_wf_trace(mgr, chunk):
@@ -585,5 +589,61 @@ async def reset_agent_instance(
         return ResponseModel(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=f"Reset agent instance failed: {str(e)}",
+            data=None
+        )
+
+
+@execution_router.post("/workflow/cancel", response_model=ResponseModel[dict])
+async def cancel_workflow_execution(
+        request_body: CancelExecutionParas,
+        current_user: Dict[str, Any] = Depends(get_current_user)
+) -> ResponseModel[Dict[str, Any]]:
+    """
+    取消正在执行的工作流
+
+    Args:
+        request_body: 包含 conversation_id 和 force 标志的请求体
+        current_user: 当前用户信息
+
+    Returns:
+        ResponseModel: 取消操作的结果
+    """
+    try:
+        _ = check_user_space(request_body.space_id, current_user)
+        # 获取执行信息以验证权限
+        execution_info = workflow_execution_manager.get_execution(request_body.conversation_id)
+        if not execution_info:
+            return ResponseModel(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Execution not found for conversation_id: {request_body.conversation_id}",
+                data=None
+            )
+
+        # 执行取消操作
+        success = await workflow_execution_manager.cancel_execution(
+            conversation_id=request_body.conversation_id,
+            force=request_body.force
+        )
+
+        if success:
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Workflow execution cancelled successfully",
+                data={
+                    "conversation_id": request_body.conversation_id,
+                    "cancelled": True
+                }
+            )
+        else:
+            return ResponseModel(
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                message="Failed to cancel workflow execution",
+                data=None
+            )
+    except Exception as e:
+        log_exception(e)
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Cancel workflow execution failed: {str(e)}",
             data=None
         )

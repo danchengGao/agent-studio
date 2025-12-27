@@ -56,6 +56,17 @@ class JiuWenExecuteException(JiuWenBaseException):
         self._node_id = node_id
         self._connection = connection
 
+    # 添加公共的setter方法
+    def set_workflow_id(self, workflow_id: str) -> None:
+        self._workflow_id = workflow_id
+
+    # 添加公共的setter方法
+    def set_node_id(self, node_id: str) -> None:
+        self._node_id = node_id
+
+    def set_connection(self, connection: Connection) -> None:
+        self._connection = connection
+
     @property
     def workflow_id(self) -> str:
         return self._workflow_id
