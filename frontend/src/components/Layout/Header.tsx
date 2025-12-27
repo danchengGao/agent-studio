@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { Menu, ChevronDown, Users } from 'lucide-react'
+import { Menu, ChevronDown, Users, Globe } from 'lucide-react'
 import { useLogout } from '@test-agentstudio/api-client'
 import { resolveAvatar } from '../../utils/avatar'
 
@@ -75,7 +75,7 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
       {/* Right section */}
       <div className="flex items-center space-x-4">
         {/* Language switcher */}
-        {/* <div className="relative" ref={languageMenuRef}>
+        <div className="relative" ref={languageMenuRef}>
           <button
             onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
             className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -95,7 +95,6 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
                     i18n.language === 'zh-CN' ? 'text-blue-600 font-medium' : 'text-gray-700'
                   }`}
                 >
-                  <span className="mr-2">🇨🇳</span>
                   {t('layout.header.switchToChinese')}
                 </button>
                 <button
@@ -104,13 +103,12 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
                     i18n.language === 'en-US' ? 'text-blue-600 font-medium' : 'text-gray-700'
                   }`}
                 >
-                  <span className="mr-2">🇺🇸</span>
                   {t('layout.header.switchToEnglish')}
                 </button>
               </div>
             </div>
           )}
-        </div> */}
+        </div>
 
         {/* User menu */}
         <div className="relative" ref={userMenuRef}>

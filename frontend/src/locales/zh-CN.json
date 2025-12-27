@@ -593,13 +593,8 @@
           "plugins": "插件选择",
           "pluginConfiguration": "技能配置",
           "pluginSelection": "插件选择",
-          "workflows": "工作流选择",
           "openingRemarks": "开场白设置",
-          "addPlugin": "添加插件",
           "llmModel": "LLM模型",
-          "temperature": "温度 (Temperature)",
-          "maxTokens": "最大Token数",
-          "topP": "Top P",
           "timeout": "超时 (Timeout)",
           "temperatureHelper": "控制输出的随机性",
           "maxTokensHelper": "限制单次对话的最大输出长度",
@@ -642,7 +637,6 @@
           "characters": "字符",
           "addWorkflow": "添加工作流",
           "noPlugin": "未配置",
-          "modelSelection": "模型选择",
           "modelPlaceholder": "请选择模型",
           "temperatureLabel": "温度 (Temperature)：",
           "temperatureHint": "控制输出的随机性，值越高输出越随机",
@@ -652,7 +646,6 @@
           "topPHint": "控制输出的多样性，值越小输出越集中",
           "streamingLabel": "流式输出：",
           "streamingHint": "启用实时响应流",
-          "pluginSelection": "插件选择",
           "workflowSelection": "工作流选择",
           "noDataMessage": "暂无数据",
           "selectModelFirst": "请先选择模型",
@@ -1853,13 +1846,6 @@
       "updates": "更新",
       "settings": "设置"
     },
-    "stats": {
-      "total": "总计",
-      "active": "运行中",
-      "inactive": "已停止",
-      "error": "错误",
-      "updating": "更新中"
-    },
     "filters": {
       "allCategories": "全部分类",
       "allStatuses": "全部状态",
@@ -1895,7 +1881,6 @@
       "reload": "重新加载",
       "clearFilters": "清除筛选",
       "installPlugin": "安装插件",
-      "checkUpdates": "检查更新",
       "backToManagement": "返回管理",
       "cancel": "取消",
       "retry": "重试"
@@ -1969,7 +1954,6 @@
       "configurationInDevelopment": "{{name}} 配置功能开发中...",
       "uploadInDevelopment": "文件上传功能开发中...",
       "ideCreationInDevelopment": "本地代码插件创建功能开发中...",
-      "checkingUpdates": "正在检查更新...",
       "pluginError": "插件运行异常，请检查配置或重新安装",
       "autoUpdate": "自动更新插件",
       "enableMarket": "启用插件市场",
@@ -2136,16 +2120,9 @@
     },
     "confirmDelete": "确认删除",
     "confirmDeleteMessage": "确定要删除插件 \"{{name}}\" 吗？此操作无法撤销。",
-    "basicInfo": "基本信息",
     "usageStats": "使用统计",
     "permissions": "权限要求",
     "checkAndInstallUpdates": "检查并安装更新",
-    "tabs": {
-      "installed": "已安装",
-      "market": "市场",
-      "updates": "更新",
-      "settings": "设置"
-    },
     "settings": {
       "autoUpdate": "自动更新插件",
       "enableMarket": "启用插件市场",
@@ -2258,7 +2235,6 @@
       "deleting": "删除中...",
       "saving": "保存中...",
       "deleted": "工具删除成功",
-      "deleteFailed": "工具删除失败",
       "errors": {
         "notFound": "工具未找到",
         "unknown": "未知错误"
@@ -2372,8 +2348,6 @@
         "requestMethod": "请求方法:",
         "inputParams": "输入参数:",
         "headerConfig": "请求头配置:",
-        "noResults": "暂无测试结果",
-        "noResultsDesc": "填写参数后点击执行测试查看结果",
         "testInfo": "测试信息",
         "testTime": "测试时间:",
         "copyResult": "复制结果",
@@ -2421,7 +2395,6 @@
       "descriptionPlaceholder": "请输入工具描述",
       "function": "函数名称",
       "functionPlaceholder": "请输入函数名称",
-      "parameters": "参数配置",
       "parametersPlaceholder": "请输入参数配置",
       "enabled": "启用工具",
       "type": "工具类型",
@@ -2454,7 +2427,6 @@
       "devDependenciesPlaceholder": "请输入开发依赖",
       "scripts": "脚本",
       "scriptsPlaceholder": "请输入脚本",
-      "config": "配置",
       "configPlaceholder": "请输入配置",
       "schema": "模式",
       "schemaPlaceholder": "请输入模式",
@@ -2518,13 +2490,11 @@
       "readmePlaceholder": "请输入说明文档",
       "changelog": "更新日志",
       "changelogPlaceholder": "请输入更新日志",
-      "type": "插件类型",
       "typePlaceholder": "请选择插件类型",
       "category": "插件分类",
       "categoryPlaceholder": "请选择插件分类",
       "tags": "标签",
       "tagsPlaceholder": "请输入标签",
-      "icon": "图标",
       "iconPlaceholder": "请输入图标地址",
       "banner": "横幅",
       "bannerPlaceholder": "请输入横幅地址",
@@ -2562,13 +2532,6 @@
       "copyrightPlaceholder": "请输入版权信息",
       "patent": "专利",
       "patentPlaceholder": "请输入专利信息"
-    },
-    "types": {
-      "cloud": "云端插件",
-      "local": "本地插件"
-    },
-    "authors": {
-      "cloud": "官方"
     },
     "defaultDescription": "{{name}}是一个功能强大的插件，为您的系统提供扩展功能"
   },
