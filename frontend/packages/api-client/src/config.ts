@@ -233,6 +233,7 @@ export const API_ENDPOINTS = {
     JOB_DETAIL: '/prompts/tuning/templates_optimization/jobs/:jobId',
     SAVE_JOB_DRAFT: '/prompts/tuning/templates_optimization/job_draft/save',
     GET_JOB_DRAFT: '/prompts/tuning/templates_optimization/job_draft/get',
+    JOB_HISTORY: '/prompts/tuning/templates_optimization/job_history/:jobId',
   },
 
   // 反馈优化管理

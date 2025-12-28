@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { Copy, Trash2, TestTube, Brain, RefreshCw, Sliders, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { Trash2, TestTube, Brain, Sliders, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button, Typography, Card, CardContent, IconButton, Tooltip } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
@@ -140,6 +140,8 @@ const PromptEditPage: React.FC = () => {
   const [latestVersion, setLatestVersion] = useState<string>('') // 最新提交版本号
   const [isDraftEdited, setIsDraftEdited] = useState<boolean>(false) // 是否有未提交的草稿
   const [isNewPromptScenario, setIsNewPromptScenario] = useState<boolean>(false) // 是否是新建提示词场景
+  const [versionHistoryHeight, setVersionHistoryHeight] = useState('calc(100vh - 200px)') // 版本历史高度
+  const [chatMessageMaxHeight, setChatMessageMaxHeight] = useState('calc(100vh - 300px)') // 聊天消息区域最大高度
 
   // 三列布局拖动调整状态
   const [columnWidths, setColumnWidths] = useState([33.33, 33.33, 33.34]) // 三列的宽度百分比
@@ -362,6 +364,29 @@ const PromptEditPage: React.FC = () => {
       readOnlyWarningLockRef.current = false
     }, 1500)
   }, [showSnackbar, t])
+
+  // 响应式计算版本历史的高度和聊天消息区域高度
+  useEffect(() => {
+    const updateResponsiveHeights = () => {
+      if (window.innerWidth < 640) {
+        // 小屏幕：手机等移动设备
+        setVersionHistoryHeight('calc(100vh - 150px)')
+        setChatMessageMaxHeight('calc(100vh - 350px)')
+      } else if (window.innerWidth < 2000) {
+        // 中等屏幕：平板、14寸笔记本等
+        setVersionHistoryHeight('calc(100vh - 140px)')
+        setChatMessageMaxHeight('calc(100vh - 350px)')
+      } else {
+        // 大屏幕：15寸以上笔记本、台式显示器
+        setVersionHistoryHeight('calc(100vh - 200px)')
+        setChatMessageMaxHeight('calc(100vh - 300px)')
+      }
+    }
+
+    updateResponsiveHeights()
+    window.addEventListener('resize', updateResponsiveHeights)
+    return () => window.removeEventListener('resize', updateResponsiveHeights)
+  }, [])
 
   useEffect(() => {
     if (isReadOnlyMode) {
@@ -3668,7 +3693,7 @@ const PromptEditPage: React.FC = () => {
   )
 
   return (
-    <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40" style={{ minHeight: '93vh' }}>
+    <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40" style={{ minHeight: '93vh', minWidth: 'fit-content', width: '100%' }}>
       {/* Page header */}
       <PromptEditHeader
         isNew={isNew}
@@ -4242,23 +4267,61 @@ const PromptEditPage: React.FC = () => {
         </div>
       ) : (
         /* 正常编辑模式 */
-        <div className={`resizable-columns-container flex min-h-[calc(100vh-200px)] ${versionHistoryOpen ? 'xl:flex-row' : 'xl:flex-row'}`}>
+        <div className={`resizable-columns-container flex min-h-[calc(100vh-200px)] gap-0`} style={{ minWidth: 'fit-content', width: '100%' }}>
           {/* Column 1: 编写提示词 */}
           <div style={{ width: `${visibleModules.actualWidths[0]}%` }}>
             <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
-              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-md">
-                      <Brain className="w-4 h-4 text-white" />
+              <CardContent 
+                className="flex-1 flex flex-col overflow-hidden"
+                sx={{
+                  padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                }}
+              >
+                <div 
+                  className="flex items-center justify-between"
+                  style={{
+                    marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
+                  }}
+                >
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                    }}
+                  >
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-md"
+                      style={{
+                        padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                      }}
+                    >
+                      <Brain 
+                        className="text-white"
+                        style={{
+                          width: 'clamp(0.5rem, 1vw, 1rem)',
+                          height: 'clamp(0.5rem, 1vw, 1rem)',
+                        }}
+                      />
                     </div>
-                    <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    <Typography 
+                      variant="h6" 
+                      className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                      sx={{
+                        fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                        lineHeight: 1.3,
+                      }}
+                    >
                       {t('prompts.promptEdit.promptEditor.title')}
                     </Typography>
                   </div>
 
                   {/* 展开其他模块的按钮 */}
-                  <div className="flex items-center gap-1">
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                    }}
+                  >
                     {moduleCollapsed.advancedConfig && (
                       <Tooltip title={t('prompts.promptEdit.promptEditor.expandAdvancedConfig')}>
                         <IconButton
@@ -4266,12 +4329,19 @@ const PromptEditPage: React.FC = () => {
                           onClick={() => toggleModuleCollapse('advancedConfig')}
                           className="text-gray-400 hover:text-blue-600"
                           sx={{
+                            width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            height: 'clamp(1.25rem, 2.5vw, 2rem)',
                             '&:hover': {
                               backgroundColor: '#eff6ff',
                             },
                           }}
                         >
-                          <Sliders className="w-4 h-4" />
+                          <Sliders 
+                            style={{
+                              width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                              height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            }}
+                          />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -4283,12 +4353,19 @@ const PromptEditPage: React.FC = () => {
                           onClick={() => toggleModuleCollapse('promptDebug')}
                           className="text-gray-400 hover:text-blue-600"
                           sx={{
+                            width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            height: 'clamp(1.25rem, 2.5vw, 2rem)',
                             '&:hover': {
                               backgroundColor: '#eff6ff',
                             },
                           }}
                         >
-                          <TestTube className="w-4 h-4" />
+                          <TestTube 
+                            style={{
+                              width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                              height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            }}
+                          />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -4397,20 +4474,66 @@ const PromptEditPage: React.FC = () => {
           {/* Column 2: 高级配置 */}
           {!moduleCollapsed.advancedConfig && (
             <div style={{ width: `${visibleModules.actualWidths[1]}%` }}>
-              <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-                <CardContent className="p-6 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md">
-                        <Sliders className="w-4 h-4 text-white" />
+              <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
+                <CardContent 
+                  className="flex-1 flex flex-col overflow-hidden"
+                  sx={{
+                    padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                  }}
+                >
+                  <div 
+                    className="flex items-center justify-between"
+                    style={{
+                      marginBottom: 'clamp(0.1rem, 0.25vh, 0.2rem)',
+                    }}
+                  >
+                    <div 
+                      className="flex items-center"
+                      style={{
+                        gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                      }}
+                    >
+                      <div 
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-md"
+                        style={{
+                          padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                        }}
+                      >
+                        <Sliders 
+                          className="text-white"
+                          style={{
+                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                          }}
+                        />
                       </div>
-                      <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                      <Typography 
+                        variant="h6" 
+                        className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                        sx={{
+                          fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {t('prompts.promptEdit.advancedConfig.title')}
                       </Typography>
                     </div>
                     <Tooltip title={t('prompts.promptEdit.advancedConfig.collapse')}>
-                      <IconButton size="small" onClick={() => toggleModuleCollapse('advancedConfig')} className="text-gray-400 hover:text-gray-600">
-                        <ChevronUp className="w-4 h-4" />
+                      <IconButton 
+                        size="small" 
+                        onClick={() => toggleModuleCollapse('advancedConfig')} 
+                        className="text-gray-400 hover:text-gray-600"
+                        sx={{
+                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                        }}
+                      >
+                        <ChevronUp 
+                          style={{
+                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          }}
+                        />
                       </IconButton>
                     </Tooltip>
                   </div>
@@ -4522,31 +4645,78 @@ const PromptEditPage: React.FC = () => {
           {!moduleCollapsed.promptDebug && (
             <div style={{ width: `${visibleModules.actualWidths[2]}%` }}>
               <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-                <CardContent className="p-6 flex-1 flex flex-col h-full min-h-0">
+                <CardContent 
+                  className="flex-1 flex flex-col h-full min-h-0"
+                  sx={{
+                    padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                  }}
+                >
                   {/* 标题区域 */}
-                  <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-md">
-                        <TestTube className="w-4 h-4 text-white" />
+                  <div 
+                    className="flex items-center justify-between flex-shrink-0"
+                    style={{
+                      marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
+                    }}
+                  >
+                    <div 
+                      className="flex items-center"
+                      style={{
+                        gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                      }}
+                    >
+                      <div 
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-md"
+                        style={{
+                          padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                        }}
+                      >
+                        <TestTube 
+                          className="text-white"
+                          style={{
+                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                          }}
+                        />
                       </div>
-                      <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                      <Typography 
+                        variant="h6" 
+                        className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                        sx={{
+                          fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {t('prompts.promptEdit.promptDebug.title')}
                       </Typography>
                     </div>
                     <Tooltip title={t('prompts.promptEdit.promptDebug.collapse')}>
-                      <IconButton size="small" onClick={() => toggleModuleCollapse('promptDebug')} className="text-gray-400 hover:text-gray-600">
-                        <ChevronUp className="w-4 h-4" />
+                      <IconButton 
+                        size="small" 
+                        onClick={() => toggleModuleCollapse('promptDebug')} 
+                        className="text-gray-400 hover:text-gray-600"
+                        sx={{
+                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                        }}
+                      >
+                        <ChevronUp 
+                          style={{
+                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          }}
+                        />
                       </IconButton>
                     </Tooltip>
                   </div>
 
                   {/* 聊天消息区域 - 使用ChatMessageArea组件 */}
                   <div
-                    className="flex-1 bg-transparent rounded-lg border border-transparent"
+                    className="flex-1 bg-transparent border border-transparent"
                     style={{
                       minHeight: 0,
-                      maxHeight: 'calc(100vh - 500px)', // 限制最大高度
+                      maxHeight: chatMessageMaxHeight, // 根据屏幕尺寸动态设置
                       overflow: 'hidden',
+                      borderRadius: 'clamp(0.375rem, 0.3rem + 0.3vw, 0.5rem)',
                     }}
                   >
                     <ChatMessageArea
@@ -4610,7 +4780,13 @@ const PromptEditPage: React.FC = () => {
 
           {/* Column 4: 版本历史 */}
           {versionHistoryOpen && (
-            <div className="xl:col-span-1">
+            <div 
+              className="flex-shrink-0"
+              style={{
+                minWidth: 'clamp(16rem, 20vw, 26rem)',
+                maxWidth: 'clamp(15rem, 24vw, 30rem)',
+              }}
+            >
               <VersionHistory
                 isOpen={versionHistoryOpen}
                 onClose={handleOpenVersionHistory}
@@ -4619,53 +4795,12 @@ const PromptEditPage: React.FC = () => {
                 onSelectVersion={handleSelectVersion}
                 loading={versionListLoading}
                 draftSavedTime={draftSavedTime}
-                maxHeight={
-                  selectedVersion && selectedVersion !== 'current-draft'
-                    ? 'calc(100vh - 260px)' // 有操作按钮时，为按钮预留空间
-                    : 'calc(100vh - 188px)' // 无操作按钮时，使用全部可用空间
-                }
-                minHeight={
-                  selectedVersion && selectedVersion !== 'current-draft'
-                    ? 'calc(100vh - 260px)' // 有操作按钮时的最小高度
-                    : 'calc(100vh - 188px)' // 无操作按钮时可以更小，因为没有按钮占用空间
-                }
-                width="18vw"
-                showBottomRadius={!(selectedVersion && selectedVersion !== 'current-draft')} // 有操作按钮时不显示底部圆角
+                height={versionHistoryHeight}
+                width="100%"
                 onOpenAssociationsDialog={handleOpenAssociationsDialog}
+                onCreateCopy={handleCreateCopy}
+                onRollbackToVersion={handleRollbackToVersion}
               />
-
-              {/* 版本操作按钮 - 动态显示 */}
-              {selectedVersion && selectedVersion !== 'current-draft' && (
-                <Card
-                  className="shadow-lg border-0 !bg-gradient-to-br !from-green-50 !to-emerald-50 -mt-1"
-                  sx={{
-                    background: 'white !important',
-                    borderTopLeftRadius: 0,
-                    borderTopRightRadius: 0,
-                  }}
-                >
-                  <CardContent className="p-4 border-t border-gray-200">
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outlined"
-                        startIcon={<Copy className="w-4 h-4" />}
-                        onClick={handleCreateCopy}
-                        className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
-                      >
-                        {t('components.prompts.promptEditPage.createCopy')}
-                      </Button>
-                      <Button
-                        variant="contained"
-                        startIcon={<RefreshCw className="w-4 h-4" />}
-                        onClick={handleRollbackToVersion}
-                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                      >
-                        {t('components.prompts.promptEditPage.revertToVersion')}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
             </div>
           )}
         </div>

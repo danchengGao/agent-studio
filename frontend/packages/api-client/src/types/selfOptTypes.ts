@@ -235,3 +235,50 @@ export interface SelfOptApiError {
   error?: string
   details?: Record<string, any>
 }
+
+// 用例历史记录 - 用例输入
+export interface CaseInputs {
+  [key: string]: any
+}
+
+// 用例历史记录 - 用例标签
+export interface CaseLabel {
+  output: string
+}
+
+// 用例历史记录 - 用例详情
+export interface CaseDetail {
+  inputs: CaseInputs
+  label: CaseLabel
+  tools: any[] | null
+  case_id: string
+}
+
+// 用例历史记录 - 模型回答
+export interface CaseAnswer {
+  output: string
+  tool_calls: any[]
+}
+
+// 用例历史记录 - 评测用例
+export interface EvaluateCase {
+  case: CaseDetail
+  answer: CaseAnswer
+  score: number
+  reason: string
+}
+
+// 用例历史记录 - 历史记录项
+export interface JobHistoryItem {
+  iteration_round: number
+  optimized_prompt: string
+  success_rate: number
+  evaluate_cases: EvaluateCase[]
+}
+
+// 查询用例历史记录响应接口
+export interface GetJobHistoryResponse {
+  code: number
+  msg: string
+  history: JobHistoryItem[]
+}

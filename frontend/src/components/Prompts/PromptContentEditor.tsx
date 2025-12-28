@@ -124,10 +124,33 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
   // 添加防抖定时器引用，用于光标位置变化的更新（减少父组件渲染）
   const cursorPositionUpdateTimer = useRef<NodeJS.Timeout | null>(null)
 
+  // 响应式消息列表最大高度
+  const [messageListMaxHeight, setMessageListMaxHeight] = React.useState('calc(100vh - 350px)')
+
   // 同步 messageInputValues 到 pendingMessageInputValuesRef（当外部值变化时）
   React.useEffect(() => {
     pendingMessageInputValuesRef.current = messageInputValues
   }, [messageInputValues])
+
+  // 响应式调整消息列表最大高度
+  useEffect(() => {
+    const updateMessageListMaxHeight = () => {
+      if (window.innerWidth < 640) {
+        // 小屏幕
+        setMessageListMaxHeight('calc(100vh - 280px)')
+      } else if (window.innerWidth < 2000) {
+        // 中屏幕
+        setMessageListMaxHeight('calc(100vh - 290px)')
+      } else {
+        // 大屏幕
+        setMessageListMaxHeight('calc(100vh - 390px)')
+      }
+    }
+
+    updateMessageListMaxHeight()
+    window.addEventListener('resize', updateMessageListMaxHeight)
+    return () => window.removeEventListener('resize', updateMessageListMaxHeight)
+  }, [])
 
   // 添加验证错误状态
   const [internalValidationErrors, setInternalValidationErrors] = React.useState<Record<string, string>>({})
@@ -430,13 +453,43 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">{t('components.prompts.promptContentEditor.promptContent')}</label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">{t('components.prompts.promptContentEditor.promptTemplate')}:</span>
-            <FormControl size="small" className="min-w-[200px]" disabled={isReadOnly}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 1.5vh, 1rem)' }}>
+      <div className="flex flex-col">
+        <div 
+          className="flex items-center justify-between"
+          style={{
+            marginBottom: 'clamp(0.1875rem, 0.75vh, 0.5rem)',
+          }}
+        >
+          <label 
+            className="block font-medium text-gray-700"
+            style={{
+              fontSize: 'clamp(0.625rem, 1.2vw, 0.875rem)',
+            }}
+          >
+            {t('components.prompts.promptContentEditor.promptContent')}
+          </label>
+          <div 
+            className="flex items-center"
+            style={{
+              gap: 'clamp(0.1875rem, 0.75vw, 0.5rem)',
+            }}
+          >
+            <span 
+              className="font-medium text-gray-700"
+              style={{
+                fontSize: 'clamp(0.625rem, 1.2vw, 0.875rem)',
+              }}
+            >
+              {t('components.prompts.promptContentEditor.promptTemplate')}:
+            </span>
+            <FormControl 
+              size="small" 
+              disabled={isReadOnly}
+              sx={{
+                minWidth: 'clamp(1.75rem, 10vw, 6rem)',
+              }}
+            >
               <Select
                 value={templateEngine}
                 onChange={e => onTemplateEngineChange(e.target.value as 'normal' | 'jinja2')}
@@ -444,19 +497,19 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                 renderValue={value => (value === 'normal' ? 'Normal' : 'Jinja2')}
                 className="bg-white/80"
                 sx={{
-                  height: '32px',
-                  fontSize: '15px',
+                  height: 'clamp(1.375rem, 3.5vh, 2rem)',
+                  fontSize: 'clamp(0.6875rem, 1.3vw, 0.9375rem)',
                   '& .MuiSelect-select': {
-                    padding: '6px 14px',
-                    fontSize: '15px',
+                    padding: 'clamp(0.125rem, 0.5vh, 0.375rem) clamp(0.4375rem, 1.25vw, 0.875rem)',
+                    fontSize: 'clamp(0.6875rem, 1.3vw, 0.9375rem)',
                   },
                 }}
                 MenuProps={{
                   PaperProps: {
                     sx: {
                       '& .MuiMenuItem-root': {
-                        fontSize: '12px',
-                        padding: '6px 16px',
+                        fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)',
+                        padding: 'clamp(0.125rem, 0.5vh, 0.375rem) clamp(0.5625rem, 1.5vw, 1rem)',
                         minHeight: 'auto',
                       },
                     },
@@ -464,26 +517,68 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                 }}
               >
                 <MenuItem value="normal">
-                  <div className="flex items-center gap-2">
-                    <Code className="w-4 h-4 text-blue-600" />
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.1875rem, 0.75vw, 0.5rem)',
+                    }}
+                  >
+                    <Code 
+                      className="text-blue-600"
+                      style={{
+                        width: 'clamp(0.5625rem, 1.5vw, 1rem)',
+                        height: 'clamp(0.5625rem, 1.5vw, 1rem)',
+                      }}
+                    />
                     <div>
-                      <div className="font-medium" style={{ fontSize: '12px' }}>
+                      <div 
+                        className="font-medium"
+                        style={{ 
+                          fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)',
+                        }}
+                      >
                         {t('components.prompts.promptContentEditor.normalTemplateEngine')}
                       </div>
-                      <div className="text-xs text-gray-500" style={{ fontSize: '10px' }}>
+                      <div 
+                        className="text-xs text-gray-500"
+                        style={{ 
+                          fontSize: 'clamp(0.4375rem, 0.9vw, 0.625rem)',
+                        }}
+                      >
                         {t('components.prompts.promptContentEditor.normalTemplateDescription')}
                       </div>
                     </div>
                   </div>
                 </MenuItem>
                 <MenuItem value="jinja2">
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-green-600" />
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.1875rem, 0.75vw, 0.5rem)',
+                    }}
+                  >
+                    <Settings 
+                      className="text-green-600"
+                      style={{
+                        width: 'clamp(0.5625rem, 1.5vw, 1rem)',
+                        height: 'clamp(0.5625rem, 1.5vw, 1rem)',
+                      }}
+                    />
                     <div>
-                      <div className="font-medium" style={{ fontSize: '12px' }}>
+                      <div 
+                        className="font-medium"
+                        style={{ 
+                          fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)',
+                        }}
+                      >
                         {t('components.prompts.promptContentEditor.jinja2TemplateEngine')}
                       </div>
-                      <div className="text-xs text-gray-500" style={{ fontSize: '10px' }}>
+                      <div 
+                        className="text-xs text-gray-500"
+                        style={{ 
+                          fontSize: 'clamp(0.4375rem, 0.9vw, 0.625rem)',
+                        }}
+                      >
                         {t('components.prompts.promptContentEditor.jinja2TemplateDescription')}
                       </div>
                     </div>
@@ -559,12 +654,19 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                 sx={{
                   background: 'linear-gradient(to right, #f97316, #ef4444)',
                   color: 'white',
+                  width: 'clamp(1.5rem, 3vw, 1rem)',
+                  height: 'clamp(1.5rem, 3vw, 1rem)',
                   '&:hover': {
                     background: 'linear-gradient(to right, #ea580c, #dc2626)',
                   },
                 }}
               >
-                <Zap className="w-4 h-4" />
+                <Zap 
+                  style={{
+                    width: 'clamp(0.75rem, 1.5vw, 0.8rem)',
+                    height: 'clamp(0.75rem, 1.5vw, 0.8rem)',
+                  }}
+                />
               </IconButton>
             </Tooltip>
           </div>
@@ -608,12 +710,19 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                   sx={{
                     background: 'linear-gradient(to right, #10b981, #059669)',
                     color: 'white',
+                    width: 'clamp(1.5rem, 3vw, 1rem)',
+                    height: 'clamp(1.5rem, 3vw, 1rem)',
                     '&:hover': {
                       background: 'linear-gradient(to right, #059669, #047857)',
                     },
                   }}
                 >
-                  <Zap className="w-4 h-4" />
+                  <Zap 
+                    style={{
+                      width: 'clamp(0.75rem, 1.5vw, 0.8rem)',
+                      height: 'clamp(0.75rem, 1.5vw, 0.8rem)',
+                    }}
+                  />
                 </IconButton>
               </Tooltip>
             </div>,
@@ -621,29 +730,64 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
           )}
 
         {/* 消息列表 */}
-        <div className="space-y-3 flex-1 overflow-y-auto relative message-list-container max-h-[calc(100vh-400px)] scrollbar-hide messages-container">
+        <div 
+          className="overflow-y-auto overflow-x-hidden relative message-list-container scrollbar-hide messages-container"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'clamp(0.25rem, 1vh, 0.75rem)',
+            minHeight: 'auto',
+            maxHeight: messageListMaxHeight,
+          }}
+        >
           {promptMessages.map((message, index) => {
             const roleStyles = getRoleStyles(message.role)
 
             return (
               <div
                 key={message.id}
-                className={`bg-white/80 border ${roleStyles.border} rounded-lg p-2 shadow-sm hover:shadow-sm transition-shadow ${draggedMessageId === message.id ? 'opacity-50' : ''}`}
+                className={`bg-white/80 border ${roleStyles.border} rounded-lg shadow-sm hover:shadow-sm transition-shadow ${draggedMessageId === message.id ? 'opacity-50' : ''}`}
                 draggable={false}
                 onDragOver={isReadOnly ? undefined : onDragOver}
                 onDrop={isReadOnly ? undefined : e => onDrop?.(e, index)}
+                style={{
+                  padding: 'clamp(0.1875rem, 0.75vh, 0.5rem)',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
+                <div 
+                  className="flex items-center justify-between"
+                  style={{
+                    marginBottom: 'clamp(0.1875rem, 0.75vh, 0.5rem)',
+                  }}
+                >
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.25rem, 1vw, 0.75rem)',
+                    }}
+                  >
                     <div
                       className={`${isReadOnly ? 'cursor-not-allowed text-gray-300' : 'cursor-move text-gray-400 hover:text-gray-600'} drag-handle`}
                       draggable={!isReadOnly}
                       onDragStart={isReadOnly ? undefined : e => onDragStart?.(e, message.id)}
                       onDragEnd={isReadOnly ? undefined : onDragEnd}
                     >
-                      <GripVertical className="w-5 h-5" />
+                      <GripVertical 
+                        style={{
+                          width: 'clamp(0.75rem, 2vw, 1.25rem)',
+                          height: 'clamp(0.75rem, 2vw, 1.25rem)',
+                        }}
+                      />
                     </div>
-                    <FormControl size="small" className="min-w-[140px]" disabled={isReadOnly}>
+                    <FormControl 
+                      size="small" 
+                      disabled={isReadOnly}
+                      sx={{
+                        minWidth: 'clamp(3.5rem, 9vw, 6rem)',
+                      }}
+                    >
                       <Select
                         value={message.role}
                         onChange={e => handleMessageRoleChange(index, e.target.value as PromptMessage['role'])}
@@ -665,11 +809,11 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                           '&:hover .MuiOutlinedInput-notchedOutline': {
                             borderColor: roleStyles.text.replace('text-', ''),
                           },
-                          height: '25px',
-                          fontSize: '15px',
+                          height: 'clamp(1.125rem, 2.75vh, 1.5625rem)',
+                          fontSize: 'clamp(0.6875rem, 1.3vw, 0.9375rem)',
                           '& .MuiSelect-select': {
-                            padding: '4px 8px',
-                            fontSize: '15px',
+                            padding: 'clamp(0.09375rem, 0.375vh, 0.25rem) clamp(0.25rem, 0.75vw, 0.5rem)',
+                            fontSize: 'clamp(0.6875rem, 1.3vw, 0.9375rem)',
                           },
                         }}
                         MenuProps={{
@@ -677,8 +821,8 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                             sx: {
                               maxHeight: 140,
                               '& .MuiMenuItem-root': {
-                                fontSize: '12px',
-                                padding: '6px 16px',
+                                fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)',
+                                padding: 'clamp(0.125rem, 0.5vh, 0.375rem) clamp(0.5625rem, 1.5vw, 1rem)',
                                 minHeight: 'auto',
                               },
                             },
@@ -686,22 +830,27 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                         }}
                       >
                         <MenuItem value="system">
-                          <span style={{ fontSize: '12px' }}>System</span>
+                          <span style={{ fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)' }}>System</span>
                         </MenuItem>
                         <MenuItem value="user">
-                          <span style={{ fontSize: '12px' }}>User</span>
+                          <span style={{ fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)' }}>User</span>
                         </MenuItem>
                         <MenuItem value="assistant">
-                          <span style={{ fontSize: '12px' }}>Assistant</span>
+                          <span style={{ fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)' }}>Assistant</span>
                         </MenuItem>
                         <MenuItem value="placeholder">
-                          <span style={{ fontSize: '12px' }}>Placeholder</span>
+                          <span style={{ fontSize: 'clamp(0.5625rem, 1.1vw, 0.75rem)' }}>Placeholder</span>
                         </MenuItem>
                       </Select>
                     </FormControl>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.0625rem, 0.25vw, 0.25rem)',
+                    }}
+                  >
                     {message.role === 'system' && (
                       <>
                         <IconButton
@@ -872,8 +1021,13 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                       '& .MuiOutlinedInput-root': {
                         backgroundColor: 'rgba(255, 255, 255, 0.6)',
                         position: 'relative',
+                        fontSize: 'clamp(0.3rem, 0.75vw, 0.875rem)',
                         '& input': {
                           paddingRight: '8px',
+                          fontSize: 'clamp(0.3rem, 0.75vw, 0.875rem)',
+                        },
+                        '& input::placeholder': {
+                          fontSize: 'clamp(0.3rem, 0.75vw, 0.875rem)',
                         },
                         '& fieldset': {
                           borderColor: validationErrors[message.id] ? '#ef4444' : roleStyles.border.replace('border-', ''),
@@ -891,69 +1045,73 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                     }}
                   />
                 ) : (
-                  <FormattedPromptEditor
-                    fullWidth
-                    minRows={message.role === 'system' ? 20 : 1}
-                    value={messageInputValues[message.id] || message.content}
-                    messageId={message.id}
-                    disabled={isReadOnly}
-                    templateEngine={templateEngine}
-                    optimizationSourceType={optimizationSource.type}
-                    onTextSelection={
-                      message.role === 'system'
-                        ? (selectedText: string, position: { x: number; y: number }, messageId?: string) => {
-                            // 设置正确的优化来源
-                            onOptimizationSourceChange?.(optimizationSource)
-                            // 调用原始的文本选择处理，传递消息ID
-                            onTextSelection?.(selectedText, position, messageId || message.id)
-                          }
-                        : undefined
-                    }
-                    onCursorPositionChange={
-                      message.role === 'system'
-                        ? (position: { x: number; y: number }, cursorPos: number) => {
-                            // 如果正在输入中文，跳过光标位置更新，避免频繁渲染
-                            if (compositionState[message.id]) {
-                              return
-                            }
-
-                            // 使用防抖更新光标位置（1000ms 防抖）
-                            if (cursorPositionUpdateTimer.current) {
-                              clearTimeout(cursorPositionUpdateTimer.current)
-                            }
-
-                            cursorPositionUpdateTimer.current = setTimeout(() => {
+                  <div style={{ width: '100%', overflow: 'hidden' }}>
+                    <FormattedPromptEditor
+                      fullWidth
+                      minRows={message.role === 'system' ? 20 : 1}
+                      maxRows={message.role === 'system' ? 25 : undefined}
+                      value={messageInputValues[message.id] || message.content}
+                      messageId={message.id}
+                      disabled={isReadOnly}
+                      templateEngine={templateEngine}
+                      optimizationSourceType={optimizationSource.type}
+                      onTextSelection={
+                        message.role === 'system'
+                          ? (selectedText: string, position: { x: number; y: number }, messageId?: string) => {
                               // 设置正确的优化来源
                               onOptimizationSourceChange?.(optimizationSource)
-                              // 调用原始的光标位置处理，传递完整的参数
-                              onCursorPositionChange?.(message.id)?.(position, cursorPos)
-                              cursorPositionUpdateTimer.current = null
-                            }, 1000)
-                          }
-                        : undefined
-                    }
-                    onChange={newValue => handleMessageContentChange(message.id, index, newValue, message)}
-                    placeholder={t('components.prompts.promptContentEditor.messagePlaceholder', { role: message.role })}
-                    className={`${roleStyles.lightBg}`}
-                    InputProps={{
-                      className: 'bg-white/60',
-                      sx: {
-                        '& .MuiOutlinedInput-notchedOutline': {
-                          borderColor: roleStyles.border.replace('border-', ''),
+                              // 调用原始的文本选择处理，传递消息ID
+                              onTextSelection?.(selectedText, position, messageId || message.id)
+                            }
+                          : undefined
+                      }
+                      onCursorPositionChange={
+                        message.role === 'system'
+                          ? (position: { x: number; y: number }, cursorPos: number) => {
+                              // 如果正在输入中文，跳过光标位置更新，避免频繁渲染
+                              if (compositionState[message.id]) {
+                                return
+                              }
+
+                              // 使用防抖更新光标位置（1000ms 防抖）
+                              if (cursorPositionUpdateTimer.current) {
+                                clearTimeout(cursorPositionUpdateTimer.current)
+                              }
+
+                              cursorPositionUpdateTimer.current = setTimeout(() => {
+                                // 设置正确的优化来源
+                                onOptimizationSourceChange?.(optimizationSource)
+                                // 调用原始的光标位置处理，传递完整的参数
+                                onCursorPositionChange?.(message.id)?.(position, cursorPos)
+                                cursorPositionUpdateTimer.current = null
+                              }, 1000)
+                            }
+                          : undefined
+                      }
+                      onChange={newValue => handleMessageContentChange(message.id, index, newValue, message)}
+                      placeholder={t('components.prompts.promptContentEditor.messagePlaceholder', { role: message.role })}
+                      className={`${roleStyles.lightBg}`}
+                      InputProps={{
+                        className: 'bg-white/60',
+                        sx: {
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: roleStyles.border.replace('border-', ''),
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: roleStyles.text.replace('text-', ''),
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: roleStyles.text.replace('text-', ''),
+                          },
+                          '& textarea': {
+                            resize: 'none',
+                            overflow: 'auto !important',
+                            maxHeight: message.role === 'system' ? '600px' : 'none',
+                          },
                         },
-                        '&:hover .MuiOutlinedInput-notchedOutline': {
-                          borderColor: roleStyles.text.replace('text-', ''),
-                        },
-                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                          borderColor: roleStyles.text.replace('text-', ''),
-                        },
-                        '& textarea': {
-                          resize: 'none',
-                          overflow: 'hidden',
-                        },
-                      },
-                    }}
-                  />
+                      }}
+                    />
+                  </div>
                 )}
               </div>
             )
@@ -975,8 +1133,6 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
         >
           {t('components.prompts.promptContentEditor.addMessage')}
         </Button>
-
-        <div className="mt-2 text-xs text-gray-500">{t('components.prompts.promptContentEditor.variableHint')}</div>
       </div>
     </div>
   )

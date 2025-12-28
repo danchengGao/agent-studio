@@ -20,21 +20,42 @@ export interface ModelParameterEditorProps {
 const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedModel, modelConfig, onModelConfigChange, className = '', readonly = false }) => {
   const { t } = useTranslation()
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={className} style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.5rem, 1.5vh, 0.75rem)' }}>
       {selectedModel?.openModel?.param_config?.param_schemas ? (
         selectedModel.openModel.param_config.param_schemas.map(paramSchema => (
-          <div key={paramSchema.name} className="mb-3">
+          <div key={paramSchema.name} style={{ marginBottom: 'clamp(0.375rem, 1vh, 0.5rem)' }}>
             {paramSchema.type === 'float' || paramSchema.type === 'int' ? (
               paramSchema.min !== undefined && paramSchema.max !== undefined ? (
                 // 使用滑块控件（当有min和max时）
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                    <Typography variant="subtitle2" className="text-gray-700">
+                <div className="flex items-center" style={{ gap: 0 }}>
+                  <div className="flex items-center flex-shrink-0" style={{ width: 'clamp(2rem, 20vw, 5rem)', gap: 0 }}>
+                    <Typography 
+                      variant="subtitle2" 
+                      className="text-gray-700 truncate"
+                      sx={{ 
+                        fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)',
+                      }}
+                    >
                       {paramSchema.label}
                     </Typography>
                     <Tooltip title={paramSchema.desc}>
-                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <IconButton 
+                        size="small" 
+                        className="text-gray-400 hover:text-gray-600 p-0 flex-shrink-0"
+                        sx={{ 
+                          width: 'clamp(1rem, 2vw, 2rem)',
+                          height: 'clamp(1rem, 2vw, 2rem)',
+                        }}
+                      >
+                        <svg 
+                          style={{ 
+                            width: 'clamp(0.85rem, 1.5vw, 0.85rem)', 
+                            height: 'clamp(0.85rem, 1.5vw, 0.85rem)' 
+                          }} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -45,8 +66,15 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                       </IconButton>
                     </Tooltip>
                   </div>
-                  <div className="flex-1 flex items-center gap-2">
-                    <Typography variant="caption" className="text-gray-500 text-right" sx={{ minWidth: '40px', width: '40px' }}>
+                  <div className="flex-1 flex items-center" style={{ gap: 'clamp(0.125rem, 0.5vw, 0.25rem)', minWidth: 0 }}>
+                    <Typography 
+                      variant="caption" 
+                      className="text-gray-500 text-right flex-shrink-0" 
+                      sx={{ 
+                        width: 'clamp(0.75rem, 3vw, 1.5rem)',
+                        fontSize: 'clamp(0.5rem, 1.25vw, 0.65rem)',
+                      }}
+                    >
                       {paramSchema.min}
                     </Typography>
                     <Slider
@@ -64,10 +92,22 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                       disabled={readonly}
                       sx={{
                         flex: 1,
+                        minWidth: 0,
+                        '& .MuiSlider-valueLabel': {
+                          fontSize: 'clamp(0.625rem, 1.25vw, 0.7rem)',
+                        },
                       }}
-                      className="bg-white/60 p-2 rounded"
+                      className="bg-white/60 rounded"
+                      style={{ padding: 'clamp(0.125rem, 0.5vw, 0.375rem)' }}
                     />
-                    <Typography variant="caption" className="text-gray-500 text-left" sx={{ minWidth: '40px', width: '40px' }}>
+                    <Typography 
+                      variant="caption" 
+                      className="text-gray-500 text-left flex-shrink-0" 
+                      sx={{ 
+                        width: 'clamp(0.75rem, 3vw, 1.5rem)',
+                        fontSize: 'clamp(0.5rem, 1.25vw, 0.65rem)',
+                      }}
+                    >
                       {paramSchema.max}
                     </Typography>
                   </div>
@@ -119,10 +159,16 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                       max: paramSchema.max,
                       step: paramSchema.type === 'float' ? 0.1 : 1,
                     }}
-                    className="bg-white/60"
+                    className="bg-white/60 flex-shrink-0"
                     sx={{
-                      width: '80px',
+                      width: 'clamp(2.25rem, 8vw, 3.5rem)',
+                      fontSize: 'clamp(0.65rem, 1.5vw, 0.8rem)',
+                      display: { xs: 'none', sm: 'block' },
                       '& .MuiOutlinedInput-root': {
+                        fontSize: 'clamp(0.65rem, 1.5vw, 0.8rem)',
+                        '& input': {
+                          padding: 'clamp(0.125rem, 0.5vw, 0.375rem)',
+                        },
                         '& fieldset': {
                           borderColor: '#d1d5db',
                         },
@@ -138,14 +184,35 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                 </div>
               ) : (
                 // 使用文本输入框（当没有min和max时）
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                    <Typography variant="subtitle2" className="text-gray-700">
+                <div className="flex items-center" style={{ gap: 0 }}>
+                  <div className="flex items-center flex-shrink-0" style={{ minWidth: 'clamp(2rem, 8vw, 3rem)', gap: 0 }}>
+                    <Typography 
+                      variant="subtitle2" 
+                      className="text-gray-700 truncate"
+                      sx={{ 
+                        fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)',
+                      }}
+                    >
                       {paramSchema.label}
                     </Typography>
                     <Tooltip title={paramSchema.desc}>
-                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <IconButton 
+                        size="small" 
+                        className="text-gray-400 hover:text-gray-600 p-0 flex-shrink-0"
+                        sx={{ 
+                          width: 'clamp(1rem, 2vw, 1rem)',
+                          height: 'clamp(1rem, 2vw, 1rem)',
+                        }}
+                      >
+                        <svg 
+                          style={{ 
+                            width: 'clamp(0.85rem, 1.5vw, 0.85rem)', 
+                            height: 'clamp(0.85rem, 1.5vw, 0.85rem)' 
+                          }} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
                           <path
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -173,7 +240,12 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                     disabled={readonly}
                     className="bg-white/60"
                     sx={{
+                      fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)',
                       '& .MuiOutlinedInput-root': {
+                        fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)',
+                        '& input': {
+                          padding: 'clamp(0.375rem, 1vw, 0.4rem)',
+                        },
                         '& fieldset': {
                           borderColor: '#d1d5db',
                         },
@@ -190,13 +262,34 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
               )
             ) : paramSchema.type === 'bool' ? (
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-1">
-                  <Typography variant="subtitle2" className="text-gray-700">
+                <div className="flex items-center flex-shrink-0" style={{ minWidth: 'clamp(2rem, 10vw, 3.5rem)', gap: 0 }}>
+                  <Typography 
+                    variant="subtitle2" 
+                    className="text-gray-700 truncate"
+                    sx={{ 
+                      fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                    }}
+                  >
                     {paramSchema.label}
                   </Typography>
                   <Tooltip title={paramSchema.desc}>
-                    <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <IconButton 
+                      size="small" 
+                      className="text-gray-400 hover:text-gray-600 p-0 flex-shrink-0"
+                      sx={{ 
+                        width: 'clamp(0.875rem, 2vw, 1.25rem)',
+                        height: 'clamp(0.875rem, 2vw, 1.25rem)',
+                      }}
+                    >
+                      <svg 
+                        style={{ 
+                          width: 'clamp(0.75rem, 1.5vw, 1rem)', 
+                          height: 'clamp(0.75rem, 1.5vw, 1rem)' 
+                        }} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -211,18 +304,48 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                   checked={Boolean(modelConfig[paramSchema.name as keyof typeof modelConfig] ?? paramSchema.default_val)}
                   onChange={e => onModelConfigChange({ ...modelConfig, [paramSchema.name]: e.target.checked })}
                   disabled={readonly}
+                  sx={{
+                    '& .MuiSwitch-switchBase': {
+                      padding: 'clamp(0.3rem, 0.75vw, 0.4rem)',
+                    },
+                    '& .MuiSwitch-thumb': {
+                      width: 'clamp(0.65rem, 1.5vw, 0.85rem)',
+                      height: 'clamp(0.65rem, 1.5vw, 0.85rem)',
+                    },
+                  }}
                 />
               </div>
             ) : (
               // 其他类型使用文本输入框
-              <div className="flex items-center gap-3">
-                <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                  <Typography variant="subtitle2" className="text-gray-700">
+              <div className="flex items-center" style={{ gap: 0 }}>
+                <div className="flex items-center flex-shrink-0" style={{ minWidth: 'clamp(2rem, 10vw, 3.5rem)', gap: 0 }}>
+                  <Typography 
+                    variant="subtitle2" 
+                    className="text-gray-700 truncate"
+                    sx={{ 
+                      fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                    }}
+                  >
                     {paramSchema.label}
                   </Typography>
                   <Tooltip title={paramSchema.desc}>
-                    <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <IconButton 
+                      size="small" 
+                      className="text-gray-400 hover:text-gray-600 p-0 flex-shrink-0"
+                      sx={{ 
+                        width: 'clamp(0.875rem, 2vw, 1.25rem)',
+                        height: 'clamp(0.875rem, 2vw, 1.25rem)',
+                      }}
+                    >
+                      <svg 
+                        style={{ 
+                          width: 'clamp(0.75rem, 1.5vw, 1rem)', 
+                          height: 'clamp(0.75rem, 1.5vw, 1rem)' 
+                          }} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -244,7 +367,12 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
                   disabled={readonly}
                   className="bg-white/60"
                   sx={{
+                    fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
                     '& .MuiOutlinedInput-root': {
+                      fontSize: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                      '& input': {
+                        padding: 'clamp(0.375rem, 1vw, 0.5rem)',
+                      },
                       '& fieldset': {
                         borderColor: '#d1d5db',
                       },
@@ -262,10 +390,26 @@ const ModelParameterEditor: React.FC<ModelParameterEditorProps> = ({ selectedMod
           </div>
         ))
       ) : (
-        <div className="text-center py-6 text-gray-500">
-          <Cpu className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-          <p>{t('components.prompts.modelParameterEditor.selectModelFirst')}</p>
-          <p className="text-sm">{t('components.prompts.modelParameterEditor.selectModelDescription')}</p>
+        <div 
+          className="text-center text-gray-500" 
+          style={{ 
+            padding: 'clamp(0.75rem, 2vh, 1rem) 0',
+          }}
+        >
+          <Cpu 
+            className="mx-auto text-gray-300" 
+            style={{ 
+              width: 'clamp(1.5rem, 3vw, 2rem)', 
+              height: 'clamp(1.5rem, 3vw, 2rem)',
+              marginBottom: 'clamp(0.25rem, 0.5vh, 0.375rem)',
+            }} 
+          />
+          <p style={{ fontSize: 'clamp(0.7rem, 1.5vw, 0.8rem)' }}>
+            {t('components.prompts.modelParameterEditor.selectModelFirst')}
+          </p>
+          <p style={{ fontSize: 'clamp(0.6rem, 1.25vw, 0.7rem)' }}>
+            {t('components.prompts.modelParameterEditor.selectModelDescription')}
+          </p>
         </div>
       )}
     </div>

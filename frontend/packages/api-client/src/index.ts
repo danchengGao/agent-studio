@@ -60,6 +60,13 @@ export type {
   GetJobDetailResponse,
   SelfOptApiResponse,
   SelfOptApiError,
+  CaseInputs,
+  CaseLabel,
+  CaseDetail,
+  CaseAnswer,
+  EvaluateCase,
+  JobHistoryItem,
+  GetJobHistoryResponse,
 } from './types/selfOptTypes'
 
 // 反馈优化相关类型

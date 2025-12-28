@@ -18,7 +18,7 @@ import {
   RadioGroup,
   Radio,
 } from '@mui/material'
-import { Settings, Cpu, Code, Copy, Edit, Trash2, Plus, ChevronRight, ChevronDown } from 'lucide-react'
+import { Settings, Cpu, Code, Copy, Edit, Trash2, Plus, ChevronRight, ChevronDown, X } from 'lucide-react'
 import JsonEditor from './JsonEditor'
 import ModelSelector from './ModelSelector'
 import ModelParameterEditor from './ModelParameterEditor'
@@ -107,6 +107,40 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
 
   // 变量展开收起状态管理，默认展开
   const [variableExpanded, setVariableExpanded] = React.useState<{ [key: string]: boolean }>({})
+  
+  // 提示框显示状态管理
+  const [showHint, setShowHint] = React.useState(true)
+  
+  // 模型设置提示框显示状态管理
+  const [showModelHint, setShowModelHint] = React.useState(true)
+  
+  // 响应式计算变量定义区域的最大高度（包含变量列表和底部提示）
+  const [variableTabMaxHeight, setVariableTabMaxHeight] = React.useState('calc(100vh - 350px)')
+  
+  // 响应式计算模型设置区域的最大高度
+  const [modelSettingsMaxHeight, setModelSettingsMaxHeight] = React.useState('calc(100vh - 425px)')
+
+  React.useEffect(() => {
+    const updateMaxHeight = () => {
+      if (window.innerWidth < 640) {
+        // 小屏幕：手机等移动设备
+        setVariableTabMaxHeight('calc(100vh - 320px)')
+        setModelSettingsMaxHeight('calc(100vh - 320px)')
+      } else if (window.innerWidth < 2000) {
+        // 中等屏幕：平板、14寸笔记本等
+        setVariableTabMaxHeight('calc(100vh - 260px)')
+        setModelSettingsMaxHeight('calc(100vh - 260px)')
+      } else {
+        // 大屏幕：15寸以上笔记本、台式显示器
+        setVariableTabMaxHeight('calc(100vh - 380px)')
+        setModelSettingsMaxHeight('calc(100vh - 425px)')
+      }
+    }
+
+    updateMaxHeight()
+    window.addEventListener('resize', updateMaxHeight)
+    return () => window.removeEventListener('resize', updateMaxHeight)
+  }, [])
 
   // 切换变量展开收起状态
   const toggleVariableExpanded = (paramName: string) => {
@@ -155,22 +189,45 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
           }}
           aria-label={t('components.prompts.advancedConfigEditor.tabs.ariaLabel')}
           className="bg-white/60 rounded-t-lg"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
+            height: 'clamp(2rem, 5.5vh, 2.75rem)',
+            '& .MuiTabs-flexContainer': {
+              height: '100%',
+            },
+            '& .MuiTab-root': {
+              fontSize: 'clamp(0.625rem, 1.5vw, 0.8125rem)',
+              padding: 'clamp(0.3rem, 1vw, 0.6rem) clamp(0.375rem, 1.5vw, 0.75rem)',
+              minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
+            },
+          }}
         >
           <Tab
             disabled={isReadOnly}
             label={
-              <div className="flex items-center space-x-2">
-                <Settings className="w-4 h-4" />
+              <div className="flex items-center" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.375rem)' }}>
+                <Settings style={{ width: 'clamp(0.625rem, 1.5vw, 0.875rem)', height: 'clamp(0.625rem, 1.5vw, 0.875rem)' }} />
                 <span>{t('components.prompts.advancedConfigEditor.tabs.variableDefinition')}</span>
-                <Chip label={parameters.length} size="small" className="bg-blue-100 text-blue-700 text-xs" />
+                <Chip 
+                  label={parameters.length} 
+                  size="small" 
+                  className="bg-blue-100 text-blue-700"
+                  sx={{ 
+                    fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
+                    height: 'clamp(0.875rem, 2vh, 1.125rem)',
+                  }}
+                />
               </div>
             }
           />
           <Tab
             disabled={isReadOnly}
             label={
-              <div className="flex items-center space-x-2">
-                <Cpu className="w-4 h-4" />
+              <div className="flex items-center" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.375rem)' }}>
+                <Cpu style={{ width: 'clamp(0.625rem, 1.5vw, 0.875rem)', height: 'clamp(0.625rem, 1.5vw, 0.875rem)' }} />
                 <span>{t('components.prompts.advancedConfigEditor.tabs.modelSettings')}</span>
               </div>
             }
@@ -178,10 +235,18 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
           <Tab
             disabled={isReadOnly}
             label={
-              <div className="flex items-center space-x-2">
-                <Code className="w-4 h-4" />
+              <div className="flex items-center" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.375rem)' }}>
+                <Code style={{ width: 'clamp(0.625rem, 1.5vw, 0.875rem)', height: 'clamp(0.625rem, 1.5vw, 0.875rem)' }} />
                 <span>{t('components.prompts.advancedConfigEditor.tabs.toolSettings')}</span>
-                <Chip label={tools.length} size="small" className="bg-blue-100 text-blue-700 text-xs" />
+                <Chip 
+                  label={tools.length} 
+                  size="small" 
+                  className="bg-blue-100 text-blue-700"
+                  sx={{ 
+                    fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
+                    height: 'clamp(0.875rem, 2vh, 1.125rem)',
+                  }}
+                />
               </div>
             }
           />
@@ -189,22 +254,53 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
       </Box>
 
       {/* 变量定义标签页 */}
-      <div role="tabpanel" hidden={activeTab !== 0} className="flex-1 flex-col p-4">
+      <div role="tabpanel" hidden={activeTab !== 0} className="flex-1 flex-col" style={{ padding: 'clamp(0.25rem, 1vw, 1rem)' }}>
         {activeTab === 0 && (
-          <div className="space-y-4 flex-1 flex flex-col">
-            <div className="space-y-3 flex-1 overflow-y-auto max-h-[calc(100vh-425px)] scrollbar-hide">
+          <div 
+            className="flex-1 flex flex-col overflow-y-auto scrollbar-hide" 
+            style={{ 
+              gap: 'clamp(0.25rem, 1vh, 1rem)',
+              maxHeight: variableTabMaxHeight
+            }}
+          >
+            <div 
+              className="flex-1" 
+              style={{ 
+                gap: 'clamp(0.2rem, 0.75vh, 0.75rem)', 
+                display: 'flex', 
+                flexDirection: 'column'
+              }}
+            >
               {parameters.length > 0 ? (
                 parameters.map((param, index) => (
-                  <Paper key={index} elevation={1} className="p-3 bg-white/80 border border-green-200">
-                    <div className="space-y-2">
+                  <Paper 
+                    key={index} 
+                    elevation={1} 
+                    className="bg-white/80 border border-green-200"
+                    sx={{ padding: 'clamp(0.1rem, 0.5vw, 0.35rem)' }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.1rem, 0.3vh, 0.3rem)' }}>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-5 h-5 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">{index + 1}</span>
+                        <div className="flex items-center" style={{ gap: 'clamp(0.15rem, 0.5vw, 0.5rem)' }}>
+                          <div 
+                            className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center"
+                            style={{
+                              width: 'clamp(0.75rem, 2vw, 1.25rem)',
+                              height: 'clamp(0.75rem, 2vw, 1.25rem)',
+                            }}
+                          >
+                            <span className="text-white font-bold" style={{ fontSize: 'clamp(0.4rem, 1.2vw, 0.75rem)' }}>{index + 1}</span>
                           </div>
                           <div className="min-w-0 flex-1">
                             <ConditionalTooltip title={param.name}>
-                              <Typography variant="subtitle2" className="text-gray-800 font-medium truncate" style={{ maxWidth: '200px' }}>
+                              <Typography 
+                                variant="subtitle2" 
+                                className="text-gray-800 font-medium truncate" 
+                                sx={{ 
+                                  maxWidth: '200px',
+                                  fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
+                                }}
+                              >
                                 {param.name}
                               </Typography>
                             </ConditionalTooltip>
@@ -219,27 +315,52 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                 ? t('components.prompts.advancedConfigEditor.variable.collapse')
                                 : t('components.prompts.advancedConfigEditor.variable.expand')
                             }
+                            sx={{
+                              width: 'clamp(1rem, 2.5vw, 2rem)',
+                              height: 'clamp(1rem, 2.5vw, 2rem)',
+                            }}
                           >
                             {variableExpanded[param.name] === undefined || variableExpanded[param.name] === true ? (
-                              <ChevronDown className="w-4 h-4" />
+                              <ChevronDown style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />
                             ) : (
-                              <ChevronRight className="w-4 h-4" />
+                              <ChevronRight style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />
                             )}
                           </IconButton>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center" style={{ gap: 'clamp(0.05rem, 0.25vw, 0.5rem)' }}>
                           {templateEngine === 'normal' && (
                             <Chip
                               label={param.type === 'placeholder' ? 'Placeholder' : t('components.prompts.advancedConfigEditor.variable.autoGenerated')}
                               size="small"
-                              className={param.type === 'placeholder' ? 'bg-purple-100 text-purple-700 text-xs' : 'bg-blue-100 text-blue-700 text-xs'}
+                              className={param.type === 'placeholder' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}
+                              sx={{ 
+                                fontSize: 'clamp(0.4rem, 1.2vw, 0.75rem)',
+                                height: 'clamp(0.75rem, 2vh, 1.25rem)',
+                              }}
                             />
                           )}
                           {templateEngine === 'jinja2' && param.type === 'placeholder' && (
-                            <Chip label="Placeholder" size="small" className="bg-purple-100 text-purple-700 text-xs" />
+                            <Chip 
+                              label="Placeholder" 
+                              size="small" 
+                              className="bg-purple-100 text-purple-700"
+                              sx={{ 
+                                fontSize: 'clamp(0.4rem, 1.2vw, 0.75rem)',
+                                height: 'clamp(0.75rem, 2vh, 1.25rem)',
+                              }}
+                            />
                           )}
                           {templateEngine === 'jinja2' && param.dataType && param.type !== 'placeholder' && (
-                            <Chip label={param.dataType} size="small" color="primary" variant="outlined" />
+                            <Chip 
+                              label={param.dataType} 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined"
+                              sx={{ 
+                                fontSize: 'clamp(0.4rem, 1.2vw, 0.75rem)',
+                                height: 'clamp(0.75rem, 2vh, 1.25rem)',
+                              }}
+                            />
                           )}
                           <IconButton
                             size="small"
@@ -256,8 +377,12 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                             }}
                             className="text-blue-500 hover:bg-blue-50"
                             title={t('components.prompts.advancedConfigEditor.variable.copyVariableValue')}
+                            sx={{
+                              width: 'clamp(1rem, 2.5vw, 2rem)',
+                              height: 'clamp(1rem, 2.5vw, 2rem)',
+                            }}
                           >
-                            <Copy className="w-4 h-4" />
+                            <Copy style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />
                           </IconButton>
                           {templateEngine === 'jinja2' && (
                             <>
@@ -274,8 +399,12 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                   }}
                                   className="text-green-500 hover:bg-green-50"
                                   title={t('components.prompts.advancedConfigEditor.variable.editVariable')}
+                                  sx={{
+                                    width: 'clamp(1rem, 2.5vw, 2rem)',
+                                    height: 'clamp(1rem, 2.5vw, 2rem)',
+                                  }}
                                 >
-                                  <Edit className="w-4 h-4" />
+                                  <Edit style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />
                                 </IconButton>
                               )}
                               <IconButton
@@ -289,8 +418,12 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                 }}
                                 className="text-red-500 hover:bg-red-50"
                                 title={t('components.prompts.advancedConfigEditor.variable.deleteVariable')}
+                                sx={{
+                                  width: 'clamp(1rem, 2.5vw, 2rem)',
+                                  height: 'clamp(1rem, 2.5vw, 2rem)',
+                                }}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />
                               </IconButton>
                             </>
                           )}
@@ -300,13 +433,17 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                       {(variableExpanded[param.name] === undefined || variableExpanded[param.name] === true) && (
                         <div>
                           {param.type === 'placeholder' ? (
-                            <div className="space-y-3">
-                              <Typography variant="caption" className="text-gray-600">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.25rem, 1vh, 0.75rem)' }}>
+                              <Typography 
+                                variant="caption" 
+                                className="text-gray-600"
+                                sx={{ fontSize: 'clamp(0.5rem, 1.3vw, 0.75rem)' }}
+                              >
                                 {t('components.prompts.advancedConfigEditor.variable.configurePlaceholderMessages')}
                               </Typography>
 
                               {/* Placeholder消息列表 */}
-                              <div className="space-y-3">
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.25rem, 1vh, 0.75rem)' }}>
                                 {param.messages?.map((msg, msgIndex) => {
                                   const getRoleStyles = (role: string) => {
                                     switch (role) {
@@ -346,11 +483,16 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                   return (
                                     <div
                                       key={msg.id}
-                                      className={`bg-white/80 border ${roleStyles.border} rounded-lg p-2 shadow-sm hover:shadow-sm transition-shadow`}
+                                      className={`bg-white/80 border ${roleStyles.border} rounded-lg shadow-sm hover:shadow-sm transition-shadow`}
+                                      style={{ padding: 'clamp(0.2rem, 0.75vw, 0.5rem)' }}
                                     >
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                          <FormControl size="small" className="min-w-[140px]" disabled={isReadOnly}>
+                                      <div className="flex items-center justify-between" style={{ marginBottom: 'clamp(0.2rem, 0.75vh, 0.5rem)' }}>
+                                        <div className="flex items-center" style={{ gap: 'clamp(0.2rem, 0.75vw, 0.5rem)' }}>
+                                          <FormControl 
+                                            size="small" 
+                                            disabled={isReadOnly}
+                                            sx={{ minWidth: 'clamp(60px, 12vw, 100px)' }}
+                                          >
                                             <Select
                                               value={msg.role}
                                               onChange={e => {
@@ -380,11 +522,11 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                                 '&:hover .MuiOutlinedInput-notchedOutline': {
                                                   borderColor: roleStyles.text.replace('text-', ''),
                                                 },
-                                                height: '25px',
-                                                fontSize: '15px',
+                                                height: 'clamp(1.2rem, 3vh, 1.75rem)',
+                                                fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
                                                 '& .MuiSelect-select': {
-                                                  padding: '4px 8px',
-                                                  fontSize: '15px',
+                                                  padding: 'clamp(0.15rem, 0.5vw, 0.5rem)',
+                                                  fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
                                                 },
                                               }}
                                               MenuProps={{
@@ -392,8 +534,8 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                                   sx: {
                                                     maxHeight: 140,
                                                     '& .MuiMenuItem-root': {
-                                                      fontSize: '12px',
-                                                      padding: '6px 16px',
+                                                      fontSize: 'clamp(0.5rem, 1.3vw, 0.75rem)',
+                                                      padding: 'clamp(0.15rem, 0.5vw, 0.375rem) clamp(0.4rem, 1.5vw, 1rem)',
                                                       minHeight: 'auto',
                                                     },
                                                   },
@@ -401,19 +543,19 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                               }}
                                             >
                                               <MenuItem value="system">
-                                                <span style={{ fontSize: '12px' }}>System</span>
+                                                <span>System</span>
                                               </MenuItem>
                                               <MenuItem value="user">
-                                                <span style={{ fontSize: '12px' }}>User</span>
+                                                <span>User</span>
                                               </MenuItem>
                                               <MenuItem value="assistant">
-                                                <span style={{ fontSize: '12px' }}>Assistant</span>
+                                                <span>Assistant</span>
                                               </MenuItem>
                                             </Select>
                                           </FormControl>
                                         </div>
 
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center" style={{ gap: 'clamp(0.05rem, 0.25vw, 0.25rem)' }}>
                                           <IconButton
                                             size="small"
                                             disabled={isReadOnly}
@@ -429,8 +571,12 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                             }}
                                             className="text-blue-500 hover:bg-blue-50 transition-colors"
                                             title={t('components.prompts.advancedConfigEditor.variable.copyContent')}
+                                            sx={{
+                                              width: 'clamp(0.9rem, 2vw, 1.5rem)',
+                                              height: 'clamp(0.9rem, 2vw, 1.5rem)',
+                                            }}
                                           >
-                                            <Copy className="w-3 h-3" />
+                                            <Copy style={{ width: 'clamp(0.4rem, 1.2vw, 0.75rem)', height: 'clamp(0.4rem, 1.2vw, 0.75rem)' }} />
                                           </IconButton>
 
                                           <IconButton
@@ -448,8 +594,12 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                             }}
                                             className="text-red-500 hover:bg-red-50 transition-colors"
                                             title={t('components.prompts.advancedConfigEditor.variable.deleteMessage')}
+                                            sx={{
+                                              width: 'clamp(0.9rem, 2vw, 1.5rem)',
+                                              height: 'clamp(0.9rem, 2vw, 1.5rem)',
+                                            }}
                                           >
-                                            <Trash2 className="w-3 h-3" />
+                                            <Trash2 style={{ width: 'clamp(0.4rem, 1.2vw, 0.75rem)', height: 'clamp(0.4rem, 1.2vw, 0.75rem)' }} />
                                           </IconButton>
                                         </div>
                                       </div>
@@ -479,6 +629,7 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                         InputProps={{
                                           className: 'bg-white/60',
                                           sx: {
+                                            fontSize: 'clamp(0.5rem, 1.3vw, 0.8125rem)',
                                             '& .MuiOutlinedInput-notchedOutline': {
                                               borderColor: roleStyles.border.replace('border-', ''),
                                             },
@@ -491,14 +642,10 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                             '& textarea': {
                                               resize: 'none',
                                               overflow: 'hidden',
+                                              fontSize: 'clamp(0.5rem, 1.3vw, 0.8125rem)',
+                                              lineHeight: '1.5',
+                                              minHeight: 'clamp(0.75rem, 2vh, 1.25rem)',
                                             },
-                                          },
-                                        }}
-                                        inputProps={{
-                                          style: {
-                                            fontSize: '13px',
-                                            lineHeight: '1.5',
-                                            minHeight: '20px',
                                           },
                                         }}
                                         autoFocus={editingParamId === param.name + '_' + msgIndex}
@@ -509,11 +656,11 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                               </div>
 
                               {/* 添加消息按钮 */}
-                              <div className="flex justify-center mt-2">
+                              <div className="flex justify-center" style={{ marginTop: 'clamp(0.2rem, 0.75vh, 0.5rem)' }}>
                                 <Button
                                   size="small"
                                   variant="outlined"
-                                  startIcon={<Plus className="w-4 h-4" />}
+                                  startIcon={<Plus style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />}
                                   onClick={() => {
                                     if (isReadOnly) {
                                       return
@@ -531,8 +678,12 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                     })
                                     onParametersChange(newParams)
                                   }}
-                                  className="border-green-300 text-green-600 hover:bg-green-50 text-xs"
+                                  className="border-green-300 text-green-600 hover:bg-green-50"
                                   disabled={isReadOnly}
+                                  sx={{
+                                    fontSize: 'clamp(0.5rem, 1.3vw, 0.75rem)',
+                                    padding: 'clamp(0.15rem, 0.5vw, 0.375rem) clamp(0.3rem, 1vw, 0.75rem)',
+                                  }}
                                 >
                                   {t('components.prompts.advancedConfigEditor.variable.addMessage')}
                                 </Button>
@@ -549,16 +700,31 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                                   onParameterChange(param.name, e.target.value)
                                 }}
                                 row
-                                className="gap-4"
+                                sx={{ gap: 'clamp(0.25rem, 1vw, 1rem)' }}
                               >
                                 <FormControlLabel
                                   value="true"
                                   control={<Radio size="small" disabled={isReadOnly} />}
                                   label="True"
-                                  className="mr-6"
                                   disabled={isReadOnly}
+                                  sx={{
+                                    marginRight: 'clamp(0.3rem, 1.5vw, 1.5rem)',
+                                    '& .MuiFormControlLabel-label': {
+                                      fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
+                                    },
+                                  }}
                                 />
-                                <FormControlLabel value="false" control={<Radio size="small" disabled={isReadOnly} />} label="False" disabled={isReadOnly} />
+                                <FormControlLabel 
+                                  value="false" 
+                                  control={<Radio size="small" disabled={isReadOnly} />} 
+                                  label="False" 
+                                  disabled={isReadOnly}
+                                  sx={{
+                                    '& .MuiFormControlLabel-label': {
+                                      fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
+                                    },
+                                  }}
+                                />
                               </RadioGroup>
                             </FormControl>
                           ) : param.dataType === 'object' ? (
@@ -607,6 +773,10 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                               disabled={isReadOnly}
                               sx={{
                                 '& .MuiOutlinedInput-root': {
+                                  fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
+                                  '& input': {
+                                    fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
+                                  },
                                   '& fieldset': {
                                     borderColor: '#d1d5db',
                                   },
@@ -626,19 +796,30 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
                   </Paper>
                 ))
               ) : (
-                <div className="text-center py-6 text-gray-500">
-                  <Settings className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                  <p>{t('components.prompts.advancedConfigEditor.variable.noVariables')}</p>
-                  <p className="text-sm">{t('components.prompts.advancedConfigEditor.variable.variableDefinitionHint')}</p>
+                <div className="text-center text-gray-500" style={{ padding: 'clamp(0.5rem, 2vh, 1.5rem) 0' }}>
+                  <Settings 
+                    className="mx-auto text-gray-300" 
+                    style={{ 
+                      width: 'clamp(1.5rem, 4vw, 2.5rem)', 
+                      height: 'clamp(1.5rem, 4vw, 2.5rem)',
+                      marginBottom: 'clamp(0.2rem, 0.75vh, 0.5rem)',
+                    }} 
+                  />
+                  <p style={{ fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)' }}>{t('components.prompts.advancedConfigEditor.variable.noVariables')}</p>
+                  <p style={{ fontSize: 'clamp(0.5rem, 1.3vw, 0.8125rem)' }}>{t('components.prompts.advancedConfigEditor.variable.variableDefinitionHint')}</p>
                 </div>
               )}
             </div>
 
             {templateEngine === 'jinja2' && onAddVariable && (
-              <div className="mt-4 text-center">
+              <div className="text-center" style={{ marginTop: 'clamp(0.3rem, 1.5vh, 1rem)' }}>
                 <Button
                   variant="outlined"
-                  startIcon={<Plus className="w-4 h-4" />}
+                  sx={{
+                    fontSize: 'clamp(0.5rem, 1.5vw, 0.875rem)',
+                    padding: 'clamp(0.2rem, 0.75vw, 0.5rem) clamp(0.4rem, 1.5vw, 1rem)',
+                  }}
+                  startIcon={<Plus style={{ width: 'clamp(0.5rem, 1.5vw, 1rem)', height: 'clamp(0.5rem, 1.5vw, 1rem)' }} />}
                   onClick={e => {
                     if (isReadOnly) {
                       return
@@ -658,27 +839,58 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
             )}
 
             {/* 页签底部提示文本 */}
-            <div className="mt-6">
-              <Alert severity="info">
-                <Typography variant="body2">
-                  {templateEngine === 'normal'
-                    ? t('components.prompts.advancedConfigEditor.variable.normalModeHint')
-                    : t('components.prompts.advancedConfigEditor.variable.jinja2ModeHint')}
-                </Typography>
-              </Alert>
-            </div>
+            {showHint && (
+              <div style={{ marginTop: 'clamp(0.5rem, 2vh, 1.5rem)' }}>
+                <Alert 
+                  severity="info"
+                  action={
+                    <IconButton
+                      aria-label="close"
+                      color="inherit"
+                      size="small"
+                      onClick={() => setShowHint(false)}
+                      sx={{
+                        padding: 'clamp(0.1rem, 0.5vw, 0.2rem)',
+                      }}
+                    >
+                      <X style={{ width: 'clamp(0.5rem, 2vw, 0.875rem)', height: 'clamp(0.5rem, 2vw, 0.875rem)' }} />
+                    </IconButton>
+                  }
+                  sx={{
+                    padding: 'clamp(0.25rem, 0.5vw, 0.5rem) clamp(0.5rem, 1vw, 0.75rem)',
+                    '& .MuiAlert-message': {
+                      padding: 0,
+                    },
+                    '& .MuiAlert-icon': {
+                      padding: 0,
+                      marginRight: 'clamp(0.375rem, 0.75vw, 0.5rem)',
+                    },
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontSize: 'clamp(0.65rem, 1.4vw, 0.8125rem)' }}>
+                    {templateEngine === 'normal'
+                      ? t('components.prompts.advancedConfigEditor.variable.normalModeHint')
+                      : t('components.prompts.advancedConfigEditor.variable.jinja2ModeHint')}
+                  </Typography>
+                </Alert>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* 模型设置标签页 */}
-      <div role="tabpanel" hidden={activeTab !== 1} className="flex-1 flex-col p-4">
+      <div role="tabpanel" hidden={activeTab !== 1} className="flex-1 flex-col" style={{ padding: 'clamp(0.375rem, 1vw, 1rem)' }}>
         {activeTab === 1 && (
           <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto max-h-[calc(100vh-425px)] scrollbar-hide">
+            <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ maxHeight: modelSettingsMaxHeight }}>
               {/* 模型选择区域 */}
-              <div className="space-y-3">
-                <Typography variant="h6" className="text-gray-800 font-bold">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 1vh, 0.75rem)' }}>
+                <Typography 
+                  variant="h6" 
+                  className="text-gray-800 font-bold"
+                  sx={{ fontSize: 'clamp(0.35rem, 1.75vw, 1rem)' }}
+                >
                   {t('components.prompts.advancedConfigEditor.model.modelSelection')}
                 </Typography>
 
@@ -695,11 +907,15 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
               </div>
 
               {/* 分隔线 */}
-              <div className="border-t border-gray-300 my-4"></div>
+              <div className="border-t border-gray-300" style={{ margin: 'clamp(0.5rem, 1.5vh, 1rem) 0' }}></div>
 
               {/* 参数配置区域 */}
-              <div className="space-y-4">
-                <Typography variant="h6" className="text-gray-800 font-bold">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.5rem, 1.5vh, 1rem)' }}>
+                <Typography 
+                  variant="h6" 
+                  className="text-gray-800 font-bold"
+                  sx={{ fontSize: 'clamp(0.35rem, 1.75vw, 1rem)' }}
+                >
                   {t('components.prompts.advancedConfigEditor.model.parameterConfig')}
                 </Typography>
 
@@ -712,18 +928,47 @@ const AdvancedConfigEditor: React.FC<AdvancedConfigEditorProps> = ({
               </div>
 
               {/* 页签底部提示文本 */}
-              <div className="mt-6">
-                <Alert severity="info">
-                  <Typography variant="body2">{t('components.prompts.advancedConfigEditor.model.settingsHint')}</Typography>
-                </Alert>
-              </div>
+              {showModelHint && (
+                <div style={{ marginTop: 'clamp(0.75rem, 2vh, 1.5rem)' }}>
+                  <Alert 
+                    severity="info"
+                    action={
+                      <IconButton
+                        aria-label="close"
+                        color="inherit"
+                        size="small"
+                        onClick={() => setShowModelHint(false)}
+                        sx={{
+                          padding: 'clamp(0.1rem, 0.5vw, 0.2rem)',
+                        }}
+                      >
+                        <X style={{ width: 'clamp(0.5rem, 2vw, 0.875rem)', height: 'clamp(0.5rem, 2vw, 0.875rem)' }} />
+                      </IconButton>
+                    }
+                    sx={{
+                      padding: 'clamp(0.25rem, 0.5vw, 0.5rem) clamp(0.5rem, 1vw, 0.75rem)',
+                      '& .MuiAlert-message': {
+                        padding: 0,
+                      },
+                      '& .MuiAlert-icon': {
+                        padding: 0,
+                        marginRight: 'clamp(0.375rem, 0.75vw, 0.5rem)',
+                      },
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontSize: 'clamp(0.65rem, 1.4vw, 0.8125rem)' }}>
+                      {t('components.prompts.advancedConfigEditor.model.settingsHint')}
+                    </Typography>
+                  </Alert>
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* 工具设置标签页 */}
-      <div role="tabpanel" hidden={activeTab !== 2} className="flex-1 flex-col p-4">
+      <div role="tabpanel" hidden={activeTab !== 2} className="flex-1 flex-col" style={{ padding: 'clamp(0.375rem, 1vw, 1rem)' }}>
         {activeTab === 2 && (
           <ToolSettingsPanel
             tools={tools}

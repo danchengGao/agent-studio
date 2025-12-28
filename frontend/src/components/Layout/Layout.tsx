@@ -70,9 +70,9 @@ const Layout: React.FC = () => {
         <Header user={user} onMenuClick={() => setSidebarOpen(true)} />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-[#F8F9FC]">
-          <div className="py-6 h-full">
-            <div className="w-full h-full px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 overflow-auto bg-[#F8F9FC]">
+          <div className="py-6 h-full min-w-full">
+            <div className="min-w-full h-full px-4 sm:px-6 lg:px-8">
               <Outlet />
             </div>
           </div>

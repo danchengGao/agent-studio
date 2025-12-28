@@ -79,11 +79,14 @@ import {
   useSaveJobDraft,
   useJobDraftDetail,
   useDeleteOptimizationJob,
+  useJobHistory,
   PromptModelService,
   PromptService,
   type Prompt,
   type PromptModel,
   type OptimizationCase,
+  type EvaluateCase,
+  type GetJobHistoryResponse,
 } from '@test-agentstudio/api-client'
 import { Tool } from '@/types/promptType'
 import DiffViewer from '@/components/Prompts/DiffViewer'
@@ -92,7 +95,10 @@ import ConditionalTooltip from '@/components/Prompts/ConditionalTooltip'
 import { FormattedPromptEditor, ModelSelector, ModelParameterEditor } from '@/components/Prompts'
 import ToolSettingsPanel from '@/components/Prompts/ToolSettingsPanel'
 import ToolEditDialog, { type EditingTool } from '@/components/Prompts/ToolEditDialog'
+import { SliderField } from '@/components/Prompts/SliderField'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
+import Pagination from '@/components/Prompts/Pagination'
+import EvaluationDetailDialog from '@/components/Prompts/EvaluationDetailDialog'
 import { copyToClipboard } from '@/utils/prompts/utils'
 import { convertApiToolsToFrontendTools, convertFrontendToolsToApiTools } from '@/utils/prompts/toolFormatConverter'
 
@@ -129,7 +135,7 @@ const PromptOptimizeEditPage: React.FC = () => {
   const isDraftType = urlParams.get('type') === 'draft'
 
   // 根据任务类型调用不同的详情查询接口
-  const { data: formalJobDetailData, isLoading: formalJobDetailLoading } = useOptimizationJobDetail(
+  const { data: formalJobDetailData, isLoading: formalJobDetailLoading, error: formalJobDetailError } = useOptimizationJobDetail(
     id && isEditMode && !isDraftType ? id : undefined,
     workspaceId,
     userId,
@@ -139,13 +145,37 @@ const PromptOptimizeEditPage: React.FC = () => {
     data: draftDetailData,
     isLoading: draftDetailLoading,
     refetch: refetchDraftDetail,
+    error: draftDetailError,
   } = useJobDraftDetail(id && isEditMode && isDraftType ? parseInt(id) : undefined, workspaceId, userId)
 
   // 统一的数据和加载状态
   const jobDetailData = isDraftType ? draftDetailData : formalJobDetailData
+  const jobDetailError = isDraftType ? draftDetailError : formalJobDetailError
   const createOptimizationJobMutation = useCreateOptimizationJob()
   const saveJobDraftMutation = useSaveJobDraft()
   const deleteJobMutation = useDeleteOptimizationJob()
+
+  // 详情对话框相关状态（需要在useJobHistory之前定义）
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [detailDialogType, setDetailDialogType] = useState<'original' | 'optimized'>('original')
+  const [detailDialogIterationRound, setDetailDialogIterationRound] = useState(0)
+  const [detailDialogPageNum, setDetailDialogPageNum] = useState(1)
+  const [detailDialogPageSize, setDetailDialogPageSize] = useState(10)
+  const [evaluateCases, setEvaluateCases] = useState<EvaluateCase[]>([])
+
+  // 获取用例历史记录
+  const {
+    data: jobHistoryData,
+    isLoading: jobHistoryLoading,
+    refetch: refetchJobHistory,
+  } = useJobHistory(
+    detailDialogOpen && id ? id : undefined,
+    detailDialogOpen ? workspaceId : undefined,
+    detailDialogOpen ? userId : undefined,
+    detailDialogOpen ? detailDialogPageNum : undefined,
+    detailDialogOpen ? detailDialogPageSize : undefined,
+    detailDialogOpen ? detailDialogIterationRound : undefined,
+  )
   const [taskName, setTaskName] = useState('')
   const [description, setDescription] = useState('')
   const [originalPrompt, setOriginalPrompt] = useState('') // 基本信息中可编辑的原始提示词
@@ -237,13 +267,14 @@ const PromptOptimizeEditPage: React.FC = () => {
   const [optimizationHistory, setOptimizationHistory] = useState<any[]>([])
   const [currentOptimizedVersion, setCurrentOptimizedVersion] = useState(0)
   const [optimizedVersions, setOptimizedVersions] = useState<string[]>([])
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
-  const [detailDialogType, setDetailDialogType] = useState<'original' | 'optimized'>('original')
   const [isCreatingJob, setIsCreatingJob] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [draftId, setDraftId] = useState<number | undefined>(undefined)
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null)
+  
+  // 响应式高度状态
+  const [contentHeight, setContentHeight] = useState<string>('80vh')
 
   // 页码编辑处理
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -519,6 +550,9 @@ const PromptOptimizeEditPage: React.FC = () => {
     toolsEnabled: false,
   })
 
+  // 使用ref跟踪已处理的jobDetailData，避免重复处理
+  const processedJobDetailDataRef = useRef<string | null>(null)
+
   // 根据任务状态获取提示信息
   const getStatusMessage = (status: string): string => {
     switch (status) {
@@ -539,9 +573,49 @@ const PromptOptimizeEditPage: React.FC = () => {
     }
   }
 
+  // 处理任务详情API错误
+  useEffect(() => {
+    if (jobDetailError) {
+      // 从错误对象中提取错误信息
+      let errorMessage = '获取优化任务详情失败'
+      
+      if (jobDetailError instanceof Error) {
+        // ApiError 继承自 Error，错误信息在 message 字段
+        errorMessage = jobDetailError.message || errorMessage
+      } else if (typeof jobDetailError === 'object' && jobDetailError !== null) {
+        // 检查是否是 ApiError 类型，通常错误信息在 message 或 msg 字段
+        const apiError = jobDetailError as any
+        // 优先从 response.data.msg 获取，然后是 message，最后是默认值
+        errorMessage = apiError.response?.data?.msg || apiError.message || apiError.msg || errorMessage
+      } else if (typeof jobDetailError === 'string') {
+        errorMessage = jobDetailError
+      }
+      
+      // 只有当错误信息不为空时才显示
+      if (errorMessage && errorMessage.trim()) {
+        showSnackbar(errorMessage, 'error')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobDetailError])
+
   // 处理任务详情数据（包括正式任务和草稿）
   useEffect(() => {
-    if (jobDetailData && jobDetailData.code === 200) {
+    if (!jobDetailData) {
+      return
+    }
+
+    // 生成唯一标识，避免重复处理相同的数据
+    const dataKey = `${id}_${jobDetailData.code}_${isDraftType ? 'draft' : 'formal'}`
+    if (processedJobDetailDataRef.current === dataKey) {
+      // 已经处理过这个数据，跳过
+      return
+    }
+
+    if (jobDetailData.code === 200) {
+      // 标记为已处理
+      processedJobDetailDataRef.current = dataKey
+      
       if (isDraftType) {
         // 草稿类型的数据处理
         const content = jobDetailData.content
@@ -719,7 +793,18 @@ const PromptOptimizeEditPage: React.FC = () => {
               improvement: `${((item.success_rate || 0) * 100).toFixed(2)}%`,
               summary: t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: item.iteration_round }),
             }))
-            setOptimizationHistory(allHistory)
+            
+            // 检查数据是否真的变化了，避免不必要的状态更新
+            const historyChanged = 
+              optimizationHistory.length !== allHistory.length ||
+              optimizationHistory.some((item, index) => 
+                item.round !== allHistory[index]?.round || 
+                item.score !== allHistory[index]?.score
+              )
+            
+            if (historyChanged) {
+              setOptimizationHistory(allHistory)
+            }
 
             // 构建优化版本（只包含第1轮及以后的优化版本）
             const optimizedRounds = jobDetailData.history.filter(item => item.iteration_round > 0)
@@ -736,7 +821,12 @@ const PromptOptimizeEditPage: React.FC = () => {
           }
         }
       }
+    } else {
+      // 处理错误情况：code 不是 200
+      const errorMessage = jobDetailData.msg || '获取优化任务详情失败'
+      showSnackbar(errorMessage, 'error')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobDetailData, isDraftType, id])
 
   // 处理模型设置（当模型列表和任务详情都加载完成后）
@@ -832,6 +922,32 @@ const PromptOptimizeEditPage: React.FC = () => {
       // startProgressPolling(jobId)
     }
   }
+
+  // 处理用例历史记录数据
+  useEffect(() => {
+    if (jobHistoryData && (jobHistoryData.code === 200 || jobHistoryData.code === 0)) {
+      if (jobHistoryData.history && jobHistoryData.history.length > 0) {
+        // 获取第一个历史记录项的评测用例
+        const historyItem = jobHistoryData.history[0]
+        if (historyItem.evaluate_cases) {
+          setEvaluateCases(historyItem.evaluate_cases)
+        } else {
+          setEvaluateCases([])
+        }
+      } else {
+        // 如果history为空数组，清空数据
+        setEvaluateCases([])
+        // 如果有错误消息，显示提示
+        if (jobHistoryData.msg) {
+          showSnackbar(jobHistoryData.msg, 'warning')
+        }
+      }
+    } else if (jobHistoryData && jobHistoryData.code !== 200 && jobHistoryData.code !== 0) {
+      // 如果返回错误，显示错误信息
+      showSnackbar(jobHistoryData.msg || '获取用例历史记录失败', 'error')
+      setEvaluateCases([])
+    }
+  }, [jobHistoryData])
 
   // 获取提示词列表
   useEffect(() => {
@@ -967,6 +1083,26 @@ const PromptOptimizeEditPage: React.FC = () => {
   // 页面加载时获取模型列表
   React.useEffect(() => {
     fetchModels()
+  }, [])
+
+  // 响应式计算主体内容区域高度
+  React.useEffect(() => {
+    const updateContentHeight = () => {
+      if (window.innerWidth < 640) {
+        // 小屏幕：手机等移动设备
+        setContentHeight('70vh')
+      } else if (window.innerWidth < 2000) {
+        // 中等屏幕：平板、14寸笔记本等
+        setContentHeight('72vh')
+      } else {
+        // 大屏幕：15寸以上笔记本、台式显示器
+        setContentHeight('85vh')
+      }
+    }
+
+    updateContentHeight()
+    window.addEventListener('resize', updateContentHeight)
+    return () => window.removeEventListener('resize', updateContentHeight)
   }, [])
 
   // 页面进入时，如果是草稿类型，强制刷新一次（确保获取最新数据）
@@ -1891,11 +2027,6 @@ const PromptOptimizeEditPage: React.FC = () => {
     return { isValid: true }
   }
 
-  // 自定义用例检查函数（使用当前状态，保持向后兼容）
-  const validateTestCases = (): { isValid: boolean; errorMessage?: string } => {
-    return validateTestCasesWithValues(latestValuesRef.current)
-  }
-
   // 将testCases转换为用例检查API需要的格式
   const convertTestCasesToCheckFormat = (): OptimizationCase[] => {
     return testCases.map(testCase => {
@@ -2440,8 +2571,11 @@ const PromptOptimizeEditPage: React.FC = () => {
     }
   }
 
-  const handleShowDetail = (type: 'original' | 'optimized') => {
+  const handleShowDetail = (type: 'original' | 'optimized', iterationRound: number = 0) => {
     setDetailDialogType(type)
+    setDetailDialogIterationRound(iterationRound)
+    setDetailDialogPageNum(1) // 重置为第一页
+    setEvaluateCases([]) // 清空之前的数据，避免显示旧数据
     setDetailDialogOpen(true)
   }
 
@@ -2461,36 +2595,63 @@ const PromptOptimizeEditPage: React.FC = () => {
     navigate(`/dashboard/prompts/${editorPromptId}`)
   }
 
-  // 模拟评测数据
+  // 获取评测数据（从API返回的数据转换为表格显示格式）
   const getEvaluationData = () => {
-    const baseData = [
-      {
-        userInput: '如何办理退款？',
-        modelAnswer: detailDialogType === 'original' ? '请联系客服处理退款事宜。' : '您好！我来帮您处理退款事宜。请提供订单号，我会立即为您查询并协助办理。',
-        referenceAnswer: '您好！我理解您需要办理退款。请提供订单号，我会立即查询并协助您完成退款流程。',
-        score: detailDialogType === 'original' ? 65 : 92,
-        reason: detailDialogType === 'original' ? '回复过于简短，缺乏具体指导' : '回复友好专业，提供了清晰的解决方案',
-      },
-      {
-        userInput: '产品保修期是多久？',
-        modelAnswer:
-          detailDialogType === 'original' ? '一年。' : '感谢您的咨询！我们的产品享有一年的质保期，从购买之日起计算。如需了解更多保修政策，请随时告诉我。',
-        referenceAnswer: '我们的产品提供一年质保服务，自购买日期开始计算。保修期内出现非人为损坏，可享受免费维修或更换服务。',
-        score: detailDialogType === 'original' ? 50 : 88,
-        reason: detailDialogType === 'original' ? '信息准确但表达过于简单' : '信息完整，语气友好，但可以补充更多保修细节',
-      },
-      {
-        userInput: '怎么联系客服？',
-        modelAnswer:
-          detailDialogType === 'original'
-            ? '拨打客服电话。'
-            : '您可以通过以下方式联系我们：\n1. 在线客服（工作时间实时响应）\n2. 客服热线：400-XXX-XXXX\n3. 邮箱：support@example.com\n我现在就可以为您提供帮助，请问有什么需要协助的吗？',
-        referenceAnswer: '您可以通过电话、在线客服或邮件联系我们。客服热线：400-XXX-XXXX，工作时间：周一至周日 9:00-21:00。',
-        score: detailDialogType === 'original' ? 40 : 95,
-        reason: detailDialogType === 'original' ? '缺少具体联系方式' : '提供了完整的联系方式，并主动提供帮助',
-      },
-    ]
-    return baseData
+    if (!evaluateCases || evaluateCases.length === 0) {
+      return []
+    }
+
+    return evaluateCases.map(evalCase => {
+      // 用户输入：直接展示原始JSON
+      const userInput = JSON.stringify(evalCase.case.inputs, null, 2)
+
+      // 参照回答：优先展示tool_calls，如果为空则展示output
+      let referenceAnswer = ''
+      const labelToolCalls = (evalCase.case.label as any)?.tool_calls
+      if (labelToolCalls && Array.isArray(labelToolCalls) && labelToolCalls.length > 0) {
+        // 如果有tool_calls，只取第一个，删除id、type、index字段后展示JSON
+        const firstToolCall = labelToolCalls[0]
+        const cleaned: any = { ...firstToolCall }
+        // 删除可能存在的字段
+        if ('id' in cleaned) delete cleaned.id
+        if ('type' in cleaned) delete cleaned.type
+        if ('index' in cleaned) delete cleaned.index
+        referenceAnswer = JSON.stringify(cleaned, null, 2)
+      } else {
+        // 否则展示output
+        referenceAnswer = evalCase.case.label?.output || ''
+      }
+
+      // 模型回答：优先展示tool_calls，如果为空则展示output
+      let modelAnswer = ''
+      if (evalCase.answer.tool_calls && evalCase.answer.tool_calls.length > 0) {
+        // 如果有tool_calls，只取第一个，删除id、type、index字段后展示JSON
+        const firstToolCall = evalCase.answer.tool_calls[0]
+        const cleaned: any = { ...firstToolCall }
+        // 删除可能存在的字段
+        if ('id' in cleaned) delete cleaned.id
+        if ('type' in cleaned) delete cleaned.type
+        if ('index' in cleaned) delete cleaned.index
+        modelAnswer = JSON.stringify(cleaned, null, 2)
+      } else {
+        // 否则展示output
+        modelAnswer = evalCase.answer.output || ''
+      }
+
+      // 模型评分
+      const score = Math.round(evalCase.score * 100) // 将0-1的分数转换为0-100
+
+      // 评分原因
+      const reason = evalCase.reason || ''
+
+      return {
+        userInput,
+        modelAnswer,
+        referenceAnswer,
+        score,
+        reason,
+      }
+    })
   }
 
   // 获取当前显示的提示词
@@ -2504,12 +2665,21 @@ const PromptOptimizeEditPage: React.FC = () => {
       {/* 页面容器 */}
       <div style={{ margin: '0 auto', minWidth: '1100px' }}>
       {/* 页面头部 */}
-      <div className="flex items-center justify-between bg-white/60 backdrop-blur-sm p-4 border border-gray-200/60 shadow-sm">
-        <div className="flex items-center space-x-4">
+      <div 
+        className="flex items-center bg-white/60 backdrop-blur-sm border border-gray-200/60 shadow-sm"
+        style={{
+          padding: 'clamp(0.5rem, 0.6vw, 0.875rem)',
+          minHeight: 'clamp(3.5rem, 4.5vh, 4rem)',
+          minWidth: 'fit-content',
+          width: '100%',
+        }}
+      >
           <IconButton
             onClick={handleBack}
             className="hover:bg-gray-100/80 transition-colors duration-200"
             sx={{
+            width: 'clamp(1.75rem, 2vw, 2.25rem)',
+            height: 'clamp(1.75rem, 2vw, 2.25rem)',
               '&:hover': {
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 transform: 'translateX(-2px)',
@@ -2517,12 +2687,30 @@ const PromptOptimizeEditPage: React.FC = () => {
               transition: 'all 0.2s ease',
             }}
           >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <ArrowLeft 
+            className="text-gray-600"
+            style={{
+              width: 'clamp(0.875rem, 1vw, 1.125rem)',
+              height: 'clamp(0.875rem, 1vw, 1.125rem)',
+            }}
+          />
           </IconButton>
-          <div className="flex items-center gap-3">
-            <div>
+        <div 
+          className="flex items-center flex-1 min-w-0"
+          style={{
+            gap: 'clamp(0.375rem, 0.5vw, 0.5rem)',
+            marginLeft: 'clamp(0.5rem, 0.8vw, 0.875rem)',
+          }}
+        >
+          <div className="min-w-0" style={{ maxWidth: '50%', flex: '0 1 auto' }}>
               <ConditionalTooltip title={isEditMode ? taskName || t('prompts.optimizeEditPage.common.editTask') : t('prompts.optimizeEditPage.common.newTask')}>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate max-w-md">
+              <h1 
+                className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate"
+                style={{
+                  fontSize: 'clamp(0.875rem, 0.85vw, 1.125rem)',
+                  lineHeight: 1.5,
+                }}
+              >
                   {isEditMode ? taskName || t('prompts.optimizeEditPage.common.editTask') : t('prompts.optimizeEditPage.common.newTask')}
                 </h1>
               </ConditionalTooltip>
@@ -2533,7 +2721,14 @@ const PromptOptimizeEditPage: React.FC = () => {
                     : t('prompts.optimizeEditPage.basicInfo.createDescription')
                 }
               >
-                <p className="text-sm text-gray-600 truncate max-w-md">
+              <p 
+                className="text-gray-600 truncate"
+                style={{
+                  fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                  marginTop: 'clamp(0.125rem, 0.1vh, 0.1875rem)',
+                  lineHeight: 1.6,
+                }}
+              >
                   {isEditMode
                     ? description || t('prompts.optimizeEditPage.basicInfo.editDescription')
                     : t('prompts.optimizeEditPage.basicInfo.createDescription')}
@@ -2541,33 +2736,92 @@ const PromptOptimizeEditPage: React.FC = () => {
               </ConditionalTooltip>
             </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-3">
+
+        <div 
+          className="flex items-center"
+          style={{
+            gap: 'clamp(0.5rem, 1vw, 1rem)',
+          }}
+        >
           {/* 自动保存状态指示器 */}
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
+          <div 
+            className="flex items-center text-gray-500"
+            style={{
+              gap: 'clamp(0.375rem, 0.7vw, 0.625rem)',
+            }}
+          >
             {isSavingDraft ? (
               <>
-                <CircularProgress size={16} className="text-blue-600" />
-                <span>{t('prompts.optimizeEditPage.common.autoSaving')}</span>
+                <CircularProgress 
+                  size={16} 
+                  className="text-blue-600"
+                  sx={{
+                    width: 'clamp(0.875rem, 1vw, 1rem) !important',
+                    height: 'clamp(0.875rem, 1vw, 1rem) !important',
+                  }}
+                />
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t('prompts.optimizeEditPage.common.autoSaving')}
+                </Typography>
               </>
             ) : lastSavedTime ? (
               <>
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                <span>
+                <CheckCircle 
+                  style={{
+                    width: 'clamp(0.875rem, 1vw, 1rem)',
+                    height: 'clamp(0.875rem, 1vw, 1rem)',
+                  }}
+                  className="text-green-500" 
+                />
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {t('prompts.optimizeEditPage.common.saved')} {lastSavedTime.toLocaleTimeString()}
-                </span>
+                </Typography>
               </>
             ) : (
-              <span className="text-gray-400">{t('prompts.optimizeEditPage.common.autoSaveHint')}</span>
+              <Typography
+                variant="body2"
+                className="text-gray-400"
+                sx={{
+                  fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {t('prompts.optimizeEditPage.common.autoSaveHint')}
+              </Typography>
             )}
           </div>
           <Button
             variant="contained"
-            startIcon={isCreatingJob ? <CircularProgress size={20} className="text-white" /> : <Play />}
+            startIcon={isCreatingJob ? (
+              <CircularProgress 
+                sx={{
+                  width: 'clamp(0.75rem, 0.75vw, 0.9375rem) !important',
+                  height: 'clamp(0.75rem, 0.75vw, 0.9375rem) !important',
+                  color: 'white',
+                }}
+              />
+            ) : (
+              <Play style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />
+            )}
             onClick={handleStartOptimization}
             disabled={isCreatingJob}
             sx={{
               background: isCreatingJob ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+              padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+              minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
               '&:hover': {
                 background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                 transform: 'translateY(-1px)',
@@ -2578,7 +2832,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                 color: '#6b7280',
               },
               transition: 'all 0.2s ease',
-              borderRadius: '8px',
+              borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
               textTransform: 'none',
               fontWeight: 600,
               boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
@@ -2590,7 +2844,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       </div>
 
       {/* 主体内容 - 三列布局 */}
-      <div className="resizable-columns-container flex h-[calc(100vh-180px)]" style={{ minWidth: '1100px' }}>
+      <div className="resizable-columns-container flex" style={{ minWidth: '1100px', height: contentHeight }}>
         {/* Column 1: 基本信息 */}
         <div
           style={{
@@ -2608,19 +2862,57 @@ const PromptOptimizeEditPage: React.FC = () => {
           {/* 隐藏滚动条（Webkit） */}
           <style>{`.basic-info-scroll::-webkit-scrollbar { display: none; }`}</style>
           <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-            <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-sm">
-                    <FileText className="w-4 h-4 text-white" />
+            <CardContent 
+              className="flex-1 flex flex-col overflow-hidden"
+              sx={{
+                padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+              }}
+            >
+              <div 
+                className="flex items-center justify-between"
+                style={{
+                  marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
+                }}
+              >
+                <div 
+                  className="flex items-center"
+                  style={{
+                    gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                  }}
+                >
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-sm"
+                    style={{
+                      padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                    }}
+                  >
+                    <FileText 
+                      className="text-white"
+                      style={{
+                        width: 'clamp(0.5rem, 1vw, 1rem)',
+                        height: 'clamp(0.5rem, 1vw, 1rem)',
+                      }}
+                    />
                   </div>
-                  <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                  <Typography 
+                    variant="h6" 
+                    className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                    sx={{
+                      fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                      lineHeight: 1.3,
+                    }}
+                  >
                     {t('prompts.optimizeEditPage.basicInfo.title')}
                   </Typography>
                 </div>
 
                 {/* 展开其他模块的按钮 */}
-                <div className="flex items-center gap-1">
+                <div 
+                  className="flex items-center"
+                  style={{
+                    gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                  }}
+                >
                   {moduleCollapsed.optimizationConfig && (
                     <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.expand')}>
                       <IconButton
@@ -2628,12 +2920,19 @@ const PromptOptimizeEditPage: React.FC = () => {
                         onClick={() => toggleModuleCollapse('optimizationConfig')}
                         className="text-gray-400 hover:text-blue-600"
                         sx={{
+                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
                           '&:hover': {
                             backgroundColor: '#eff6ff',
                           },
                         }}
                       >
-                        <Settings className="w-4 h-4" />
+                        <Settings 
+                          style={{
+                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          }}
+                        />
                       </IconButton>
                     </Tooltip>
                   )}
@@ -2645,12 +2944,19 @@ const PromptOptimizeEditPage: React.FC = () => {
                         onClick={() => toggleModuleCollapse('optimizationResult')}
                         className="text-gray-400 hover:text-blue-600"
                         sx={{
+                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
                           '&:hover': {
                             backgroundColor: '#eff6ff',
                           },
                         }}
                       >
-                        <BarChart className="w-4 h-4" />
+                        <BarChart 
+                          style={{
+                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          }}
+                        />
                       </IconButton>
                     </Tooltip>
                   )}
@@ -2658,16 +2964,52 @@ const PromptOptimizeEditPage: React.FC = () => {
               </div>
               {/* 基本信息主体内容：单独做一个可滚动区域，隐藏滚动条 */}
               <div
-                className="flex-1 flex flex-col space-y-4 basic-info-scroll"
-                style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                className="flex-1 flex flex-col basic-info-scroll"
+                style={{ 
+                  overflowY: 'auto', 
+                  scrollbarWidth: 'none', 
+                  msOverflowStyle: 'none',
+                  gap: 'clamp(0.5rem, 1.5vw, 1rem)',
+                }}
               >
                 {/* 任务信息配置 */}
-                <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex-shrink-0 space-y-4">
-                  <Typography variant="subtitle1" className="mb-3 font-bold text-gray-800 flex items-center space-x-3">
-                    <Settings className="w-5 h-5 text-blue-600" />
+                <div 
+                  className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex-shrink-0"
+                  style={{
+                    padding: 'clamp(0.5rem, 1.5vw, 1rem)',
+                    gap: 'clamp(0.5rem, 1.5vw, 1rem)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <Typography 
+                    variant="subtitle1" 
+                    className="font-bold text-gray-800 flex items-center flex-shrink-0"
+                    style={{
+                      marginBottom: 'clamp(0.375rem, 1vh, 0.75rem)',
+                      gap: 'clamp(0.375rem, 0.75vw, 0.75rem)',
+                    }}
+                    sx={{
+                      fontSize: 'clamp(0.75rem, 1vw, 1rem)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <Settings 
+                      className="text-blue-600"
+                      style={{
+                        width: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                        height: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                      }}
+                    />
                     <span>{t('prompts.optimizeEditPage.basicInfo.taskInfo')}</span>
                   </Typography>
-                  <div className="space-y-3">
+                  <div 
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 'clamp(0.5rem, 1vw, 0.75rem)',
+                    }}
+                  >
                     {/* 提示词选择下拉框 */}
                     {!isEditMode && (
                       <Autocomplete
@@ -2681,10 +3023,22 @@ const PromptOptimizeEditPage: React.FC = () => {
                         renderOption={(props, option) => (
                           <li {...props}>
                             <div>
-                              <Typography variant="body2" fontWeight="medium">
+                              <Typography 
+                                variant="body2" 
+                                fontWeight="medium"
+                                sx={{
+                                  fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                                }}
+                              >
                                 {option.prompt_key}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography 
+                                variant="caption" 
+                                color="text.secondary"
+                                sx={{
+                                  fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)',
+                                }}
+                              >
                                 {option.name}
                               </Typography>
                             </div>
@@ -2696,6 +3050,16 @@ const PromptOptimizeEditPage: React.FC = () => {
                             label={t('prompts.optimizeEditPage.basicInfo.selectPrompt')}
                             placeholder={t('prompts.optimizeEditPage.basicInfo.selectPromptPlaceholder')}
                             className="bg-white"
+                            sx={{
+                              '& .MuiInputLabel-root': {
+                                fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
+                              },
+                              '& .MuiOutlinedInput-root': {
+                                '& input': {
+                                  fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                                },
+                              },
+                            }}
                             InputProps={{
                               ...params.InputProps,
                               endAdornment: (
@@ -2721,17 +3085,21 @@ const PromptOptimizeEditPage: React.FC = () => {
                       className="bg-white"
                       inputProps={{ maxLength: 32 }}
                       sx={{
+                        '& .MuiInputLabel-root': {
+                          fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
+                        },
                         '& .MuiOutlinedInput-root': {
                           position: 'relative',
                           '& input': {
                             paddingRight: '60px',
+                            fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
                           },
                         },
                       }}
                       InputProps={{
                         endAdornment: (
                           <Box sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                            <Typography variant="caption" sx={{ color: taskName.length >= 32 ? '#ef4444' : '#6b7280', fontSize: '0.75rem' }}>
+                            <Typography variant="caption" sx={{ color: taskName.length >= 32 ? '#ef4444' : '#6b7280', fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)' }}>
                               {taskName.length}/32
                             </Typography>
                           </Box>
@@ -2751,18 +3119,22 @@ const PromptOptimizeEditPage: React.FC = () => {
                       className="bg-white"
                       inputProps={{ maxLength: 256 }}
                       sx={{
+                        '& .MuiInputLabel-root': {
+                          fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
+                        },
                         '& .MuiOutlinedInput-root': {
                           position: 'relative',
                           '& textarea': {
                             paddingRight: '60px',
                             marginBottom: '10px',
+                            fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
                           },
                         },
                       }}
                       InputProps={{
                         endAdornment: (
                           <Box sx={{ position: 'absolute', right: 8, bottom: 0, pointerEvents: 'none' }}>
-                            <Typography variant="caption" sx={{ color: description.length >= 256 ? '#ef4444' : '#6b7280', fontSize: '0.75rem' }}>
+                            <Typography variant="caption" sx={{ color: description.length >= 256 ? '#ef4444' : '#6b7280', fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)' }}>
                               {description.length}/256
                             </Typography>
                           </Box>
@@ -2775,14 +3147,48 @@ const PromptOptimizeEditPage: React.FC = () => {
                 <Divider className="flex-shrink-0" />
 
                 {/* Original Prompt */}
-                <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col flex-shrink-0">
-                  <Typography variant="subtitle1" className="mb-3 font-bold text-gray-800 flex items-center space-x-3 flex-shrink-0 relative">
-                    <Zap className="w-5 h-5 text-indigo-600" />
+                <div 
+                  className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
+                  style={{
+                    padding: 'clamp(0.5rem, 1.5vw, 1rem)',
+                  }}
+                >
+                  <Typography 
+                    variant="subtitle1" 
+                    className="font-bold text-gray-800 flex items-center flex-shrink-0 relative"
+                    style={{
+                      marginBottom: 'clamp(0.375rem, 1vh, 0.75rem)',
+                      gap: 'clamp(0.375rem, 0.75vw, 0.75rem)',
+                    }}
+                    sx={{
+                      fontSize: 'clamp(0.75rem, 1vw, 1rem)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <Zap 
+                      className="text-indigo-600"
+                      style={{
+                        width: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                        height: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                      }}
+                    />
                     <span>{t('prompts.optimizeEditPage.basicInfo.originalPrompt')}</span>
-                    <span className="text-gray-700 ml-1">*</span>
+                    <span 
+                      className="text-gray-700"
+                      style={{
+                        marginLeft: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                      }}
+                    >
+                      *
+                    </span>
                   </Typography>
-                  <div className="h-4"></div>
-                  <div className="flex flex-col" style={{ minHeight: '660px' }}>
+                  <div style={{ height: 'clamp(0.5rem, 1vh, 1rem)' }}></div>
+                  <div 
+                    className="flex flex-col" 
+                    style={{ 
+                      minHeight: 'clamp(400px, 50vh, 660px)',
+                    }}
+                  >
                     <FormattedPromptEditor
                       fullWidth
                       placeholder={t('prompts.optimizeEditPage.basicInfo.originalPromptPlaceholder')}
@@ -2791,10 +3197,10 @@ const PromptOptimizeEditPage: React.FC = () => {
                       className="bg-white"
                       sx={{
                         flex: 1,
-                        minHeight: '350px',
+                        minHeight: 'clamp(200px, 25vh, 350px)',
                         '& .cm-editor': {
                           height: '100%',
-                          minHeight: '350px',
+                          minHeight: 'clamp(200px, 25vh, 350px)',
                         },
                         '& .cm-scroller': {
                           overflow: 'auto',
@@ -2857,19 +3263,65 @@ const PromptOptimizeEditPage: React.FC = () => {
             className="flex flex-col h-full"
           >
             <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm">
-                      <Settings className="w-4 h-4 text-white" />
+              <CardContent 
+                className="flex-1 flex flex-col overflow-hidden min-h-0"
+                sx={{
+                  padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                }}
+              >
+                <div 
+                  className="flex items-center justify-between"
+                  style={{
+                    marginBottom: 'clamp(0.1rem, 0.25vh, 0.2rem)',
+                  }}
+                >
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                    }}
+                  >
+                    <div 
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm"
+                      style={{
+                        padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                      }}
+                    >
+                      <Settings 
+                        className="text-white"
+                        style={{
+                          width: 'clamp(0.5rem, 1vw, 1rem)',
+                          height: 'clamp(0.5rem, 1vw, 1rem)',
+                        }}
+                      />
                     </div>
-                    <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    <Typography 
+                      variant="h6" 
+                      className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                      sx={{
+                        fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                        lineHeight: 1.3,
+                      }}
+                    >
                       {t('prompts.optimizeEditPage.optimizationConfig.title')}
                     </Typography>
                   </div>
                   <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.collapse')}>
-                    <IconButton size="small" onClick={() => toggleModuleCollapse('optimizationConfig')} className="text-gray-400 hover:text-gray-600">
-                      <ChevronUp className="w-4 h-4" />
+                    <IconButton 
+                      size="small" 
+                      onClick={() => toggleModuleCollapse('optimizationConfig')} 
+                      className="text-gray-400 hover:text-gray-600"
+                      sx={{
+                        width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                        height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                      }}
+                    >
+                      <ChevronUp 
+                        style={{
+                          width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                        }}
+                      />
                     </IconButton>
                   </Tooltip>
                 </div>
@@ -2890,6 +3342,16 @@ const PromptOptimizeEditPage: React.FC = () => {
                       scrollButtons="auto"
                       allowScrollButtonsMobile
                       sx={{
+                        minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
+                        height: 'clamp(2rem, 5.5vh, 2.75rem)',
+                        '& .MuiTabs-flexContainer': {
+                          height: '100%',
+                        },
+                        '& .MuiTab-root': {
+                          fontSize: 'clamp(0.625rem, 1.5vw, 0.8125rem)',
+                          padding: 'clamp(0.3rem, 1vw, 0.6rem) clamp(0.375rem, 1.5vw, 0.75rem)',
+                          minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
+                        },
                         '& .MuiTabs-scroller': {
                           overflowX: 'auto',
                           scrollbarWidth: 'none',
@@ -2902,35 +3364,91 @@ const PromptOptimizeEditPage: React.FC = () => {
                     >
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2 whitespace-nowrap">
-                            <FileText className="w-4 h-4" />
+                          <div 
+                            className="flex items-center"
+                            style={{
+                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                            }}
+                          >
+                            <FileText 
+                              style={{
+                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                              }}
+                            />
                             <span>{t('prompts.optimizeEditPage.optimizationConfig.testCasesConfig')}</span>
-                            <Chip label={testCases.length} size="small" className="bg-blue-100 text-blue-700 text-xs" />
+                            <Chip 
+                              label={testCases.length} 
+                              size="small" 
+                              className="bg-blue-100 text-blue-700" 
+                              sx={{ 
+                                fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
+                                height: 'clamp(0.875rem, 2vh, 1.125rem)',
+                              }}
+                            />
                           </div>
                         }
                       />
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2 whitespace-nowrap">
-                            <Brain className="w-4 h-4" />
+                          <div 
+                            className="flex items-center"
+                            style={{
+                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                            }}
+                          >
+                            <Brain 
+                              style={{
+                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                              }}
+                            />
                             <span>{t('prompts.optimizeEditPage.optimizationConfig.optimizationStrategy')}</span>
                           </div>
                         }
                       />
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2 whitespace-nowrap">
-                            <BarChart className="w-4 h-4" />
+                          <div 
+                            className="flex items-center"
+                            style={{
+                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                            }}
+                          >
+                            <BarChart 
+                              style={{
+                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                              }}
+                            />
                             <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteria')}</span>
                           </div>
                         }
                       />
                       <Tab
                         label={
-                          <div className="flex items-center space-x-2 whitespace-nowrap">
-                            <Code className="w-4 h-4" />
+                          <div 
+                            className="flex items-center"
+                            style={{
+                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                            }}
+                          >
+                            <Code 
+                              style={{
+                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                              }}
+                            />
                             <span>工具设置</span>
-                            <Chip label={tools.length} size="small" className="bg-green-100 text-green-700 text-xs" />
+                            <Chip 
+                              label={tools.length} 
+                              size="small" 
+                              className="bg-green-100 text-green-700" 
+                              sx={{ 
+                                fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
+                                height: 'clamp(0.875rem, 2vh, 1.125rem)',
+                              }}
+                            />
                           </div>
                         }
                       />
@@ -2939,8 +3457,13 @@ const PromptOptimizeEditPage: React.FC = () => {
 
                   {/* Tab内容区域 */}
                   <div
-                    className="flex-1 bg-gradient-to-r from-gray-50/50 to-slate-50/50 border border-gray-100/60 border-t-0 rounded-b-lg p-4"
-                    style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    className="flex-1 bg-gradient-to-r from-gray-50/50 to-slate-50/50 border border-gray-100/60 border-t-0 rounded-b-lg"
+                    style={{ 
+                      overflowY: 'auto', 
+                      scrollbarWidth: 'none', 
+                      msOverflowStyle: 'none',
+                      padding: 'clamp(0.25rem, 1vw, 1rem)',
+                    }}
                   >
                     {/* 隐藏滚动条（Webkit） */}
                     <style>{`
@@ -2958,27 +3481,63 @@ const PromptOptimizeEditPage: React.FC = () => {
                           className="h-full flex flex-col optimization-tab-scroll"
                           style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                         >
-                          <div className="flex flex-col space-y-3">
+                          <div 
+                            className="flex flex-col"
+                            style={{
+                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                            }}
+                          >
                             {/* 操作按钮 */}
-                            <div className="flex gap-2 flex-shrink-0 items-center flex-wrap">
+                            <div 
+                              className="flex flex-shrink-0 items-center flex-wrap"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                              }}
+                            >
                               <Button
                                 variant="outlined"
                                 size="small"
-                                startIcon={<Plus className="w-4 h-4" />}
+                                startIcon={
+                                  <Plus 
+                                    style={{
+                                      width: 'clamp(0.5rem, 1vw, 1rem)',
+                                      height: 'clamp(0.5rem, 1vw, 1rem)',
+                                    }}
+                                  />
+                                }
                                 onClick={handleAddCase}
                                 disabled={testCases.length >= MAX_TEST_CASES}
-                                className="border-blue-300 text-blue-700 text-xs whitespace-nowrap"
-                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
+                                className="border-blue-300 text-blue-700 whitespace-nowrap"
+                                sx={{ 
+                                  whiteSpace: 'nowrap', 
+                                  minWidth: 'auto',
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                }}
                               >
                                 {t('prompts.optimizeEditPage.testCases.add')}
                               </Button>
                               <Button
                                 variant="outlined"
                                 size="small"
-                                startIcon={<Upload className="w-4 h-4" />}
+                                startIcon={
+                                  <Upload 
+                                    style={{
+                                      width: 'clamp(0.5rem, 1vw, 1rem)',
+                                      height: 'clamp(0.5rem, 1vw, 1rem)',
+                                    }}
+                                  />
+                                }
                                 component="label"
-                                className="border-blue-300 text-blue-700 text-xs whitespace-nowrap"
-                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
+                                className="border-blue-300 text-blue-700 whitespace-nowrap"
+                                sx={{ 
+                                  whiteSpace: 'nowrap', 
+                                  minWidth: 'auto',
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                }}
                               >
                                 {t('prompts.optimizeEditPage.common.uploadFile')}
                                 <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
@@ -2986,27 +3545,64 @@ const PromptOptimizeEditPage: React.FC = () => {
                               <Button
                                 variant="outlined"
                                 size="small"
-                                startIcon={<Trash className="w-4 h-4" />}
+                                startIcon={
+                                  <Trash 
+                                    style={{
+                                      width: 'clamp(0.5rem, 1vw, 1rem)',
+                                      height: 'clamp(0.5rem, 1vw, 1rem)',
+                                    }}
+                                  />
+                                }
                                 onClick={handleClearCases}
-                                className="border-red-300 text-red-700 text-xs hover:bg-red-50 whitespace-nowrap"
+                                className="border-red-300 text-red-700 hover:bg-red-50 whitespace-nowrap"
                                 disabled={testCases.length === 0}
-                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
+                                sx={{ 
+                                  whiteSpace: 'nowrap', 
+                                  minWidth: 'auto',
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                }}
                               >
                                 {t('prompts.optimizeEditPage.testCases.clear')}
                               </Button>
                               <Button
                                 variant="outlined"
                                 size="small"
-                                startIcon={<Download className="w-4 h-4" />}
+                                startIcon={
+                                  <Download 
+                                    style={{
+                                      width: 'clamp(0.5rem, 1vw, 1rem)',
+                                      height: 'clamp(0.5rem, 1vw, 1rem)',
+                                    }}
+                                  />
+                                }
                                 onClick={handleDownloadSample}
-                                className="border-green-300 text-green-700 text-xs hover:bg-green-50 whitespace-nowrap"
-                                sx={{ whiteSpace: 'nowrap', minWidth: 'auto' }}
+                                className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap"
+                                sx={{ 
+                                  whiteSpace: 'nowrap', 
+                                  minWidth: 'auto',
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                }}
                               >
                                 {t('prompts.optimizeEditPage.testCases.downloadExample')}
                               </Button>
                               {/* 用例数量显示 */}
-                              <div className="ml-auto flex items-center space-x-2 flex-shrink-0">
-                                <Typography variant="body2" className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                              <div 
+                                className="ml-auto flex items-center flex-shrink-0"
+                                style={{
+                                  gap: 'clamp(0.125rem, 0.3vw, 0.5rem)',
+                                }}
+                              >
+                                <Typography 
+                                  variant="body2" 
+                                  className="font-medium text-gray-600 whitespace-nowrap"
+                                  sx={{
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                  }}
+                                >
                                   {t('prompts.optimizeEditPage.testCases.count', {
                                     max: MAX_TEST_CASES,
                                   })}
@@ -3015,24 +3611,55 @@ const PromptOptimizeEditPage: React.FC = () => {
                             </div>
 
                             {/* 用例表格 */}
-                            <div className="flex flex-col" style={{ minHeight: '300px' }}>
+                            <div 
+                              className="flex flex-col"
+                              style={{ 
+                                minHeight: 'clamp(200px, 30vh, 300px)',
+                              }}
+                            >
                               <TableContainer 
                                 className="bg-white rounded border border-gray-200" 
                                 style={{ 
                                   overflowX: 'auto',
                                   overflowY: 'auto',
-                                  minHeight: '300px',
+                                  minHeight: 'clamp(200px, 30vh, 300px)',
                                   width: '100%'
                                 }}
                               >
-                                <Table size="small" stickyHeader sx={{ minWidth: '400px' }}>
+                                <Table size="small" stickyHeader sx={{ minWidth: 'clamp(300px, 50vw, 400px)' }}>
                                   <TableHead>
                                     <TableRow>
-                                      <TableCell width="60" className="bg-gray-50 font-medium text-xs" sx={{ minWidth: '60px' }}>
+                                      <TableCell 
+                                        width="60" 
+                                        className="bg-gray-50 font-medium" 
+                                        sx={{ 
+                                          minWidth: 'clamp(40px, 8vw, 60px)',
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                          padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                        }}
+                                      >
                                         编号
                                       </TableCell>
-                                      <TableCell className="bg-gray-50 font-medium text-xs" sx={{ minWidth: '200px' }}>用例</TableCell>
-                                      <TableCell width="80" align="center" className="bg-gray-50 font-medium text-xs" sx={{ minWidth: '120px' }}>
+                                      <TableCell 
+                                        className="bg-gray-50 font-medium" 
+                                        sx={{ 
+                                          minWidth: 'clamp(150px, 25vw, 200px)',
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                          padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                        }}
+                                      >
+                                        用例
+                                      </TableCell>
+                                      <TableCell 
+                                        width="80" 
+                                        align="center" 
+                                        className="bg-gray-50 font-medium" 
+                                        sx={{ 
+                                          minWidth: 'clamp(80px, 15vw, 120px)',
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                          padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                        }}
+                                      >
                                         {t('prompts.optimizeEditPage.testCases.actions')}
                                       </TableCell>
                                     </TableRow>
@@ -3042,9 +3669,28 @@ const PromptOptimizeEditPage: React.FC = () => {
                                       .slice(testCasePage * testCaseRowsPerPage, testCasePage * testCaseRowsPerPage + testCaseRowsPerPage)
                                       .map(testCase => (
                                         <TableRow key={testCase.id} hover>
-                                          <TableCell className="text-xs">{testCase.id}</TableCell>
-                                          <TableCell className="text-xs cursor-pointer hover:bg-gray-50" onClick={() => handleViewCase(testCase)}>
-                                            <div className="min-w-[200px] max-w-none overflow-hidden">
+                                          <TableCell 
+                                            sx={{
+                                              fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                              padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                            }}
+                                          >
+                                            {testCase.id}
+                                          </TableCell>
+                                          <TableCell 
+                                            className="cursor-pointer hover:bg-gray-50" 
+                                            onClick={() => handleViewCase(testCase)}
+                                            sx={{
+                                              fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                              padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                            }}
+                                          >
+                                            <div 
+                                              className="max-w-none overflow-hidden"
+                                              style={{
+                                                minWidth: 'clamp(150px, 25vw, 200px)',
+                                              }}
+                                            >
                                               {(() => {
                                                 const formattedCase = formatTestCaseForDisplay(testCase)
                                                 const isLongContent = formattedCase.length > 200
@@ -3053,28 +3699,84 @@ const PromptOptimizeEditPage: React.FC = () => {
                                                 return isLongContent ? (
                                                   <Tooltip
                                                     title={
-                                                      <pre className="whitespace-pre-wrap text-xs font-mono max-w-md max-h-96 overflow-auto">
+                                                      <pre 
+                                                        className="whitespace-pre-wrap font-mono overflow-auto"
+                                                        style={{
+                                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                          maxWidth: 'clamp(200px, 40vw, 400px)',
+                                                          maxHeight: 'clamp(200px, 50vh, 400px)',
+                                                        }}
+                                                      >
                                                         {formattedCase}
                                                       </pre>
                                                     }
                                                     placement="top-start"
                                                     arrow
                                                   >
-                                                    <pre className="whitespace-pre-wrap text-xs font-mono text-gray-600 break-all">{displayContent}</pre>
+                                                    <pre 
+                                                      className="whitespace-pre-wrap font-mono text-gray-600 break-all"
+                                                      style={{
+                                                        fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                      }}
+                                                    >
+                                                      {displayContent}
+                                                    </pre>
                                                   </Tooltip>
                                                 ) : (
-                                                  <pre className="whitespace-pre-wrap text-xs font-mono text-gray-600 break-all">{displayContent}</pre>
+                                                  <pre 
+                                                    className="whitespace-pre-wrap font-mono text-gray-600 break-all"
+                                                    style={{
+                                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                    }}
+                                                  >
+                                                    {displayContent}
+                                                  </pre>
                                                 )
                                               })()}
                                             </div>
                                           </TableCell>
-                                          <TableCell align="center">
-                                            <Box className="flex justify-center gap-1">
-                                              <IconButton size="small" onClick={() => handleViewCase(testCase)} className="p-1" title="查看">
-                                                <Info className="w-3 h-3 text-green-600" />
+                                          <TableCell align="center" sx={{ padding: 'clamp(0.25rem, 0.5vw, 0.5rem)' }}>
+                                            <Box 
+                                              className="flex justify-center"
+                                              style={{
+                                                gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                              }}
+                                            >
+                                              <IconButton 
+                                                size="small" 
+                                                onClick={() => handleViewCase(testCase)} 
+                                                title="查看"
+                                                sx={{
+                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
+                                              >
+                                                <Info 
+                                                  className="text-green-600"
+                                                  style={{
+                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  }}
+                                                />
                                               </IconButton>
-                                              <IconButton size="small" onClick={() => handleEditCase(testCase)} className="p-1" title="编辑">
-                                                <Edit className="w-3 h-3 text-blue-600" />
+                                              <IconButton 
+                                                size="small" 
+                                                onClick={() => handleEditCase(testCase)} 
+                                                title="编辑"
+                                                sx={{
+                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
+                                              >
+                                                <Edit 
+                                                  className="text-blue-600"
+                                                  style={{
+                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  }}
+                                                />
                                               </IconButton>
                                               <IconButton
                                                 size="small"
@@ -3084,13 +3786,38 @@ const PromptOptimizeEditPage: React.FC = () => {
                                                     showSnackbar(snackbar.message, snackbar.severity)
                                                   })
                                                 }}
-                                                className="p-1"
                                                 title="复制"
+                                                sx={{
+                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
                                               >
-                                                <Copy className="w-3 h-3 text-purple-600" />
+                                                <Copy 
+                                                  className="text-purple-600"
+                                                  style={{
+                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  }}
+                                                />
                                               </IconButton>
-                                              <IconButton size="small" onClick={() => handleDeleteCase(testCase.id)} className="p-1" title="删除">
-                                                <Trash2 className="w-3 h-3 text-red-600" />
+                                              <IconButton 
+                                                size="small" 
+                                                onClick={() => handleDeleteCase(testCase.id)} 
+                                                title="删除"
+                                                sx={{
+                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
+                                              >
+                                                <Trash2 
+                                                  className="text-red-600"
+                                                  style={{
+                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  }}
+                                                />
                                               </IconButton>
                                             </Box>
                                           </TableCell>
@@ -3102,11 +3829,27 @@ const PromptOptimizeEditPage: React.FC = () => {
                             </div>
 
                             {/* 分页控件 */}
-                            <div className="flex items-center justify-end flex-shrink-0 border-t pt-4">
-                              <div className="flex items-center flex-wrap gap-2 justify-end">
+                            <div 
+                              className="flex items-center justify-end flex-shrink-0 border-t"
+                              style={{
+                                paddingTop: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            >
+                              <div 
+                                className="flex items-center flex-wrap justify-end"
+                                style={{
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                }}
+                              >
                                 {/* 每页显示条数 */}
                                 <div className="flex items-center whitespace-nowrap">
-                                  <Typography variant="body2" className="text-gray-700 text-xs">
+                                  <Typography 
+                                    variant="body2" 
+                                    className="text-gray-700"
+                                    sx={{
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    }}
+                                  >
                                     {t('prompts.optimizeEditPage.pagination.itemsPerPage')}
                                   </Typography>
                                   <select
@@ -3115,59 +3858,124 @@ const PromptOptimizeEditPage: React.FC = () => {
                                       setTestCaseRowsPerPage(parseInt(e.target.value, 10))
                                       setTestCasePage(0)
                                     }}
-                                    className="text-xs border border-gray-300 rounded px-1 py-0.5 bg-white mx-1"
+                                    className="border border-gray-300 rounded bg-white"
+                                    style={{
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                      padding: 'clamp(0.125rem, 0.3vw, 0.25rem) clamp(0.25rem, 0.5vw, 0.5rem)',
+                                      margin: '0 clamp(0.125rem, 0.3vw, 0.25rem)',
+                                    }}
                                   >
                                     <option value={5}>5</option>
                                     <option value={10}>10</option>
                                     <option value={15}>15</option>
                                     <option value={20}>20</option>
                                   </select>
-                                  <Typography variant="body2" className="text-gray-700 text-xs">
+                                  <Typography 
+                                    variant="body2" 
+                                    className="text-gray-700"
+                                    sx={{
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    }}
+                                  >
                                     {t('prompts.optimizeEditPage.pagination.items')}
                                   </Typography>
                                 </div>
 
                                 {/* 总条数 */}
                                 <div className="flex items-center whitespace-nowrap">
-                                  <Typography variant="body2" className="text-gray-700 text-xs">
+                                  <Typography 
+                                    variant="body2" 
+                                    className="text-gray-700"
+                                    sx={{
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    }}
+                                  >
                                     {t('prompts.optimizeEditPage.pagination.total', { count: testCases.length })}
                                   </Typography>
                                 </div>
 
                                 {/* 分页按钮和页码 */}
-                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                <div 
+                                  className="flex items-center flex-shrink-0"
+                                  style={{
+                                    gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                  }}
+                                >
                                   <Button
                                     size="small"
                                     onClick={handleFirstPage}
                                     disabled={testCasePage === 0}
                                     className="min-w-0 p-0"
-                                    sx={{ width: 25, height: 25, minWidth: 25 }}
+                                    sx={{ 
+                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                    }}
                                     title={t('prompts.optimizeEditPage.pagination.firstPage')}
                                   >
-                                    <ChevronsLeft className="w-3 h-3" />
+                                    <ChevronsLeft 
+                                      style={{
+                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                      }}
+                                    />
                                   </Button>
                                   <Button
                                     size="small"
                                     onClick={handlePrevPage}
                                     disabled={testCasePage === 0}
                                     className="min-w-0 p-0"
-                                    sx={{ width: 25, height: 25, minWidth: 25 }}
+                                    sx={{ 
+                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                    }}
                                     title={t('prompts.optimizeEditPage.pagination.previousPage')}
                                   >
-                                    <ChevronLeft className="w-3 h-3" />
+                                    <ChevronLeft 
+                                      style={{
+                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                      }}
+                                    />
                                   </Button>
 
-                                  <div className="flex items-center mx-1 text-gray-700 whitespace-nowrap">
-                                    <Typography variant="body2" className="text-xs">{t('prompts.optimizeEditPage.common.page')}</Typography>
+                                  <div 
+                                    className="flex items-center text-gray-700 whitespace-nowrap"
+                                    style={{
+                                      margin: '0 clamp(0.125rem, 0.3vw, 0.25rem)',
+                                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                    }}
+                                  >
+                                    <Typography 
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                      }}
+                                    >
+                                      {t('prompts.optimizeEditPage.common.page')}
+                                    </Typography>
                                     <input
                                       type="text"
                                       value={currentPageInput}
                                       onChange={handlePageInputChange}
                                       onKeyPress={handlePageInputKeyPress}
                                       onBlur={handlePageInputBlur}
-                                      className="w-8 text-center border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
+                                      className="text-center border border-gray-300 rounded bg-white"
+                                      style={{
+                                        width: 'clamp(1.5rem, 3vw, 2rem)',
+                                        fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                        padding: 'clamp(0.125rem, 0.3vw, 0.25rem) clamp(0.25rem, 0.5vw, 0.5rem)',
+                                      }}
                                     />
-                                    <Typography variant="body2" className="text-xs">{t('prompts.optimizeEditPage.common.of', { total: totalPages })}</Typography>
+                                    <Typography 
+                                      variant="body2"
+                                      sx={{
+                                        fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                      }}
+                                    >
+                                      {t('prompts.optimizeEditPage.common.of', { total: totalPages })}
+                                    </Typography>
                                   </div>
 
                                   <Button
@@ -3175,20 +3983,38 @@ const PromptOptimizeEditPage: React.FC = () => {
                                     onClick={handleNextPage}
                                     disabled={testCasePage >= totalPages - 1}
                                     className="min-w-0 p-0"
-                                    sx={{ width: 25, height: 25, minWidth: 25 }}
+                                    sx={{ 
+                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                    }}
                                     title={t('prompts.optimizeEditPage.pagination.nextPage')}
                                   >
-                                    <ChevronRight className="w-3 h-3" />
+                                    <ChevronRight 
+                                      style={{
+                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                      }}
+                                    />
                                   </Button>
                                   <Button
                                     size="small"
                                     onClick={handleLastPage}
                                     disabled={testCasePage >= totalPages - 1}
                                     className="min-w-0 p-0"
-                                    sx={{ width: 25, height: 25, minWidth: 25 }}
+                                    sx={{ 
+                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                    }}
                                     title="跳转到尾页"
                                   >
-                                    <ChevronsRight className="w-3 h-3" />
+                                    <ChevronsRight 
+                                      style={{
+                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                      }}
+                                    />
                                   </Button>
                                 </div>
                               </div>
@@ -3208,285 +4034,183 @@ const PromptOptimizeEditPage: React.FC = () => {
                       {optimizationConfigTab === 1 && (
                         <div className="h-full flex flex-col">
                           <div 
-                            className="space-y-4 optimization-tab-scroll"
+                            className="optimization-tab-scroll"
                             style={{ 
                               overflowY: 'auto', 
                               scrollbarWidth: 'none', 
-                              msOverflowStyle: 'none'
+                              msOverflowStyle: 'none',
+                              gap: 'clamp(0.25rem, 1vw, 1rem)',
+                              display: 'flex',
+                              flexDirection: 'column',
                             }}
                           >
                             {/* 优化参数 */}
-                            <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60">
-                              <Typography variant="subtitle2" className="font-bold text-gray-800 mb-6 flex items-center space-x-3">
-                                <Target className="w-5 h-5 text-blue-600" />
+                            <div 
+                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
+                              style={{
+                                padding: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            >
+                              <Typography 
+                                variant="subtitle2" 
+                                className="font-bold text-gray-800 flex items-center"
+                                sx={{
+                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.5rem)',
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                }}
+                              >
+                                <Target 
+                                  className="text-blue-600"
+                                  style={{
+                                    width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  }}
+                                />
                                 <span>优化参数</span>
                               </Typography>
-                              <div className="h-4"></div>
-                              <div className="space-y-4">
+                              <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
+                              <div 
+                                style={{
+                                  gap: 'clamp(0.25rem, 1vw, 1rem)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                }}
+                              >
                                 {/* 示例个数 */}
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                                    <Typography variant="subtitle2" className="text-gray-700">
-                                      {t('prompts.optimizeEditPage.optimizationConfig.exampleCount')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.exampleCountTooltip')}>
-                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                        <HelpCircle className="w-4 h-4" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                  <div className="flex-1 flex items-center gap-2">
-                                    <Typography variant="caption" className="text-gray-500 text-right" sx={{ minWidth: '40px', width: '40px' }}>
-                                      0
-                                    </Typography>
-                                    <Slider
-                                      value={exampleCount}
-                                      onChange={(_, value) => setExampleCountWithAutoSave(value as number)}
-                                      min={0}
-                                      max={Math.min(testCases.length, 20)}
-                                      disabled={testCases.length === 0}
-                                      step={1}
-                                      valueLabelDisplay="auto"
-                                      sx={{ flex: 1 }}
-                                      className="bg-white/60 p-2 rounded"
-                                    />
-                                    <Typography variant="caption" className="text-gray-500 text-left" sx={{ minWidth: '40px', width: '40px' }}>
-                                      {Math.min(testCases.length, 20)}
-                                    </Typography>
-                                  </div>
-                                  <TextField
-                                    size="small"
-                                    type="number"
-                                    value={exampleCount}
-                                    onChange={e => {
-                                      const inputValue = e.target.value
-                                      // 允许空字符串（用户正在输入）或有效数字
-                                      if (inputValue === '' || inputValue === '0') {
-                                        setExampleCountWithAutoSave(0)
-                                      } else {
-                                        const value = parseInt(inputValue)
-                                        if (!isNaN(value)) {
-                                          const min = 0
-                                          const max = Math.min(testCases.length, 20)
-                                          if (value >= min && value <= max) {
-                                            setExampleCountWithAutoSave(value)
-                                          }
-                                        }
-                                      }
-                                    }}
-                                    inputProps={{
-                                      min: 0,
-                                      max: Math.min(testCases.length, 20),
-                                      step: 1,
-                                    }}
-                                    disabled={testCases.length === 0}
-                                    sx={{
-                                      width: '80px',
-                                      '& .MuiOutlinedInput-input': {
-                                        padding: '4px 8px',
-                                        textAlign: 'center',
-                                      },
-                                    }}
-                                  />
-                                </div>
+                                <SliderField
+                                  label={t('prompts.optimizeEditPage.optimizationConfig.exampleCount')}
+                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.exampleCountTooltip')}
+                                  value={exampleCount}
+                                  onChange={setExampleCountWithAutoSave}
+                                  min={0}
+                                  max={Math.min(testCases.length, 20)}
+                                  disabled={testCases.length === 0}
+                                  minLabel="0"
+                                  maxLabel={Math.min(testCases.length, 20).toString()}
+                                  allowZero={true}
+                                />
 
                                 {/* 目标准确率 */}
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                                    <Typography variant="subtitle2" className="text-gray-700">
-                                      {t('prompts.optimizeEditPage.optimizationConfig.targetAccuracy')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracyTooltip')}>
-                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                        <HelpCircle className="w-4 h-4" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                  <div className="flex-1 flex items-center gap-2">
-                                    <Typography variant="caption" className="text-gray-500 text-right" sx={{ minWidth: '40px', width: '40px' }}>
-                                      0%
-                                    </Typography>
-                                    <Slider
-                                      value={targetAccuracy}
-                                      onChange={(_, value) => setTargetAccuracyWithAutoSave(value as number)}
-                                      min={0}
-                                      max={100}
-                                      step={1}
-                                      valueLabelDisplay="auto"
-                                      valueLabelFormat={value => `${value}%`}
-                                      sx={{ flex: 1 }}
-                                      className="bg-white/60 p-2 rounded"
-                                    />
-                                    <Typography variant="caption" className="text-gray-500 text-left" sx={{ minWidth: '40px', width: '40px' }}>
-                                      100%
-                                    </Typography>
-                                  </div>
-                                  <TextField
-                                    size="small"
-                                    type="number"
-                                    value={targetAccuracy}
-                                    onChange={e => {
-                                      const value = parseInt(e.target.value)
-                                      if (!isNaN(value)) {
-                                        if (value >= 0 && value <= 100) {
-                                          setTargetAccuracyWithAutoSave(value)
-                                        }
-                                      }
-                                    }}
-                                    inputProps={{
-                                      min: 0,
-                                      max: 100,
-                                      step: 1,
-                                    }}
-                                    sx={{
-                                      width: '80px',
-                                      '& .MuiOutlinedInput-input': {
-                                        padding: '4px 8px',
-                                        textAlign: 'center',
-                                      },
-                                    }}
-                                    InputProps={{
-                                      endAdornment: <span className="text-gray-500 text-sm">%</span>,
-                                    }}
-                                  />
-                                </div>
+                                <SliderField
+                                  label={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracy')}
+                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracyTooltip')}
+                                  value={targetAccuracy}
+                                  onChange={setTargetAccuracyWithAutoSave}
+                                  min={0}
+                                  max={100}
+                                  minLabel="0%"
+                                  maxLabel="100%"
+                                  valueLabelFormat={value => `${value}%`}
+                                  inputEndAdornment={
+                                    <span 
+                                      className="text-gray-500"
+                                      style={{
+                                        fontSize: 'clamp(0.5rem, 1.25vw, 0.65rem)',
+                                      }}
+                                    >
+                                      %
+                                    </span>
+                                  }
+                                />
 
                                 {/* 优化轮次 */}
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                                    <Typography variant="subtitle2" className="text-gray-700">
-                                      {t('prompts.optimizeEditPage.optimizationConfig.maxRounds')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.maxRoundsTooltip')}>
-                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                        <HelpCircle className="w-4 h-4" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                  <div className="flex-1 flex items-center gap-2">
-                                    <Typography variant="caption" className="text-gray-500 text-right" sx={{ minWidth: '40px', width: '40px' }}>
-                                      1
-                                    </Typography>
-                                    <Slider
-                                      value={maxRounds}
-                                      onChange={(_, value) => setMaxRoundsWithAutoSave(value as number)}
-                                      min={1}
-                                      max={20}
-                                      step={1}
-                                      valueLabelDisplay="auto"
-                                      sx={{ flex: 1 }}
-                                      className="bg-white/60 p-2 rounded"
-                                    />
-                                    <Typography variant="caption" className="text-gray-500 text-left" sx={{ minWidth: '40px', width: '40px' }}>
-                                      20
-                                    </Typography>
-                                  </div>
-                                  <TextField
-                                    size="small"
-                                    type="number"
-                                    value={maxRounds}
-                                    onChange={e => {
-                                      const value = parseInt(e.target.value)
-                                      if (!isNaN(value)) {
-                                        if (value >= 1 && value <= 20) {
-                                          setMaxRoundsWithAutoSave(value)
-                                        }
-                                      }
-                                    }}
-                                    inputProps={{
-                                      min: 1,
-                                      max: 20,
-                                      step: 1,
-                                    }}
-                                    sx={{
-                                      width: '80px',
-                                      '& .MuiOutlinedInput-input': {
-                                        padding: '4px 8px',
-                                        textAlign: 'center',
-                                      },
-                                    }}
-                                  />
-                                </div>
+                                <SliderField
+                                  label={t('prompts.optimizeEditPage.optimizationConfig.maxRounds')}
+                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.maxRoundsTooltip')}
+                                  value={maxRounds}
+                                  onChange={setMaxRoundsWithAutoSave}
+                                  min={1}
+                                  max={20}
+                                />
 
                                 {/* 最大并发数 */}
-                                <div className="flex items-center gap-3">
-                                  <div className="flex items-center space-x-1" style={{ minWidth: '120px' }}>
-                                    <Typography variant="subtitle2" className="text-gray-700">
-                                      {t('prompts.optimizeEditPage.optimizationConfig.llmParallel')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.llmParallelTooltip')}>
-                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                        <HelpCircle className="w-4 h-4" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                  <div className="flex-1 flex items-center gap-2">
-                                    <Typography variant="caption" className="text-gray-500 text-right" sx={{ minWidth: '40px', width: '40px' }}>
-                                      1
-                                    </Typography>
-                                    <Slider
-                                      value={llmParallel}
-                                      onChange={(_, value) => setLlmParallelWithAutoSave(value as number)}
-                                      min={1}
-                                      max={20}
-                                      step={1}
-                                      valueLabelDisplay="auto"
-                                      sx={{ flex: 1 }}
-                                      className="bg-white/60 p-2 rounded"
-                                    />
-                                    <Typography variant="caption" className="text-gray-500 text-left" sx={{ minWidth: '40px', width: '40px' }}>
-                                      20
-                                    </Typography>
-                                  </div>
-                                  <TextField
-                                    size="small"
-                                    type="number"
-                                    value={llmParallel}
-                                    onChange={e => {
-                                      const value = parseInt(e.target.value)
-                                      if (!isNaN(value)) {
-                                        if (value >= 1 && value <= 20) {
-                                          setLlmParallelWithAutoSave(value)
-                                        }
-                                      }
-                                    }}
-                                    inputProps={{
-                                      min: 1,
-                                      max: 20,
-                                      step: 1,
-                                    }}
-                                    sx={{
-                                      width: '80px',
-                                      '& .MuiOutlinedInput-input': {
-                                        padding: '4px 8px',
-                                        textAlign: 'center',
-                                      },
-                                    }}
-                                  />
-                                </div>
+                                <SliderField
+                                  label={t('prompts.optimizeEditPage.optimizationConfig.llmParallel')}
+                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.llmParallelTooltip')}
+                                  value={llmParallel}
+                                  onChange={setLlmParallelWithAutoSave}
+                                  min={1}
+                                  max={20}
+                                />
                               </div>
                             </div>
 
                             {/* 分割线 */}
-                            <div className="border-t border-gray-200 my-4"></div>
+                            <div 
+                              className="border-t border-gray-200"
+                              style={{
+                                marginTop: 'clamp(0.25rem, 1vw, 1rem)',
+                                marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            ></div>
 
                             {/* 模型配置 */}
-                            <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60">
-                              <Typography variant="subtitle2" className="font-bold text-gray-800 mb-6 flex items-center space-x-3">
-                                <Settings className="w-5 h-5 text-blue-600" />
+                            <div 
+                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
+                              style={{
+                                padding: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            >
+                              <Typography 
+                                variant="subtitle2" 
+                                className="font-bold text-gray-800 flex items-center"
+                                sx={{
+                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.5rem)',
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                }}
+                              >
+                                <Settings 
+                                  className="text-blue-600"
+                                  style={{
+                                    width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  }}
+                                />
                                 <span>{t('prompts.optimizeEditPage.optimizationConfig.modelConfig')}</span>
                               </Typography>
-                              <div className="h-4"></div>
-                              <div className="space-y-4">
+                              <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
+                              <div 
+                                style={{
+                                  gap: 'clamp(0.25rem, 1vw, 1rem)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                }}
+                              >
                                 {/* 优化模型 */}
                                 <div>
-                                  <div className="flex items-center space-x-1 mb-1">
-                                    <Typography variant="subtitle2" className="text-gray-700">
+                                  <div 
+                                    className="flex items-center"
+                                    style={{
+                                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                      marginBottom: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                    }}
+                                  >
+                                    <Typography 
+                                      variant="subtitle2" 
+                                      className="text-gray-700"
+                                      sx={{
+                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                      }}
+                                    >
                                       {t('prompts.optimizeEditPage.optimizationConfig.optimizeModel')}
                                     </Typography>
                                     <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.optimizeModelTooltip')}>
-                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                        <HelpCircle className="w-4 h-4" />
+                                      <IconButton 
+                                        size="small" 
+                                        className="text-gray-400 hover:text-gray-600 p-0"
+                                        sx={{
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <HelpCircle 
+                                          style={{
+                                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                                          }}
+                                        />
                                       </IconButton>
                                     </Tooltip>
                                   </div>
@@ -3504,7 +4228,7 @@ const PromptOptimizeEditPage: React.FC = () => {
 
                                   {/* 优化模型参数配置 */}
                                   {selectedOptimizeModel && (
-                                    <div className="mt-3">
+                                    <div style={{ marginTop: 'clamp(0.25rem, 0.75vw, 0.75rem)' }}>
                                       <ModelParameterEditor
                                         selectedModel={selectedOptimizeModel}
                                         modelConfig={optimizeModelParams}
@@ -3516,13 +4240,37 @@ const PromptOptimizeEditPage: React.FC = () => {
 
                                 {/* 运行模型 */}
                                 <div>
-                                  <div className="flex items-center space-x-1 mb-1">
-                                    <Typography variant="subtitle2" className="text-gray-700">
+                                  <div 
+                                    className="flex items-center"
+                                    style={{
+                                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                      marginBottom: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                    }}
+                                  >
+                                    <Typography 
+                                      variant="subtitle2" 
+                                      className="text-gray-700"
+                                      sx={{
+                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                      }}
+                                    >
                                       {t('prompts.optimizeEditPage.optimizationConfig.runModel')}
                                     </Typography>
                                     <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.runModelTooltip')}>
-                                      <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                        <HelpCircle className="w-4 h-4" />
+                                      <IconButton 
+                                        size="small" 
+                                        className="text-gray-400 hover:text-gray-600 p-0"
+                                        sx={{
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <HelpCircle 
+                                          style={{
+                                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                                          }}
+                                        />
                                       </IconButton>
                                     </Tooltip>
                                   </div>
@@ -3540,7 +4288,7 @@ const PromptOptimizeEditPage: React.FC = () => {
 
                                   {/* 运行模型参数配置 */}
                                   {selectedRunModel && (
-                                    <div className="mt-3">
+                                    <div style={{ marginTop: 'clamp(0.25rem, 0.75vw, 0.75rem)' }}>
                                       <ModelParameterEditor
                                         selectedModel={selectedRunModel}
                                         modelConfig={runModelParams}
@@ -3564,26 +4312,81 @@ const PromptOptimizeEditPage: React.FC = () => {
                       style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                     >
                       {optimizationConfigTab === 2 && (
-                        <div className="flex flex-col space-y-2">
+                        <div 
+                          className="flex flex-col"
+                          style={{
+                            gap: 'clamp(0.125rem, 0.3vw, 0.25rem)',
+                          }}
+                        >
                           {/* 评价类型选择 */}
-                          <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60">
-                            <Typography variant="subtitle2" className="font-bold text-gray-800 mb-3 flex items-center space-x-3">
-                              <Settings className="w-5 h-5 text-blue-600" />
+                          <div 
+                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
+                            style={{
+                              padding: 'clamp(0.25rem, 1vw, 1rem)',
+                            }}
+                          >
+                            <Typography 
+                              variant="subtitle2" 
+                              className="font-bold text-gray-800 flex items-center"
+                              sx={{
+                                fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                              }}
+                            >
+                              <Settings 
+                                className="text-blue-600"
+                                style={{
+                                  width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                }}
+                              />
                               <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationType')}</span>
                             </Typography>
-                            <div className="h-4"></div>
-                            <RadioGroup row value={evaluationType} onChange={e => setEvaluationTypeWithAutoSave(e.target.value)}>
+                            <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
+                            <RadioGroup 
+                              row 
+                              value={evaluationType} 
+                              onChange={e => setEvaluationTypeWithAutoSave(e.target.value)}
+                              sx={{
+                                gap: 'clamp(0.5rem, 1.5vw, 1.5rem)',
+                              }}
+                            >
                               <FormControlLabel
                                 value="objective"
                                 control={<Radio size="small" />}
                                 label={
-                                  <div className="flex items-center gap-2">
-                                    <Typography variant="subtitle2" className="text-gray-700">
+                                  <div 
+                                    className="flex items-center"
+                                    style={{
+                                      gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                    }}
+                                  >
+                                    <Typography 
+                                      variant="subtitle2" 
+                                      className="text-gray-700"
+                                      sx={{
+                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                      }}
+                                    >
                                       {t('prompts.optimizeEditPage.evaluationType.objective')}
                                     </Typography>
                                     <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.objectiveTooltip')}>
-                                      <IconButton size="small" className="p-0">
-                                        <HelpCircle className="w-4 h-4 text-gray-400" />
+                                      <IconButton 
+                                        size="small" 
+                                        className="p-0"
+                                        sx={{
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <HelpCircle 
+                                          className="text-gray-400"
+                                          style={{
+                                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                                          }}
+                                        />
                                       </IconButton>
                                     </Tooltip>
                                   </div>
@@ -3593,13 +4396,37 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 value="subjective"
                                 control={<Radio size="small" />}
                                 label={
-                                  <div className="flex items-center gap-2">
-                                    <Typography variant="subtitle2" className="text-gray-700">
+                                  <div 
+                                    className="flex items-center"
+                                    style={{
+                                      gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                    }}
+                                  >
+                                    <Typography 
+                                      variant="subtitle2" 
+                                      className="text-gray-700"
+                                      sx={{
+                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                      }}
+                                    >
                                       {t('prompts.optimizeEditPage.evaluationType.subjective')}
                                     </Typography>
                                     <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.subjectiveTooltip')}>
-                                      <IconButton size="small" className="p-0">
-                                        <HelpCircle className="w-4 h-4 text-gray-400" />
+                                      <IconButton 
+                                        size="small" 
+                                        className="p-0"
+                                        sx={{
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <HelpCircle 
+                                          className="text-gray-400"
+                                          style={{
+                                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                                          }}
+                                        />
                                       </IconButton>
                                     </Tooltip>
                                   </div>
@@ -3609,18 +4436,50 @@ const PromptOptimizeEditPage: React.FC = () => {
                           </div>
 
                           {/* 分割线 */}
-                          <div className="border-t border-gray-200 my-4"></div>
+                          <div 
+                            className="border-t border-gray-200"
+                            style={{
+                              marginTop: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                              marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                            }}
+                          ></div>
 
                           {/* 评价标准 */}
                           <div
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col flex-shrink-0"
-                            style={{ minHeight: '350px' }}
+                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
+                            style={{ 
+                              minHeight: 'clamp(250px, 40vh, 350px)',
+                              padding: 'clamp(0.25rem, 1vw, 1rem)',
+                            }}
                           >
-                            <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                              <div className="flex items-center space-x-3">
-                                <Typography variant="subtitle2" className="font-bold text-gray-800 flex items-center">
-                                  <BarChart className="w-5 h-5 text-blue-600" />
-                                  <span className="ml-2">{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaLabel')}</span>
+                            <div 
+                              className="flex items-center justify-between flex-shrink-0"
+                              style={{
+                                marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              }}
+                            >
+                              <div 
+                                className="flex items-center"
+                                style={{
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                }}
+                              >
+                                <Typography 
+                                  variant="subtitle2" 
+                                  className="font-bold text-gray-800 flex items-center"
+                                  sx={{
+                                    fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                    gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                  }}
+                                >
+                                  <BarChart 
+                                    className="text-blue-600"
+                                    style={{
+                                      width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                      height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    }}
+                                  />
+                                  <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaLabel')}</span>
                                 </Typography>
                                 <Tooltip
                                   title={t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaTooltip', {
@@ -3630,13 +4489,30 @@ const PromptOptimizeEditPage: React.FC = () => {
                                         : t('prompts.optimizeEditPage.evaluationType.subjective'),
                                   })}
                                 >
-                                  <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                    <HelpCircle className="w-4 h-4" />
+                                  <IconButton 
+                                    size="small" 
+                                    className="text-gray-400 hover:text-gray-600 p-0"
+                                    sx={{
+                                      width: 'clamp(1rem, 2vw, 1.5rem)',
+                                      height: 'clamp(1rem, 2vw, 1.5rem)',
+                                    }}
+                                  >
+                                    <HelpCircle 
+                                      style={{
+                                        width: 'clamp(0.5rem, 1vw, 1rem)',
+                                        height: 'clamp(0.5rem, 1vw, 1rem)',
+                                      }}
+                                    />
                                   </IconButton>
                                 </Tooltip>
                               </div>
                             </div>
-                            <div className="flex flex-col" style={{ minHeight: '300px' }}>
+                            <div 
+                              className="flex flex-col" 
+                              style={{ 
+                                minHeight: 'clamp(200px, 30vh, 300px)',
+                              }}
+                            >
                               <TextField
                                 fullWidth
                                 multiline
@@ -3653,9 +4529,11 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 sx={{
                                   '& .MuiInputBase-root': {
                                     alignItems: 'flex-start',
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
                                   },
                                   '& .MuiInputBase-input': {
                                     overflow: 'auto !important',
+                                    padding: 'clamp(0.25rem, 0.75vw, 0.75rem)',
                                   },
                                 }}
                               />
@@ -3663,25 +4541,70 @@ const PromptOptimizeEditPage: React.FC = () => {
                           </div>
 
                           {/* 分割线 */}
-                          <div className="border-t border-gray-200 my-4"></div>
+                          <div 
+                            className="border-t border-gray-200"
+                            style={{
+                              marginTop: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                              marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                            }}
+                          ></div>
 
                           {/* 背景知识 */}
                           <div
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex flex-col flex-shrink-0"
-                            style={{ minHeight: '350px' }}
+                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
+                            style={{ 
+                              minHeight: 'clamp(250px, 40vh, 350px)',
+                              padding: 'clamp(0.25rem, 1vw, 1rem)',
+                            }}
                           >
-                            <div className="flex items-center space-x-3 mb-3 flex-shrink-0">
-                              <Typography variant="subtitle2" className="font-bold text-gray-800 flex items-center">
-                                <Info className="w-5 h-5 text-blue-600" />
-                                <span className="ml-2">{t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledge')}</span>
+                            <div 
+                              className="flex items-center flex-shrink-0"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              }}
+                            >
+                              <Typography 
+                                variant="subtitle2" 
+                                className="font-bold text-gray-800 flex items-center"
+                                sx={{
+                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                  gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                }}
+                              >
+                                <Info 
+                                  className="text-blue-600"
+                                  style={{
+                                    width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  }}
+                                />
+                                <span>{t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledge')}</span>
                               </Typography>
                               <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledgeTooltip')}>
-                                <IconButton size="small" className="text-gray-400 hover:text-gray-600 p-0">
-                                  <HelpCircle className="w-4 h-4" />
+                                <IconButton 
+                                  size="small" 
+                                  className="text-gray-400 hover:text-gray-600 p-0"
+                                  sx={{
+                                    width: 'clamp(1rem, 2vw, 1.5rem)',
+                                    height: 'clamp(1rem, 2vw, 1.5rem)',
+                                  }}
+                                >
+                                  <HelpCircle 
+                                    style={{
+                                      width: 'clamp(0.5rem, 1vw, 1rem)',
+                                      height: 'clamp(0.5rem, 1vw, 1rem)',
+                                    }}
+                                  />
                                 </IconButton>
                               </Tooltip>
                             </div>
-                            <div className="flex flex-col" style={{ minHeight: '300px' }}>
+                            <div 
+                              className="flex flex-col" 
+                              style={{ 
+                                minHeight: 'clamp(200px, 30vh, 300px)',
+                              }}
+                            >
                               <TextField
                                 fullWidth
                                 multiline
@@ -3694,9 +4617,11 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 sx={{
                                   '& .MuiInputBase-root': {
                                     alignItems: 'flex-start',
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
                                   },
                                   '& .MuiInputBase-input': {
                                     overflow: 'auto !important',
+                                    padding: 'clamp(0.25rem, 0.75vw, 0.75rem)',
                                   },
                                 }}
                               />
@@ -3771,21 +4696,67 @@ const PromptOptimizeEditPage: React.FC = () => {
             className="flex flex-col h-full"
           >
             <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-              <CardContent className="p-6 flex-1 flex flex-col overflow-hidden min-h-0">
-                <div className="flex items-center justify-between mb-6 flex-shrink-0">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-sm">
-                      <BarChart className="w-4 h-4 text-white" />
+              <CardContent 
+                className="flex-1 flex flex-col overflow-hidden min-h-0"
+                sx={{
+                  padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                }}
+              >
+                <div 
+                  className="flex items-center justify-between flex-shrink-0"
+                  style={{
+                    marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
+                  }}
+                >
+                  <div 
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                    }}
+                  >
+                    <div 
+                      className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-sm"
+                      style={{
+                        padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                      }}
+                    >
+                      <BarChart 
+                        className="text-white"
+                        style={{
+                          width: 'clamp(0.5rem, 1vw, 1rem)',
+                          height: 'clamp(0.5rem, 1vw, 1rem)',
+                        }}
+                      />
                     </div>
-                    <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    <Typography 
+                      variant="h6" 
+                      className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                      sx={{
+                        fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                        lineHeight: 1.3,
+                      }}
+                    >
                       {t('prompts.optimizeEditPage.optimizationResult.title')}
                     </Typography>
                   </div>
 
                   {/* 收起按钮 */}
                   <Tooltip title={t('prompts.optimizeEditPage.optimizationResult.collapse')}>
-                    <IconButton size="small" onClick={() => toggleModuleCollapse('optimizationResult')} className="text-gray-400 hover:text-gray-600">
-                      <ChevronUp className="w-4 h-4" />
+                    <IconButton 
+                      size="small" 
+                      onClick={() => toggleModuleCollapse('optimizationResult')} 
+                      className="text-gray-400 hover:text-gray-600"
+                      sx={{
+                        width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                        height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                      }}
+                    >
+                      <ChevronUp 
+                        style={{
+                          width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                        }}
+                      />
                     </IconButton>
                   </Tooltip>
                 </div>
@@ -3801,24 +4772,62 @@ const PromptOptimizeEditPage: React.FC = () => {
                 >
                   {/* 错误信息卡片 - 当任务失败时显示 */}
                   {taskStatus === 'failed' && (
-                    <div className="mb-4 flex-shrink-0">
+                    <div 
+                      className="flex-shrink-0"
+                      style={{
+                        marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
+                      }}
+                    >
                       <Card
                         sx={{
                           backgroundColor: '#fef2f2',
                           border: '1px solid #fecaca',
-                          borderRadius: '12px',
+                          borderRadius: 'clamp(0.5rem, 1.5vw, 0.75rem)',
                         }}
                       >
-                        <CardContent className="p-4">
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 mt-0.5">
-                              <X className="w-5 h-5 text-red-600" />
+                        <CardContent 
+                          sx={{
+                            padding: 'clamp(0.25rem, 1vw, 1rem) !important',
+                          }}
+                        >
+                          <div 
+                            className="flex items-start"
+                            style={{
+                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                            }}
+                          >
+                            <div 
+                              className="flex-shrink-0"
+                              style={{
+                                marginTop: 'clamp(0.0625rem, 0.125vw, 0.125rem)',
+                              }}
+                            >
+                              <X 
+                                className="text-red-600"
+                                style={{
+                                  width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                }}
+                              />
                             </div>
                             <div className="flex-1">
-                              <Typography variant="subtitle1" className="font-bold text-red-800 mb-2">
+                              <Typography 
+                                variant="subtitle1" 
+                                className="font-bold text-red-800"
+                                sx={{
+                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                  marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                }}
+                              >
                                 任务执行失败
                               </Typography>
-                              <Typography variant="body2" className="text-red-700 whitespace-pre-wrap break-words">
+                              <Typography 
+                                variant="body2" 
+                                className="text-red-700 whitespace-pre-wrap break-words"
+                                sx={{
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                }}
+                              >
                                 {errorMsg ? `失败原因：${errorMsg}` : '暂无失败原因'}
                               </Typography>
                             </div>
@@ -3828,60 +4837,162 @@ const PromptOptimizeEditPage: React.FC = () => {
                     </div>
                   )}
                   {optimizationHistory && optimizationHistory.length > 0 ? (
-                    <div className="flex flex-col space-y-4">
+                    <div 
+                      className="flex flex-col"
+                      style={{
+                        gap: 'clamp(0.25rem, 1vw, 1rem)',
+                      }}
+                    >
                       {/* 优化评分趋势 */}
-                      <div className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl p-4 border border-gray-100/60 flex-shrink-0">
-                        <div className="flex items-center justify-between mb-3">
-                          <Typography variant="subtitle1" className="font-bold text-gray-800 flex items-center space-x-3">
-                            <TrendingUp className="w-5 h-5 text-amber-600" />
+                      <div 
+                        className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex-shrink-0"
+                        style={{
+                          padding: 'clamp(0.25rem, 1vw, 1rem)',
+                        }}
+                      >
+                        <div 
+                          className="flex items-center justify-between"
+                          style={{
+                            marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                          }}
+                        >
+                          <Typography 
+                            variant="subtitle1" 
+                            className="font-bold text-gray-800 flex items-center"
+                            sx={{
+                              fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                            }}
+                          >
+                            <TrendingUp 
+                              className="text-amber-600"
+                              style={{
+                                width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                              }}
+                            />
                             <span>{t('prompts.optimizeEditPage.optimizationResult.scoreTrend')}</span>
                           </Typography>
-                          <IconButton size="small" onClick={() => setIsChartFullscreen(true)} className="text-gray-500 hover:text-blue-600">
-                            <Maximize2 className="w-4 h-4" />
+                          <IconButton 
+                            size="small" 
+                            onClick={() => setIsChartFullscreen(true)} 
+                            className="text-gray-500 hover:text-blue-600"
+                            sx={{
+                              width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                              height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            }}
+                          >
+                            <Maximize2 
+                              style={{
+                                width: 'clamp(0.5rem, 1vw, 1rem)',
+                                height: 'clamp(0.5rem, 1vw, 1rem)',
+                              }}
+                            />
                           </IconButton>
                         </div>
-                        <Box className="bg-white p-2 rounded" sx={{ height: 180 }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart
-                              data={optimizationHistory.map(item => ({
-                                round: t('prompts.optimizeEditPage.optimizationConfig.round', { round: item.round }),
-                                score: item.score,
-                              }))}
-                              margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                              <XAxis dataKey="round" tick={{ fontSize: 12 }} stroke="#666" />
-                              <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} stroke="#666" />
-                              <RechartsTooltip
-                                contentStyle={{
-                                  backgroundColor: 'white',
-                                  border: '1px solid #e0e0e0',
-                                  borderRadius: '4px',
+                        <Box 
+                          className="bg-white rounded" 
+                          sx={{ 
+                            height: 'clamp(120px, 20vh, 180px)',
+                            width: '100%',
+                            minWidth: 0,
+                            minHeight: 'clamp(120px, 20vh, 180px)',
+                            padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                          }}
+                        >
+                          {optimizationHistory && optimizationHistory.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%" minHeight={120}>
+                              <LineChart
+                                data={optimizationHistory.map(item => ({
+                                  round: t('prompts.optimizeEditPage.optimizationConfig.round', { round: item.round }),
+                                  score: item.score,
+                                }))}
+                                margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                                <XAxis 
+                                  dataKey="round" 
+                                  tick={{ fontSize: 'clamp(8px, 1.5vw, 12px)' }} 
+                                  stroke="#666" 
+                                />
+                                <YAxis 
+                                  domain={[0, 100]} 
+                                  tick={{ fontSize: 'clamp(8px, 1.5vw, 12px)' }} 
+                                  stroke="#666" 
+                                />
+                                <RechartsTooltip
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e0e0e0',
+                                    borderRadius: '4px',
+                                    fontSize: 'clamp(10px, 1.5vw, 12px)',
+                                  }}
+                                />
+                                <Line
+                                  type="monotone"
+                                  dataKey="score"
+                                  stroke="#2196f3"
+                                  strokeWidth={2}
+                                  dot={{ fill: '#2196f3', strokeWidth: 2, r: 4 }}
+                                  activeDot={{ r: 6 }}
+                                  connectNulls={false}
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          ) : (
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                              <Typography 
+                                variant="body2" 
+                                color="text.secondary"
+                                sx={{
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
                                 }}
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="score"
-                                stroke="#2196f3"
-                                strokeWidth={2}
-                                dot={{ fill: '#2196f3', strokeWidth: 2, r: 4 }}
-                                activeDot={{ r: 6 }}
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
+                              >
+                                暂无数据
+                              </Typography>
+                            </Box>
+                          )}
                         </Box>
                       </div>
 
                       <Divider className="flex-shrink-0" />
 
                       {/* 提示词对比 */}
-                      <div className="bg-gradient-to-r from-slate-50/50 to-gray-50/50 rounded-xl p-4 border border-slate-100/60 flex flex-col flex-shrink-0">
-                        <div className="flex items-center justify-between mb-3 flex-shrink-0">
-                          <Typography variant="subtitle1" className="font-bold text-gray-800 flex items-center space-x-3">
-                            <Zap className="w-5 h-5 text-amber-600" />
+                      <div 
+                        className="bg-gradient-to-r from-slate-50/50 to-gray-50/50 rounded-xl border border-slate-100/60 flex flex-col flex-shrink-0"
+                        style={{
+                          padding: 'clamp(0.25rem, 1vw, 1rem)',
+                        }}
+                      >
+                        <div 
+                          className="flex items-center justify-between flex-shrink-0"
+                          style={{
+                            marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                          }}
+                        >
+                          <Typography 
+                            variant="subtitle1" 
+                            className="font-bold text-gray-800 flex items-center"
+                            sx={{
+                              fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                            }}
+                          >
+                            <Zap 
+                              className="text-amber-600"
+                              style={{
+                                width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                              }}
+                            />
                             <span>{t('prompts.optimizeEditPage.optimizationResult.promptComparison')}</span>
                           </Typography>
-                          <Box className="flex items-center gap-1">
+                          <Box 
+                            className="flex items-center"
+                            style={{
+                              gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                            }}
+                          >
                             <IconButton
                               size="small"
                               onClick={() => {
@@ -3893,10 +5004,26 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 }
                               }}
                               disabled={optimizedVersions.length <= 1}
+                              sx={{
+                                width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                              }}
                             >
-                              <ChevronLeft className="w-4 h-4" />
+                              <ChevronLeft 
+                                style={{
+                                  width: 'clamp(0.5rem, 1vw, 1rem)',
+                                  height: 'clamp(0.5rem, 1vw, 1rem)',
+                                }}
+                              />
                             </IconButton>
-                            <Typography variant="caption" className="text-gray-600 px-2">
+                            <Typography 
+                              variant="caption" 
+                              className="text-gray-600"
+                              sx={{
+                                fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                padding: '0 clamp(0.125rem, 0.5vw, 0.5rem)',
+                              }}
+                            >
                               {t('prompts.optimizeEditPage.optimizationConfig.currentRound', {
                                 current: currentOptimizedVersion + 1,
                                 total: optimizedVersions.length,
@@ -3913,25 +5040,73 @@ const PromptOptimizeEditPage: React.FC = () => {
                                 }
                               }}
                               disabled={optimizedVersions.length <= 1}
+                              sx={{
+                                width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                              }}
                             >
-                              <ChevronRight className="w-4 h-4" />
+                              <ChevronRight 
+                                style={{
+                                  width: 'clamp(0.5rem, 1vw, 1rem)',
+                                  height: 'clamp(0.5rem, 1vw, 1rem)',
+                                }}
+                              />
                             </IconButton>
-                            <IconButton size="small" onClick={() => setIsComparisonFullscreen(true)} className="text-gray-500 hover:text-blue-600 ml-2">
-                              <Maximize2 className="w-4 h-4" />
+                            <IconButton 
+                              size="small" 
+                              onClick={() => setIsComparisonFullscreen(true)} 
+                              className="text-gray-500 hover:text-blue-600"
+                              sx={{
+                                width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                marginLeft: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                              }}
+                            >
+                              <Maximize2 
+                                style={{
+                                  width: 'clamp(0.5rem, 1vw, 1rem)',
+                                  height: 'clamp(0.5rem, 1vw, 1rem)',
+                                }}
+                              />
                             </IconButton>
                           </Box>
                         </div>
 
-                        <div className="flex flex-col" style={{ minHeight: '400px' }}>
+                        <div 
+                          className="flex flex-col" 
+                          style={{ 
+                            minHeight: 'clamp(300px, 50vh, 400px)',
+                          }}
+                        >
                           <Card variant="outlined" className="bg-white overflow-hidden flex flex-col">
                             {/* 标题栏 */}
                             <Box className="bg-gray-100 border-b flex-shrink-0">
                               <div className="flex w-full">
                                 {/* 左侧：原始提示词 - 50% */}
                                 <div className="w-1/2 border-r border-gray-300">
-                                  <Box className="px-4 py-3 flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                      <Typography variant="subtitle2" className="font-semibold text-gray-700">
+                                  <Box 
+                                    className="flex flex-wrap items-center"
+                                    sx={{
+                                      padding: 'clamp(0.25rem, 0.75vw, 0.75rem) clamp(0.25rem, 1vw, 1rem)',
+                                      gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                    }}
+                                  >
+                                    <div 
+                                      className="flex items-center flex-wrap"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                        flex: '1 1 auto',
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <Typography 
+                                        variant="subtitle2" 
+                                        className="font-semibold text-gray-700"
+                                        sx={{
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                          whiteSpace: 'nowrap',
+                                        }}
+                                      >
                                         {t('prompts.optimizeEditPage.optimizationResult.originalPrompt')}
                                       </Typography>
                                       {/* 显示第0轮的分数标签 */}
@@ -3940,30 +5115,87 @@ const PromptOptimizeEditPage: React.FC = () => {
                                         const roundZero = optimizationHistory.find(h => h.round === 0)
                                         if (roundZero && typeof roundZero.score === 'number') {
                                           return (
-                                            <Chip label={`${roundZero.score.toFixed(2)}%`} size="small" className="bg-gray-100 text-gray-700 font-medium" />
+                                            <Chip 
+                                              label={`${roundZero.score.toFixed(2)}%`} 
+                                              size="small" 
+                                              className="bg-gray-100 text-gray-700 font-medium flex-shrink-0"
+                                              sx={{
+                                                fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                height: 'clamp(1rem, 2vw, 1.5rem)',
+                                              }}
+                                            />
                                           )
                                         }
                                         return null
                                       })()}
                                     </div>
-                                    <Box className="flex gap-1">
-                                      <IconButton size="small" onClick={() => handleCopyPrompt(originalPrompt)} sx={{ color: '#6b7280' }}>
-                                        <Copy className="w-3 h-3" />
+                                    <Box 
+                                      className="flex flex-shrink-0"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                      }}
+                                    >
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={() => handleCopyPrompt(originalPrompt)} 
+                                        sx={{ 
+                                          color: '#6b7280',
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <Copy 
+                                          style={{
+                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          }}
+                                        />
                                       </IconButton>
-                                      {false && (
-                                        <IconButton size="small" onClick={() => handleShowDetail('original')} sx={{ color: '#6b7280' }}>
-                                          <Info className="w-3 h-3" />
-                                        </IconButton>
-                                      )}
+                                      {false && <IconButton 
+                                        size="small" 
+                                        onClick={() => handleShowDetail('original', 0)} 
+                                        sx={{ 
+                                          color: '#6b7280',
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <Info 
+                                          style={{
+                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          }}
+                                        />
+                                      </IconButton>}
                                     </Box>
                                   </Box>
                                 </div>
 
                                 {/* 右侧：优化结果 - 50% */}
                                 <div className="w-1/2">
-                                  <Box className="px-4 py-3 flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                      <Typography variant="subtitle2" className="font-semibold text-gray-700">
+                                  <Box 
+                                    className="flex flex-wrap items-center"
+                                    sx={{
+                                      padding: 'clamp(0.25rem, 0.75vw, 0.75rem) clamp(0.25rem, 1vw, 1rem)',
+                                      gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                    }}
+                                  >
+                                    <div 
+                                      className="flex items-center flex-wrap"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                        flex: '1 1 auto',
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <Typography 
+                                        variant="subtitle2" 
+                                        className="font-semibold text-gray-700"
+                                        sx={{
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                          whiteSpace: 'nowrap',
+                                        }}
+                                      >
                                         {t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: currentOptimizedVersion + 1 })}
                                       </Typography>
                                       {/* 显示当前轮次的分数 */}
@@ -3973,7 +5205,15 @@ const PromptOptimizeEditPage: React.FC = () => {
                                         const roundData = optimizationHistory.find(h => h.round === currentRound)
                                         if (roundData && typeof roundData.score === 'number') {
                                           return (
-                                            <Chip label={`${roundData.score.toFixed(2)}%`} size="small" className="bg-blue-100 text-blue-700 font-medium" />
+                                            <Chip 
+                                              label={`${roundData.score.toFixed(2)}%`} 
+                                              size="small" 
+                                              className="bg-blue-100 text-blue-700 font-medium flex-shrink-0"
+                                              sx={{
+                                                fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                height: 'clamp(1rem, 2vw, 1.5rem)',
+                                              }}
+                                            />
                                           )
                                         }
                                         return null
@@ -3986,37 +5226,83 @@ const PromptOptimizeEditPage: React.FC = () => {
                                             <Chip
                                               label={t('prompts.optimizeEditPage.optimizationResult.best')}
                                               size="small"
-                                              style={{ backgroundColor: '#10b981', color: 'white', fontWeight: 'medium' }}
+                                              className="flex-shrink-0"
+                                              style={{ 
+                                                backgroundColor: '#10b981', 
+                                                color: 'white', 
+                                                fontWeight: 'medium',
+                                                fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                height: 'clamp(1rem, 2vw, 1.5rem)',
+                                              }}
                                             />
                                           )
                                         }
                                         return null
                                       })()}
                                     </div>
-                                    <Box className="flex gap-1">
+                                    <Box 
+                                      className="flex flex-shrink-0"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                      }}
+                                    >
                                       {fromEditor && (
                                         <Button
                                           size="small"
                                           variant="contained"
-                                          startIcon={<Check className="w-3 h-3" />}
+                                          startIcon={
+                                            <Check 
+                                              style={{
+                                                width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                              }}
+                                            />
+                                          }
                                           onClick={handleApplyOptimization}
                                           sx={{
                                             backgroundColor: '#10b981',
                                             '&:hover': { backgroundColor: '#059669' },
-                                            mr: 1,
+                                            marginRight: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                            padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                            minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
                                           }}
                                         >
                                           应用
                                         </Button>
                                       )}
-                                      <IconButton size="small" onClick={() => handleCopyPrompt(currentOptimizedPrompt)} sx={{ color: '#6b7280' }}>
-                                        <Copy className="w-3 h-3" />
+                                      <IconButton 
+                                        size="small" 
+                                        onClick={() => handleCopyPrompt(currentOptimizedPrompt)} 
+                                        sx={{ 
+                                          color: '#6b7280',
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <Copy 
+                                          style={{
+                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          }}
+                                        />
                                       </IconButton>
-                                      {false && (
-                                        <IconButton size="small" onClick={() => handleShowDetail('optimized')} sx={{ color: '#059669' }}>
-                                          <Info className="w-3 h-3" />
-                                        </IconButton>
-                                      )}
+                                      {false && <IconButton 
+                                        size="small" 
+                                        onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)} 
+                                        sx={{ 
+                                          color: '#059669',
+                                          width: 'clamp(1rem, 2vw, 1.5rem)',
+                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                        }}
+                                      >
+                                        <Info 
+                                          style={{
+                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          }}
+                                        />
+                                      </IconButton>}
                                     </Box>
                                   </Box>
                                 </div>
@@ -4024,7 +5310,12 @@ const PromptOptimizeEditPage: React.FC = () => {
                             </Box>
 
                             {/* Diff 内容区 */}
-                            <Box className="flex-1 overflow-auto" style={{ minHeight: '580px' }}>
+                            <Box 
+                              className="flex-1 overflow-auto" 
+                              style={{ 
+                                minHeight: 'clamp(400px, 60vh, 580px)',
+                              }}
+                            >
                               <DiffViewer oldContent={historicalOriginalPrompt} newContent={currentOptimizedPrompt} />
                             </Box>
                           </Card>
@@ -4034,11 +5325,31 @@ const PromptOptimizeEditPage: React.FC = () => {
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
                       <div className="text-center">
-                        <BarChart className="w-16 h-16 text-blue-300 mx-auto mb-4" />
-                        <Typography variant="h6" className="text-gray-500 mb-2">
+                        <BarChart 
+                          className="text-blue-300 mx-auto"
+                          style={{
+                            width: 'clamp(2rem, 8vw, 4rem)',
+                            height: 'clamp(2rem, 8vw, 4rem)',
+                            marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
+                          }}
+                        />
+                        <Typography 
+                          variant="h6" 
+                          className="text-gray-500"
+                          sx={{
+                            fontSize: 'clamp(0.75rem, 1.5vw, 1.125rem)',
+                            marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                          }}
+                        >
                           {t('prompts.optimizeEditPage.optimizationResult.noResult')}
                         </Typography>
-                        <Typography variant="body2" className="text-gray-400">
+                        <Typography 
+                          variant="body2" 
+                          className="text-gray-400"
+                          sx={{
+                            fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                          }}
+                        >
                           {taskStatus ? getStatusMessage(taskStatus) : t('prompts.optimizeEditPage.optimizationResult.completeConfigFirst')}
                         </Typography>
                       </div>
@@ -4371,248 +5682,26 @@ const PromptOptimizeEditPage: React.FC = () => {
       </Dialog>
 
       {/* 详情对话框 */}
-      <Dialog 
-        open={detailDialogOpen} 
-        onClose={() => setDetailDialogOpen(false)} 
-        maxWidth="lg" 
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: '16px',
-            background: 'linear-gradient(to bottom right, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.95))',
-            backdropFilter: 'blur(10px)',
-          }
+      <EvaluationDetailDialog
+        open={detailDialogOpen}
+        onClose={() => {
+          setDetailDialogOpen(false)
+          setEvaluateCases([]) // 关闭对话框时清空数据
         }}
-      >
-        <DialogTitle 
-          sx={{ 
-            borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-            background: 'linear-gradient(to right, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.8))',
-            py: 2.5
-          }}
-        >
-          <Box className="flex items-center justify-between">
-            <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-              {detailDialogType === 'original'
-                ? t('prompts.optimizeEditPage.optimizationResult.originalPrompt')
-                : t('prompts.optimizeEditPage.optimizationResult.optimizedPrompt')}
-              {t('prompts.optimizeEditPage.optimizationResult.evaluationDetail')}
-            </Typography>
-            <IconButton 
-              onClick={() => setDetailDialogOpen(false)} 
-              size="small"
-              sx={{
-                color: '#6b7280',
-                '&:hover': {
-                  color: '#ef4444',
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                },
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <X className="w-5 h-5" />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3, bgcolor: 'transparent' }}>
-          <TableContainer 
-            component={Paper} 
-            className="mt-2"
-            sx={{
-              borderRadius: '12px',
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-              overflow: 'hidden',
-            }}
-          >
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ backgroundColor: '#f9fafb' }}>
-                  <TableCell 
-                    width="60" 
-                    className="font-semibold"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      borderBottom: '2px solid #e5e7eb',
-                    }}
-                  >
-                    {t('prompts.optimizeEditPage.testCaseDialog.sequenceNumberColumn')}
-                  </TableCell>
-                  <TableCell 
-                    width="20%" 
-                    className="font-semibold"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      borderBottom: '2px solid #e5e7eb',
-                    }}
-                  >
-                    用户输入
-                  </TableCell>
-                  <TableCell 
-                    width="25%" 
-                    className="font-semibold"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      borderBottom: '2px solid #e5e7eb',
-                    }}
-                  >
-                    模型回答
-                  </TableCell>
-                  <TableCell 
-                    width="25%" 
-                    className="font-semibold"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      borderBottom: '2px solid #e5e7eb',
-                    }}
-                  >
-                    参照回答
-                  </TableCell>
-                  <TableCell 
-                    width="100" 
-                    className="font-semibold text-center"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      borderBottom: '2px solid #e5e7eb',
-                    }}
-                  >
-                    模型评分
-                  </TableCell>
-                  <TableCell 
-                    width="20%" 
-                    className="font-semibold"
-                    sx={{
-                      fontWeight: 600,
-                      color: '#374151',
-                      fontSize: '0.875rem',
-                      borderBottom: '2px solid #e5e7eb',
-                    }}
-                  >
-                    评分原因
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {getEvaluationData().map((item, index) => (
-                  <TableRow 
-                    key={index} 
-                    hover
-                    sx={{
-                      '&:hover': {
-                        backgroundColor: 'rgba(59, 130, 246, 0.04)',
-                      },
-                      '&:last-child td': {
-                        borderBottom: 'none',
-                      },
-                    }}
-                  >
-                    <TableCell 
-                      sx={{
-                        color: '#6b7280',
-                        fontSize: '0.875rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {index + 1}
-                    </TableCell>
-                    <TableCell 
-                      className="text-sm"
-                      sx={{
-                        color: '#374151',
-                        fontSize: '0.875rem',
-                        maxWidth: '200px',
-                      }}
-                    >
-                      {item.userInput}
-                    </TableCell>
-                    <TableCell 
-                      className="text-sm whitespace-pre-wrap"
-                      sx={{
-                        color: '#374151',
-                        fontSize: '0.875rem',
-                        maxWidth: '250px',
-                      }}
-                    >
-                      {item.modelAnswer}
-                    </TableCell>
-                    <TableCell 
-                      className="text-sm whitespace-pre-wrap"
-                      sx={{
-                        color: '#374151',
-                        fontSize: '0.875rem',
-                        maxWidth: '250px',
-                      }}
-                    >
-                      {item.referenceAnswer}
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip 
-                        label={item.score} 
-                        size="small" 
-                        color={item.score >= 80 ? 'success' : item.score >= 60 ? 'warning' : 'error'}
-                        sx={{
-                          fontWeight: 600,
-                          fontSize: '0.75rem',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell 
-                      className="text-sm"
-                      sx={{
-                        color: '#6b7280',
-                        fontSize: '0.875rem',
-                        maxWidth: '200px',
-                      }}
-                    >
-                      {item.reason}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          <Box 
-            className="mt-4 rounded-xl border"
-            sx={{
-              p: 3,
-              background: 'linear-gradient(to right, rgba(249, 250, 251, 0.8), rgba(243, 244, 246, 0.8))',
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              borderRadius: '12px',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-            }}
-          >
-            <Typography 
-              variant="body2" 
-              sx={{
-                color: '#374151',
-                fontSize: '0.9375rem',
-                fontWeight: 500,
-              }}
-            >
-              <strong style={{ color: '#1f2937', fontWeight: 600 }}>平均得分：</strong>{' '}
-              <span style={{ 
-                color: '#3b82f6', 
-                fontWeight: 700,
-                fontSize: '1.125rem',
-              }}>
-                {Math.round(getEvaluationData().reduce((sum, item) => sum + item.score, 0) / getEvaluationData().length)}
-              </span>
-              <span style={{ color: '#6b7280', marginLeft: '4px' }}>分</span>
-            </Typography>
-          </Box>
-        </DialogContent>
-      </Dialog>
+        type={detailDialogType}
+        loading={jobHistoryLoading}
+        evaluationData={getEvaluationData()}
+        evaluateCases={evaluateCases}
+        pageNum={detailDialogPageNum}
+        pageSize={detailDialogPageSize}
+        onPageChange={(page) => {
+          setDetailDialogPageNum(page)
+        }}
+        onPageSizeChange={(size) => {
+          setDetailDialogPageSize(size)
+          setDetailDialogPageNum(1) // 重置为第一页
+        }}
+      />
 
       {/* 清空确认对话框 */}
       <Dialog
@@ -4830,11 +5919,9 @@ const PromptOptimizeEditPage: React.FC = () => {
                       <IconButton size="small" onClick={() => handleCopyPrompt(originalPrompt)} sx={{ color: '#6b7280' }}>
                         <Copy className="w-3 h-3" />
                       </IconButton>
-                      {false && (
-                        <IconButton size="small" onClick={() => handleShowDetail('original')} sx={{ color: '#6b7280' }}>
-                          <Info className="w-3 h-3" />
-                        </IconButton>
-                      )}
+                      {false && <IconButton size="small" onClick={() => handleShowDetail('original', 0)} sx={{ color: '#6b7280' }}>
+                        <Info className="w-3 h-3" />
+                      </IconButton>}
                     </Box>
                   </Box>
                 </div>
@@ -4875,11 +5962,9 @@ const PromptOptimizeEditPage: React.FC = () => {
                       <IconButton size="small" onClick={() => handleCopyPrompt(currentOptimizedPrompt)} sx={{ color: '#6b7280' }}>
                         <Copy className="w-3 h-3" />
                       </IconButton>
-                      {false && (
-                        <IconButton size="small" onClick={() => handleShowDetail('optimized')} sx={{ color: '#6b7280' }}>
-                          <Info className="w-3 h-3" />
-                        </IconButton>
-                      )}
+                      {false && <IconButton size="small" onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)} sx={{ color: '#6b7280' }}>
+                        <Info className="w-3 h-3" />
+                      </IconButton>}
                     </Box>
                   </Box>
                 </div>
