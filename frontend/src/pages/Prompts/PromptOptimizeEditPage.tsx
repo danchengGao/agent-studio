@@ -135,11 +135,11 @@ const PromptOptimizeEditPage: React.FC = () => {
   const isDraftType = urlParams.get('type') === 'draft'
 
   // 根据任务类型调用不同的详情查询接口
-  const { data: formalJobDetailData, isLoading: formalJobDetailLoading, error: formalJobDetailError } = useOptimizationJobDetail(
-    id && isEditMode && !isDraftType ? id : undefined,
-    workspaceId,
-    userId,
-  )
+  const {
+    data: formalJobDetailData,
+    isLoading: formalJobDetailLoading,
+    error: formalJobDetailError,
+  } = useOptimizationJobDetail(id && isEditMode && !isDraftType ? id : undefined, workspaceId, userId)
 
   const {
     data: draftDetailData,
@@ -272,7 +272,7 @@ const PromptOptimizeEditPage: React.FC = () => {
   const [draftId, setDraftId] = useState<number | undefined>(undefined)
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<NodeJS.Timeout | null>(null)
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null)
-  
+
   // 响应式高度状态
   const [contentHeight, setContentHeight] = useState<string>('80vh')
 
@@ -578,7 +578,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     if (jobDetailError) {
       // 从错误对象中提取错误信息
       let errorMessage = '获取优化任务详情失败'
-      
+
       if (jobDetailError instanceof Error) {
         // ApiError 继承自 Error，错误信息在 message 字段
         errorMessage = jobDetailError.message || errorMessage
@@ -590,7 +590,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       } else if (typeof jobDetailError === 'string') {
         errorMessage = jobDetailError
       }
-      
+
       // 只有当错误信息不为空时才显示
       if (errorMessage && errorMessage.trim()) {
         showSnackbar(errorMessage, 'error')
@@ -615,7 +615,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     if (jobDetailData.code === 200) {
       // 标记为已处理
       processedJobDetailDataRef.current = dataKey
-      
+
       if (isDraftType) {
         // 草稿类型的数据处理
         const content = jobDetailData.content
@@ -793,15 +793,12 @@ const PromptOptimizeEditPage: React.FC = () => {
               improvement: `${((item.success_rate || 0) * 100).toFixed(2)}%`,
               summary: t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: item.iteration_round }),
             }))
-            
+
             // 检查数据是否真的变化了，避免不必要的状态更新
-            const historyChanged = 
+            const historyChanged =
               optimizationHistory.length !== allHistory.length ||
-              optimizationHistory.some((item, index) => 
-                item.round !== allHistory[index]?.round || 
-                item.score !== allHistory[index]?.score
-              )
-            
+              optimizationHistory.some((item, index) => item.round !== allHistory[index]?.round || item.score !== allHistory[index]?.score)
+
             if (historyChanged) {
               setOptimizationHistory(allHistory)
             }
@@ -2664,22 +2661,22 @@ const PromptOptimizeEditPage: React.FC = () => {
     <div className="w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40" style={{ minHeight: '93vh', overflowX: 'auto' }}>
       {/* 页面容器 */}
       <div style={{ margin: '0 auto', minWidth: '1100px' }}>
-      {/* 页面头部 */}
-      <div 
-        className="flex items-center bg-white/60 backdrop-blur-sm border border-gray-200/60 shadow-sm"
-        style={{
-          padding: 'clamp(0.5rem, 0.6vw, 0.875rem)',
-          minHeight: 'clamp(3.5rem, 4.5vh, 4rem)',
-          minWidth: 'fit-content',
-          width: '100%',
-        }}
-      >
+        {/* 页面头部 */}
+        <div
+          className="flex items-center bg-white/60 backdrop-blur-sm border border-gray-200/60 shadow-sm"
+          style={{
+            padding: 'clamp(0.5rem, 0.6vw, 0.875rem)',
+            minHeight: 'clamp(3.5rem, 4.5vh, 4rem)',
+            minWidth: 'fit-content',
+            width: '100%',
+          }}
+        >
           <IconButton
             onClick={handleBack}
             className="hover:bg-gray-100/80 transition-colors duration-200"
             sx={{
-            width: 'clamp(1.75rem, 2vw, 2.25rem)',
-            height: 'clamp(1.75rem, 2vw, 2.25rem)',
+              width: 'clamp(1.75rem, 2vw, 2.25rem)',
+              height: 'clamp(1.75rem, 2vw, 2.25rem)',
               '&:hover': {
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 transform: 'translateX(-2px)',
@@ -2687,30 +2684,30 @@ const PromptOptimizeEditPage: React.FC = () => {
               transition: 'all 0.2s ease',
             }}
           >
-          <ArrowLeft 
-            className="text-gray-600"
-            style={{
-              width: 'clamp(0.875rem, 1vw, 1.125rem)',
-              height: 'clamp(0.875rem, 1vw, 1.125rem)',
-            }}
-          />
+            <ArrowLeft
+              className="text-gray-600"
+              style={{
+                width: 'clamp(0.875rem, 1vw, 1.125rem)',
+                height: 'clamp(0.875rem, 1vw, 1.125rem)',
+              }}
+            />
           </IconButton>
-        <div 
-          className="flex items-center flex-1 min-w-0"
-          style={{
-            gap: 'clamp(0.375rem, 0.5vw, 0.5rem)',
-            marginLeft: 'clamp(0.5rem, 0.8vw, 0.875rem)',
-          }}
-        >
-          <div className="min-w-0" style={{ maxWidth: '50%', flex: '0 1 auto' }}>
+          <div
+            className="flex items-center flex-1 min-w-0"
+            style={{
+              gap: 'clamp(0.375rem, 0.5vw, 0.5rem)',
+              marginLeft: 'clamp(0.5rem, 0.8vw, 0.875rem)',
+            }}
+          >
+            <div className="min-w-0" style={{ maxWidth: '50%', flex: '0 1 auto' }}>
               <ConditionalTooltip title={isEditMode ? taskName || t('prompts.optimizeEditPage.common.editTask') : t('prompts.optimizeEditPage.common.newTask')}>
-              <h1 
-                className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate"
-                style={{
-                  fontSize: 'clamp(0.875rem, 0.85vw, 1.125rem)',
-                  lineHeight: 1.5,
-                }}
-              >
+                <h1
+                  className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate"
+                  style={{
+                    fontSize: 'clamp(0.875rem, 0.85vw, 1.125rem)',
+                    lineHeight: 1.5,
+                  }}
+                >
                   {isEditMode ? taskName || t('prompts.optimizeEditPage.common.editTask') : t('prompts.optimizeEditPage.common.newTask')}
                 </h1>
               </ConditionalTooltip>
@@ -2721,14 +2718,14 @@ const PromptOptimizeEditPage: React.FC = () => {
                     : t('prompts.optimizeEditPage.basicInfo.createDescription')
                 }
               >
-              <p 
-                className="text-gray-600 truncate"
-                style={{
-                  fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
-                  marginTop: 'clamp(0.125rem, 0.1vh, 0.1875rem)',
-                  lineHeight: 1.6,
-                }}
-              >
+                <p
+                  className="text-gray-600 truncate"
+                  style={{
+                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                    marginTop: 'clamp(0.125rem, 0.1vh, 0.1875rem)',
+                    lineHeight: 1.6,
+                  }}
+                >
                   {isEditMode
                     ? description || t('prompts.optimizeEditPage.basicInfo.editDescription')
                     : t('prompts.optimizeEditPage.basicInfo.createDescription')}
@@ -2737,522 +2734,121 @@ const PromptOptimizeEditPage: React.FC = () => {
             </div>
           </div>
 
-        <div 
-          className="flex items-center"
-          style={{
-            gap: 'clamp(0.5rem, 1vw, 1rem)',
-          }}
-        >
-          {/* 自动保存状态指示器 */}
-          <div 
-            className="flex items-center text-gray-500"
+          <div
+            className="flex items-center"
             style={{
-              gap: 'clamp(0.375rem, 0.7vw, 0.625rem)',
+              gap: 'clamp(0.5rem, 1vw, 1rem)',
             }}
           >
-            {isSavingDraft ? (
-              <>
-                <CircularProgress 
-                  size={16} 
-                  className="text-blue-600"
-                  sx={{
-                    width: 'clamp(0.875rem, 1vw, 1rem) !important',
-                    height: 'clamp(0.875rem, 1vw, 1rem) !important',
-                  }}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {t('prompts.optimizeEditPage.common.autoSaving')}
-                </Typography>
-              </>
-            ) : lastSavedTime ? (
-              <>
-                <CheckCircle 
-                  style={{
-                    width: 'clamp(0.875rem, 1vw, 1rem)',
-                    height: 'clamp(0.875rem, 1vw, 1rem)',
-                  }}
-                  className="text-green-500" 
-                />
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {t('prompts.optimizeEditPage.common.saved')} {lastSavedTime.toLocaleTimeString()}
-                </Typography>
-              </>
-            ) : (
-              <Typography
-                variant="body2"
-                className="text-gray-400"
-                sx={{
-                  fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {t('prompts.optimizeEditPage.common.autoSaveHint')}
-              </Typography>
-            )}
-          </div>
-          <Button
-            variant="contained"
-            startIcon={isCreatingJob ? (
-              <CircularProgress 
-                sx={{
-                  width: 'clamp(0.75rem, 0.75vw, 0.9375rem) !important',
-                  height: 'clamp(0.75rem, 0.75vw, 0.9375rem) !important',
-                  color: 'white',
-                }}
-              />
-            ) : (
-              <Play style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />
-            )}
-            onClick={handleStartOptimization}
-            disabled={isCreatingJob}
-            sx={{
-              background: isCreatingJob ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
-              padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
-              minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                transform: 'translateY(-1px)',
-                boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
-              },
-              '&:disabled': {
-                background: 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)',
-                color: '#6b7280',
-              },
-              transition: 'all 0.2s ease',
-              borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
-              textTransform: 'none',
-              fontWeight: 600,
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
-            }}
-          >
-            {isCreatingJob ? t('prompts.optimizeEditPage.common.creating') : t('prompts.optimizeEditPage.startOptimization')}
-          </Button>
-        </div>
-      </div>
-
-      {/* 主体内容 - 三列布局 */}
-      <div className="resizable-columns-container flex" style={{ minWidth: '1100px', height: contentHeight }}>
-        {/* Column 1: 基本信息 */}
-        <div
-          style={{
-            width: `${visibleModules.actualWidths[0]}%`,
-            minWidth: '320px',
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            overflowY: 'auto',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
-          className="flex flex-col h-full"
-        >
-          {/* 隐藏滚动条（Webkit） */}
-          <style>{`.basic-info-scroll::-webkit-scrollbar { display: none; }`}</style>
-          <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-            <CardContent 
-              className="flex-1 flex flex-col overflow-hidden"
-              sx={{
-                padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+            {/* 自动保存状态指示器 */}
+            <div
+              className="flex items-center text-gray-500"
+              style={{
+                gap: 'clamp(0.375rem, 0.7vw, 0.625rem)',
               }}
             >
-              <div 
-                className="flex items-center justify-between"
-                style={{
-                  marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
-                }}
-              >
-                <div 
-                  className="flex items-center"
-                  style={{
-                    gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
-                  }}
-                >
-                  <div 
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-sm"
-                    style={{
-                      padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                    }}
-                  >
-                    <FileText 
-                      className="text-white"
-                      style={{
-                        width: 'clamp(0.5rem, 1vw, 1rem)',
-                        height: 'clamp(0.5rem, 1vw, 1rem)',
-                      }}
-                    />
-                  </div>
-                  <Typography 
-                    variant="h6" 
-                    className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+              {isSavingDraft ? (
+                <>
+                  <CircularProgress
+                    size={16}
+                    className="text-blue-600"
                     sx={{
-                      fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
-                      lineHeight: 1.3,
+                      width: 'clamp(0.875rem, 1vw, 1rem) !important',
+                      height: 'clamp(0.875rem, 1vw, 1rem) !important',
                     }}
-                  >
-                    {t('prompts.optimizeEditPage.basicInfo.title')}
-                  </Typography>
-                </div>
-
-                {/* 展开其他模块的按钮 */}
-                <div 
-                  className="flex items-center"
-                  style={{
-                    gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                  }}
-                >
-                  {moduleCollapsed.optimizationConfig && (
-                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.expand')}>
-                      <IconButton
-                        size="small"
-                        onClick={() => toggleModuleCollapse('optimizationConfig')}
-                        className="text-gray-400 hover:text-blue-600"
-                        sx={{
-                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                          '&:hover': {
-                            backgroundColor: '#eff6ff',
-                          },
-                        }}
-                      >
-                        <Settings 
-                          style={{
-                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
-                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
-                          }}
-                        />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-
-                  {moduleCollapsed.optimizationResult && (
-                    <Tooltip title={t('prompts.optimizeEditPage.optimizationResult.expand')}>
-                      <IconButton
-                        size="small"
-                        onClick={() => toggleModuleCollapse('optimizationResult')}
-                        className="text-gray-400 hover:text-blue-600"
-                        sx={{
-                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                          '&:hover': {
-                            backgroundColor: '#eff6ff',
-                          },
-                        }}
-                      >
-                        <BarChart 
-                          style={{
-                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
-                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
-                          }}
-                        />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </div>
-              </div>
-              {/* 基本信息主体内容：单独做一个可滚动区域，隐藏滚动条 */}
-              <div
-                className="flex-1 flex flex-col basic-info-scroll"
-                style={{ 
-                  overflowY: 'auto', 
-                  scrollbarWidth: 'none', 
-                  msOverflowStyle: 'none',
-                  gap: 'clamp(0.5rem, 1.5vw, 1rem)',
-                }}
-              >
-                {/* 任务信息配置 */}
-                <div 
-                  className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex-shrink-0"
-                  style={{
-                    padding: 'clamp(0.5rem, 1.5vw, 1rem)',
-                    gap: 'clamp(0.5rem, 1.5vw, 1rem)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                  }}
-                >
-                  <Typography 
-                    variant="subtitle1" 
-                    className="font-bold text-gray-800 flex items-center flex-shrink-0"
-                    style={{
-                      marginBottom: 'clamp(0.375rem, 1vh, 0.75rem)',
-                      gap: 'clamp(0.375rem, 0.75vw, 0.75rem)',
-                    }}
+                  />
+                  <Typography
+                    variant="body2"
                     sx={{
-                      fontSize: 'clamp(0.75rem, 1vw, 1rem)',
-                      lineHeight: 1.4,
+                      fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    <Settings 
-                      className="text-blue-600"
-                      style={{
-                        width: 'clamp(0.875rem, 1.2vw, 1.25rem)',
-                        height: 'clamp(0.875rem, 1.2vw, 1.25rem)',
-                      }}
-                    />
-                    <span>{t('prompts.optimizeEditPage.basicInfo.taskInfo')}</span>
+                    {t('prompts.optimizeEditPage.common.autoSaving')}
                   </Typography>
-                  <div 
+                </>
+              ) : lastSavedTime ? (
+                <>
+                  <CheckCircle
                     style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 'clamp(0.5rem, 1vw, 0.75rem)',
+                      width: 'clamp(0.875rem, 1vw, 1rem)',
+                      height: 'clamp(0.875rem, 1vw, 1rem)',
+                    }}
+                    className="text-green-500"
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                      whiteSpace: 'nowrap',
                     }}
                   >
-                    {/* 提示词选择下拉框 */}
-                    {!isEditMode && (
-                      <Autocomplete
-                        fullWidth
-                        size="small"
-                        value={selectedPrompt}
-                        onChange={(event, newValue) => handlePromptSelect(newValue)}
-                        options={promptList}
-                        loading={promptListLoading}
-                        getOptionLabel={option => `${option.prompt_key} - ${option.name}`}
-                        renderOption={(props, option) => (
-                          <li {...props}>
-                            <div>
-                              <Typography 
-                                variant="body2" 
-                                fontWeight="medium"
-                                sx={{
-                                  fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
-                                }}
-                              >
-                                {option.prompt_key}
-                              </Typography>
-                              <Typography 
-                                variant="caption" 
-                                color="text.secondary"
-                                sx={{
-                                  fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)',
-                                }}
-                              >
-                                {option.name}
-                              </Typography>
-                            </div>
-                          </li>
-                        )}
-                        renderInput={params => (
-                          <TextField
-                            {...params}
-                            label={t('prompts.optimizeEditPage.basicInfo.selectPrompt')}
-                            placeholder={t('prompts.optimizeEditPage.basicInfo.selectPromptPlaceholder')}
-                            className="bg-white"
-                            sx={{
-                              '& .MuiInputLabel-root': {
-                                fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
-                              },
-                              '& .MuiOutlinedInput-root': {
-                                '& input': {
-                                  fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
-                                },
-                              },
-                            }}
-                            InputProps={{
-                              ...params.InputProps,
-                              endAdornment: (
-                                <>
-                                  {promptListLoading ? <CircularProgress color="inherit" size={20} /> : null}
-                                  {params.InputProps.endAdornment}
-                                </>
-                              ),
-                            }}
-                          />
-                        )}
-                      />
-                    )}
-
-                    <TextField
-                      fullWidth
-                      label={t('prompts.optimizeEditPage.basicInfo.taskName')}
-                      value={taskName}
-                      onChange={e => setTaskNameWithAutoSave(e.target.value)}
-                      placeholder={t('prompts.optimizeEditPage.basicInfo.taskNamePlaceholder')}
-                      required
-                      size="small"
-                      className="bg-white"
-                      inputProps={{ maxLength: 32 }}
-                      sx={{
-                        '& .MuiInputLabel-root': {
-                          fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
-                        },
-                        '& .MuiOutlinedInput-root': {
-                          position: 'relative',
-                          '& input': {
-                            paddingRight: '60px',
-                            fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
-                          },
-                        },
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <Box sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                            <Typography variant="caption" sx={{ color: taskName.length >= 32 ? '#ef4444' : '#6b7280', fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)' }}>
-                              {taskName.length}/32
-                            </Typography>
-                          </Box>
-                        ),
-                      }}
-                    />
-
-                    <TextField
-                      fullWidth
-                      label={t('prompts.optimizeEditPage.basicInfo.taskDescription')}
-                      value={description}
-                      onChange={e => setDescriptionWithAutoSave(e.target.value)}
-                      placeholder={t('prompts.optimizeEditPage.basicInfo.taskDescriptionPlaceholder')}
-                      size="small"
-                      multiline
-                      rows={3}
-                      className="bg-white"
-                      inputProps={{ maxLength: 256 }}
-                      sx={{
-                        '& .MuiInputLabel-root': {
-                          fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
-                        },
-                        '& .MuiOutlinedInput-root': {
-                          position: 'relative',
-                          '& textarea': {
-                            paddingRight: '60px',
-                            marginBottom: '10px',
-                            fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
-                          },
-                        },
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <Box sx={{ position: 'absolute', right: 8, bottom: 0, pointerEvents: 'none' }}>
-                            <Typography variant="caption" sx={{ color: description.length >= 256 ? '#ef4444' : '#6b7280', fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)' }}>
-                              {description.length}/256
-                            </Typography>
-                          </Box>
-                        ),
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <Divider className="flex-shrink-0" />
-
-                {/* Original Prompt */}
-                <div 
-                  className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
-                  style={{
-                    padding: 'clamp(0.5rem, 1.5vw, 1rem)',
+                    {t('prompts.optimizeEditPage.common.saved')} {lastSavedTime.toLocaleTimeString()}
+                  </Typography>
+                </>
+              ) : (
+                <Typography
+                  variant="body2"
+                  className="text-gray-400"
+                  sx={{
+                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <Typography 
-                    variant="subtitle1" 
-                    className="font-bold text-gray-800 flex items-center flex-shrink-0 relative"
-                    style={{
-                      marginBottom: 'clamp(0.375rem, 1vh, 0.75rem)',
-                      gap: 'clamp(0.375rem, 0.75vw, 0.75rem)',
-                    }}
+                  {t('prompts.optimizeEditPage.common.autoSaveHint')}
+                </Typography>
+              )}
+            </div>
+            <Button
+              variant="contained"
+              startIcon={
+                isCreatingJob ? (
+                  <CircularProgress
                     sx={{
-                      fontSize: 'clamp(0.75rem, 1vw, 1rem)',
-                      lineHeight: 1.4,
+                      width: 'clamp(0.75rem, 0.75vw, 0.9375rem) !important',
+                      height: 'clamp(0.75rem, 0.75vw, 0.9375rem) !important',
+                      color: 'white',
                     }}
-                  >
-                    <Zap 
-                      className="text-indigo-600"
-                      style={{
-                        width: 'clamp(0.875rem, 1.2vw, 1.25rem)',
-                        height: 'clamp(0.875rem, 1.2vw, 1.25rem)',
-                      }}
-                    />
-                    <span>{t('prompts.optimizeEditPage.basicInfo.originalPrompt')}</span>
-                    <span 
-                      className="text-gray-700"
-                      style={{
-                        marginLeft: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                      }}
-                    >
-                      *
-                    </span>
-                  </Typography>
-                  <div style={{ height: 'clamp(0.5rem, 1vh, 1rem)' }}></div>
-                  <div 
-                    className="flex flex-col" 
-                    style={{ 
-                      minHeight: 'clamp(400px, 50vh, 660px)',
-                    }}
-                  >
-                    <FormattedPromptEditor
-                      fullWidth
-                      placeholder={t('prompts.optimizeEditPage.basicInfo.originalPromptPlaceholder')}
-                      value={originalPrompt}
-                      onChange={value => setOriginalPromptWithAutoSave(value)}
-                      className="bg-white"
-                      sx={{
-                        flex: 1,
-                        minHeight: 'clamp(200px, 25vh, 350px)',
-                        '& .cm-editor': {
-                          height: '100%',
-                          minHeight: 'clamp(200px, 25vh, 350px)',
-                        },
-                        '& .cm-scroller': {
-                          overflow: 'auto',
-                        },
-                        '& .cm-content': {
-                          overflow: 'auto',
-                        },
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                  />
+                ) : (
+                  <Play style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />
+                )
+              }
+              onClick={handleStartOptimization}
+              disabled={isCreatingJob}
+              sx={{
+                background: isCreatingJob ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)',
+                },
+                '&:disabled': {
+                  background: 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)',
+                  color: '#6b7280',
+                },
+                transition: 'all 0.2s ease',
+                borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+              }}
+            >
+              {isCreatingJob ? t('prompts.optimizeEditPage.common.creating') : t('prompts.optimizeEditPage.startOptimization')}
+            </Button>
+          </div>
         </div>
 
-        {/* 第一个拖动分界线 - 当优化配置显示时显示 */}
-        {!moduleCollapsed.optimizationConfig && (
-          <div
-            className={`w-1 bg-gradient-to-b from-gray-200/60 to-gray-300/60 hover:from-blue-400 hover:to-blue-500 cursor-col-resize transition-all duration-300 relative group ${
-              isDraggingColumn === 0 ? 'from-blue-500 to-blue-600 shadow-sm' : ''
-            }`}
-            onMouseDown={handleColumnMouseDown(0)}
-          >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200/60">
-              <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full mr-0.5"></div>
-              <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full ml-0.5"></div>
-            </div>
-          </div>
-        )}
-
-        {/* 基本信息和优化结果之间的分界线 - 当优化配置收起但优化结果显示时显示 */}
-        {moduleCollapsed.optimizationConfig && !moduleCollapsed.optimizationResult && (
-          <div
-            className={`w-1 bg-gradient-to-b from-gray-200/60 to-gray-300/60 hover:from-blue-400 hover:to-blue-500 cursor-col-resize transition-all duration-300 relative group ${
-              isDraggingColumn === 0 ? 'from-blue-500 to-blue-600 shadow-sm' : ''
-            }`}
-            onMouseDown={handleColumnMouseDown(0)}
-          >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200/60">
-              <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full mr-0.5"></div>
-              <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full ml-0.5"></div>
-            </div>
-          </div>
-        )}
-
-        {/* Column 2: 优化配置 */}
-        {!moduleCollapsed.optimizationConfig && (
+        {/* 主体内容 - 三列布局 */}
+        <div className="resizable-columns-container flex" style={{ minWidth: '1100px', height: contentHeight }}>
+          {/* Column 1: 基本信息 */}
           <div
             style={{
-              width: `${visibleModules.actualWidths[1]}%`,
-              minWidth: '360px',
+              width: `${visibleModules.actualWidths[0]}%`,
+              minWidth: '320px',
               display: 'flex',
               flexDirection: 'column',
               height: '100%',
@@ -3262,32 +2858,34 @@ const PromptOptimizeEditPage: React.FC = () => {
             }}
             className="flex flex-col h-full"
           >
+            {/* 隐藏滚动条（Webkit） */}
+            <style>{`.basic-info-scroll::-webkit-scrollbar { display: none; }`}</style>
             <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-              <CardContent 
-                className="flex-1 flex flex-col overflow-hidden min-h-0"
+              <CardContent
+                className="flex-1 flex flex-col overflow-hidden"
                 sx={{
                   padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
                 }}
               >
-                <div 
+                <div
                   className="flex items-center justify-between"
                   style={{
-                    marginBottom: 'clamp(0.1rem, 0.25vh, 0.2rem)',
+                    marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
                   }}
                 >
-                  <div 
+                  <div
                     className="flex items-center"
                     style={{
                       gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
                     }}
                   >
-                    <div 
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm"
+                    <div
+                      className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow-sm"
                       style={{
                         padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
                       }}
                     >
-                      <Settings 
+                      <FileText
                         className="text-white"
                         style={{
                           width: 'clamp(0.5rem, 1vw, 1rem)',
@@ -3295,425 +2893,842 @@ const PromptOptimizeEditPage: React.FC = () => {
                         }}
                       />
                     </div>
-                    <Typography 
-                      variant="h6" 
+                    <Typography
+                      variant="h6"
                       className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
                       sx={{
                         fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
                         lineHeight: 1.3,
                       }}
                     >
-                      {t('prompts.optimizeEditPage.optimizationConfig.title')}
+                      {t('prompts.optimizeEditPage.basicInfo.title')}
                     </Typography>
                   </div>
-                  <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.collapse')}>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => toggleModuleCollapse('optimizationConfig')} 
-                      className="text-gray-400 hover:text-gray-600"
-                      sx={{
-                        width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                        height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                      }}
-                    >
-                      <ChevronUp 
-                        style={{
-                          width: 'clamp(0.625rem, 1.2vw, 1rem)',
-                          height: 'clamp(0.625rem, 1.2vw, 1rem)',
-                        }}
-                      />
-                    </IconButton>
-                  </Tooltip>
-                </div>
-                {/* 优化结果主体内容：单独做一个可滚动区域，隐藏滚动条 */}
-                <style>{`.optimization-result-scroll::-webkit-scrollbar { display: none; }`}</style>
-                <div
-                  className="flex-1 flex flex-col optimization-result-scroll min-h-0"
-                  style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                >
-                  {/* Tab标签 */}
-                  <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tabs
-                      value={optimizationConfigTab}
-                      onChange={(e, newValue) => setOptimizationConfigTab(newValue)}
-                      aria-label={t('prompts.optimizeEditPage.optimizationConfig.title')}
-                      className="bg-white/60 rounded-t-lg"
-                      variant="scrollable"
-                      scrollButtons="auto"
-                      allowScrollButtonsMobile
-                      sx={{
-                        minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
-                        height: 'clamp(2rem, 5.5vh, 2.75rem)',
-                        '& .MuiTabs-flexContainer': {
-                          height: '100%',
-                        },
-                        '& .MuiTab-root': {
-                          fontSize: 'clamp(0.625rem, 1.5vw, 0.8125rem)',
-                          padding: 'clamp(0.3rem, 1vw, 0.6rem) clamp(0.375rem, 1.5vw, 0.75rem)',
-                          minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
-                        },
-                        '& .MuiTabs-scroller': {
-                          overflowX: 'auto',
-                          scrollbarWidth: 'none',
-                          msOverflowStyle: 'none',
-                          '&::-webkit-scrollbar': {
-                            display: 'none',
-                          },
-                        },
-                      }}
-                    >
-                      <Tab
-                        label={
-                          <div 
-                            className="flex items-center"
-                            style={{
-                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
-                            }}
-                          >
-                            <FileText 
-                              style={{
-                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                              }}
-                            />
-                            <span>{t('prompts.optimizeEditPage.optimizationConfig.testCasesConfig')}</span>
-                            <Chip 
-                              label={testCases.length} 
-                              size="small" 
-                              className="bg-blue-100 text-blue-700" 
-                              sx={{ 
-                                fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
-                                height: 'clamp(0.875rem, 2vh, 1.125rem)',
-                              }}
-                            />
-                          </div>
-                        }
-                      />
-                      <Tab
-                        label={
-                          <div 
-                            className="flex items-center"
-                            style={{
-                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
-                            }}
-                          >
-                            <Brain 
-                              style={{
-                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                              }}
-                            />
-                            <span>{t('prompts.optimizeEditPage.optimizationConfig.optimizationStrategy')}</span>
-                          </div>
-                        }
-                      />
-                      <Tab
-                        label={
-                          <div 
-                            className="flex items-center"
-                            style={{
-                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
-                            }}
-                          >
-                            <BarChart 
-                              style={{
-                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                              }}
-                            />
-                            <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteria')}</span>
-                          </div>
-                        }
-                      />
-                      <Tab
-                        label={
-                          <div 
-                            className="flex items-center"
-                            style={{
-                              gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
-                            }}
-                          >
-                            <Code 
-                              style={{
-                                width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                                height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                              }}
-                            />
-                            <span>工具设置</span>
-                            <Chip 
-                              label={tools.length} 
-                              size="small" 
-                              className="bg-green-100 text-green-700" 
-                              sx={{ 
-                                fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
-                                height: 'clamp(0.875rem, 2vh, 1.125rem)',
-                              }}
-                            />
-                          </div>
-                        }
-                      />
-                    </Tabs>
-                  </Box>
 
-                  {/* Tab内容区域 */}
+                  {/* 展开其他模块的按钮 */}
                   <div
-                    className="flex-1 bg-gradient-to-r from-gray-50/50 to-slate-50/50 border border-gray-100/60 border-t-0 rounded-b-lg"
-                    style={{ 
-                      overflowY: 'auto', 
-                      scrollbarWidth: 'none', 
-                      msOverflowStyle: 'none',
-                      padding: 'clamp(0.25rem, 1vw, 1rem)',
+                    className="flex items-center"
+                    style={{
+                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
                     }}
                   >
-                    {/* 隐藏滚动条（Webkit） */}
-                    <style>{`
-                      .optimization-tab-scroll::-webkit-scrollbar { display: none; }
-                    `}</style>
-                    {/* 用例集配置 Tab */}
-                    <div
-                      role="tabpanel"
-                      hidden={optimizationConfigTab !== 0}
-                      className="h-full optimization-tab-scroll"
-                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {optimizationConfigTab === 0 && (
-                        <div
-                          className="h-full flex flex-col optimization-tab-scroll"
-                          style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    {moduleCollapsed.optimizationConfig && (
+                      <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.expand')}>
+                        <IconButton
+                          size="small"
+                          onClick={() => toggleModuleCollapse('optimizationConfig')}
+                          className="text-gray-400 hover:text-blue-600"
+                          sx={{
+                            width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            '&:hover': {
+                              backgroundColor: '#eff6ff',
+                            },
+                          }}
                         >
-                          <div 
-                            className="flex flex-col"
+                          <Settings
                             style={{
-                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                              height: 'clamp(0.625rem, 1.2vw, 1rem)',
                             }}
-                          >
-                            {/* 操作按钮 */}
-                            <div 
-                              className="flex flex-shrink-0 items-center flex-wrap"
-                              style={{
-                                gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                              }}
-                            >
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={
-                                  <Plus 
-                                    style={{
-                                      width: 'clamp(0.5rem, 1vw, 1rem)',
-                                      height: 'clamp(0.5rem, 1vw, 1rem)',
-                                    }}
-                                  />
-                                }
-                                onClick={handleAddCase}
-                                disabled={testCases.length >= MAX_TEST_CASES}
-                                className="border-blue-300 text-blue-700 whitespace-nowrap"
-                                sx={{ 
-                                  whiteSpace: 'nowrap', 
-                                  minWidth: 'auto',
-                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
-                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                }}
-                              >
-                                {t('prompts.optimizeEditPage.testCases.add')}
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={
-                                  <Upload 
-                                    style={{
-                                      width: 'clamp(0.5rem, 1vw, 1rem)',
-                                      height: 'clamp(0.5rem, 1vw, 1rem)',
-                                    }}
-                                  />
-                                }
-                                component="label"
-                                className="border-blue-300 text-blue-700 whitespace-nowrap"
-                                sx={{ 
-                                  whiteSpace: 'nowrap', 
-                                  minWidth: 'auto',
-                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
-                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                }}
-                              >
-                                {t('prompts.optimizeEditPage.common.uploadFile')}
-                                <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={
-                                  <Trash 
-                                    style={{
-                                      width: 'clamp(0.5rem, 1vw, 1rem)',
-                                      height: 'clamp(0.5rem, 1vw, 1rem)',
-                                    }}
-                                  />
-                                }
-                                onClick={handleClearCases}
-                                className="border-red-300 text-red-700 hover:bg-red-50 whitespace-nowrap"
-                                disabled={testCases.length === 0}
-                                sx={{ 
-                                  whiteSpace: 'nowrap', 
-                                  minWidth: 'auto',
-                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
-                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                }}
-                              >
-                                {t('prompts.optimizeEditPage.testCases.clear')}
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                startIcon={
-                                  <Download 
-                                    style={{
-                                      width: 'clamp(0.5rem, 1vw, 1rem)',
-                                      height: 'clamp(0.5rem, 1vw, 1rem)',
-                                    }}
-                                  />
-                                }
-                                onClick={handleDownloadSample}
-                                className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap"
-                                sx={{ 
-                                  whiteSpace: 'nowrap', 
-                                  minWidth: 'auto',
-                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                  padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
-                                  minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                }}
-                              >
-                                {t('prompts.optimizeEditPage.testCases.downloadExample')}
-                              </Button>
-                              {/* 用例数量显示 */}
-                              <div 
-                                className="ml-auto flex items-center flex-shrink-0"
-                                style={{
-                                  gap: 'clamp(0.125rem, 0.3vw, 0.5rem)',
-                                }}
-                              >
-                                <Typography 
-                                  variant="body2" 
-                                  className="font-medium text-gray-600 whitespace-nowrap"
+                          />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+
+                    {moduleCollapsed.optimizationResult && (
+                      <Tooltip title={t('prompts.optimizeEditPage.optimizationResult.expand')}>
+                        <IconButton
+                          size="small"
+                          onClick={() => toggleModuleCollapse('optimizationResult')}
+                          className="text-gray-400 hover:text-blue-600"
+                          sx={{
+                            width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                            '&:hover': {
+                              backgroundColor: '#eff6ff',
+                            },
+                          }}
+                        >
+                          <BarChart
+                            style={{
+                              width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                              height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            }}
+                          />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+                {/* 基本信息主体内容：单独做一个可滚动区域，隐藏滚动条 */}
+                <div
+                  className="flex-1 flex flex-col basic-info-scroll"
+                  style={{
+                    overflowY: 'auto',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    gap: 'clamp(0.5rem, 1.5vw, 1rem)',
+                  }}
+                >
+                  {/* 任务信息配置 */}
+                  <div
+                    className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex-shrink-0"
+                    style={{
+                      padding: 'clamp(0.5rem, 1.5vw, 1rem)',
+                      gap: 'clamp(0.5rem, 1.5vw, 1rem)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      className="font-bold text-gray-800 flex items-center flex-shrink-0"
+                      style={{
+                        marginBottom: 'clamp(0.375rem, 1vh, 0.75rem)',
+                        gap: 'clamp(0.375rem, 0.75vw, 0.75rem)',
+                      }}
+                      sx={{
+                        fontSize: 'clamp(0.75rem, 1vw, 1rem)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <Settings
+                        className="text-blue-600"
+                        style={{
+                          width: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                          height: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                        }}
+                      />
+                      <span>{t('prompts.optimizeEditPage.basicInfo.taskInfo')}</span>
+                    </Typography>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'clamp(0.5rem, 1vw, 0.75rem)',
+                      }}
+                    >
+                      {/* 提示词选择下拉框 */}
+                      {!isEditMode && (
+                        <Autocomplete
+                          fullWidth
+                          size="small"
+                          value={selectedPrompt}
+                          onChange={(event, newValue) => handlePromptSelect(newValue)}
+                          options={promptList}
+                          loading={promptListLoading}
+                          getOptionLabel={option => `${option.prompt_key} - ${option.name}`}
+                          renderOption={(props, option) => (
+                            <li {...props}>
+                              <div>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight="medium"
                                   sx={{
-                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
                                   }}
                                 >
-                                  {t('prompts.optimizeEditPage.testCases.count', {
-                                    max: MAX_TEST_CASES,
-                                  })}
+                                  {option.prompt_key}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)',
+                                  }}
+                                >
+                                  {option.name}
                                 </Typography>
                               </div>
-                            </div>
+                            </li>
+                          )}
+                          renderInput={params => (
+                            <TextField
+                              {...params}
+                              label={t('prompts.optimizeEditPage.basicInfo.selectPrompt')}
+                              placeholder={t('prompts.optimizeEditPage.basicInfo.selectPromptPlaceholder')}
+                              className="bg-white"
+                              sx={{
+                                '& .MuiInputLabel-root': {
+                                  fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
+                                },
+                                '& .MuiOutlinedInput-root': {
+                                  '& input': {
+                                    fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                                  },
+                                },
+                              }}
+                              InputProps={{
+                                ...params.InputProps,
+                                endAdornment: (
+                                  <>
+                                    {promptListLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                                    {params.InputProps.endAdornment}
+                                  </>
+                                ),
+                              }}
+                            />
+                          )}
+                        />
+                      )}
 
-                            {/* 用例表格 */}
-                            <div 
-                              className="flex flex-col"
-                              style={{ 
-                                minHeight: 'clamp(200px, 30vh, 300px)',
+                      <TextField
+                        fullWidth
+                        label={t('prompts.optimizeEditPage.basicInfo.taskName')}
+                        value={taskName}
+                        onChange={e => setTaskNameWithAutoSave(e.target.value)}
+                        placeholder={t('prompts.optimizeEditPage.basicInfo.taskNamePlaceholder')}
+                        required
+                        size="small"
+                        className="bg-white"
+                        inputProps={{ maxLength: 32 }}
+                        sx={{
+                          '& .MuiInputLabel-root': {
+                            fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
+                          },
+                          '& .MuiOutlinedInput-root': {
+                            position: 'relative',
+                            '& input': {
+                              paddingRight: '60px',
+                              fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                            },
+                          },
+                        }}
+                        InputProps={{
+                          endAdornment: (
+                            <Box sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                              <Typography
+                                variant="caption"
+                                sx={{ color: taskName.length >= 32 ? '#ef4444' : '#6b7280', fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)' }}
+                              >
+                                {taskName.length}/32
+                              </Typography>
+                            </Box>
+                          ),
+                        }}
+                      />
+
+                      <TextField
+                        fullWidth
+                        label={t('prompts.optimizeEditPage.basicInfo.taskDescription')}
+                        value={description}
+                        onChange={e => setDescriptionWithAutoSave(e.target.value)}
+                        placeholder={t('prompts.optimizeEditPage.basicInfo.taskDescriptionPlaceholder')}
+                        size="small"
+                        multiline
+                        rows={3}
+                        className="bg-white"
+                        inputProps={{ maxLength: 256 }}
+                        sx={{
+                          '& .MuiInputLabel-root': {
+                            fontSize: 'clamp(0.65rem, 1.5vw, 0.875rem)',
+                          },
+                          '& .MuiOutlinedInput-root': {
+                            position: 'relative',
+                            '& textarea': {
+                              paddingRight: '60px',
+                              marginBottom: '10px',
+                              fontSize: 'clamp(0.7rem, 1.5vw, 0.875rem)',
+                            },
+                          },
+                        }}
+                        InputProps={{
+                          endAdornment: (
+                            <Box sx={{ position: 'absolute', right: 8, bottom: 0, pointerEvents: 'none' }}>
+                              <Typography
+                                variant="caption"
+                                sx={{ color: description.length >= 256 ? '#ef4444' : '#6b7280', fontSize: 'clamp(0.6rem, 1.25vw, 0.75rem)' }}
+                              >
+                                {description.length}/256
+                              </Typography>
+                            </Box>
+                          ),
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <Divider className="flex-shrink-0" />
+
+                  {/* Original Prompt */}
+                  <div
+                    className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
+                    style={{
+                      padding: 'clamp(0.5rem, 1.5vw, 1rem)',
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle1"
+                      className="font-bold text-gray-800 flex items-center flex-shrink-0 relative"
+                      style={{
+                        marginBottom: 'clamp(0.375rem, 1vh, 0.75rem)',
+                        gap: 'clamp(0.375rem, 0.75vw, 0.75rem)',
+                      }}
+                      sx={{
+                        fontSize: 'clamp(0.75rem, 1vw, 1rem)',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <Zap
+                        className="text-indigo-600"
+                        style={{
+                          width: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                          height: 'clamp(0.875rem, 1.2vw, 1.25rem)',
+                        }}
+                      />
+                      <span>{t('prompts.optimizeEditPage.basicInfo.originalPrompt')}</span>
+                      <span
+                        className="text-gray-700"
+                        style={{
+                          marginLeft: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                        }}
+                      >
+                        *
+                      </span>
+                    </Typography>
+                    <div style={{ height: 'clamp(0.5rem, 1vh, 1rem)' }}></div>
+                    <div
+                      className="flex flex-col"
+                      style={{
+                        minHeight: 'clamp(400px, 50vh, 660px)',
+                      }}
+                    >
+                      <FormattedPromptEditor
+                        fullWidth
+                        placeholder={t('prompts.optimizeEditPage.basicInfo.originalPromptPlaceholder')}
+                        value={originalPrompt}
+                        onChange={value => setOriginalPromptWithAutoSave(value)}
+                        className="bg-white"
+                        sx={{
+                          flex: 1,
+                          minHeight: 'clamp(200px, 25vh, 350px)',
+                          '& .cm-editor': {
+                            height: '100%',
+                            minHeight: 'clamp(200px, 25vh, 350px)',
+                          },
+                          '& .cm-scroller': {
+                            overflow: 'auto',
+                          },
+                          '& .cm-content': {
+                            overflow: 'auto',
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 第一个拖动分界线 - 当优化配置显示时显示 */}
+          {!moduleCollapsed.optimizationConfig && (
+            <div
+              className={`w-1 bg-gradient-to-b from-gray-200/60 to-gray-300/60 hover:from-blue-400 hover:to-blue-500 cursor-col-resize transition-all duration-300 relative group ${
+                isDraggingColumn === 0 ? 'from-blue-500 to-blue-600 shadow-sm' : ''
+              }`}
+              onMouseDown={handleColumnMouseDown(0)}
+            >
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200/60">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full mr-0.5"></div>
+                <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full ml-0.5"></div>
+              </div>
+            </div>
+          )}
+
+          {/* 基本信息和优化结果之间的分界线 - 当优化配置收起但优化结果显示时显示 */}
+          {moduleCollapsed.optimizationConfig && !moduleCollapsed.optimizationResult && (
+            <div
+              className={`w-1 bg-gradient-to-b from-gray-200/60 to-gray-300/60 hover:from-blue-400 hover:to-blue-500 cursor-col-resize transition-all duration-300 relative group ${
+                isDraggingColumn === 0 ? 'from-blue-500 to-blue-600 shadow-sm' : ''
+              }`}
+              onMouseDown={handleColumnMouseDown(0)}
+            >
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200/60">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full mr-0.5"></div>
+                <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full ml-0.5"></div>
+              </div>
+            </div>
+          )}
+
+          {/* Column 2: 优化配置 */}
+          {!moduleCollapsed.optimizationConfig && (
+            <div
+              style={{
+                width: `${visibleModules.actualWidths[1]}%`,
+                minWidth: '360px',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+                overflowY: 'auto',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+              className="flex flex-col h-full"
+            >
+              <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
+                <CardContent
+                  className="flex-1 flex flex-col overflow-hidden min-h-0"
+                  sx={{
+                    padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-between"
+                    style={{
+                      marginBottom: 'clamp(0.1rem, 0.25vh, 0.2rem)',
+                    }}
+                  >
+                    <div
+                      className="flex items-center"
+                      style={{
+                        gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                      }}
+                    >
+                      <div
+                        className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-sm"
+                        style={{
+                          padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                        }}
+                      >
+                        <Settings
+                          className="text-white"
+                          style={{
+                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                          }}
+                        />
+                      </div>
+                      <Typography
+                        variant="h6"
+                        className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                        sx={{
+                          fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {t('prompts.optimizeEditPage.optimizationConfig.title')}
+                      </Typography>
+                    </div>
+                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.collapse')}>
+                      <IconButton
+                        size="small"
+                        onClick={() => toggleModuleCollapse('optimizationConfig')}
+                        className="text-gray-400 hover:text-gray-600"
+                        sx={{
+                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                        }}
+                      >
+                        <ChevronUp
+                          style={{
+                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          }}
+                        />
+                      </IconButton>
+                    </Tooltip>
+                  </div>
+                  {/* 优化结果主体内容：单独做一个可滚动区域，隐藏滚动条 */}
+                  <style>{`.optimization-result-scroll::-webkit-scrollbar { display: none; }`}</style>
+                  <div
+                    className="flex-1 flex flex-col optimization-result-scroll min-h-0"
+                    style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    {/* Tab标签 */}
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                      <Tabs
+                        value={optimizationConfigTab}
+                        onChange={(e, newValue) => setOptimizationConfigTab(newValue)}
+                        aria-label={t('prompts.optimizeEditPage.optimizationConfig.title')}
+                        className="bg-white/60 rounded-t-lg"
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        allowScrollButtonsMobile
+                        sx={{
+                          minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
+                          height: 'clamp(2rem, 5.5vh, 2.75rem)',
+                          '& .MuiTabs-flexContainer': {
+                            height: '100%',
+                          },
+                          '& .MuiTab-root': {
+                            fontSize: 'clamp(0.625rem, 1.5vw, 0.8125rem)',
+                            padding: 'clamp(0.3rem, 1vw, 0.6rem) clamp(0.375rem, 1.5vw, 0.75rem)',
+                            minHeight: 'clamp(2rem, 5.5vh, 2.75rem)',
+                          },
+                          '& .MuiTabs-scroller': {
+                            overflowX: 'auto',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none',
+                            '&::-webkit-scrollbar': {
+                              display: 'none',
+                            },
+                          },
+                        }}
+                      >
+                        <Tab
+                          label={
+                            <div
+                              className="flex items-center"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
                               }}
                             >
-                              <TableContainer 
-                                className="bg-white rounded border border-gray-200" 
-                                style={{ 
-                                  overflowX: 'auto',
-                                  overflowY: 'auto',
-                                  minHeight: 'clamp(200px, 30vh, 300px)',
-                                  width: '100%'
+                              <FileText
+                                style={{
+                                  width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                  height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                }}
+                              />
+                              <span>{t('prompts.optimizeEditPage.optimizationConfig.testCasesConfig')}</span>
+                              <Chip
+                                label={testCases.length}
+                                size="small"
+                                className="bg-blue-100 text-blue-700"
+                                sx={{
+                                  fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
+                                  height: 'clamp(0.875rem, 2vh, 1.125rem)',
+                                }}
+                              />
+                            </div>
+                          }
+                        />
+                        <Tab
+                          label={
+                            <div
+                              className="flex items-center"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                              }}
+                            >
+                              <Brain
+                                style={{
+                                  width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                  height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                }}
+                              />
+                              <span>{t('prompts.optimizeEditPage.optimizationConfig.optimizationStrategy')}</span>
+                            </div>
+                          }
+                        />
+                        <Tab
+                          label={
+                            <div
+                              className="flex items-center"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                              }}
+                            >
+                              <BarChart
+                                style={{
+                                  width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                  height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                }}
+                              />
+                              <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteria')}</span>
+                            </div>
+                          }
+                        />
+                        <Tab
+                          label={
+                            <div
+                              className="flex items-center"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                              }}
+                            >
+                              <Code
+                                style={{
+                                  width: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                  height: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                                }}
+                              />
+                              <span>{t('prompts.optimizeEditPage.optimizationConfig.toolSettings')}</span>
+                              <Chip
+                                label={tools.length}
+                                size="small"
+                                className="bg-green-100 text-green-700"
+                                sx={{
+                                  fontSize: 'clamp(0.5rem, 1.2vw, 0.6875rem)',
+                                  height: 'clamp(0.875rem, 2vh, 1.125rem)',
+                                }}
+                              />
+                            </div>
+                          }
+                        />
+                      </Tabs>
+                    </Box>
+
+                    {/* Tab内容区域 */}
+                    <div
+                      className="flex-1 bg-gradient-to-r from-gray-50/50 to-slate-50/50 border border-gray-100/60 border-t-0 rounded-b-lg"
+                      style={{
+                        overflowY: 'auto',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none',
+                        padding: 'clamp(0.25rem, 1vw, 1rem)',
+                      }}
+                    >
+                      {/* 隐藏滚动条（Webkit） */}
+                      <style>{`
+                      .optimization-tab-scroll::-webkit-scrollbar { display: none; }
+                    `}</style>
+                      {/* 用例集配置 Tab */}
+                      <div
+                        role="tabpanel"
+                        hidden={optimizationConfigTab !== 0}
+                        className="h-full optimization-tab-scroll"
+                        style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      >
+                        {optimizationConfigTab === 0 && (
+                          <div
+                            className="h-full flex flex-col optimization-tab-scroll"
+                            style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                          >
+                            <div
+                              className="flex flex-col"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              }}
+                            >
+                              {/* 操作按钮 */}
+                              <div
+                                className="flex flex-shrink-0 items-center flex-wrap"
+                                style={{
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
                                 }}
                               >
-                                <Table size="small" stickyHeader sx={{ minWidth: 'clamp(300px, 50vw, 400px)' }}>
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell 
-                                        width="60" 
-                                        className="bg-gray-50 font-medium" 
-                                        sx={{ 
-                                          minWidth: 'clamp(40px, 8vw, 60px)',
-                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                          padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                        }}
-                                      >
-                                        编号
-                                      </TableCell>
-                                      <TableCell 
-                                        className="bg-gray-50 font-medium" 
-                                        sx={{ 
-                                          minWidth: 'clamp(150px, 25vw, 200px)',
-                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                          padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                        }}
-                                      >
-                                        用例
-                                      </TableCell>
-                                      <TableCell 
-                                        width="80" 
-                                        align="center" 
-                                        className="bg-gray-50 font-medium" 
-                                        sx={{ 
-                                          minWidth: 'clamp(80px, 15vw, 120px)',
-                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                          padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                        }}
-                                      >
-                                        {t('prompts.optimizeEditPage.testCases.actions')}
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {testCases
-                                      .slice(testCasePage * testCaseRowsPerPage, testCasePage * testCaseRowsPerPage + testCaseRowsPerPage)
-                                      .map(testCase => (
-                                        <TableRow key={testCase.id} hover>
-                                          <TableCell 
-                                            sx={{
-                                              fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                              padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                            }}
-                                          >
-                                            {testCase.id}
-                                          </TableCell>
-                                          <TableCell 
-                                            className="cursor-pointer hover:bg-gray-50" 
-                                            onClick={() => handleViewCase(testCase)}
-                                            sx={{
-                                              fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                              padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                            }}
-                                          >
-                                            <div 
-                                              className="max-w-none overflow-hidden"
-                                              style={{
-                                                minWidth: 'clamp(150px, 25vw, 200px)',
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={
+                                    <Plus
+                                      style={{
+                                        width: 'clamp(0.5rem, 1vw, 1rem)',
+                                        height: 'clamp(0.5rem, 1vw, 1rem)',
+                                      }}
+                                    />
+                                  }
+                                  onClick={handleAddCase}
+                                  disabled={testCases.length >= MAX_TEST_CASES}
+                                  className="border-blue-300 text-blue-700 whitespace-nowrap"
+                                  sx={{
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'auto',
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                    minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  }}
+                                >
+                                  {t('prompts.optimizeEditPage.testCases.add')}
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={
+                                    <Upload
+                                      style={{
+                                        width: 'clamp(0.5rem, 1vw, 1rem)',
+                                        height: 'clamp(0.5rem, 1vw, 1rem)',
+                                      }}
+                                    />
+                                  }
+                                  component="label"
+                                  className="border-blue-300 text-blue-700 whitespace-nowrap"
+                                  sx={{
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'auto',
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                    minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  }}
+                                >
+                                  {t('prompts.optimizeEditPage.common.uploadFile')}
+                                  <input type="file" hidden accept=".xlsx,.xls,.csv" onChange={handleFileUpload} />
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={
+                                    <Trash
+                                      style={{
+                                        width: 'clamp(0.5rem, 1vw, 1rem)',
+                                        height: 'clamp(0.5rem, 1vw, 1rem)',
+                                      }}
+                                    />
+                                  }
+                                  onClick={handleClearCases}
+                                  className="border-red-300 text-red-700 hover:bg-red-50 whitespace-nowrap"
+                                  disabled={testCases.length === 0}
+                                  sx={{
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'auto',
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                    minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  }}
+                                >
+                                  {t('prompts.optimizeEditPage.testCases.clear')}
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  startIcon={
+                                    <Download
+                                      style={{
+                                        width: 'clamp(0.5rem, 1vw, 1rem)',
+                                        height: 'clamp(0.5rem, 1vw, 1rem)',
+                                      }}
+                                    />
+                                  }
+                                  onClick={handleDownloadSample}
+                                  className="border-green-300 text-green-700 hover:bg-green-50 whitespace-nowrap"
+                                  sx={{
+                                    whiteSpace: 'nowrap',
+                                    minWidth: 'auto',
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                    minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  }}
+                                >
+                                  {t('prompts.optimizeEditPage.testCases.downloadExample')}
+                                </Button>
+                                {/* 用例数量显示 */}
+                                <div
+                                  className="ml-auto flex items-center flex-shrink-0"
+                                  style={{
+                                    gap: 'clamp(0.125rem, 0.3vw, 0.5rem)',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="body2"
+                                    className="font-medium text-gray-600 whitespace-nowrap"
+                                    sx={{
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                    }}
+                                  >
+                                    {t('prompts.optimizeEditPage.testCases.count', {
+                                      max: MAX_TEST_CASES,
+                                    })}
+                                  </Typography>
+                                </div>
+                              </div>
+
+                              {/* 用例表格 */}
+                              <div
+                                className="flex flex-col"
+                                style={{
+                                  minHeight: 'clamp(200px, 30vh, 300px)',
+                                }}
+                              >
+                                <TableContainer
+                                  className="bg-white rounded border border-gray-200"
+                                  style={{
+                                    overflowX: 'auto',
+                                    overflowY: 'auto',
+                                    minHeight: 'clamp(200px, 30vh, 300px)',
+                                    width: '100%',
+                                  }}
+                                >
+                                  <Table size="small" stickyHeader sx={{ minWidth: 'clamp(300px, 50vw, 400px)' }}>
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell
+                                          width="60"
+                                          className="bg-gray-50 font-medium"
+                                          sx={{
+                                            minWidth: 'clamp(40px, 8vw, 60px)',
+                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                            padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                          }}
+                                        >
+                                          编号
+                                        </TableCell>
+                                        <TableCell
+                                          className="bg-gray-50 font-medium"
+                                          sx={{
+                                            minWidth: 'clamp(150px, 25vw, 200px)',
+                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                            padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                          }}
+                                        >
+                                          用例
+                                        </TableCell>
+                                        <TableCell
+                                          width="80"
+                                          align="center"
+                                          className="bg-gray-50 font-medium"
+                                          sx={{
+                                            minWidth: 'clamp(80px, 15vw, 120px)',
+                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                            padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                          }}
+                                        >
+                                          {t('prompts.optimizeEditPage.testCases.actions')}
+                                        </TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {testCases
+                                        .slice(testCasePage * testCaseRowsPerPage, testCasePage * testCaseRowsPerPage + testCaseRowsPerPage)
+                                        .map(testCase => (
+                                          <TableRow key={testCase.id} hover>
+                                            <TableCell
+                                              sx={{
+                                                fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
                                               }}
                                             >
-                                              {(() => {
-                                                const formattedCase = formatTestCaseForDisplay(testCase)
-                                                const isLongContent = formattedCase.length > 200
-                                                const displayContent = isLongContent ? formattedCase.substring(0, 200) + '...' : formattedCase
+                                              {testCase.id}
+                                            </TableCell>
+                                            <TableCell
+                                              className="cursor-pointer hover:bg-gray-50"
+                                              onClick={() => handleViewCase(testCase)}
+                                              sx={{
+                                                fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                              }}
+                                            >
+                                              <div
+                                                className="max-w-none overflow-hidden"
+                                                style={{
+                                                  minWidth: 'clamp(150px, 25vw, 200px)',
+                                                }}
+                                              >
+                                                {(() => {
+                                                  const formattedCase = formatTestCaseForDisplay(testCase)
+                                                  const isLongContent = formattedCase.length > 200
+                                                  const displayContent = isLongContent ? formattedCase.substring(0, 200) + '...' : formattedCase
 
-                                                return isLongContent ? (
-                                                  <Tooltip
-                                                    title={
-                                                      <pre 
-                                                        className="whitespace-pre-wrap font-mono overflow-auto"
+                                                  return isLongContent ? (
+                                                    <Tooltip
+                                                      title={
+                                                        <pre
+                                                          className="whitespace-pre-wrap font-mono overflow-auto"
+                                                          style={{
+                                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                            maxWidth: 'clamp(200px, 40vw, 400px)',
+                                                            maxHeight: 'clamp(200px, 50vh, 400px)',
+                                                          }}
+                                                        >
+                                                          {formattedCase}
+                                                        </pre>
+                                                      }
+                                                      placement="top-start"
+                                                      arrow
+                                                    >
+                                                      <pre
+                                                        className="whitespace-pre-wrap font-mono text-gray-600 break-all"
                                                         style={{
                                                           fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                                          maxWidth: 'clamp(200px, 40vw, 400px)',
-                                                          maxHeight: 'clamp(200px, 50vh, 400px)',
                                                         }}
                                                       >
-                                                        {formattedCase}
+                                                        {displayContent}
                                                       </pre>
-                                                    }
-                                                    placement="top-start"
-                                                    arrow
-                                                  >
-                                                    <pre 
+                                                    </Tooltip>
+                                                  ) : (
+                                                    <pre
                                                       className="whitespace-pre-wrap font-mono text-gray-600 break-all"
                                                       style={{
                                                         fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
@@ -3721,783 +3736,866 @@ const PromptOptimizeEditPage: React.FC = () => {
                                                     >
                                                       {displayContent}
                                                     </pre>
-                                                  </Tooltip>
-                                                ) : (
-                                                  <pre 
-                                                    className="whitespace-pre-wrap font-mono text-gray-600 break-all"
+                                                  )
+                                                })()}
+                                              </div>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ padding: 'clamp(0.25rem, 0.5vw, 0.5rem)' }}>
+                                              <Box
+                                                className="flex justify-center"
+                                                style={{
+                                                  gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                }}
+                                              >
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => handleViewCase(testCase)}
+                                                  title={t('prompts.optimizeEditPage.testCases.view')}
+                                                  sx={{
+                                                    padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                    width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                    height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                  }}
+                                                >
+                                                  <Info
+                                                    className="text-green-600"
                                                     style={{
-                                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                                      width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                      height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
                                                     }}
-                                                  >
-                                                    {displayContent}
-                                                  </pre>
-                                                )
-                                              })()}
-                                            </div>
-                                          </TableCell>
-                                          <TableCell align="center" sx={{ padding: 'clamp(0.25rem, 0.5vw, 0.5rem)' }}>
-                                            <Box 
-                                              className="flex justify-center"
-                                              style={{
-                                                gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                              }}
-                                            >
-                                              <IconButton 
-                                                size="small" 
-                                                onClick={() => handleViewCase(testCase)} 
-                                                title="查看"
-                                                sx={{
-                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
-                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
-                                                }}
-                                              >
-                                                <Info 
-                                                  className="text-green-600"
-                                                  style={{
-                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  />
+                                                </IconButton>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => handleEditCase(testCase)}
+                                                  title={t('prompts.optimizeEditPage.testCases.edit')}
+                                                  sx={{
+                                                    padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                    width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                    height: 'clamp(1rem, 2vw, 1.5rem)',
                                                   }}
-                                                />
-                                              </IconButton>
-                                              <IconButton 
-                                                size="small" 
-                                                onClick={() => handleEditCase(testCase)} 
-                                                title="编辑"
-                                                sx={{
-                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
-                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
-                                                }}
-                                              >
-                                                <Edit 
-                                                  className="text-blue-600"
-                                                  style={{
-                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                >
+                                                  <Edit
+                                                    className="text-blue-600"
+                                                    style={{
+                                                      width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                      height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    }}
+                                                  />
+                                                </IconButton>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => {
+                                                    const content = formatTestCaseForDisplay(testCase)
+                                                    copyToClipboard(content, snackbar => {
+                                                      showSnackbar(snackbar.message, snackbar.severity)
+                                                    })
                                                   }}
-                                                />
-                                              </IconButton>
-                                              <IconButton
-                                                size="small"
-                                                onClick={() => {
-                                                  const content = formatTestCaseForDisplay(testCase)
-                                                  copyToClipboard(content, snackbar => {
-                                                    showSnackbar(snackbar.message, snackbar.severity)
-                                                  })
-                                                }}
-                                                title="复制"
-                                                sx={{
-                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
-                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
-                                                }}
-                                              >
-                                                <Copy 
-                                                  className="text-purple-600"
-                                                  style={{
-                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  title={t('prompts.optimizeEditPage.testCases.copy')}
+                                                  sx={{
+                                                    padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                    width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                    height: 'clamp(1rem, 2vw, 1.5rem)',
                                                   }}
-                                                />
-                                              </IconButton>
-                                              <IconButton 
-                                                size="small" 
-                                                onClick={() => handleDeleteCase(testCase.id)} 
-                                                title="删除"
-                                                sx={{
-                                                  padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                                  width: 'clamp(1rem, 2vw, 1.5rem)',
-                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
-                                                }}
-                                              >
-                                                <Trash2 
-                                                  className="text-red-600"
-                                                  style={{
-                                                    width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                    height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                >
+                                                  <Copy
+                                                    className="text-purple-600"
+                                                    style={{
+                                                      width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                      height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    }}
+                                                  />
+                                                </IconButton>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={() => handleDeleteCase(testCase.id)}
+                                                  title={t('prompts.optimizeEditPage.testCases.delete')}
+                                                  sx={{
+                                                    padding: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                                    width: 'clamp(1rem, 2vw, 1.5rem)',
+                                                    height: 'clamp(1rem, 2vw, 1.5rem)',
                                                   }}
-                                                />
-                                              </IconButton>
-                                            </Box>
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                  </TableBody>
-                                </Table>
-                              </TableContainer>
-                            </div>
+                                                >
+                                                  <Trash2
+                                                    className="text-red-600"
+                                                    style={{
+                                                      width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                      height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                    }}
+                                                  />
+                                                </IconButton>
+                                              </Box>
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                    </TableBody>
+                                  </Table>
+                                </TableContainer>
+                              </div>
 
-                            {/* 分页控件 */}
-                            <div 
-                              className="flex items-center justify-end flex-shrink-0 border-t"
-                              style={{
-                                paddingTop: 'clamp(0.25rem, 1vw, 1rem)',
-                              }}
-                            >
-                              <div 
-                                className="flex items-center flex-wrap justify-end"
+                              {/* 分页控件 */}
+                              <div
+                                className="flex items-center justify-end flex-shrink-0 border-t"
                                 style={{
-                                  gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                  paddingTop: 'clamp(0.25rem, 1vw, 1rem)',
                                 }}
                               >
-                                {/* 每页显示条数 */}
-                                <div className="flex items-center whitespace-nowrap">
-                                  <Typography 
-                                    variant="body2" 
-                                    className="text-gray-700"
-                                    sx={{
-                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                    }}
-                                  >
-                                    {t('prompts.optimizeEditPage.pagination.itemsPerPage')}
-                                  </Typography>
-                                  <select
-                                    value={testCaseRowsPerPage}
-                                    onChange={e => {
-                                      setTestCaseRowsPerPage(parseInt(e.target.value, 10))
-                                      setTestCasePage(0)
-                                    }}
-                                    className="border border-gray-300 rounded bg-white"
-                                    style={{
-                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                      padding: 'clamp(0.125rem, 0.3vw, 0.25rem) clamp(0.25rem, 0.5vw, 0.5rem)',
-                                      margin: '0 clamp(0.125rem, 0.3vw, 0.25rem)',
-                                    }}
-                                  >
-                                    <option value={5}>5</option>
-                                    <option value={10}>10</option>
-                                    <option value={15}>15</option>
-                                    <option value={20}>20</option>
-                                  </select>
-                                  <Typography 
-                                    variant="body2" 
-                                    className="text-gray-700"
-                                    sx={{
-                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                    }}
-                                  >
-                                    {t('prompts.optimizeEditPage.pagination.items')}
-                                  </Typography>
-                                </div>
-
-                                {/* 总条数 */}
-                                <div className="flex items-center whitespace-nowrap">
-                                  <Typography 
-                                    variant="body2" 
-                                    className="text-gray-700"
-                                    sx={{
-                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                    }}
-                                  >
-                                    {t('prompts.optimizeEditPage.pagination.total', { count: testCases.length })}
-                                  </Typography>
-                                </div>
-
-                                {/* 分页按钮和页码 */}
-                                <div 
-                                  className="flex items-center flex-shrink-0"
+                                <div
+                                  className="flex items-center flex-wrap justify-end"
                                   style={{
-                                    gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                    gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
                                   }}
                                 >
-                                  <Button
-                                    size="small"
-                                    onClick={handleFirstPage}
-                                    disabled={testCasePage === 0}
-                                    className="min-w-0 p-0"
-                                    sx={{ 
-                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
-                                    }}
-                                    title={t('prompts.optimizeEditPage.pagination.firstPage')}
-                                  >
-                                    <ChevronsLeft 
-                                      style={{
-                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                      }}
-                                    />
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    onClick={handlePrevPage}
-                                    disabled={testCasePage === 0}
-                                    className="min-w-0 p-0"
-                                    sx={{ 
-                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
-                                    }}
-                                    title={t('prompts.optimizeEditPage.pagination.previousPage')}
-                                  >
-                                    <ChevronLeft 
-                                      style={{
-                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                      }}
-                                    />
-                                  </Button>
-
-                                  <div 
-                                    className="flex items-center text-gray-700 whitespace-nowrap"
-                                    style={{
-                                      margin: '0 clamp(0.125rem, 0.3vw, 0.25rem)',
-                                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                    }}
-                                  >
-                                    <Typography 
+                                  {/* 每页显示条数 */}
+                                  <div className="flex items-center whitespace-nowrap">
+                                    <Typography
                                       variant="body2"
+                                      className="text-gray-700"
                                       sx={{
                                         fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
                                       }}
                                     >
-                                      {t('prompts.optimizeEditPage.common.page')}
+                                      {t('prompts.optimizeEditPage.pagination.itemsPerPage')}
                                     </Typography>
-                                    <input
-                                      type="text"
-                                      value={currentPageInput}
-                                      onChange={handlePageInputChange}
-                                      onKeyPress={handlePageInputKeyPress}
-                                      onBlur={handlePageInputBlur}
-                                      className="text-center border border-gray-300 rounded bg-white"
+                                    <select
+                                      value={testCaseRowsPerPage}
+                                      onChange={e => {
+                                        setTestCaseRowsPerPage(parseInt(e.target.value, 10))
+                                        setTestCasePage(0)
+                                      }}
+                                      className="border border-gray-300 rounded bg-white"
                                       style={{
-                                        width: 'clamp(1.5rem, 3vw, 2rem)',
                                         fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
                                         padding: 'clamp(0.125rem, 0.3vw, 0.25rem) clamp(0.25rem, 0.5vw, 0.5rem)',
+                                        margin: '0 clamp(0.125rem, 0.3vw, 0.25rem)',
                                       }}
-                                    />
-                                    <Typography 
+                                    >
+                                      <option value={5}>5</option>
+                                      <option value={10}>10</option>
+                                      <option value={15}>15</option>
+                                      <option value={20}>20</option>
+                                    </select>
+                                    <Typography
                                       variant="body2"
+                                      className="text-gray-700"
                                       sx={{
                                         fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
                                       }}
                                     >
-                                      {t('prompts.optimizeEditPage.common.of', { total: totalPages })}
+                                      {t('prompts.optimizeEditPage.pagination.items')}
                                     </Typography>
                                   </div>
 
-                                  <Button
-                                    size="small"
-                                    onClick={handleNextPage}
-                                    disabled={testCasePage >= totalPages - 1}
-                                    className="min-w-0 p-0"
-                                    sx={{ 
-                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
-                                    }}
-                                    title={t('prompts.optimizeEditPage.pagination.nextPage')}
-                                  >
-                                    <ChevronRight 
-                                      style={{
-                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                      }}
-                                    />
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    onClick={handleLastPage}
-                                    disabled={testCasePage >= totalPages - 1}
-                                    className="min-w-0 p-0"
-                                    sx={{ 
-                                      width: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      height: 'clamp(1rem, 2vw, 1.5625rem)',
-                                      minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
-                                    }}
-                                    title="跳转到尾页"
-                                  >
-                                    <ChevronsRight 
-                                      style={{
-                                        width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                        height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                      }}
-                                    />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 优化策略配置 Tab */}
-                    <div
-                      role="tabpanel"
-                      hidden={optimizationConfigTab !== 1}
-                      className="h-full optimization-tab-scroll"
-                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {optimizationConfigTab === 1 && (
-                        <div className="h-full flex flex-col">
-                          <div 
-                            className="optimization-tab-scroll"
-                            style={{ 
-                              overflowY: 'auto', 
-                              scrollbarWidth: 'none', 
-                              msOverflowStyle: 'none',
-                              gap: 'clamp(0.25rem, 1vw, 1rem)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                            }}
-                          >
-                            {/* 优化参数 */}
-                            <div 
-                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
-                              style={{
-                                padding: 'clamp(0.25rem, 1vw, 1rem)',
-                              }}
-                            >
-                              <Typography 
-                                variant="subtitle2" 
-                                className="font-bold text-gray-800 flex items-center"
-                                sx={{
-                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.5rem)',
-                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
-                                }}
-                              >
-                                <Target 
-                                  className="text-blue-600"
-                                  style={{
-                                    width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                    height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                  }}
-                                />
-                                <span>优化参数</span>
-                              </Typography>
-                              <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
-                              <div 
-                                style={{
-                                  gap: 'clamp(0.25rem, 1vw, 1rem)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                }}
-                              >
-                                {/* 示例个数 */}
-                                <SliderField
-                                  label={t('prompts.optimizeEditPage.optimizationConfig.exampleCount')}
-                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.exampleCountTooltip')}
-                                  value={exampleCount}
-                                  onChange={setExampleCountWithAutoSave}
-                                  min={0}
-                                  max={Math.min(testCases.length, 20)}
-                                  disabled={testCases.length === 0}
-                                  minLabel="0"
-                                  maxLabel={Math.min(testCases.length, 20).toString()}
-                                  allowZero={true}
-                                />
-
-                                {/* 目标准确率 */}
-                                <SliderField
-                                  label={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracy')}
-                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracyTooltip')}
-                                  value={targetAccuracy}
-                                  onChange={setTargetAccuracyWithAutoSave}
-                                  min={0}
-                                  max={100}
-                                  minLabel="0%"
-                                  maxLabel="100%"
-                                  valueLabelFormat={value => `${value}%`}
-                                  inputEndAdornment={
-                                    <span 
-                                      className="text-gray-500"
-                                      style={{
-                                        fontSize: 'clamp(0.5rem, 1.25vw, 0.65rem)',
+                                  {/* 总条数 */}
+                                  <div className="flex items-center whitespace-nowrap">
+                                    <Typography
+                                      variant="body2"
+                                      className="text-gray-700"
+                                      sx={{
+                                        fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
                                       }}
                                     >
-                                      %
-                                    </span>
-                                  }
-                                />
+                                      {t('prompts.optimizeEditPage.pagination.total', { count: testCases.length })}
+                                    </Typography>
+                                  </div>
 
-                                {/* 优化轮次 */}
-                                <SliderField
-                                  label={t('prompts.optimizeEditPage.optimizationConfig.maxRounds')}
-                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.maxRoundsTooltip')}
-                                  value={maxRounds}
-                                  onChange={setMaxRoundsWithAutoSave}
-                                  min={1}
-                                  max={20}
-                                />
-
-                                {/* 最大并发数 */}
-                                <SliderField
-                                  label={t('prompts.optimizeEditPage.optimizationConfig.llmParallel')}
-                                  tooltip={t('prompts.optimizeEditPage.optimizationConfig.llmParallelTooltip')}
-                                  value={llmParallel}
-                                  onChange={setLlmParallelWithAutoSave}
-                                  min={1}
-                                  max={20}
-                                />
-                              </div>
-                            </div>
-
-                            {/* 分割线 */}
-                            <div 
-                              className="border-t border-gray-200"
-                              style={{
-                                marginTop: 'clamp(0.25rem, 1vw, 1rem)',
-                                marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
-                              }}
-                            ></div>
-
-                            {/* 模型配置 */}
-                            <div 
-                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
-                              style={{
-                                padding: 'clamp(0.25rem, 1vw, 1rem)',
-                              }}
-                            >
-                              <Typography 
-                                variant="subtitle2" 
-                                className="font-bold text-gray-800 flex items-center"
-                                sx={{
-                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.5rem)',
-                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
-                                }}
-                              >
-                                <Settings 
-                                  className="text-blue-600"
-                                  style={{
-                                    width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                    height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                  }}
-                                />
-                                <span>{t('prompts.optimizeEditPage.optimizationConfig.modelConfig')}</span>
-                              </Typography>
-                              <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
-                              <div 
-                                style={{
-                                  gap: 'clamp(0.25rem, 1vw, 1rem)',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                }}
-                              >
-                                {/* 优化模型 */}
-                                <div>
-                                  <div 
-                                    className="flex items-center"
+                                  {/* 分页按钮和页码 */}
+                                  <div
+                                    className="flex items-center flex-shrink-0"
                                     style={{
                                       gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                      marginBottom: 'clamp(0.125rem, 0.25vw, 0.25rem)',
                                     }}
                                   >
-                                    <Typography 
-                                      variant="subtitle2" 
-                                      className="text-gray-700"
+                                    <Button
+                                      size="small"
+                                      onClick={handleFirstPage}
+                                      disabled={testCasePage === 0}
+                                      className="min-w-0 p-0"
                                       sx={{
-                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                        width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      }}
+                                      title={t('prompts.optimizeEditPage.pagination.firstPage')}
+                                    >
+                                      <ChevronsLeft
+                                        style={{
+                                          width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        }}
+                                      />
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      onClick={handlePrevPage}
+                                      disabled={testCasePage === 0}
+                                      className="min-w-0 p-0"
+                                      sx={{
+                                        width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      }}
+                                      title={t('prompts.optimizeEditPage.pagination.previousPage')}
+                                    >
+                                      <ChevronLeft
+                                        style={{
+                                          width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        }}
+                                      />
+                                    </Button>
+
+                                    <div
+                                      className="flex items-center text-gray-700 whitespace-nowrap"
+                                      style={{
+                                        margin: '0 clamp(0.125rem, 0.3vw, 0.25rem)',
+                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
                                       }}
                                     >
-                                      {t('prompts.optimizeEditPage.optimizationConfig.optimizeModel')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.optimizeModelTooltip')}>
-                                      <IconButton 
-                                        size="small" 
-                                        className="text-gray-400 hover:text-gray-600 p-0"
+                                      <Typography
+                                        variant="body2"
                                         sx={{
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
                                         }}
                                       >
-                                        <HelpCircle 
-                                          style={{
-                                            width: 'clamp(0.5rem, 1vw, 1rem)',
-                                            height: 'clamp(0.5rem, 1vw, 1rem)',
-                                          }}
-                                        />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                  <ModelSelector
-                                    availableModels={models}
-                                    selectedModel={selectedOptimizeModel}
-                                    onModelChange={model => {
-                                      if (model) {
-                                        handleModelChange(model.openModel.name, 'optimize')
-                                      }
-                                    }}
-                                    modelsLoading={modelsLoading}
-                                    placeholder="请选择模型"
-                                  />
-
-                                  {/* 优化模型参数配置 */}
-                                  {selectedOptimizeModel && (
-                                    <div style={{ marginTop: 'clamp(0.25rem, 0.75vw, 0.75rem)' }}>
-                                      <ModelParameterEditor
-                                        selectedModel={selectedOptimizeModel}
-                                        modelConfig={optimizeModelParams}
-                                        onModelConfigChange={setOptimizeModelParamsWithAutoSave}
+                                        {t('prompts.optimizeEditPage.common.page')}
+                                      </Typography>
+                                      <input
+                                        type="text"
+                                        value={currentPageInput}
+                                        onChange={handlePageInputChange}
+                                        onKeyPress={handlePageInputKeyPress}
+                                        onBlur={handlePageInputBlur}
+                                        className="text-center border border-gray-300 rounded bg-white"
+                                        style={{
+                                          width: 'clamp(1.5rem, 3vw, 2rem)',
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                          padding: 'clamp(0.125rem, 0.3vw, 0.25rem) clamp(0.25rem, 0.5vw, 0.5rem)',
+                                        }}
                                       />
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                        }}
+                                      >
+                                        {t('prompts.optimizeEditPage.common.of', { total: totalPages })}
+                                      </Typography>
                                     </div>
-                                  )}
-                                </div>
 
-                                {/* 运行模型 */}
-                                <div>
-                                  <div 
-                                    className="flex items-center"
-                                    style={{
-                                      gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                      marginBottom: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                    }}
-                                  >
-                                    <Typography 
-                                      variant="subtitle2" 
-                                      className="text-gray-700"
+                                    <Button
+                                      size="small"
+                                      onClick={handleNextPage}
+                                      disabled={testCasePage >= totalPages - 1}
+                                      className="min-w-0 p-0"
                                       sx={{
-                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                        width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
                                       }}
+                                      title={t('prompts.optimizeEditPage.pagination.nextPage')}
                                     >
-                                      {t('prompts.optimizeEditPage.optimizationConfig.runModel')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.runModelTooltip')}>
-                                      <IconButton 
-                                        size="small" 
-                                        className="text-gray-400 hover:text-gray-600 p-0"
-                                        sx={{
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                      <ChevronRight
+                                        style={{
+                                          width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
                                         }}
-                                      >
-                                        <HelpCircle 
-                                          style={{
-                                            width: 'clamp(0.5rem, 1vw, 1rem)',
-                                            height: 'clamp(0.5rem, 1vw, 1rem)',
-                                          }}
-                                        />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                  <ModelSelector
-                                    availableModels={models}
-                                    selectedModel={selectedRunModel}
-                                    onModelChange={model => {
-                                      if (model) {
-                                        handleModelChange(model.openModel.name, 'run')
-                                      }
-                                    }}
-                                    modelsLoading={modelsLoading}
-                                    placeholder="请选择模型"
-                                  />
-
-                                  {/* 运行模型参数配置 */}
-                                  {selectedRunModel && (
-                                    <div style={{ marginTop: 'clamp(0.25rem, 0.75vw, 0.75rem)' }}>
-                                      <ModelParameterEditor
-                                        selectedModel={selectedRunModel}
-                                        modelConfig={runModelParams}
-                                        onModelConfigChange={setRunModelParamsWithAutoSave}
                                       />
-                                    </div>
-                                  )}
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      onClick={handleLastPage}
+                                      disabled={testCasePage >= totalPages - 1}
+                                      className="min-w-0 p-0"
+                                      sx={{
+                                        width: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        height: 'clamp(1rem, 2vw, 1.5625rem)',
+                                        minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
+                                      }}
+                                      title="跳转到尾页"
+                                    >
+                                      <ChevronsRight
+                                        style={{
+                                          width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                          height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        }}
+                                      />
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
 
-                    {/* 评价标准配置 Tab */}
-                    <div
-                      role="tabpanel"
-                      hidden={optimizationConfigTab !== 2}
-                      className="h-full optimization-tab-scroll"
-                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {optimizationConfigTab === 2 && (
-                        <div 
-                          className="flex flex-col"
-                          style={{
-                            gap: 'clamp(0.125rem, 0.3vw, 0.25rem)',
-                          }}
-                        >
-                          {/* 评价类型选择 */}
-                          <div 
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
-                            style={{
-                              padding: 'clamp(0.25rem, 1vw, 1rem)',
-                            }}
-                          >
-                            <Typography 
-                              variant="subtitle2" 
-                              className="font-bold text-gray-800 flex items-center"
-                              sx={{
-                                fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                                marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                                gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
-                              }}
-                            >
-                              <Settings 
-                                className="text-blue-600"
-                                style={{
-                                  width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                  height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                }}
-                              />
-                              <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationType')}</span>
-                            </Typography>
-                            <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
-                            <RadioGroup 
-                              row 
-                              value={evaluationType} 
-                              onChange={e => setEvaluationTypeWithAutoSave(e.target.value)}
-                              sx={{
-                                gap: 'clamp(0.5rem, 1.5vw, 1.5rem)',
-                              }}
-                            >
-                              <FormControlLabel
-                                value="objective"
-                                control={<Radio size="small" />}
-                                label={
-                                  <div 
-                                    className="flex items-center"
-                                    style={{
-                                      gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                                    }}
-                                  >
-                                    <Typography 
-                                      variant="subtitle2" 
-                                      className="text-gray-700"
-                                      sx={{
-                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
-                                      }}
-                                    >
-                                      {t('prompts.optimizeEditPage.evaluationType.objective')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.objectiveTooltip')}>
-                                      <IconButton 
-                                        size="small" 
-                                        className="p-0"
-                                        sx={{
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
-                                        }}
-                                      >
-                                        <HelpCircle 
-                                          className="text-gray-400"
-                                          style={{
-                                            width: 'clamp(0.5rem, 1vw, 1rem)',
-                                            height: 'clamp(0.5rem, 1vw, 1rem)',
-                                          }}
-                                        />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                }
-                              />
-                              <FormControlLabel
-                                value="subjective"
-                                control={<Radio size="small" />}
-                                label={
-                                  <div 
-                                    className="flex items-center"
-                                    style={{
-                                      gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                                    }}
-                                  >
-                                    <Typography 
-                                      variant="subtitle2" 
-                                      className="text-gray-700"
-                                      sx={{
-                                        fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
-                                      }}
-                                    >
-                                      {t('prompts.optimizeEditPage.evaluationType.subjective')}
-                                    </Typography>
-                                    <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.subjectiveTooltip')}>
-                                      <IconButton 
-                                        size="small" 
-                                        className="p-0"
-                                        sx={{
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
-                                        }}
-                                      >
-                                        <HelpCircle 
-                                          className="text-gray-400"
-                                          style={{
-                                            width: 'clamp(0.5rem, 1vw, 1rem)',
-                                            height: 'clamp(0.5rem, 1vw, 1rem)',
-                                          }}
-                                        />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </div>
-                                }
-                              />
-                            </RadioGroup>
-                          </div>
-
-                          {/* 分割线 */}
-                          <div 
-                            className="border-t border-gray-200"
-                            style={{
-                              marginTop: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                              marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                            }}
-                          ></div>
-
-                          {/* 评价标准 */}
-                          <div
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
-                            style={{ 
-                              minHeight: 'clamp(250px, 40vh, 350px)',
-                              padding: 'clamp(0.25rem, 1vw, 1rem)',
-                            }}
-                          >
-                            <div 
-                              className="flex items-center justify-between flex-shrink-0"
+                      {/* 优化策略配置 Tab */}
+                      <div
+                        role="tabpanel"
+                        hidden={optimizationConfigTab !== 1}
+                        className="h-full optimization-tab-scroll"
+                        style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      >
+                        {optimizationConfigTab === 1 && (
+                          <div className="h-full flex flex-col">
+                            <div
+                              className="optimization-tab-scroll"
                               style={{
-                                marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                overflowY: 'auto',
+                                scrollbarWidth: 'none',
+                                msOverflowStyle: 'none',
+                                gap: 'clamp(0.25rem, 1vw, 1rem)',
+                                display: 'flex',
+                                flexDirection: 'column',
                               }}
                             >
-                              <div 
-                                className="flex items-center"
+                              {/* 优化参数 */}
+                              <div
+                                className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
                                 style={{
-                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                  padding: 'clamp(0.25rem, 1vw, 1rem)',
                                 }}
                               >
-                                <Typography 
-                                  variant="subtitle2" 
+                                <Typography
+                                  variant="subtitle2"
                                   className="font-bold text-gray-800 flex items-center"
                                   sx={{
                                     fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                                    gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                    marginBottom: 'clamp(0.25rem, 0.75vw, 0.5rem)',
+                                    gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
                                   }}
                                 >
-                                  <BarChart 
+                                  <Target
                                     className="text-blue-600"
                                     style={{
                                       width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                       height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                     }}
                                   />
-                                  <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaLabel')}</span>
+                                  <span>优化参数</span>
                                 </Typography>
-                                <Tooltip
-                                  title={t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaTooltip', {
-                                    type:
-                                      evaluationType === 'objective'
-                                        ? t('prompts.optimizeEditPage.evaluationType.objective')
-                                        : t('prompts.optimizeEditPage.evaluationType.subjective'),
-                                  })}
+                                <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
+                                <div
+                                  style={{
+                                    gap: 'clamp(0.25rem, 1vw, 1rem)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                  }}
                                 >
-                                  <IconButton 
-                                    size="small" 
+                                  {/* 示例个数 */}
+                                  <SliderField
+                                    label={t('prompts.optimizeEditPage.optimizationConfig.exampleCount')}
+                                    tooltip={t('prompts.optimizeEditPage.optimizationConfig.exampleCountTooltip')}
+                                    value={exampleCount}
+                                    onChange={setExampleCountWithAutoSave}
+                                    min={0}
+                                    max={Math.min(testCases.length, 20)}
+                                    disabled={testCases.length === 0}
+                                    minLabel="0"
+                                    maxLabel={Math.min(testCases.length, 20).toString()}
+                                    allowZero={true}
+                                  />
+
+                                  {/* 目标准确率 */}
+                                  <SliderField
+                                    label={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracy')}
+                                    tooltip={t('prompts.optimizeEditPage.optimizationConfig.targetAccuracyTooltip')}
+                                    value={targetAccuracy}
+                                    onChange={setTargetAccuracyWithAutoSave}
+                                    min={0}
+                                    max={100}
+                                    minLabel="0%"
+                                    maxLabel="100%"
+                                    valueLabelFormat={value => `${value}%`}
+                                    inputEndAdornment={
+                                      <span
+                                        className="text-gray-500"
+                                        style={{
+                                          fontSize: 'clamp(0.5rem, 1.25vw, 0.65rem)',
+                                        }}
+                                      >
+                                        %
+                                      </span>
+                                    }
+                                  />
+
+                                  {/* 优化轮次 */}
+                                  <SliderField
+                                    label={t('prompts.optimizeEditPage.optimizationConfig.maxRounds')}
+                                    tooltip={t('prompts.optimizeEditPage.optimizationConfig.maxRoundsTooltip')}
+                                    value={maxRounds}
+                                    onChange={setMaxRoundsWithAutoSave}
+                                    min={1}
+                                    max={20}
+                                  />
+
+                                  {/* 最大并发数 */}
+                                  <SliderField
+                                    label={t('prompts.optimizeEditPage.optimizationConfig.llmParallel')}
+                                    tooltip={t('prompts.optimizeEditPage.optimizationConfig.llmParallelTooltip')}
+                                    value={llmParallel}
+                                    onChange={setLlmParallelWithAutoSave}
+                                    min={1}
+                                    max={20}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 分割线 */}
+                              <div
+                                className="border-t border-gray-200"
+                                style={{
+                                  marginTop: 'clamp(0.25rem, 1vw, 1rem)',
+                                  marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
+                                }}
+                              ></div>
+
+                              {/* 模型配置 */}
+                              <div
+                                className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
+                                style={{
+                                  padding: 'clamp(0.25rem, 1vw, 1rem)',
+                                }}
+                              >
+                                <Typography
+                                  variant="subtitle2"
+                                  className="font-bold text-gray-800 flex items-center"
+                                  sx={{
+                                    fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                    marginBottom: 'clamp(0.25rem, 0.75vw, 0.5rem)',
+                                    gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                  }}
+                                >
+                                  <Settings
+                                    className="text-blue-600"
+                                    style={{
+                                      width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                      height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    }}
+                                  />
+                                  <span>{t('prompts.optimizeEditPage.optimizationConfig.modelConfig')}</span>
+                                </Typography>
+                                <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
+                                <div
+                                  style={{
+                                    gap: 'clamp(0.25rem, 1vw, 1rem)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                  }}
+                                >
+                                  {/* 优化模型 */}
+                                  <div>
+                                    <div
+                                      className="flex items-center"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                        marginBottom: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="subtitle2"
+                                        className="text-gray-700"
+                                        sx={{
+                                          fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                        }}
+                                      >
+                                        {t('prompts.optimizeEditPage.optimizationConfig.optimizeModel')}
+                                      </Typography>
+                                      <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.optimizeModelTooltip')}>
+                                        <IconButton
+                                          size="small"
+                                          className="text-gray-400 hover:text-gray-600 p-0"
+                                          sx={{
+                                            width: 'clamp(1rem, 2vw, 1.5rem)',
+                                            height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          }}
+                                        >
+                                          <HelpCircle
+                                            style={{
+                                              width: 'clamp(0.5rem, 1vw, 1rem)',
+                                              height: 'clamp(0.5rem, 1vw, 1rem)',
+                                            }}
+                                          />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </div>
+                                    <ModelSelector
+                                      availableModels={models}
+                                      selectedModel={selectedOptimizeModel}
+                                      onModelChange={model => {
+                                        if (model) {
+                                          handleModelChange(model.openModel.name, 'optimize')
+                                        }
+                                      }}
+                                      modelsLoading={modelsLoading}
+                                      placeholder="请选择模型"
+                                    />
+
+                                    {/* 优化模型参数配置 */}
+                                    {selectedOptimizeModel && (
+                                      <div style={{ marginTop: 'clamp(0.25rem, 0.75vw, 0.75rem)' }}>
+                                        <ModelParameterEditor
+                                          selectedModel={selectedOptimizeModel}
+                                          modelConfig={optimizeModelParams}
+                                          onModelConfigChange={setOptimizeModelParamsWithAutoSave}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* 运行模型 */}
+                                  <div>
+                                    <div
+                                      className="flex items-center"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                        marginBottom: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="subtitle2"
+                                        className="text-gray-700"
+                                        sx={{
+                                          fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                        }}
+                                      >
+                                        {t('prompts.optimizeEditPage.optimizationConfig.runModel')}
+                                      </Typography>
+                                      <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.runModelTooltip')}>
+                                        <IconButton
+                                          size="small"
+                                          className="text-gray-400 hover:text-gray-600 p-0"
+                                          sx={{
+                                            width: 'clamp(1rem, 2vw, 1.5rem)',
+                                            height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          }}
+                                        >
+                                          <HelpCircle
+                                            style={{
+                                              width: 'clamp(0.5rem, 1vw, 1rem)',
+                                              height: 'clamp(0.5rem, 1vw, 1rem)',
+                                            }}
+                                          />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </div>
+                                    <ModelSelector
+                                      availableModels={models}
+                                      selectedModel={selectedRunModel}
+                                      onModelChange={model => {
+                                        if (model) {
+                                          handleModelChange(model.openModel.name, 'run')
+                                        }
+                                      }}
+                                      modelsLoading={modelsLoading}
+                                      placeholder="请选择模型"
+                                    />
+
+                                    {/* 运行模型参数配置 */}
+                                    {selectedRunModel && (
+                                      <div style={{ marginTop: 'clamp(0.25rem, 0.75vw, 0.75rem)' }}>
+                                        <ModelParameterEditor
+                                          selectedModel={selectedRunModel}
+                                          modelConfig={runModelParams}
+                                          onModelConfigChange={setRunModelParamsWithAutoSave}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 评价标准配置 Tab */}
+                      <div
+                        role="tabpanel"
+                        hidden={optimizationConfigTab !== 2}
+                        className="h-full optimization-tab-scroll"
+                        style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      >
+                        {optimizationConfigTab === 2 && (
+                          <div
+                            className="flex flex-col"
+                            style={{
+                              gap: 'clamp(0.125rem, 0.3vw, 0.25rem)',
+                            }}
+                          >
+                            {/* 评价类型选择 */}
+                            <div
+                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60"
+                              style={{
+                                padding: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            >
+                              <Typography
+                                variant="subtitle2"
+                                className="font-bold text-gray-800 flex items-center"
+                                sx={{
+                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                }}
+                              >
+                                <Settings
+                                  className="text-blue-600"
+                                  style={{
+                                    width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  }}
+                                />
+                                <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationType')}</span>
+                              </Typography>
+                              <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
+                              <RadioGroup
+                                row
+                                value={evaluationType}
+                                onChange={e => setEvaluationTypeWithAutoSave(e.target.value)}
+                                sx={{
+                                  gap: 'clamp(0.5rem, 1.5vw, 1.5rem)',
+                                }}
+                              >
+                                <FormControlLabel
+                                  value="objective"
+                                  control={<Radio size="small" />}
+                                  label={
+                                    <div
+                                      className="flex items-center"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="subtitle2"
+                                        className="text-gray-700"
+                                        sx={{
+                                          fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                        }}
+                                      >
+                                        {t('prompts.optimizeEditPage.evaluationType.objective')}
+                                      </Typography>
+                                      <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.objectiveTooltip')}>
+                                        <IconButton
+                                          size="small"
+                                          className="p-0"
+                                          sx={{
+                                            width: 'clamp(1rem, 2vw, 1.5rem)',
+                                            height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          }}
+                                        >
+                                          <HelpCircle
+                                            className="text-gray-400"
+                                            style={{
+                                              width: 'clamp(0.5rem, 1vw, 1rem)',
+                                              height: 'clamp(0.5rem, 1vw, 1rem)',
+                                            }}
+                                          />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </div>
+                                  }
+                                />
+                                <FormControlLabel
+                                  value="subjective"
+                                  control={<Radio size="small" />}
+                                  label={
+                                    <div
+                                      className="flex items-center"
+                                      style={{
+                                        gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="subtitle2"
+                                        className="text-gray-700"
+                                        sx={{
+                                          fontSize: 'clamp(0.625rem, 1vw, 0.875rem)',
+                                        }}
+                                      >
+                                        {t('prompts.optimizeEditPage.evaluationType.subjective')}
+                                      </Typography>
+                                      <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.subjectiveTooltip')}>
+                                        <IconButton
+                                          size="small"
+                                          className="p-0"
+                                          sx={{
+                                            width: 'clamp(1rem, 2vw, 1.5rem)',
+                                            height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          }}
+                                        >
+                                          <HelpCircle
+                                            className="text-gray-400"
+                                            style={{
+                                              width: 'clamp(0.5rem, 1vw, 1rem)',
+                                              height: 'clamp(0.5rem, 1vw, 1rem)',
+                                            }}
+                                          />
+                                        </IconButton>
+                                      </Tooltip>
+                                    </div>
+                                  }
+                                />
+                              </RadioGroup>
+                            </div>
+
+                            {/* 分割线 */}
+                            <div
+                              className="border-t border-gray-200"
+                              style={{
+                                marginTop: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                              }}
+                            ></div>
+
+                            {/* 评价标准 */}
+                            <div
+                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
+                              style={{
+                                minHeight: 'clamp(250px, 40vh, 350px)',
+                                padding: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            >
+                              <div
+                                className="flex items-center justify-between flex-shrink-0"
+                                style={{
+                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                }}
+                              >
+                                <div
+                                  className="flex items-center"
+                                  style={{
+                                    gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                  }}
+                                >
+                                  <Typography
+                                    variant="subtitle2"
+                                    className="font-bold text-gray-800 flex items-center"
+                                    sx={{
+                                      fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                      gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                    }}
+                                  >
+                                    <BarChart
+                                      className="text-blue-600"
+                                      style={{
+                                        width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                        height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                      }}
+                                    />
+                                    <span>{t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaLabel')}</span>
+                                  </Typography>
+                                  <Tooltip
+                                    title={t('prompts.optimizeEditPage.optimizationConfig.evaluationCriteriaTooltip', {
+                                      type:
+                                        evaluationType === 'objective'
+                                          ? t('prompts.optimizeEditPage.evaluationType.objective')
+                                          : t('prompts.optimizeEditPage.evaluationType.subjective'),
+                                    })}
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      className="text-gray-400 hover:text-gray-600 p-0"
+                                      sx={{
+                                        width: 'clamp(1rem, 2vw, 1.5rem)',
+                                        height: 'clamp(1rem, 2vw, 1.5rem)',
+                                      }}
+                                    >
+                                      <HelpCircle
+                                        style={{
+                                          width: 'clamp(0.5rem, 1vw, 1rem)',
+                                          height: 'clamp(0.5rem, 1vw, 1rem)',
+                                        }}
+                                      />
+                                    </IconButton>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                              <div
+                                className="flex flex-col"
+                                style={{
+                                  minHeight: 'clamp(200px, 30vh, 300px)',
+                                }}
+                              >
+                                <TextField
+                                  fullWidth
+                                  multiline
+                                  rows={12}
+                                  value={evaluationCriteria}
+                                  onChange={e => setEvaluationCriteriaWithAutoSave(e.target.value)}
+                                  placeholder={
+                                    evaluationType === 'objective'
+                                      ? t('prompts.optimizeEditPage.optimizationConfig.objectiveCriteriaPlaceholder')
+                                      : t('prompts.optimizeEditPage.optimizationConfig.subjectiveCriteriaPlaceholder')
+                                  }
+                                  size="small"
+                                  className="bg-white"
+                                  sx={{
+                                    '& .MuiInputBase-root': {
+                                      alignItems: 'flex-start',
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                    },
+                                    '& .MuiInputBase-input': {
+                                      overflow: 'auto !important',
+                                      padding: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* 分割线 */}
+                            <div
+                              className="border-t border-gray-200"
+                              style={{
+                                marginTop: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                              }}
+                            ></div>
+
+                            {/* 背景知识 */}
+                            <div
+                              className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
+                              style={{
+                                minHeight: 'clamp(250px, 40vh, 350px)',
+                                padding: 'clamp(0.25rem, 1vw, 1rem)',
+                              }}
+                            >
+                              <div
+                                className="flex items-center flex-shrink-0"
+                                style={{
+                                  gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
+                                  marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                }}
+                              >
+                                <Typography
+                                  variant="subtitle2"
+                                  className="font-bold text-gray-800 flex items-center"
+                                  sx={{
+                                    fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                    gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                  }}
+                                >
+                                  <Info
+                                    className="text-blue-600"
+                                    style={{
+                                      width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                      height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                    }}
+                                  />
+                                  <span>{t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledge')}</span>
+                                </Typography>
+                                <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledgeTooltip')}>
+                                  <IconButton
+                                    size="small"
                                     className="text-gray-400 hover:text-gray-600 p-0"
                                     sx={{
                                       width: 'clamp(1rem, 2vw, 1.5rem)',
                                       height: 'clamp(1rem, 2vw, 1.5rem)',
                                     }}
                                   >
-                                    <HelpCircle 
+                                    <HelpCircle
                                       style={{
                                         width: 'clamp(0.5rem, 1vw, 1rem)',
                                         height: 'clamp(0.5rem, 1vw, 1rem)',
@@ -4506,1019 +4604,859 @@ const PromptOptimizeEditPage: React.FC = () => {
                                   </IconButton>
                                 </Tooltip>
                               </div>
-                            </div>
-                            <div 
-                              className="flex flex-col" 
-                              style={{ 
-                                minHeight: 'clamp(200px, 30vh, 300px)',
-                              }}
-                            >
-                              <TextField
-                                fullWidth
-                                multiline
-                                rows={12}
-                                value={evaluationCriteria}
-                                onChange={e => setEvaluationCriteriaWithAutoSave(e.target.value)}
-                                placeholder={
-                                  evaluationType === 'objective'
-                                    ? t('prompts.optimizeEditPage.optimizationConfig.objectiveCriteriaPlaceholder')
-                                    : t('prompts.optimizeEditPage.optimizationConfig.subjectiveCriteriaPlaceholder')
-                                }
-                                size="small"
-                                className="bg-white"
-                                sx={{
-                                  '& .MuiInputBase-root': {
-                                    alignItems: 'flex-start',
-                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                                  },
-                                  '& .MuiInputBase-input': {
-                                    overflow: 'auto !important',
-                                    padding: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                                  },
-                                }}
-                              />
-                            </div>
-                          </div>
-
-                          {/* 分割线 */}
-                          <div 
-                            className="border-t border-gray-200"
-                            style={{
-                              marginTop: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                              marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                            }}
-                          ></div>
-
-                          {/* 背景知识 */}
-                          <div
-                            className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex flex-col flex-shrink-0"
-                            style={{ 
-                              minHeight: 'clamp(250px, 40vh, 350px)',
-                              padding: 'clamp(0.25rem, 1vw, 1rem)',
-                            }}
-                          >
-                            <div 
-                              className="flex items-center flex-shrink-0"
-                              style={{
-                                gap: 'clamp(0.25rem, 0.5vw, 0.75rem)',
-                                marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                              }}
-                            >
-                              <Typography 
-                                variant="subtitle2" 
-                                className="font-bold text-gray-800 flex items-center"
-                                sx={{
-                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                                  gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                              <div
+                                className="flex flex-col"
+                                style={{
+                                  minHeight: 'clamp(200px, 30vh, 300px)',
                                 }}
                               >
-                                <Info 
-                                  className="text-blue-600"
+                                <TextField
+                                  fullWidth
+                                  multiline
+                                  rows={12}
+                                  value={backgroundKnowledge}
+                                  onChange={e => setBackgroundKnowledgeWithAutoSave(e.target.value)}
+                                  placeholder={t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledgePlaceholder')}
+                                  size="small"
+                                  className="bg-white"
+                                  sx={{
+                                    '& .MuiInputBase-root': {
+                                      alignItems: 'flex-start',
+                                      fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                    },
+                                    '& .MuiInputBase-input': {
+                                      overflow: 'auto !important',
+                                      padding: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                                    },
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 工具设置配置 Tab */}
+                      <div
+                        role="tabpanel"
+                        hidden={optimizationConfigTab !== 3}
+                        className="h-full optimization-tab-scroll"
+                        style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      >
+                        {optimizationConfigTab === 3 && (
+                          <div className="h-full optimization-tab-scroll" style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                            <ToolSettingsPanel
+                              tools={tools}
+                              toolsEnabled={toolsEnabled}
+                              onToolsChange={handleToolsChange}
+                              onToolsEnabledChange={handleToolsEnabledChange}
+                              onAddTool={handleAddTool}
+                              onEditTool={handleEditTool}
+                              onDeleteTool={handleDeleteTool}
+                              onHasUnsavedChanges={handleToolHasUnsavedChanges}
+                              onTriggerAutoSave={handleToolTriggerAutoSave}
+                              enableAutoSave={true}
+                              isReadOnly={false}
+                              showDefaultValue={false}
+                              showToolFunctionHint={false}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* 第二个拖动分界线 - 当优化配置显示且优化结果也显示时显示 */}
+          {!moduleCollapsed.optimizationConfig && (
+            <div
+              className={`w-1 bg-gradient-to-b from-gray-200/60 to-gray-300/60 hover:from-blue-400 hover:to-blue-500 cursor-col-resize transition-all duration-300 relative group ${
+                isDraggingColumn === 1 ? 'from-blue-500 to-blue-600 shadow-sm' : ''
+              }`}
+              onMouseDown={handleColumnMouseDown(1)}
+            >
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200/60">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full mr-0.5"></div>
+                <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full ml-0.5"></div>
+              </div>
+            </div>
+          )}
+
+          {/* Column 3: 优化结果 */}
+          {!moduleCollapsed.optimizationResult && (
+            <div
+              style={{
+                width: `${visibleModules.actualWidths[2]}%`,
+                minWidth: '320px',
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
+              }}
+              className="flex flex-col h-full"
+            >
+              <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
+                <CardContent
+                  className="flex-1 flex flex-col overflow-hidden min-h-0"
+                  sx={{
+                    padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
+                  }}
+                >
+                  <div
+                    className="flex items-center justify-between flex-shrink-0"
+                    style={{
+                      marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
+                    }}
+                  >
+                    <div
+                      className="flex items-center"
+                      style={{
+                        gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
+                      }}
+                    >
+                      <div
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-sm"
+                        style={{
+                          padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                        }}
+                      >
+                        <BarChart
+                          className="text-white"
+                          style={{
+                            width: 'clamp(0.5rem, 1vw, 1rem)',
+                            height: 'clamp(0.5rem, 1vw, 1rem)',
+                          }}
+                        />
+                      </div>
+                      <Typography
+                        variant="h6"
+                        className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
+                        sx={{
+                          fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {t('prompts.optimizeEditPage.optimizationResult.title')}
+                      </Typography>
+                    </div>
+
+                    {/* 收起按钮 */}
+                    <Tooltip title={t('prompts.optimizeEditPage.optimizationResult.collapse')}>
+                      <IconButton
+                        size="small"
+                        onClick={() => toggleModuleCollapse('optimizationResult')}
+                        className="text-gray-400 hover:text-gray-600"
+                        sx={{
+                          width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                          height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                        }}
+                      >
+                        <ChevronUp
+                          style={{
+                            width: 'clamp(0.625rem, 1.2vw, 1rem)',
+                            height: 'clamp(0.625rem, 1.2vw, 1rem)',
+                          }}
+                        />
+                      </IconButton>
+                    </Tooltip>
+                  </div>
+                  {/* 优化结果主体内容：单独做一个可滚动区域，隐藏滚动条 */}
+                  <style>{`.optimization-result-scroll::-webkit-scrollbar { display: none; }`}</style>
+                  <div
+                    className="flex-1 flex flex-col optimization-result-scroll min-h-0"
+                    style={{
+                      overflowY: 'auto',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
+                    }}
+                  >
+                    {/* 错误信息卡片 - 当任务失败时显示 */}
+                    {taskStatus === 'failed' && (
+                      <div
+                        className="flex-shrink-0"
+                        style={{
+                          marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
+                        }}
+                      >
+                        <Card
+                          sx={{
+                            backgroundColor: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: 'clamp(0.5rem, 1.5vw, 0.75rem)',
+                          }}
+                        >
+                          <CardContent
+                            sx={{
+                              padding: 'clamp(0.25rem, 1vw, 1rem) !important',
+                            }}
+                          >
+                            <div
+                              className="flex items-start"
+                              style={{
+                                gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              }}
+                            >
+                              <div
+                                className="flex-shrink-0"
+                                style={{
+                                  marginTop: 'clamp(0.0625rem, 0.125vw, 0.125rem)',
+                                }}
+                              >
+                                <X
+                                  className="text-red-600"
                                   style={{
                                     width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                     height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                   }}
                                 />
-                                <span>{t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledge')}</span>
-                              </Typography>
-                              <Tooltip title={t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledgeTooltip')}>
-                                <IconButton 
-                                  size="small" 
-                                  className="text-gray-400 hover:text-gray-600 p-0"
+                              </div>
+                              <div className="flex-1">
+                                <Typography
+                                  variant="subtitle1"
+                                  className="font-bold text-red-800"
                                   sx={{
-                                    width: 'clamp(1rem, 2vw, 1.5rem)',
-                                    height: 'clamp(1rem, 2vw, 1.5rem)',
+                                    fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                    marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
                                   }}
                                 >
-                                  <HelpCircle 
-                                    style={{
-                                      width: 'clamp(0.5rem, 1vw, 1rem)',
-                                      height: 'clamp(0.5rem, 1vw, 1rem)',
-                                    }}
-                                  />
-                                </IconButton>
-                              </Tooltip>
-                            </div>
-                            <div 
-                              className="flex flex-col" 
-                              style={{ 
-                                minHeight: 'clamp(200px, 30vh, 300px)',
-                              }}
-                            >
-                              <TextField
-                                fullWidth
-                                multiline
-                                rows={12}
-                                value={backgroundKnowledge}
-                                onChange={e => setBackgroundKnowledgeWithAutoSave(e.target.value)}
-                                placeholder={t('prompts.optimizeEditPage.optimizationConfig.backgroundKnowledgePlaceholder')}
-                                size="small"
-                                className="bg-white"
-                                sx={{
-                                  '& .MuiInputBase-root': {
-                                    alignItems: 'flex-start',
+                                  任务执行失败
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  className="text-red-700 whitespace-pre-wrap break-words"
+                                  sx={{
                                     fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                                  },
-                                  '& .MuiInputBase-input': {
-                                    overflow: 'auto !important',
-                                    padding: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                                  },
-                                }}
-                              />
+                                  }}
+                                >
+                                  {errorMsg ? `失败原因：${errorMsg}` : '暂无失败原因'}
+                                </Typography>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 工具设置配置 Tab */}
-                    <div
-                      role="tabpanel"
-                      hidden={optimizationConfigTab !== 3}
-                      className="h-full optimization-tab-scroll"
-                      style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                      {optimizationConfigTab === 3 && (
-                        <div
-                          className="h-full optimization-tab-scroll"
-                          style={{ overflowY: 'auto', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        >
-                          <ToolSettingsPanel
-                            tools={tools}
-                            toolsEnabled={toolsEnabled}
-                            onToolsChange={handleToolsChange}
-                            onToolsEnabledChange={handleToolsEnabledChange}
-                            onAddTool={handleAddTool}
-                            onEditTool={handleEditTool}
-                            onDeleteTool={handleDeleteTool}
-                            onHasUnsavedChanges={handleToolHasUnsavedChanges}
-                            onTriggerAutoSave={handleToolTriggerAutoSave}
-                            enableAutoSave={true}
-                            isReadOnly={false}
-                            showDefaultValue={false}
-                            showToolFunctionHint={false}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* 第二个拖动分界线 - 当优化配置显示且优化结果也显示时显示 */}
-        {!moduleCollapsed.optimizationConfig && (
-          <div
-            className={`w-1 bg-gradient-to-b from-gray-200/60 to-gray-300/60 hover:from-blue-400 hover:to-blue-500 cursor-col-resize transition-all duration-300 relative group ${
-              isDraggingColumn === 1 ? 'from-blue-500 to-blue-600 shadow-sm' : ''
-            }`}
-            onMouseDown={handleColumnMouseDown(1)}
-          >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-gray-200/60">
-              <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full mr-0.5"></div>
-              <div className="w-0.5 h-6 bg-gradient-to-b from-gray-400 to-gray-500 rounded-full ml-0.5"></div>
-            </div>
-          </div>
-        )}
-
-        {/* Column 3: 优化结果 */}
-        {!moduleCollapsed.optimizationResult && (
-          <div
-            style={{
-              width: `${visibleModules.actualWidths[2]}%`,
-              minWidth: '320px',
-              display: 'flex',
-              flexDirection: 'column',
-              height: '100%',
-            }}
-            className="flex flex-col h-full"
-          >
-            <Card className="h-full shadow-sm border-0 bg-white/60 backdrop-blur-sm flex flex-col" sx={{ borderRadius: 0 }}>
-              <CardContent 
-                className="flex-1 flex flex-col overflow-hidden min-h-0"
-                sx={{
-                  padding: 'clamp(0.2rem, 1vw, 1.5rem) !important',
-                }}
-              >
-                <div 
-                  className="flex items-center justify-between flex-shrink-0"
-                  style={{
-                    marginBottom: 'clamp(0.375rem, 1.5vh, 1rem)',
-                  }}
-                >
-                  <div 
-                    className="flex items-center"
-                    style={{
-                      gap: 'clamp(0.25rem, 0.5vw, 0.625rem)',
-                    }}
-                  >
-                    <div 
-                      className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg shadow-sm"
-                      style={{
-                        padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                      }}
-                    >
-                      <BarChart 
-                        className="text-white"
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+                    {optimizationHistory && optimizationHistory.length > 0 ? (
+                      <div
+                        className="flex flex-col"
                         style={{
-                          width: 'clamp(0.5rem, 1vw, 1rem)',
-                          height: 'clamp(0.5rem, 1vw, 1rem)',
-                        }}
-                      />
-                    </div>
-                    <Typography 
-                      variant="h6" 
-                      className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
-                      sx={{
-                        fontSize: 'clamp(0.625rem, 1.2vw, 1.125rem)',
-                        lineHeight: 1.3,
-                      }}
-                    >
-                      {t('prompts.optimizeEditPage.optimizationResult.title')}
-                    </Typography>
-                  </div>
-
-                  {/* 收起按钮 */}
-                  <Tooltip title={t('prompts.optimizeEditPage.optimizationResult.collapse')}>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => toggleModuleCollapse('optimizationResult')} 
-                      className="text-gray-400 hover:text-gray-600"
-                      sx={{
-                        width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                        height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                      }}
-                    >
-                      <ChevronUp 
-                        style={{
-                          width: 'clamp(0.625rem, 1.2vw, 1rem)',
-                          height: 'clamp(0.625rem, 1.2vw, 1rem)',
-                        }}
-                      />
-                    </IconButton>
-                  </Tooltip>
-                </div>
-                {/* 优化结果主体内容：单独做一个可滚动区域，隐藏滚动条 */}
-                <style>{`.optimization-result-scroll::-webkit-scrollbar { display: none; }`}</style>
-                <div
-                  className="flex-1 flex flex-col optimization-result-scroll min-h-0"
-                  style={{ 
-                    overflowY: 'auto', 
-                    scrollbarWidth: 'none', 
-                    msOverflowStyle: 'none'
-                  }}
-                >
-                  {/* 错误信息卡片 - 当任务失败时显示 */}
-                  {taskStatus === 'failed' && (
-                    <div 
-                      className="flex-shrink-0"
-                      style={{
-                        marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
-                      }}
-                    >
-                      <Card
-                        sx={{
-                          backgroundColor: '#fef2f2',
-                          border: '1px solid #fecaca',
-                          borderRadius: 'clamp(0.5rem, 1.5vw, 0.75rem)',
+                          gap: 'clamp(0.25rem, 1vw, 1rem)',
                         }}
                       >
-                        <CardContent 
-                          sx={{
-                            padding: 'clamp(0.25rem, 1vw, 1rem) !important',
+                        {/* 优化评分趋势 */}
+                        <div
+                          className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex-shrink-0"
+                          style={{
+                            padding: 'clamp(0.25rem, 1vw, 1rem)',
                           }}
                         >
-                          <div 
-                            className="flex items-start"
+                          <div
+                            className="flex items-center justify-between"
                             style={{
-                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
                             }}
                           >
-                            <div 
-                              className="flex-shrink-0"
-                              style={{
-                                marginTop: 'clamp(0.0625rem, 0.125vw, 0.125rem)',
+                            <Typography
+                              variant="subtitle1"
+                              className="font-bold text-gray-800 flex items-center"
+                              sx={{
+                                fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
                               }}
                             >
-                              <X 
-                                className="text-red-600"
+                              <TrendingUp
+                                className="text-amber-600"
                                 style={{
                                   width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                   height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                 }}
                               />
-                            </div>
-                            <div className="flex-1">
-                              <Typography 
-                                variant="subtitle1" 
-                                className="font-bold text-red-800"
-                                sx={{
-                                  fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                                  marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                                }}
-                              >
-                                任务执行失败
-                              </Typography>
-                              <Typography 
-                                variant="body2" 
-                                className="text-red-700 whitespace-pre-wrap break-words"
-                                sx={{
-                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                                }}
-                              >
-                                {errorMsg ? `失败原因：${errorMsg}` : '暂无失败原因'}
-                              </Typography>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  )}
-                  {optimizationHistory && optimizationHistory.length > 0 ? (
-                    <div 
-                      className="flex flex-col"
-                      style={{
-                        gap: 'clamp(0.25rem, 1vw, 1rem)',
-                      }}
-                    >
-                      {/* 优化评分趋势 */}
-                      <div 
-                        className="bg-gradient-to-r from-gray-50/50 to-slate-50/50 rounded-xl border border-gray-100/60 flex-shrink-0"
-                        style={{
-                          padding: 'clamp(0.25rem, 1vw, 1rem)',
-                        }}
-                      >
-                        <div 
-                          className="flex items-center justify-between"
-                          style={{
-                            marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                          }}
-                        >
-                          <Typography 
-                            variant="subtitle1" 
-                            className="font-bold text-gray-800 flex items-center"
-                            sx={{
-                              fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                            }}
-                          >
-                            <TrendingUp 
-                              className="text-amber-600"
-                              style={{
-                                width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                              }}
-                            />
-                            <span>{t('prompts.optimizeEditPage.optimizationResult.scoreTrend')}</span>
-                          </Typography>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => setIsChartFullscreen(true)} 
-                            className="text-gray-500 hover:text-blue-600"
-                            sx={{
-                              width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                              height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                            }}
-                          >
-                            <Maximize2 
-                              style={{
-                                width: 'clamp(0.5rem, 1vw, 1rem)',
-                                height: 'clamp(0.5rem, 1vw, 1rem)',
-                              }}
-                            />
-                          </IconButton>
-                        </div>
-                        <Box 
-                          className="bg-white rounded" 
-                          sx={{ 
-                            height: 'clamp(120px, 20vh, 180px)',
-                            width: '100%',
-                            minWidth: 0,
-                            minHeight: 'clamp(120px, 20vh, 180px)',
-                            padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                          }}
-                        >
-                          {optimizationHistory && optimizationHistory.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%" minHeight={120}>
-                              <LineChart
-                                data={optimizationHistory.map(item => ({
-                                  round: t('prompts.optimizeEditPage.optimizationConfig.round', { round: item.round }),
-                                  score: item.score,
-                                }))}
-                                margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                                <XAxis 
-                                  dataKey="round" 
-                                  tick={{ fontSize: 'clamp(8px, 1.5vw, 12px)' }} 
-                                  stroke="#666" 
-                                />
-                                <YAxis 
-                                  domain={[0, 100]} 
-                                  tick={{ fontSize: 'clamp(8px, 1.5vw, 12px)' }} 
-                                  stroke="#666" 
-                                />
-                                <RechartsTooltip
-                                  contentStyle={{
-                                    backgroundColor: 'white',
-                                    border: '1px solid #e0e0e0',
-                                    borderRadius: '4px',
-                                    fontSize: 'clamp(10px, 1.5vw, 12px)',
-                                  }}
-                                />
-                                <Line
-                                  type="monotone"
-                                  dataKey="score"
-                                  stroke="#2196f3"
-                                  strokeWidth={2}
-                                  dot={{ fill: '#2196f3', strokeWidth: 2, r: 4 }}
-                                  activeDot={{ r: 6 }}
-                                  connectNulls={false}
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          ) : (
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                              <Typography 
-                                variant="body2" 
-                                color="text.secondary"
-                                sx={{
-                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                                }}
-                              >
-                                暂无数据
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </div>
-
-                      <Divider className="flex-shrink-0" />
-
-                      {/* 提示词对比 */}
-                      <div 
-                        className="bg-gradient-to-r from-slate-50/50 to-gray-50/50 rounded-xl border border-slate-100/60 flex flex-col flex-shrink-0"
-                        style={{
-                          padding: 'clamp(0.25rem, 1vw, 1rem)',
-                        }}
-                      >
-                        <div 
-                          className="flex items-center justify-between flex-shrink-0"
-                          style={{
-                            marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                          }}
-                        >
-                          <Typography 
-                            variant="subtitle1" 
-                            className="font-bold text-gray-800 flex items-center"
-                            sx={{
-                              fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
-                              gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
-                            }}
-                          >
-                            <Zap 
-                              className="text-amber-600"
-                              style={{
-                                width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                                height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                              }}
-                            />
-                            <span>{t('prompts.optimizeEditPage.optimizationResult.promptComparison')}</span>
-                          </Typography>
-                          <Box 
-                            className="flex items-center"
-                            style={{
-                              gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                            }}
-                          >
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                // 循环切换：如果在第一轮，切换到最后一轮
-                                if (currentOptimizedVersion === 0) {
-                                  setCurrentOptimizedVersion(optimizedVersions.length - 1)
-                                } else {
-                                  setCurrentOptimizedVersion(currentOptimizedVersion - 1)
-                                }
-                              }}
-                              disabled={optimizedVersions.length <= 1}
-                              sx={{
-                                width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                              }}
-                            >
-                              <ChevronLeft 
-                                style={{
-                                  width: 'clamp(0.5rem, 1vw, 1rem)',
-                                  height: 'clamp(0.5rem, 1vw, 1rem)',
-                                }}
-                              />
-                            </IconButton>
-                            <Typography 
-                              variant="caption" 
-                              className="text-gray-600"
-                              sx={{
-                                fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                padding: '0 clamp(0.125rem, 0.5vw, 0.5rem)',
-                              }}
-                            >
-                              {t('prompts.optimizeEditPage.optimizationConfig.currentRound', {
-                                current: currentOptimizedVersion + 1,
-                                total: optimizedVersions.length,
-                              })}
+                              <span>{t('prompts.optimizeEditPage.optimizationResult.scoreTrend')}</span>
                             </Typography>
                             <IconButton
                               size="small"
-                              onClick={() => {
-                                // 循环切换：如果在最后一轮，切换到第一轮
-                                if (currentOptimizedVersion >= optimizedVersions.length - 1) {
-                                  setCurrentOptimizedVersion(0)
-                                } else {
-                                  setCurrentOptimizedVersion(currentOptimizedVersion + 1)
-                                }
-                              }}
-                              disabled={optimizedVersions.length <= 1}
-                              sx={{
-                                width: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                              }}
-                            >
-                              <ChevronRight 
-                                style={{
-                                  width: 'clamp(0.5rem, 1vw, 1rem)',
-                                  height: 'clamp(0.5rem, 1vw, 1rem)',
-                                }}
-                              />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              onClick={() => setIsComparisonFullscreen(true)} 
+                              onClick={() => setIsChartFullscreen(true)}
                               className="text-gray-500 hover:text-blue-600"
                               sx={{
                                 width: 'clamp(1.25rem, 2.5vw, 2rem)',
                                 height: 'clamp(1.25rem, 2.5vw, 2rem)',
-                                marginLeft: 'clamp(0.125rem, 0.5vw, 0.5rem)',
                               }}
                             >
-                              <Maximize2 
+                              <Maximize2
                                 style={{
                                   width: 'clamp(0.5rem, 1vw, 1rem)',
                                   height: 'clamp(0.5rem, 1vw, 1rem)',
                                 }}
                               />
                             </IconButton>
+                          </div>
+                          <Box
+                            className="bg-white rounded"
+                            sx={{
+                              height: 'clamp(120px, 20vh, 180px)',
+                              width: '100%',
+                              minWidth: 0,
+                              minHeight: 'clamp(120px, 20vh, 180px)',
+                              padding: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                            }}
+                          >
+                            {optimizationHistory && optimizationHistory.length > 0 ? (
+                              <ResponsiveContainer width="100%" height="100%" minHeight={120}>
+                                <LineChart
+                                  data={optimizationHistory.map(item => ({
+                                    round: t('prompts.optimizeEditPage.optimizationConfig.round', { round: item.round }),
+                                    score: item.score,
+                                  }))}
+                                  margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                                  <XAxis dataKey="round" tick={{ fontSize: 'clamp(8px, 1.5vw, 12px)' }} stroke="#666" />
+                                  <YAxis domain={[0, 100]} tick={{ fontSize: 'clamp(8px, 1.5vw, 12px)' }} stroke="#666" />
+                                  <RechartsTooltip
+                                    contentStyle={{
+                                      backgroundColor: 'white',
+                                      border: '1px solid #e0e0e0',
+                                      borderRadius: '4px',
+                                      fontSize: 'clamp(10px, 1.5vw, 12px)',
+                                    }}
+                                  />
+                                  <Line
+                                    type="monotone"
+                                    dataKey="score"
+                                    stroke="#2196f3"
+                                    strokeWidth={2}
+                                    dot={{ fill: '#2196f3', strokeWidth: 2, r: 4 }}
+                                    activeDot={{ r: 6 }}
+                                    connectNulls={false}
+                                  />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            ) : (
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                  }}
+                                >
+                                  暂无数据
+                                </Typography>
+                              </Box>
+                            )}
                           </Box>
                         </div>
 
-                        <div 
-                          className="flex flex-col" 
-                          style={{ 
-                            minHeight: 'clamp(300px, 50vh, 400px)',
+                        <Divider className="flex-shrink-0" />
+
+                        {/* 提示词对比 */}
+                        <div
+                          className="bg-gradient-to-r from-slate-50/50 to-gray-50/50 rounded-xl border border-slate-100/60 flex flex-col flex-shrink-0"
+                          style={{
+                            padding: 'clamp(0.25rem, 1vw, 1rem)',
                           }}
                         >
-                          <Card variant="outlined" className="bg-white overflow-hidden flex flex-col">
-                            {/* 标题栏 */}
-                            <Box className="bg-gray-100 border-b flex-shrink-0">
-                              <div className="flex w-full">
-                                {/* 左侧：原始提示词 - 50% */}
-                                <div className="w-1/2 border-r border-gray-300">
-                                  <Box 
-                                    className="flex flex-wrap items-center"
-                                    sx={{
-                                      padding: 'clamp(0.25rem, 0.75vw, 0.75rem) clamp(0.25rem, 1vw, 1rem)',
-                                      gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                    }}
-                                  >
-                                    <div 
-                                      className="flex items-center flex-wrap"
-                                      style={{
-                                        gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                                        flex: '1 1 auto',
-                                        minWidth: 0,
-                                      }}
-                                    >
-                                      <Typography 
-                                        variant="subtitle2" 
-                                        className="font-semibold text-gray-700"
-                                        sx={{
-                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                                          whiteSpace: 'nowrap',
-                                        }}
-                                      >
-                                        {t('prompts.optimizeEditPage.optimizationResult.originalPrompt')}
-                                      </Typography>
-                                      {/* 显示第0轮的分数标签 */}
-                                      {(() => {
-                                        // 从原始history数据中找到第0轮的分数
-                                        const roundZero = optimizationHistory.find(h => h.round === 0)
-                                        if (roundZero && typeof roundZero.score === 'number') {
-                                          return (
-                                            <Chip 
-                                              label={`${roundZero.score.toFixed(2)}%`} 
-                                              size="small" 
-                                              className="bg-gray-100 text-gray-700 font-medium flex-shrink-0"
-                                              sx={{
-                                                fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                height: 'clamp(1rem, 2vw, 1.5rem)',
-                                              }}
-                                            />
-                                          )
-                                        }
-                                        return null
-                                      })()}
-                                    </div>
-                                    <Box 
-                                      className="flex flex-shrink-0"
-                                      style={{
-                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                      }}
-                                    >
-                                      <IconButton 
-                                        size="small" 
-                                        onClick={() => handleCopyPrompt(originalPrompt)} 
-                                        sx={{ 
-                                          color: '#6b7280',
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
-                                        }}
-                                      >
-                                        <Copy 
-                                          style={{
-                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                          }}
-                                        />
-                                      </IconButton>
-                                      {false && <IconButton 
-                                        size="small" 
-                                        onClick={() => handleShowDetail('original', 0)} 
-                                        sx={{ 
-                                          color: '#6b7280',
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
-                                        }}
-                                      >
-                                        <Info 
-                                          style={{
-                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                          }}
-                                        />
-                                      </IconButton>}
-                                    </Box>
-                                  </Box>
-                                </div>
+                          <div
+                            className="flex items-center justify-between flex-shrink-0"
+                            style={{
+                              marginBottom: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                            }}
+                          >
+                            <Typography
+                              variant="subtitle1"
+                              className="font-bold text-gray-800 flex items-center"
+                              sx={{
+                                fontSize: 'clamp(0.625rem, 1.1vw, 0.875rem)',
+                                gap: 'clamp(0.25rem, 0.75vw, 0.75rem)',
+                              }}
+                            >
+                              <Zap
+                                className="text-amber-600"
+                                style={{
+                                  width: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                  height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
+                                }}
+                              />
+                              <span>{t('prompts.optimizeEditPage.optimizationResult.promptComparison')}</span>
+                            </Typography>
+                            <Box
+                              className="flex items-center"
+                              style={{
+                                gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                              }}
+                            >
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  // 循环切换：如果在第一轮，切换到最后一轮
+                                  if (currentOptimizedVersion === 0) {
+                                    setCurrentOptimizedVersion(optimizedVersions.length - 1)
+                                  } else {
+                                    setCurrentOptimizedVersion(currentOptimizedVersion - 1)
+                                  }
+                                }}
+                                disabled={optimizedVersions.length <= 1}
+                                sx={{
+                                  width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                }}
+                              >
+                                <ChevronLeft
+                                  style={{
+                                    width: 'clamp(0.5rem, 1vw, 1rem)',
+                                    height: 'clamp(0.5rem, 1vw, 1rem)',
+                                  }}
+                                />
+                              </IconButton>
+                              <Typography
+                                variant="caption"
+                                className="text-gray-600"
+                                sx={{
+                                  fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                  padding: '0 clamp(0.125rem, 0.5vw, 0.5rem)',
+                                }}
+                              >
+                                {t('prompts.optimizeEditPage.optimizationConfig.currentRound', {
+                                  current: currentOptimizedVersion + 1,
+                                  total: optimizedVersions.length,
+                                })}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  // 循环切换：如果在最后一轮，切换到第一轮
+                                  if (currentOptimizedVersion >= optimizedVersions.length - 1) {
+                                    setCurrentOptimizedVersion(0)
+                                  } else {
+                                    setCurrentOptimizedVersion(currentOptimizedVersion + 1)
+                                  }
+                                }}
+                                disabled={optimizedVersions.length <= 1}
+                                sx={{
+                                  width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                }}
+                              >
+                                <ChevronRight
+                                  style={{
+                                    width: 'clamp(0.5rem, 1vw, 1rem)',
+                                    height: 'clamp(0.5rem, 1vw, 1rem)',
+                                  }}
+                                />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => setIsComparisonFullscreen(true)}
+                                className="text-gray-500 hover:text-blue-600"
+                                sx={{
+                                  width: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  height: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                  marginLeft: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                }}
+                              >
+                                <Maximize2
+                                  style={{
+                                    width: 'clamp(0.5rem, 1vw, 1rem)',
+                                    height: 'clamp(0.5rem, 1vw, 1rem)',
+                                  }}
+                                />
+                              </IconButton>
+                            </Box>
+                          </div>
 
-                                {/* 右侧：优化结果 - 50% */}
-                                <div className="w-1/2">
-                                  <Box 
-                                    className="flex flex-wrap items-center"
-                                    sx={{
-                                      padding: 'clamp(0.25rem, 0.75vw, 0.75rem) clamp(0.25rem, 1vw, 1rem)',
-                                      gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
-                                    }}
-                                  >
-                                    <div 
-                                      className="flex items-center flex-wrap"
-                                      style={{
-                                        gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                                        flex: '1 1 auto',
-                                        minWidth: 0,
+                          <div
+                            className="flex flex-col"
+                            style={{
+                              minHeight: 'clamp(300px, 50vh, 400px)',
+                            }}
+                          >
+                            <Card variant="outlined" className="bg-white overflow-hidden flex flex-col">
+                              {/* 标题栏 */}
+                              <Box className="bg-gray-100 border-b flex-shrink-0">
+                                <div className="flex w-full">
+                                  {/* 左侧：原始提示词 - 50% */}
+                                  <div className="w-1/2 border-r border-gray-300">
+                                    <Box
+                                      className="flex flex-wrap items-center"
+                                      sx={{
+                                        padding: 'clamp(0.25rem, 0.75vw, 0.75rem) clamp(0.25rem, 1vw, 1rem)',
+                                        gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
                                       }}
                                     >
-                                      <Typography 
-                                        variant="subtitle2" 
-                                        className="font-semibold text-gray-700"
-                                        sx={{
-                                          fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                                          whiteSpace: 'nowrap',
+                                      <div
+                                        className="flex items-center flex-wrap"
+                                        style={{
+                                          gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                          flex: '1 1 auto',
+                                          minWidth: 0,
                                         }}
                                       >
-                                        {t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: currentOptimizedVersion + 1 })}
-                                      </Typography>
-                                      {/* 显示当前轮次的分数 */}
-                                      {(() => {
-                                        // 找到对应轮次的分数（轮次 = 索引 + 1）
-                                        const currentRound = currentOptimizedVersion + 1
-                                        const roundData = optimizationHistory.find(h => h.round === currentRound)
-                                        if (roundData && typeof roundData.score === 'number') {
-                                          return (
-                                            <Chip 
-                                              label={`${roundData.score.toFixed(2)}%`} 
-                                              size="small" 
-                                              className="bg-blue-100 text-blue-700 font-medium flex-shrink-0"
-                                              sx={{
-                                                fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                height: 'clamp(1rem, 2vw, 1.5rem)',
-                                              }}
-                                            />
-                                          )
-                                        }
-                                        return null
-                                      })()}
-                                      {(() => {
-                                        // 检查是否是最优轮次（轮次 = 索引 + 1）
-                                        const currentRound = currentOptimizedVersion + 1
-                                        if (bestIteration === currentRound) {
-                                          return (
-                                            <Chip
-                                              label={t('prompts.optimizeEditPage.optimizationResult.best')}
-                                              size="small"
-                                              className="flex-shrink-0"
-                                              style={{ 
-                                                backgroundColor: '#10b981', 
-                                                color: 'white', 
-                                                fontWeight: 'medium',
-                                                fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                                height: 'clamp(1rem, 2vw, 1.5rem)',
-                                              }}
-                                            />
-                                          )
-                                        }
-                                        return null
-                                      })()}
-                                    </div>
-                                    <Box 
-                                      className="flex flex-shrink-0"
-                                      style={{
-                                        gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                      }}
-                                    >
-                                      {fromEditor && (
-                                        <Button
+                                        <Typography
+                                          variant="subtitle2"
+                                          className="font-semibold text-gray-700"
+                                          sx={{
+                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                            whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          {t('prompts.optimizeEditPage.optimizationResult.originalPrompt')}
+                                        </Typography>
+                                        {/* 显示第0轮的分数标签 */}
+                                        {(() => {
+                                          // 从原始history数据中找到第0轮的分数
+                                          const roundZero = optimizationHistory.find(h => h.round === 0)
+                                          if (roundZero && typeof roundZero.score === 'number') {
+                                            return (
+                                              <Chip
+                                                label={`${roundZero.score.toFixed(2)}%`}
+                                                size="small"
+                                                className="bg-gray-100 text-gray-700 font-medium flex-shrink-0"
+                                                sx={{
+                                                  fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
+                                              />
+                                            )
+                                          }
+                                          return null
+                                        })()}
+                                      </div>
+                                      <Box
+                                        className="flex flex-shrink-0"
+                                        style={{
+                                          gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                        }}
+                                      >
+                                        <IconButton
                                           size="small"
-                                          variant="contained"
-                                          startIcon={
-                                            <Check 
+                                          onClick={() => handleCopyPrompt(originalPrompt)}
+                                          sx={{
+                                            color: '#6b7280',
+                                            width: 'clamp(1rem, 2vw, 1.5rem)',
+                                            height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          }}
+                                        >
+                                          <Copy
+                                            style={{
+                                              width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                              height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                            }}
+                                          />
+                                        </IconButton>
+                                        {false && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleShowDetail('original', 0)}
+                                            sx={{
+                                              color: '#6b7280',
+                                              width: 'clamp(1rem, 2vw, 1.5rem)',
+                                              height: 'clamp(1rem, 2vw, 1.5rem)',
+                                            }}
+                                          >
+                                            <Info
                                               style={{
                                                 width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
                                                 height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
                                               }}
                                             />
-                                          }
-                                          onClick={handleApplyOptimization}
+                                          </IconButton>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  </div>
+
+                                  {/* 右侧：优化结果 - 50% */}
+                                  <div className="w-1/2">
+                                    <Box
+                                      className="flex flex-wrap items-center"
+                                      sx={{
+                                        padding: 'clamp(0.25rem, 0.75vw, 0.75rem) clamp(0.25rem, 1vw, 1rem)',
+                                        gap: 'clamp(0.25rem, 0.5vw, 0.5rem)',
+                                      }}
+                                    >
+                                      <div
+                                        className="flex items-center flex-wrap"
+                                        style={{
+                                          gap: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                                          flex: '1 1 auto',
+                                          minWidth: 0,
+                                        }}
+                                      >
+                                        <Typography
+                                          variant="subtitle2"
+                                          className="font-semibold text-gray-700"
                                           sx={{
-                                            backgroundColor: '#10b981',
-                                            '&:hover': { backgroundColor: '#059669' },
-                                            marginRight: 'clamp(0.125rem, 0.25vw, 0.25rem)',
-                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
-                                            padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
-                                            minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                            fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                                            whiteSpace: 'nowrap',
                                           }}
                                         >
-                                          应用
-                                        </Button>
-                                      )}
-                                      <IconButton 
-                                        size="small" 
-                                        onClick={() => handleCopyPrompt(currentOptimizedPrompt)} 
-                                        sx={{ 
-                                          color: '#6b7280',
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
+                                          {t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: currentOptimizedVersion + 1 })}
+                                        </Typography>
+                                        {/* 显示当前轮次的分数 */}
+                                        {(() => {
+                                          // 找到对应轮次的分数（轮次 = 索引 + 1）
+                                          const currentRound = currentOptimizedVersion + 1
+                                          const roundData = optimizationHistory.find(h => h.round === currentRound)
+                                          if (roundData && typeof roundData.score === 'number') {
+                                            return (
+                                              <Chip
+                                                label={`${roundData.score.toFixed(2)}%`}
+                                                size="small"
+                                                className="bg-blue-100 text-blue-700 font-medium flex-shrink-0"
+                                                sx={{
+                                                  fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
+                                              />
+                                            )
+                                          }
+                                          return null
+                                        })()}
+                                        {(() => {
+                                          // 检查是否是最优轮次（轮次 = 索引 + 1）
+                                          const currentRound = currentOptimizedVersion + 1
+                                          if (bestIteration === currentRound) {
+                                            return (
+                                              <Chip
+                                                label={t('prompts.optimizeEditPage.optimizationResult.best')}
+                                                size="small"
+                                                className="flex-shrink-0"
+                                                style={{
+                                                  backgroundColor: '#10b981',
+                                                  color: 'white',
+                                                  fontWeight: 'medium',
+                                                  fontSize: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  height: 'clamp(1rem, 2vw, 1.5rem)',
+                                                }}
+                                              />
+                                            )
+                                          }
+                                          return null
+                                        })()}
+                                      </div>
+                                      <Box
+                                        className="flex flex-shrink-0"
+                                        style={{
+                                          gap: 'clamp(0.125rem, 0.25vw, 0.25rem)',
                                         }}
                                       >
-                                        <Copy 
-                                          style={{
-                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                        {fromEditor && (
+                                          <Button
+                                            size="small"
+                                            variant="contained"
+                                            startIcon={
+                                              <Check
+                                                style={{
+                                                  width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                  height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                }}
+                                              />
+                                            }
+                                            onClick={handleApplyOptimization}
+                                            sx={{
+                                              backgroundColor: '#10b981',
+                                              '&:hover': { backgroundColor: '#059669' },
+                                              marginRight: 'clamp(0.125rem, 0.25vw, 0.25rem)',
+                                              fontSize: 'clamp(0.5rem, 0.9vw, 0.75rem)',
+                                              padding: 'clamp(0.125rem, 0.4vw, 0.375rem) clamp(0.25rem, 0.8vw, 0.75rem)',
+                                              minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
+                                            }}
+                                          >
+                                            应用
+                                          </Button>
+                                        )}
+                                        <IconButton
+                                          size="small"
+                                          onClick={() => handleCopyPrompt(currentOptimizedPrompt)}
+                                          sx={{
+                                            color: '#6b7280',
+                                            width: 'clamp(1rem, 2vw, 1.5rem)',
+                                            height: 'clamp(1rem, 2vw, 1.5rem)',
                                           }}
-                                        />
-                                      </IconButton>
-                                      {false && <IconButton 
-                                        size="small" 
-                                        onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)} 
-                                        sx={{ 
-                                          color: '#059669',
-                                          width: 'clamp(1rem, 2vw, 1.5rem)',
-                                          height: 'clamp(1rem, 2vw, 1.5rem)',
-                                        }}
-                                      >
-                                        <Info 
-                                          style={{
-                                            width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                            height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
-                                          }}
-                                        />
-                                      </IconButton>}
+                                        >
+                                          <Copy
+                                            style={{
+                                              width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                              height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                            }}
+                                          />
+                                        </IconButton>
+                                        {false && (
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)}
+                                            sx={{
+                                              color: '#059669',
+                                              width: 'clamp(1rem, 2vw, 1.5rem)',
+                                              height: 'clamp(1rem, 2vw, 1.5rem)',
+                                            }}
+                                          >
+                                            <Info
+                                              style={{
+                                                width: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                                height: 'clamp(0.5rem, 0.8vw, 0.75rem)',
+                                              }}
+                                            />
+                                          </IconButton>
+                                        )}
+                                      </Box>
                                     </Box>
-                                  </Box>
+                                  </div>
                                 </div>
-                              </div>
-                            </Box>
+                              </Box>
 
-                            {/* Diff 内容区 */}
-                            <Box 
-                              className="flex-1 overflow-auto" 
-                              style={{ 
-                                minHeight: 'clamp(400px, 60vh, 580px)',
-                              }}
-                            >
-                              <DiffViewer oldContent={historicalOriginalPrompt} newContent={currentOptimizedPrompt} />
-                            </Box>
-                          </Card>
+                              {/* Diff 内容区 */}
+                              <Box
+                                className="flex-1 overflow-auto"
+                                style={{
+                                  minHeight: 'clamp(400px, 60vh, 580px)',
+                                }}
+                              >
+                                <DiffViewer oldContent={historicalOriginalPrompt} newContent={currentOptimizedPrompt} />
+                              </Box>
+                            </Card>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="text-center">
-                        <BarChart 
-                          className="text-blue-300 mx-auto"
-                          style={{
-                            width: 'clamp(2rem, 8vw, 4rem)',
-                            height: 'clamp(2rem, 8vw, 4rem)',
-                            marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
-                          }}
-                        />
-                        <Typography 
-                          variant="h6" 
-                          className="text-gray-500"
-                          sx={{
-                            fontSize: 'clamp(0.75rem, 1.5vw, 1.125rem)',
-                            marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
-                          }}
-                        >
-                          {t('prompts.optimizeEditPage.optimizationResult.noResult')}
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          className="text-gray-400"
-                          sx={{
-                            fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
-                          }}
-                        >
-                          {taskStatus ? getStatusMessage(taskStatus) : t('prompts.optimizeEditPage.optimizationResult.completeConfigFirst')}
-                        </Typography>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="text-center">
+                          <BarChart
+                            className="text-blue-300 mx-auto"
+                            style={{
+                              width: 'clamp(2rem, 8vw, 4rem)',
+                              height: 'clamp(2rem, 8vw, 4rem)',
+                              marginBottom: 'clamp(0.25rem, 1vw, 1rem)',
+                            }}
+                          />
+                          <Typography
+                            variant="h6"
+                            className="text-gray-500"
+                            sx={{
+                              fontSize: 'clamp(0.75rem, 1.5vw, 1.125rem)',
+                              marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
+                            }}
+                          >
+                            {t('prompts.optimizeEditPage.optimizationResult.noResult')}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            className="text-gray-400"
+                            sx={{
+                              fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
+                            }}
+                          >
+                            {taskStatus ? getStatusMessage(taskStatus) : t('prompts.optimizeEditPage.optimizationResult.completeConfigFirst')}
+                          </Typography>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
-
-      {/* 编辑用例抽屉 */}
-      <Drawer
-        anchor="right"
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            width: '800px',
-            maxWidth: '90vw',
-            padding: 0,
-          },
-        }}
-      >
-        <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
-          {/* 头部 */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200/60 bg-white/60 backdrop-blur-sm">
-            <div className="flex items-center space-x-4">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl shadow-sm">
-                <Edit className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                  {isViewMode ? t('prompts.optimizeEditPage.testCaseDialog.view') : t('prompts.optimizeEditPage.testCaseDialog.edit')}
-                </Typography>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Typography variant="body2" className="text-gray-600">
-                    {t('prompts.optimizeEditPage.testCaseDialog.caseId', { id: currentTestCase?.id })}
-                  </Typography>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <IconButton
-                size="small"
-                onClick={() => setEditDialogOpen(false)}
-                sx={{
-                  color: '#6b7280',
-                  '&:hover': {
-                    color: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  },
-                }}
-              >
-                <X className="w-4 h-4" />
-              </IconButton>
-            </div>
-          </div>
-          {/* 编辑表单 */}
-          <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-            {testCaseDetails.map((detail, index) => (
-              <div key={detail.id} className="bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200/60 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-                  <div className="flex items-center space-x-3">
-                    <Typography variant="subtitle1" className="font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                      {t('prompts.optimizeEditPage.testCaseDialog.messageNumber', { number: index + 1 })}
-                    </Typography>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Chip
-                      label={detail.role}
-                      size="small"
-                      sx={{
-                        backgroundColor: detail.role === 'inputs' ? '#dbeafe' : '#f0fdf4',
-                        color: detail.role === 'inputs' ? '#1d4ed8' : '#15803d',
-                        fontWeight: 500,
-                        fontSize: '12px',
-                        borderRadius: '6px',
-                      }}
-                    />
-                    {!isViewMode && (
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteDetailRow(detail.id)}
-                        sx={{
-                          color: '#6b7280',
-                          '&:hover': {
-                            color: '#ef4444',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                          },
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </IconButton>
                     )}
                   </div>
-                </div>
-                <div className="p-4 space-y-4">
-                  {/* 字段类型显示 */}
-                  <div>
-                    <Typography variant="body2" className="text-gray-700 mb-2 font-medium">
-                      字段类型
-                    </Typography>
-                    <TextField
-                      value={detail.role}
-                      size="small"
-                      fullWidth
-                      disabled={true}
-                      sx={{
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '8px',
-                        '& .MuiOutlinedInput-root': {
-                          borderRadius: '8px',
-                          '& fieldset': {
-                            borderColor: '#e5e7eb',
-                          },
-                          '&.Mui-disabled': {
-                            backgroundColor: '#f9fafb',
-                            '& fieldset': {
-                              borderColor: '#e5e7eb',
-                            },
-                          },
-                        },
-                        '& .MuiInputBase-input.Mui-disabled': {
-                          WebkitTextFillColor: '#6b7280',
-                        },
-                      }}
-                    />
-                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
 
-                  {/* 字段名称输入 */}
-                  <div>
-                    <Typography variant="body2" className="text-gray-700 mb-2 font-medium">
-                      字段名称
+        {/* 编辑用例抽屉 */}
+        <Drawer
+          anchor="right"
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          PaperProps={{
+            sx: {
+              width: '800px',
+              maxWidth: '90vw',
+              padding: 0,
+            },
+          }}
+        >
+          <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
+            {/* 头部 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200/60 bg-white/60 backdrop-blur-sm">
+              <div className="flex items-center space-x-4">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl shadow-sm">
+                  <Edit className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                    {isViewMode ? t('prompts.optimizeEditPage.testCaseDialog.view') : t('prompts.optimizeEditPage.testCaseDialog.edit')}
+                  </Typography>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Typography variant="body2" className="text-gray-600">
+                      {t('prompts.optimizeEditPage.testCaseDialog.caseId', { id: currentTestCase?.id })}
                     </Typography>
-                    {detail.role === 'label' ? (
-                      <Select
-                        value={detail.variableName || ''}
-                        onChange={e => handleUpdateDetail(detail.id, 'variableName', e.target.value)}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <IconButton
+                  size="small"
+                  onClick={() => setEditDialogOpen(false)}
+                  sx={{
+                    color: '#6b7280',
+                    '&:hover': {
+                      color: '#ef4444',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    },
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </IconButton>
+              </div>
+            </div>
+            {/* 编辑表单 */}
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+              {testCaseDetails.map((detail, index) => (
+                <div key={detail.id} className="bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl shadow-sm">
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200/60 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
+                    <div className="flex items-center space-x-3">
+                      <Typography variant="subtitle1" className="font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                        {t('prompts.optimizeEditPage.testCaseDialog.messageNumber', { number: index + 1 })}
+                      </Typography>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Chip
+                        label={detail.role}
                         size="small"
-                        fullWidth
-                        disabled={isViewMode}
-                        displayEmpty
                         sx={{
-                          backgroundColor: 'white',
-                          borderRadius: '8px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#e5e7eb',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: isViewMode ? '#e5e7eb' : '#3b82f6',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: isViewMode ? '#e5e7eb' : '#3b82f6',
-                          },
+                          backgroundColor: detail.role === 'inputs' ? '#dbeafe' : '#f0fdf4',
+                          color: detail.role === 'inputs' ? '#1d4ed8' : '#15803d',
+                          fontWeight: 500,
+                          fontSize: '12px',
+                          borderRadius: '6px',
                         }}
-                      >
-                        <MenuItem value="output">output</MenuItem>
-                        <MenuItem value="tool_calls">tool_calls</MenuItem>
-                      </Select>
-                    ) : (
+                      />
+                      {!isViewMode && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteDetailRow(detail.id)}
+                          sx={{
+                            color: '#6b7280',
+                            '&:hover': {
+                              color: '#ef4444',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            },
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </IconButton>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-4">
+                    {/* 字段类型显示 */}
+                    <div>
+                      <Typography variant="body2" className="text-gray-700 mb-2 font-medium">
+                        字段类型
+                      </Typography>
                       <TextField
-                        value={detail.variableName || ''}
-                        onChange={e => handleUpdateDetail(detail.id, 'variableName', e.target.value)}
+                        value={detail.role}
                         size="small"
                         fullWidth
                         disabled={true}
-                        placeholder="请输入字段名称"
                         sx={{
                           backgroundColor: '#f9fafb',
                           borderRadius: '8px',
@@ -5539,456 +5477,519 @@ const PromptOptimizeEditPage: React.FC = () => {
                           },
                         }}
                       />
-                    )}
-                  </div>
+                    </div>
 
-                  {/* 字段值输入 */}
-                  <div>
-                    <FieldEditor
-                      label="字段值"
-                      value={detail.content}
-                      fieldType={detail.contentType || 'PlainText'}
-                      placeholder="请输入字段值"
-                      maxLength={2000}
-                      showCharCount={true}
-                      disabled={isViewMode}
-                      allowedTypes={['PlainText', 'Code', 'JSON', 'Markdown']}
-                      onValueChange={value => handleUpdateDetail(detail.id, 'content', value)}
-                      onTypeChange={type => handleUpdateDetail(detail.id, 'contentType', type)}
-                    />
+                    {/* 字段名称输入 */}
+                    <div>
+                      <Typography variant="body2" className="text-gray-700 mb-2 font-medium">
+                        字段名称
+                      </Typography>
+                      {detail.role === 'label' ? (
+                        <Select
+                          value={detail.variableName || ''}
+                          onChange={e => handleUpdateDetail(detail.id, 'variableName', e.target.value)}
+                          size="small"
+                          fullWidth
+                          disabled={isViewMode}
+                          displayEmpty
+                          sx={{
+                            backgroundColor: 'white',
+                            borderRadius: '8px',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: '#e5e7eb',
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isViewMode ? '#e5e7eb' : '#3b82f6',
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                              borderColor: isViewMode ? '#e5e7eb' : '#3b82f6',
+                            },
+                          }}
+                        >
+                          <MenuItem value="output">output</MenuItem>
+                          <MenuItem value="tool_calls">tool_calls</MenuItem>
+                        </Select>
+                      ) : (
+                        <TextField
+                          value={detail.variableName || ''}
+                          onChange={e => handleUpdateDetail(detail.id, 'variableName', e.target.value)}
+                          size="small"
+                          fullWidth
+                          disabled={true}
+                          placeholder="请输入字段名称"
+                          sx={{
+                            backgroundColor: '#f9fafb',
+                            borderRadius: '8px',
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: '8px',
+                              '& fieldset': {
+                                borderColor: '#e5e7eb',
+                              },
+                              '&.Mui-disabled': {
+                                backgroundColor: '#f9fafb',
+                                '& fieldset': {
+                                  borderColor: '#e5e7eb',
+                                },
+                              },
+                            },
+                            '& .MuiInputBase-input.Mui-disabled': {
+                              WebkitTextFillColor: '#6b7280',
+                            },
+                          }}
+                        />
+                      )}
+                    </div>
+
+                    {/* 字段值输入 */}
+                    <div>
+                      <FieldEditor
+                        label="字段值"
+                        value={detail.content}
+                        fieldType={detail.contentType || 'PlainText'}
+                        placeholder="请输入字段值"
+                        maxLength={2000}
+                        showCharCount={true}
+                        disabled={isViewMode}
+                        allowedTypes={['PlainText', 'Code', 'JSON', 'Markdown']}
+                        onValueChange={value => handleUpdateDetail(detail.id, 'content', value)}
+                        onTypeChange={type => handleUpdateDetail(detail.id, 'contentType', type)}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* 底部按钮 */}
-          <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200/60 bg-white/60 backdrop-blur-sm">
-            <Button
-              variant="outlined"
-              onClick={() => setEditDialogOpen(false)}
-              sx={{
-                borderColor: '#e5e7eb',
-                color: '#6b7280',
-                '&:hover': {
-                  borderColor: '#ef4444',
-                  backgroundColor: 'rgba(239, 68, 68, 0.05)',
-                  color: '#ef4444',
-                },
-                borderRadius: '8px',
-                textTransform: 'none',
-                fontWeight: 500,
-                minWidth: '100px',
-              }}
-            >
-              {isViewMode ? t('prompts.optimizeEditPage.testCaseDialog.close') : t('prompts.optimizeEditPage.testCaseDialog.cancel')}
-            </Button>
-            {isViewMode ? (
+            {/* 底部按钮 */}
+            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200/60 bg-white/60 backdrop-blur-sm">
               <Button
-                variant="contained"
-                onClick={handleSwitchToEditMode}
-                startIcon={<Edit className="w-4 h-4" />}
+                variant="outlined"
+                onClick={() => setEditDialogOpen(false)}
                 sx={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  borderColor: '#e5e7eb',
+                  color: '#6b7280',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                    color: '#ef4444',
                   },
-                  transition: 'all 0.2s ease',
                   borderRadius: '8px',
                   textTransform: 'none',
-                  fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
+                  fontWeight: 500,
                   minWidth: '100px',
                 }}
               >
-                {t('prompts.optimizeEditPage.testCaseDialog.editButton')}
+                {isViewMode ? t('prompts.optimizeEditPage.testCaseDialog.close') : t('prompts.optimizeEditPage.testCaseDialog.cancel')}
               </Button>
-            ) : (
-              <Button
-                variant="contained"
-                onClick={handleSaveEdit}
-                startIcon={<CheckCircle className="w-4 h-4" />}
-                sx={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
-                  },
-                  transition: 'all 0.2s ease',
-                  borderRadius: '8px',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
-                  minWidth: '100px',
-                }}
-              >
-                {t('prompts.optimizeEditPage.testCaseDialog.save')}
-              </Button>
-            )}
+              {isViewMode ? (
+                <Button
+                  variant="contained"
+                  onClick={handleSwitchToEditMode}
+                  startIcon={<Edit className="w-4 h-4" />}
+                  sx={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
+                    },
+                    transition: 'all 0.2s ease',
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
+                    minWidth: '100px',
+                  }}
+                >
+                  {t('prompts.optimizeEditPage.testCaseDialog.editButton')}
+                </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  onClick={handleSaveEdit}
+                  startIcon={<CheckCircle className="w-4 h-4" />}
+                  sx={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
+                    },
+                    transition: 'all 0.2s ease',
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
+                    minWidth: '100px',
+                  }}
+                >
+                  {t('prompts.optimizeEditPage.testCaseDialog.save')}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      </Drawer>
+        </Drawer>
 
-      {/* 查看用例对话框 */}
-      <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box className="flex items-center justify-between">
-            <Typography variant="h6">{t('prompts.optimizeEditPage.testCaseDialog.view')}</Typography>
-            <IconButton onClick={() => setViewDialogOpen(false)} size="small">
-              <X className="w-5 h-5" />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box className="mt-2">
-            <TableContainer className="border border-gray-200 rounded">
-              <Table size="small">
-                <TableHead>
-                  <TableRow className="bg-gray-50">
-                    <TableCell width="60" className="font-medium">
-                      {t('prompts.optimizeEditPage.testCaseDialog.sequenceNumberColumn')}
-                    </TableCell>
-                    <TableCell width="120" className="font-medium">
-                      {t('prompts.optimizeEditPage.testCaseDialog.roleColumn')}
-                    </TableCell>
-                    <TableCell className="font-medium">{t('prompts.optimizeEditPage.testCaseDialog.contentColumn')}</TableCell>
-                    <TableCell className="font-medium">{t('prompts.optimizeEditPage.testCaseDialog.variableColumn')}</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {testCaseDetails.map((detail, index) => (
-                    <TableRow key={detail.id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
-                        <Chip label={detail.role} size="small" color={detail.role === 'inputs' ? 'primary' : 'default'} />
+        {/* 查看用例对话框 */}
+        <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
+          <DialogTitle>
+            <Box className="flex items-center justify-between">
+              <Typography variant="h6">{t('prompts.optimizeEditPage.testCaseDialog.view')}</Typography>
+              <IconButton onClick={() => setViewDialogOpen(false)} size="small">
+                <X className="w-5 h-5" />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Box className="mt-2">
+              <TableContainer className="border border-gray-200 rounded">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow className="bg-gray-50">
+                      <TableCell width="60" className="font-medium">
+                        {t('prompts.optimizeEditPage.testCaseDialog.sequenceNumberColumn')}
                       </TableCell>
-                      <TableCell>{detail.content}</TableCell>
-                      <TableCell>{detail.variableName}</TableCell>
+                      <TableCell width="120" className="font-medium">
+                        {t('prompts.optimizeEditPage.testCaseDialog.roleColumn')}
+                      </TableCell>
+                      <TableCell className="font-medium">{t('prompts.optimizeEditPage.testCaseDialog.contentColumn')}</TableCell>
+                      <TableCell className="font-medium">{t('prompts.optimizeEditPage.testCaseDialog.variableColumn')}</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setViewDialogOpen(false)} variant="contained">
-            {t('prompts.optimizeEditPage.testCaseDialog.close')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                  </TableHead>
+                  <TableBody>
+                    {testCaseDetails.map((detail, index) => (
+                      <TableRow key={detail.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>
+                          <Chip label={detail.role} size="small" color={detail.role === 'inputs' ? 'primary' : 'default'} />
+                        </TableCell>
+                        <TableCell>{detail.content}</TableCell>
+                        <TableCell>{detail.variableName}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setViewDialogOpen(false)} variant="contained">
+              {t('prompts.optimizeEditPage.testCaseDialog.close')}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* 详情对话框 */}
-      <EvaluationDetailDialog
-        open={detailDialogOpen}
-        onClose={() => {
-          setDetailDialogOpen(false)
-          setEvaluateCases([]) // 关闭对话框时清空数据
-        }}
-        type={detailDialogType}
-        loading={jobHistoryLoading}
-        evaluationData={getEvaluationData()}
-        evaluateCases={evaluateCases}
-        pageNum={detailDialogPageNum}
-        pageSize={detailDialogPageSize}
-        onPageChange={(page) => {
-          setDetailDialogPageNum(page)
-        }}
-        onPageSizeChange={(size) => {
-          setDetailDialogPageSize(size)
-          setDetailDialogPageNum(1) // 重置为第一页
-        }}
-      />
+        {/* 详情对话框 */}
+        <EvaluationDetailDialog
+          open={detailDialogOpen}
+          onClose={() => {
+            setDetailDialogOpen(false)
+            setEvaluateCases([]) // 关闭对话框时清空数据
+          }}
+          type={detailDialogType}
+          loading={jobHistoryLoading}
+          evaluationData={getEvaluationData()}
+          evaluateCases={evaluateCases}
+          pageNum={detailDialogPageNum}
+          pageSize={detailDialogPageSize}
+          onPageChange={page => {
+            setDetailDialogPageNum(page)
+          }}
+          onPageSizeChange={size => {
+            setDetailDialogPageSize(size)
+            setDetailDialogPageNum(1) // 重置为第一页
+          }}
+        />
 
-      {/* 清空确认对话框 */}
-      <Dialog
-        open={clearConfirmOpen}
-        onClose={() => setClearConfirmOpen(false)}
-        aria-labelledby="clear-dialog-title"
-        aria-describedby="clear-dialog-description"
-      >
-        <DialogTitle id="clear-dialog-title">{t('prompts.optimizeEditPage.clearDialog.title')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="clear-dialog-description">{t('prompts.optimizeEditPage.clearDialog.message')}</DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClearConfirmOpen(false)} color="primary">
-            {t('prompts.optimizeEditPage.clearDialog.cancel')}
-          </Button>
-          <Button onClick={handleConfirmClear} color="error" variant="contained">
-            {t('prompts.optimizeEditPage.clearDialog.confirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {/* 清空确认对话框 */}
+        <Dialog
+          open={clearConfirmOpen}
+          onClose={() => setClearConfirmOpen(false)}
+          aria-labelledby="clear-dialog-title"
+          aria-describedby="clear-dialog-description"
+        >
+          <DialogTitle id="clear-dialog-title">{t('prompts.optimizeEditPage.clearDialog.title')}</DialogTitle>
+          <DialogContent>
+            <DialogContentText id="clear-dialog-description">{t('prompts.optimizeEditPage.clearDialog.message')}</DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setClearConfirmOpen(false)} color="primary">
+              {t('prompts.optimizeEditPage.clearDialog.cancel')}
+            </Button>
+            <Button onClick={handleConfirmClear} color="error" variant="contained">
+              {t('prompts.optimizeEditPage.clearDialog.confirm')}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* 上传确认对话框 */}
-      <Dialog
-        open={uploadConfirmOpen}
-        onClose={handleUploadCancel}
-        aria-labelledby="upload-confirm-dialog-title"
-        aria-describedby="upload-confirm-dialog-description"
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle id="upload-confirm-dialog-title">{t('prompts.optimizeEditPage.uploadDialog.title')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="upload-confirm-dialog-description" className="mb-4">
-            {t('prompts.optimizeEditPage.uploadDialog.message', { existing: testCases.length, new: pendingExcelData.length })}
-          </DialogContentText>
+        {/* 上传确认对话框 */}
+        <Dialog
+          open={uploadConfirmOpen}
+          onClose={handleUploadCancel}
+          aria-labelledby="upload-confirm-dialog-title"
+          aria-describedby="upload-confirm-dialog-description"
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle id="upload-confirm-dialog-title">{t('prompts.optimizeEditPage.uploadDialog.title')}</DialogTitle>
+          <DialogContent>
+            <DialogContentText id="upload-confirm-dialog-description" className="mb-4">
+              {t('prompts.optimizeEditPage.uploadDialog.message', { existing: testCases.length, new: pendingExcelData.length })}
+            </DialogContentText>
 
-          <RadioGroup value={uploadMode} onChange={e => setUploadMode(e.target.value as 'append' | 'replace')}>
-            <FormControlLabel
-              value="append"
-              control={<Radio />}
-              label={
-                <div>
-                  <div className="font-medium">{t('prompts.optimizeEditPage.uploadDialog.append')}</div>
-                  <div className="text-sm text-gray-600">
-                    {t('prompts.optimizeEditPage.uploadDialog.appendDescription', {
-                      existing: testCases.length,
-                      new: pendingExcelData.length,
-                      total: testCases.length + pendingExcelData.length,
-                    })}
+            <RadioGroup value={uploadMode} onChange={e => setUploadMode(e.target.value as 'append' | 'replace')}>
+              <FormControlLabel
+                value="append"
+                control={<Radio />}
+                label={
+                  <div>
+                    <div className="font-medium">{t('prompts.optimizeEditPage.uploadDialog.append')}</div>
+                    <div className="text-sm text-gray-600">
+                      {t('prompts.optimizeEditPage.uploadDialog.appendDescription', {
+                        existing: testCases.length,
+                        new: pendingExcelData.length,
+                        total: testCases.length + pendingExcelData.length,
+                      })}
+                    </div>
                   </div>
-                </div>
-              }
-            />
-            <FormControlLabel
-              value="replace"
-              control={<Radio />}
-              label={
-                <div>
-                  <div className="font-medium">{t('prompts.optimizeEditPage.uploadDialog.replace')}</div>
-                  <div className="text-sm text-gray-600">
-                    {t('prompts.optimizeEditPage.uploadDialog.replaceDescription', { existing: testCases.length, new: pendingExcelData.length })}
+                }
+              />
+              <FormControlLabel
+                value="replace"
+                control={<Radio />}
+                label={
+                  <div>
+                    <div className="font-medium">{t('prompts.optimizeEditPage.uploadDialog.replace')}</div>
+                    <div className="text-sm text-gray-600">
+                      {t('prompts.optimizeEditPage.uploadDialog.replaceDescription', { existing: testCases.length, new: pendingExcelData.length })}
+                    </div>
                   </div>
-                </div>
-              }
-            />
-          </RadioGroup>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleUploadCancel} color="primary">
-            {t('prompts.optimizeEditPage.uploadDialog.cancel')}
-          </Button>
-          <Button onClick={handleUploadConfirm} color="primary" variant="contained">
-            {t('prompts.optimizeEditPage.uploadDialog.confirm')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                }
+              />
+            </RadioGroup>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleUploadCancel} color="primary">
+              {t('prompts.optimizeEditPage.uploadDialog.cancel')}
+            </Button>
+            <Button onClick={handleUploadConfirm} color="primary" variant="contained">
+              {t('prompts.optimizeEditPage.uploadDialog.confirm')}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* 优化评分趋势全屏对话框 */}
-      <Dialog
-        open={isChartFullscreen}
-        onClose={() => setIsChartFullscreen(false)}
-        maxWidth={false}
-        fullWidth
-        PaperProps={{
-          sx: {
-            width: '95vw',
-            height: '90vh',
-            maxWidth: 'none',
-            maxHeight: 'none',
-          },
-        }}
-      >
-        <DialogTitle>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
-              <Typography variant="h6">{t('prompts.optimizeEditPage.optimizationResult.scoreTrend')}</Typography>
-            </div>
-            <IconButton onClick={() => setIsChartFullscreen(false)} size="small">
-              <Minimize2 className="w-5 h-5" />
-            </IconButton>
-          </div>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3, height: 'calc(100% - 64px)' }}>
-          <Box sx={{ width: '100%', height: '100%', minHeight: '500px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={optimizationHistory.map(item => ({
-                  round: `第${item.round}轮`,
-                  score: item.score,
-                }))}
-                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="round" tick={{ fontSize: 14 }} stroke="#666" />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 14 }} stroke="#666" />
-                <RechartsTooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '4px',
-                    fontSize: '14px',
-                  }}
-                />
-                <Line type="monotone" dataKey="score" stroke="#2196f3" strokeWidth={3} dot={{ fill: '#2196f3', strokeWidth: 2, r: 6 }} activeDot={{ r: 8 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </Box>
-        </DialogContent>
-      </Dialog>
-
-      {/* 提示词对比全屏对话框 */}
-      <Dialog
-        open={isComparisonFullscreen}
-        onClose={() => setIsComparisonFullscreen(false)}
-        maxWidth={false}
-        fullWidth
-        PaperProps={{
-          sx: {
-            width: '95vw',
-            height: '90vh',
-            maxWidth: 'none',
-            maxHeight: 'none',
-          },
-        }}
-      >
-        <DialogTitle>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <GitCompare className="w-5 h-5 mr-2 text-blue-600" />
-              <Typography variant="h6">{t('prompts.optimizeEditPage.optimizationResult.promptComparison')}</Typography>
-            </div>
-            <div className="flex items-center gap-2">
-              <Box className="flex items-center gap-1">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    if (currentOptimizedVersion === 0) {
-                      setCurrentOptimizedVersion(optimizedVersions.length - 1)
-                    } else {
-                      setCurrentOptimizedVersion(currentOptimizedVersion - 1)
-                    }
-                  }}
-                  disabled={optimizedVersions.length <= 1}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </IconButton>
-                <Typography variant="body2" className="text-gray-600 px-2">
-                  {t('prompts.optimizeEditPage.optimizationConfig.currentRound', { current: currentOptimizedVersion + 1, total: optimizedVersions.length })}
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    if (currentOptimizedVersion >= optimizedVersions.length - 1) {
-                      setCurrentOptimizedVersion(0)
-                    } else {
-                      setCurrentOptimizedVersion(currentOptimizedVersion + 1)
-                    }
-                  }}
-                  disabled={optimizedVersions.length <= 1}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </IconButton>
-              </Box>
-              <IconButton onClick={() => setIsComparisonFullscreen(false)} size="small">
+        {/* 优化评分趋势全屏对话框 */}
+        <Dialog
+          open={isChartFullscreen}
+          onClose={() => setIsChartFullscreen(false)}
+          maxWidth={false}
+          fullWidth
+          PaperProps={{
+            sx: {
+              width: '95vw',
+              height: '90vh',
+              maxWidth: 'none',
+              maxHeight: 'none',
+            },
+          }}
+        >
+          <DialogTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
+                <Typography variant="h6">{t('prompts.optimizeEditPage.optimizationResult.scoreTrend')}</Typography>
+              </div>
+              <IconButton onClick={() => setIsChartFullscreen(false)} size="small">
                 <Minimize2 className="w-5 h-5" />
               </IconButton>
             </div>
-          </div>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3, height: 'calc(100% - 64px)' }}>
-          <Card variant="outlined" className="bg-white overflow-hidden h-full flex flex-col">
-            {/* 标题栏 */}
-            <Box className="bg-gray-100 border-b flex-shrink-0">
-              <div className="flex w-full">
-                {/* 左侧：原始提示词 - 50% */}
-                <div className="w-1/2 border-r border-gray-300">
-                  <Box className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Typography variant="subtitle2" className="font-semibold text-gray-700">
-                        {t('prompts.optimizeEditPage.optimizationResult.originalPrompt')}
-                      </Typography>
-                      {/* 显示第0轮的分数标签 */}
-                      {(() => {
-                        // 从原始history数据中找到第0轮的分数
-                        const roundZero = optimizationHistory.find(h => h.round === 0)
-                        if (roundZero && typeof roundZero.score === 'number') {
-                          return <Chip label={`${roundZero.score.toFixed(2)}%`} size="small" className="bg-gray-100 text-gray-700 font-medium" />
-                        }
-                        return null
-                      })()}
-                    </div>
-                    <Box className="flex gap-1">
-                      <IconButton size="small" onClick={() => handleCopyPrompt(originalPrompt)} sx={{ color: '#6b7280' }}>
-                        <Copy className="w-3 h-3" />
-                      </IconButton>
-                      {false && <IconButton size="small" onClick={() => handleShowDetail('original', 0)} sx={{ color: '#6b7280' }}>
-                        <Info className="w-3 h-3" />
-                      </IconButton>}
-                    </Box>
-                  </Box>
-                </div>
+          </DialogTitle>
+          <DialogContent sx={{ p: 3, height: 'calc(100% - 64px)' }}>
+            <Box sx={{ width: '100%', height: '100%', minHeight: '500px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={optimizationHistory.map(item => ({
+                    round: `第${item.round}轮`,
+                    score: item.score,
+                  }))}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis dataKey="round" tick={{ fontSize: 14 }} stroke="#666" />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 14 }} stroke="#666" />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                    }}
+                  />
+                  <Line type="monotone" dataKey="score" stroke="#2196f3" strokeWidth={3} dot={{ fill: '#2196f3', strokeWidth: 2, r: 6 }} activeDot={{ r: 8 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </Box>
+          </DialogContent>
+        </Dialog>
 
-                {/* 右侧：优化结果 - 50% */}
-                <div className="w-1/2">
-                  <Box className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Typography variant="subtitle2" className="font-semibold text-gray-700">
-                        {t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: currentOptimizedVersion + 1 })}
-                      </Typography>
-                      {/* 显示当前轮次的分数 */}
-                      {(() => {
-                        // 找到对应轮次的分数（轮次 = 索引 + 1）
-                        const currentRound = currentOptimizedVersion + 1
-                        const roundData = optimizationHistory.find(h => h.round === currentRound)
-                        if (roundData && typeof roundData.score === 'number') {
-                          return <Chip label={`${roundData.score.toFixed(2)}%`} size="small" className="bg-blue-100 text-blue-700 font-medium" />
-                        }
-                        return null
-                      })()}
-                      {(() => {
-                        // 检查是否是最优轮次（轮次 = 索引 + 1）
-                        const currentRound = currentOptimizedVersion + 1
-                        if (bestIteration === currentRound) {
-                          return (
-                            <Chip
-                              label={t('prompts.optimizeEditPage.optimizationResult.best')}
-                              size="small"
-                              style={{ backgroundColor: '#10b981', color: 'white', fontWeight: 'medium' }}
-                            />
-                          )
-                        }
-                        return null
-                      })()}
-                    </div>
-                    <Box className="flex gap-1">
-                      <IconButton size="small" onClick={() => handleCopyPrompt(currentOptimizedPrompt)} sx={{ color: '#6b7280' }}>
-                        <Copy className="w-3 h-3" />
-                      </IconButton>
-                      {false && <IconButton size="small" onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)} sx={{ color: '#6b7280' }}>
-                        <Info className="w-3 h-3" />
-                      </IconButton>}
-                    </Box>
-                  </Box>
-                </div>
+        {/* 提示词对比全屏对话框 */}
+        <Dialog
+          open={isComparisonFullscreen}
+          onClose={() => setIsComparisonFullscreen(false)}
+          maxWidth={false}
+          fullWidth
+          PaperProps={{
+            sx: {
+              width: '95vw',
+              height: '90vh',
+              maxWidth: 'none',
+              maxHeight: 'none',
+            },
+          }}
+        >
+          <DialogTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <GitCompare className="w-5 h-5 mr-2 text-blue-600" />
+                <Typography variant="h6">{t('prompts.optimizeEditPage.optimizationResult.promptComparison')}</Typography>
               </div>
-            </Box>
+              <div className="flex items-center gap-2">
+                <Box className="flex items-center gap-1">
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      if (currentOptimizedVersion === 0) {
+                        setCurrentOptimizedVersion(optimizedVersions.length - 1)
+                      } else {
+                        setCurrentOptimizedVersion(currentOptimizedVersion - 1)
+                      }
+                    }}
+                    disabled={optimizedVersions.length <= 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </IconButton>
+                  <Typography variant="body2" className="text-gray-600 px-2">
+                    {t('prompts.optimizeEditPage.optimizationConfig.currentRound', { current: currentOptimizedVersion + 1, total: optimizedVersions.length })}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      if (currentOptimizedVersion >= optimizedVersions.length - 1) {
+                        setCurrentOptimizedVersion(0)
+                      } else {
+                        setCurrentOptimizedVersion(currentOptimizedVersion + 1)
+                      }
+                    }}
+                    disabled={optimizedVersions.length <= 1}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </IconButton>
+                </Box>
+                <IconButton onClick={() => setIsComparisonFullscreen(false)} size="small">
+                  <Minimize2 className="w-5 h-5" />
+                </IconButton>
+              </div>
+            </div>
+          </DialogTitle>
+          <DialogContent sx={{ p: 3, height: 'calc(100% - 64px)' }}>
+            <Card variant="outlined" className="bg-white overflow-hidden h-full flex flex-col">
+              {/* 标题栏 */}
+              <Box className="bg-gray-100 border-b flex-shrink-0">
+                <div className="flex w-full">
+                  {/* 左侧：原始提示词 - 50% */}
+                  <div className="w-1/2 border-r border-gray-300">
+                    <Box className="px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Typography variant="subtitle2" className="font-semibold text-gray-700">
+                          {t('prompts.optimizeEditPage.optimizationResult.originalPrompt')}
+                        </Typography>
+                        {/* 显示第0轮的分数标签 */}
+                        {(() => {
+                          // 从原始history数据中找到第0轮的分数
+                          const roundZero = optimizationHistory.find(h => h.round === 0)
+                          if (roundZero && typeof roundZero.score === 'number') {
+                            return <Chip label={`${roundZero.score.toFixed(2)}%`} size="small" className="bg-gray-100 text-gray-700 font-medium" />
+                          }
+                          return null
+                        })()}
+                      </div>
+                      <Box className="flex gap-1">
+                        <IconButton size="small" onClick={() => handleCopyPrompt(originalPrompt)} sx={{ color: '#6b7280' }}>
+                          <Copy className="w-3 h-3" />
+                        </IconButton>
+                        {false && (
+                          <IconButton size="small" onClick={() => handleShowDetail('original', 0)} sx={{ color: '#6b7280' }}>
+                            <Info className="w-3 h-3" />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </Box>
+                  </div>
 
-            {/* Diff 内容区 */}
-            <Box className="flex-1 overflow-auto">
-              <DiffViewer oldContent={historicalOriginalPrompt} newContent={currentOptimizedPrompt} />
-            </Box>
-          </Card>
-        </DialogContent>
-      </Dialog>
+                  {/* 右侧：优化结果 - 50% */}
+                  <div className="w-1/2">
+                    <Box className="px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Typography variant="subtitle2" className="font-semibold text-gray-700">
+                          {t('prompts.optimizeEditPage.optimizationConfig.roundResult', { round: currentOptimizedVersion + 1 })}
+                        </Typography>
+                        {/* 显示当前轮次的分数 */}
+                        {(() => {
+                          // 找到对应轮次的分数（轮次 = 索引 + 1）
+                          const currentRound = currentOptimizedVersion + 1
+                          const roundData = optimizationHistory.find(h => h.round === currentRound)
+                          if (roundData && typeof roundData.score === 'number') {
+                            return <Chip label={`${roundData.score.toFixed(2)}%`} size="small" className="bg-blue-100 text-blue-700 font-medium" />
+                          }
+                          return null
+                        })()}
+                        {(() => {
+                          // 检查是否是最优轮次（轮次 = 索引 + 1）
+                          const currentRound = currentOptimizedVersion + 1
+                          if (bestIteration === currentRound) {
+                            return (
+                              <Chip
+                                label={t('prompts.optimizeEditPage.optimizationResult.best')}
+                                size="small"
+                                style={{ backgroundColor: '#10b981', color: 'white', fontWeight: 'medium' }}
+                              />
+                            )
+                          }
+                          return null
+                        })()}
+                      </div>
+                      <Box className="flex gap-1">
+                        <IconButton size="small" onClick={() => handleCopyPrompt(currentOptimizedPrompt)} sx={{ color: '#6b7280' }}>
+                          <Copy className="w-3 h-3" />
+                        </IconButton>
+                        {false && (
+                          <IconButton size="small" onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)} sx={{ color: '#6b7280' }}>
+                            <Info className="w-3 h-3" />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </Box>
+                  </div>
+                </div>
+              </Box>
 
-      {/* 工具编辑对话框 */}
-      <ToolEditDialog
-        open={toolEditDialogOpen}
-        editingTool={editingTool}
-        onClose={handleToolEditDialogClose}
-        onSave={handleToolEditDialogSave}
-        onToolChange={handleEditingToolChange}
-        showDefaultValue={false}
-      />
+              {/* Diff 内容区 */}
+              <Box className="flex-1 overflow-auto">
+                <DiffViewer oldContent={historicalOriginalPrompt} newContent={currentOptimizedPrompt} />
+              </Box>
+            </Card>
+          </DialogContent>
+        </Dialog>
 
+        {/* 工具编辑对话框 */}
+        <ToolEditDialog
+          open={toolEditDialogOpen}
+          editingTool={editingTool}
+          onClose={handleToolEditDialogClose}
+          onSave={handleToolEditDialogSave}
+          onToolChange={handleEditingToolChange}
+          showDefaultValue={false}
+        />
       </div>
       {/* Snackbar提示 */}
       <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} anchorOrigin={{ vertical: 'top', horizontal: 'center' }} />
