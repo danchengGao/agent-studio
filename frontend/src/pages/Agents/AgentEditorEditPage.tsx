@@ -567,7 +567,7 @@ const AgentEditorEditPage = () => {
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-lg mr-3">
                       <Brain className="w-5 h-5 text-blue-600" />
                     </div>
-                    <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.enhanced.tabs.systemPrompt')}</span>
+                    <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.systemPrompt.title')}</span>
                     <ActionSlotTarget name="system-title-actions" className="ml-auto flex items-center gap-2" />
                   </div>
                   <div className="h-[calc(100%-52px)]">
@@ -591,7 +591,7 @@ const AgentEditorEditPage = () => {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-lg mr-3">
                     <Settings className="w-5 h-5 text-blue-600" />
                   </div>
-                  <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.enhanced.tabs.orchestration')}</span>
+                  <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.orchestration.title')}</span>
                 </div>
                 <div className="h-[calc(100%-52px)] text-gray-600 overflow-auto border rounded-xl p-2">
                   {agentMode === 'multi-workflow' ? (
@@ -620,7 +620,7 @@ const AgentEditorEditPage = () => {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-lg mr-3">
                     <Eye className="w-5 h-5 text-blue-600" />
                   </div>
-                  <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.enhanced.tabs.previewDebug')}</span>
+                  <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.previewDebug.title')}</span>
                   <ActionSlotTarget name="debug-title-actions" className="ml-auto flex items-center gap-2" />
                 </div>
                 {/* 对话调试面板 - 使用独立组件 */}

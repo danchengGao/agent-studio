@@ -664,7 +664,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         readonly={readonly}
         isLockedForCandidate={isLockedForCandidate}
         onChange={setSystemPrompt}
-        placeholder={t('agents.agentEditor.enhanced.previewDebug.defineAgentPlaceholder')}
+        placeholder={t('agents.agentEditor.systemPrompt.defineAgentPlaceholder')}
       />
 
       <UnifiedSnackbar snackbar={snackbar} onClose={() => setSnackbar(s => ({ ...s, open: false }))} />
