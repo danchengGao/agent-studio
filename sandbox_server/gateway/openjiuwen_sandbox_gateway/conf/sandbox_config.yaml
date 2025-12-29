@@ -1,0 +1,22 @@
+mount:
+  [
+    {src: '/lib', dst: '/lib', mode: 'read'},
+    {src: '/lib64', dst: '/lib64', mode: 'read'},
+    {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
+    {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
+    {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
+  ]
+
+sandbox:
+  type: bubblewrap
+  path: bwrap
+
+# Please ensure that both the Python and JavaScript interpreters
+# are already in the mount directory, and either provide their full
+# paths or add those paths to the PATH environment variable.
+interpreter:
+  python_path: python3
+  node_path: node
+
+environment:
+  PATH: /bin:/usr/bin

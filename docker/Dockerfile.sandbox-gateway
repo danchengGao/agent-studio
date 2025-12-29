@@ -29,6 +29,7 @@ USER app
 WORKDIR /sandbox
 COPY --from=builder /sandbox/dist/openjiuwen_sandbox_gateway-0.1.0-py3-none-any.whl /sandbox/dist
 RUN pip3 install /sandbox/dist/openjiuwen_sandbox_gateway-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
+RUN apt-get install -y --no-install-recommends bubblewrap
 
 ENV PYTHONPATH=/sandbox/site-packages/openjiuwen_sandbox_gateway:/sandbox/site-packages
 
