@@ -1,4 +1,48 @@
 {
+  "agentCreate": {
+    "title": "Create Agent",
+    "mode": {
+      "label": "Creation Mode",
+      "singleReact": {
+        "name": "Single Agent (Autonomous Planning Mode)",
+        "description": "An agent built on large model autonomous planning and reflection, intelligent orchestration, and tool invocation, suitable for scenarios relying on complex task planning and deep analysis execution."
+      },
+      "multiWorkflow": {
+        "name": "Single Agent (Multi-Workflow Mode)",
+        "description": "Orchestrate agents through workflows, suitable for scenarios with clear and definite business solution steps."
+      }
+    },
+    "form": {
+      "name": {
+        "label": "Agent Name",
+        "placeholder": "Enter your agent name, e.g., Product Expert. The name cannot be modified after creation.",
+        "required": "Please enter agent name"
+      },
+      "icon": {
+        "title": "Select Icon"
+      },
+      "description": {
+        "label": "Agent Description",
+        "placeholder": "Describe the agent's capabilities in one sentence, e.g., Answer product questions",
+        "required": "Please enter function description"
+      }
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating..."
+    },
+    "messages": {
+      "success": "Agent created successfully",
+      "failed": "Creation failed: {{reason}}",
+      "unknownError": "Unknown error",
+      "retry": "Creation failed, please try again"
+    },
+    "preview": {
+      "singleReactAlt": "Single Agent Mode Example",
+      "multiWorkflowAlt": "Multi-Workflow Mode Example"
+    }
+  },
   "agentEditor": {
     "enhanced": {
       "tabs": {

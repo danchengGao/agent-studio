@@ -1,4 +1,48 @@
 {
+  "agentCreate": {
+    "title": "新建智能体",
+    "mode": {
+      "label": "创建模式",
+      "singleReact": {
+        "name": "单Agent（自主规划模式）",
+        "description": "依托大模型自主规划与反思、智能编排与工具调用构建的智能体，适用于依赖复杂任务规划和深度分析后执行的场景"
+      },
+      "multiWorkflow": {
+        "name": "单Agent（多工作流模式）",
+        "description": "通过工作流编排智能体，适用于业务解决方案有清晰明确步骤的场景"
+      }
+    },
+    "form": {
+      "name": {
+        "label": "智能体名称",
+        "placeholder": "输入你的智能体名称，例如：华为产品专家。创建后名称不支持修改",
+        "required": "请输入智能体名称"
+      },
+      "icon": {
+        "title": "选择图标"
+      },
+      "description": {
+        "label": "智能体描述",
+        "placeholder": "一句话描述该智能体能力，例如：解答华为产品疑问",
+        "required": "请输入功能描述"
+      }
+    },
+    "actions": {
+      "cancel": "取消",
+      "create": "创建",
+      "creating": "创建中..."
+    },
+    "messages": {
+      "success": "智能体创建成功",
+      "failed": "创建失败: {{reason}}",
+      "unknownError": "未知错误",
+      "retry": "创建失败，请重试"
+    },
+    "preview": {
+      "singleReactAlt": "单Agent模式示例",
+      "multiWorkflowAlt": "多工作流模式示例"
+    }
+  },
   "agentEditor": {
     "enhanced": {
       "tabs": {

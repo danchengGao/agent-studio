@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { X, Loader2, Sparkles } from 'lucide-react'
 import CreateAgentIcon from '@/assets/icons/create-agent-react.svg?react'
 import CreateAgentWorkflowIcon from '@/assets/icons/create-agent-workflow.svg?react'
@@ -22,22 +23,6 @@ interface AgentModeInfo {
   detailDescription: string
 }
 
-const MODE_INFO: Record<AgentMode, AgentModeInfo> = {
-  'single-react-agent': {
-    id: 'single-react-agent',
-    icon: '👤',
-    name: '单Agent（自主规划模式）',
-    description: '依托大模型自主规划与反思、智能编排与工具调用构建的智能体，适用于依赖复杂任务规划和深度分析后执行的场景',
-    detailDescription: '依托大模型自主规划与反思、智能编排与工具调用构建的智能体，适用于依赖复杂任务规划和深度分析后执行的场景',
-  },
-  'multi-workflow': {
-    id: 'multi-workflow',
-    icon: '🔄',
-    name: '单Agent（多工作流模式）',
-    description: '通过工作流编排智能体，适用于业务解决方案有清晰明确步骤的场景',
-    detailDescription: '通过工作流编排智能体，适用于业务解决方案有清晰明确步骤的场景',
-  },
-}
 
 interface AgentCreateData {
   mode: AgentMode
@@ -47,8 +32,27 @@ interface AgentCreateData {
 }
 
 const AgentCreatePage: React.FC = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuthStore()
+
+  const MODE_INFO: Record<AgentMode, AgentModeInfo> = {
+    'single-react-agent': {
+      id: 'single-react-agent',
+      icon: '👤',
+      name: t('agents.agentCreate.mode.singleReact.name'),
+      description: t('agents.agentCreate.mode.singleReact.description'),
+      detailDescription: t('agents.agentCreate.mode.singleReact.description'),
+    },
+    'multi-workflow': {
+      id: 'multi-workflow',
+      icon: '🔄',
+      name: t('agents.agentCreate.mode.multiWorkflow.name'),
+      description: t('agents.agentCreate.mode.multiWorkflow.description'),
+      detailDescription: t('agents.agentCreate.mode.multiWorkflow.description'),
+    },
+  }
+
   const [agentData, setAgentData] = useState<AgentCreateData>({
     mode: 'single-react-agent',
     name: '',
@@ -96,11 +100,11 @@ const AgentCreatePage: React.FC = () => {
     const newErrors: Partial<AgentCreateData> = {}
 
     if (!agentData.name.trim()) {
-      newErrors.name = '请输入智能体名称'
+      newErrors.name = t('agents.agentCreate.form.name.required')
     }
 
     if (!agentData.description.trim()) {
-      newErrors.description = '请输入功能描述'
+      newErrors.description = t('agents.agentCreate.form.description.required')
     }
 
     setErrors(newErrors)
@@ -128,7 +132,7 @@ const AgentCreatePage: React.FC = () => {
       const response = await createAgentMutation.mutateAsync(createAgentRequest)
 
       if (response.code === 0 || response.code === 200) {
-        setSnackbar({ open: true, message: '智能体创建成功', severity: 'success' })
+        setSnackbar({ open: true, message: t('agents.agentCreate.messages.success'), severity: 'success' })
 
         await new Promise(resolve => setTimeout(resolve, 1500))
 
@@ -143,13 +147,13 @@ const AgentCreatePage: React.FC = () => {
       } else {
         setSnackbar({
           open: true,
-          message: `创建失败: ${response.message || '未知错误'}`,
+          message: t('agents.agentCreate.messages.failed', { reason: response.message || t('agents.agentCreate.messages.unknownError') }),
           severity: 'error',
         })
       }
     } catch (error) {
       console.error('API调用失败:', error)
-      setSnackbar({ open: true, message: '创建失败，请重试', severity: 'error' })
+      setSnackbar({ open: true, message: t('agents.agentCreate.messages.retry'), severity: 'error' })
     } finally {
       setIsLoading(false)
     }
@@ -209,7 +213,7 @@ const AgentCreatePage: React.FC = () => {
             lineHeight: 1.2
           }}
         >
-          新建智能体
+          {t('agents.agentCreate.title')}
         </Typography>
         <IconButton 
           onClick={handleClose} 
@@ -279,7 +283,7 @@ const AgentCreatePage: React.FC = () => {
                     lineHeight: 1.2
                   }}
                 >
-                  创建模式
+                  {t('agents.agentCreate.mode.label')}
                 </Typography>
                   <div 
                   className="flex flex-col sm:flex-row"
@@ -453,7 +457,7 @@ const AgentCreatePage: React.FC = () => {
                         lineHeight: 1.2
                       }}
                     >
-                      智能体名称
+                      {t('agents.agentCreate.form.name.label')}
                     </Typography>
                   </div>
                   <TextField
@@ -463,12 +467,12 @@ const AgentCreatePage: React.FC = () => {
                     onChange={e => setAgentData(prev => ({ ...prev, name: e.target.value }))}
                     onBlur={() => {
                       if (!agentData.name.trim()) {
-                        setErrors(prev => ({ ...prev, name: '请输入智能体名称' }))
+                        setErrors(prev => ({ ...prev, name: t('agents.agentCreate.form.name.required') }))
                       } else {
                         setErrors(prev => ({ ...prev, name: undefined }))
                       }
                     }}
-                    placeholder="输入你的智能体名称，例如：华为产品专家。创建后名称不支持修改"
+                    placeholder={t('agents.agentCreate.form.name.placeholder')}
                     error={!!errors.name}
                     helperText={errors.name || ''}
                     inputProps={{ maxLength: 100 }}
@@ -560,7 +564,7 @@ const AgentCreatePage: React.FC = () => {
                         marginBottom: 'clamp(0.5rem, 1vh, 0.75rem)'
                       }}
                     >
-                      选择图标
+                      {t('agents.agentCreate.form.icon.title')}
                     </Typography>
                     <div 
                       className="flex flex-wrap"
@@ -620,7 +624,7 @@ const AgentCreatePage: React.FC = () => {
                       lineHeight: 1.2
                     }}
                   >
-                    智能体描述
+                    {t('agents.agentCreate.form.description.label')}
                   </Typography>
                 </div>
                 <TextField
@@ -632,12 +636,12 @@ const AgentCreatePage: React.FC = () => {
                   onChange={e => setAgentData(prev => ({ ...prev, description: e.target.value }))}
                   onBlur={() => {
                     if (!agentData.description.trim()) {
-                      setErrors(prev => ({ ...prev, description: '请输入功能描述' }))
+                      setErrors(prev => ({ ...prev, description: t('agents.agentCreate.form.description.required') }))
                     } else {
                       setErrors(prev => ({ ...prev, description: undefined }))
                     }
                   }}
-                  placeholder="一句话描述该智能体能力，例如：解答华为产品疑问"
+                  placeholder={t('agents.agentCreate.form.description.placeholder')}
                   error={!!errors.description}
                   helperText={errors.description}
                   inputProps={{ maxLength: 1000 }}
@@ -717,7 +721,7 @@ const AgentCreatePage: React.FC = () => {
                   },
                 }}
               >
-                取消
+                {t('agents.agentCreate.actions.cancel')}
               </Button>
               <Button
                 variant="contained"
@@ -749,7 +753,7 @@ const AgentCreatePage: React.FC = () => {
                   },
                 }}
               >
-                {isLoading ? '创建中...' : '创建'}
+                {isLoading ? t('agents.agentCreate.actions.creating') : t('agents.agentCreate.actions.create')}
               </Button>
             </div>
           </div>
@@ -815,7 +819,7 @@ const AgentCreatePage: React.FC = () => {
               >
                 <img 
                   src={agentData.mode === 'single-react-agent' ? CreateAgentReactPreview : CreateAgentWorkflowPreview}
-                  alt={agentData.mode === 'single-react-agent' ? '单Agent模式示例' : '多工作流模式示例'}
+                  alt={agentData.mode === 'single-react-agent' ? t('agents.agentCreate.preview.singleReactAlt') : t('agents.agentCreate.preview.multiWorkflowAlt')}
                   style={{
                     width: '100%',
                     height: '100%',

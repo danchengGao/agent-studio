@@ -5,6 +5,7 @@
   "agentList": {
     "noAgents": "暂无智能体",
     "searchPlaceholder": "搜索智能体名称或描述...",
+    "loading": "加载智能体中...",
     "sortBy": "排序方式",
     "sortByName": "按名称排序",
     "sortByCreated": "按创建时间排序",

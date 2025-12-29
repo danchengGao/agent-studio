@@ -430,7 +430,7 @@ const AgentsPage: React.FC = () => {
       {agentsLoading ? (
         <div className="flex flex-col items-center justify-center h-64">
           <CircularProgress />
-          <div className="mt-3 text-sm text-gray-600">加载智能体中...</div>
+          <div className="mt-3 text-sm text-gray-600">{t('agents.agentList.loading')}</div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

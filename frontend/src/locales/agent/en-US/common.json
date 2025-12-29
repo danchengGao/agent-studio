@@ -5,9 +5,13 @@
   "agentList": {
     "noAgents": "No agents available",
     "searchPlaceholder": "Search agent names, descriptions, or tags...",
+    "loading": "Loading agents...",
     "sortBy": "Sort by",
     "sortByName": "Sort by name",
     "sortByCreated": "Sort by creation time",
+    "sortByUpdated": "Sort by update time",
+    "ascending": "Ascending",
+    "descending": "Descending",
     "model": "Model",
     "noModel": "Unconfigured",
     "noAgentsFound": "No agents found",
