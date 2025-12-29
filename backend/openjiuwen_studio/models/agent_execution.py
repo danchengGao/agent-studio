@@ -1,15 +1,13 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import (JSON, BigInteger, DateTime, ForeignKey, Index, Integer,
-                        String, Text, UniqueConstraint, func)
-from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
-                            mapped_column, relationship)
+                        String, Text, func)
+from sqlalchemy.orm import (Mapped, mapped_column, relationship)
 
 from openjiuwen_studio.models.agent import AgentBaseDB, AgentPublishDB
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 # ==================== agent_execution ====================
 
 

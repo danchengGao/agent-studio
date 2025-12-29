@@ -5,7 +5,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
-from ops.modules.prompt.domain.debug_entity import DebugLog
+from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import DebugLog
 
 
 class DebugContextRepository(ABC):

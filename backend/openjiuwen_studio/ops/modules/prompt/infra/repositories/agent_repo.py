@@ -5,8 +5,8 @@
 
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from ops.modules.prompt.domain.repositories import AgentRepository
-from ops.modules.prompt.infra.database import BaseAgent
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import AgentRepository
+from openjiuwen_studio.ops.modules.prompt.infra.database import BaseAgent
 
 
 class SQLAgentRepository(AgentRepository):

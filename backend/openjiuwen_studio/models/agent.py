@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from sqlalchemy import (JSON, BigInteger, ForeignKey, String, UniqueConstraint,
                         and_, func, select, Integer)
@@ -10,12 +10,10 @@ from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 if TYPE_CHECKING:
-    from openjiuwen_studio.models.agent_execution import AgentExecutionDB
-    from openjiuwen_studio.models.awp_relation import AgentWorkflowRelationDB
-    from openjiuwen_studio.models.prompt_relation import PromptRelationDB
+    pass
 
 
 @declarative_mixin

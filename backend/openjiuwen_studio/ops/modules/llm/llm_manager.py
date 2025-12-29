@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Literal, Optional
 from openai import OpenAI, AsyncOpenAI
 from openjiuwen.core.utils.llm.model_utils.model_factory import ModelFactory
 
-from ops.modules.llm.llm_config_service import LLMConfigService
+from openjiuwen_studio.ops.modules.llm.llm_config_service import LLMConfigService
 
 # 全局单例，方便后面拿配置
 _config_service: LLMConfigService | None = None

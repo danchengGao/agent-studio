@@ -1,15 +1,15 @@
 from __future__ import annotations
 import enum
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict
 
 from sqlalchemy import JSON, BigInteger, Index, String, UniqueConstraint, Integer
 from sqlalchemy.orm import (Mapped, declarative_mixin, mapped_column,
                             relationship)
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 
 if TYPE_CHECKING:
-    from openjiuwen_studio.models.knowledge_base import KnowledgeBaseDB
+    pass
 
 
 class DocumentStatus(str, enum.Enum):

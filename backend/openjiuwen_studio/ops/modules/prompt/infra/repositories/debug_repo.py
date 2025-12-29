@@ -5,12 +5,12 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import Column, Integer, String, DateTime, BigInteger, func, JSON, select, desc
-from ops.modules.prompt.infra.database import Base
-from ops.modules.prompt.domain.debug_entity import DebugContext, DebugCore, DebugLog, DebugMessage, VariableVal, \
+from openjiuwen_studio.ops.modules.prompt.infra.database import Base
+from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import DebugContext, DebugCore, DebugLog, DebugMessage, VariableVal, \
     DebugToolCall, ToolCall, FunctionCall, ContentPart, ContentType, ImageURL, Role, ToolType, Message, VariableType, \
     MockTool
-from ops.modules.prompt.domain.debug_repository import DebugLogRepository, DebugContextRepository
-from ops.config import settings
+from openjiuwen_studio.ops.modules.prompt.domain.debug_repository import DebugLogRepository, DebugContextRepository
+from openjiuwen_studio.ops.config import settings
 
 
 class PromptDebugContext(Base):

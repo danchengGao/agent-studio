@@ -1,9 +1,7 @@
-import os
-import sys
 from fastapi import FastAPI, APIRouter
 from openjiuwen_studio.routers import (auth, models, users, agents, workflows, execution, space,
-                         related_member, plugin, tags, knowledge_base, embedding_models)
-from ops.routers import llm_router, prompt_router, prompt_debug_router, prompt_tuning_router
+                                       related_member, plugin, tags, knowledge_base, embedding_models, prompt_router,
+                                       prompt_debug_router, prompt_tuning_router, prompt_llm_router)
 
 api_router = APIRouter()
 
@@ -36,7 +34,7 @@ def router_register(app: FastAPI):
     api_router.include_router(v1_router)
     app.include_router(api_router, prefix="/api")
 
-    app.include_router(llm_router.router)
+    app.include_router(prompt_llm_router.router)
     app.include_router(prompt_router.router)
     app.include_router(prompt_debug_router.router)
     app.include_router(prompt_tuning_router.router)

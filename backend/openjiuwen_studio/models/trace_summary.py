@@ -6,11 +6,11 @@ Trace Summary 数据库模型
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from sqlalchemy import (JSON, BigInteger, Column, DateTime, Integer, String,
+from sqlalchemy import (JSON, BigInteger, DateTime, Integer, String,
                         Text)
 from sqlalchemy.orm import Mapped, mapped_column
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 
 class TraceSummaryDB(Base, DBFunBase):

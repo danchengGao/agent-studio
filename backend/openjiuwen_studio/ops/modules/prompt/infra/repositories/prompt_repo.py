@@ -8,12 +8,12 @@ import yaml
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 
-from ops.common.date_time_util import get_china_datetime
-from ops.modules.prompt.domain import entities
-from ops.modules.prompt.domain.repositories import PromptRepository, PromptVersionRepository, \
+from openjiuwen_studio.ops.common.date_time_util import get_china_datetime
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import PromptRepository, PromptVersionRepository, \
     PromptUserDraftRepository, PromptSubmitRepository
-from ops.modules.prompt.infra.database import Base
-from ops.modules.prompt.infra.repositories import orm_repo
+from openjiuwen_studio.ops.modules.prompt.infra.database import Base
+from openjiuwen_studio.ops.modules.prompt.infra.repositories import orm_repo
 
 
 class SQLPromptRepository(PromptRepository):

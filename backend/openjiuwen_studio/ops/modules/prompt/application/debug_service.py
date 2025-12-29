@@ -18,18 +18,18 @@ try:
     from ops_client.entities import SpanType, PlatformType
     from ops_client import trace, inject
 except ImportError:
-    from ops.modules.prompt.application.trace_sdk_interface import observe, set_baggage, get_baggage, \
+    from openjiuwen_studio.ops.modules.prompt.application.trace_sdk_interface import observe, set_baggage, get_baggage, \
         calculate_input_tokens, set_attribute, start_span, end_span, SpanType, PlatformType, trace, inject
 
-from ops.modules.llm.llm_manager import build_call_kwargs, ModelCallParams, get_llm_client_by_protocol
-from ops.modules.prompt.domain.debug_entity import (
+from openjiuwen_studio.ops.modules.llm.llm_manager import build_call_kwargs, ModelCallParams, get_llm_client_by_protocol
+from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import (
     SaveDebugContextRequest,
     ListDebugHistoryResponse,
     DebugContext,
     DebugStreamingRequest,
     DebugStreamingResponse,
 )
-from ops.modules.prompt.domain.debug_repository import DebugContextRepository, DebugLogRepository
+from openjiuwen_studio.ops.modules.prompt.domain.debug_repository import DebugContextRepository, DebugLogRepository
 
 
 # 配置日志

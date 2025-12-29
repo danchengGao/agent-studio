@@ -1,9 +1,9 @@
 
 from typing import Optional, Dict, Any
-from sqlalchemy import Column, String, BigInteger, Text, JSON, Integer
+from sqlalchemy import String, BigInteger, Text, JSON, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 
 class TraceDetailDB(Base, DBFunBase):

@@ -5,4 +5,4 @@
 
 __all__ = ["get_db_ops", "get_db_agent"]
 
-from ops.modules.prompt.infra.database import get_db_agent, get_db_ops
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_db_agent, get_db_ops

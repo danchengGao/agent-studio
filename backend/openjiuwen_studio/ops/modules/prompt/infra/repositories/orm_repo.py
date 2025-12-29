@@ -9,10 +9,10 @@ from sqlalchemy.sql import func
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from pydantic import BaseModel, Field, field_validator
 
-from ops.modules.prompt.domain.entities import LLMModelInfo
-from ops.modules.prompt.infra.database import Base, BaseAgent
-from ops.modules.prompt.domain import entities
-from ops.config import settings
+from openjiuwen_studio.ops.modules.prompt.domain.entities import LLMModelInfo
+from openjiuwen_studio.ops.modules.prompt.infra.database import Base, BaseAgent
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.config import settings
 
 
 # ORM模型

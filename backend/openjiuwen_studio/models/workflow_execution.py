@@ -1,13 +1,11 @@
 from __future__ import annotations
 from datetime import datetime
-from typing import Any
 from sqlalchemy import (JSON, BigInteger, DateTime, ForeignKey, Index, Integer,
-                        String, Text, UniqueConstraint, func)
-from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
-                            mapped_column, relationship)
+                        String, Text, func)
+from sqlalchemy.orm import (Mapped, mapped_column, relationship)
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 from openjiuwen_studio.models.workflow import WorkflowBaseDB, WorkflowPublishDB
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 
 # ==================== workflow_execution ====================

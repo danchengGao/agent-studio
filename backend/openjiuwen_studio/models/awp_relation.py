@@ -1,9 +1,9 @@
-from sqlalchemy import BigInteger, JSON, String, UniqueConstraint, Index, Integer
+from sqlalchemy import BigInteger, String, UniqueConstraint, Index, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 from openjiuwen_studio.models.workflow import WorkflowBaseDB, WorkflowPublishDB
 from openjiuwen_studio.models.agent import AgentBaseDB, AgentPublishDB
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 '''
 the relation between agent/workflow/plugin

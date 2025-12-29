@@ -1,10 +1,7 @@
-import asyncio
 import base64
 import binascii
 import os
-from pathlib import Path
 
-import yaml
 from dotenv import load_dotenv
 from openjiuwen.core.common.logging import logger
 from openjiuwen.core.memory.config.config import SysMemConfig
@@ -16,8 +13,8 @@ from openjiuwen.core.memory.store.impl.milvus_semantic_store import \
     MilvusSemanticStore
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from ops.modules.prompt.infra.database import get_database_url
-from ops.modules.prompt.infra.database import get_async_database_url
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_database_url
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_async_database_url
 
 
 class MemoryEngineManager:

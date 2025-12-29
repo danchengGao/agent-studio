@@ -6,7 +6,7 @@ from enum import Enum
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 
-from ops.modules.prompt.domain.entities import BaseResponse
+from openjiuwen_studio.ops.modules.prompt.domain.entities import BaseResponse
 
 
 # ---------- 基础消息结构 ----------

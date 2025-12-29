@@ -6,16 +6,16 @@ from typing import List, Optional
 
 from sqlalchemy import or_
 
-from ops.common.date_time_util import get_china_datetime
-from ops.modules.prompt.application.debug_service import logger
-from ops.modules.prompt.domain import entities
-from ops.modules.prompt.domain.entities import OptimizeTaskCreationRequest
-from ops.modules.prompt.domain.repositories import PromptRepository, AgentRepository, JobRepository
-from ops.modules.prompt.domain.services import DraftDomainService, CommitDomainService, \
+from openjiuwen_studio.ops.common.date_time_util import get_china_datetime
+from openjiuwen_studio.ops.modules.prompt.application.debug_service import logger
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.modules.prompt.domain.entities import OptimizeTaskCreationRequest
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import PromptRepository, AgentRepository, JobRepository
+from openjiuwen_studio.ops.modules.prompt.domain.services import DraftDomainService, CommitDomainService, \
     BatchPromptDomainService, GetPromptDetailService, JobDomainService
-from ops.modules.prompt.domain.repositories import PromptUserDraftRepository, PromptSubmitRepository
-from ops.modules.prompt.application.exception import NotFoundException, DuplicateException, RelationException
-from ops.modules.prompt.infra.repositories import orm_repo
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import PromptUserDraftRepository, PromptSubmitRepository
+from openjiuwen_studio.ops.modules.prompt.application.exception import NotFoundException, DuplicateException
+from openjiuwen_studio.ops.modules.prompt.infra.repositories import orm_repo
 
 
 class PromptService:

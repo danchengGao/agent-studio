@@ -6,11 +6,11 @@
 import logging
 from typing import Dict, Any, Tuple
 
-from ops.config import ModelConfigManager
-from ops.modules.llm.model import ModelConfig, ListModelResponse
-from ops.modules.llm.schema import ListModelRequest
-from ops.modules.prompt.domain.repositories import AgentRepository
-from ops.modules.prompt.infra.repositories import orm_repo
+from openjiuwen_studio.ops.config import ModelConfigManager
+from openjiuwen_studio.ops.modules.llm.model import ModelConfig, ListModelResponse
+from openjiuwen_studio.ops.modules.llm.schema import ListModelRequest
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import AgentRepository
+from openjiuwen_studio.ops.modules.prompt.infra.repositories import orm_repo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

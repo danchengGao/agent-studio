@@ -8,8 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from ops.config import settings
-from ops.common.date_time_util import get_china_datetime
+from openjiuwen_studio.ops.config import settings
+from openjiuwen_studio.ops.common.date_time_util import get_china_datetime
 
 # 配置日志
 logger = logging.getLogger(__name__)

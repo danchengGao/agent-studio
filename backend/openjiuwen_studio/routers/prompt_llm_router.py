@@ -5,12 +5,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ops.modules.llm.llm_config_service import LLMConfigService
-from ops.config import ModelConfigManager
-from ops.modules.llm.llm_manager import init_llm_manager
-from ops.modules.llm.schema import ListModelRequest, GetModelRequest
-from ops.modules.prompt.infra.database import get_db_agent
-from ops.modules.prompt.infra.repositories.agent_repo import SQLAgentRepository
+from openjiuwen_studio.ops.modules.llm.llm_config_service import LLMConfigService
+from openjiuwen_studio.ops.config import ModelConfigManager
+from openjiuwen_studio.ops.modules.llm.llm_manager import init_llm_manager
+from openjiuwen_studio.ops.modules.llm.schema import ListModelRequest, GetModelRequest
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_db_agent
+from openjiuwen_studio.ops.modules.prompt.infra.repositories.agent_repo import SQLAgentRepository
 
 router = APIRouter(
     prefix="/api/v1/llm",

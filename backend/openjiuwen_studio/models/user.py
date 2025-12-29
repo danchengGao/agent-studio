@@ -1,7 +1,7 @@
 from sqlalchemy import BigInteger, Boolean, Integer, JSON, String, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 
 # ==================== user 表 ====================

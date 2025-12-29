@@ -9,12 +9,12 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 from typing import Any
 
 from sqlalchemy import (JSON, BigInteger, ForeignKey, ForeignKeyConstraint,
-                        Index, Integer, String, Text, UniqueConstraint)
-from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
+                        Index, Integer, String, UniqueConstraint)
+from sqlalchemy.orm import (Mapped, declarative_mixin,
                             declared_attr, mapped_column, relationship)
 
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 
 @declarative_mixin

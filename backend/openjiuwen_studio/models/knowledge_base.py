@@ -1,15 +1,15 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from ops.config import settings
-from sqlalchemy import (JSON, BigInteger, ForeignKey, Index, Integer, String,
+from typing import TYPE_CHECKING, Any, Dict
+from openjiuwen_studio.ops.config import settings
+from sqlalchemy import (JSON, BigInteger, Index, Integer, String,
                         Text, UniqueConstraint)
-from sqlalchemy.orm import (Mapped, declarative_mixin, foreign, mapped_column,
+from sqlalchemy.orm import (Mapped, declarative_mixin, mapped_column,
                             relationship)
 
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 
 if TYPE_CHECKING:
-    from openjiuwen_studio.models.knowledge_base_document import KnowledgeBaseDocumentDB
+    pass
 
 
 @declarative_mixin

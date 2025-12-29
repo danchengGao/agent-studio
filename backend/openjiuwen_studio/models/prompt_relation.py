@@ -3,7 +3,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 from openjiuwen_studio.models.workflow import WorkflowBaseDB, WorkflowPublishDB
 from openjiuwen_studio.models.agent import AgentBaseDB, AgentPublishDB
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 
 # ==================== user 表 ====================

@@ -4,8 +4,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, List, Optional, Tuple, Union, Dict
 
-from ops.modules.prompt.domain import entities
-from ops.modules.prompt.infra.database import Base, BaseAgent
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.modules.prompt.infra.database import Base, BaseAgent
 
 
 class PromptRepository(ABC):

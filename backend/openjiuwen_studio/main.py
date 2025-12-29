@@ -2,7 +2,6 @@ import os
 import sys
 import io
 from contextlib import asynccontextmanager
-from typing import Dict
 
 # 添加项目根目录到 Python 路径，以便直接运行时能找到所有模块
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,9 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 project_root = os.path.dirname(backend_dir)
 load_dotenv(os.path.join(project_root, '.env'))
 
-from ops.config import settings
-from ops.modules.prompt.infra.database import create_database_tables
-from sqlalchemy import inspect
+from openjiuwen_studio.ops.modules.prompt.infra.database import create_database_tables
 from openjiuwen_studio.memory_engine_start import MemoryEngineManager
 
 from openjiuwen_studio.routers import register

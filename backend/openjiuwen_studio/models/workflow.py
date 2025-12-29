@@ -2,16 +2,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from sqlalchemy import (JSON, BigInteger, ForeignKey, Index, String, Text,
                         UniqueConstraint, and_, func, select, Integer)
-from sqlalchemy.orm import (DeclarativeBase, Mapped, declarative_mixin,
+from sqlalchemy.orm import (Mapped, declarative_mixin,
                             foreign, mapped_column, relationship)
 from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
-from ops.config import settings
+from openjiuwen_studio.ops.config import settings
 
 if TYPE_CHECKING:
-    from openjiuwen_studio.models.awp_relation import AgentWorkflowRelationDB
-    from openjiuwen_studio.models.prompt_relation import PromptRelationDB
-    from openjiuwen_studio.models.workflow_execution import WorkflowExecutionDB
+    pass
 
 
 @declarative_mixin

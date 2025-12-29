@@ -5,8 +5,8 @@
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
-from ops.modules.prompt.domain.repositories import JobRepository
-from ops.modules.prompt.infra.database import Base
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import JobRepository
+from openjiuwen_studio.ops.modules.prompt.infra.database import Base
 
 
 class SQLJobRepository(JobRepository):

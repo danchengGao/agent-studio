@@ -4,15 +4,15 @@
 from fastapi import APIRouter, Depends, status, Path, Body, Query
 from sqlalchemy.orm import Session
 
-from ops.common.handle_exceptions_util import handle_exceptions
-from ops.modules.prompt.application.service import PromptService
-from ops.modules.prompt.domain import entities
-from ops.modules.prompt.domain.entities import BatchGetPromptResponse, BatchGetPromptRequest
-from ops.modules.prompt.infra.repositories import SQLPromptUserDraftRepository
-from ops.modules.prompt.infra.repositories import SQLPromptRepository
-from ops.modules.prompt.infra.database import get_db_ops, get_db_agent
-from ops.modules.prompt.infra.repositories.agent_repo import SQLAgentRepository
-from ops.modules.prompt.infra.repositories.prompt_repo import SQLPromptSubmitRepository
+from openjiuwen_studio.ops.common.handle_exceptions_util import handle_exceptions
+from openjiuwen_studio.ops.modules.prompt.application.service import PromptService
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.modules.prompt.domain.entities import BatchGetPromptResponse, BatchGetPromptRequest
+from openjiuwen_studio.ops.modules.prompt.infra.repositories import SQLPromptUserDraftRepository
+from openjiuwen_studio.ops.modules.prompt.infra.repositories import SQLPromptRepository
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_db_ops, get_db_agent
+from openjiuwen_studio.ops.modules.prompt.infra.repositories.agent_repo import SQLAgentRepository
+from openjiuwen_studio.ops.modules.prompt.infra.repositories.prompt_repo import SQLPromptSubmitRepository
 
 router = APIRouter(prefix="/api/v1/prompts", tags=["prompts"])
 

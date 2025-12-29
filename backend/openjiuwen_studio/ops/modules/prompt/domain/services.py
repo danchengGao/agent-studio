@@ -8,18 +8,18 @@ from typing import Optional, List
 from pydantic import ValidationError
 
 from openjiuwen_studio.routers.models import logger
-from ops.common.date_time_util import get_china_datetime
-from ops.modules.prompt.domain import entities
-from ops.modules.prompt.domain.entities import BatchGetPromptRequest, BatchPromptResponseItem, PromptCommit, \
+from openjiuwen_studio.ops.common.date_time_util import get_china_datetime
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.modules.prompt.domain.entities import BatchGetPromptRequest, BatchPromptResponseItem, PromptCommit, \
     Base, BatchGetPromptResponse, PromptBasic, PromptDraft, AgentRelationObj, OptimizeTaskCreationRequest, \
     OptimizeProgressResponse, JobInfo, Progress, HistoryItem, OptimizeInfo, JobDetails, JobDetailItem, \
     OptimizeTaskGetInfoResponse
-from ops.modules.prompt.domain.repositories import PromptUserDraftRepository, PromptSubmitRepository, \
+from openjiuwen_studio.ops.modules.prompt.domain.repositories import PromptUserDraftRepository, PromptSubmitRepository, \
     PromptRepository, AgentRepository, JobRepository
-from ops.modules.prompt.application.exception import DuplicateException, NotFoundException
-from ops.common.json_util import convert_json
-from ops.modules.prompt.infra.database import BaseAgent
-from ops.modules.prompt.infra.repositories import orm_repo
+from openjiuwen_studio.ops.modules.prompt.application.exception import DuplicateException, NotFoundException
+from openjiuwen_studio.ops.common.json_util import convert_json
+from openjiuwen_studio.ops.modules.prompt.infra.database import BaseAgent
+from openjiuwen_studio.ops.modules.prompt.infra.repositories import orm_repo
 
 
 class DraftDomainService:
@@ -494,7 +494,8 @@ class JobDomainService:
         job_info = trans_job_info(job_data)
         return job_info
 
-    def get_jobs(self, space_id: str, user_id: str, job_ids: List[str]) -> Optional[entities.OptimizeTaskGetInfoResponse]:
+    def get_jobs(self, space_id: str, user_id: str, job_ids: List[str]) -> Optional[
+        entities.OptimizeTaskGetInfoResponse]:
         """查询任务信息"""
         if job_ids == ["*"]:
             # 查询所有任务

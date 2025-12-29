@@ -4,15 +4,15 @@
 from fastapi import APIRouter, Depends, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import StreamingResponse
-from ops.common.handle_exceptions_util import handle_exceptions
-from ops.modules.llm.llm_config_service import LLMConfigService
-from ops.modules.prompt.application.debug_service import PromptDebugService
-from ops.modules.prompt.domain.debug_entity import DebugStreamingRequest, SaveDebugContextRequest, \
+from openjiuwen_studio.ops.common.handle_exceptions_util import handle_exceptions
+from openjiuwen_studio.ops.modules.llm.llm_config_service import LLMConfigService
+from openjiuwen_studio.ops.modules.prompt.application.debug_service import PromptDebugService
+from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import DebugStreamingRequest, SaveDebugContextRequest, \
     DebugContextResponse, ListDebugHistoryResponse
-from ops.modules.prompt.infra.database import get_async_session_ops
-from ops.modules.prompt.infra.repositories.debug_repo import SQLDebugContextRepository, SQLDebugLogRepository
-from ops.modules.prompt.domain.entities import BaseResponse
-from ops.routers.llm_router import get_llm_config_service
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_async_session_ops
+from openjiuwen_studio.ops.modules.prompt.infra.repositories.debug_repo import SQLDebugContextRepository, SQLDebugLogRepository
+from openjiuwen_studio.ops.modules.prompt.domain.entities import BaseResponse
+from openjiuwen_studio.routers.prompt_llm_router import get_llm_config_service
 
 # 创建子路由
 router = APIRouter(prefix="/api/v1/prompts", tags=["prompt-debug"])

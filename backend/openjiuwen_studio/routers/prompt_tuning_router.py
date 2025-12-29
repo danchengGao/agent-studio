@@ -2,15 +2,12 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
-import asyncio
 import json
 import logging
 import os
 import time
 import hashlib
-from concurrent.futures import ThreadPoolExecutor
-from typing import List, Tuple, Dict, Any, Optional, Literal
-from urllib.parse import urljoin
+from typing import List, Dict, Any
 
 from fastapi import APIRouter, Request
 from fastapi.openapi.models import Response
@@ -19,23 +16,23 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import StreamingResponse, JSONResponse
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor
 
-from ops.common.date_time_util import get_china_datetime
-from ops.modules.prompt.application.service import JobService
-from ops.modules.prompt.domain import entities
-from ops.modules.prompt.domain.entities import (
+from openjiuwen_studio.ops.common.date_time_util import get_china_datetime
+from openjiuwen_studio.ops.modules.prompt.application.service import JobService
+from openjiuwen_studio.ops.modules.prompt.domain import entities
+from openjiuwen_studio.ops.modules.prompt.domain.entities import (
     OptimizeTaskCreationRequest, OptimizeTaskCreationResponse,
     JobInfo, BaseResponse, OptimizeProgressResponse, OptimizeTaskGetInfoResponse,
     JobDraftCreateResponse, OptimizeTaskGetInfoRequest
 )
 
-from ops.modules.prompt.infra.database import get_db_ops
-from ops.modules.prompt.infra.repositories.job_repo import SQLJobRepository
+from openjiuwen_studio.ops.modules.prompt.infra.database import get_db_ops
+from openjiuwen_studio.ops.modules.prompt.infra.repositories.job_repo import SQLJobRepository
 
-from ops.modules.llm.llm_config_service import LLMConfigService
-from ops.routers.llm_router import get_llm_config_service
-from ops.common.handle_exceptions_util import handle_exceptions
+from openjiuwen_studio.ops.modules.llm.llm_config_service import LLMConfigService
+from openjiuwen_studio.routers.prompt_llm_router import get_llm_config_service
+from openjiuwen_studio.ops.common.handle_exceptions_util import handle_exceptions
 
 from openjiuwen.agent.chat_agent import create_chat_agent_config, create_chat_agent
 from openjiuwen.agent.config.base import LLMCallConfig
@@ -43,7 +40,7 @@ from openjiuwen.core.utils.llm.base import BaseModelInfo
 from openjiuwen.agent_builder.tune.optimizer.joint_optimizer import JointOptimizer
 from openjiuwen.agent_builder.tune.evaluator.evaluator import DefaultEvaluator
 from openjiuwen.agent_builder.tune.base import Case, EvaluatedCase
-from openjiuwen.core.utils.tool.schema import ToolInfo, Parameters, ToolCall
+from openjiuwen.core.utils.tool.schema import ToolInfo, ToolCall
 from openjiuwen.agent_builder.tune.trainer.trainer import Trainer
 from openjiuwen.agent_builder.tune.dataset.case_loader import CaseLoader
 from openjiuwen.core.component.common.configs.model_config import ModelConfig
