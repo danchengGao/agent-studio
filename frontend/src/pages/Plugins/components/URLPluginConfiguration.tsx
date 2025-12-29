@@ -525,6 +525,12 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                         disabled={isReadOnly}
                         InputProps={{
                           sx: {
+                            '& .MuiInputBase-input': {
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 'calc(80ch + 20px)',
+                            },
                             '&.Mui-error': {
                               borderColor: 'error.main',
                             },
@@ -589,7 +595,19 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                             </Typography>
                             <div className="flex items-center space-x-4 text-sm text-gray-500">
                               <span>方法: {getMethodString(tool.method)}</span>
-                              <span>路径: {tool.path || '/'}</span>
+                              <Typography
+                                component="span"
+                                sx={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  maxWidth: '80ch',
+                                  display: 'inline-block',
+                                  verticalAlign: 'middle',
+                                }}
+                              >
+                                路径: {tool.path || '/'}
+                              </Typography>
                               <Chip label="启用" size="small" color="success" />
                             </div>
                           </div>

@@ -994,7 +994,20 @@ const ToolConfigurationPage: React.FC = () => {
                 ) : (
                   <>
                     <Chip label={`方法: ${getMethodString(tool.method || 1)}`} size="small" />
-                    <Chip label={`路径: ${tool.path || ''}`} size="small" variant="outlined" />
+                    <Chip
+                      label={`路径: ${tool.path || ''}`}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        maxWidth: '80ch',
+                        '& .MuiChip-label': {
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 'calc(80ch - 24px)',
+                        },
+                      }}
+                    />
                   </>
                 )}
               </div>
@@ -1122,6 +1135,16 @@ const ToolConfigurationPage: React.FC = () => {
                     placeholder="请输入API路径..."
                     helperText={pathError || '例如：/api/users/:id，必须以/开头，只能包含英文、数字、下划线、连字符和斜杠'}
                     error={!!pathError}
+                    InputProps={{
+                      sx: {
+                        '& .MuiInputBase-input': {
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 'calc(80ch + 20px)',
+                        },
+                      },
+                    }}
                   />
                 </div>
               )}
@@ -1500,7 +1523,16 @@ const ToolConfigurationPage: React.FC = () => {
                       <>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <Typography variant="body2" color="text.secondary">
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '80ch',
+                            }}
+                          >
                             API路径: {tool.path}
                           </Typography>
                         </div>
@@ -1899,7 +1931,17 @@ const ToolConfigurationPage: React.FC = () => {
                   测试信息
                 </Typography>
                 <div className="space-y-1 text-sm text-gray-600">
-                  <div>API路径: {tool?.path}</div>
+                  <Typography
+                    component="div"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '80ch',
+                    }}
+                  >
+                    API路径: {tool?.path}
+                  </Typography>
                   <div>请求方法: {tool && getMethodString(tool.method)}</div>
                   <div>测试时间: {new Date().toLocaleString('zh-CN')}</div>
                 </div>

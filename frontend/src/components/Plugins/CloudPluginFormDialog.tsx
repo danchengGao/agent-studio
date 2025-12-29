@@ -68,11 +68,18 @@ const CloudPluginFormDialog: React.FC<CloudPluginFormDialogProps> = ({
     }
   }
 
+  // Check URL length (1000 bytes max)
+  const MAX_URL_BYTES = 1000
+  const getUrlByteLength = (url: string): number => {
+    return new Blob([url]).size
+  }
+  const isUrlLengthValid = form.url ? getUrlByteLength(form.url) <= MAX_URL_BYTES : true
+
   // Check if URL is valid for UI feedback
   const isUrlValid = form.url ? isValidUrl(form.url) : true
 
   // Form validation - check if all required fields are valid
-  const isFormValid = form.name.trim() && form.description.trim() && form.url.trim() && isUrlValid
+  const isFormValid = form.name.trim() && form.description.trim() && form.url.trim() && isUrlValid && isUrlLengthValid
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="md" fullWidth>
       <DialogTitle>{isEditing ? '编辑云侧插件' : '创建云侧插件'}</DialogTitle>
@@ -123,8 +130,14 @@ const CloudPluginFormDialog: React.FC<CloudPluginFormDialogProps> = ({
               fullWidth
               required
               placeholder="例如：http://api.example.com/plugin 或 http://localhost:8080/api"
-              helperText={form.url && !isUrlValid ? '请输入有效的HTTP或HTTPS地址' : '请提供完整的API服务地址，包含协议(http)'}
-              error={Boolean(form.url && !isUrlValid)}
+              helperText={
+                form.url && !isUrlValid
+                  ? '请输入有效的HTTP或HTTPS地址'
+                  : form.url && !isUrlLengthValid
+                    ? `URL长度不能超过${MAX_URL_BYTES}字节（当前：${getUrlByteLength(form.url)}字节）`
+                    : `请提供完整的API服务地址，包含协议(http)（${form.url ? getUrlByteLength(form.url) : 0}/${MAX_URL_BYTES}字节）`
+              }
+              error={Boolean(form.url && (!isUrlValid || !isUrlLengthValid))}
             />
           </div>
         </div>
