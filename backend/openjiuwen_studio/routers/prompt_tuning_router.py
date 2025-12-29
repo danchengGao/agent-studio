@@ -9,14 +9,14 @@ import time
 import hashlib
 from typing import List, Dict, Any
 
+from concurrent.futures import TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Request
 from fastapi.openapi.models import Response
 from fastapi.params import Depends, Query
 from sqlalchemy.orm import Session
 from starlette.concurrency import iterate_in_threadpool
 from starlette.responses import StreamingResponse, JSONResponse
-from concurrent.futures import TimeoutError as FutureTimeoutError
-from concurrent.futures import ThreadPoolExecutor
 
 from openjiuwen_studio.ops.common.date_time_util import get_china_datetime
 from openjiuwen_studio.ops.modules.prompt.application.service import JobService

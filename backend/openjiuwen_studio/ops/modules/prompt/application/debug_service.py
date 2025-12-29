@@ -18,8 +18,9 @@ try:
     from ops_client.entities import SpanType, PlatformType
     from ops_client import trace, inject
 except ImportError:
-    from openjiuwen_studio.ops.modules.prompt.application.trace_sdk_interface import observe, set_baggage, get_baggage, \
-        calculate_input_tokens, set_attribute, start_span, end_span, SpanType, PlatformType, trace, inject
+    from openjiuwen_studio.ops.modules.prompt.application.trace_sdk_interface import observe, set_baggage, \
+        get_baggage, calculate_input_tokens, set_attribute, start_span, end_span, SpanType, PlatformType, \
+        trace, inject
 
 from openjiuwen_studio.ops.modules.llm.llm_manager import build_call_kwargs, ModelCallParams, get_llm_client_by_protocol
 from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import (
