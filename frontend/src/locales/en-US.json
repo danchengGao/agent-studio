@@ -252,13 +252,14 @@
     "login": {
       "title": "Login",
       "subtitle": "Welcome back! Please login to your account",
+      "formTitle": "Start your openJiuwen journey",
       "username": "Username",
-      "usernamePlaceholder": "Enter username",
+      "usernamePlaceholder": "Enter workspace name (email format)",
       "password": "Password",
       "passwordPlaceholder": "Enter password",
       "rememberMe": "Remember me",
       "forgotPassword": "Forgot password?",
-      "loginButton": "Login",
+      "loginButton": "Enter workspace",
       "loggingIn": "Logging in...",
       "noAccount": "Don't have an account?",
       "signUp": "Sign up now",
@@ -406,7 +407,7 @@
   },
   "dashboard": {
     "title": "Workspace Dashboard",
-    "subtitle": "Welcome back to Jiuwen, explore your AI agent development progress and system performance",
+    "subtitle": "Welcome back to openJiuwen, explore your AI agent journey",
     "quickStats": {
       "agents": {
         "total": "Total Agents"
@@ -428,6 +429,10 @@
       "manageModels": {
         "name": "Manage Models",
         "description": "Configure and manage AI model settings"
+      },
+      "installPlugins": {
+        "name": "Install Plugins",
+        "description": "Manage and install plugin extensions"
       },
       "appSpace": {
         "name": "App Space",

@@ -142,7 +142,6 @@
       "formTitle": "开启openJiuwen之旅",
       "username": "用户名",
       "usernamePlaceholder": "请输入用户空间名称（邮箱格式）",
-      "signUpUsernamePlaceholder": "请输入用户空间名称（邮箱格式）",
       "password": "密码",
       "passwordPlaceholder": "请输入登录密码",
       "signUpPasswordPlaceholder": "请设置登录密码",
@@ -327,6 +326,10 @@
       "manageModels": {
         "name": "管理模型",
         "description": "配置和管理AI模型设置"
+      },
+      "installPlugins": {
+        "name": "安装插件",
+        "description": "管理和安装插件扩展功能"
       },
       "appSpace": {
         "name": "应用空间",

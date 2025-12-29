@@ -282,8 +282,8 @@ const DashboardPage: React.FC = () => {
       color: 'bg-purple-500 hover:bg-purple-600',
     },
     {
-      name: '安装插件',
-      description: '管理和安装插件扩展功能',
+      name: t('dashboard.quickActions.installPlugins.name'),
+      description: t('dashboard.quickActions.installPlugins.description'),
       icon: PluginIcon,
       href: '/dashboard/plugins',
       color: 'bg-orange-500 hover:bg-orange-600',
