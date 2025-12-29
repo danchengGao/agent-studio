@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { t } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { Paper } from '@mui/material'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 
@@ -34,7 +34,8 @@ const PromptEditor: React.FC<{
   readonly: boolean
   isLockedForCandidate: boolean
   onChange: (value: string) => void
-}> = ({ textAreaRef, effectiveText, readonly, isLockedForCandidate, onChange }) => (
+  placeholder?: string
+}> = ({ textAreaRef, effectiveText, readonly, isLockedForCandidate, onChange, placeholder }) => (
   <Paper elevation={0} className="relative flex-1 min-h-0 flex flex-col">
     <textarea
       ref={textAreaRef}
@@ -44,13 +45,14 @@ const PromptEditor: React.FC<{
         if (readonly || isLockedForCandidate) return
         onChange(newPrompt)
       }}
-      placeholder={t('agents.agentEditor.enhanced.previewDebug.defineAgentPlaceholder')}
+      placeholder={placeholder}
       className={`h-full w-full p-2 text-sm placeholder:text-gray-400 text-gray-600 border rounded-xl resize-y min-h-[240px] max-h-[80vh] overflow-auto${readonly || isLockedForCandidate ? ' cursor-not-allowed' : ''}`}
       readOnly={readonly || isLockedForCandidate}
     />
   </Paper>
 )
 const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | null }> = ({ agentDetailResponse }) => {
+  const { t } = useTranslation()
   const { saveAgentRequest, updateSaveAgentRequest } = useAgentStore()
   const readonly = useAgentStore(s => s.readonly)
   const { user } = useAuthStore()
@@ -662,6 +664,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         readonly={readonly}
         isLockedForCandidate={isLockedForCandidate}
         onChange={setSystemPrompt}
+        placeholder={t('agents.agentEditor.enhanced.previewDebug.defineAgentPlaceholder')}
       />
 
       <UnifiedSnackbar snackbar={snackbar} onClose={() => setSnackbar(s => ({ ...s, open: false }))} />

@@ -1,0 +1,23 @@
+{
+  "agentEditor": {
+    "enhanced": {
+      "tabs": {
+        "systemPrompt": "System Prompt Configuration",
+        "orchestration": "Orchestration Configuration",
+        "previewDebug": "Preview & Debug"
+      },
+      "orchestration": {
+        "overwritePromptTemplateDialog": "This operation will overwrite the prompt template draft. Please choose your preferred handling method.",
+        "overwriteAndJump": "Overwrite and Jump: Overwrite the prompt editing page with the current agent's system prompt content",
+        "notOverwriteAndJump": "Don't Overwrite and Jump: Keep the original content of the prompt editing page unchanged",
+        "cancel": "Cancel"
+      },
+      "previewDebug": {
+        "defineAgentPlaceholder": "Define the agent's role, capabilities, and behavioral guidelines...",
+        "dialogs": {
+          "goToTemplateManagement": "Go to Prompt Template Management"
+        }
+      }
+    }
+  }
+}

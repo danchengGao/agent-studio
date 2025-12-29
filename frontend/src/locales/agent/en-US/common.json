@@ -1,0 +1,23 @@
+{
+  "title": "Agent Development",
+  "subtitle": "Create and manage your AI agents",
+  "createAgent": "Create Agent",
+  "agentList": {
+    "noAgents": "No agents available",
+    "searchPlaceholder": "Search agent names, descriptions, or tags...",
+    "sortBy": "Sort by",
+    "sortByName": "Sort by name",
+    "sortByCreated": "Sort by creation time",
+    "model": "Model",
+    "noModel": "Unconfigured",
+    "noAgentsFound": "No agents found",
+    "createFirstAgent": "Start creating your first agent to build a powerful AI assistant ecosystem",
+    "editNamePlaceholder": "Enter agent name (max 100 characters)",
+    "editDescriptionPlaceholder": "Enter agent description (max 500 characters)",
+    "createFirst": "Create Agent",
+    "characterCount": {
+      "name": "/100",
+      "description": "/500"
+    }
+  }
+}

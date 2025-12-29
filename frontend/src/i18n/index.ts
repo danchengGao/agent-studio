@@ -6,12 +6,31 @@ import LanguageDetector from 'i18next-browser-languagedetector'
 import zhCN from '../locales/zh-CN.json'
 import enUS from '../locales/en-US.json'
 
+// Agent translations
+import agentCommonZh from '../locales/agent/zh-CN/common.json'
+import agentEditorZh from '../locales/agent/zh-CN/editor.json'
+
+import agentCommonEn from '../locales/agent/en-US/common.json'
+import agentEditorEn from '../locales/agent/en-US/editor.json'
+
 const resources = {
   'zh-CN': {
-    translation: zhCN,
+    translation: {
+      ...zhCN,
+      agents: {
+        ...agentCommonZh,
+        ...agentEditorZh,
+      },
+    },
   },
   'en-US': {
-    translation: enUS,
+    translation: {
+      ...enUS,
+      agents: {
+        ...agentCommonEn,
+        ...agentEditorEn,
+      },
+    },
   },
 }
 

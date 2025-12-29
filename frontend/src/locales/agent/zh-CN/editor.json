@@ -1,0 +1,23 @@
+{
+  "agentEditor": {
+    "enhanced": {
+      "tabs": {
+        "systemPrompt": "系统提示词配置",
+        "orchestration": "编排配置",
+        "previewDebug": "调试预览"
+      },
+      "orchestration": {
+        "overwritePromptTemplateDialog": "本操作会覆盖提示词模板的草稿，请选择您希望的处理方式。",
+        "overwriteAndJump": "覆盖跳转：将当前智能体的系统提示词内容覆盖到提示词编辑页面",
+        "notOverwriteAndJump": "不覆盖跳转：保持提示词编辑页面的原有内容不变",
+        "cancel": "取消"
+      },
+      "previewDebug": {
+        "defineAgentPlaceholder": "定义智能体的角色、能力和行为准则...",
+        "dialogs": {
+          "goToTemplateManagement": "前往提示词模板管理"
+        }
+      }
+    }
+  }
+}

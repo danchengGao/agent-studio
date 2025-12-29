@@ -2,7 +2,7 @@ import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { Button, IconButton, Paper, CircularProgress, Divider, Select, MenuItem, SelectChangeEvent } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AgentDetailResponse, AgentService, ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client'
-import { t } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Save, History, Brain, Settings, Eye, Clock, Tag } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import AgentModelSelector from '@/components/Agent/AgentModelSelector'
@@ -21,6 +21,7 @@ const MIN_MIDDLE = 20
 const MIN_RIGHT = 15
 
 const AgentEditorEditPage = () => {
+  const { t } = useTranslation()
   const [leftPanelWidth, setLeftPanelWidth] = useState(30)
   const [rightPanelWidth, setRightPanelWidth] = useState(30)
   const [isDragging, setIsDragging] = useState(false)

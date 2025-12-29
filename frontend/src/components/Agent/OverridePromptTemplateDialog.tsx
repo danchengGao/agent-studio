@@ -1,5 +1,5 @@
 import React from 'react'
-import { t } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Alert, Typography } from '@mui/material'
 import { AlertTriangle } from 'lucide-react'
 
@@ -11,6 +11,7 @@ interface OverridePromptTemplateDialogProps {
 }
 
 const OverridePromptTemplateDialog: React.FC<OverridePromptTemplateDialogProps> = ({ open, onClose, onJump, onOverwrite }) => {
+  const { t } = useTranslation()
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
