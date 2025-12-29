@@ -9,6 +9,7 @@ import { usePlaygroundTools, type InteractiveType as IdeInteractiveType } from '
 import { Tooltip, Popover } from '@douyinfe/semi-ui'
 
 import { MousePadSelector } from './mouse-pad-selector'
+import { useTranslation } from '../../i18n'
 
 export const CACHE_KEY = 'workflow_prefer_interactive_type'
 export const IS_MAC_OS = /(Macintosh|MacIntel|MacPPC|Mac68K|iPad)/.test(navigator.userAgent)
@@ -32,13 +33,14 @@ export enum InteractiveType {
 
 export const Interactive = () => {
   const tools = usePlaygroundTools()
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
 
   const [interactiveType, setInteractiveType] = useState<InteractiveType>(() => getPreferInteractiveType() as InteractiveType)
 
   const [showInteractivePanel, setShowInteractivePanel] = useState(false)
 
-  const mousePadTooltip = interactiveType === InteractiveType.Mouse ? '鼠标友好' : '触控板友好'
+  const mousePadTooltip = interactiveType === InteractiveType.Mouse ? t('workflowCanvas.tools.mouseMode') : t('workflowCanvas.tools.touchpadMode')
 
   useEffect(() => {
     // read from localStorage

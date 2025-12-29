@@ -20,6 +20,7 @@ import {
   IFlowRefValue,
 } from '../../form-materials'
 import { provideLoopEffect } from './effects'
+import { useTranslation } from '../../i18n'
 
 import { FormHeader, FormContent, FormItem, Feedback, FormSelect, FormDisplay } from '../../form-components'
 import { useIsSidebar, useNodeRenderContext } from '../../hooks'
@@ -61,6 +62,7 @@ const ArrayInputsValues = ({
   onChange: (value?: Record<string, IFlowValue | undefined>) => void
   schema?: unknown
 }) => {
+  const { t } = useTranslation()
   const { list, add } = useObjectList<IFlowValue | undefined>({
     value,
     onChange,
@@ -87,11 +89,11 @@ const ArrayInputsValues = ({
       deleteable={true}
       onValidateKey={(key, itemId, allItems) => {
         if (key === 'index') {
-          return '不允许使用 "index" 作为变量名（保留字）'
+          return t('workflowCanvas.loop.indexReserved')
         }
         const isDuplicate = allItems.some(item => item.id !== itemId && item.key === key)
         if (isDuplicate && key) {
-          return `变量名 "${key}" 已存在`
+          return t('workflowCanvas.loop.variableExists', { key })
         }
         return undefined
       }}
@@ -105,14 +107,14 @@ const ArrayInputsValues = ({
 }
 
 export const LoopFormRender = () => {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
   const { node } = useNodeRenderContext()
   const formHeight = 110
 
   const loopSettings = (
     <>
-      {/* 循环类型选择 - 始终显示 */}
-      <FormItem name="循环类型" vertical>
+      <FormItem name={t('workflowCanvas.loop.loopType')} vertical>
         <Field<LoopType> name={`inputs.loopParam.type`}>
           {({ field }) => (
             <FormSelect
@@ -124,8 +126,8 @@ export const LoopFormRender = () => {
                 }
               }}
               options={[
-                { label: '指定循环次数', value: LoopType.NUM_LOOP },
-                { label: '数组循环', value: LoopType.ARRAY_LOOP },
+                { label: t('workflowCanvas.loop.specifyCount'), value: LoopType.NUM_LOOP },
+                { label: t('workflowCanvas.loop.arrayLoop'), value: LoopType.ARRAY_LOOP },
               ]}
             />
           )}
@@ -136,7 +138,7 @@ export const LoopFormRender = () => {
         {({ field }) => {
           if (field.value === LoopType.NUM_LOOP) {
             return (
-              <FormItem name="循环次数" vertical>
+              <FormItem name={t('workflowCanvas.loop.loopCount')} vertical>
                 <Field<IFlowValue> name={`inputs.loopParam.loopNum`}>
                   {({ field: numField }) => (
                     <PrivateScopeProvider>
@@ -170,7 +172,7 @@ export const LoopFormRender = () => {
         {({ field }) => {
           if (field.value === LoopType.ARRAY_LOOP) {
             return (
-              <FormItem name="循环数组" vertical>
+              <FormItem name={t('workflowCanvas.loop.loopArray')} vertical>
                 <Field<Record<string, IFlowValue | undefined> | undefined> name={`inputs.loopParam.loopArray`}>
                   {({ field: arrayField }) => (
                     <PrivateScopeProvider>
@@ -185,8 +187,7 @@ export const LoopFormRender = () => {
         }}
       </Field>
 
-      {/* 中间变量 - 始终显示 */}
-      <FormItem name={'中间变量'} vertical>
+      <FormItem name={t('workflowCanvas.loop.intermediateVar')} vertical>
         <Field<Record<string, IFlowValue | undefined> | undefined> name="inputs.loopParam.intermediateVar">
           {({ field }) => (
             <PrivateScopeProvider>
@@ -195,11 +196,11 @@ export const LoopFormRender = () => {
                 onChange={value => field.onChange(value)}
                 onValidateKey={(key, itemId, allItems) => {
                   if (key === 'index') {
-                    return '不允许使用 "index" 作为变量名（保留字）'
+                    return t('workflowCanvas.loop.indexReserved')
                   }
                   const isDuplicate = allItems.some(item => item.id !== itemId && item.key === key)
                   if (isDuplicate && key) {
-                    return `变量名 "${key}" 已存在`
+                    return t('workflowCanvas.loop.variableExists', { key })
                   }
                   return undefined
                 }}
@@ -217,7 +218,7 @@ export const LoopFormRender = () => {
               const skipKeys = ['index', ...loopArrayKeys]
 
               return (
-                <FormItem name="循环输出" vertical>
+                <FormItem name={t('workflowCanvas.loop.loopOutput')} vertical>
                   <BatchOutputs
                     style={{ width: '100%' }}
                     value={field.value}
@@ -246,7 +247,7 @@ export const LoopFormRender = () => {
           return (
             <Field<Record<string, IFlowValue | undefined> | undefined> name={`inputs.loopParam.loopArray`}>
               {({ field: arrayField }) => (
-                <FormDisplay label="输入" content={<DisplayInputsValues value={arrayField.value} node={node} includePrivateScope={true} />} />
+                <FormDisplay label={t('workflowCanvas.loop.input')} content={<DisplayInputsValues value={arrayField.value} node={node} includePrivateScope={true} />} />
               )}
             </Field>
           )
@@ -259,13 +260,13 @@ export const LoopFormRender = () => {
 
   const intermediateVarDisplay = (
     <Field<Record<string, IFlowValue | undefined> | undefined> name="inputs.loopParam.intermediateVar">
-      {({ field }) => <FormDisplay label="中间变量" content={<DisplayInputsValues value={field.value} node={node} includePrivateScope={true} />} />}
+      {({ field }) => <FormDisplay label={t('workflowCanvas.loop.intermediateVar')} content={<DisplayInputsValues value={field.value} node={node} includePrivateScope={true} />} />}
     </Field>
   )
 
   const outputVarDisplay = (
     <Field<Record<string, IFlowRefValue | undefined> | undefined> name={`outputs.properties`}>
-      {() => <FormDisplay label="循环输出" content={<DisplayOutputs displayFromScope />} />}
+      {() => <FormDisplay label={t('workflowCanvas.loop.loopOutput')} content={<DisplayOutputs displayFromScope />} />}
     </Field>
   )
 

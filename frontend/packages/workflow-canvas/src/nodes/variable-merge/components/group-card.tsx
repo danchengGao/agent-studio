@@ -10,6 +10,7 @@ import { Info, Minus, Plus } from 'lucide-react'
 import { VariableSelector, VariableSelectorProvider, TypeSelector, DisplaySchemaTag } from '../../../form-materials'
 import { cn } from '../../../utils/cn'
 import { DraggableList } from '../../../form-components/draggable-list'
+import { useTranslation } from '../../../i18n'
 import {
   GroupCardWrapper,
   GroupHeader,
@@ -53,6 +54,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   getGroupType,
   readOnly = false,
 }) => {
+  const { t } = useTranslation()
   const [isEditingName, setIsEditingName] = useState(false)
   const [editingName, setEditingName] = useState(group.name)
 
@@ -231,7 +233,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
               <DisplaySchemaTag value={getGroupSchema()} />
             )}
 
-            <Tooltip content="分组的变量类型默认以第一个变量的类型为主">
+            <Tooltip content={t('workflowCanvas.nodes.variableMerge.tooltipType')}>
               <InfoIcon as="span">
                 <Info size={14} />
               </InfoIcon>
@@ -290,7 +292,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
             <EmptyIconStyled>
               <Plus size={16} />
             </EmptyIconStyled>
-            <EmptyText>暂无变量，点击上方按钮添加</EmptyText>
+            <EmptyText>{t('workflowCanvas.nodes.variableMerge.noVariables')}</EmptyText>
           </EmptyContent>
         </EmptyVariables>
       )}

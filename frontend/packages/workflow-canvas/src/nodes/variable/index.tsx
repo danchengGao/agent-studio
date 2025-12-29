@@ -4,6 +4,7 @@
  */
 
 import { nanoid } from 'nanoid'
+import { I18n } from '@flowgram.ai/editor'
 
 import { WorkflowNodeType } from '../constants'
 import { FlowNodeRegistry } from '../../typings'
@@ -15,7 +16,7 @@ export const VariableNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Variable,
   info: {
     icon: <Key size={16} className="text-blue-600" />,
-    description: '用于重置循环变量的值，使其下次循环使用重置后的值',
+    description: I18n.t('Used to reset the value of a loop variable for the next iteration'),
   },
   meta: {
     size: {
@@ -29,7 +30,7 @@ export const VariableNodeRegistry: FlowNodeRegistry = {
       id: `variable__${customNanoid(5)}`,
       type: WorkflowNodeType.Variable,
       data: {
-        title: `变量`,
+        title: I18n.t('Variable'),
         assign: [
           {
             operator: 'assign',

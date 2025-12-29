@@ -4,55 +4,56 @@
  */
 
 import { validateFlowValue } from '../../form-materials'
+import { t } from '../../i18n'
 
 /**
- * 验证器配置选项
+ * Validator configuration options
  */
 export interface ValidatorOptions {
-  /** 错误消息 */
+  /** Error message */
   message?: string
-  /** 是否必需 */
+  /** Whether required */
   required?: boolean
-  /** 包含私有作用域 */
+  /** Include private scope */
   includePrivateScope?: boolean
-  /** 自定义错误消息 */
+  /** Custom error messages */
   errorMessages?: {
     required?: string
     unknownVariable?: string
   }
-  /** 空消息（用于返回内容验证） */
+  /** Empty message (for return content validation) */
   emptyMessage?: string
-  /** 结果消息（用于返回内容验证） */
+  /** Result message (for return content validation) */
   resultMessage?: string
 }
 
 /**
- * 输入参数验证器配置
+ * Input parameters validator configuration
  */
 export interface InputParametersValidatorOptions extends ValidatorOptions {
-  /** 必需参数列表 */
+  /** Required parameters list */
   requiredParams?: string[]
-  /** 参数名提取正则表达式 */
+  /** Parameter name extraction regex */
   namePattern?: RegExp
-  /** 是否检查空内容 */
+  /** Whether to check empty content */
   checkEmptyContent?: boolean
 }
 
 /**
- * 创建标题验证器
- * @param options 验证器配置
- * @returns 标题验证函数
+ * Create title validator
+ * @param options - Validator configuration
+ * @returns Title validator function
  */
 export const createTitleValidator = (options: ValidatorOptions = {}) => {
-  const { message = '标题是必需的' } = options
+  const { message = t('workflowCanvas.validation.titleRequired') } = options
 
   return ({ value }: { value: string }) => (value ? undefined : message)
 }
 
 /**
- * 创建输入参数验证器
- * @param options 验证器配置
- * @returns 输入参数验证函数
+ * Create input parameters validator
+ * @param options - Validator configuration
+ * @returns Input parameters validator function
  */
 export const createInputParametersValidator = (options: InputParametersValidatorOptions = {}) => {
   const {
@@ -64,42 +65,42 @@ export const createInputParametersValidator = (options: InputParametersValidator
     errorMessages = {},
   } = options
 
-  const { required: requiredMessage = '是必需的', unknownVariable: unknownVariableMessage = '引用的变量不存在' } = errorMessages
+  const { required: requiredMessage = t('workflowCanvas.validation.paramRequired'), unknownVariable: unknownVariableMessage = t('workflowCanvas.validation.variableUnknown') } = errorMessages
 
   return ({ value, context, name, formValues }: any) => {
-    // 提取属性名
+    // Extract property name
     const valuePropertyKey = name.replace(namePattern, '')
 
-    // 检查是否为必需参数
+    // Check if it's a required parameter
     const isRequired = required || requiredParams.includes(valuePropertyKey)
 
-    // 如果参数存在，检查其值是否为空
+    // If parameter exists, check if its value is empty
     if (value && checkEmptyContent) {
       if (value?.type === 'constant' && (value?.content === undefined || value?.content === null || value?.content === '')) {
-        return `${valuePropertyKey} 参数不能为空`
+        return t('workflowCanvas.validation.paramEmpty', { param: valuePropertyKey })
       }
     }
 
-    // 使用 validateFlowValue 进行变量引用校验
+    // Use validateFlowValue for variable reference validation
     return validateFlowValue(value, {
       node: context.node,
       required: isRequired,
       includePrivateScope,
       errorMessages: {
-        required: `${valuePropertyKey} ${requiredMessage}`,
-        unknownVariable: `${valuePropertyKey} ${unknownVariableMessage}`,
+        required: t('workflowCanvas.validation.paramRequired', { param: valuePropertyKey }),
+        unknownVariable: t('workflowCanvas.validation.paramEmpty', { param: valuePropertyKey }),
       },
     })
   }
 }
 
 /**
- * 创建提示词验证器
- * @param options 验证器配置
- * @returns 提示词验证函数
+ * Create prompt validator
+ * @param options - Validator configuration
+ * @returns Prompt validator function
  */
 export const createPromptValidator = (options: ValidatorOptions = {}) => {
-  const { message = '提示词不能为空' } = options
+  const { message = t('workflowCanvas.validation.promptRequired') } = options
 
   return ({ value }: any) => {
     const content = value?.content ?? ''
@@ -108,13 +109,13 @@ export const createPromptValidator = (options: ValidatorOptions = {}) => {
 }
 
 /**
- * 创建输出数量验证器
- * @param minCount 最小输出数量
- * @param options 验证器配置
- * @returns 输出数量验证函数
+ * Create output count validator
+ * @param minCount - Minimum output count
+ * @param options - Validator configuration
+ * @returns Output count validator function
  */
 export const createOutputCountValidator = (minCount: number, options: ValidatorOptions = {}) => {
-  const { message = `输出至少需要有${minCount}个变量` } = options
+  const { message = t('workflowCanvas.validation.outputCountMin', { count: minCount }) } = options
 
   return ({ value }: any) => {
     if (!value?.properties) return message
@@ -124,31 +125,31 @@ export const createOutputCountValidator = (minCount: number, options: ValidatorO
 }
 
 /**
- * 创建条件完整性验证器
- * @param options 验证器配置
- * @returns 条件完整性验证函数
+ * Create condition validator
+ * @param options - Validator configuration
+ * @returns Condition validator function
  */
 export const createConditionValidator = (options: ValidatorOptions = {}) => {
-  const { message = '条件不完整' } = options
+  const { message = t('workflowCanvas.validation.conditionIncomplete') } = options
 
   return ({ value }: any) => {
-    // 处理 is_empty 和 is_not_empty 操作符
+    // Handle is_empty and is_not_empty operators
     if (value?.operator === 'is_empty' || value?.operator === 'is_not_empty') {
       return !value?.left ? message : undefined
     }
 
-    // 处理其他需要左右值的操作符
+    // Handle other operators that require left and right values
     return !value?.left || !value?.right ? message : undefined
   }
 }
 
 /**
- * 创建返回内容配置验证器
- * @param options 验证器配置
- * @returns 返回内容配置验证函数
+ * Create return content validator
+ * @param options - Validator configuration
+ * @returns Return content validator function
  */
 export const createReturnContentValidator = (options: ValidatorOptions = {}) => {
-  const { emptyMessage = '返回内容配置不能为空', resultMessage = '返回结果(result)是必需的' } = options
+  const { emptyMessage = t('workflowCanvas.validation.returnContentEmpty'), resultMessage = t('workflowCanvas.validation.resultRequired') } = options
 
   return ({ value, formValues }: any) => {
     if (formValues?.exceptionConfig?.processType === 'return_content') {
@@ -164,15 +165,15 @@ export const createReturnContentValidator = (options: ValidatorOptions = {}) => 
 }
 
 /**
- * 创建模型验证器
- * @param options 验证器配置
- * @returns 模型验证函数
+ * Create model validator
+ * @param options - Validator configuration
+ * @returns Model validator function
  */
 export const createModelValidator = (options: ValidatorOptions = {}) => {
-  const { message = '请选择模型' } = options
+  const { message = t('workflowCanvas.validation.modelRequired') } = options
 
   return ({ value }: any) => {
-    // 检查模型是否已配置
+    // Check if model is configured
     if (!value || !value.id || value.id === '') {
       return message
     }
@@ -181,15 +182,15 @@ export const createModelValidator = (options: ValidatorOptions = {}) => {
 }
 
 /**
- * 创建流式输出模板验证器
- * @param options 验证器配置
- * @returns 流式输出模板验证函数
+ * Create streaming template validator
+ * @param options - Validator configuration
+ * @returns Streaming template validator function
  */
 export const createStreamingTemplateValidator = (options: ValidatorOptions = {}) => {
-  const { message = '开启流式输出时，输出模板不能为空' } = options
+  const { message = t('workflowCanvas.validation.streamingTemplateEmpty') } = options
 
   return ({ value, formValues }: any) => {
-    // 如果开启了流式输出，检查输出模板是否为空
+    // If streaming is enabled, check if output template is empty
     if (formValues?.inputs?.streaming === true) {
       const content = formValues?.inputs?.content?.content ?? ''
       if (!content || content.trim().length === 0) {
@@ -201,30 +202,30 @@ export const createStreamingTemplateValidator = (options: ValidatorOptions = {})
 }
 
 /**
- * 预定义的通用验证器
+ * Predefined common validators
  */
 export const commonValidators = {
-  /** 默认标题验证器 */
+  /** Default title validator */
   title: createTitleValidator(),
 
-  /** 默认输入参数验证器 */
+  /** Default input parameters validator */
   inputParameters: createInputParametersValidator(),
 
-  /** 非必需输入参数验证器 */
+  /** Optional input parameters validator */
   optionalInputParameters: createInputParametersValidator({ required: false }),
 
-  /** 双输出验证器 */
-  dualOutput: createOutputCountValidator(2, { message: '输出至少需要有两个变量' }),
+  /** Dual output validator */
+  dualOutput: createOutputCountValidator(2, { message: t('workflowCanvas.validation.outputCountDual') }),
 
-  /** 条件完整性验证器 */
+  /** Condition validator */
   condition: createConditionValidator(),
 
-  /** 返回内容配置验证器 */
+  /** Return content validator */
   returnContent: createReturnContentValidator(),
 
-  /** 模型验证器 */
+  /** Model validator */
   model: createModelValidator(),
 
-  /** 流式输出模板验证器 */
+  /** Streaming template validator */
   streamingTemplate: createStreamingTemplateValidator(),
 }

@@ -9,12 +9,13 @@ import { FlowNodeRegistry } from '../../typings'
 import { customNanoid } from '../../utils/nanoid-custom'
 import { WorkflowNodeType } from '../constants'
 import { formMeta } from './form-meta'
+import { t } from '../../i18n'
 
 export const ConditionNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Condition,
   info: {
     icon: <GitBranch size={16} className="text-orange-600" />,
-    description: '连接多个下游分支。只有满足设定条件的对应分支才会被执行。',
+    description: t('workflowCanvas.nodes.condition.description'),
   },
   meta: {
     defaultPorts: [{ type: 'input' }],

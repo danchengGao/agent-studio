@@ -8,6 +8,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { Download } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 export const OutputNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Output,
@@ -22,7 +23,7 @@ export const OutputNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <Download size={16} className="text-blue-600" />,
-    description: '输出节点，用于输出工作流执行过程中的中间结果或最终结果。',
+    description: t('workflowCanvas.nodes.output.description'),
   },
   formMeta,
   onAdd() {

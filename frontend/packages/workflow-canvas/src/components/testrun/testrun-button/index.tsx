@@ -13,10 +13,12 @@ import { Play } from 'lucide-react'
 import { testRunPanelFactory } from '../testrun-panel'
 import { testRunRuntimeService } from '../runtime/testrun-runtime-service'
 import { useValidationStatus } from '../../../hooks'
+import { useTranslation } from '../../../i18n'
 
 import styles from './index.module.less'
 
 export function TestRunButton(props: { disabled: boolean; workflowId?: string; spaceId?: string }) {
+  const { t } = useTranslation()
   const [isSaving, setIsSaving] = useState(false)
   const clientContext = useClientContext()
   const panelManager = usePanelManager()
@@ -80,13 +82,13 @@ export function TestRunButton(props: { disabled: boolean; workflowId?: string; s
       {errorCount === 0 ? (
         <Button disabled={isDisabled} loading={isSaving} onClick={onTestRun} className={styles.testrunSuccessButton}>
           <Play size={16} className={styles['mr-2']} />
-          {isSaving ? '保存中...' : '试运行'}
+          {isSaving ? t('workflowCanvas.testrun.saving') : t('workflowCanvas.testrun.testRun')}
         </Button>
       ) : (
         <Badge count={errorCount} position="rightTop" type="danger">
           <Button type="danger" disabled={isDisabled} loading={isSaving} onClick={handleButtonClick} className={styles.testrunErrorButton}>
             <Play size={16} className={styles['mr-2']} />
-            {isSaving ? '保存中...' : '试运行'}
+            {isSaving ? t('workflowCanvas.testrun.saving') : t('workflowCanvas.testrun.testRun')}
           </Button>
         </Badge>
       )}

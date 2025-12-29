@@ -5,12 +5,14 @@
 
 import { Tooltip, IconButton } from '@douyinfe/semi-ui'
 import { UIIconMinimap } from './styles'
+import { useTranslation } from '../../i18n'
 
 export const MinimapSwitch = (props: { minimapVisible: boolean; setMinimapVisible: (visible: boolean) => void }) => {
   const { minimapVisible, setMinimapVisible } = props
+  const { t } = useTranslation()
 
   return (
-    <Tooltip content="小地图">
+    <Tooltip content={t('workflowCanvas.tools.minimap')}>
       <IconButton
         type="tertiary"
         theme="borderless"

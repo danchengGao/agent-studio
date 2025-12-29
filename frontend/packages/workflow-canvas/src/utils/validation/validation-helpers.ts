@@ -5,11 +5,35 @@
 
 import type { FlowNodeEntity } from '@flowgram.ai/free-layout-editor'
 import type { ValidationErrorInfo } from '../../components/validation/types'
+import { t } from '../../i18n'
 
 /**
- * 获取节点显示名称
- * @param node 节点实体
- * @returns 节点显示名称
+ * Node type to translation key mapping
+ */
+const NODE_TYPE_I18N_KEYS: Record<string, string> = {
+  '1': 'workflowCanvas.node.Start',
+  '2': 'workflowCanvas.node.End',
+  '3': 'workflowCanvas.node.LLM',
+  '4': 'workflowCanvas.node.Selector',
+  '5': 'workflowCanvas.node.Loop',
+  '6': 'workflowCanvas.node.Code',
+  '7': 'workflowCanvas.node.Input',
+  '8': 'workflowCanvas.node.Output',
+  '9': 'workflowCanvas.node.Intent',
+  '10': 'workflowCanvas.node.Questioner',
+  '11': 'workflowCanvas.node.TextEditor',
+  '12': 'workflowCanvas.node.Continue',
+  '13': 'workflowCanvas.node.Break',
+  '14': 'workflowCanvas.node.Variable',
+  '15': 'workflowCanvas.node.Start',
+  '16': 'workflowCanvas.node.End',
+  comment: 'workflowCanvas.node.Comment',
+}
+
+/**
+ * Get node display name
+ * @param node - Node entity
+ * @returns Node display name
  */
 export const getNodeDisplayName = (node: any): string => {
   if (node?.data?.title) {
@@ -17,28 +41,13 @@ export const getNodeDisplayName = (node: any): string => {
   }
 
   const nodeType = node?.type || node?.data?.type
+  const i18nKey = NODE_TYPE_I18N_KEYS[nodeType]
 
-  const nodeTypeNames: Record<string, string> = {
-    '1': '开始',
-    '2': '结束',
-    '3': '大模型',
-    '4': '选择器',
-    '5': '循环',
-    '6': '代码执行',
-    '7': '输入',
-    '8': '输出',
-    '9': '意图识别',
-    '10': '提问器',
-    '11': '文本编辑',
-    '12': '继续',
-    '13': '跳出',
-    '14': '变量',
-    '15': '开始',
-    '16': '结束',
-    comment: '注释',
+  if (i18nKey) {
+    return t(i18nKey)
   }
 
-  return nodeTypeNames[nodeType] || `节点 (${node?.id || '未知'})`
+  return `${t('workflowCanvas.node.Node')} (${node?.id || t('workflowCanvas.node.Unknown')})`
 }
 
 /**

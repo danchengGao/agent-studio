@@ -33,4 +33,11 @@ i18n
     },
   })
 
+// Attach i18next to window for workflow-canvas to access
+// @ts-ignore - i18next global access
+if (typeof window !== 'undefined') {
+  // @ts-ignore - i18next global access
+  window.i18next = i18n
+}
+
 export default i18n

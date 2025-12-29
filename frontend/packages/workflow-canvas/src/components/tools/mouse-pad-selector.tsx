@@ -9,6 +9,7 @@ import { Popover, Typography } from '@douyinfe/semi-ui'
 
 import './mouse-pad-selector.less'
 import { Mouse, Touchpad } from 'lucide-react'
+import { useTranslation } from '../../i18n'
 
 const { Title, Paragraph } = Typography
 
@@ -53,6 +54,7 @@ export const MousePadSelector: React.FC<MousePadSelectorProps & React.RefAttribu
   iconStyle,
   arrowStyle,
 }) => {
+  const { t } = useTranslation()
   const isMouse = value === InteractiveType.Mouse
   const [visible, setVisible] = useState(false)
 
@@ -71,11 +73,11 @@ export const MousePadSelector: React.FC<MousePadSelectorProps & React.RefAttribu
       spacing={20}
       content={
         <div className={'ui-mouse-pad-selector-popover'}>
-          <Typography.Title heading={4}>{'交互模式'}</Typography.Title>
+          <Typography.Title heading={4}>{t('workflowCanvas.tools.interactiveMode')}</Typography.Title>
           <div className={'ui-mouse-pad-selector-popover-options'}>
             <InteractiveItem
-              title={'鼠标友好'}
-              subTitle={'使用左鼠标按钮拖拽画布，使用滚轮缩放。'}
+              title={t('workflowCanvas.tools.mouseMode')}
+              subTitle={t('workflowCanvas.tools.mouseModeDescription')}
               value={InteractiveType.Mouse}
               selected={value === InteractiveType.Mouse}
               icon={<Mouse />}
@@ -83,8 +85,8 @@ export const MousePadSelector: React.FC<MousePadSelectorProps & React.RefAttribu
             />
 
             <InteractiveItem
-              title={'触控板友好'}
-              subTitle={'使用两个手指向同一方向移动进行拖拽，通过捏合或展开两个手指进行缩放。'}
+              title={t('workflowCanvas.tools.touchpadMode')}
+              subTitle={t('workflowCanvas.tools.touchpadModeDescription')}
               value={InteractiveType.Pad}
               selected={value === InteractiveType.Pad}
               icon={<Touchpad />}

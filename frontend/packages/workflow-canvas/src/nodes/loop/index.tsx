@@ -11,12 +11,13 @@ import { RotateCcw } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
 import { LoopType } from './form-meta'
+import { t } from '../../i18n'
 
 export const LoopNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Loop,
   info: {
     icon: <RotateCcw size={16} className="text-cyan-600" />,
-    description: '用于通过设置迭代次数和逻辑来重复执行一系列任务。',
+    description: t('workflowCanvas.nodes.loop.description'),
   },
   meta: {
     /**
@@ -78,7 +79,7 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
         // 如果当前容器已经是循环节点，则不允许添加嵌套循环
         return {
           allowed: false,
-          reason: '循环体内部不支持嵌套循环',
+          reason: t('workflowCanvas.loop.nestedLoopNotAllowed'),
         }
       }
       return { allowed: true }
@@ -89,7 +90,7 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
       id: `loop_${customNanoid(5)}`,
       type: WorkflowNodeType.Loop,
       data: {
-        title: `循环`,
+        title: t('workflowCanvas.loop.title'),
         inputs: {
           loopParam: {
             type: LoopType.NUM_LOOP,
@@ -118,7 +119,7 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
             },
             moveDisable: false,
           },
-          data: { title: '开始' },
+          data: { title: t('workflowCanvas.block.start') },
         },
         {
           id: `block_end_${customNanoid(5)}`,
@@ -131,7 +132,7 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
 
             moveDisable: false,
           },
-          data: { title: '结束' },
+          data: { title: t('workflowCanvas.block.end') },
         },
       ],
     }

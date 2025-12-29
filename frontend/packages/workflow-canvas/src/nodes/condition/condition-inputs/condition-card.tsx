@@ -11,6 +11,7 @@ import { Field, FieldArray } from '@flowgram.ai/free-layout-editor'
 import { Button } from '@douyinfe/semi-ui'
 import { Plus, XCircle, GripVertical } from 'lucide-react'
 import styled from 'styled-components'
+import { useTranslation } from '../../../i18n'
 
 import { ConditionRow, ConditionRowValueType, ConditionPresetOp } from '../../../form-materials'
 import { generateBranchPortId } from './utils'
@@ -110,14 +111,16 @@ interface ConditionCardProps {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 export const ConditionCard: React.FC<ConditionCardProps> = React.memo(
   ({ branch, branchIndex, branchType, totalBranches, onUpdate, onDelete, onCardDelete, enableDrag = false, dragHandleProps, isDragging = false }) => {
+    const { t } = useTranslation()
+
     const getBranchTitle = useCallback(() => {
       switch (branchType) {
         case 'if':
-          return '如果'
+          return t('workflowCanvas.condition.if')
         case 'elseIf':
-          return '否则如果'
+          return t('workflowCanvas.condition.elseIf')
         case 'else':
-          return '否则'
+          return t('workflowCanvas.condition.else')
       }
     }, [branchType])
 
@@ -130,7 +133,7 @@ export const ConditionCard: React.FC<ConditionCardProps> = React.memo(
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
             {enableDrag && (
-              <DragHandle disabled={isDragDisabled} {...dragHandleProps} title={isDragDisabled ? '只有一个分支，无法拖拽' : '拖拽排序'}>
+              <DragHandle disabled={isDragDisabled} {...dragHandleProps} title={isDragDisabled ? t('workflowCanvas.condition.onlyOneBranch') : t('workflowCanvas.condition.dragSort')}>
                 <GripVertical size={14} />
               </DragHandle>
             )}
@@ -231,8 +234,8 @@ const ConditionContent: React.FC<{
                         handleLogicChange(value)
                       }}
                     >
-                      <option value={2}>且</option>
-                      <option value={1}>或</option>
+                      <option value={2}>{t('workflowCanvas.condition.and')}</option>
+                      <option value={1}>{t('workflowCanvas.condition.or')}</option>
                     </StyledSelect>
                   </div>
                   <div className="flex-1 relative">
@@ -300,7 +303,7 @@ const ConditionContent: React.FC<{
                   className="text-blue-500 border border-blue-500 hover:bg-blue-50"
                   size="small"
                 >
-                  新增
+                  {t('workflowCanvas.condition.add')}
                 </Button>
               </div>
             </div>

@@ -8,6 +8,7 @@ import { Field } from '@flowgram.ai/free-layout-editor'
 import { useIsSidebar } from '../../hooks'
 import { FormItem, FormDisplay } from '../../form-components'
 import { JsonSchemaEditor, DisplayOutputs, IJsonSchema } from '../../form-materials'
+import { useTranslation } from '../../i18n'
 
 export interface FormOutputProps {
   name?: string
@@ -20,7 +21,7 @@ export interface FormOutputProps {
 }
 
 export function FormOutput({
-  name = '输出',
+  name,
   outputName = 'outputs',
   showAddButton,
   defaultFields,
@@ -28,15 +29,17 @@ export function FormOutput({
   expandable = false,
   readonly = false,
 }: FormOutputProps) {
+  const { t } = useTranslation()
+  const displayName = name || t('workflowCanvas.formOutput.output')
   const isSidebar = useIsSidebar()
 
   if (!isSidebar) {
-    return <Field<IJsonSchema> name={outputName}>{({ field }) => <FormDisplay label={name} content={<DisplayOutputs value={field.value} />} />}</Field>
+    return <Field<IJsonSchema> name={outputName}>{({ field }) => <FormDisplay label={displayName} content={<DisplayOutputs value={field.value} />} />}</Field>
   }
 
   return (
     <>
-      <FormItem name={name} vertical>
+      <FormItem name={displayName} vertical>
         <Field<IJsonSchema> name={outputName}>
           {({ field }) => (
             <JsonSchemaEditor

@@ -9,12 +9,13 @@ import { WorkflowNodeType } from '../constants'
 import { FlowNodeRegistry } from '../../typings'
 import { Sparkles } from 'lucide-react'
 import { formMeta } from './form-meta'
+import { t } from '../../i18n'
 
 export const LLMNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.LLM,
   info: {
     icon: <Sparkles size={16} className="text-purple-600" />,
-    description: '调用，使用变量和提示词生成响应。',
+    description: t('workflowCanvas.nodes.llm.description'),
   },
   meta: {
     size: {
@@ -100,7 +101,8 @@ export const LLMNodeRegistry: FlowNodeRegistry = {
         llmNodes.forEach(node => {
           const title = node.data?.title || node.title || '';
           console.log(`Node ${node.id} title: "${title}"`);
-          const match = title.match(/大模型(\d+)$/);
+          // Match title ending with number (works for both "大模型1" and "LLM 1")
+          const match = title.match(/(\d+)$/);
           if (match) {
             const number = parseInt(match[1], 10);
             usedNumbers.add(number);
@@ -128,7 +130,7 @@ export const LLMNodeRegistry: FlowNodeRegistry = {
       maxLLMNumber = 1;
     }
 
-    const title = `大模型${maxLLMNumber}`;
+    const title = `${t('workflowCanvas.nodes.llm.titlePrefix')}${maxLLMNumber}`;
 
     console.log(`Creating LLM node: ${title}`);
 

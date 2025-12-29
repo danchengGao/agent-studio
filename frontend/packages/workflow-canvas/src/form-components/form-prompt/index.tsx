@@ -9,6 +9,7 @@ import { Field } from '@flowgram.ai/free-layout-editor'
 import { IFlowTemplateValue, PromptEditorWithInputs } from '../../form-materials'
 import { useIsSidebar, useNodeRenderContext } from '../../hooks'
 import { FormItem } from '../form-item'
+import { useTranslation } from '../../i18n'
 import { PromptTitleActions } from '@/components/Agent/PromptTitleActions'
 import { PromptGenerationBanner } from '@/components/Agent/PromptGenerationBanner'
 import { PromptRelationInfoBar } from '@/components/Agent/PromptRelationInfoBar'
@@ -39,6 +40,7 @@ export function FormPrompt({
   style = { flexGrow: 4 },
   mode = 'both',
 }: FormPromptProps) {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
   const { node } = useNodeRenderContext()
 
@@ -47,7 +49,7 @@ export function FormPrompt({
   }
 
   const renderUserPrompt = (inputsValues: Record<string, any>) => (
-    <FormItem name="用户提示词" vertical defaultCollapsed={true}>
+    <FormItem name={t('workflowCanvas.formPrompt.userPrompt')} vertical defaultCollapsed={true}>
       <Field<IFlowTemplateValue> name={userPromptName}>
         {({ field }) => (
           <PromptEditorWithInputs
@@ -137,7 +139,7 @@ export function FormPrompt({
 
                           return (
                             <>
-                              <FormItem name="系统提示词" vertical defaultCollapsed={true}>
+                              <FormItem name={t('workflowCanvas.formPrompt.systemPrompt')} vertical defaultCollapsed={true}>
                                 <div className="flex flex-col gap-2">
                                   {/* 操作按钮 */}
                                   <div className="flex items-center gap-2">

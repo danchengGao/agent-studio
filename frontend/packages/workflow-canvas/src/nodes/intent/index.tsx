@@ -10,6 +10,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { WorkflowNodeType } from '../constants'
 import { formMeta } from './form-meta'
 import { generateIntentId } from './components/utils'
+import { t } from '../../i18n'
 
 export const IntentNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Intent,
@@ -23,7 +24,7 @@ export const IntentNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <Target size={16} className="text-blue-600" />,
-    description: '意图识别节点，用于根据用户不同的输入匹配不同的意图。',
+    description: t('workflowCanvas.nodes.intent.description'),
   },
   /**
    * 通过 formMeta 渲染节点

@@ -7,13 +7,14 @@ import { FormMeta, ValidateTrigger, FlowNodeJSON } from '@flowgram.ai/free-layou
 
 import { provideJsonSchemaOutputs, syncVariableTitle } from '../../form-materials'
 import { FormHeader, FormContent, FormOutput } from '../../form-components'
+import { t } from '../../i18n'
 
 export const renderForm = () => {
   return (
     <>
       <FormHeader />
       <FormContent>
-        <FormOutput name={'输入'} minProperties={1} expandable={true} />
+        <FormOutput name={t('workflowCanvas.nodes.input.output')} minProperties={1} expandable={true} />
       </FormContent>
     </>
   )

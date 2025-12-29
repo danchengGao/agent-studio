@@ -10,8 +10,10 @@ import { Plus } from 'lucide-react'
 import { VariableGroupManagerProps, VariableGroup } from '../types'
 import { GroupCard } from './group-card'
 import { inferVariableType } from './type-inference'
+import { useTranslation } from '../../../i18n'
 
 export const VariableGroupManager = ({ groups, onGroupsChange, onNodeStructureChange }: VariableGroupManagerProps) => {
+  const { t } = useTranslation()
   const availableVariables = useAvailableVariables()
 
   useEffect(() => {
@@ -125,13 +127,13 @@ export const VariableGroupManager = ({ groups, onGroupsChange, onNodeStructureCh
           }}
         >
           <Plus style={{ fontSize: 24, marginBottom: 8 }} />
-          <div>暂无分组，点击下方按钮添加</div>
+          <div>{t('workflowCanvas.nodes.variableMerge.noGroups')}</div>
         </div>
       )}
 
       <div style={{ marginTop: 16 }}>
         <Button type="primary" icon={<Plus />} block onClick={addGroup}>
-          添加分组
+          {t('workflowCanvas.nodes.variableMerge.addGroup')}
         </Button>
       </div>
     </div>

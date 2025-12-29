@@ -12,8 +12,10 @@ import { NodeValidationErrorPanelProps } from './types'
 import { ValidationErrorList } from './validation-error-list'
 import styles from './styles/index.module.less'
 import { testRunRuntimeService } from '../testrun/runtime/testrun-runtime-service'
+import { useTranslation } from '../../i18n'
 
 export const NodeValidationErrorPanel: FC<NodeValidationErrorPanelProps> = ({ errors, onNodeSelect, onFixAll, onDismiss }) => {
+  const { t } = useTranslation()
   const panelManager = usePanelManager()
 
   const handleClose = useCallback(() => {
@@ -29,16 +31,16 @@ export const NodeValidationErrorPanel: FC<NodeValidationErrorPanelProps> = ({ er
       <div className={styles['validation-error-header']}>
         <div className={styles['validation-error-title']}>
           <AlertTriangle size={20} className={styles['error-icon']} />
-          <span>节点校验问题</span>
+          <span>{t('workflowCanvas.validation.nodeValidationError')}</span>
           <div className={styles['validation-error-count']}>
-            {errorCount > 0 && <span className={styles['error-count']}>{errorCount} 错误</span>}
-            {warningCount > 0 && <span className={styles['warning-count']}>{warningCount} 警告</span>}
+            {errorCount > 0 && <span className={styles['error-count']}>{errorCount} {t('workflowCanvas.validation.error')}</span>}
+            {warningCount > 0 && <span className={styles['warning-count']}>{warningCount} {t('workflowCanvas.validation.warning')}</span>}
           </div>
         </div>
         <div className={styles['validation-error-actions']}>
           {onFixAll && errors.length > 0 && (
             <Button size="small" type="secondary" onClick={onFixAll}>
-              修复所有
+              {t('workflowCanvas.validation.fixAll')}
             </Button>
           )}
           <Button size="small" type="tertiary" theme="borderless" onClick={handleClose}>

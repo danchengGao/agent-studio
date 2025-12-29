@@ -15,6 +15,7 @@ import { WorkflowDocument } from '@flowgram.ai/free-layout-editor'
 import { useExecutionContext } from '../../../context'
 import { findNodeRecursively } from '../../../utils'
 import { useTestExecution } from '../shared/use-test-execution'
+import { useTranslation } from '../../../i18n'
 
 import styles from './index.module.less'
 
@@ -46,11 +47,8 @@ export interface TestDebugPanelProps {
   spaceId?: string
 }
 
-export const TestDebugPanel: FC<TestDebugPanelProps> = ({
-  nodeData,
-  workflowId,
-  spaceId,
-}) => {
+export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, spaceId }) => {
+  const { t } = useTranslation()
   const panelManager = usePanelManager()
   const executionContext = useExecutionContext()
   const document = useService(WorkflowDocument)
@@ -159,14 +157,14 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({
         nodeIcon={nodeIcon}
         nodeIconFallback={<MessageSquare size={16} className={styles['interruption-icon']} />}
         values={valuesRef.current}
-        setValues={(vals) => {
+        setValues={vals => {
           valuesRef.current = vals
         }}
         inputFormMeta={inputFormMeta}
         inputJSONMode={inputJSONMode}
         setInputJSONMode={handleSetInputJSONMode}
-        isInterruptionMode={false}
-        interruptionMessage="完成以下输入后，继续试运行"
+        isInterruptionMode={false} // 修改为非中断模式，确保能显示输出结果
+        interruptionMessage={t('workflowCanvas.testDebugPanel.completeInputToContinue')}
         result={
           result
             ? {
@@ -182,27 +180,18 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({
 
   const renderButton = isExecuting ? (
     <Button onClick={handleCancel} className={`${styles.button} ${styles.running}`}>
-      取消
+      {t('workflowCanvas.testDebugPanel.cancel')}
     </Button>
   ) : (
-    <Button
-      onClick={() => handleTestRun(valuesRef.current)}
-      className={`${styles.button} ${styles.save}`}
-    >
-      运行
+    <Button onClick={() => handleTestRun(valuesRef.current)} className={`${styles.button} ${styles.save}`}>
+      {t('workflowCanvas.testDebugPanel.run')}
     </Button>
   )
 
   const renderHeader = (
     <div className={styles['testrun-panel-header']}>
-      <div className={styles['testrun-panel-title']}>试运行</div>
-      <Button
-        className={styles['testrun-panel-title']}
-        type="tertiary"
-        size="small"
-        theme="borderless"
-        onClick={handleClose}
-      >
+      <div className={styles['testrun-panel-title']}>{t('workflowCanvas.testDebugPanel.testRun')}</div>
+      <Button className={styles['testrun-panel-title']} type="tertiary" size="small" theme="borderless" onClick={handleClose}>
         <X size={16} className={styles['text-gray-600']} />
       </Button>
     </div>

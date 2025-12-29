@@ -9,12 +9,13 @@ import { WorkflowNodeType } from '../constants'
 import { FlowNodeRegistry } from '../../typings'
 import { formMeta } from './form-meta'
 import { customNanoid } from '../../utils/nanoid-custom'
+import { t } from '../../i18n'
 
 export const VariableMergeNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.VariableMerge,
   info: {
     icon: <Merge size={16} className="text-purple-600" />,
-    description: '工作流的变量聚合节点，用于将多个分组的变量进行聚合',
+    description: t('workflowCanvas.nodes.variableMerge.description'),
   },
   meta: {
     size: {

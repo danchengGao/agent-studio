@@ -7,6 +7,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { Square } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 export const BlockEndNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.BlockEnd,
@@ -33,10 +34,10 @@ export const BlockEndNodeRegistry: FlowNodeRegistry = {
     icon: (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '4px 0', flexDirection: 'column' }}>
         <Square size={20} className="text-red-600" />
-        <span style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>结束</span>
+        <span style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>{t('workflowCanvas.block.end')}</span>
       </div>
     ),
-    description: '块的结束节点。',
+    description: t('workflowCanvas.nodes.blockEnd.description'),
   },
   /**
    * Render node via formMeta

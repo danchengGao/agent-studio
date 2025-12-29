@@ -20,6 +20,7 @@ import { WorkflowDocument } from '@flowgram.ai/free-layout-editor'
 import { findNodeRecursively } from '../../../utils'
 import { parseInteractionMsgToFormMeta } from '../utils/parseInteractionMsg'
 import { useStreamMessages, useInputInterruption, useFormValidation } from '../shared'
+import { useTranslation } from '../../../i18n'
 
 import styles from './index.module.less'
 
@@ -35,6 +36,7 @@ interface TestRunSidePanelProps {
 }
 
 export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceId }) => {
+  const { t } = useTranslation()
   const panelManager = usePanelManager()
   const executionContext = useExecutionContext()
   const document = useService(WorkflowDocument)
@@ -276,7 +278,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
     <div className={styles['testrun-panel-running']}>
       <div className={styles['running-header']}>
         <Loader2 className="animate-spin" size={20} />
-        <div className={styles.text}>运行中...</div>
+        <div className={styles.text}>{t('workflowCanvas.testrunPanel.running')}</div>
       </div>
       {messages.size > 0 && (
         <div className={styles['stream-messages-container']}>
@@ -296,7 +298,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
   const renderForm = (
     <div className={styles['testrun-panel-form']}>
       <NodeInputPanel
-        title={interruption ? undefined : '试运行输入'}
+        title={interruption ? undefined : t('workflowCanvas.testrunPanel.testRunInput')}
         nodeIcon={interruption ? interruptionNodeIcon : undefined}
         nodeIconFallback={<MessageSquare size={16} className={styles['interruption-icon']} />}
         values={interruption ? inputValues : values}
@@ -305,7 +307,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
         inputJSONMode={interruption ? false : inputJSONMode}
         setInputJSONMode={interruption ? () => {} : setInputJSONMode}
         isInterruptionMode={!!interruption}
-        interruptionMessage="完成以下输入后，继续试运行"
+        interruptionMessage={t('workflowCanvas.testrunPanel.completeInputToContinue')}
         result={result}
         errors={errors}
       />
@@ -314,7 +316,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
 
   const renderButton = interruption ? (
     <Button onClick={handleInputResume} className={classnames(styles.button, styles.save)}>
-      继续运行
+      {t('workflowCanvas.testrunPanel.continueRunning')}
     </Button>
   ) : (
     <Button
@@ -324,13 +326,13 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
         [styles.default]: !isStreamExecuting,
       })}
     >
-      {isStreamExecuting ? '取消' : '运行'}
+      {isStreamExecuting ? <>{t('workflowCanvas.testrunPanel.cancel')}</> : <>{t('workflowCanvas.testrunPanel.run')}</>}
     </Button>
   )
 
   const renderHeader = (
     <div className={styles['testrun-panel-header']}>
-      <div className={styles['testrun-panel-title']}>试运行</div>
+      <div className={styles['testrun-panel-title']}>{t('workflowCanvas.testrunPanel.testRun')}</div>
       <Button className={styles['testrun-panel-title']} type="tertiary" size="small" theme="borderless" onClick={onClose}>
         <X size={16} className={`${styles['text-gray-600']} ${styles['hover:text-red-6']}`} />
       </Button>

@@ -13,8 +13,10 @@ import { FormHeader, FormContent, FormItem, FormDisplay } from '../../form-compo
 import { useIsSidebar } from '../../hooks'
 import { VariableGroupManager } from './components'
 import { VariableMergeNodeJSON, MergeStrategy, VariableGroup } from './types'
+import { useTranslation } from '../../i18n'
 
 export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNodeJSON>) => {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
   const { form } = props
   const available = useScopeAvailable()
@@ -95,7 +97,7 @@ export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNode
 
               return (
                 <FormDisplay
-                  label={'输出'}
+                  label={t('workflowCanvas.nodes.variableMerge.output')}
                   content={
                     <div className="gedit-m-display-inputs-wrapper">
                       {displayGroups.map((group, index) => {
@@ -152,9 +154,9 @@ export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNode
       <FormContent>
         <Field<MergeStrategy> name={`inputs.mergeStrategy`}>
           {({ field }) => (
-            <FormItem name="聚合策略">
+            <FormItem name={t('workflowCanvas.nodes.variableMerge.aggregationStrategy')}>
               <Select style={{ width: '100%' }} value={field.value || MergeStrategy.FIRST_NON_NULL} onChange={value => field.onChange(value as MergeStrategy)}>
-                <Select.Option value={MergeStrategy.FIRST_NON_NULL}>返回每个分组中第一个非空的值</Select.Option>
+                <Select.Option value={MergeStrategy.FIRST_NON_NULL}>{t('workflowCanvas.nodes.variableMerge.firstNonNull')}</Select.Option>
               </Select>
             </FormItem>
           )}

@@ -7,6 +7,7 @@ import React from 'react'
 import { Toast } from '@douyinfe/semi-ui'
 import { WorkflowService } from '@test-agentstudio/api-client'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import { useTranslation } from '../../i18n'
 
 export interface PublishModalProps {
   open: boolean
@@ -30,7 +31,7 @@ function computeNextVersion(latest?: string): string {
 }
 
 // 拉取版本列表并设置默认版本（命名函数，避免闭包/IIFE）
-async function refreshDefaultVersion(workflowId: string, spaceId: string, defaultVersion: string, setVersion: (v: string) => void): Promise<void> {
+async function refreshDefaultVersion(workflowId: string, spaceId: string, defaultVersion: string, setVersion: (v: string) => void, t: (key: string) => string): Promise<void> {
   try {
     const res = await WorkflowService.getWorkflowVersionList({ workflow_id: workflowId, space_id: spaceId })
     const versions = res?.data?.versions || []
@@ -38,12 +39,13 @@ async function refreshDefaultVersion(workflowId: string, spaceId: string, defaul
     const next = computeNextVersion(latest)
     setVersion(next)
   } catch (err) {
-    console.error('获取版本列表失败:', err)
+    console.error(t('workflowCanvas.publishDialog.fetchVersionListFailed'), err)
     setVersion(defaultVersion)
   }
 }
 
 const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId, onSave, asyncSaveRef, onClose, defaultVersion = 'v1.0.0' }) => {
+  const { t } = useTranslation()
   const [version, setVersion] = React.useState<string>('')
   const [description, setDescription] = React.useState<string>('')
   const [loading, setLoading] = React.useState<boolean>(false)
@@ -55,19 +57,19 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
   // 校验函数：版本号与描述
   const validateVersionInput = React.useCallback((val: string): string => {
     const trimmed = (val || '').trim()
-    if (!trimmed) return '请输入发布版本'
+    if (!trimmed) return t('workflowCanvas.publishDialog.enterPublishVersion')
     const pattern = /^v\d+\.\d+\.\d+$/
-    if (!pattern.test(trimmed)) return '版本号格式不正确，请使用 v1.2.3 格式'
+    if (!pattern.test(trimmed)) return t('workflowCanvas.publishDialog.versionFormatIncorrect')
     return ''
-  }, [])
+  }, [t])
 
   const validateDescriptionInput = React.useCallback((val: string): string => {
     const trimmed = (val || '').trim()
-    if (!trimmed) return '请输入发布描述'
-    if (trimmed.length < 5) return '发布描述至少需要5个字符'
-    if (trimmed.length > 200) return '发布描述不能超过200个字符'
+    if (!trimmed) return t('workflowCanvas.publishDialog.enterPublishDescription')
+    if (trimmed.length < 5) return t('workflowCanvas.publishDialog.descriptionMinLength')
+    if (trimmed.length > 200) return t('workflowCanvas.publishDialog.descriptionMaxLength')
     return ''
-  }, [])
+  }, [t])
 
   React.useEffect(() => {
     if (!open) return
@@ -80,12 +82,12 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
       return
     }
 
-    refreshDefaultVersion(workflowId, spaceId, defaultVersion, setVersion)
-  }, [open, workflowId, spaceId, defaultVersion])
+    refreshDefaultVersion(workflowId, spaceId, defaultVersion, setVersion, t)
+  }, [open, workflowId, spaceId, defaultVersion, t])
 
   const handleConfirm = async () => {
     if (!workflowId || !spaceId) {
-      Toast.error('工作流信息不存在')
+      Toast.error(t('workflowCanvas.publishDialog.workflowInfoNotFound'))
       return
     }
 
@@ -116,7 +118,7 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
       })
 
       if (response.code === 200) {
-        Toast.success('工作流发布成功')
+        Toast.success(t('workflowCanvas.publishDialog.publishSuccess'))
         // 通知 store 发布成功：刷新历史列表并重置选中为草稿
         const notifyPublished = useWorkflowStore.getState().notifyPublished
         notifyPublished({ workflowId, spaceId })
@@ -124,11 +126,11 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
         setVersion('')
         setDescription('')
       } else {
-        Toast.error(response.message || '发布失败')
+        Toast.error(response.message || t('workflowCanvas.publishDialog.publishFailed'))
       }
     } catch (error: any) {
-      console.error('发布工作流失败:', error)
-      Toast.error(error?.message || '发布失败，请稍后重试')
+      console.error(t('workflowCanvas.publishDialog.publishWorkflowFailed'), error)
+      Toast.error(error?.message || t('workflowCanvas.publishDialog.publishFailedRetry'))
     } finally {
       setLoading(false)
     }
@@ -166,11 +168,11 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
           maxWidth: '90vw',
         }}
       >
-        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 'bold' }}>发布工作流</h3>
+        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 'bold' }}>{t('workflowCanvas.publishDialog.publishWorkflow')}</h3>
 
         <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '14px', color: '#333', marginBottom: '8px', fontWeight: 500 }}>
-            发布版本 <span style={{ color: '#ff4d4f' }}>*</span>
+            {t('workflowCanvas.publishDialog.publishVersion')} <span style={{ color: '#ff4d4f' }}>*</span>
           </div>
           <input
             type="text"
@@ -179,7 +181,7 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
               const v = e.target.value
               if (v.length <= 80) setVersion(v)
             }}
-            placeholder="请输入版本号，如: v0.0.1"
+            placeholder={t('workflowCanvas.publishDialog.versionPlaceholder')}
             style={{
               width: '100%',
               padding: '12px 16px',
@@ -210,7 +212,7 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
 
         <div style={{ marginBottom: '16px' }}>
           <div style={{ fontSize: '14px', color: '#333', marginBottom: '8px', fontWeight: 500 }}>
-            发布描述 <span style={{ color: '#ff4d4f' }}>*</span>
+            {t('workflowCanvas.publishDialog.publishDescription')} <span style={{ color: '#ff4d4f' }}>*</span>
           </div>
           <textarea
             value={description}
@@ -218,7 +220,7 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
               const v = e.target.value
               if (v.length <= 200) setDescription(v)
             }}
-            placeholder="请输入本次发布的描述信息..."
+            placeholder={t('workflowCanvas.publishDialog.descriptionPlaceholder')}
             style={{
               width: '100%',
               minHeight: '120px',
@@ -260,7 +262,7 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
               fontSize: '14px',
             }}
           >
-            取消
+            {t('workflowCanvas.publishDialog.cancel')}
           </button>
           <button
             onClick={handleConfirm}
@@ -276,7 +278,7 @@ const PublishDialog: React.FC<PublishModalProps> = ({ open, workflowId, spaceId,
               opacity: loading || !!versionError || !!descriptionError || !version.trim() || !description.trim() ? 0.6 : 1,
             }}
           >
-            {loading ? '发布中...' : '确认发布'}
+            {loading ? t('workflowCanvas.publishDialog.publishing') : t('workflowCanvas.publishDialog.confirmPublish')}
           </button>
         </div>
       </div>

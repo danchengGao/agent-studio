@@ -9,12 +9,13 @@ import { WorkflowNodeType } from '../constants'
 import { FlowNodeRegistry } from '../../typings'
 import { Code } from 'lucide-react'
 import { formMeta } from './form-meta'
+import { t } from '../../i18n'
 
 export const CodeNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Code,
   info: {
     icon: <Code size={16} className="text-emerald-600" />,
-    description: '代码节点，用于运行自定义的 JavaScript 或 Python 代码。',
+    description: t('workflowCanvas.nodes.code.description'),
   },
   meta: {
     defaultPorts: [{ type: 'input' }],
@@ -32,7 +33,7 @@ export const CodeNodeRegistry: FlowNodeRegistry = {
       id: `code_${customNanoid(5)}`,
       type: WorkflowNodeType.Code,
       data: {
-        title: '代码',
+        title: t('workflowCanvas.nodes.code.title'),
         inputs: {
           inputParameters: {
             input: {
@@ -54,7 +55,7 @@ export const CodeNodeRegistry: FlowNodeRegistry = {
           properties: {
             result: {
               type: 'string',
-              description: '代码执行结果',
+              description: t('workflowCanvas.nodes.code.outputDescription'),
             },
           },
           required: ['result'],

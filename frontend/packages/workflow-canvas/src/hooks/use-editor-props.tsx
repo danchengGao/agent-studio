@@ -306,16 +306,6 @@ export function useEditorProps(
       onDispose() {
         console.log('---- Playground Dispose ----')
       },
-      i18n: {
-        locale: navigator.language,
-        languages: {
-          'zh-CN': {
-            'Never Remind': '不再提示',
-            'Hold {{key}} to drag node out': '按住 {{key}} 可以将节点拖出',
-          },
-          'en-US': {},
-        },
-      },
       plugins: () => [
         /**
          * Line render plugin

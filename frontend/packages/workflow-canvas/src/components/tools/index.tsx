@@ -20,6 +20,7 @@ import { Comment } from './comment'
 import { AutoLayout } from './auto-layout'
 import { Interactive } from './interactive'
 import { ToolContainer, ToolSection } from './styles'
+import { useTranslation } from '../../i18n'
 
 interface ToolsProps {
   workflowId?: string
@@ -28,6 +29,7 @@ interface ToolsProps {
 
 export function Tools({ workflowId, spaceId }: ToolsProps) {
   const { history, playground } = useClientContext()
+  const { t } = useTranslation()
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [minimapVisible, setMinimapVisible] = useState(false)
@@ -57,10 +59,10 @@ export function Tools({ workflowId, spaceId }: ToolsProps) {
           <MinimapSwitch minimapVisible={minimapVisible} setMinimapVisible={setMinimapVisible} />
           <Comment />
 
-          <Tooltip content="撤销">
+          <Tooltip content={t('workflowCanvas.tools.undo')}>
             <IconButton type="tertiary" theme="borderless" icon={<Undo2 size="small" />} disabled={!canUndo} onClick={() => history.undo()} />
           </Tooltip>
-          <Tooltip content="重做">
+          <Tooltip content={t('workflowCanvas.tools.redo')}>
             <IconButton type="tertiary" theme="borderless" icon={<Redo2 size="small" />} disabled={!canRedo} onClick={() => history.redo()} />
           </Tooltip>
 

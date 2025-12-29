@@ -8,6 +8,7 @@ import { Bug, Terminal, AlertCircle, XCircle, Code, Database, ArrowRight, Clock,
 import { useExecutionLogsList, useExecutionDebug, useFetchExecutionLogDetail } from '@test-agentstudio/api-client'
 import { LogSummaryTree } from '../log-summary-tree'
 import { ErrorBoundary } from './ErrorBoundary'
+import { useTranslation } from '../../../i18n'
 
 interface DebugSidePanelProps {
   visible: boolean
@@ -18,6 +19,7 @@ interface DebugSidePanelProps {
 
 // Component Detail Panel for Sidebar
 const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
+  const { t } = useTranslation()
   const hasInputs = component.inputs && Object.keys(component.inputs).length > 0
   const hasOutputs = component.outputs && Object.keys(component.outputs).length > 0
   const formatJSON = (obj: any) => {
@@ -32,7 +34,7 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center gap-2 text-blue-600">
           <Database size={16} />
-          <span className="text-sm font-medium">该组件没有输入输出数据</span>
+          <span className="text-sm font-medium">{t('workflowCanvas.debugPanel.noInputOutputData')}</span>
         </div>
       </div>
     )
@@ -41,7 +43,7 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
     <div className="space-y-6">
       {/* Component Info */}
       <div>
-        <h3 className="text-sm font-medium text-gray-900 mb-3">组件信息</h3>
+        <h3 className="text-sm font-medium text-gray-900 mb-3">{t('workflowCanvas.debugPanel.componentInfo')}</h3>
         <div className="bg-gray-50 rounded-lg p-3 space-y-2">
           {component.invokeId && (
             <div className="flex justify-between text-sm">
@@ -51,7 +53,7 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
           )}
           {component.status && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">状态:</span>
+              <span className="text-gray-600">{t('workflowCanvas.debugPanel.status')}:</span>
               <span
                 className={`px-2 py-1 rounded text-xs ${
                   component.status === 'success' || component.status === 'completed'
@@ -69,13 +71,13 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
           )}
           {component.duration && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">执行时间:</span>
+              <span className="text-gray-600">{t('workflowCanvas.debugPanel.executionTime')}:</span>
               <span className="text-gray-900">{component.duration}ms</span>
             </div>
           )}
           {component.llmModel && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">模型:</span>
+              <span className="text-gray-600">{t('workflowCanvas.debugPanel.model')}:</span>
               <span className="text-gray-900">{component.llmModel}</span>
             </div>
           )}
@@ -87,7 +89,7 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
           <div className="flex items-center gap-2 mb-3">
             <ArrowRight size={14} className="text-green-500" />
             <h3 className="text-sm font-medium text-gray-900">Inputs</h3>
-            <span className="text-xs text-gray-500">({Object.keys(component.inputs).length} 项)</span>
+            <span className="text-xs text-gray-500">({Object.keys(component.inputs).length} {t('workflowCanvas.debugPanel.items')})</span>
           </div>
           <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
             <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono overflow-x-auto max-h-64 overflow-y-auto">{formatJSON(component.inputs)}</pre>
@@ -100,7 +102,7 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
           <div className="flex items-center gap-2 mb-3">
             <ArrowRight size={14} className="text-blue-500" />
             <h3 className="text-sm font-medium text-gray-900">Outputs</h3>
-            <span className="text-xs text-gray-500">({Object.keys(component.outputs).length} 项)</span>
+            <span className="text-xs text-gray-500">({Object.keys(component.outputs).length} {t('workflowCanvas.debugPanel.items')})</span>
           </div>
           <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
             <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono overflow-x-auto max-h-64 overflow-y-auto">{formatJSON(component.outputs)}</pre>
@@ -111,7 +113,7 @@ const ComponentDetailPanel: FC<{ component: any }> = ({ component }) => {
   )
 }
 
-// 调试函数：深度检查API响应结构
+// Debug function: Deep check API response structure
 const debugApiResponse = (response: any, context: string) => {
   console.log(`🔍 [${context}] API响应调试:`)
   console.log('  - 响应类型:', typeof response)
@@ -143,6 +145,7 @@ const debugApiResponse = (response: any, context: string) => {
 }
 
 export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, workflowId, spaceId }) => {
+  const { t } = useTranslation()
   const [selectedComponent, setSelectedComponent] = useState<any>(null)
   const [debugData, setDebugData] = useState<{
     log_summary?: any
@@ -291,7 +294,7 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
       } else {
         date = new Date(timestamp)
       }
-      if (isNaN(date.getTime())) return '无效日期'
+      if (isNaN(date.getTime())) return t('workflowCanvas.debugPanel.invalidDate')
       return date.toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -302,7 +305,7 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
         hour12: false,
       })
     } catch (error) {
-      return '时间格式错误'
+      return t('workflowCanvas.debugPanel.timeFormatError')
     }
   }
 
@@ -321,10 +324,10 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
       setExecutionLogDebugData(null) // 清空执行日志调试数据
       setSelectedComponent(null) // 清空选中的组件
       setIsDebugDataLoading(true) // 设置加载状态
-      Toast.info(`正在加载 ${formattedTime} 的调测数据...`)
+      Toast.info(`${t('workflowCanvas.debugPanel.loadingDebugData')} ${formattedTime}...`)
 
       if (!workflowId || !spaceId) {
-        Toast.error('缺少工作流或空间ID')
+        Toast.error(t('workflowCanvas.debugPanel.missingWorkflowOrSpaceId'))
         setIsDebugDataLoading(false)
         return
       }
@@ -401,10 +404,10 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
         setExecutionLogDebugData(result.data)
 
         setIsDebugDataLoading(false) // 重置加载状态
-        Toast.success(`已加载 ${formattedTime} 的执行日志详情`)
+        Toast.success(`${t('workflowCanvas.debugPanel.loadedExecutionLogDetails')} ${formattedTime}`)
       } else {
         console.warn('⚠️ API响应数据为空或格式错误')
-        Toast.warning('获取到的执行日志详情为空')
+        Toast.warning(t('workflowCanvas.debugPanel.executionLogDetailsEmpty'))
         setIsDebugDataLoading(false) // 重置加载状态
 
         // 提供降级数据，防止页面空白
@@ -426,8 +429,8 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
       })
       setExecutionLogDebugData(null)
 
-      const errorMessage = error instanceof Error ? error.message : '未知错误'
-      Toast.error(`加载调测数据失败: ${errorMessage}`)
+      const errorMessage = error instanceof Error ? error.message : t('workflowCanvas.debugPanel.unknownError')
+      Toast.error(`${t('workflowCanvas.debugPanel.loadDebugDataFailed')}: ${errorMessage}`)
     }
   }
 
@@ -437,10 +440,10 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
     const logsCreateList = logsData?.data?.logs_create_list || logsData?.data?.logsCreateList || executionLogs
 
     if (logsCreateList.length === 0) {
-      const loadingText = logsError ? '加载失败' : logsLoading ? '获取数据中...' : '暂无执行日志'
+      const loadingText = logsError ? t('workflowCanvas.debugPanel.loadFailed') : logsLoading ? t('workflowCanvas.debugPanel.fetchingData') : t('workflowCanvas.debugPanel.noExecutionLogs')
       return (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-700 font-medium">执行日志：</span>
+          <span className="text-sm text-gray-700 font-medium">{t('workflowCanvas.debugPanel.executionLogs')}:</span>
           <div className="flex items-center gap-1 text-xs text-gray-400">
             <Clock size={12} />
             <span>{loadingText}</span>
@@ -450,11 +453,11 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
             size="small"
             type="tertiary"
             onClick={() => {
-              Toast.info('正在重新加载执行日志列表...')
+              Toast.info(t('workflowCanvas.debugPanel.reloadingExecutionLogs'))
             }}
             className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
           >
-            重试
+            {t('workflowCanvas.debugPanel.retry')}
           </Button>
         </div>
       )
@@ -467,8 +470,8 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
 
       // 使用完整的格式化时间作为显示值
       let displayTime = formattedTime
-      if (formattedTime && ['无效日期', '时间格式错误'].includes(formattedTime)) {
-        displayTime = `执行时间 ${index + 1}`
+      if (formattedTime && [t('workflowCanvas.debugPanel.invalidDate'), t('workflowCanvas.debugPanel.timeFormatError')].includes(formattedTime)) {
+        displayTime = `${t('workflowCanvas.debugPanel.executionTime')} ${index + 1}`
       }
 
       return {
@@ -499,17 +502,17 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
       setDebugData(null)
       setExecutionLogDebugData(null) // 同时清空执行日志调试数据
       setSelectedComponent(null)
-      Toast.info('已清空选择，请重新选择执行时间')
+      Toast.info(t('workflowCanvas.debugPanel.clearedSelection'))
     }
 
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-700 font-medium">执行日志：</span>
+        <span className="text-sm text-gray-700 font-medium">{t('workflowCanvas.debugPanel.executionLogs')}:</span>
         <Select
-          value={selectedExecutionTime && !['无效日期', '时间格式错误'].includes(selectedExecutionTime) ? selectedExecutionTime : ''}
+          value={selectedExecutionTime && ![t('workflowCanvas.debugPanel.invalidDate'), t('workflowCanvas.debugPanel.timeFormatError')].includes(selectedExecutionTime) ? selectedExecutionTime : ''}
           onChange={handleSelectChange}
           onClear={handleSelectClear}
-          placeholder="请选择执行日志"
+          placeholder={t('workflowCanvas.debugPanel.selectExecutionLog')}
           size="small"
           style={{ width: '280px' }}
           className="w-full max-w-xs"
@@ -524,7 +527,7 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
               key={option.value || `option-${option.index}`}
               value={option.value}
               render={option.render}
-              disabled={!option.value || ['无效日期', '时间格式错误'].includes(option.value)}
+              disabled={!option.value || [t('workflowCanvas.debugPanel.invalidDate'), t('workflowCanvas.debugPanel.timeFormatError')].includes(option.value)}
             >
               {option.label}
             </Select.Option>
@@ -540,7 +543,7 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <Bug size={20} className="text-orange-500" />
-            <span>调试</span>
+            <span>{t('workflowCanvas.debugPanel.debug')}</span>
           </div>
           <div className="flex items-center gap-2">
             {renderExecutionLogsDropdown()}
@@ -549,12 +552,12 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
               size="small"
               type="tertiary"
               onClick={() => {
-                Toast.info('正在获取最新的执行日志...')
+                Toast.info(t('workflowCanvas.debugPanel.fetchingLatestLogs'))
                 // 只重新获取执行日志列表，不影响当前选中的执行时间和调试数据
                 refetchDebug()
               }}
               className="text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-              title="刷新执行日志"
+              title={t('workflowCanvas.debugPanel.refreshExecutionLogs')}
             />
           </div>
         </div>
@@ -580,7 +583,7 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <div className="flex items-center gap-2">
                       <Clock size={16} className="text-blue-500" />
-                      <span className="text-sm font-medium text-blue-900">当前执行时间: {selectedExecutionTime}</span>
+                      <span className="text-sm font-medium text-blue-900">{t('workflowCanvas.debugPanel.currentExecutionTime')}: {selectedExecutionTime}</span>
                     </div>
                   </div>
                 )}
@@ -588,7 +591,7 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
                   <LogSummaryTree
                     logSummary={debugData.log_summary}
                     onNodeClick={node => {
-                      console.log('LogSummary调测树节点点击:', node)
+                      console.log('[DebugPanel] LogSummary node clicked:', node)
                       setSelectedComponent(node)
                     }}
                   />
@@ -600,9 +603,9 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <div className="flex items-center gap-2">
                   <AlertCircle size={16} className="text-orange-600" />
-                  <span className="font-medium text-gray-900">缺少 LogSummary 数据</span>
+                  <span className="font-medium text-gray-900">{t('workflowCanvas.debugPanel.missingLogSummaryData')}</span>
                 </div>
-                <div className="text-sm text-gray-600 mt-2">调测树需要 logSummary 数据来显示组件执行信息，但当前没有找到。</div>
+                <div className="text-sm text-gray-600 mt-2">{t('workflowCanvas.debugPanel.missingLogSummaryDescription')}</div>
               </div>
             )}
           </div>
@@ -615,13 +618,13 @@ export const DebugSidePanel: FC<DebugSidePanelProps> = ({ visible, onCancel, wor
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Code size={16} className="text-blue-500" />
-                  <span className="font-medium text-gray-900">{selectedComponent.invokeType || 'Unknown Component'}</span>
+                  <span className="font-medium text-gray-900">{selectedComponent.invokeType || t('workflowCanvas.debugPanel.unknownComponent')}</span>
                 </div>
                 <button onClick={() => setSelectedComponent(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
                   <XCircle size={16} />
                 </button>
               </div>
-              <div className="text-xs text-gray-500 mt-1">{selectedComponent.invokeName && `名称: ${selectedComponent.invokeName}`}</div>
+              <div className="text-xs text-gray-500 mt-1">{selectedComponent.invokeName && `${t('workflowCanvas.debugPanel.name')}: ${selectedComponent.invokeName}`}</div>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <ComponentDetailPanel component={selectedComponent} />

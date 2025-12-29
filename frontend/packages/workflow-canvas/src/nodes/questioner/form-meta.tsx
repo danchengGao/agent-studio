@@ -11,18 +11,20 @@ import { validation } from './validation'
 import { FlowNodeJSON } from '../../typings'
 import { FormHeader, FormContent, FormModel, FormPrompt, FormInput, FormOutput, FormItem, FormDisplay } from '../../form-components'
 import { useIsSidebar } from '../../hooks'
+import { useTranslation } from '../../i18n'
 
 const FormMaxResponse = () => {
   const isSidebar = useIsSidebar()
+  const { t } = useTranslation()
 
   return (
     <Field<number> name="inputs.max_response">
       {({ field, meta }: any) => {
         if (!isSidebar) {
-          return <FormDisplay label="最大提问次数" content={field.value} />
+          return <FormDisplay label={t('workflowCanvas.nodes.questioner.maxQuestions')} content={field.value} />
         }
         return (
-          <FormItem name="最大提问次数" description="设置最大提问次数，范围 1-10">
+          <FormItem name={t('workflowCanvas.nodes.questioner.maxQuestions')} description={t('workflowCanvas.nodes.questioner.maxQuestionsDescription')}>
             <InputNumber
               value={field.value}
               onChange={v => field.onChange(v as number)}

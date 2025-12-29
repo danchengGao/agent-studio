@@ -15,6 +15,7 @@ import { dragStateManager } from '../../utils/drag-state-manager'
 import { customNanoid } from '../../utils/nanoid-custom'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import WorkflowService from '../../../../api-client/src/services/workflowService'
+import { t } from '../../i18n'
 
 export const handleWorkflowNodesSelection = (
   nodeType: string,
@@ -309,7 +310,7 @@ export const WorkflowNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <GitFork size={16} className="text-blue-600" />,
-    description: '可执行嵌套子工作流',
+    description: t('workflowCanvas.nodes.subWorkflow.description'),
   },
   formMeta,
   // 使用异步方法，支持多选工作流创建多个节点

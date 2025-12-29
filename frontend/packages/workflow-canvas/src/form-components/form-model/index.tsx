@@ -11,6 +11,7 @@ import { AlertCircle } from 'lucide-react'
 import { useIsSidebar } from '../../hooks'
 import { FormItem, FormDisplay, FormSelect } from '../../form-components'
 import { useModels, type FrontendModelConfig } from '@test-agentstudio/api-client'
+import { useTranslation } from '../../i18n'
 
 const { Text } = Typography
 
@@ -26,7 +27,9 @@ export interface FormModelProps {
   required?: boolean
 }
 
-export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = true }: FormModelProps) {
+export function FormModel({ name, fieldPrefix = 'inputs', required = true }: FormModelProps) {
+  const { t } = useTranslation()
+  const displayName = name || t('workflowCanvas.formModel.model')
   const isSidebar = useIsSidebar()
   const [searchParams] = useSearchParams()
   const spaceId = searchParams.get('spaceId')
@@ -57,10 +60,10 @@ export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = 
   if (isSidebar && isLoading) {
     return (
       <>
-        <FormItem name={name} required={required} vertical>
+        <FormItem name={displayName} required={required} vertical>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Spin size="small" />
-            <Text>加载模型中...</Text>
+            <Text>{t('workflowCanvas.formModel.loadingModels')}</Text>
           </div>
         </FormItem>
       </>
@@ -70,9 +73,9 @@ export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = 
   if (isSidebar && error) {
     return (
       <>
-        <FormItem name={name} required={required} vertical>
+        <FormItem name={displayName} required={required} vertical>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Text>加载模型失败，请重试</Text>
+            <Text>{t('workflowCanvas.formModel.loadFailed')}</Text>
           </div>
         </FormItem>
       </>
@@ -92,14 +95,14 @@ export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = 
     return (
       <Field<{ id: string; name: string; type: string }> name={`${fieldPrefix}.llmParam.model`} defaultValue={defaultModel}>
         {({ field }: FieldRenderProps<{ id: string; name: string; type: string }>) => {
-          const modelName = field.value?.name || '未选择'
+          const modelName = field.value?.name || t('workflowCanvas.formModel.notSelected')
           const isUnselected = !field.value?.id || field.value?.id === ''
           const modelId = field.value?.id || ''
           const isModelMissing = modelId && !availableModelIds.has(modelId) && modelsData // 模型列表已加载但模型不在可用列表中（可能已被禁用）
 
           return (
             <FormDisplay
-              label={name}
+              label={displayName}
               content={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap', minWidth: 0 }}>
                   <div style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -125,7 +128,7 @@ export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = 
                   {isModelMissing && (
                     <span className="inline-flex items-center text-xs text-amber-600 leading-[18px]" style={{ flexShrink: 0 }}>
                       <AlertCircle className="w-4 h-4 mr-1" />
-                      模型已禁用，请重新选择
+                      {t('workflowCanvas.formModel.modelDisabled')}
                     </span>
                   )}
                 </div>
@@ -157,14 +160,14 @@ export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = 
 
         return (
           <FormItem
-            name={name}
+            name={displayName}
             required={required}
             vertical
             customComponent={
               <Field<boolean> name={`${fieldPrefix}.historyEnable`} defaultValue={false}>
                 {({ field }) => (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '14px' }}>启用对话历史</span>
+                    <span style={{ fontSize: '14px' }}>{t('workflowCanvas.formModel.enableHistory')}</span>
                     <Switch
                       checked={field.value ?? false}
                       onChange={field.onChange}
@@ -202,7 +205,7 @@ export function FormModel({ name = '模型', fieldPrefix = 'inputs', required = 
               {isModelMissing && (
                 <span className="inline-flex items-center text-xs text-amber-600 leading-[18px]">
                   <AlertCircle className="w-4 h-4 mr-1" />
-                  模型不存在，请重新选择
+                  {t('workflowCanvas.formModel.modelNotExists')}
                 </span>
               )}
             </div>

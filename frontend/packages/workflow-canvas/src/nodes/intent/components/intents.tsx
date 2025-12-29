@@ -6,6 +6,7 @@ import { useLayoutEffect, useCallback } from 'react'
 import { Input, Tag } from '@douyinfe/semi-ui'
 import { Field, WorkflowNodePortsData } from '@flowgram.ai/free-layout-editor'
 import { Plus } from 'lucide-react'
+import { useTranslation } from '../../../i18n'
 
 import { FormItem } from '../../../form-components'
 import { DraggableList } from '../../../form-components/draggable-list'
@@ -67,6 +68,7 @@ const IntentDisplay: React.FC<IntentDisplayProps> = ({ label, content, isWarning
  * 意图识别节点的意图匹配组件
  */
 export const Intents: React.FC<IntentsProps> = ({ readOnly = false }) => {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
   const { node } = useNodeRenderContext()
 
@@ -115,7 +117,7 @@ export const Intents: React.FC<IntentsProps> = ({ readOnly = false }) => {
       </Field>
 
       {isSidebar && (
-        <FormItem name="意图匹配" vertical>
+        <FormItem name={t('workflowCanvas.intent.matching')} vertical>
           <Field<any[]> name="inputs.intents">
             {({ field }) => {
               const safeIntents = normalizeIntents(field.value)
@@ -186,7 +188,7 @@ export const Intents: React.FC<IntentsProps> = ({ readOnly = false }) => {
                   {/* "其他"选项 */}
                   <OtherIntentContainer>
                     <Spacer />
-                    <OtherIntentText>其他意图</OtherIntentText>
+                    <OtherIntentText>{t('workflowCanvas.intent.otherIntent')}</OtherIntentText>
                   </OtherIntentContainer>
 
                   {/* 添加意图按钮 */}

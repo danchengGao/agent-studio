@@ -7,6 +7,7 @@ import { FC } from 'react'
 
 import classNames from 'classnames'
 import { Input, Switch, InputNumber } from '@douyinfe/semi-ui'
+import { useTranslation } from '../../../i18n'
 
 import { DisplaySchemaTag, JsonCodeEditor } from '../../../form-materials'
 import { useFormMeta } from '../hooks/use-form-meta'
@@ -24,6 +25,7 @@ interface TestRunFormProps {
 }
 
 export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputFormMeta }) => {
+  const { t } = useTranslation()
   const formMeta = useFormMeta()
 
   // 如果有inputFormMeta（输入中断时），使用它；否则使用工作流的formMeta
@@ -108,7 +110,7 @@ export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputForm
     return (
       <div className={styles.formContainer}>
         <div className={styles.emptyState}>
-          <div className={styles.emptyText}>本次试运行无需输入</div>
+          <div className={styles.emptyText}>{t('workflowCanvas.testrunForm.noInputNeeded')}</div>
         </div>
       </div>
     )

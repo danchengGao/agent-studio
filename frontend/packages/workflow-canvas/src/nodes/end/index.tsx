@@ -7,6 +7,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { Power } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 export const EndNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.End,
@@ -21,7 +22,7 @@ export const EndNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <Power size={16} className="text-red-600" />,
-    description: '工作流的最终节点，用于返回工作流运行后的结果信息。',
+    description: t('workflowCanvas.nodes.end.description'),
   },
   onAdd() {
     return {
