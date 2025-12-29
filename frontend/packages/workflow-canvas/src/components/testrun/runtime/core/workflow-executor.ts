@@ -5,6 +5,7 @@
 
 import { ExecutionService } from '@test-agentstudio/api-client'
 import { Emitter } from '@flowgram.ai/free-layout-editor'
+import { nanoid } from 'nanoid'
 
 import {
   StreamExecuteParams,
@@ -23,6 +24,8 @@ export class WorkflowExecutor {
   private executionController?: AbortController
   private closeExecutionFunction?: () => void
   private currentExecutionParams?: StreamExecuteParams
+  private currentConversationId?: string
+  private currentSpaceId?: string
 
   private resultEmitter = new Emitter<{
     errors?: string[]
@@ -66,6 +69,10 @@ export class WorkflowExecutor {
     this.executionController = new AbortController()
     this.currentExecutionParams = params
 
+    const conversationId = params.conversation_id || nanoid()
+    this.currentConversationId = conversationId
+    this.currentSpaceId = params.space_id
+
     this.eventConverter.reset()
 
     try {
@@ -75,15 +82,18 @@ export class WorkflowExecutor {
           version: params.version,
           space_id: params.space_id,
           inputs: params.inputs,
-          conversation_id: params.conversation_id,
+          conversation_id: conversationId,
         },
         executionEvent => {
           const streamEvent = this.eventConverter.convert(executionEvent)
           this.handleStreamEvent(streamEvent, executionEvent)
           if (onEvent) onEvent(streamEvent)
 
-          if (streamEvent.type === 'completed') {
-            this.handleExecutionComplete(executionId, params.inputs)
+          if (streamEvent.type === 'node_status' && streamEvent.data.status === 'completed') {
+            const nodeId = streamEvent.data.nodeId
+            if (nodeId && nodeId.toString().startsWith('end_')) {
+              this.handleExecutionComplete(executionId, params.inputs)
+            }
           }
         },
         error => {
@@ -132,8 +142,11 @@ export class WorkflowExecutor {
           this.handleStreamEvent(streamEvent, executionEvent)
           this.eventHandlers.forEach(handler => handler(streamEvent))
 
-          if (streamEvent.type === 'completed') {
-            this.handleExecutionComplete('', this.currentExecutionParams?.inputs || {})
+          if (streamEvent.type === 'node_status' && streamEvent.data.status === 'completed') {
+            const nodeId = streamEvent.data.nodeId
+            if (nodeId && nodeId.toString().startsWith('end_')) {
+              this.handleExecutionComplete('', this.currentExecutionParams?.inputs || {})
+            }
           }
         },
         error => {
@@ -164,7 +177,21 @@ export class WorkflowExecutor {
   }
 
   stop(): void {
+    if (this.isExecuting && this.currentConversationId && this.currentSpaceId) {
+      ExecutionService.cancelWorkflowExecution({
+        space_id: this.currentSpaceId,
+        conversation_id: this.currentConversationId,
+        force: true,
+      }).catch((error) => {
+        console.error('Failed to cancel workflow execution on server:', error)
+      })
+    }
+
     const runningNodes = this.statusManager.getRunningNodes()
+
+    for (const nodeId of runningNodes) {
+      this.statusManager.setNodeStatus(nodeId, NodeExecutionStatus.CANCELED)
+    }
 
     if (runningNodes.length > 0) {
       this.eventHandlers.forEach(handler =>
@@ -198,6 +225,8 @@ export class WorkflowExecutor {
     this.statusManager.clearWaitingForInput()
     this.eventHandlers = []
     this.currentExecutionParams = undefined
+    this.currentConversationId = undefined
+    this.currentSpaceId = undefined
   }
 
   reset(): void {
@@ -206,6 +235,8 @@ export class WorkflowExecutor {
     this.activeExecutions.clear()
     this.eventHandlers = []
     this.currentExecutionParams = undefined
+    this.currentConversationId = undefined
+    this.currentSpaceId = undefined
     this.eventConverter.reset()
   }
 

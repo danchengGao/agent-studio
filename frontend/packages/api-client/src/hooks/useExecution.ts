@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import ExecutionService from '../services/executionService'
 import {
   WorkflowExecutionRequest,
+  WorkflowCancelRequest,
   WorkflowExecutionEvent,
   WorkflowExecutionResult,
   WorkflowExecutionStatus,
@@ -566,8 +567,25 @@ export const useStreamAgentExecution = () => {
   }
 }
 
+export const useCancelWorkflowExecution = () => {
+  return useMutation(
+    async (request: WorkflowCancelRequest) => {
+      return await ExecutionService.cancelWorkflowExecution(request)
+    },
+    {
+      onSuccess: (data) => {
+        console.log('Workflow execution cancelled successfully:', data)
+      },
+      onError: (error: Error) => {
+        console.error('Failed to cancel workflow execution:', error)
+      },
+    },
+  )
+}
+
 export default {
   useStreamWorkflowExecution,
   useComponentExecute,
   useStreamAgentExecution,
+  useCancelWorkflowExecution,
 }

@@ -750,7 +750,21 @@ export interface WorkflowUserInputRequest {
   }
 }
 
-// 工作流执行状态枚举
+export interface WorkflowCancelRequest {
+  space_id: string
+  conversation_id: string
+  force?: boolean
+}
+
+export interface WorkflowCancelResponse {
+  code: number
+  message: string
+  data?: {
+    conversation_id: string
+    cancelled: boolean
+  }
+}
+
 export enum WorkflowExecutionStatus {
   PENDING = 'pending',
   RUNNING = 'running',
@@ -759,7 +773,6 @@ export enum WorkflowExecutionStatus {
   CANCELLED = 'cancelled',
 }
 
-// 工作流执行结果类型
 export interface WorkflowExecutionResult {
   executionId: string
   status: WorkflowExecutionStatus

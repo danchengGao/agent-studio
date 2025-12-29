@@ -230,10 +230,12 @@ export class EventConverter {
   }
 
   private convertFinishEvent(event: any): StreamResponse {
-    const finishNodeId = event.id
+    const finishNodeId = this.getEventProperty(event, 'id')
+    const outputs = this.getEventProperty(event, 'outputs')
+    const timestamp = this.getEventProperty(event, 'timestamp')
 
-    if (event.outputs && event.id) {
-      this.nodeOutputs.set(event.id, event.outputs)
+    if (outputs && finishNodeId) {
+      this.nodeOutputs.set(finishNodeId, outputs)
     }
 
     this.nodeStartTimes.delete(finishNodeId)
@@ -244,25 +246,17 @@ export class EventConverter {
           responseContent: this.streamMessageOutput,
         }
       } else {
-        this.finalOutputs = event.outputs || {}
-      }
-
-      return {
-        type: 'completed',
-        data: {
-          inputs: {},
-          outputs: this.finalOutputs,
-        },
+        this.finalOutputs = outputs || {}
       }
     }
 
     return {
       type: 'node_status',
       data: {
-        nodeId: event.id,
+        nodeId: finishNodeId,
         status: 'completed',
-        outputs: event.outputs,
-        timestamp: event.timestamp || Date.now(),
+        outputs: outputs,
+        timestamp: timestamp || Date.now(),
       },
     }
   }
@@ -270,22 +264,26 @@ export class EventConverter {
   private convertFailedEvent(event: any): StreamResponse {
     this.hasError = true
 
+    const eventId = this.getEventProperty(event, 'id')
+    const error = this.getEventProperty(event, 'error')
+    const timestamp = this.getEventProperty(event, 'timestamp')
+
     return {
       type: 'error',
       data: {
-        nodeId: event.id,
-        message: event.error || 'Execution failed',
-        timestamp: event.timestamp || Date.now(),
+        nodeId: eventId,
+        message: error || 'Execution failed',
+        timestamp: timestamp || Date.now(),
       },
     }
   }
 
   private isStreamMessageEvent(event: any): boolean {
-    return (
-      event.id === 'workflow_stream' &&
-      event.output_text &&
-      (event as any)._streamPayload?.node_id
-    )
+    const id = this.getEventProperty(event, 'id')
+    const outputText = this.getEventProperty(event, 'output_text')
+    const streamPayload = (event as any)._streamPayload
+
+    return id === 'workflow_stream' && outputText && streamPayload?.node_id
   }
 
   private convertStreamMessageEvent(event: any): StreamResponse {

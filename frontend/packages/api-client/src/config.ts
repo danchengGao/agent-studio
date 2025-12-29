@@ -110,6 +110,7 @@ export const API_ENDPOINTS = {
   // 执行管理
   EXECUTION: {
     WORKFLOW: '/execution/workflow',
+    WORKFLOW_CANCEL: '/execution/workflow/cancel',
     USERINPUT: '/execution/userInput',
     WORKFLOW_VALIDATE: '/execution/workflow/validate',
     AGENT: '/execution/agent',

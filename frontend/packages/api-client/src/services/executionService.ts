@@ -3,6 +3,8 @@ import { API_ENDPOINTS } from '../config'
 import {
   WorkflowExecutionRequest,
   WorkflowUserInputRequest,
+  WorkflowCancelRequest,
+  WorkflowCancelResponse,
   WorkflowExecutionEvent,
   AgentExecutionEvent,
   WorkflowExecutionEventHandler,
@@ -567,8 +569,18 @@ export class ExecutionService {
         errorMessage = error.detail
       }
 
-      // 抛出错误
       throw new Error(errorMessage)
+    }
+  }
+
+  static async cancelWorkflowExecution(request: WorkflowCancelRequest): Promise<WorkflowCancelResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<WorkflowCancelResponse>(API_ENDPOINTS.EXECUTION.WORKFLOW_CANCEL, request)
+      return response.data
+    } catch (error: any) {
+      console.error('取消工作流执行失败:', error)
+      throw error
     }
   }
 }

@@ -138,48 +138,51 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
     [document.root.blocks, messages],
   )
 
-  const handleStreamEvent = useCallback((event: StreamResponse) => {
-    handleStreamMessageEvent(event)
+  const handleStreamEvent = useCallback(
+    (event: StreamResponse) => {
+      handleStreamMessageEvent(event)
 
-    switch (event.type) {
-      case 'input_required':
-        handleInputRequired(event.data)
-        setIsStreamExecuting(false)
-        break
-      case 'completed':
-        setIsStreamExecuting(false)
-        setResult({
-          inputs: event.data.inputs,
-          outputs: event.data.outputs,
-        })
-        break
-      case 'error':
-        setIsStreamExecuting(false)
-        {
-          const errorMessage = event.data.message || 'Execution error'
-          const isUserCanceled = event.data.isUserCanceled || errorMessage === 'canceled by user'
-          const nodeId = event.data.nodeId
+      switch (event.type) {
+        case 'input_required':
+          handleInputRequired(event.data)
+          setIsStreamExecuting(false)
+          break
+        case 'completed':
+          setIsStreamExecuting(false)
+          setResult({
+            inputs: event.data.inputs,
+            outputs: event.data.outputs,
+          })
+          break
+        case 'error':
+          setIsStreamExecuting(false)
+          {
+            const errorMessage = event.data.message || 'Execution error'
+            const isUserCanceled = event.data.isUserCanceled || errorMessage === 'canceled by user'
+            const nodeId = event.data.nodeId
 
-          if (!isUserCanceled) {
-            setErrors([errorMessage])
+            if (!isUserCanceled) {
+              setErrors([errorMessage])
 
-            const isWorkflowLevelError = nodeId && nodeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+              const isWorkflowLevelError = nodeId && nodeId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
 
-            if (isWorkflowLevelError) {
-              const runningNodes = testRunRuntimeService.getRunningNodes()
+              if (isWorkflowLevelError) {
+                const runningNodes = testRunRuntimeService.getRunningNodes()
 
-              if (runningNodes.length > 0) {
-                const lastRunningNode = runningNodes[runningNodes.length - 1]
-                testRunRuntimeService.setNodeFailedStatus(lastRunningNode, errorMessage)
+                if (runningNodes.length > 0) {
+                  const lastRunningNode = runningNodes[runningNodes.length - 1]
+                  testRunRuntimeService.setNodeFailedStatus(lastRunningNode, errorMessage)
+                }
+              } else if (nodeId) {
+                testRunRuntimeService.setNodeFailedStatus(nodeId, errorMessage)
               }
-            } else if (nodeId) {
-              testRunRuntimeService.setNodeFailedStatus(nodeId, errorMessage)
             }
           }
-        }
-        break
-    }
-  }, [handleStreamMessageEvent, handleInputRequired])
+          break
+      }
+    },
+    [handleStreamMessageEvent, handleInputRequired],
+  )
 
   const onTestRun = async () => {
     if (isStreamExecuting) {
@@ -281,10 +284,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
           {Array.from(messages.entries()).map(([nodeId, data]) => (
             <div key={nodeId} className={styles['node-message-container']}>
               <div className={styles['node-message-header']}>{getNodeDisplayName(nodeId)}</div>
-              <div
-                ref={el => setRef(nodeId, el)}
-                className={styles['node-message-textarea']}
-              >
+              <div ref={el => setRef(nodeId, el)} className={styles['node-message-textarea']}>
                 {data.message}
               </div>
             </div>
@@ -304,7 +304,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
         setValues={interruption ? setInputValues : setValues}
         inputFormMeta={interruptionFormMeta}
         inputJSONMode={interruption ? false : inputJSONMode}
-        setInputJSONMode={interruption ? (() => {}) : setInputJSONMode}
+        setInputJSONMode={interruption ? () => {} : setInputJSONMode}
         isInterruptionMode={!!interruption}
         interruptionMessage="完成以下输入后，继续试运行"
         result={result}
@@ -320,7 +320,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
   ) : (
     <Button
       onClick={onTestRun}
-      disabled={isStreamExecuting}
       className={classnames(styles.button, {
         [styles.running]: isStreamExecuting,
         [styles.default]: !isStreamExecuting,

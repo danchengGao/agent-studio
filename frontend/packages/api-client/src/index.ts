@@ -217,6 +217,8 @@ export * from './hooks/useExecution'
 export * from './hooks/useExecutionLogs'
 export type {
   WorkflowExecutionRequest,
+  WorkflowCancelRequest,
+  WorkflowCancelResponse,
   WorkflowExecutionEvent,
   WorkflowExecutionResult,
   WorkflowExecutionStatus,
