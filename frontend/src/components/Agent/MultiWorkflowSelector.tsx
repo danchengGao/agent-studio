@@ -4,12 +4,11 @@ import MuiAccordion, { AccordionProps } from '@mui/material/Accordion'
 import MuiAccordionSummary, { AccordionSummaryProps, accordionSummaryClasses } from '@mui/material/AccordionSummary'
 import MuiAccordionDetails from '@mui/material/AccordionDetails'
 import Typography from '@mui/material/Typography'
-import { AgentDetailResponse, SaveAgentRequest } from '@test-agentstudio/api-client'
-import { useState, useEffect, useRef } from 'react'
+import { AgentDetailResponse, SaveAgentRequest, useModels } from '@test-agentstudio/api-client'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ModelDetail, WorkflowDetail, WorkflowSelectDetail } from '../../types/agentTypes'
-import { Button, Alert, TextField, Select, MenuItem, Slider, Box, IconButton, Popover, Tooltip, InputAdornment } from '@mui/material'
+import { Button, Alert, TextField, Select, MenuItem, Box, IconButton, Popover, Tooltip } from '@mui/material'
 import { Link } from 'react-router-dom'
-import SettingsIcon from '@mui/icons-material/Settings'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
 import WorkflowSelector from './WorkflowSelector'
@@ -17,8 +16,10 @@ import { useAgentStore } from '@/stores/useAgentStore'
 import AddButton from './AddButton'
 import WorkflowList from './WorkflowList'
 import ModelDetailForm from './ModelDetailForm'
-import { useModels } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
+import { AlertCircle, RefreshCcw } from 'lucide-react'
+import { useWorkflowValidation } from '@/hooks/useWorkflowValidation'
+import { getDefaultSpaceId } from '@/utils/spaceUtils'
 
 // 保留其他 Accordion 样式用于其他部分
 const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters elevation={0} square {...props} />)(({ theme }) => ({
@@ -52,7 +53,7 @@ const AccordionSummary = styled((props: AccordionSummaryProps) => {
       </div>
     </MuiAccordionSummary>
   )
-})(theme => ({
+})(() => ({
   height: '50px',
   flexDirection: 'row-reverse',
   [`& .${accordionSummaryClasses.expandIconWrapper}.${accordionSummaryClasses.expanded}`]: {
@@ -88,18 +89,37 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
   const [defaultResponse, setDefaultResponse] = useState<string>('')
   const [maxMessageRounds, setMaxMessageRounds] = useState<number>(3)
   const [conversationSettingsAnchorEl, setConversationSettingsAnchorEl] = useState<null | HTMLElement>(null)
+  const [workflowListRefreshToken, setWorkflowListRefreshToken] = useState<number>(0)
+
+  const spaceId = getDefaultSpaceId() || ''
+
+  const { validationResults, setValidationResults, validateWorkflows, isValidating, workflowValidationErrorCount } = useWorkflowValidation({
+    workflows: workflowObjects,
+    spaceId,
+  })
 
   // 获取模型管理API的完整模型列表
-  const {
-    data: modelsData,
-    isLoading: modelsLoading,
-    error: modelsError,
-  } = useModels({
+  const { data: modelsData } = useModels({
     spaceId: user?.spaceId || '0',
     size: 100,
     sort_by: 'update_time',
     sort_order: 'desc',
   })
+
+  useEffect(() => {
+    if (!initializedRef.current) return
+    const newWorkflows = saveAgentRequest?.workflows || []
+    setWorkflowObjects(newWorkflows)
+  }, [saveAgentRequest?.workflows])
+
+  useEffect(() => {
+    if (!initializedRef.current) return
+    if (!spaceId) return
+    const t = setTimeout(() => {
+      validateWorkflows(workflowObjects).catch(() => {})
+    }, 200)
+    return () => clearTimeout(t)
+  }, [workflowObjects, spaceId, validateWorkflows])
 
   // 将模型管理API的数据转换为ModelDetail格式
   useEffect(() => {
@@ -292,6 +312,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
     setWorkflowObjects(workflowDetails)
     updateWorkflowDetail(workflowDetails)
     setShowWorkflowSelector(false)
+    validateWorkflows(workflowDetails).catch(() => {})
   }
 
   // 处理工作流操作（删除/设置）
@@ -302,31 +323,33 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
         updateWorkflowDetail(updatedWorkflows)
         return updatedWorkflows
       })
+      setValidationResults(prev => {
+        const next = { ...prev }
+        delete next[workflowId]
+        return next
+      })
     } else if (operate === 'setting') {
       // 处理设置操作，打开新页面设置工作流，携带版本信息
-      const spaceId = agentDetailResponse?.data?.agent_info?.space_id || ''
       const versionParam = version && version !== 'draft' ? `&version=${version}` : ''
       window.open(`/dashboard/workflows/editor/${workflowId}?spaceId=${spaceId}${versionParam}`, '_blank')
     }
   }
 
+  const handleRefreshWorkflows = useCallback(() => {
+    setWorkflowListRefreshToken(t => t + 1)
+    validateWorkflows(workflowObjects).catch(() => {})
+  }, [validateWorkflows, workflowObjects])
+
   // 处理最大消息轮数变化
   const handleMaxMessageRoundsChange = (value: number) => {
     setMaxMessageRounds(value)
-    // 使用函数式更新避免useEffect依赖循环
-    updateSaveAgentRequest(prev => ({
-      ...prev,
+    updateSaveAgentRequest({
       constraint: {
-        ...prev?.constraint,
+        ...(saveAgentRequest?.constraint || {}),
         reserved_max_chat_rounds: value,
-        max_iteration: prev?.constraint?.max_iteration || 10,
+        max_iteration: saveAgentRequest?.constraint?.max_iteration || 10,
       },
-    }))
-  }
-
-  // 处理对话设置按钮点击
-  const handleConversationSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
-    setConversationSettingsAnchorEl(event.currentTarget)
+    })
   }
 
   // 处理对话设置关闭
@@ -347,6 +370,13 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               >
                 {workflowObjects.length}
               </span>
+              {workflowValidationErrorCount > 0 && (
+                <Tooltip title={`所选工作流存在校验不通过（${workflowValidationErrorCount} 个），请跳转对应工作流进行修改`} arrow>
+                  <span className="inline-flex items-center ml-2">
+                    <AlertCircle className="w-[20px] h-[20px] text-red-500" />
+                  </span>
+                </Tooltip>
+              )}
             </Typography>
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
               {/* <Tooltip title="对话设置" arrow>
@@ -363,6 +393,13 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                   <SettingsIcon fontSize="small" />
                 </IconButton>
               </Tooltip> */}
+              <Tooltip title="刷新工作流信息" arrow>
+                <span>
+                  <IconButton size="small" onClick={handleRefreshWorkflows} disabled={workflowObjects.length === 0} aria-label="刷新">
+                    <RefreshCcw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
+                  </IconButton>
+                </span>
+              </Tooltip>
               <AddButton
                 options={[
                   { label: '添加已有工作流', value: 'existing' },
@@ -383,7 +420,13 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
           </AccordionSummary>
           <AccordionDetails>
             {/* 工作流列表 */}
-            <WorkflowList workflowObjects={workflowObjects} onClick={handleWorkflowOperation} disabled={readonly} />
+            <WorkflowList
+              workflowObjects={workflowObjects}
+              onClick={handleWorkflowOperation}
+              disabled={readonly}
+              refreshToken={workflowListRefreshToken}
+              validationResults={validationResults}
+            />
             {workflowObjects.length === 0 && (
               <Alert severity="info" sx={{ mt: 2 }}>
                 暂无工作流，点击上方按钮添加工作流

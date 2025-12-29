@@ -1,6 +1,7 @@
 import Typography from '@mui/material/Typography'
+import Tooltip from '@mui/material/Tooltip'
 import { WorkflowDetail } from '../../types/agentTypes'
-import { Settings, Trash2, Workflow } from 'lucide-react'
+import { AlertCircle, LoaderCircle, Settings, Trash2, Workflow } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
@@ -8,16 +9,21 @@ import { useAgentStore } from '@/stores/useAgentStore'
 import { useWorkflowVersions, useSelectedVersions } from '@/hooks/useWorkflowVersions'
 import { isVersionValid } from '@/utils/versionMenu'
 import { VersionField } from '@/components/Agent/VersionField'
+import type { WorkflowValidationResult } from '@/hooks/useWorkflowValidation'
 
 // 工作流列表组件
 const WorkflowList = ({
   workflowObjects,
   onClick,
   disabled = false,
+  refreshToken,
+  validationResults,
 }: {
   workflowObjects: WorkflowDetail[]
   onClick: (operate: 'delete' | 'setting', workflowId: string, version?: string) => void
   disabled?: boolean
+  refreshToken?: number
+  validationResults?: Record<string, WorkflowValidationResult>
 }) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
@@ -67,19 +73,47 @@ const WorkflowList = ({
               <Workflow className="w-4 h-4 text-blue-600" />
             </div>
             <div className="flex-1 min-w-0 max-w-[320px]">
-              <Typography
-                sx={{
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  marginBottom: '8px',
-                }}
-                title={workflow.workflow_name}
-              >
-                {workflow.workflow_name}
-              </Typography>
+              <div className="flex items-center gap-1 min-w-0 mb-2">
+                <Typography
+                  sx={{
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  className="min-w-0"
+                  title={workflow.workflow_name}
+                >
+                  {workflow.workflow_name}
+                </Typography>
+                {validationResults?.[workflow.workflow_id]?.status === 'loading' && (
+                  <span className="inline-flex items-center gap-2 text-xs text-gray-500 flex-shrink-0">
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                    <span>校验中...</span>
+                  </span>
+                )}
+                {validationResults?.[workflow.workflow_id]?.status === 'error' && (
+                  <Tooltip title={'工作流校验失败，请跳转对应的工作流进行修改'} arrow>
+                    <span className="inline-flex items-center flex-shrink-0 ml-1">
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (disabled) return
+                          const currentVersion = selectedVersions[workflow.workflow_id] ?? 'draft'
+                          onClick('setting', workflow.workflow_id, currentVersion)
+                        }}
+                        disabled={disabled}
+                        className={`inline-flex items-center text-red-600 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        aria-label="工作流校验失败"
+                      >
+                        <AlertCircle className="w-4 h-4" />
+                      </button>
+                    </span>
+                  </Tooltip>
+                )}
+              </div>
               {workflow.description && (
                 <Typography
                   variant="body2"
@@ -125,6 +159,7 @@ const WorkflowList = ({
                   onChange={ver => handleVersionChange(workflow.workflow_id, ver)}
                   spaceId={spaceId}
                   readonly={disabled}
+                  refreshToken={refreshToken}
                 />
               </div>
             </div>

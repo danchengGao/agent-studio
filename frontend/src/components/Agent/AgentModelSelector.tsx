@@ -4,30 +4,11 @@ import MuiAccordion, { AccordionProps } from '@mui/material/Accordion'
 import MuiAccordionSummary, { AccordionSummaryProps, accordionSummaryClasses } from '@mui/material/AccordionSummary'
 import MuiAccordionDetails from '@mui/material/AccordionDetails'
 import Typography from '@mui/material/Typography'
-import { AgentDetailResponse, AgentPlugin, SaveAgentRequest } from '@test-agentstudio/api-client'
+import { AgentDetailResponse, AgentPlugin, SaveAgentRequest, useModels, type PluginApiInfo } from '@test-agentstudio/api-client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Trash2 } from 'lucide-react'
+import { AlertCircle, RefreshCcw, Trash2 } from 'lucide-react'
 import { ModelDetail, WorkflowDetail, WorkflowSelectDetail } from '../../types/agentTypes'
-import {
-  Select,
-  Button,
-  Alert,
-  MenuItem,
-  TextField,
-  Box,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Switch,
-  FormControlLabel,
-  Popover,
-  RadioGroup,
-  Radio,
-  Slider,
-  Tooltip,
-} from '@mui/material'
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline'
+import { Select, Button, Alert, MenuItem, TextField, Box, IconButton, List, ListItem, ListItemText, Switch, FormControlLabel, Tooltip } from '@mui/material'
 import { Link } from 'react-router-dom'
 import ModelDetailForm from './ModelDetailForm'
 import WorkflowSelector from './WorkflowSelector'
@@ -36,10 +17,10 @@ import PluginSelector from '../../../packages/workflow-canvas/src/components/Plu
 import AddButton from './AddButton'
 import WorkflowList from './WorkflowList'
 import PluginList from './PluginList'
-import { useModels } from '@test-agentstudio/api-client'
-import DeleteIcon from '@mui/icons-material/Delete'
 import { useAuthStore } from '../../stores/useAuthStore'
 import axios from 'axios'
+import { useWorkflowValidation } from '@/hooks/useWorkflowValidation'
+import { getDefaultSpaceId } from '@/utils/spaceUtils'
 
 // 保留其他 Accordion 样式用于其他部分
 const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters elevation={0} square {...props} />)(({ theme }) => ({
@@ -73,7 +54,7 @@ const AccordionSummary = styled((props: AccordionSummaryProps) => {
       </div>
     </MuiAccordionSummary>
   )
-})(({ theme }) => ({
+})(() => ({
   height: '50px',
   flexDirection: 'row-reverse',
   [`& .${accordionSummaryClasses.expandIconWrapper}.${accordionSummaryClasses.expanded}`]: {
@@ -130,11 +111,7 @@ const AgentModelSelector = (props: {
   const initializedRef = useRef(false)
 
   // 获取模型管理API的完整模型列表
-  const {
-    data: modelsData,
-    isLoading: modelsLoading,
-    error: modelsError,
-  } = useModels({
+  const { data: modelsData } = useModels({
     spaceId: user?.spaceId || '0',
     size: 100,
     sort_by: 'update_time',
@@ -142,9 +119,32 @@ const AgentModelSelector = (props: {
   })
   const [workflowObjects, setWorkflowObjects] = useState<WorkflowDetail[]>([])
   const [showWorkflowSelector, setShowWorkflowSelector] = useState(false)
+  const [workflowListRefreshToken, setWorkflowListRefreshToken] = useState<number>(0)
   const [pluginObjects, setPluginObjects] = useState<AgentPlugin[]>([])
   const [showPluginSelector, setShowPluginSelector] = useState(false)
   const [greeting, setGreeting] = useState<string>('')
+
+  const spaceId = getDefaultSpaceId() || ''
+
+  const { validationResults, setValidationResults, validateWorkflows, isValidating, workflowValidationErrorCount } = useWorkflowValidation({
+    workflows: workflowObjects,
+    spaceId,
+  })
+
+  useEffect(() => {
+    if (!initializedRef.current) return
+    const newWorkflows = saveAgentRequest?.workflows || []
+    setWorkflowObjects(newWorkflows)
+  }, [saveAgentRequest?.workflows])
+
+  useEffect(() => {
+    if (!initializedRef.current) return
+    if (!spaceId) return
+    const t = setTimeout(() => {
+      validateWorkflows(workflowObjects).catch(() => {})
+    }, 200)
+    return () => clearTimeout(t)
+  }, [workflowObjects, spaceId, validateWorkflows])
 
   // 记忆配置状态
   const [memoryVariables, setMemoryVariables] = useState<MemoryVariable[]>([])
@@ -337,6 +337,7 @@ const AgentModelSelector = (props: {
     setWorkflowObjects(workflowDetails)
     updateWorkflowDetail(workflowDetails)
     setShowWorkflowSelector(false)
+    validateWorkflows(workflowDetails).catch(() => {})
   }
 
   // 处理插件选择
@@ -379,18 +380,29 @@ const AgentModelSelector = (props: {
   }
 
   // 处理工作流操作（删除/设置）
-  const handleWorkflowOperation = (operate: 'delete' | 'setting', workflowId: string) => {
+  const handleWorkflowOperation = (operate: 'delete' | 'setting', workflowId: string, version?: string) => {
     if (operate === 'delete') {
       setWorkflowObjects(prevWorkflows => {
         const updatedWorkflows = prevWorkflows.filter(workflow => workflow.workflow_id !== workflowId)
         updateWorkflowDetail(updatedWorkflows)
         return updatedWorkflows
       })
+      setValidationResults(prev => {
+        const next = { ...prev }
+        delete next[workflowId]
+        return next
+      })
     } else if (operate === 'setting') {
       // 处理设置操作，打开新页面设置工作流
-      window.open(`/dashboard/workflows/editor/${workflowId}?spaceId=${agentDetailResponse?.data?.agent_info?.space_id}`, '_blank')
+      const versionParam = version && version !== 'draft' ? `&version=${version}` : ''
+      window.open(`/dashboard/workflows/editor/${workflowId}?spaceId=${spaceId}${versionParam}`, '_blank')
     }
   }
+
+  const handleRefreshWorkflows = useCallback(() => {
+    setWorkflowListRefreshToken(t => t + 1)
+    validateWorkflows(workflowObjects).catch(() => {})
+  }, [validateWorkflows, workflowObjects])
 
   // 处理插件操作（删除）
   const handlePluginOperation = (operate: 'delete', pluginId: string, toolId: string) => {
@@ -740,27 +752,52 @@ const AgentModelSelector = (props: {
               >
                 {workflowObjects.length}
               </span>
+              {workflowValidationErrorCount > 0 && (
+                <Tooltip title={`所选工作流存在校验不通过（${workflowValidationErrorCount} 个），请跳转对应工作流进行修改`} arrow>
+                  <span className="inline-flex items-center ml-2">
+                    <AlertCircle className="w-[20px] h-[20px] text-red-500" />
+                  </span>
+                </Tooltip>
+              )}
             </Typography>
-            <AddButton
-              options={[
-                { label: '添加已有工作流', value: 'existing' },
-                { label: '创建新工作流', value: 'new' },
-              ]}
-              onSelect={addType => {
-                if (addType === 'existing') {
-                  // 打开工作流选择器
-                  setShowWorkflowSelector(true)
-                } else if (addType === 'new') {
-                  // 创建工作流的逻辑，在新页面打开
-                  window.open('/dashboard/workflows/new', '_blank')
-                }
-              }}
-              disabled={readonly}
-            />
+            <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
+              <Tooltip title="刷新工作流信息" arrow>
+                <span>
+                  <IconButton size="small" onClick={handleRefreshWorkflows} disabled={workflowObjects.length === 0} aria-label="刷新">
+                    <RefreshCcw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <AddButton
+                options={[
+                  { label: '添加已有工作流', value: 'existing' },
+                  { label: '创建新工作流', value: 'new' },
+                ]}
+                onSelect={addType => {
+                  if (addType === 'existing') {
+                    setShowWorkflowSelector(true)
+                  } else if (addType === 'new') {
+                    window.open('/dashboard/workflows/new', '_blank')
+                  }
+                }}
+                disabled={readonly}
+              />
+            </div>
           </AccordionSummary>
           <AccordionDetails>
             {/* 工作流列表 */}
-            <WorkflowList workflowObjects={workflowObjects} onClick={handleWorkflowOperation} disabled={readonly} />
+            <WorkflowList
+              workflowObjects={workflowObjects}
+              onClick={handleWorkflowOperation}
+              disabled={readonly}
+              refreshToken={workflowListRefreshToken}
+              validationResults={validationResults}
+            />
+            {workflowObjects.length === 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                暂无工作流，点击上方按钮添加工作流
+              </Alert>
+            )}
           </AccordionDetails>
         </Accordion>
 

@@ -111,6 +111,7 @@ export const API_ENDPOINTS = {
   EXECUTION: {
     WORKFLOW: '/execution/workflow',
     USERINPUT: '/execution/userInput',
+    WORKFLOW_VALIDATE: '/execution/workflow/validate',
     AGENT: '/execution/agent',
     AGENT_RESET: '/execution/agent/reset',
     AGENT_USERINPUT: '/execution/agent/userInput',
