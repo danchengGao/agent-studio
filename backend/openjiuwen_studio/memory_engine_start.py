@@ -24,12 +24,12 @@ class MemoryEngineManager:
     async def init(cls):
         if cls._instance is not None:
             return cls._instance
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        load_dotenv(os.path.join(project_root, '.env'))
-        current_dir = os.path.join(project_root, 'backend')
-        resource_dir = os.path.join(current_dir, 'resources')
-        os.makedirs(resource_dir, exist_ok=True)
-        kv_db_path = os.path.join(resource_dir, 'dbmstore')
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))
+        load_dotenv(os.path.join(current_file_dir, '../.env'))
+
+        data_dir = os.path.join(current_file_dir, 'memory-data')
+        os.makedirs(data_dir, exist_ok=True)
+        kv_db_path = os.path.join(data_dir, 'dbmstore')
 
         try:
             master_aes_key = base64.b64decode(os.getenv("SERVER_AES_MASTER_KEY_ENV", ""))

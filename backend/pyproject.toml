@@ -3,10 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openjiuwen-studio-server"
+name = "openjiuwen-studio"
 version = "0.1.1"
-description = "Add your description here"
-readme = "README.md"
+description = "OpenJiuwen Studio offers an all-in-one AI Agent development platform"
 requires-python = "==3.11.4"
 dependencies = [
     "fastapi==0.115.11",
@@ -26,10 +25,6 @@ dependencies = [
     "pycryptodome==3.23.0",
     "python-jose[cryptography]==3.3.0",
 ]
-
-
-[project.scripts]
-openjiuwen-studio-server = "openjiuwen_studio_server.main:main"
 
 [tool.uv]
 default-groups = ['dev']

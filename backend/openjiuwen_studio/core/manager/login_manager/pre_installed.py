@@ -37,7 +37,7 @@ def _read_json(path: str) -> dict:
 
 def create_examples(space_id: str):
     base_dir = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "../../../../examples")
+        os.path.join(os.path.dirname(__file__), "../../../examples")
     )
 
     current_time = milliseconds()

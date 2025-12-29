@@ -17,8 +17,8 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ../examples:<<BACKEND_PATH>>/examples
-      - ./config.yaml:<<BACKEND_PATH>>/config.yaml
-      - ./config.json:<<BACKEND_PATH>>/config.json
+      - ./config.yaml:<<BACKEND_PATH>>/conf/config.yaml
+      - ./config.json:<<BACKEND_PATH>>/conf/config.json
       - ../logs/run:/app/logs/run
       - ../logs/performance:/app/logs/performance
       - ../logs/interface:/app/logs/interface

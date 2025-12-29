@@ -847,7 +847,7 @@ def plugin_read_market_json(
     _ = check_user_space(req.space_id, current_user)
 
     # 2. 构造config.json文件路径
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../conf/"))
     config_file_path = os.path.join(base_dir, "config.json")
     try:
         with open(config_file_path, 'r', encoding='utf-8') as f:

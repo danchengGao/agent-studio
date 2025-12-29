@@ -64,10 +64,10 @@ class ExecutorConfig():
         return getattr(self._config, name)
 
 
-config = ExecutorConfig(os.path.join(os.path.dirname(__file__), "../../../config.yaml"))
+config = ExecutorConfig(os.path.join(os.path.dirname(__file__), "../../conf/config.yaml"))
 
 from openjiuwen.extensions.common.configs.config_manager import configure
 from openjiuwen.extensions.common.configs.log_config import configure_log
 
-configure(os.path.join(os.path.dirname(__file__), "../../../config.yaml"))
-configure_log(os.path.join(os.path.dirname(__file__), "../../../config.yaml"))
+configure(os.path.join(os.path.dirname(__file__), "../../conf/config.yaml"))
+configure_log(os.path.join(os.path.dirname(__file__), "../../conf/config.yaml"))
