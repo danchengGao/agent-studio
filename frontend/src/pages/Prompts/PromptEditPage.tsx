@@ -379,7 +379,7 @@ const PromptEditPage: React.FC = () => {
       } else {
         // 大屏幕：15寸以上笔记本、台式显示器
         setVersionHistoryHeight('calc(100vh - 200px)')
-        setChatMessageMaxHeight('calc(100vh - 300px)')
+        setChatMessageMaxHeight('calc(100vh - 500px)')
       }
     }
 
