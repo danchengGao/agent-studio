@@ -529,7 +529,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              maxWidth: 'calc(80ch + 20px)',
+                              maxWidth: 'calc(70ch + 20px)',
                             },
                             '&.Mui-error': {
                               borderColor: 'error.main',
@@ -601,7 +601,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                  maxWidth: '80ch',
+                                  maxWidth: '70ch',
                                   display: 'inline-block',
                                   verticalAlign: 'middle',
                                 }}

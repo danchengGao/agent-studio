@@ -44,6 +44,7 @@ interface ToolParameter {
   description: string
   type: string
   method: string
+  is_required?: boolean
 }
 
 interface HeaderConfig {
@@ -168,6 +169,7 @@ const ToolConfigurationPage: React.FC = () => {
     description: '',
     type: 'string',
     method: 'query',
+    is_required: false,
   })
 
   const { user } = useAuthStore()
@@ -236,6 +238,7 @@ const ToolConfigurationPage: React.FC = () => {
             description: param.desc || '',
             type: mapNumberToString(param.type),
             method: 'query',
+            is_required: param.is_required,
           })) || [],
         output_parameters:
           targetApiInfo.response_params?.map(param => ({
@@ -244,6 +247,7 @@ const ToolConfigurationPage: React.FC = () => {
             description: param.desc || '',
             type: mapNumberToString(param.type),
             method: 'query',
+            is_required: param.is_required,
           })) || [],
         headers:
           targetApiInfo.headers?.map(header => ({
@@ -474,6 +478,14 @@ const ToolConfigurationPage: React.FC = () => {
   }
 
   const convertToolToApiRequest = (tool: Tool) => {
+    const convertParams = (params: ToolParameter[]) =>
+      params.map(param => ({
+        name: param.name,
+        desc: param.description,
+        type: mapTypeToNumber(param.type),
+        is_required: param.is_required ?? false,
+      }))
+
     if (pluginType === 'code') {
       return {
         space_id: getDefaultSpaceId(),
@@ -484,18 +496,8 @@ const ToolConfigurationPage: React.FC = () => {
         language: tool.language || 'python',
         code: tool.code || '',
         plugin_version: '',
-        request_params: tool.input_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: true,
-        })),
-        response_params: tool.output_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: false,
-        })),
+        request_params: convertParams(tool.input_parameters),
+        response_params: convertParams(tool.output_parameters),
         headers: tool.headers.map(header => ({
           name: header.key,
           value: header.value,
@@ -511,18 +513,8 @@ const ToolConfigurationPage: React.FC = () => {
         path: tool.path,
         method: tool.method,
         plugin_version: '',
-        request_params: tool.input_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: true,
-        })),
-        response_params: tool.output_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: false,
-        })),
+        request_params: convertParams(tool.input_parameters),
+        response_params: convertParams(tool.output_parameters),
         headers: tool.headers.map(header => ({
           name: header.key,
           value: header.value,
@@ -531,7 +523,7 @@ const ToolConfigurationPage: React.FC = () => {
     }
   }
 
-  const handleParameterFormChange = (field: keyof typeof parameterForm, value: string) => {
+  const handleParameterFormChange = (field: keyof typeof parameterForm, value: string | boolean) => {
     setParameterForm(prev => ({
       ...prev,
       [field]: value,
@@ -546,6 +538,7 @@ const ToolConfigurationPage: React.FC = () => {
         description: parameter.description,
         type: parameter.type,
         method: parameter.method,
+        is_required: parameter.is_required || false,
       })
     } else {
       setParameterForm({
@@ -553,6 +546,7 @@ const ToolConfigurationPage: React.FC = () => {
         description: '',
         type: 'string',
         method: 'query',
+        is_required: false,
       })
     }
     if (isInput) {
@@ -574,6 +568,7 @@ const ToolConfigurationPage: React.FC = () => {
       description: parameterForm.description.trim(),
       type: parameterForm.type,
       method: parameterForm.method,
+      is_required: parameterForm.is_required,
     }
 
     if (tool) {
@@ -1004,7 +999,7 @@ const ToolConfigurationPage: React.FC = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          maxWidth: 'calc(80ch - 24px)',
+                          maxWidth: 'calc(70ch - 24px)',
                         },
                       }}
                     />
@@ -1141,7 +1136,7 @@ const ToolConfigurationPage: React.FC = () => {
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
-                          maxWidth: 'calc(80ch + 20px)',
+                          maxWidth: 'calc(70ch + 20px)',
                         },
                       },
                     }}
@@ -1530,7 +1525,7 @@ const ToolConfigurationPage: React.FC = () => {
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
-                              maxWidth: '80ch',
+                              maxWidth: '70ch',
                             }}
                           >
                             API路径: {tool.path}
@@ -1620,7 +1615,34 @@ const ToolConfigurationPage: React.FC = () => {
                 inputProps={{ maxLength: 40 }}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            {isInputDialogOpen ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Typography variant="subtitle2" className="mb-2">
+                    参数类型
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
+                      <MenuItem value="string">字符串</MenuItem>
+                      <MenuItem value="number">数字</MenuItem>
+                      <MenuItem value="boolean">布尔值</MenuItem>
+                      <MenuItem value="array">数组</MenuItem>
+                      <MenuItem value="object">对象</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+                <div>
+                  <Typography variant="subtitle2" className="mb-2">
+                    传入方法
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
+                      <MenuItem value="query">Query参数</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+              </div>
+            ) : (
               <div>
                 <Typography variant="subtitle2" className="mb-2">
                   参数类型
@@ -1635,16 +1657,23 @@ const ToolConfigurationPage: React.FC = () => {
                   </Select>
                 </FormControl>
               </div>
-              <div>
-                <Typography variant="subtitle2" className="mb-2">
-                  传入方法
-                </Typography>
-                <FormControl fullWidth>
-                  <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
-                    <MenuItem value="query">Query参数</MenuItem>
-                  </Select>
-                </FormControl>
+            )}
+            <div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_required"
+                  checked={parameterForm.is_required}
+                  onChange={e => handleParameterFormChange('is_required', e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="is_required" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  必选参数
+                </label>
               </div>
+              <Typography variant="caption" className="text-gray-500 mt-1 block">
+                勾选后该参数为必填项
+              </Typography>
             </div>
           </div>
         </DialogContent>
@@ -1937,7 +1966,7 @@ const ToolConfigurationPage: React.FC = () => {
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                      maxWidth: '80ch',
+                      maxWidth: '70ch',
                     }}
                   >
                     API路径: {tool?.path}

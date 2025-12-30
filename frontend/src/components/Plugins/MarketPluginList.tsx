@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { CircularProgress } from '@mui/material'
-import { Search, Grid, List, RefreshCw, Plug } from 'lucide-react'
+import { Search, Grid, List, RefreshCw, Plug, AlertTriangle } from 'lucide-react'
 import MarketPluginCard from './MarketPluginCard'
 import { PluginInfo } from '@agent-studio/api-client'
 
@@ -49,6 +49,8 @@ interface MarketPluginListProps {
   onPluginAction: (action: string, plugin: Plugin) => void
   onInstallPlugin: (plugin: Plugin) => void
   getPluginTypeText: (pluginType: number) => string
+  marketError: string | null
+  refreshMarketPlugins: () => Promise<void>
 }
 
 const MarketPluginList: React.FC<MarketPluginListProps> = ({
@@ -67,6 +69,8 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
   onPluginAction,
   onInstallPlugin,
   getPluginTypeText,
+  marketError,
+  refreshMarketPlugins,
 }) => {
   const { t } = useTranslation()
 
@@ -180,6 +184,19 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Market Error Alert */}
+      {marketError && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
+            <span className="text-yellow-800">{marketError}</span>
+          </div>
+          <button onClick={refreshMarketPlugins} className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors">
+            重试
+          </button>
+        </div>
+      )}
 
       {/* Market Plugins Grid/List */}
       {filteredMarketPlugins.length === 0 ? (
