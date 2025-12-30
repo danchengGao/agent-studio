@@ -320,12 +320,16 @@ class PromptDebugService:
 
                 # 2. 工具调用
                 if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                    id_set = {items['id'] for items in tool_calls_delta}
                     for tc in delta.tool_calls:
-                        if tc.id:
+                        if tc.id and tc.id in id_set:
+                            new_item = tc.model_dump()
+                            next((item.update({k: v for k, v in new_item.items() if v}) or item
+                                  for item in tool_calls_delta if item['id'] == new_item['id']), new_item)
+                        elif tc.id:
                             tool_calls_delta.append(tc.model_dump())
                             tool_call_index = tc.index
                         else:
-
                             tool_calls_delta[tool_call_index]["arguments"] += tc.arguments
 
                     debug_logs.append({
