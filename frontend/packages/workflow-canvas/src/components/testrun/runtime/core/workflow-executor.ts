@@ -5,7 +5,7 @@
 
 import { ExecutionService } from '@test-agentstudio/api-client'
 import { Emitter } from '@flowgram.ai/free-layout-editor'
-import { nanoid } from 'nanoid'
+import { v4 as uuidv4 } from 'uuid'
 
 import {
   StreamExecuteParams,
@@ -67,10 +67,10 @@ export class WorkflowExecutor {
 
     this.eventHandlers = onEvent ? [onEvent] : []
     this.executionController = new AbortController()
-    this.currentExecutionParams = params
 
-    const conversationId = params.conversation_id || nanoid()
-    this.currentConversationId = conversationId
+    const conversation_id = params.conversation_id || uuidv4()
+    this.currentExecutionParams = { ...params, conversation_id }
+    this.currentConversationId = conversation_id
     this.currentSpaceId = params.space_id
 
     this.eventConverter.reset()
@@ -82,7 +82,7 @@ export class WorkflowExecutor {
           version: params.version,
           space_id: params.space_id,
           inputs: params.inputs,
-          conversation_id: conversationId,
+          conversation_id,
         },
         executionEvent => {
           const streamEvent = this.eventConverter.convert(executionEvent)

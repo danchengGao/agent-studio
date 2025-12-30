@@ -13,7 +13,7 @@ export interface StreamExecuteParams {
   version: string
   space_id: string
   inputs: Record<string, any>
-  conversation_id: string
+  conversation_id?: string
 }
 
 export interface ExecuteParams {

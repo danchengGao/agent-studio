@@ -150,7 +150,7 @@ export class TestRunRuntimeService implements ITestRunRuntimeService {
           version: params.version,
           space_id: params.space_id,
           inputs: params.inputs,
-          conversation_id: params.conversation_id || '',
+          conversation_id: params.conversation_id,
         },
         options,
         onEvent,

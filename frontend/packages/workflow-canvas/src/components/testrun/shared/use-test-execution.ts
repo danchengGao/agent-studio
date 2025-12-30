@@ -68,7 +68,6 @@ export function useTestExecution(options: UseTestExecutionOptions): UseTestExecu
           version: version || '',
           space_id: finalSpaceId,
           inputs: values,
-          conversation_id: conversationId || '',
           component_id: nodeId,
           loop_id: loopId,
           options: {

@@ -220,7 +220,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
         version: '',
         space_id: spaceId,
         inputs: values,
-        conversation_id: '',
         options: {
           statusManagement: {
             clearBeforeStart: false,
