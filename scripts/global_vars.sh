@@ -16,9 +16,8 @@ declare -A CONFIG=(
     ["CONFIG_DIR"]="${SCRIPT_DIR}/conf"
     ["NGINX_TEMPLE_FILE"]="${SCRIPT_DIR}/conf/nginx.template.conf"
     ["DOCKER_COMPOSE_CMD"]=""
-    ["START_PORT"]="1024"
+    ["START_PORT"]="3000"
     ["END_PORT"]="65535"
-    ["ALLOC_PORT_NUM"]="7"
     ["OS_TYPE"]=""
 )
 
@@ -55,12 +54,12 @@ declare -A NAMES=(
 
 # ===== Host port variables to allocate for services (dynamic assignment) =====
 declare -ga PORTS=(
+    FRONTEND_HOST_PORT
     MYSQL_HOST_PORT
     ETCD_HOST_PORT
     MINIO_SERVICE_HOST_PORT
     MINIO_CONSOLE_HOST_PORT
     MILVUS_HOST_PORT
-    FRONTEND_HOST_PORT
     BACKEND_HOST_PORT
     PLUGIN_SERVER_HOST_PORT
     SANDBOX_GATEWAY_HOST_PORT
@@ -151,6 +150,7 @@ declare -A CONTAINERS=(
 declare -A ARGS=(
     ["CMD"]=""
     ["ENV_FILE"]=""
+    ["IS_NEW_SVC"]="false"
 )
 
 # ==== Modules specified via command-line arguments ====

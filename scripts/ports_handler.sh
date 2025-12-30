@@ -122,7 +122,7 @@ alloc_available_ports() {
     info "Successfully collected $need_port_num available ports: ${AVAILABLE_PORTS[*]}"
 }
 
-# ===================== Dynamically assign ports =====================
+# ===================== Dynamically assign ports to containers =====================
 assign_ports() {
     local port_index=0  # Available port index (starting from 0)
 

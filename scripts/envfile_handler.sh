@@ -78,13 +78,16 @@ read_env_from_file() {
 process_env_file() {
     local cmd=${ARGS["CMD"]}
     local arg_env_file=${ARGS["ENV_FILE"]}
+    local arg_new_svc=${ARGS["IS_NEW_SVC"]}
     local current_env_file=${CONFIG["ENV_FILE"]}
 
     get_public_ip
     case "${cmd}" in
         up)
-            if [ -z "${arg_env_file}" ]; then
+            if [[ "${arg_new_svc}" == "true" || ( -z "${arg_env_file}" && ! -f "${current_env_file}" ) ]]; then
                 generate_env_file
+            elif [ -z "${arg_env_file}" ]; then
+                read_env_from_file ${current_env_file}
             else
                 read_env_from_file ${arg_env_file}
             fi
@@ -92,7 +95,7 @@ process_env_file() {
             ;;
     
         down|stop)
-            if [ -z ${arg_env_file} ]; then
+            if [ -z "${arg_env_file}" ]; then
                 read_env_from_file ${current_env_file}
             else
                 read_env_from_file ${arg_env_file}

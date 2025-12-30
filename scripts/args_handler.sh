@@ -7,6 +7,7 @@ parse_args() {
     local args=("$@")
     local cmd=""
     local env_file=""
+    local is_new_svc="false"
     local modules=()
 
     while [ $i -lt ${#args[@]} ]; do
@@ -22,6 +23,10 @@ parse_args() {
                     error "-f specified file does not exist: ${env_file}"
                 fi
                 i=$((i+2))  # Skip -f and file path
+                ;;
+            -n|--new)
+                is_new_svc="true"
+                i=$((i+1))
                 ;;
             up|down|stop|conf)
                 # treat as commands
@@ -55,9 +60,15 @@ parse_args() {
         modules=("${deduped_modules[@]}")
     fi
 
+    # should not specify .env when bring up new services
+    if [[ -n "${is_new_svc}" && -n "${env_file}" ]]; then
+        error "Please do not specify -f and -n in the sametime"
+    fi
+
     # Assign parsed commands to global variables for main function
     ARGS["CMD"]=${cmd}
     ARGS["ENV_FILE"]=${env_file}
+    ARGS["IS_NEW_SVC"]=${is_new_svc}
     ARGS_MODULES=("${modules[@]}")
 
     if [ ${#ARGS_MODULES[@]} -eq 0 ]; then

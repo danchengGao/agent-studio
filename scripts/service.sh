@@ -49,7 +49,7 @@ exec_service() {
                 JIUWEN|PLUGIN|SANDBOX)
                     eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
                     if [ "${cmd}" == "up" ]; then
-                        check_containers ${CONTAINERS[${module}]}  
+                        check_containers "${CONTAINERS[${module}]}"
                     fi
                     ;;
             esac
@@ -63,7 +63,7 @@ exec_service() {
 main() {
     detect_os
     info "Operating System: ${CONFIG["OS_TYPE"]}"
-    info "Executing command: $@"
+    info "Executing command: $*"
     parse_args "$@"
     check_docker
     process_env_file
