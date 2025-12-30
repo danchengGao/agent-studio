@@ -100,7 +100,16 @@ async def handler(
             inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
         else:
             inputs = request_body.inputs
-        set_thread_session(request_body.space_id)
+
+        session_id = " ".join(
+            [
+                id_val.strip()
+                for id_val in [request_body.space_id, request_body.conversation_id]
+                if id_val and id_val.strip()
+            ]
+        )
+        if session_id:
+            set_thread_session(session_id)
 
         async for chunk in mgr.run(request_body.id, request_body.version, inputs,
                                    request_body.conversation_id, request_body.space_id, current_user):
