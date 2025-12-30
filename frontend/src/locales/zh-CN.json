@@ -2,7 +2,6 @@
   "common": {
     "buttons": {
       "save": "保存",
-      "settings": "设置",
       "cancel": "取消",
       "confirm": "确认",
       "delete": "删除",
@@ -33,12 +32,8 @@
       "clear": "清空",
       "select": "选择",
       "selectAll": "全选",
-      "deselectAll": "取消全选",
-      "add": "添加"
+      "deselectAll": "取消全选"
     },
-    "cancel": "取消",
-    "loading": "加载中...",
-    "saving": "保存中...",
     "tooltips": {
       "clickToEditName": "点击编辑名称",
       "clickToEditDescription": "点击编辑描述",
