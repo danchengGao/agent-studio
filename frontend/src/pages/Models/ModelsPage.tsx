@@ -129,7 +129,6 @@ const ModelsPage: React.FC = () => {
       newModel.modelId?.trim() && // 模型ID必填
       newModel.apiKey?.trim() && // API密钥必填
       newModel.baseUrl?.trim() && // 基础URL必填
-      newModel.description?.trim() && // 描述必填
       !baseUrlError && // 基础URL格式正确
       (newModel.name?.length || 0) <= 100 && // 名称不超过100字符
       (newModel.modelId?.length || 0) <= 100 && // 模型ID不超过100字符
@@ -1319,15 +1318,9 @@ const ModelsPage: React.FC = () => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                required
                 multiline
                 rows={3}
                 label="描述"
-                sx={{
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red',
-                  },
-                }}
                 value={newModel.description}
                 onChange={e => {
                   const value = e.target.value
