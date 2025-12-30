@@ -4,6 +4,7 @@ import { Tag } from 'lucide-react'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { AgentService, AgentPublishRequest, AgentPublishResponse, AgentVersionListRequest, AgentVersionListResponse } from '@test-agentstudio/api-client'
 import { useAgentStore } from '@/stores/useAgentStore'
+import { useScopedTranslation } from '@/i18n'
 
 interface AgentPublishDialogProps {
   open: boolean
@@ -19,6 +20,7 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
   const [latestVersionDisplay, setLatestVersionDisplay] = useState<string | null>(null)
+  const { t } = useScopedTranslation('agents.agentPublishDialog')
 
   const suggestedVersion = useMemo(() => {
     const base = latestVersionDisplay || ''
@@ -91,16 +93,16 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
 
   const handlePublish = async () => {
     if (!agentId) {
-      setPublishError('智能体信息不完整，无法发布')
+      setPublishError(t('errors.missingAgent'))
       return
     }
 
     if (!versionNumber.trim()) {
-      setPublishError('请输入版本号')
+      setPublishError(t('errors.missingVersion'))
       return
     }
     if (!versionDescription.trim()) {
-      setPublishError('请输入版本描述')
+      setPublishError(t('errors.missingDescription'))
       return
     }
 
@@ -109,7 +111,7 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
       setPublishError(null)
       const saveSuccess = await saveAgent()
       if (!saveSuccess) {
-        throw new Error(saveError || '保存失败，无法继续发布')
+        throw new Error(saveError || t('errors.saveFailed'))
       }
       const publishRequest: AgentPublishRequest = {
         agent_id: agentId,
@@ -124,10 +126,10 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
         onPublished?.()
         onClose()
       } else {
-        throw new Error(response.message || '发布失败')
+        throw new Error(response.message || t('errors.publishFailed'))
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '发布失败，请重试'
+      const errorMessage = error instanceof Error ? error.message : t('errors.publishFailedRetry')
       setPublishError(errorMessage)
     } finally {
       setIsPublishing(false)
@@ -156,8 +158,8 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
             <Tag className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
           <div className="ml-3 sm:ml-4">
-            <h2 className="text-lg sm:text-xl font-bold">提交新版本</h2>
-            <p className="text-blue-100 text-xs sm:text-sm mt-1">创建智能体的版本标签</p>
+            <h2 className="text-lg sm:text-xl font-bold">{t('title')}</h2>
+            <p className="text-blue-100 text-xs sm:text-sm mt-1">{t('subtitle')}</p>
           </div>
         </div>
       </div>
@@ -170,7 +172,7 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
             {/* 版本号 */}
             <div className="mb-3 sm:mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                版本号 <span className="text-red-500">*</span>
+                {t('fields.version.label')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -180,12 +182,12 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
                   if (v.length <= 80) setVersionNumber(v)
                 }}
                 disabled={isPublishing}
-                placeholder="例如: v1.0.0"
+                placeholder={t('fields.version.placeholder')}
                 className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors text-sm"
                 maxLength={80}
               />
               <div className="flex justify-between items-center mt-1 sm:mt-2">
-                <p className="text-xs text-gray-500">格式：v主版本.次版本.修订版本（例如: v0.0.1）</p>
+                <p className="text-xs text-gray-500">{t('fields.version.hint')}</p>
                 <span className="text-xs text-gray-500">{versionNumber.length}/80</span>
               </div>
             </div>
@@ -193,7 +195,7 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
             {/* 版本描述 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                版本描述 <span className="text-red-500">*</span>
+                {t('fields.description.label')} <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={versionDescription}
@@ -204,13 +206,13 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
                   }
                 }}
                 disabled={isPublishing}
-                placeholder="请描述此版本的主要更新内容..."
+                placeholder={t('fields.description.placeholder')}
                 rows={3}
                 maxLength={200}
                 className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none transition-colors text-sm"
               />
               <div className="flex justify-between items-center mt-1 sm:mt-2">
-                <p className="text-xs text-gray-500">请输入版本描述，说明此版本的更新内容</p>
+                <p className="text-xs text-gray-500">{t('fields.description.hint')}</p>
                 <span className="text-xs text-gray-500">{versionDescription.length}/200</span>
               </div>
             </div>
@@ -227,7 +229,7 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
             variant="outlined"
             className="w-full sm:w-auto px-4 sm:px-6 py-2 border-gray-300 text-gray-700 hover:bg-gray-50"
           >
-            取消
+            {t('buttons.cancel')}
           </Button>
           <Button
             onClick={handlePublish}
@@ -238,10 +240,10 @@ const AgentPublishDialog: React.FC<AgentPublishDialogProps> = ({ open, agentId, 
             {isPublishing ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                发布中...
+                {t('status.publishing')}
               </div>
             ) : (
-              <div className="flex items-center justify-center">提交新版本</div>
+              <div className="flex items-center justify-center">{t('buttons.confirm')}</div>
             )}
           </Button>
         </div>

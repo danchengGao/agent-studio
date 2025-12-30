@@ -47,10 +47,18 @@
     "systemPrompt": {
       "title": "System Prompt Configuration",
       "defineAgentPlaceholder": "Define the agent's role, capabilities, and behavioral guidelines...",
+      "generationBanner": {
+        "generating": "Generating system prompt...",
+        "generated": "System prompt generated (you can preview and decide whether to apply it).",
+        "cancel": "Cancel",
+        "adopt": "Apply"
+      },
       "overwritePromptTemplateDialog": {
         "description": "This operation will overwrite the prompt template draft. Please choose your preferred handling method.",
-        "overwriteAndJump": "Overwrite and Jump: Overwrite the prompt editing page with the current agent's system prompt content",
-        "notOverwriteAndJump": "Don't Overwrite and Jump: Keep the original content of the prompt editing page unchanged",
+        "overwriteAndJump": "Overwrite: Overwrite the prompt editing page with the current agent's system prompt content",
+        "notOverwriteAndJump": "Don't Overwrite: Keep the original content of the prompt editing page unchanged",
+        "overwriteAndJumpLabel": "Overwrite",
+        "notOverwriteAndJumpLabel": "Don't Overwrite",
         "cancel": "Cancel"
       },
       "promptDialog": {
@@ -68,6 +76,67 @@
         "noContentForVersion": "No content for this version",
         "selectPrompt": "Please select a prompt on the left",
         "loadFailed": "Load failed"
+      },
+      "relationBar": {
+        "tooltipGoToTemplate": "Go to Prompt Template Management",
+        "chipLatest": "Latest Version",
+        "tooltipHasNewVersion": "A newer version {{latestVersion}} is available",
+        "chipHistory": "Older Version",
+        "tooltipUnlink": "Unlink",
+        "ariaUnlink": "Unlink"
+      },
+      "titleActions": {
+        "needContent": "Please enter content first",
+        "optimizePrompt": "Optimize system prompt",
+        "associatePrompt": "Associate prompt",
+        "saveNewVersion": "Submit new version"
+      },
+      "savePromptDialog": {
+        "title": "Save Prompt",
+        "fields": {
+          "promptKeyLabel": "Prompt Key",
+          "promptKeyHelperExisting": "A prompt is already associated, key cannot be modified",
+          "promptKeyHelperInvalid": "Only letters, numbers, underscores (_) and hyphens (-) are allowed, and it must start with a letter",
+          "promptNameLabel": "Prompt Name",
+          "promptNameHelperExisting": "A prompt is already associated, name cannot be modified",
+          "promptNameHelperRequired": "Name cannot be empty",
+          "versionLabel": "Version",
+          "versionPlaceholder": "e.g. 1.0.1",
+          "versionHelperFormat": "Version must follow x.x.x format",
+          "versionHelperMustGreaterExisting": "Version must be greater than existing version {{latestVersion}}",
+          "versionHelperFormatAndGreater": "Must be in x.x.x format and greater than current latest version {{latestVersion}}",
+          "descLabel": "Version Description"
+        },
+        "actions": {
+          "cancel": "Cancel",
+          "save": "Save"
+        }
+      },
+      "defaults": {
+        "unnamedPrompt": "Untitled Prompt"
+      },
+      "messages": {
+        "emptySystemPrompt": "System prompt is empty and cannot be generated.",
+        "emptySystemPromptCannotSave": "System prompt is empty and cannot be saved.",
+        "modelIdNotFound": "No matching model ID found, using default value.",
+        "generateFailedWithError": "Failed to generate prompt: {{error}}",
+        "generateRequestFailed": "System prompt generation request failed",
+        "generateComplete": "System prompt has been generated. You can review and apply it.",
+        "noAdoptableContent": "No content to apply.",
+        "adopted": "The auto-generated system prompt has been applied.",
+        "cancelled": "Auto-generated result cancelled. Original prompt restored.",
+        "prefillFailed": "Failed to prefill prompt information. Please try again later.",
+        "fillKeyNameVersion": "Please fill in prompt key, name and version.",
+        "createPromptFailed": "Failed to create prompt",
+        "versionFormatAndGreaterError": "Version must be in x.x.x format and greater than the existing version.",
+        "savedAndCommitted": "Prompt has been saved and version committed.",
+        "savePromptFailed": "Failed to save prompt. Please try again later.",
+        "commitDescriptionFallback": "Version saved from Agent {{agentName}}"
+      },
+      "unlinkDialog": {
+        "title": "Unlink Prompt",
+        "message": "Are you sure you want to unlink prompt \"{{promptName}}-{{version}}\" from this agent? This action cannot be undone.",
+        "confirmButtonText": "Confirm"
       }
     },
     "orchestration": {
@@ -79,6 +148,69 @@
       "addPlugin": {
         "addExisting": "Add existing plugin",
         "createNew": "Create new plugin"
+      },
+      "modelSetting": {
+        "fields": {
+          "timeout": {
+            "label": "Timeout (s)"
+          },
+          "temperature": {
+            "label": "Temperature",
+            "tooltip": "Temperature: controls the randomness and creativity of model outputs. Higher values produce more random, diverse results; lower values make outputs more deterministic and conservative. Typical range is 0–2, recommended 0.1–1.0. Examples: 0.7 (balanced) and 1.2 (more creative)."
+          },
+          "topP": {
+            "label": "Top-p",
+            "tooltip": "Top-p: samples from the smallest set of tokens whose cumulative probability is at least p. Dynamically adjusts candidate count to balance diversity and quality. Typically set to 0.9–0.95. When used together with temperature, it is recommended to adjust only one of them."
+          }
+        },
+        "errors": {
+          "required": "{{label}} cannot be empty",
+          "range": "{{label}} must be between {{min}} and {{max}}",
+          "min": "{{label}} must be at least {{min}}",
+          "integer": "{{label}} must be an integer"
+        }
+      },
+      "pluginSetting": {
+        "list": {
+          "empty": "No plugins added yet. Click the button in the upper right to add."
+        },
+        "delete": {
+          "tooltip": "Delete",
+          "title": "Remove Plugin",
+          "confirmButtonText": "Confirm",
+          "message": "Are you sure you want to remove this plugin? This action cannot be undone."
+        }
+      },
+      "workflowSetting": {
+        "versionField": {
+          "loading": "Loading versions...",
+          "followLatest": "Follow latest content",
+          "hasNewVersion": "Newer version available",
+          "latestPublished": "Latest published version",
+          "draftLabel": "Draft"
+        },
+        "workflowList": {
+          "versionLabel": "Version:",
+          "emptyText": "No workflows added yet. Click the button in the upper right to add.",
+          "settingsTitle": "Settings",
+          "deleteTitle": "Delete"
+        }
+      },
+      "workflowSelector": {
+        "title": "Select Existing Workflows",
+        "searchPlaceholder": "Search workflow names, descriptions...",
+        "loading": "Loading workflow list...",
+        "loadFailed": "Failed to load workflow list. Please try again later.",
+        "noSearchResults": "No matching workflows found",
+        "noWorkflows": "No available workflows",
+        "createdAtLabel": "Created at: ",
+        "unknownDate": "Unknown",
+        "selectedTag": "Selected",
+        "paginationInfo": "Total {{total}} workflows, page {{currentPage}} of {{totalPages}}",
+        "selectedPrefix": "Selected",
+        "selectedSuffix": "workflows",
+        "cancel": "Cancel",
+        "confirmAdd": "Confirm"
       }
     },
     "previewDebug": {
@@ -191,6 +323,45 @@
           "fieldInput": "Please enter {{fieldName}}..."
         }
       }
+    }
+  },
+  "multiAgent": {
+    "sections": {
+      "orchestrationTitle": "Orchestration",
+      "workflowTitle": "Workflows",
+      "modelTitle": "Controller",
+      "defaultResponseTitle": "Default Response",
+      "conversationTitle": "Conversation Settings",
+      "greetingTitle": "Greeting"
+    },
+    "addButton": {
+      "addExistingWorkflow": "Add existing workflow",
+      "createNewWorkflow": "Create new workflow"
+    },
+    "alerts": {
+      "noWorkflow": "No workflows yet. Click the button above to add a workflow.",
+      "noModelsInline": "No models configured",
+      "modelDisabledAction": "Enable model",
+      "modelDisabledMessage": "The associated model \"{{name}}\" is disabled. Please select another available model or go to the model management page to enable it.",
+      "noModelSelectedAction": "Select a model above",
+      "noModelSelectedMessage": "No model selected",
+      "noModelsConfiguredAction": "Configure models",
+      "noModelsConfiguredMessage": "No models are configured. Please go to the model configuration page to add models."
+    },
+    "select": {
+      "placeholder": "Select a model",
+      "disabledModel": "Model disabled ({{name}})"
+    },
+    "defaultResponse": {
+      "placeholder": "Set a default response for cases where no workflow matches or a generic reply is needed..."
+    },
+    "greeting": {
+      "placeholder": "Set the agent's greeting so users know how to start the conversation..."
+    },
+    "popover": {
+      "title": "Conversation Settings",
+      "description": "Configure the maximum number of message turns carried during workflow execution.",
+      "maxRoundsLabel": "Max message turns"
     }
   }
 }

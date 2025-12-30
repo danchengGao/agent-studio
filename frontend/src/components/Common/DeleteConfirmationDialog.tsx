@@ -1,5 +1,6 @@
 import React from 'react'
 import { X, Trash2, Loader2, AlertTriangle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export interface DeleteConfirmationDialogProps {
   isOpen: boolean
@@ -25,58 +26,61 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   title,
   message,
   confirmButtonText,
-  cancelButtonText = '取消',
+  cancelButtonText,
   iconType = 'danger',
 }) => {
+  const { t } = useTranslation()
+
   // Default titles and messages based on item type
   const getDefaultTitle = () => {
     switch (itemType) {
       case 'agent':
-        return '删除智能体'
+        return t('common.confirmDialog.titles.agent')
       case 'workflow':
-        return '删除工作流'
+        return t('common.confirmDialog.titles.workflow')
       case 'model':
-        return '删除模型'
+        return t('common.confirmDialog.titles.model')
       case 'plugin':
-        return '删除插件'
+        return t('common.confirmDialog.titles.plugin')
       default:
-        return '删除确认'
+        return t('common.confirmDialog.titles.default')
     }
   }
 
   const getDefaultMessage = () => {
     switch (itemType) {
       case 'agent':
-        return `确定要删除智能体"${itemName}"吗？此操作无法撤销。`
+        return t('common.confirmDialog.messages.agent', { name: itemName })
       case 'workflow':
-        return `确定要删除工作流"${itemName}"吗？此操作无法撤销。`
+        return t('common.confirmDialog.messages.workflow', { name: itemName })
       case 'model':
-        return `确定要删除模型"${itemName}"吗？此操作无法撤销。`
+        return t('common.confirmDialog.messages.model', { name: itemName })
       case 'plugin':
-        return `确定要删除插件"${itemName}"吗？此操作无法撤销。`
+        return t('common.confirmDialog.messages.plugin', { name: itemName })
       default:
-        return `确定要删除"${itemName}"吗？此操作无法撤销。`
+        return t('common.confirmDialog.messages.default', { name: itemName })
     }
   }
 
   const getDefaultConfirmButtonText = () => {
     switch (itemType) {
       case 'agent':
-        return '删除智能体'
+        return t('common.confirmDialog.buttons.deleteAgent')
       case 'workflow':
-        return '删除工作流'
+        return t('common.confirmDialog.buttons.deleteWorkflow')
       case 'model':
-        return '删除模型'
+        return t('common.confirmDialog.buttons.deleteModel')
       case 'plugin':
-        return '删除插件'
+        return t('common.confirmDialog.buttons.deletePlugin')
       default:
-        return '删除'
+        return t('common.confirmDialog.buttons.delete')
     }
   }
 
   const displayTitle = title || getDefaultTitle()
   const displayMessage = message || getDefaultMessage()
   const displayConfirmButtonText = confirmButtonText || getDefaultConfirmButtonText()
+  const displayCancelButtonText = cancelButtonText || t('common.confirmDialog.buttons.cancel')
 
   if (!isOpen) return null
 
@@ -112,7 +116,7 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
             disabled={isLoading}
             className="flex-1 px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {cancelButtonText}
+            {displayCancelButtonText}
           </button>
           <button
             onClick={onConfirm}
@@ -122,7 +126,7 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
             {isLoading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                删除中...
+                {t('common.confirmDialog.buttons.deleting')}
               </>
             ) : (
               displayConfirmButtonText

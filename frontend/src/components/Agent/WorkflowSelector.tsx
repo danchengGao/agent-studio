@@ -3,7 +3,7 @@ import { Typography, Button, Pagination, Box } from '@mui/material'
 import { X, Search } from 'lucide-react'
 import { WorkflowService, useWorkflows, useSearchWorkflows } from '@test-agentstudio/api-client'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
-import { useTranslation } from 'react-i18next'
+import i18n, { useScopedTranslation } from '@/i18n'
 import { WorkflowSelectDetail, WorkflowDetail } from '../../types/agentTypes'
 import { useAgentStore } from '@/stores/useAgentStore'
 import { mapWorkflow, buildDetails } from '@/hooks/useWorkflowVersions'
@@ -17,7 +17,7 @@ interface WorkflowSelectorProps {
 }
 
 const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onConfirm, initialSelected = [], excludeWorkflowId }) => {
-  const { t } = useTranslation()
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration.workflowSelector')
   const [selectedWorkflows, setSelectedWorkflows] = useState<string[]>(initialSelected)
   const [selectedWorkflowsCache, setSelectedWorkflowsCache] = useState<Map<string, WorkflowSelectDetail>>(new Map())
   const updateWorkflowDetail = useAgentStore(s => s.updateWorkflowDetail)
@@ -265,23 +265,21 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-        {/* 头部 */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <Typography variant="h6" className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-bold">
-            选择已有工作流
+            {t('title')}
           </Typography>
           <div onClick={handleCancel} className="text-gray-500 hover:text-gray-700 cursor-pointer p-2 rounded-full hover:bg-gray-100">
             <X className="w-5 h-5" />
           </div>
         </div>
 
-        {/* 搜索框 */}
         <div className="px-6 pt-4 pb-2">
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200" />
             <input
               type="text"
-              placeholder={t('workflows.workflowList.searchPlaceholder') || '搜索工作流名称、描述...'}
+              placeholder={t('searchPlaceholder')}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition-all duration-200 bg-gray-50 focus:bg-white"
@@ -297,15 +295,14 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
         {workflowLoading ? (
           <div className="flex items-center justify-center py-12 flex-1">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">加载工作流列表中...</span>
+            <span className="ml-3 text-gray-600">{t('loading')}</span>
           </div>
         ) : error ? (
-          <div className="text-center py-12 text-red-500 flex-1">加载工作流列表失败，请稍后重试</div>
+          <div className="text-center py-12 text-red-500 flex-1">{t('loadFailed')}</div>
         ) : workflowList.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 flex-1">{debouncedSearchTerm.trim() ? `未找到匹配的工作流` : '暂无可用工作流'}</div>
+          <div className="text-center py-12 text-gray-500 flex-1">{debouncedSearchTerm.trim() ? t('noSearchResults') : t('noWorkflows')}</div>
         ) : (
           <>
-            {/* 滚动内容区域 */}
             <div className="flex-1 overflow-y-auto">
               <div className="p-6 space-y-4">
                 {workflowList.map(workflow => (
@@ -338,7 +335,8 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                           </h4>
                           <p className="text-gray-600 text-sm overflow-hidden text-ellipsis whitespace-nowrap leading-relaxed mb-1">{workflow.description}</p>
                           <p className="text-xs text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
-                            创建时间: {workflow.create_time ? new Date(workflow.create_time).toLocaleDateString() : '未知'}
+                            {t('createdAtLabel')}
+                            {workflow.create_time ? new Date(workflow.create_time).toLocaleDateString() : t('unknownDate')}
                           </p>
                         </div>
                       </div>
@@ -346,7 +344,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                       {selectedWorkflows.includes(workflow.id) && (
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-sm text-blue-700 font-medium">已选择</span>
+                          <span className="text-sm text-blue-700 font-medium">{t('selectedTag')}</span>
                         </div>
                       )}
                     </div>
@@ -354,12 +352,15 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                 ))}
               </div>
 
-              {/* 分页控件 */}
               {paginationInfo.totalPages > 1 && (
                 <div className="flex justify-center px-6 pb-6">
                   <Box display="flex" justifyContent="center" alignItems="center" gap={2}>
                     <Typography variant="body2" color="textSecondary">
-                      共 {paginationInfo.total} 个工作流，第 {paginationInfo.currentPage} / {paginationInfo.totalPages} 页
+                      {t('paginationInfo', {
+                        total: paginationInfo.total,
+                        currentPage: paginationInfo.currentPage,
+                        totalPages: paginationInfo.totalPages,
+                      })}
                     </Typography>
                     <Pagination
                       count={paginationInfo.totalPages}
@@ -377,14 +378,13 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
               )}
             </div>
 
-            {/* 固定底部 */}
             <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-white">
               <Typography variant="body2" className="text-gray-500 font-medium">
-                已选择 <span className="text-blue-600 font-bold">{selectedWorkflows.length}</span> 个工作流
+                {t('selectedPrefix')} <span className="text-blue-600 font-bold">{selectedWorkflows.length}</span> {t('selectedSuffix')}
               </Typography>
               <div className="flex items-center space-x-3">
                 <Button variant="outlined" onClick={handleCancel} className="border-2 border-gray-300 text-gray-700 hover:border-gray-500 hover:bg-gray-50">
-                  取消
+                  {t('cancel')}
                 </Button>
                 <div
                   onClick={selectedWorkflows.length === 0 ? undefined : handleConfirm}
@@ -394,7 +394,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                       : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 cursor-pointer'
                   }`}
                 >
-                  确认添加
+                  {t('confirmAdd')}
                 </div>
               </div>
             </div>

@@ -27,5 +27,109 @@
   "addBtn": {
     "addExisting": "添加已有",
     "createNew": "创建新的"
+  },
+  "agentPublishDialog": {
+    "title": "提交新版本",
+    "subtitle": "创建智能体的版本标签",
+    "fields": {
+      "version": {
+        "label": "版本号",
+        "placeholder": "例如: v1.0.0",
+        "hint": "格式：v主版本.次版本.修订版本（例如: v0.0.1）"
+      },
+      "description": {
+        "label": "版本描述",
+        "placeholder": "请描述此版本的主要更新内容...",
+        "hint": "请输入版本描述，说明此版本的更新内容"
+      }
+    },
+    "buttons": {
+      "cancel": "取消",
+      "confirm": "提交新版本"
+    },
+    "status": {
+      "publishing": "发布中..."
+    },
+    "errors": {
+      "missingAgent": "智能体信息不完整，无法发布",
+      "missingVersion": "请输入版本号",
+      "missingDescription": "请输入版本描述",
+      "saveFailed": "保存失败，无法继续发布",
+      "publishFailed": "发布失败",
+      "publishFailedRetry": "发布失败，请重试"
+    }
+  },
+  "settingDialog": {
+    "title": "编辑智能体信息",
+    "fields": {
+      "name": {
+        "label": "名称",
+        "placeholder": "例如：智能客服助手",
+        "helper": {
+          "required": "请输入智能体名称",
+          "tooLong": "名称过长，请控制在{{max}}字符以内（当前：{{current}}/{{max}}）",
+          "normal": "为您的智能体起一个描述性的名称（{{current}}/{{max}}）"
+        }
+      },
+      "description": {
+        "label": "功能描述",
+        "placeholder": "详细描述智能体的功能、用途和行为特征...",
+        "helper": {
+          "tooLong": "描述过长，请控制在{{max}}字符以内（当前：{{current}}/{{max}}）",
+          "normal": "详细描述智能体的功能和行为（{{current}}/{{max}}）"
+        }
+      }
+    },
+    "icon": {
+      "label": "选择图标",
+      "current": "当前选择："
+    },
+    "buttons": {
+      "cancel": "取消",
+      "save": "保存"
+    }
+  },
+  "historyPanel": {
+    "title": "版本历史",
+    "subtitle": "查看和切换智能体版本",
+    "status": {
+      "loading": "加载中...",
+      "loadFailed": "加载失败：{{error}}",
+      "noData": "暂无版本数据",
+      "loadingFailed": "获取版本列表失败",
+      "deleting": "删除中..."
+    },
+    "fields": {
+      "version": "版本",
+      "description": "版本描述",
+      "createdAt": "创建时间"
+    },
+    "actions": {
+      "createCopy": "创建副本",
+      "restore": "还原至该版本",
+      "delete": "删除",
+      "switching": "切换中..."
+    },
+    "description": {
+      "label": "版本描述：",
+      "empty": "无版本描述",
+      "draft": "当前草稿版本"
+    },
+    "time": {
+      "invalid": "无效时间",
+      "formatError": "时间格式错误"
+    },
+    "dialogs": {
+      "restore": {
+        "title": "还原为此版本",
+        "message": "还原后，将覆盖最新编写的智能体内容",
+        "confirm": "确认"
+      },
+      "delete": {
+        "title": "删除版本",
+        "message": "确定要删除版本 {{version}} 吗？删除后无法恢复",
+        "confirm": "删除"
+      }
+    }
   }
 }

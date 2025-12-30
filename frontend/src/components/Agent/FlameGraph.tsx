@@ -13,7 +13,7 @@ type ExecNode = InvokeExecuteInfo & { start_timestamp?: number; duration?: numbe
 
 interface BarItem {
   id: string
-  label: string
+  label?: string
   type: string
   start: number
   end: number
@@ -99,8 +99,8 @@ const buildBars = (roots: ExecNode[], rootLabel?: string, defaultNodeLabel?: str
     const end = start + dur
     res.push({
       id: String(node.invoke_id || `${start}-${end}-${depth}-${Math.random()}`),
-      label: depth === 0 && rootLabel ? rootLabel : (node.invoke_name as string) || (node.invoke_type as string) || defaultNodeLabel,
-      type: (node.invoke_type as string) || 'node',
+      label: depth === 0 && rootLabel ? rootLabel : node.invoke_name || node.invoke_type || defaultNodeLabel,
+      type: node.invoke_type || 'node',
       start,
       end,
       duration: dur,

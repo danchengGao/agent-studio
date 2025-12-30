@@ -20,6 +20,7 @@ import { useAuthStore } from '../../stores/useAuthStore'
 import { AlertCircle, RefreshCcw } from 'lucide-react'
 import { useWorkflowValidation } from '@/hooks/useWorkflowValidation'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
+import { useScopedTranslation } from '@/i18n'
 
 // 保留其他 Accordion 样式用于其他部分
 const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters elevation={0} square {...props} />)(({ theme }) => ({
@@ -97,6 +98,8 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
     workflows: workflowObjects,
     spaceId,
   })
+
+  const { t } = useScopedTranslation('agents.multiAgent')
 
   // 获取模型管理API的完整模型列表
   const { data: modelsData } = useModels({
@@ -360,11 +363,11 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
   return (
     <div className="h-full overflow-auto">
       <div className="workflow-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>编排配置</Typography>
+        <Typography sx={{ mb: 2 }}>{t('sections.orchestrationTitle')}</Typography>
         <Accordion defaultExpanded={true}>
           <AccordionSummary aria-controls="workflow-content" id="workflow-header">
             <Typography component="span" className="flex items-center">
-              工作流
+              {t('sections.workflowTitle')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${workflowObjects.length > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}
               >
@@ -379,7 +382,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               )}
             </Typography>
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
-              {/* <Tooltip title="对话设置" arrow>
+              {/* <Tooltip title={t('sections.conversationTitle')} arrow>
                 <IconButton
                   size="small"
                   onClick={handleConversationSettingsClick}
@@ -402,8 +405,8 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               </Tooltip>
               <AddButton
                 options={[
-                  { label: '添加已有工作流', value: 'existing' },
-                  { label: '创建新工作流', value: 'new' },
+                  { label: t('addButton.addExistingWorkflow'), value: 'existing' },
+                  { label: t('addButton.createNewWorkflow'), value: 'new' },
                 ]}
                 onSelect={addType => {
                   if (addType === 'existing') {
@@ -429,17 +432,17 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
             />
             {workflowObjects.length === 0 && (
               <Alert severity="info" sx={{ mt: 2 }}>
-                暂无工作流，点击上方按钮添加工作流
+                {t('alerts.noWorkflow')}
               </Alert>
             )}
           </AccordionDetails>
         </Accordion>
       </div>
       <div className="model-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>控制器配置</Typography>
+        <Typography sx={{ mb: 2 }}>{t('sections.modelTitle')}</Typography>
         <Accordion expanded={modelExpanded} onChange={handleAccordionChange}>
           <AccordionSummary aria-controls="model-content" id="model-header">
-            <Typography component="span">模型</Typography>
+            <Typography component="span">{t('sections.modelTitle')}</Typography>
             {modelsList.length > 0 ? (
               <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                 <Select
@@ -449,9 +452,9 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                   renderValue={value => {
                     // 如果选择的模型不在可用列表中，显示提示
                     if (value && !modelsList.find(model => model.model_name === value && model.is_active)) {
-                      return <span style={{ color: '#d32f2f' }}>模型已禁用（{value}）</span>
+                      return <span style={{ color: '#d32f2f' }}>{t('select.disabledModel', { name: value })}</span>
                     }
-                    return value ? value : <span style={{ color: 'rgba(0, 0, 0, 0.38)' }}>请选择模型</span>
+                    return value ? value : <span style={{ color: 'rgba(0, 0, 0, 0.38)' }}>{t('select.placeholder')}</span>
                   }}
                   sx={{
                     width: 200,
@@ -473,7 +476,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               </div>
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                未配置模型
+                {t('alerts.noModelsInline')}
               </Typography>
             )}
           </AccordionSummary>
@@ -492,22 +495,22 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                         disabled={readonly}
                         sx={{ '&.Mui-disabled': { cursor: 'not-allowed' } }}
                       >
-                        前往启用
+                        {t('alerts.modelDisabledAction')}
                       </Button>
                     }
                   >
-                    当前关联的模型&ldquo;{selectedModelName}&rdquo;已被禁用，请选择其他可用模型或前往模型管理页面启用该模型
+                    {t('alerts.modelDisabledMessage', { name: selectedModelName })}
                   </Alert>
                 ) : !selectedModel ? (
                   <Alert
                     severity="info"
                     action={
                       <Button color="primary" size="small" onClick={() => setModelExpanded(true)} sx={{ mt: -1 }}>
-                        点击上方选择模型
+                        {t('alerts.noModelSelectedAction')}
                       </Button>
                     }
                   >
-                    暂无模型
+                    {t('alerts.noModelSelectedMessage')}
                   </Alert>
                 ) : (
                   selectedModel && <ModelDetailForm modelDetail={selectedModel} onModelDetailChange={handleModelDetailChange} readonly={readonly} />
@@ -525,18 +528,18 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                     disabled={readonly}
                     sx={{ '&.Mui-disabled': { cursor: 'not-allowed' } }}
                   >
-                    前往配置
+                    {t('alerts.noModelsConfiguredAction')}
                   </Button>
                 }
               >
-                当前未配置任何模型，请前往模型配置页面添加模型
+                {t('alerts.noModelsConfiguredMessage')}
               </Alert>
             )}
           </AccordionDetails>
         </Accordion>
         <Accordion defaultExpanded={true}>
           <AccordionSummary aria-controls="default-response-content" id="default-response-header">
-            <Typography component="span">默认回复</Typography>
+            <Typography component="span">{t('sections.defaultResponseTitle')}</Typography>
           </AccordionSummary>
           <AccordionDetails>
             <TextField
@@ -551,7 +554,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               fullWidth
               multiline
               rows={4}
-              placeholder="设置默认回复文本，用于无工作流匹配或需提供通用回复的场景..."
+              placeholder={t('defaultResponse.placeholder')}
               disabled={readonly}
               sx={{
                 '& .MuiInputBase-root.Mui-disabled': { cursor: 'not-allowed' },
@@ -562,10 +565,10 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
         </Accordion>
       </div>
       <div className="dialog-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>对话设置</Typography>
+        <Typography sx={{ mb: 2 }}>{t('sections.conversationTitle')}</Typography>
         <Accordion defaultExpanded={true}>
           <AccordionSummary aria-controls="greeting-content" id="greeting-header">
-            <Typography component="span">开场白</Typography>
+            <Typography component="span">{t('sections.greetingTitle')}</Typography>
           </AccordionSummary>
           <AccordionDetails>
             <TextField
@@ -577,7 +580,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               fullWidth
               multiline
               rows={4}
-              placeholder="设置智能体的开场白，让用户了解如何开始对话..."
+              placeholder={t('greeting.placeholder')}
               disabled={readonly}
               sx={{
                 '& .MuiInputBase-root.Mui-disabled': { cursor: 'not-allowed' },
@@ -618,14 +621,13 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
         }}
       >
         <Typography variant="h6" sx={{ mb: 1, fontSize: '1rem' }}>
-          对话设置
+          {t('popover.title')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          设置工作流执行时携带的最大消息轮数
+          {t('popover.description')}
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* 减少按钮 */}
           <IconButton
             onClick={() => handleMaxMessageRoundsChange(Math.max(0, maxMessageRounds - 1))}
             disabled={readonly || maxMessageRounds <= 0}
@@ -640,7 +642,6 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
             <RemoveIcon fontSize="small" />
           </IconButton>
 
-          {/* 输入框 */}
           <TextField
             value={maxMessageRounds}
             onChange={e => {
@@ -720,7 +721,6 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
             }}
           />
 
-          {/* 增加按钮 */}
           <IconButton
             onClick={() => handleMaxMessageRoundsChange(Math.min(100, maxMessageRounds + 1))}
             disabled={readonly || maxMessageRounds >= 100}
@@ -735,9 +735,8 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
             <AddIcon fontSize="small" />
           </IconButton>
 
-          {/* 提示文字 */}
           <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-            最大消息轮数
+            {t('popover.maxRoundsLabel')}
           </Typography>
         </Box>
       </Popover>

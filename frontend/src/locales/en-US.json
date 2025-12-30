@@ -128,6 +128,31 @@
       "weeksAgo": "{{count}} weeks ago",
       "monthsAgo": "{{count}} months ago",
       "yearsAgo": "{{count}} years ago"
+    },
+    "confirmDialog": {
+      "titles": {
+        "agent": "Delete Agent",
+        "workflow": "Delete Workflow",
+        "model": "Delete Model",
+        "plugin": "Delete Plugin",
+        "default": "Delete Confirmation"
+      },
+      "messages": {
+        "agent": "Are you sure you want to delete agent \"{{name}}\"? This action cannot be undone.",
+        "workflow": "Are you sure you want to delete workflow \"{{name}}\"? This action cannot be undone.",
+        "model": "Are you sure you want to delete model \"{{name}}\"? This action cannot be undone.",
+        "plugin": "Are you sure you want to delete plugin \"{{name}}\"? This action cannot be undone.",
+        "default": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
+      },
+      "buttons": {
+        "deleteAgent": "Delete Agent",
+        "deleteWorkflow": "Delete Workflow",
+        "deleteModel": "Delete Model",
+        "deletePlugin": "Delete Plugin",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "deleting": "Deleting..."
+      }
     }
   },
   "settings": {
@@ -559,7 +584,6 @@
     "workflowList": {
       "title": "Workflow List",
       "noWorkflows": "No workflows available",
-      "searchPlaceholder": "Search workflow names, descriptions, or tags...",
       "filter": "Filter",
       "sortBy": "Sort by",
       "name": "Name",

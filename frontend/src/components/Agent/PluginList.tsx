@@ -3,6 +3,7 @@ import { AgentPlugin } from '@test-agentstudio/api-client'
 import { Trash2, Plug } from 'lucide-react'
 import React, { useState } from 'react'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
+import { useScopedTranslation } from '@/i18n'
 
 // 插件列表组件
 const PluginList = ({
@@ -16,6 +17,7 @@ const PluginList = ({
 }) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ pluginId: string; toolId: string; name: string } | null>(null)
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration.pluginSetting')
   return (
     <div className="space-y-3">
       {pluginObjects.map(plugin => (
@@ -34,7 +36,7 @@ const PluginList = ({
           </div>
           <div className="flex space-x-4">
             <button
-              title="删除"
+              title={t('delete.tooltip')}
               onClick={e => {
                 e.stopPropagation()
                 if (!disabled) {
@@ -50,7 +52,7 @@ const PluginList = ({
           </div>
         </div>
       ))}
-      {pluginObjects.length === 0 && <div className="text-center py-6 text-gray-500">未添加插件，可点击右上角进行添加</div>}
+      {pluginObjects.length === 0 && <div className="text-center py-6 text-gray-500">{t('list.empty')}</div>}
       <DeleteConfirmationDialog
         isOpen={confirmOpen}
         onClose={() => {
@@ -64,9 +66,9 @@ const PluginList = ({
         }}
         itemType="plugin"
         itemName={pendingDelete?.name || ''}
-        title="移除插件"
-        confirmButtonText="确认"
-        message={`确定移除此插件？此操作无法撤销。`}
+        title={t('delete.title')}
+        confirmButtonText={t('delete.confirmButtonText')}
+        message={t('delete.message')}
       />
     </div>
   )

@@ -27,5 +27,109 @@
   "addBtn": {
     "addExisting": "Add existing",
     "createNew": "Create new"
+  },
+  "agentPublishDialog": {
+    "title": "Submit New Version",
+    "subtitle": "Create a version tag for this agent",
+    "fields": {
+      "version": {
+        "label": "Version",
+        "placeholder": "e.g. v1.0.0",
+        "hint": "Format: vMAJOR.MINOR.PATCH (e.g. v0.0.1)"
+      },
+      "description": {
+        "label": "Version description",
+        "placeholder": "Describe the main changes in this version...",
+        "hint": "Please describe this version to explain the changes"
+      }
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "confirm": "Submit version"
+    },
+    "status": {
+      "publishing": "Publishing..."
+    },
+    "errors": {
+      "missingAgent": "Agent information is incomplete, unable to publish",
+      "missingVersion": "Please enter a version",
+      "missingDescription": "Please enter a version description",
+      "saveFailed": "Save failed, cannot continue publishing",
+      "publishFailed": "Publish failed",
+      "publishFailedRetry": "Publish failed, please try again"
+    }
+  },
+  "settingDialog": {
+    "title": "Edit Agent Info",
+    "fields": {
+      "name": {
+        "label": "Name",
+        "placeholder": "e.g. Intelligent customer service assistant",
+        "helper": {
+          "required": "Please enter an agent name",
+          "tooLong": "Name is too long, please keep within {{max}} characters (current: {{current}}/{{max}})",
+          "normal": "Give your agent a descriptive name ({{current}}/{{max}})"
+        }
+      },
+      "description": {
+        "label": "Description",
+        "placeholder": "Describe the agent's capabilities, use cases and behavior...",
+        "helper": {
+          "tooLong": "Description is too long, please keep within {{max}} characters (current: {{current}}/{{max}})",
+          "normal": "Describe the agent's capabilities and behavior ({{current}}/{{max}})"
+        }
+      }
+    },
+    "icon": {
+      "label": "Choose icon",
+      "current": "Current selection:"
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "save": "Save"
+    }
+  },
+  "historyPanel": {
+    "title": "Version history",
+    "subtitle": "View and switch agent versions",
+    "status": {
+      "loading": "Loading...",
+      "loadFailed": "Failed to load: {{error}}",
+      "noData": "No version data",
+      "loadingFailed": "Failed to load version list",
+      "deleting": "Deleting..."
+    },
+    "fields": {
+      "version": "Version",
+      "description": "Version description",
+      "createdAt": "Created at"
+    },
+    "actions": {
+      "createCopy": "Copy",
+      "restore": "Restore",
+      "delete": "Delete",
+      "switching": "Switching..."
+    },
+    "description": {
+      "label": "Description:",
+      "empty": "No version description",
+      "draft": "Current draft version"
+    },
+    "time": {
+      "invalid": "Invalid time",
+      "formatError": "Time format error"
+    },
+    "dialogs": {
+      "restore": {
+        "title": "Restore to this version",
+        "message": "Restoring will overwrite the latest agent content",
+        "confirm": "Confirm"
+      },
+      "delete": {
+        "title": "Delete version",
+        "message": "Are you sure you want to delete version {{version}}? This action cannot be undone",
+        "confirm": "Delete"
+      }
+    }
   }
 }

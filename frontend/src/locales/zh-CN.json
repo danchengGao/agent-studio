@@ -128,6 +128,31 @@
       "weeksAgo": "{{count}} 周前",
       "monthsAgo": "{{count}} 个月前",
       "yearsAgo": "{{count}} 年前"
+    },
+    "confirmDialog": {
+      "titles": {
+        "agent": "删除智能体",
+        "workflow": "删除工作流",
+        "model": "删除模型",
+        "plugin": "删除插件",
+        "default": "删除确认"
+      },
+      "messages": {
+        "agent": "确定要删除智能体\"{{name}}\"吗？此操作无法撤销。",
+        "workflow": "确定要删除工作流\"{{name}}\"吗？此操作无法撤销。",
+        "model": "确定要删除模型\"{{name}}\"吗？此操作无法撤销。",
+        "plugin": "确定要删除插件\"{{name}}\"吗？此操作无法撤销。",
+        "default": "确定要删除\"{{name}}\"吗？此操作无法撤销。"
+      },
+      "buttons": {
+        "deleteAgent": "删除智能体",
+        "deleteWorkflow": "删除工作流",
+        "deleteModel": "删除模型",
+        "deletePlugin": "删除插件",
+        "delete": "删除",
+        "cancel": "取消",
+        "deleting": "删除中..."
+      }
     }
   },
   "settings": {
@@ -538,7 +563,6 @@
     "workflowList": {
       "title": "工作流列表",
       "noWorkflows": "暂无工作流",
-      "searchPlaceholder": "搜索工作流名称、描述...",
       "filter": "筛选",
       "sortBy": "排序方式",
       "name": "名称",

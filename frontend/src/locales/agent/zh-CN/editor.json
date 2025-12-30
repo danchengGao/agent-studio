@@ -47,10 +47,18 @@
     "systemPrompt": {
       "title": "系统提示词配置",
       "defineAgentPlaceholder": "定义智能体的角色、能力和行为准则...",
+      "generationBanner": {
+        "generating": "正在生成提示词...",
+        "generated": "已生成提示词（可预览并选择是否采纳）",
+        "cancel": "取消",
+        "adopt": "采纳"
+      },
       "overwritePromptTemplateDialog": {
         "description": "本操作会覆盖提示词模板的草稿，请选择您希望的处理方式。",
         "overwriteAndJump": "覆盖跳转：将当前智能体的系统提示词内容覆盖到提示词编辑页面",
         "notOverwriteAndJump": "不覆盖跳转：保持提示词编辑页面的原有内容不变",
+        "overwriteAndJumpLabel": "覆盖跳转",
+        "notOverwriteAndJumpLabel": "不覆盖跳转",
         "cancel": "取消"
       },
       "promptDialog": {
@@ -68,6 +76,67 @@
         "noContentForVersion": "该版本暂无内容",
         "selectPrompt": "请选择左侧提示词",
         "loadFailed": "加载失败"
+      },
+      "relationBar": {
+        "tooltipGoToTemplate": "跳转提示词模板管理",
+        "chipLatest": "最新版本",
+        "tooltipHasNewVersion": "当前存在新版本 {{latestVersion}}",
+        "chipHistory": "历史版本",
+        "tooltipUnlink": "解除关联",
+        "ariaUnlink": "解除关联"
+      },
+      "titleActions": {
+        "needContent": "请先输入内容",
+        "optimizePrompt": "优化提示词",
+        "associatePrompt": "关联提示词",
+        "saveNewVersion": "提交新版本"
+      },
+      "savePromptDialog": {
+        "title": "保存提示词",
+        "fields": {
+          "promptKeyLabel": "提示词 Key",
+          "promptKeyHelperExisting": "已有绑定关系，Key不可修改",
+          "promptKeyHelperInvalid": "只能包含英文字母、数字、下划线（_）、连字符（-），必须以英文字母开头",
+          "promptNameLabel": "提示词名称",
+          "promptNameHelperExisting": "已有绑定关系，名称不可修改",
+          "promptNameHelperRequired": "名称不能为空",
+          "versionLabel": "提交版本",
+          "versionPlaceholder": "如 1.0.1",
+          "versionHelperFormat": "版本号需为 x.x.x 格式",
+          "versionHelperMustGreaterExisting": "版本号必须大于已存在的版本 {{latestVersion}}",
+          "versionHelperFormatAndGreater": "需为 x.x.x，并且大于当前最新版本 {{latestVersion}}",
+          "descLabel": "版本说明"
+        },
+        "actions": {
+          "cancel": "取消",
+          "save": "保存"
+        }
+      },
+      "defaults": {
+        "unnamedPrompt": "未命名提示词"
+      },
+      "messages": {
+        "emptySystemPrompt": "系统提示词为空，无法生成。",
+        "emptySystemPromptCannotSave": "系统提示词为空，无法保存。",
+        "modelIdNotFound": "未找到匹配的模型ID，将使用默认值",
+        "generateFailedWithError": "提示词生成失败: {{error}}",
+        "generateRequestFailed": "提示词生成请求失败",
+        "generateComplete": "系统提示词自动生成完成，可选择采纳。",
+        "noAdoptableContent": "无可采纳内容。",
+        "adopted": "已采纳自动生成的提示词。",
+        "cancelled": "已取消自动生成结果，恢复原提示词。",
+        "prefillFailed": "预填提示词信息失败，请稍后重试。",
+        "fillKeyNameVersion": "请填写提示词Key、名称与版本。",
+        "createPromptFailed": "创建提示词失败",
+        "versionFormatAndGreaterError": "提交版本需为 x.x.x，并且大于已存在版本。",
+        "savedAndCommitted": "提示词已保存并提交版本。",
+        "savePromptFailed": "保存提示词失败，请稍后重试。",
+        "commitDescriptionFallback": "Agent {{agentName}} 保存的版本"
+      },
+      "unlinkDialog": {
+        "title": "解除关联",
+        "message": "确认解除提示词\"{{promptName}}-{{version}}\"与智能体的关联？此操作无法撤销。",
+        "confirmButtonText": "确认"
       }
     },
     "orchestration": {
@@ -79,6 +148,69 @@
       "addPlugin": {
         "addExisting": "添加已有插件",
         "createNew": "创建新插件"
+      },
+      "modelSetting": {
+        "fields": {
+          "timeout": {
+            "label": "超时时间(s)"
+          },
+          "temperature": {
+            "label": "温度",
+            "tooltip": "temperature:控制模型生成结果的随机性与创造性。值越高，输出越随机、多样；值越低，结果越确定、保守。范围通常为0~2，推荐设置0.1~1.0。示例：0.7（平衡随机性与一致性）、1.2（更具创造性的输出）。"
+          },
+          "topP": {
+            "label": "核采样",
+            "tooltip": "Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。"
+          }
+        },
+        "errors": {
+          "required": "{{label}}不能为空",
+          "range": "{{label}}必须在 {{min}}-{{max}} 之间",
+          "min": "{{label}}必须大于等于 {{min}}",
+          "integer": "{{label}}必须是整数"
+        }
+      },
+      "pluginSetting": {
+        "list": {
+          "empty": "未添加插件，可点击右上角进行添加"
+        },
+        "delete": {
+          "tooltip": "删除",
+          "title": "移除插件",
+          "confirmButtonText": "确认",
+          "message": "确定移除此插件？此操作无法撤销。"
+        }
+      },
+      "workflowSetting": {
+        "versionField": {
+          "loading": "加载版本...",
+          "followLatest": "跟随最新内容",
+          "hasNewVersion": "存在新版本",
+          "latestPublished": "最新发布版本",
+          "draftLabel": "草稿"
+        },
+        "workflowList": {
+          "versionLabel": "关联版本：",
+          "emptyText": "未添加工作流，可点击右上角进行添加",
+          "settingsTitle": "设置",
+          "deleteTitle": "删除"
+        }
+      },
+      "workflowSelector": {
+        "title": "选择已有工作流",
+        "searchPlaceholder": "搜索工作流名称、描述...",
+        "loading": "加载工作流列表中...",
+        "loadFailed": "加载工作流列表失败，请稍后重试",
+        "noSearchResults": "未找到匹配的工作流",
+        "noWorkflows": "暂无可用工作流",
+        "createdAtLabel": "创建时间: ",
+        "unknownDate": "未知",
+        "selectedTag": "已选择",
+        "paginationInfo": "共 {{total}} 个工作流，第 {{currentPage}} / {{totalPages}} 页",
+        "selectedPrefix": "已选择",
+        "selectedSuffix": "个工作流",
+        "cancel": "取消",
+        "confirmAdd": "确认添加"
       }
     },
     "previewDebug": {
@@ -191,6 +323,45 @@
           "fieldInput": "请输入{{fieldName}}..."
         }
       }
+    }
+  },
+  "multiAgent": {
+    "sections": {
+      "orchestrationTitle": "编排配置",
+      "workflowTitle": "工作流",
+      "modelTitle": "控制器配置",
+      "defaultResponseTitle": "默认回复",
+      "conversationTitle": "对话设置",
+      "greetingTitle": "开场白"
+    },
+    "addButton": {
+      "addExistingWorkflow": "添加已有工作流",
+      "createNewWorkflow": "创建新工作流"
+    },
+    "alerts": {
+      "noWorkflow": "暂无工作流，点击上方按钮添加工作流",
+      "noModelsInline": "未配置模型",
+      "modelDisabledAction": "前往启用",
+      "modelDisabledMessage": "当前关联的模型“{{name}}”已被禁用，请选择其他可用模型或前往模型管理页面启用该模型",
+      "noModelSelectedAction": "点击上方选择模型",
+      "noModelSelectedMessage": "暂无模型",
+      "noModelsConfiguredAction": "前往配置",
+      "noModelsConfiguredMessage": "当前未配置任何模型，请前往模型配置页面添加模型"
+    },
+    "select": {
+      "placeholder": "请选择模型",
+      "disabledModel": "模型已禁用（{{name}}）"
+    },
+    "defaultResponse": {
+      "placeholder": "设置默认回复文本，用于无工作流匹配或需提供通用回复的场景..."
+    },
+    "greeting": {
+      "placeholder": "设置智能体的开场白，让用户了解如何开始对话..."
+    },
+    "popover": {
+      "title": "对话设置",
+      "description": "设置工作流执行时携带的最大消息轮数",
+      "maxRoundsLabel": "最大消息轮数"
     }
   }
 }
