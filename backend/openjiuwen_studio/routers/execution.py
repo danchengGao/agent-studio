@@ -277,16 +277,16 @@ async def execute_component(
         raise handle_http_exception(e, "Component test execution failed") from e
 
 
-@execution_router.post("/workflow/validate", response_model=ResponseModel[str])
+@execution_router.post("/workflow/validate", response_model=ResponseModel[dict])
 async def validate_workflow(
     request_body: ExecuteParas,
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user)
-) -> ResponseModel[str]:
+) -> ResponseModel[dict]:
     """validate workflow graph"""
     try:
-        flow_mgr.validate(request_body.id, request_body.version, request_body.space_id, current_user)
-        return ResponseModel(code=status.HTTP_200_OK, message="Workflow validate success", data=None)
+        await flow_mgr.validate(request_body.id, request_body.version, request_body.space_id, current_user)
+        return ResponseModel(code=status.HTTP_200_OK, message="Workflow validate success", data={})
     except HTTPException:
         raise
     except JiuWenGraphException as e:
@@ -294,7 +294,7 @@ async def validate_workflow(
         return ResponseModel(
             code=e.error_code,
             message=e.message,
-            data=None
+            data={}
         )
     except JiuWenComponentException as e:
         logger.info(f"JiuWenComponentException: {repr(e)}")

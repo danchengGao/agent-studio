@@ -115,10 +115,15 @@ def validate_input_parameters(node: Node, all_nodes: list[Node]) -> None:
                     error_stage="validate"
                 )
 
-        # 如果是 constant 类型且 required=True，检查值是否为空
-        elif param.type == "constant" and getattr(param, 'required', False):
-            # 检查 value 字段
-            if hasattr(param, 'value') and (param.value is None or param.value == ""):
+        # 如果是 constant 类型，检查值是否为空
+        elif param.type == "constant":
+            # 检查 content 字段（BaseValue 使用 content 而不是 value）
+            content = getattr(param, 'content', None)
+            # 如果 content 为 None，跳过检查（可能是前端未设置）
+            if content is None:
+                continue
+            # 检查空字符串
+            if isinstance(content, str) and content.strip() == "":
                 raise JiuWenComponentException(
                     error_code=StatusCode.COMPONENT_CONFIG_INVALID.code,
                     message=f"[{node.data.title or '组件'}] 参数 {param_name} 不能为空",
@@ -135,16 +140,17 @@ def validate_exception_return_content(node: Node) -> None:
     Args:
         node: 待校验的节点
 
-    Raises:
+    Raises:f
         JiuWenComponentException: 当异常返回内容校验失败时
     """
     if node.data.exception_config is None:
         return
 
-    # process_type == 2 表示 return_content
-    if node.data.exception_config.process_type.value == 2:
+    # process_type == "return_content" 表示返回内容模式
+    if node.data.exception_config.process_type.value == "return_content":
         return_content = node.data.exception_config.return_content
-        if return_content is None or "result" not in return_content:
+        # 检查 return_content 是否为 None、空字典或不包含 result
+        if return_content is None or not return_content or "result" not in return_content:
             raise JiuWenComponentException(
                 error_code=StatusCode.CODE_COMPONENT_CONVERT_FAILED.code,
                 message=f"[{node.data.title or 'Code 组件'}] 异常处理类型为返回内容时，返回内容必须包含 result",
@@ -222,7 +228,9 @@ def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
     Raises:
         JiuWenComponentException: 当数组变量校验失败时
     """
-    if var_value.type != "array":
+    # 检查 schema.type 是否为数组类型（var_value.type 是 constant/reference，表示值的来源）
+    schema_type = var_value.schema.type if var_value.schema else None
+    if schema_type != "array":
         raise JiuWenComponentException(
             error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
             message=f"[{node.data.title or 'Loop 组件'}] 变量 {var_name} 必须是数组类型",
@@ -231,14 +239,16 @@ def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
             error_stage="validate"
         )
 
-    if var_value.value is None or var_value.value == "":
-        raise JiuWenComponentException(
-            error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Loop 组件'}] 数组变量 {var_name} 不能为空",
-            component_id=node.id,
-            component_type=int(node.type),
-            error_stage="validate"
-        )
+    # 对于 constant 类型，检查 content 是否为空
+    if var_value.type == "constant":
+        if var_value.content is None or (isinstance(var_value.content, list) and len(var_value.content) == 0):
+            raise JiuWenComponentException(
+                error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+                message=f"[{node.data.title or 'Loop 组件'}] 数组变量 {var_name} 不能为空",
+                component_id=node.id,
+                component_type=int(node.type),
+                error_stage="validate"
+            )
 
 
 def validate_max_response_range(node: Node, max_response: int) -> None:
@@ -342,7 +352,7 @@ def validate_intermediate_vars(node: Node) -> None:
     intermediate_var = node.data.inputs.loop_param.intermediate_var
     if intermediate_var is not None:
         for var_name, var in intermediate_var.items():
-            if var.value is None or var.value == "":
+            if var.content is None or var.content == "":
                 raise JiuWenComponentException(
                     error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
                     message=f"[{node.data.title or 'Loop 组件'}] 中间变量 {var_name} 不能为空",
@@ -414,7 +424,7 @@ def validate_loop_node(node: Node, all_nodes: list[Node], all_edges: list[Edge])
 
     # 计数循环校验
     if loop_param.loop_num is not None:
-        validate_loop_num_range(node, loop_param.loop_num.value)
+        validate_loop_num_range(node, loop_param.loop_num.content)
 
     # 数组循环校验
     if loop_param.loop_array is not None:
@@ -505,7 +515,7 @@ def validate_branch_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
             for condition in branch.conditions:
                 # 检查 left 值
                 if condition.left is not None and condition.left.type == "constant":
-                    if condition.left.value is None or condition.left.value == "":
+                    if condition.left.content is None or condition.left.content == "":
                         raise JiuWenComponentException(
                             error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
                             message=f"[{node.data.title or 'Condition 组件'}] 分支条件值不能为空",
@@ -515,7 +525,7 @@ def validate_branch_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
                         )
                 # 检查 right 值（如果存在）
                 if condition.right is not None and condition.right.type == "constant":
-                    if condition.right.value is None or condition.right.value == "":
+                    if condition.right.content is None or condition.right.content == "":
                         raise JiuWenComponentException(
                             error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
                             message=f"[{node.data.title or 'Condition 组件'}] 分支条件值不能为空",
@@ -566,9 +576,8 @@ def validate_questioner_node(node: Node, all_nodes: list[Node], all_edges: list[
 
 def validate_continue_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
     """Continue 组件校验"""
-    _ = all_edges  # 未使用
+    _ = all_edges, all_nodes  # 未使用
     validate_title(node)
-    validate_input_parameters(node, all_nodes)
 
 
 def validate_variable_merge_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
@@ -582,19 +591,40 @@ def validate_variable_merge_node(node: Node, all_nodes: list[Node], all_edges: l
 def validate_plugin_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
     """Plugin 组件校验"""
     _ = all_edges  # 未使用
+    validate_title(node)
     validate_input_parameters(node, all_nodes)
 
 
 def validate_sub_workflow_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
     """Sub-workflow 组件校验"""
     _ = all_edges  # 未使用
+    validate_title(node)
     validate_input_parameters(node, all_nodes)
 
 
 def validate_text_editor_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
     """Text-editor 组件校验"""
     _ = all_edges  # 未使用
+    validate_title(node)
     validate_input_parameters(node, all_nodes)
+
+
+def validate_input_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
+    """Input 组件校验"""
+    _ = all_edges, all_nodes  # 未使用
+    validate_title(node)
+
+
+def validate_break_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
+    """Break 组件校验"""
+    _ = all_edges, all_nodes  # 未使用
+    validate_title(node)
+
+
+def validate_set_variable_node(node: Node, all_nodes: list[Node], all_edges: list[Edge]) -> None:
+    """Set-variable 组件校验"""
+    _ = all_edges, all_nodes  # 未使用
+    validate_title(node)
 
 
 # ============================================================================
@@ -628,9 +658,14 @@ def validate_canvas_nodes(canvas) -> None:
         ComponentType.COMPONENT_TYPE_OUTPUT: validate_output_node,
         ComponentType.COMPONENT_TYPE_INTENT: validate_intent_node,
         ComponentType.COMPONENT_TYPE_QUESTION: validate_questioner_node,
+        ComponentType.COMPONENT_TYPE_INPUT: validate_input_node,
         ComponentType.COMPONENT_TYPE_TEXT_EDITOR: validate_text_editor_node,
         ComponentType.COMPONENT_TYPE_CONTINUE: validate_continue_node,
+        ComponentType.COMPONENT_TYPE_BREAK: validate_break_node,
+        ComponentType.COMPONENT_TYPE_SUB_WORKFLOW: validate_sub_workflow_node,
+        ComponentType.COMPONENT_TYPE_SET_VARIABLE: validate_set_variable_node,
         ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: validate_variable_merge_node,
+        ComponentType.COMPONENT_TYPE_PLUGIN: validate_plugin_node,
     }
 
     # 遍历节点进行校验
