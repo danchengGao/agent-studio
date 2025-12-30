@@ -23,5 +23,9 @@
       "name": "/100",
       "description": "/500"
     }
+  },
+  "addBtn": {
+    "addExisting": "Add existing",
+    "createNew": "Create new"
   }
 }

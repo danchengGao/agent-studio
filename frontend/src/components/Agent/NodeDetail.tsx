@@ -1,6 +1,7 @@
 import React from 'react'
 import { InvokeExecuteInfo } from '@test-agentstudio/api-client'
 import { getStatusMeta } from './helper/statusUtils'
+import { useScopedTranslation } from '@/i18n'
 
 interface NodeDetailProps {
   node?: InvokeExecuteInfo | null
@@ -9,7 +10,8 @@ interface NodeDetailProps {
 }
 
 const NodeDetail: React.FC<NodeDetailProps> = ({ node, rootName, rootId }) => {
-  if (!node) return <div className="text-xs text-gray-500">请选择节点查看详情</div>
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugPanel.nodeDetail')
+  if (!node) return <div className="text-xs text-gray-500">{t('empty.noNode')}</div>
 
   const formatMs = (ms?: number) => {
     if (ms == null) return '0 ms'
@@ -23,11 +25,11 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ node, rootName, rootId }) => {
 
   const getNodeLabel = (n: InvokeExecuteInfo): string => {
     if (rootName && rootId && String(n.invoke_id) === String(rootId)) return rootName
-    return n.invoke_name || n.invoke_type || '节点'
+    return n.invoke_name || n.invoke_type || t('labels.nodeFallback')
   }
 
   const JsonSmall = ({ data }: { data: unknown }) => {
-    if (data == null) return <span className="text-xs text-gray-500">无</span>
+    if (data == null) return <span className="text-xs text-gray-500">{t('labels.none')}</span>
     try {
       const text = JSON.stringify(data, null, 2)
       return (
@@ -43,19 +45,21 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ node, rootName, rootId }) => {
   return (
     <div className="space-y-1">
       <div className="text-xs text-gray-800 flex items-center min-w-0">
-        <span className="mr-1 flex-shrink-0">节点：</span>
+        <span className="mr-1 flex-shrink-0">{t('labels.node')}：</span>
         <span className="truncate flex-1 min-w-0" title={getNodeLabel(node)}>
           {getNodeLabel(node)}
         </span>
       </div>
       <div className="text-xs text-gray-800">
-        状态：
+        {t('labels.status')}：
         <span className={`px-1.5 py-0.5 rounded-full ${getStatusMeta(node.status as string).className}`}>{getStatusMeta(node.status as string).label}</span>
       </div>
-      <div className="text-xs text-gray-800">耗时：{node.duration != null ? formatMs(node.duration) : '无'}</div>
-      <div className="text-xs text-gray-600 mt-1">输入</div>
+      <div className="text-xs text-gray-800">
+        {t('labels.duration')}：{node.duration != null ? formatMs(node.duration) : t('labels.none')}
+      </div>
+      <div className="text-xs text-gray-600 mt-1">{t('labels.input')}</div>
       <JsonSmall data={(node.inputs && (node.inputs as any).inputs) || node.inputs} />
-      <div className="text-xs text-gray-600 mt-1">输出</div>
+      <div className="text-xs text-gray-600 mt-1">{t('labels.output')}</div>
       <JsonSmall data={(node.outputs && (node.outputs as any).outputs) || node.outputs} />
     </div>
   )

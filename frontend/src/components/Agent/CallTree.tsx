@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { InvokeExecuteInfo } from '@test-agentstudio/api-client'
+import { useScopedTranslation } from '@/i18n'
 
 interface CallTreeProps {
   execList: InvokeExecuteInfo[]
@@ -10,6 +11,7 @@ interface CallTreeProps {
 }
 
 const CallTree: React.FC<CallTreeProps> = ({ execList, onSelect, selectedId, rootLabel }) => {
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugPanel.callTree')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
@@ -36,7 +38,7 @@ const CallTree: React.FC<CallTreeProps> = ({ execList, onSelect, selectedId, roo
 
   const getNodeLabel = (node: InvokeExecuteInfo, depth: number): string => {
     if (depth === 0 && rootLabel) return rootLabel
-    return node.invoke_name || node.invoke_type || '节点'
+    return node.invoke_name || node.invoke_type || t('labels.nodeFallback')
   }
 
   const toggleExpand = (id?: string) => {
@@ -63,7 +65,7 @@ const CallTree: React.FC<CallTreeProps> = ({ execList, onSelect, selectedId, roo
           {hasChildren ? (
             <button
               className="mr-1 text-gray-500 hover:text-gray-700"
-              aria-label={isOpen ? '折叠' : '展开'}
+              aria-label={isOpen ? t('aria.collapse') : t('aria.expand')}
               onClick={e => {
                 e.stopPropagation()
                 toggleExpand(node.invoke_id as string)

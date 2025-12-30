@@ -1,5 +1,5 @@
 import i18n from 'i18next'
-import { initReactI18next } from 'react-i18next'
+import { initReactI18next, useTranslation } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 
 // Import translation files
@@ -57,6 +57,11 @@ i18n
 if (typeof window !== 'undefined') {
   // @ts-ignore - i18next global access
   window.i18next = i18n
+}
+
+export const useScopedTranslation = (keyPrefix: string, ns = 'translation') => {
+  const { t, i18n: i18nInstance, ready } = useTranslation(ns, { keyPrefix })
+  return { t, i18n: i18nInstance, ready }
 }
 
 export default i18n

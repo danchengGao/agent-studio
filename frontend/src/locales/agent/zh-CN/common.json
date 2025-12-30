@@ -23,5 +23,9 @@
       "name": "/100",
       "description": "/500"
     }
+  },
+  "addBtn": {
+    "addExisting": "添加已有",
+    "createNew": "创建新的"
   }
 }

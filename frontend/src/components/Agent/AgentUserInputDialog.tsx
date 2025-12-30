@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalFooter } from '@test-agentstudio/base-ui'
 import { Button, Input } from '@test-agentstudio/base-ui'
+import { useScopedTranslation } from '@/i18n'
 
 interface AgentUserInputDialogProps {
   open: boolean
@@ -9,21 +10,20 @@ interface AgentUserInputDialogProps {
   onCancel: () => void
 }
 
-export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({
-  open,
-  interactionMsg,
-  onSubmit,
-  onCancel,
-}) => {
+export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({ open, interactionMsg, onSubmit, onCancel }) => {
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.userInputDialog')
   // 将interactionMsg统一处理为数组格式
   const fieldNames = Array.isArray(interactionMsg) ? interactionMsg : [interactionMsg]
 
   // 为每个字段初始化状态
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(
-    fieldNames.reduce((acc, fieldName) => {
-      acc[fieldName] = ''
-      return acc
-    }, {} as Record<string, string>)
+    fieldNames.reduce(
+      (acc, fieldName) => {
+        acc[fieldName] = ''
+        return acc
+      },
+      {} as Record<string, string>,
+    ),
   )
 
   // 检查所有必填字段是否都已填写
@@ -31,28 +31,37 @@ export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({
 
   const handleSubmit = () => {
     if (allFieldsFilled) {
-      const trimmedValues = Object.entries(fieldValues).reduce((acc, [key, value]) => {
-        acc[key] = value.trim()
-        return acc
-      }, {} as Record<string, string>)
+      const trimmedValues = Object.entries(fieldValues).reduce(
+        (acc, [key, value]) => {
+          acc[key] = value.trim()
+          return acc
+        },
+        {} as Record<string, string>,
+      )
 
       onSubmit(trimmedValues)
       // 重置表单
       setFieldValues(
-        fieldNames.reduce((acc, fieldName) => {
-          acc[fieldName] = ''
-          return acc
-        }, {} as Record<string, string>)
+        fieldNames.reduce(
+          (acc, fieldName) => {
+            acc[fieldName] = ''
+            return acc
+          },
+          {} as Record<string, string>,
+        ),
       )
     }
   }
 
   const handleCancel = () => {
     setFieldValues(
-      fieldNames.reduce((acc, fieldName) => {
-        acc[fieldName] = ''
-        return acc
-      }, {} as Record<string, string>)
+      fieldNames.reduce(
+        (acc, fieldName) => {
+          acc[fieldName] = ''
+          return acc
+        },
+        {} as Record<string, string>,
+      ),
     )
     onCancel()
   }
@@ -60,7 +69,7 @@ export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({
   const handleFieldChange = (fieldName: string, value: string) => {
     setFieldValues(prev => ({
       ...prev,
-      [fieldName]: value
+      [fieldName]: value,
     }))
   }
 
@@ -85,12 +94,13 @@ export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({
     <Modal open={open} onOpenChange={handleCancel}>
       <ModalContent className="sm:max-w-md">
         <ModalHeader>
-          <ModalTitle>请输入所需信息以继续执行智能体</ModalTitle>
+          <ModalTitle>{t('title')}</ModalTitle>
         </ModalHeader>
         <div className="space-y-4">
           <div className="text-sm text-gray-600">
             {Array.isArray(interactionMsg) ? (
-              <div>请填写以下信息：
+              <div>
+                {t('description')}
                 <ul className="list-disc list-inside ml-4 mt-2">
                   {interactionMsg.map((field, index) => (
                     <li key={index}>{field}</li>
@@ -104,15 +114,13 @@ export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({
           <div className="space-y-3">
             {fieldNames.map((fieldName, index) => (
               <div key={fieldName} className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  {fieldName}
-                </label>
+                <label className="text-sm font-medium text-gray-700">{fieldName}</label>
                 <Input
                   data-field={fieldName}
                   value={fieldValues[fieldName] || ''}
-                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, fieldName)}
-                  placeholder={`请输入${fieldName}...`}
+                  onChange={e => handleFieldChange(fieldName, e.target.value)}
+                  onKeyDown={e => handleKeyDown(e, fieldName)}
+                  placeholder={t('placeholders.fieldInput', { fieldName })}
                   className="w-full"
                   autoFocus={index === 0}
                 />
@@ -122,13 +130,10 @@ export const AgentUserInputDialog: React.FC<AgentUserInputDialogProps> = ({
         </div>
         <ModalFooter>
           <Button variant="outline" onClick={handleCancel}>
-            取消
+            {t('buttons.cancel')}
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={!allFieldsFilled}
-          >
-            提交
+          <Button onClick={handleSubmit} disabled={!allFieldsFilled}>
+            {t('buttons.submit')}
           </Button>
         </ModalFooter>
       </ModalContent>

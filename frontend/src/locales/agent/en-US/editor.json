@@ -55,13 +55,142 @@
       },
       "promptDialog": {
         "goToTemplateManagement": "Go to Prompt Template Management"
+      },
+      "agentAssociatePromptDialog": {
+        "title": "Prompt Library",
+        "searchPlaceholder": "Search",
+        "createPrompt": "Create Prompt",
+        "versionLabel": "Version",
+        "noTemplates": "No templates available",
+        "insert": "Insert Prompt",
+        "replacing": "Replacing...",
+        "replaceSystemPrompt": "Replace System Prompt",
+        "noContentForVersion": "No content for this version",
+        "selectPrompt": "Please select a prompt on the left",
+        "loadFailed": "Load failed"
       }
     },
     "orchestration": {
-      "title": "Orchestration Configuration"
+      "title": "Orchestration Configuration",
+      "addWorkflow": {
+        "addExisting": "Add existing workflow",
+        "createNew": "Create new workflow"
+      },
+      "addPlugin": {
+        "addExisting": "Add existing plugin",
+        "createNew": "Create new plugin"
+      }
     },
     "previewDebug": {
-      "title": "Preview & Debug"
+      "title": "Preview & Debug",
+      "agentDebugChat": {
+        "header": {
+          "debugInfo": "Debug Info"
+        },
+        "tips": {
+          "modelNotConfiguredTitle": "Model Not Configured",
+          "modelNotConfiguredDescription": "Please select a model in the \"Orchestration\" panel on the left before starting debug chat."
+        },
+        "placeholders": {
+          "configModelFirst": "Please configure a model before debugging",
+          "addWorkflowFirst": "Please add a workflow before debugging",
+          "waitInputComplex": "Waiting for input: fill in and submit the form in the card above",
+          "waitInputSimple": "Waiting for input: please enter your feedback",
+          "inputMessage": "Type a message..."
+        },
+        "messages": {
+          "assistantLabel": "AI Assistant",
+          "userLabel": "Me"
+        },
+        "errors": {
+          "executeFailed": "Execution failed"
+        }
+      },
+      "agentDebugPanel": {
+        "viewMode": {
+          "tree": "Call Tree",
+          "flame": "Flame Graph"
+        },
+        "empty": {
+          "noExecData": "No execution data"
+        },
+        "sections": {
+          "nodeDetail": "Node Details"
+        },
+        "filters": {
+          "executionLog": "Execution Logs:"
+        },
+        "select": {
+          "loading": "Loading...",
+          "placeholder": "Select an execution log"
+        },
+        "refresh": {
+          "loading": "Refreshing...",
+          "label": "Refresh List",
+          "ariaLabel": "Refresh"
+        },
+        "summary": {
+          "traceId": "traceId",
+          "duration": "Duration"
+        },
+        "copy": {
+          "tooltip": "Copy traceId",
+          "copied": "Copied",
+          "ariaLabel": "Copy traceId"
+        },
+        "callTree": {
+          "aria": {
+            "expand": "Expand",
+            "collapse": "Collapse"
+          },
+          "labels": {
+            "nodeFallback": "Node"
+          }
+        },
+        "flameGraph": {
+          "labels": {
+            "totalDuration": "Total Duration",
+            "nodeFallback": "Node"
+          }
+        },
+        "nodeDetail": {
+          "empty": {
+            "noNode": "Select a node to view details"
+          },
+          "labels": {
+            "node": "Node",
+            "status": "Status",
+            "duration": "Duration",
+            "input": "Input",
+            "output": "Output",
+            "none": "None",
+            "nodeFallback": "Node"
+          }
+        }
+      },
+      "operationsBar": {
+        "tooltips": {
+          "clearChat": "Clear conversation history"
+        },
+        "placeholders": {
+          "inputMessage": "Type a message to test the agent..."
+        },
+        "buttons": {
+          "send": "Send",
+          "cancel": "Cancel"
+        }
+      },
+      "userInputDialog": {
+        "title": "Please provide the required information to continue the agent",
+        "description": "Please fill in the following information:",
+        "buttons": {
+          "cancel": "Cancel",
+          "submit": "Submit"
+        },
+        "placeholders": {
+          "fieldInput": "Please enter {{fieldName}}..."
+        }
+      }
     }
   }
 }

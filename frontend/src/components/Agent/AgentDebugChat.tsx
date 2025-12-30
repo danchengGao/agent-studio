@@ -8,6 +8,7 @@ import AgentOperationsBar from './AgentOperationsBar'
 import AgentDebugPanel from './AgentDebugPanel'
 import MemoryButton from '@/pages/Memory/MemoryButton'
 import { MessageRenderer } from './messages/MessageRenderer'
+import { useScopedTranslation } from '@/i18n'
 
 import type { ChatMessage } from './messages/chatTypes'
 
@@ -68,6 +69,7 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
 
   // 获取完整的模型信息
   const model = useAgentStore(s => s.saveAgentRequest?.model)
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
 
   // 模型未配置的判断：
   // 1. model 对象本身不存在或为空
@@ -483,7 +485,7 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
 
   const formatError = (e: any): string => {
     try {
-      if (!e) return '执行失败'
+      if (!e) return t('errors.executeFailed')
       if (typeof e === 'string') return e
       if (e && typeof e === 'object' && 'message' in e && e.message) return String(e.message)
       return JSON.stringify(e)
@@ -711,7 +713,7 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
                 },
               }}
             />
-            <span className="text-sm text-gray-600">调试信息</span>
+            <span className="text-sm text-gray-600">{t('header.debugInfo')}</span>
           </div>
         </ActionSlotMount>
       </div>
@@ -733,8 +735,8 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-amber-800">未配置模型</h3>
-                  <p className="mt-1 text-sm text-amber-700">请先在左侧"编排配置"面板中选择一个模型，然后才能开始调试对话。</p>
+                  <h3 className="text-sm font-medium text-amber-800">{t('tips.modelNotConfiguredTitle')}</h3>
+                  <p className="mt-1 text-sm text-amber-700">{t('tips.modelNotConfiguredDescription')}</p>
                 </div>
               </div>
             </div>
@@ -792,14 +794,14 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
             onInputFocusChange={setInputFocused}
             placeholder={
               modelNotConfigured
-                ? '请先配置模型后进行调试'
+                ? t('placeholders.configModelFirst')
                 : chatBlocked
-                  ? '请先添加工作流后进行调试'
+                  ? t('placeholders.addWorkflowFirst')
                   : isInterrupted && !isSimpleInteraction
-                    ? '等待输入：请在上方卡片中填写并提交'
+                    ? t('placeholders.waitInputComplex')
                     : isInterrupted
-                      ? '等待输入：请输入反馈'
-                      : '输入消息...'
+                      ? t('placeholders.waitInputSimple')
+                      : t('placeholders.inputMessage')
             }
           />
         </div>
@@ -856,35 +858,38 @@ const ChatMessageItem = memo(
     onSubmitInteraction?: (value: string, ts: number) => void
     isActiveInteraction?: boolean
     inputFocused?: boolean
-  }) => (
-    <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-      <div className={`${message.kind === 'interaction' ? 'w-[85%]' : 'max-w-[85%]'} min-w-0 ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-        {message.role === 'assistant' && (
-          <div className="flex items-center space-x-2 mb-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">AI</span>
+  }) => {
+    const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
+    return (
+      <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+        <div className={`${message.kind === 'interaction' ? 'w-[85%]' : 'max-w-[85%]'} min-w-0 ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+          {message.role === 'assistant' && (
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">AI</span>
+              </div>
+              <span className="text-sm text-gray-600 font-medium">{t('messages.assistantLabel')}</span>
             </div>
-            <span className="text-sm text-gray-600 font-medium">智能助手</span>
-          </div>
-        )}
+          )}
 
-        <MessageRenderer
-          message={message}
-          onSubmitInteraction={onSubmitInteraction}
-          interactionDisabled={message.kind === 'interaction' && !isActiveInteraction}
-          inputFocused={inputFocused}
-        />
+          <MessageRenderer
+            message={message}
+            onSubmitInteraction={onSubmitInteraction}
+            interactionDisabled={message.kind === 'interaction' && !isActiveInteraction}
+            inputFocused={inputFocused}
+          />
 
-        {message.role === 'user' && (
-          <div className="flex items-center justify-end space-x-2 mt-2">
-            <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">我</span>
+          {message.role === 'user' && (
+            <div className="flex items-center justify-end space-x-2 mt-2">
+              <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">{t('messages.userLabel')}</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  ),
+    )
+  },
 )
 
 ChatMessageItem.displayName = 'ChatMessageItem'

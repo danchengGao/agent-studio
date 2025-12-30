@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Slider, Tooltip } from '@mui/material'
 import { InvokeExecuteInfo } from '@test-agentstudio/api-client'
+import { useScopedTranslation } from '@/i18n'
 
 interface FlameGraphProps {
   execList: InvokeExecuteInfo[]
@@ -90,7 +91,7 @@ const useContainerSize = () => {
   return { ref, size }
 }
 
-const buildBars = (roots: ExecNode[], rootLabel?: string): BarItem[] => {
+const buildBars = (roots: ExecNode[], rootLabel?: string, defaultNodeLabel?: string): BarItem[] => {
   const res: BarItem[] = []
   const walk = (node: ExecNode, depth: number) => {
     const start = Number(node.start_timestamp || 0)
@@ -98,7 +99,7 @@ const buildBars = (roots: ExecNode[], rootLabel?: string): BarItem[] => {
     const end = start + dur
     res.push({
       id: String(node.invoke_id || `${start}-${end}-${depth}-${Math.random()}`),
-      label: depth === 0 && rootLabel ? rootLabel : (node.invoke_name as string) || (node.invoke_type as string) || '节点',
+      label: depth === 0 && rootLabel ? rootLabel : (node.invoke_name as string) || (node.invoke_type as string) || defaultNodeLabel,
       type: (node.invoke_type as string) || 'node',
       start,
       end,
@@ -122,7 +123,9 @@ const buildBars = (roots: ExecNode[], rootLabel?: string): BarItem[] => {
 }
 
 const FlameGraph: React.FC<FlameGraphProps> = ({ execList, onSelect, rootLabel }) => {
-  const bars = useMemo(() => buildBars(execList as ExecNode[], rootLabel), [execList, rootLabel])
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugPanel.flameGraph')
+  const defaultNodeLabel = t('labels.nodeFallback')
+  const bars = useMemo(() => buildBars(execList as ExecNode[], rootLabel, defaultNodeLabel), [execList, rootLabel, defaultNodeLabel])
   const totalStart = useMemo(() => (bars.length ? Math.min(...bars.map(b => b.start)) : 0), [bars])
   const totalEnd = useMemo(() => (bars.length ? Math.max(...bars.map(b => b.end)) : 0), [bars])
   const totalDuration = Math.max(0, totalEnd - totalStart)
@@ -159,7 +162,9 @@ const FlameGraph: React.FC<FlameGraphProps> = ({ execList, onSelect, rootLabel }
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-700">总耗时：{formatMs(totalDuration)}</span>
+        <span className="text-xs text-gray-700">
+          {t('labels.totalDuration')}：{formatMs(totalDuration)}
+        </span>
       </div>
       <div ref={ref} className="relative w-full">
         <div style={{ width: contentWidth, height }} className="">

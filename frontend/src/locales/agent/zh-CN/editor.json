@@ -55,13 +55,142 @@
       },
       "promptDialog": {
         "goToTemplateManagement": "前往提示词模板管理"
+      },
+      "agentAssociatePromptDialog": {
+        "title": "提示词库",
+        "searchPlaceholder": "搜索",
+        "createPrompt": "新建提示词",
+        "versionLabel": "版本",
+        "noTemplates": "暂无模板",
+        "insert": "插入提示词",
+        "replacing": "替换中...",
+        "replaceSystemPrompt": "替换系统提示词",
+        "noContentForVersion": "该版本暂无内容",
+        "selectPrompt": "请选择左侧提示词",
+        "loadFailed": "加载失败"
       }
     },
     "orchestration": {
-      "title": "编排配置"
+      "title": "编排配置",
+      "addWorkflow": {
+        "addExisting": "添加已有工作流",
+        "createNew": "创建新工作流"
+      },
+      "addPlugin": {
+        "addExisting": "添加已有插件",
+        "createNew": "创建新插件"
+      }
     },
     "previewDebug": {
-      "title": "调试预览"
+      "title": "调试预览",
+      "agentDebugChat": {
+        "header": {
+          "debugInfo": "调试信息"
+        },
+        "tips": {
+          "modelNotConfiguredTitle": "未配置模型",
+          "modelNotConfiguredDescription": "请先在左侧\"编排配置\"面板中选择一个模型，然后才能开始调试对话。"
+        },
+        "placeholders": {
+          "configModelFirst": "请先配置模型后进行调试",
+          "addWorkflowFirst": "请先添加工作流后进行调试",
+          "waitInputComplex": "等待输入：请在上方卡片中填写并提交",
+          "waitInputSimple": "等待输入：请输入反馈",
+          "inputMessage": "输入消息..."
+        },
+        "messages": {
+          "assistantLabel": "智能助手",
+          "userLabel": "我"
+        },
+        "errors": {
+          "executeFailed": "执行失败"
+        }
+      },
+      "agentDebugPanel": {
+        "viewMode": {
+          "tree": "调用树",
+          "flame": "火焰图"
+        },
+        "empty": {
+          "noExecData": "暂无调用数据"
+        },
+        "sections": {
+          "nodeDetail": "节点详情"
+        },
+        "filters": {
+          "executionLog": "执行日志："
+        },
+        "select": {
+          "loading": "加载中...",
+          "placeholder": "请选择执行日志"
+        },
+        "refresh": {
+          "loading": "刷新中...",
+          "label": "刷新列表",
+          "ariaLabel": "刷新"
+        },
+        "summary": {
+          "traceId": "traceId",
+          "duration": "执行耗时"
+        },
+        "copy": {
+          "tooltip": "复制 traceId",
+          "copied": "已复制",
+          "ariaLabel": "复制 traceId"
+        },
+        "callTree": {
+          "aria": {
+            "expand": "展开",
+            "collapse": "折叠"
+          },
+          "labels": {
+            "nodeFallback": "节点"
+          }
+        },
+        "flameGraph": {
+          "labels": {
+            "totalDuration": "总耗时",
+            "nodeFallback": "节点"
+          }
+        },
+        "nodeDetail": {
+          "empty": {
+            "noNode": "请选择节点查看详情"
+          },
+          "labels": {
+            "node": "节点",
+            "status": "状态",
+            "duration": "耗时",
+            "input": "输入",
+            "output": "输出",
+            "none": "无",
+            "nodeFallback": "节点"
+          }
+        }
+      },
+      "operationsBar": {
+        "tooltips": {
+          "clearChat": "删除对话记录"
+        },
+        "placeholders": {
+          "inputMessage": "输入消息来测试智能体..."
+        },
+        "buttons": {
+          "send": "发送",
+          "cancel": "取消"
+        }
+      },
+      "userInputDialog": {
+        "title": "请输入所需信息以继续执行智能体",
+        "description": "请填写以下信息：",
+        "buttons": {
+          "cancel": "取消",
+          "submit": "提交"
+        },
+        "placeholders": {
+          "fieldInput": "请输入{{fieldName}}..."
+        }
+      }
     }
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { useScopedTranslation } from '@/i18n'
 import { X, Loader2, Sparkles } from 'lucide-react'
 import CreateAgentIcon from '@/assets/icons/create-agent-react.svg?react'
 import CreateAgentWorkflowIcon from '@/assets/icons/create-agent-workflow.svg?react'
@@ -23,7 +23,6 @@ interface AgentModeInfo {
   detailDescription: string
 }
 
-
 interface AgentCreateData {
   mode: AgentMode
   name: string
@@ -32,7 +31,7 @@ interface AgentCreateData {
 }
 
 const AgentCreatePage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t } = useScopedTranslation('agents.agentCreate')
   const navigate = useNavigate()
   const { user } = useAuthStore()
 
@@ -40,16 +39,16 @@ const AgentCreatePage: React.FC = () => {
     'single-react-agent': {
       id: 'single-react-agent',
       icon: '👤',
-      name: t('agents.agentCreate.mode.singleReact.name'),
-      description: t('agents.agentCreate.mode.singleReact.description'),
-      detailDescription: t('agents.agentCreate.mode.singleReact.description'),
+      name: t('mode.singleReact.name'),
+      description: t('mode.singleReact.description'),
+      detailDescription: t('mode.singleReact.description'),
     },
     'multi-workflow': {
       id: 'multi-workflow',
       icon: '🔄',
-      name: t('agents.agentCreate.mode.multiWorkflow.name'),
-      description: t('agents.agentCreate.mode.multiWorkflow.description'),
-      detailDescription: t('agents.agentCreate.mode.multiWorkflow.description'),
+      name: t('mode.multiWorkflow.name'),
+      description: t('mode.multiWorkflow.description'),
+      detailDescription: t('mode.multiWorkflow.description'),
     },
   }
 
@@ -100,11 +99,11 @@ const AgentCreatePage: React.FC = () => {
     const newErrors: Partial<AgentCreateData> = {}
 
     if (!agentData.name.trim()) {
-      newErrors.name = t('agents.agentCreate.form.name.required')
+      newErrors.name = t('form.name.required')
     }
 
     if (!agentData.description.trim()) {
-      newErrors.description = t('agents.agentCreate.form.description.required')
+      newErrors.description = t('form.description.required')
     }
 
     setErrors(newErrors)
@@ -132,7 +131,7 @@ const AgentCreatePage: React.FC = () => {
       const response = await createAgentMutation.mutateAsync(createAgentRequest)
 
       if (response.code === 0 || response.code === 200) {
-        setSnackbar({ open: true, message: t('agents.agentCreate.messages.success'), severity: 'success' })
+        setSnackbar({ open: true, message: t('messages.success'), severity: 'success' })
 
         await new Promise(resolve => setTimeout(resolve, 1500))
 
@@ -147,13 +146,13 @@ const AgentCreatePage: React.FC = () => {
       } else {
         setSnackbar({
           open: true,
-          message: t('agents.agentCreate.messages.failed', { reason: response.message || t('agents.agentCreate.messages.unknownError') }),
+          message: t('messages.failed', { reason: response.message || t('messages.unknownError') }),
           severity: 'error',
         })
       }
     } catch (error) {
       console.error('API调用失败:', error)
-      setSnackbar({ open: true, message: t('agents.agentCreate.messages.retry'), severity: 'error' })
+      setSnackbar({ open: true, message: t('messages.retry'), severity: 'error' })
     } finally {
       setIsLoading(false)
     }
@@ -183,92 +182,92 @@ const AgentCreatePage: React.FC = () => {
   const iconPopoverOpen = Boolean(iconAnchorEl)
 
   return (
-    <div 
+    <div
       className="bg-gray-50 flex flex-col"
-      style={{ 
+      style={{
         width: '100%',
         maxWidth: '100vw',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
       }}
     >
       {/* Header */}
-      <div 
+      <div
         className="flex-shrink-0 bg-white flex items-center justify-between"
-        style={{ 
+        style={{
           paddingLeft: 'clamp(0.5rem, 1vw, 1.25rem)',
           paddingRight: 'clamp(0.5rem, 1vw, 1.25rem)',
           paddingTop: 'clamp(0.25rem, 0.5vh, 0.5rem)',
           paddingBottom: 'clamp(0.25rem, 0.5vh, 0.5rem)',
           height: 'clamp(2rem, 4.5vh, 3rem)',
           minHeight: '2rem',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
         }}
       >
         <Typography
           variant="h5"
           className="font-bold"
-          sx={{ 
+          sx={{
             color: '#191919',
             fontSize: 'clamp(0.875rem, 1.5vw, 1.25rem)',
-            lineHeight: 1.2
+            lineHeight: 1.2,
           }}
         >
-          {t('agents.agentCreate.title')}
+          {t('title')}
         </Typography>
-        <IconButton 
-          onClick={handleClose} 
-          size="small" 
+        <IconButton
+          onClick={handleClose}
+          size="small"
           className="hover:bg-gray-100"
           sx={{
             width: 'clamp(1.75rem, 3vw, 2.25rem)',
             height: 'clamp(1.75rem, 3vw, 2.25rem)',
-            padding: 0
+            padding: 0,
           }}
         >
-          <X 
-            className="text-gray-600" 
-            style={{ 
+          <X
+            className="text-gray-600"
+            style={{
               width: 'clamp(1rem, 2vw, 1.5rem)',
-              height: 'clamp(1rem, 2vw, 1.5rem)'
+              height: 'clamp(1rem, 2vw, 1.5rem)',
             }}
           />
         </IconButton>
       </div>
 
       {/* Main Content */}
-      <div 
+      <div
         className="flex-shrink-0 flex flex-col lg:flex-row overflow-hidden"
-        style={{ 
+        style={{
           minHeight: 0,
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
         }}
       >
         {/* Left Panel */}
-        <div 
+        <div
           className="bg-white flex flex-col overflow-hidden"
-          style={{ 
+          style={{
             flex: '1 1 35%',
             minWidth: 0,
             maxWidth: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
           }}
         >
-          <div 
+          <div
             className="flex-shrink-0 overflow-y-auto"
             style={{
               paddingLeft: 'clamp(0.5rem, 1vw, 1rem)',
               paddingRight: 'clamp(0.5rem, 1vw, 1rem)',
               paddingTop: 'clamp(0.375rem, 0.75vh, 0.75rem)',
               paddingBottom: '0',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
             }}
           >
-            <div 
+            <div
               className="flex flex-col"
-              style={{ 
+              style={{
                 gap: 'clamp(0.375rem, 0.9vh, 0.75rem)',
                 width: '100%',
-                boxSizing: 'border-box'
+                boxSizing: 'border-box',
               }}
             >
               {/* Create Mode Selection */}
@@ -276,53 +275,48 @@ const AgentCreatePage: React.FC = () => {
                 <Typography
                   variant="subtitle1"
                   className="font-normal"
-                  sx={{ 
+                  sx={{
                     color: 'rgba(0, 0, 0, 0.9)',
                     fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
                     marginBottom: 'clamp(0.25rem, 0.5vh, 0.5rem)',
-                    lineHeight: 1.2
+                    lineHeight: 1.2,
                   }}
                 >
-                  {t('agents.agentCreate.mode.label')}
+                  {t('mode.label')}
                 </Typography>
-                  <div 
+                <div
                   className="flex flex-col sm:flex-row"
-                  style={{ 
+                  style={{
                     gap: 'clamp(0.25rem, 0.6vw, 0.5rem)',
                     width: '100%',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
                   }}
                 >
                   {/* Single React Agent Mode */}
                   <div
                     onClick={() => setAgentData(prev => ({ ...prev, mode: 'single-react-agent' }))}
                     className={`flex-1 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                      agentData.mode === 'single-react-agent'
-                        ? 'border-blue-500'
-                        : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                      agentData.mode === 'single-react-agent' ? 'border-blue-500' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                     }`}
                     style={{
                       padding: 'clamp(0.5rem, 1vw, 0.875rem)',
                       minHeight: 'clamp(4.5rem, 10vh, 6.5rem)',
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
                     }}
                   >
-                    <div 
-                      className="flex flex-col items-start h-full"
-                      style={{ gap: 'clamp(0.375rem, 0.75vh, 0.5rem)' }}
-                    >
-                      <div 
+                    <div className="flex flex-col items-start h-full" style={{ gap: 'clamp(0.375rem, 0.75vh, 0.5rem)' }}>
+                      <div
                         className="rounded-lg flex items-center justify-center transition-all duration-200 flex-shrink-0"
                         style={{
                           width: 'clamp(1.75rem, 3.5vw, 2.5rem)',
-                          height: 'clamp(1.75rem, 3.5vw, 2.5rem)'
+                          height: 'clamp(1.75rem, 3.5vw, 2.5rem)',
                         }}
                       >
-                        <CreateAgentIcon 
-                          className="text-white" 
+                        <CreateAgentIcon
+                          className="text-white"
                           style={{
                             width: '100%',
-                            height: '100%'
+                            height: '100%',
                           }}
                         />
                       </div>
@@ -330,11 +324,11 @@ const AgentCreatePage: React.FC = () => {
                         <Typography
                           variant="h6"
                           className="font-bold text-left"
-                          sx={{ 
+                          sx={{
                             color: 'rgba(0, 0, 0, 0.9)',
                             fontSize: 'clamp(0.6875rem, 1.2vw, 0.875rem)',
                             marginBottom: 'clamp(0.125rem, 0.25vh, 0.25rem)',
-                            lineHeight: 1.2
+                            lineHeight: 1.2,
                           }}
                         >
                           {MODE_INFO['single-react-agent'].name}
@@ -342,14 +336,14 @@ const AgentCreatePage: React.FC = () => {
                         <Typography
                           variant="body2"
                           className="text-left"
-                          sx={{ 
+                          sx={{
                             color: 'rgba(0, 0, 0, 0.4)',
                             fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)',
                             lineHeight: 1.3,
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
                           }}
                         >
                           {MODE_INFO['single-react-agent'].description}
@@ -362,32 +356,27 @@ const AgentCreatePage: React.FC = () => {
                   <div
                     onClick={() => setAgentData(prev => ({ ...prev, mode: 'multi-workflow' }))}
                     className={`flex-1 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
-                      agentData.mode === 'multi-workflow'
-                        ? 'border-blue-500'
-                        : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                      agentData.mode === 'multi-workflow' ? 'border-blue-500' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                     }`}
                     style={{
                       padding: 'clamp(0.375rem, 0.75vw, 0.625rem)',
                       minHeight: 'clamp(4rem, 8.5vh, 5.5rem)',
-                      boxSizing: 'border-box'
+                      boxSizing: 'border-box',
                     }}
                   >
-                    <div 
-                      className="flex flex-col items-start h-full"
-                      style={{ gap: 'clamp(0.25rem, 0.5vh, 0.375rem)' }}
-                    >
-                      <div 
+                    <div className="flex flex-col items-start h-full" style={{ gap: 'clamp(0.25rem, 0.5vh, 0.375rem)' }}>
+                      <div
                         className="rounded-lg flex items-center justify-center transition-all duration-200 flex-shrink-0"
                         style={{
                           width: 'clamp(1.5rem, 3vw, 2.25rem)',
-                          height: 'clamp(1.5rem, 3vw, 2.25rem)'
+                          height: 'clamp(1.5rem, 3vw, 2.25rem)',
                         }}
                       >
-                        <CreateAgentWorkflowIcon 
-                          className="text-white" 
+                        <CreateAgentWorkflowIcon
+                          className="text-white"
                           style={{
                             width: '100%',
-                            height: '100%'
+                            height: '100%',
                           }}
                         />
                       </div>
@@ -395,11 +384,11 @@ const AgentCreatePage: React.FC = () => {
                         <Typography
                           variant="h6"
                           className="font-bold text-left"
-                          sx={{ 
+                          sx={{
                             color: 'rgba(0, 0, 0, 0.9)',
                             fontSize: 'clamp(0.6875rem, 1.2vw, 0.875rem)',
                             marginBottom: 'clamp(0.125rem, 0.25vh, 0.25rem)',
-                            lineHeight: 1.2
+                            lineHeight: 1.2,
                           }}
                         >
                           {MODE_INFO['multi-workflow'].name}
@@ -407,14 +396,14 @@ const AgentCreatePage: React.FC = () => {
                         <Typography
                           variant="body2"
                           className="text-left"
-                          sx={{ 
+                          sx={{
                             color: 'rgba(0, 0, 0, 0.4)',
                             fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)',
                             lineHeight: 1.3,
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
                           }}
                         >
                           {MODE_INFO['multi-workflow'].description}
@@ -426,38 +415,35 @@ const AgentCreatePage: React.FC = () => {
               </div>
 
               {/* Agent Name */}
-              <div 
+              <div
                 className="flex-shrink-0 flex flex-col sm:flex-row items-start sm:items-start"
-                style={{ 
+                style={{
                   gap: 'clamp(0.25rem, 0.6vw, 0.5rem)',
                   width: '100%',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
                 }}
               >
                 <div className="flex-1 w-full relative" style={{ boxSizing: 'border-box' }}>
-                  <div 
+                  <div
                     className="flex items-center"
-                    style={{ 
+                    style={{
                       gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
-                      marginBottom: 'clamp(0.25rem, 0.4vh, 0.3rem)'
+                      marginBottom: 'clamp(0.25rem, 0.4vh, 0.3rem)',
                     }}
                   >
-                    <span 
-                      className="text-red-500"
-                      style={{ fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)' }}
-                    >
+                    <span className="text-red-500" style={{ fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)' }}>
                       *
                     </span>
                     <Typography
                       variant="subtitle1"
                       className="font-semibold"
-                      sx={{ 
+                      sx={{
                         color: '#191919',
                         fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
-                        lineHeight: 1.2
+                        lineHeight: 1.2,
                       }}
                     >
-                      {t('agents.agentCreate.form.name.label')}
+                      {t('form.name.label')}
                     </Typography>
                   </div>
                   <TextField
@@ -467,12 +453,12 @@ const AgentCreatePage: React.FC = () => {
                     onChange={e => setAgentData(prev => ({ ...prev, name: e.target.value }))}
                     onBlur={() => {
                       if (!agentData.name.trim()) {
-                        setErrors(prev => ({ ...prev, name: t('agents.agentCreate.form.name.required') }))
+                        setErrors(prev => ({ ...prev, name: t('form.name.required') }))
                       } else {
                         setErrors(prev => ({ ...prev, name: undefined }))
                       }
                     }}
-                    placeholder={t('agents.agentCreate.form.name.placeholder')}
+                    placeholder={t('form.name.placeholder')}
                     error={!!errors.name}
                     helperText={errors.name || ''}
                     inputProps={{ maxLength: 100 }}
@@ -491,29 +477,25 @@ const AgentCreatePage: React.FC = () => {
                       },
                     }}
                   />
-                  <div 
+                  <div
                     className="absolute pointer-events-none"
                     style={{
                       bottom: errors.name ? 'clamp(1.5rem, 2.5vh, 2rem)' : 'clamp(0.4rem, 1vh, 0.8rem)',
-                      right: 'clamp(0.3125rem, 0.625vw, 0.5rem)'
+                      right: 'clamp(0.3125rem, 0.625vw, 0.5rem)',
                     }}
                   >
-                    <Typography 
-                      variant="body2" 
-                      className="text-gray-500"
-                      sx={{ fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)' }}
-                    >
+                    <Typography variant="body2" className="text-gray-500" sx={{ fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)' }}>
                       {agentData.name.length}/100
                     </Typography>
                   </div>
                 </div>
-                <div 
+                <div
                   className="flex items-center justify-center flex-shrink-0"
                   style={{
                     width: 'clamp(2.5rem, 5vw, 3.5rem)',
                     height: 'clamp(2.5rem, 5vw, 3.5rem)',
                     alignSelf: 'flex-start',
-                    boxSizing: 'border-box'
+                    boxSizing: 'border-box',
                   }}
                 >
                   <IconButton
@@ -527,10 +509,10 @@ const AgentCreatePage: React.FC = () => {
                       },
                     }}
                   >
-                    <span 
-                      style={{ 
+                    <span
+                      style={{
                         fontSize: 'clamp(1.25rem, 2.5vw, 2rem)',
-                        lineHeight: 1
+                        lineHeight: 1,
                       }}
                     >
                       {agentData.icon}
@@ -550,28 +532,28 @@ const AgentCreatePage: React.FC = () => {
                     horizontal: 'right',
                   }}
                 >
-                  <div 
+                  <div
                     style={{
                       padding: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-                      maxWidth: 'clamp(20rem, 40vw, 30rem)'
+                      maxWidth: 'clamp(20rem, 40vw, 30rem)',
                     }}
                   >
-                    <Typography 
-                      variant="subtitle2" 
+                    <Typography
+                      variant="subtitle2"
                       className="font-semibold text-gray-800"
                       sx={{
                         fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)',
-                        marginBottom: 'clamp(0.5rem, 1vh, 0.75rem)'
+                        marginBottom: 'clamp(0.5rem, 1vh, 0.75rem)',
                       }}
                     >
-                      {t('agents.agentCreate.form.icon.title')}
+                      {t('form.icon.title')}
                     </Typography>
-                    <div 
+                    <div
                       className="flex flex-wrap"
-                      style={{ 
+                      style={{
                         gap: 'clamp(0.375rem, 0.75vw, 0.5rem)',
                         maxHeight: 'clamp(12rem, 25vh, 18rem)',
-                        overflowY: 'auto'
+                        overflowY: 'auto',
                       }}
                     >
                       {iconOptions.map((icon, index) => (
@@ -602,29 +584,26 @@ const AgentCreatePage: React.FC = () => {
 
               {/* Agent Description */}
               <div className="flex-shrink-0 relative" style={{ boxSizing: 'border-box' }}>
-                <div 
+                <div
                   className="flex items-center"
-                  style={{ 
+                  style={{
                     gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
-                    marginBottom: 'clamp(0.25rem, 0.4vh, 0.3rem)'
+                    marginBottom: 'clamp(0.25rem, 0.4vh, 0.3rem)',
                   }}
                 >
-                  <span 
-                    className="text-red-500"
-                    style={{ fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)' }}
-                  >
+                  <span className="text-red-500" style={{ fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)' }}>
                     *
                   </span>
                   <Typography
                     variant="subtitle1"
                     className="font-semibold"
-                    sx={{ 
+                    sx={{
                       color: '#191919',
                       fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
-                      lineHeight: 1.2
+                      lineHeight: 1.2,
                     }}
                   >
-                    {t('agents.agentCreate.form.description.label')}
+                    {t('form.description.label')}
                   </Typography>
                 </div>
                 <TextField
@@ -636,16 +615,16 @@ const AgentCreatePage: React.FC = () => {
                   onChange={e => setAgentData(prev => ({ ...prev, description: e.target.value }))}
                   onBlur={() => {
                     if (!agentData.description.trim()) {
-                      setErrors(prev => ({ ...prev, description: t('agents.agentCreate.form.description.required') }))
+                      setErrors(prev => ({ ...prev, description: t('form.description.required') }))
                     } else {
                       setErrors(prev => ({ ...prev, description: undefined }))
                     }
                   }}
-                  placeholder={t('agents.agentCreate.form.description.placeholder')}
+                  placeholder={t('form.description.placeholder')}
                   error={!!errors.description}
                   helperText={errors.description}
                   inputProps={{ maxLength: 1000 }}
-                    sx={{
+                  sx={{
                     marginBottom: 0,
                     '& .MuiOutlinedInput-root': {
                       padding: '1px !important',
@@ -668,28 +647,23 @@ const AgentCreatePage: React.FC = () => {
                     },
                   }}
                 />
-                <div 
+                <div
                   className="absolute pointer-events-none"
                   style={{
                     bottom: errors.description ? 'clamp(1.0rem, 2.05vh, 1.275rem)' : 'clamp(0.1rem, 0.25vh, 0.425rem)',
-                    right: 'clamp(0.5rem, 1vw, 0.75rem)'
+                    right: 'clamp(0.5rem, 1vw, 0.75rem)',
                   }}
                 >
-                  <Typography 
-                    variant="body2" 
-                    className="text-gray-500"
-                    sx={{ fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)' }}
-                  >
+                  <Typography variant="body2" className="text-gray-500" sx={{ fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)' }}>
                     {agentData.description.length}/1000
                   </Typography>
                 </div>
               </div>
-
             </div>
           </div>
 
           {/* Action Buttons - Fixed at bottom */}
-          <div 
+          <div
             className="flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-r-0 border-gray-200"
             style={{
               paddingLeft: 'clamp(0.5rem, 1vw, 1rem)',
@@ -698,13 +672,10 @@ const AgentCreatePage: React.FC = () => {
               paddingBottom: 'clamp(0.25rem, 0.5vh, 0.5rem)',
               height: 'clamp(2.5rem, 5vh, 3.25rem)',
               minHeight: '2.5rem',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
             }}
           >
-            <div 
-              className="flex justify-end h-full items-center"
-              style={{ gap: 'clamp(0.25rem, 0.6vw, 0.5rem)' }}
-            >
+            <div className="flex justify-end h-full items-center" style={{ gap: 'clamp(0.25rem, 0.6vw, 0.5rem)' }}>
               <Button
                 variant="outlined"
                 onClick={handleCancel}
@@ -721,19 +692,21 @@ const AgentCreatePage: React.FC = () => {
                   },
                 }}
               >
-                {t('agents.agentCreate.actions.cancel')}
+                {t('actions.cancel')}
               </Button>
               <Button
                 variant="contained"
-                startIcon={isLoading ? (
-                  <Loader2 
-                    className="animate-spin" 
-                    style={{ 
-                      width: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
-                      height: 'clamp(0.6875rem, 1.1vw, 0.8125rem)'
-                    }}
-                  />
-                ) : undefined}
+                startIcon={
+                  isLoading ? (
+                    <Loader2
+                      className="animate-spin"
+                      style={{
+                        width: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
+                        height: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
+                      }}
+                    />
+                  ) : undefined
+                }
                 onClick={handleConfirm}
                 disabled={!agentData.name.trim() || !agentData.description.trim() || isLoading}
                 sx={{
@@ -753,41 +726,38 @@ const AgentCreatePage: React.FC = () => {
                   },
                 }}
               >
-                {isLoading ? t('agents.agentCreate.actions.creating') : t('agents.agentCreate.actions.create')}
+                {isLoading ? t('actions.creating') : t('actions.create')}
               </Button>
             </div>
           </div>
         </div>
 
         {/* Right Panel - Mode Details */}
-        <div 
+        <div
           className="hidden lg:flex bg-white border-l border-gray-200 flex-col overflow-hidden"
-          style={{ 
+          style={{
             flex: '1 1 65%',
             minWidth: 0,
             maxWidth: '100%',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
           }}
         >
-          <div 
+          <div
             className="flex-shrink-0 overflow-y-auto"
             style={{
               padding: 'clamp(0.75rem, 1.5vw, 1.25rem)',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
             }}
           >
-            <div 
-              className="flex flex-col items-start"
-              style={{ gap: 'clamp(0.375rem, 0.75vh, 0.625rem)' }}
-            >
+            <div className="flex flex-col items-start" style={{ gap: 'clamp(0.375rem, 0.75vh, 0.625rem)' }}>
               {/* Name */}
               <Typography
                 variant="h4"
                 className="font-bold text-left"
-                sx={{ 
+                sx={{
                   color: 'rgba(0, 0, 0, 0.9)',
                   fontSize: 'clamp(0.9375rem, 1.6vw, 1.25rem)',
-                  lineHeight: 1.3
+                  lineHeight: 1.3,
                 }}
               >
                 {selectedModeInfo.name}
@@ -797,10 +767,10 @@ const AgentCreatePage: React.FC = () => {
               <Typography
                 variant="body1"
                 className="text-left"
-                sx={{ 
+                sx={{
                   color: 'rgba(0, 0, 0, 0.4)',
                   fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
-                  lineHeight: 1.5
+                  lineHeight: 1.5,
                 }}
               >
                 {selectedModeInfo.detailDescription}
@@ -809,30 +779,30 @@ const AgentCreatePage: React.FC = () => {
 
             {/* Example Image */}
             <div style={{ marginTop: 'clamp(1.2rem, 5vh, 2.5rem)' }}>
-              <div 
+              <div
                 className="rounded-lg overflow-hidden"
                 style={{
                   width: '100%',
                   minHeight: 'clamp(15rem, 70vh, 75rem)',
-                  boxSizing: 'border-box'
+                  boxSizing: 'border-box',
                 }}
               >
-                <img 
+                <img
                   src={agentData.mode === 'single-react-agent' ? CreateAgentReactPreview : CreateAgentWorkflowPreview}
-                  alt={agentData.mode === 'single-react-agent' ? t('agents.agentCreate.preview.singleReactAlt') : t('agents.agentCreate.preview.multiWorkflowAlt')}
+                  alt={agentData.mode === 'single-react-agent' ? t('preview.singleReactAlt') : t('preview.multiWorkflowAlt')}
                   style={{
                     width: '100%',
                     height: '100%',
                     minHeight: 'clamp(15rem, 70vh, 75rem)',
                     objectFit: 'cover',
-                    display: 'block'
+                    display: 'block',
                   }}
                 />
               </div>
             </div>
           </div>
         </div>
-        </div>
+      </div>
 
       <UnifiedSnackbar
         snackbar={snackbar}
@@ -844,4 +814,3 @@ const AgentCreatePage: React.FC = () => {
 }
 
 export default AgentCreatePage
-

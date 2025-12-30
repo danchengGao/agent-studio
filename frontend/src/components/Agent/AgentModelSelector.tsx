@@ -21,6 +21,7 @@ import { useAuthStore } from '../../stores/useAuthStore'
 import axios from 'axios'
 import { useWorkflowValidation } from '@/hooks/useWorkflowValidation'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
+import { useScopedTranslation } from '@/i18n'
 
 // 保留其他 Accordion 样式用于其他部分
 const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters elevation={0} square {...props} />)(({ theme }) => ({
@@ -99,6 +100,7 @@ const AgentModelSelector = (props: {
   const { updateModelDetail, updateWorkflowDetail, updatePluginDetail, updateGreeting, updateMemoryConfig } = useAgentStore()
   const readonly = useAgentStore(s => s.readonly)
   const { user } = useAuthStore()
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration')
   const user_id = saveAgentRequest.space_id
   const group_id = saveAgentRequest.agent_id
 
@@ -770,8 +772,8 @@ const AgentModelSelector = (props: {
               </Tooltip>
               <AddButton
                 options={[
-                  { label: '添加已有工作流', value: 'existing' },
-                  { label: '创建新工作流', value: 'new' },
+                  { label: t('addWorkflow.addExisting'), value: 'existing' },
+                  { label: t('addWorkflow.createNew'), value: 'new' },
                 ]}
                 onSelect={addType => {
                   if (addType === 'existing') {
@@ -815,8 +817,8 @@ const AgentModelSelector = (props: {
             </Typography>
             <AddButton
               options={[
-                { label: '添加已有插件', value: 'existing' },
-                { label: '创建新插件', value: 'new' },
+                { label: t('addPlugin.addExisting'), value: 'existing' },
+                { label: t('addPlugin.createNew'), value: 'new' },
               ]}
               onSelect={addType => {
                 if (addType === 'existing') {
