@@ -514,7 +514,10 @@ class OptimizationTaskExecutor:
             model_config=config,
             metric=metric
         )
-        optimize_config.num_parallel = optimize_config.get("llm_parallel", 1)
+        llm_parallel_num = optimize_config.get("llm_parallel", 1)
+        llm_parallel_num = int(llm_parallel_num) \
+            if isinstance(llm_parallel_num, (int, float, str)) and llm_parallel_num > 0 else 1
+        optimize_config["num_parallel"] = llm_parallel_num
         logger.info(f"_create_trainer optimize_config: {optimize_config}")
         # 创建训练器
         trainer = Trainer(
