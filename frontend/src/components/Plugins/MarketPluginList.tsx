@@ -161,7 +161,7 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
             className={`p-3 rounded-xl transition-all duration-200 ${
               viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
-            title="网格视图"
+            title={t('plugins.viewMode.grid')}
           >
             <Grid className="w-5 h-5" />
           </button>
@@ -170,7 +170,7 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
             className={`p-3 rounded-xl transition-all duration-200 ${
               viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}
-            title="列表视图"
+            title={t('plugins.viewMode.list')}
           >
             <List className="w-5 h-5" />
           </button>
@@ -178,7 +178,7 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
             onClick={onRefresh}
             disabled={loading}
             className="p-3 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200 disabled:opacity-50"
-            title="刷新"
+            title={t('plugins.actions.refresh')}
           >
             {loading ? <CircularProgress size={20} /> : <RefreshCw className="w-5 h-5" />}
           </button>
@@ -204,8 +204,8 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
           <div className="w-24 h-24 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
             <Plug className="w-12 h-12 text-gray-400" />
           </div>
-          <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">未找到匹配的插件</h3>
-          <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">请尝试调整搜索条件或分类筛选</p>
+          <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">{t('plugins.messages.noMatchingPlugins')}</h3>
+          <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">{t('plugins.messages.tryAdjustFilters')}</p>
           <button
             onClick={() => {
               onSearchChange('')
@@ -213,7 +213,7 @@ const MarketPluginList: React.FC<MarketPluginListProps> = ({
             }}
             className="inline-flex items-center space-x-2 border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:border-blue-500 hover:text-blue-600 transition-all duration-300"
           >
-            <span>清除筛选</span>
+            <span>{t('plugins.messages.clearFilters')}</span>
           </button>
         </div>
       ) : (

@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogTitle,
@@ -76,11 +77,13 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
   onSubmit,
   onCancel,
 }) => {
+  const { t } = useTranslation()
+  
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="md" fullWidth>
       <DialogTitle className="flex items-center space-x-2">
         <Code className="w-5 h-5 text-blue-600" />
-        <span>{isEditing ? '编辑本地代码插件' : '创建本地代码插件'}</span>
+        <span>{isEditing ? t('plugins.dialog.idePlugin.editTitle', '编辑本地代码插件') : t('plugins.dialog.idePlugin.createTitle', '创建本地代码插件')}</span>
       </DialogTitle>
 
       <DialogContent>
@@ -88,8 +91,8 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
           {/* Plugin Name */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              插件名称 <span className="text-red-500 ml-1">*</span>
-              <Tooltip title="为插件起一个简洁明了的名称，便于识别和管理" placement="top">
+              {t('plugins.dialog.cloudPluginForm.name')} <span className="text-red-500 ml-1">*</span>
+              <Tooltip title={t('plugins.dialog.idePlugin.nameTooltip')} placement="top">
                 <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
               </Tooltip>
             </label>
@@ -98,8 +101,8 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
               onChange={e => onFormChange('name', e.target.value)}
               fullWidth
               required
-              placeholder="例如：数据处理器、API调用器、文件转换器"
-              helperText={`建议使用简洁明了的名称，避免特殊字符 (${form.name.length}/20)`}
+              placeholder={t('plugins.dialog.idePlugin.namePlaceholder', '例如：数据处理器、API调用器、文件转换器')}
+              helperText={`${t('plugins.dialog.idePlugin.nameHelperText')} (${form.name.length}/20)`}
               inputProps={{ maxLength: 20 }}
             />
           </div>
@@ -107,8 +110,8 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
           {/* Plugin Description */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              插件描述 <span className="text-red-500 ml-1">*</span>
-              <Tooltip title="详细描述插件的功能、用途、适用场景等" placement="top">
+              {t('plugins.description')} <span className="text-red-500 ml-1">*</span>
+              <Tooltip title={t('plugins.dialog.idePlugin.descriptionTooltip')} placement="top">
                 <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
               </Tooltip>
             </label>
@@ -119,8 +122,8 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
               required
               multiline
               rows={3}
-              placeholder="详细描述插件的主要功能、适用场景、输入输出格式、依赖要求等..."
-              helperText={`建议包含：主要功能、适用场景、调用方式、注意事项等信息 (${form.description.length}/40)`}
+              placeholder={t('plugins.dialog.idePlugin.descriptionPlaceholder')}
+              helperText={`${t('plugins.dialog.idePlugin.descriptionHelperText')} (${form.description.length}/40)`}
               inputProps={{ maxLength: 40 }}
             />
           </div>
@@ -128,14 +131,14 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
           {/* Runtime Selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              IDE运行时 <span className="text-red-500 ml-1">*</span>
-              <Tooltip title="选择插件运行的编程语言环境" placement="top">
+              {t('plugins.dialog.idePlugin.runtime')} <span className="text-red-500 ml-1">*</span>
+              <Tooltip title={t('plugins.dialog.idePlugin.runtimeTooltip')} placement="top">
                 <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
               </Tooltip>
             </label>
             <FormControl fullWidth required>
-              <InputLabel>运行时环境</InputLabel>
-              <Select value={form.runtime} onChange={e => onFormChange('runtime', e.target.value)} label="运行时环境">
+              <InputLabel>{t('plugins.dialog.idePlugin.runtimeEnvironment')}</InputLabel>
+              <Select value={form.runtime} onChange={e => onFormChange('runtime', e.target.value)} label={t('plugins.dialog.idePlugin.runtimeEnvironment')}>
                 {runtimeOptions.map(option => (
                   <MenuItem key={option.value} value={option.value}>
                     <div className="flex flex-col space-y-1 py-1">
@@ -156,15 +159,15 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
             <div className="flex items-start space-x-3">
               <Terminal className="w-5 h-5 text-blue-600 mt-0.5" />
               <div>
-                <h4 className="text-sm font-medium text-blue-900 mb-2">运行时环境说明</h4>
+                <h4 className="text-sm font-medium text-blue-900 mb-2">{t('plugins.dialog.idePlugin.runtimeInfoTitle')}</h4>
                 <div className="space-y-2 text-sm text-blue-800">
                   <div>
-                    <strong>Python 3:</strong> 适合数据处理、机器学习、科学计算、自动化脚本等场景
+                    <strong>Python 3:</strong> {t('plugins.dialog.idePlugin.python3Desc')}
                   </div>
                   <div>
-                    <strong>Node.js:</strong> 适合Web API开发、实时通信、前端构建工具、微服务等场景
+                    <strong>Node.js:</strong> {t('plugins.dialog.idePlugin.nodejsDesc')}
                   </div>
-                  <div className="text-blue-600 text-xs mt-2">💡 选择合适的运行时环境有助于获得最佳性能和兼容性</div>
+                  <div className="text-blue-600 text-xs mt-2">{t('plugins.dialog.idePlugin.runtimeHint')}</div>
                 </div>
               </div>
             </div>
@@ -174,7 +177,7 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
 
       <DialogActions className="px-6 pb-4">
         <Button onClick={onCancel} variant="outlined" disabled={loading}>
-          取消
+          {t('common.buttons.cancel')}
         </Button>
         <Button
           onClick={() => onSubmit(isEditing)}
@@ -186,12 +189,12 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
           {loading ? (
             <>
               <CircularProgress size={16} className="mr-2" />
-              {isEditing ? '保存中...' : '创建中...'}
+              {isEditing ? t('common.status.saving') : t('common.status.creating')}
             </>
           ) : isEditing ? (
-            '保存修改'
+            t('plugins.dialog.cloudPluginForm.saveChanges')
           ) : (
-            '创建插件'
+            t('plugins.dialog.cloudPluginForm.create')
           )}
         </Button>
       </DialogActions>

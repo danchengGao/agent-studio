@@ -199,16 +199,16 @@ const PluginConfigurationPage: React.FC = () => {
           name: response.data.plugin_info.name || '',
           description: response.data.plugin_info.desc || '',
           icon: response.data.plugin_info.icon_uri || '⚙️',
-          category: response.data.plugin_info.plugin_type === 1 ? '云侧插件' : '本地插件',
+          category: response.data.plugin_info.plugin_type === 1 ? t('plugins.types.cloud') : t('plugins.types.ide'),
           status: 'active',
           version: 'v1.0.0',
-          author: '云侧创建',
+          author: t('plugins.dialog.pluginDetails.author', '云侧创建'),
           installDate: new Date().toISOString().split('T')[0],
           lastUpdate: new Date().toISOString().split('T')[0],
           usageCount: 0,
           rating: 5.0,
           downloadCount: 1,
-          tags: ['云侧', '自定义', 'API'],
+          tags: [t('plugins.types.cloud'), t('plugins.types.ide'), 'API'],
           dependencies: [],
           config: {
             url: response.data.plugin_info.url || '',
@@ -220,11 +220,11 @@ const PluginConfigurationPage: React.FC = () => {
 
         setPlugin(pluginData)
       } else {
-        showError(`获取插件配置失败: ${response.message}`)
+        showError(`${t('plugins.pluginConfig.pluginConfigLoadFailed')}: ${response.message}`)
       }
     } catch (error) {
-      console.error('获取插件配置失败:', error)
-      showError('获取插件配置失败，请稍后重试')
+      console.error(t('plugins.pluginConfig.pluginConfigLoadFailed') + ':', error)
+      showError(t('plugins.pluginConfig.pluginConfigLoadFailedRetry'))
     } finally {
       setLoading(false)
     }
@@ -232,7 +232,7 @@ const PluginConfigurationPage: React.FC = () => {
 
   const handleSaveConfig = async () => {
     if (!plugin_id || !pluginConfigData) {
-      showError('插件数据未加载，请刷新页面')
+      showError(t('plugins.errors.pluginDataNotLoaded', '插件数据未加载，请刷新页面'))
       return
     }
 
@@ -241,7 +241,7 @@ const PluginConfigurationPage: React.FC = () => {
       const { validateHttpUrl } = await import('../../utils/validationUtils')
       const urlValidation = validateHttpUrl(configForm.url)
       if (!urlValidation.isValid) {
-        showError(`服务地址格式错误: ${urlValidation.error}`)
+        showError(`${t('plugins.pluginConfig.serviceUrlFormatError')}: ${urlValidation.error}`)
         return
       }
     }
@@ -265,7 +265,7 @@ const PluginConfigurationPage: React.FC = () => {
       const response = await updatePluginApi.mutateAsync(updateRequest)
 
       if (response.code === 200) {
-        showSuccess('插件配置保存成功')
+        showSuccess(t('plugins.config.saveSuccess', '插件配置保存成功'))
 
         // Update local state
         setPluginConfigData(prev => ({
@@ -292,11 +292,11 @@ const PluginConfigurationPage: React.FC = () => {
             : null,
         )
       } else {
-        showError(`保存失败: ${response.message || '未知错误'}`)
+        showError(`${t('plugins.errors.saveFailed')}: ${response.message || t('plugins.messages.unknownError', '未知错误')}`)
       }
     } catch (error: unknown) {
-      console.error('保存插件配置失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || '保存插件配置失败，请稍后重试'
+      console.error(`${t('plugins.errors.savePluginVersionConfigFailed')}:`, error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('common.messages.networkError', '网络错误，请稍后重试')
       showError(errorMessage)
     }
   }
@@ -305,7 +305,7 @@ const PluginConfigurationPage: React.FC = () => {
     // Validate required fields
     const validation = validateForm()
     if (!validation.isValid) {
-      showError(validation.errors[0])
+     showError(validation.errors[0])
       return
     }
 
@@ -328,7 +328,7 @@ const PluginConfigurationPage: React.FC = () => {
 
       // Here you would typically send the data to your backend API
       console.log('Updating plugin:', updatedPlugin)
-      showSuccess(`插件"${updatedPlugin.name}"更新成功`)
+      showSuccess(t('plugins.pluginVersion.updateSuccess', { name: updatedPlugin.name }))
       setIsEditDialogOpen(false)
       setEditingPlugin(null)
     }
@@ -339,7 +339,7 @@ const PluginConfigurationPage: React.FC = () => {
 
   const handlePublishPlugin = async (version: string, versionDesc: string) => {
     if (!plugin_id) {
-      showError('插件ID不存在，无法发布')
+      showError(t('plugins.pluginVersion.pluginIdNotFound', '插件ID不存在，无法发布'))
       return
     }
 
@@ -357,17 +357,17 @@ const PluginConfigurationPage: React.FC = () => {
       const response = await publishPluginApi.mutateAsync(publishRequest)
 
       if (response.code === 200) {
-        showSuccess(`插件"${plugin?.name || plugin_id}"发布成功！`)
+        showSuccess(t('plugins.pluginVersion.publishSuccess', '插件"{{name}}"发布成功！', { name: plugin?.name || plugin_id }))
         setIsPublishDialogOpen(false)
 
         // Optionally refresh plugin data to get latest publish status
         await loadPluginData()
       } else {
-        showError(`发布失败: ${response.message || '未知错误'}`)
+        showError(`${t('plugins.pluginVersion.publishFailed')}: ${response.message || t('plugins.messages.unknownError', '未知错误')}`)
       }
     } catch (error: unknown) {
-      console.error('发布插件失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || '发布插件失败，请稍后重试'
+      console.error(`${t('plugins.pluginVersion.publishFailed')}:`, error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('common.messages.networkError', '网络错误，请稍后重试')
       showError(errorMessage)
     }
   }
@@ -378,7 +378,7 @@ const PluginConfigurationPage: React.FC = () => {
         <div className="text-center">
           <CircularProgress size={48} className="mb-4" />
           <Typography variant="body1" color="text.secondary">
-            {t('plugins.config.loading')}
+            {t('plugins.messages.loading', '正在加载插件配置...')}
           </Typography>
         </div>
       </div>
@@ -391,13 +391,13 @@ const PluginConfigurationPage: React.FC = () => {
         <div className="text-center">
           <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
           <Typography variant="h6" className="mb-2">
-            插件未找到
+            {t('plugins.pluginConfig.pluginNotFound', '插件未找到')}
           </Typography>
           <Typography variant="body2" color="text.secondary" className="mb-4">
-            请检查插件ID是否正确
+            {t('plugins.pluginConfig.checkPluginId', '请检查插件ID是否正确')}
           </Typography>
           <Button variant="contained" onClick={() => navigate('/dashboard/plugins')}>
-            返回插件管理
+            {t('plugins.actions.returnToPluginManagement', '返回插件管理')}
           </Button>
         </div>
       </div>

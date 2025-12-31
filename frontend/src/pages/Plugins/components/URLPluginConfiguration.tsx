@@ -209,7 +209,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
   const handleToolSubmit = async () => {
     // Validate form
     if (!toolForm.name.trim() || !toolForm.description.trim() || !toolForm.path.trim() || !toolForm.method) {
-      showError('请填写所有必填字段')
+      showError(t('plugins.tools.fillRequiredFields', '请填写所有必填字段'))
       return
     }
 
@@ -231,7 +231,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
 
     const methodNumber = methodMap[toolForm.method.toUpperCase()]
     if (!methodNumber) {
-      showError('不支持的请求方法，仅支持 GET、POST')
+      showError(t('plugins.pluginConfig.unsupportedMethod', '不支持的请求方法，仅支持 GET、POST'))
       return
     }
 
@@ -251,7 +251,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
       const response = await createToolApi.mutateAsync(createRequest)
 
       if (response.code === 200) {
-        showSuccess(`工具"${toolForm.name.trim()}"创建成功`)
+        showSuccess(t('plugins.pluginConfig.toolCreatedSuccess', { name: toolForm.name.trim() }))
         setIsToolDialogOpen(false)
 
         // Reset form
@@ -275,11 +275,11 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
           })
         }
       } else {
-        showError(`创建失败: ${response.message || '未知错误'}`)
+        showError(t('plugins.pluginConfig.createFailed', '创建失败') + `: ${response.message || t('common.messages.unknownError', '未知错误')}`)
       }
     } catch (error: unknown) {
-      console.error('创建工具失败:', error)
-      const errorMessage = error.response?.data?.message || error.message || '创建工具失败，请稍后重试'
+      console.error(t('plugins.pluginConfig.createFailed', '创建工具失败'), error)
+      const errorMessage = error.response?.data?.message || error.message || t('plugins.pluginConfig.createFailedRetry', '创建工具失败，请稍后重试')
       showError(errorMessage)
     }
   }
@@ -297,17 +297,17 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
       const response = await deleteToolApi.mutateAsync(deleteRequest)
 
       if (response.code === 200) {
-        showSuccess(`工具"${tool.name || '未命名工具'}"删除成功`)
+        showSuccess(t('plugins.pluginConfig.toolDeletedSuccess', { name: tool.name || t('plugins.pluginConfig.unnamedTool', '未命名工具') }))
         // Refresh the tool list after successful deletion
         setTimeout(() => {
           urlToolsQuery.refetch()
         }, 500) // Small delay to ensure backend processes deletion
       } else {
-        showError(`删除失败: ${response.message || '未知错误'}`)
+        showError(t('plugins.pluginConfig.deleteFailed', '删除工具失败') + `: ${response.message || t('common.messages.unknownError', '未知错误')}`)
       }
     } catch (error: unknown) {
-      console.error('删除工具失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || '删除工具失败，请稍后重试'
+      console.error(t('plugins.pluginConfig.deleteFailed', '删除工具失败'), error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.pluginConfig.deleteFailedRetry', '删除工具失败，请稍后重试')
       showError(errorMessage)
     }
   }
@@ -329,7 +329,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         <div className="text-center">
           <CircularProgress size={48} className="mb-4" />
           <Typography variant="body1" color="text.secondary">
-            {t('plugins.config.loading')}
+            {t('plugins.pluginConfig.loading')}
           </Typography>
         </div>
       </div>
@@ -342,13 +342,13 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         <div className="text-center">
           <Code className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
           <Typography variant="h6" className="mb-2">
-            插件未找到
+            {t('plugins.pluginConfig.pluginNotFound', '插件未找到')}
           </Typography>
           <Typography variant="body2" color="text.secondary" className="mb-4">
-            请检查插件ID是否正确
+            {t('plugins.pluginConfig.checkPluginId', '请检查插件ID是否正确')}
           </Typography>
           <Button variant="contained" onClick={() => navigate('/dashboard/plugins')}>
-            返回插件管理
+            {t('plugins.actions.returnToPluginManagement', '返回插件管理')}
           </Button>
         </div>
       </div>
@@ -362,7 +362,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         <div className="mb-8">
           <div className="mb-6 flex items-center justify-between">
             <Button variant="outlined" startIcon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/dashboard/plugins')}>
-              返回插件管理
+              {t('plugins.actions.returnToPluginManagement', '返回插件管理')}
             </Button>
             <Button
               variant="outlined"
@@ -370,7 +370,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
               onClick={() => setIsHistoryDialogOpen(true)}
               className="text-blue-600 border-blue-600 hover:bg-blue-50"
             >
-              版本历史
+              {t('plugins.actions.versionHistory', '版本历史')}
             </Button>
           </div>
 
@@ -386,7 +386,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                     onBlur={handleNameSubmit}
                     size="small"
                     variant="outlined"
-                    placeholder="插件名称"
+                    placeholder={t('plugins.basicInfo.name', '插件名称')}
                     inputProps={{ maxLength: 20, style: { fontSize: '2rem', fontWeight: 'bold' } }}
                     className="font-bold text-gray-900"
                     autoFocus
@@ -396,7 +396,12 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                   </Typography>
                 </div>
               ) : (
-                <div className="cursor-pointer hover:text-blue-600 transition-colors" onClick={handleEditName} title="点击编辑插件名称">
+                <div
+                  className="cursor-pointer hover:text-blue-600 transition-colors"
+                  onClick={handleEditName}
+                  title={t('plugins.actions.clickToEditName', '点击编辑插件名称')}
+                >
+                  {' '}
                   <Typography variant="h4" className="font-bold text-gray-900 hover:text-blue-600">
                     {configForm.name || plugin.name}
                   </Typography>
@@ -415,18 +420,18 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
           <Card className="p-6">
             <Typography variant="h6" className="mb-4 flex items-center">
               <Info className="w-5 h-5 mr-2 text-blue-600" />
-              基本信息
+              {t('plugins.basicInfoLabel', '基本信息')}
             </Typography>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <Typography variant="subtitle2" color="text.secondary">
-                  插件名称
+                  {t('plugins.basicInfo.name', '插件名称')}
                 </Typography>
                 <Typography variant="body1">{plugin.name}</Typography>
               </div>
               <div>
                 <Typography variant="subtitle2" color="text.secondary">
-                  插件类型
+                  {t('plugins.versionHistory.pluginType', '插件类型')}
                 </Typography>
                 <Typography variant="div" component="div">
                   <Chip label={plugin.category} size="small" />
@@ -435,7 +440,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
 
               <div>
                 <Typography variant="subtitle2" color="text.secondary">
-                  插件图标
+                  {t('plugins.versionHistory.pluginIcon', '插件图标')}
                 </Typography>
                 <Typography variant="body1">{pluginConfigData?.icon_uri || '☁️'}</Typography>
               </div>
@@ -446,12 +451,12 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
           <Card className="p-6">
             <Typography variant="h6" className="mb-4 flex items-center">
               <Settings className="w-5 h-5 mr-2 text-purple-600" />
-              配置选项
+              {t('plugins.pluginConfig.configOptions', '配置选项')}
             </Typography>
 
             <Tabs value={configTabValue} onChange={(e, newValue) => setConfigTabValue(newValue)} className="mb-6">
-              <Tab label="基本配置" value="basic" />
-              <Tab label="工具设置" value="advanced" />
+              <Tab label={t('plugins.pluginConfig.basicTab', '基本配置')} value="basic" />
+              <Tab label={t('plugins.pluginConfig.toolsTab', '工具设置')} value="advanced" />
             </Tabs>
 
             {/* Tab Content */}
@@ -459,21 +464,21 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
               <div className="space-y-6">
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-bold text-gray-800 mb-3">插件描述</label>
+                    <label className="block text-sm font-bold text-gray-800 mb-3">{t('plugins.pluginConfig.pluginDescription', '插件描述')}</label>
                     <TextField
                       fullWidth
                       multiline
                       rows={4}
                       value={configForm.desc}
                       onChange={e => setConfigForm(prev => ({ ...prev, desc: e.target.value }))}
-                      placeholder="详细描述插件的功能、用途和特性..."
-                      helperText={`详细描述插件的功能和行为，帮助用户了解插件的作用 (${configForm.desc.length}/40)`}
+                      placeholder={t('plugins.pluginConfig.descriptionPlaceholder', '详细描述插件的功能、用途和特性...')}
+                      helperText={`${t('plugins.pluginConfig.descriptionHelper', '详细描述插件的功能和行为，帮助用户了解插件的作用')} (${configForm.desc.length}/40)`}
                       inputProps={{ maxLength: 40 }}
                       disabled={isReadOnly}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-800 mb-3">插件图标</label>
+                    <label className="block text-sm font-bold text-gray-800 mb-3">{t('plugins.versionHistory.pluginIcon', '插件图标')}</label>
 
                     {/* Icon selection grid - Hidden in read-only mode */}
                     {!isReadOnly && (
@@ -495,7 +500,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                         {/* Current selection display */}
                         <div className="mt-4 text-center">
                           <Typography variant="body2" className="text-gray-500">
-                            当前选择: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
+                            {t('plugins.pluginConfig.currentSelection', '当前选择')}: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
                           </Typography>
                         </div>
                       </>
@@ -507,20 +512,20 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <Typography variant="h6" className="mb-4 flex items-center">
                     <Code className="w-5 h-5 mr-2 text-green-600" />
-                    API 配置
+                    {t('plugins.pluginConfig.apiConfig', 'API 配置')}
                   </Typography>
 
                   <div className="space-y-4">
                     <div>
                       <Typography variant="subtitle2" className="mb-2">
-                        服务地址
+                        {t('plugins.pluginConfig.serviceUrl', '服务地址')}
                       </Typography>
                       <TextField
                         fullWidth
                         value={configForm.url}
                         onChange={e => handleUrlChange(e.target.value)}
-                        placeholder="https://api.example.com"
-                        helperText={urlError || getHttpUrlHelpText()}
+                        placeholder={t('plugins.pluginConfig.serviceUrlPlaceholder', '请输入API服务地址')}
+                        helperText={t('plugins.pluginConfig.serviceUrlHelper', '输入插件提供的服务地址，例如：https://api.example.com')}
                         error={!!urlError}
                         disabled={isReadOnly}
                         InputProps={{
@@ -547,7 +552,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
               <div className="space-y-6">
                 <div className="flex items-center justify-between mb-4">
                   <Typography variant="subtitle2" className="font-medium">
-                    API工具列表
+                    {t('plugins.pluginConfig.apiToolsList', 'API工具列表')}
                   </Typography>
                   {toolsLoading && <CircularProgress size={20} />}
                 </div>
@@ -556,17 +561,17 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                   <div className="flex items-center justify-center py-8">
                     <CircularProgress size={24} className="mr-2" />
                     <Typography variant="body2" color="text.secondary">
-                      加载工具列表...
+                      {t('plugins.pluginConfig.loadingTools', '加载工具列表...')}
                     </Typography>
                   </div>
                 ) : currentToolsQuery?.isError ? (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
                     <Typography variant="body2" color="error">
-                      加载工具列表失败
+                      {t('plugins.pluginConfig.loadFailed', '加载工具列表失败')}
                     </Typography>
                     {!isReadOnly && (
                       <Button size="small" variant="outlined" onClick={() => urlToolsQuery.refetch()} className="mt-2">
-                        重试
+                        {t('common.actions.retry', '重试')}
                       </Button>
                     )}
                   </div>
@@ -588,13 +593,15 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <Typography variant="subtitle1" className="font-medium mb-1">
-                              {tool.name || '未命名工具'}
+                              {tool.name || t('plugins.pluginConfig.unnamedTool', '未命名工具')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" className="mb-2">
-                              {tool.desc || '暂无描述'}
+                              {tool.desc || t('plugins.pluginConfig.noDescription', '暂无描述')}
                             </Typography>
                             <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span>方法: {getMethodString(tool.method)}</span>
+                              <span>
+                                {t('plugins.pluginConfig.method', '方法')}: {getMethodString(tool.method)}
+                              </span>
                               <Typography
                                 component="span"
                                 sx={{
@@ -606,9 +613,9 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                                   verticalAlign: 'middle',
                                 }}
                               >
-                                路径: {tool.path || '/'}
+                                {t('plugins.pluginConfig.path', '路径')}: {tool.path || '/'}
                               </Typography>
-                              <Chip label="启用" size="small" color="success" />
+                              <Chip label={t('plugins.pluginConfig.enabled', '启用')} size="small" color="success" />
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -623,13 +630,18 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                                     },
                                   })
                                 }}
-                                title="编辑工具"
+                                title={t('plugins.pluginConfig.editTool', '编辑工具')}
                               >
                                 <Edit className="w-4 h-4" />
                               </IconButton>
                             )}
                             {!isReadOnly && (
-                              <IconButton size="small" onClick={() => handleDeleteTool(tool)} title="删除工具" disabled={deleteToolApi.isLoading}>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteTool(tool)}
+                                title={t('plugins.pluginConfig.deleteTool', '删除工具')}
+                                disabled={deleteToolApi.isLoading}
+                              >
                                 {deleteToolApi.isLoading ? <CircularProgress size={16} /> : <Trash2 className="w-4 h-4 text-red-500 hover:text-red-700" />}
                               </IconButton>
                             )}
@@ -640,7 +652,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                     {!isReadOnly && (
                       <div className="flex justify-center mt-4">
                         <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => setIsToolDialogOpen(true)}>
-                          添加新工具
+                          {t('plugins.pluginConfig.addNewTool', '添加新工具')}
                         </Button>
                       </div>
                     )}
@@ -655,7 +667,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         {!isReadOnly && (
           <div className="mt-8 flex justify-end space-x-3">
             <Button variant="outlined" onClick={() => navigate('/dashboard/plugins')}>
-              取消
+              {t('common.actions.cancel', '取消')}
             </Button>
             <Button
               variant="contained"
@@ -664,7 +676,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
               startIcon={<Rocket className="w-4 h-4" />}
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 mr-3"
             >
-              发布插件
+              {t('plugins.pluginConfig.publishPlugin', '发布插件')}
             </Button>
             <Button
               variant="contained"
@@ -675,10 +687,10 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
               {updatePluginApi.isLoading ? (
                 <div className="flex items-center">
                   <CircularProgress size={16} className="mr-2" />
-                  保存中...
+                  {t('common.actions.saving', '保存中...')}
                 </div>
               ) : (
-                '保存配置'
+                t('plugins.pluginConfig.saveConfig', '保存配置')
               )}
             </Button>
           </div>
