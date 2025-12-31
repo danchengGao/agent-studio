@@ -522,13 +522,13 @@ const ModelsPage: React.FC = () => {
     try {
       const result = await testModelMutation.mutateAsync({ id: selectedModel.id, prompt: testPrompt, spaceId: user?.spaceId || '' })
       setTestResult(
-        `测试成功！\n\n模型: ${selectedModel.name}\n提示: ${testPrompt}\n\n响应: ${result.response || '测试完成'}\n\n配置信息：\n- 温度: ${selectedModel.temperature}\n- API协议: ${selectedModel.provider}`,
+        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
       )
 
       // 测试成功后刷新模型列表以更新统计信息
       refetch()
     } catch (error) {
-      let errorMessage = error.error || '模型测试失败'
+      let errorMessage = error.error || t('models.testFailed')
 
       // 尝试多种访问路径来获取detail数据
       let detailData = null
@@ -563,7 +563,9 @@ const ModelsPage: React.FC = () => {
         errorMessage = error.message
       }
 
-      setTestResult(`测试失败：${errorMessage}\n\n模型: ${selectedModel.name}\n提示: ${testPrompt}`)
+      setTestResult(
+        `${t('models.testFailed')}: ${errorMessage}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}`,
+      )
     } finally {
       setIsTesting(false)
     }
@@ -775,14 +777,14 @@ const ModelsPage: React.FC = () => {
                             <Search className="w-8 h-8 text-gray-400" />
                           </div>
                           <div className="text-center max-w-lg">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">当前筛选状态下未能找到相关结果</h3>
-                            <p className="text-gray-600 mb-6">请尝试调整筛选条件或清空所有筛选条件查看更多内容</p>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('models.modelList.filterEmpty')}</h3>
+                            <p className="text-gray-600 mb-6">{t('models.modelList.filterEmptyDesc')}</p>
                             <button
                               onClick={handleClearFilters}
                               className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-xl transform hover:scale-105"
                             >
                               <RefreshCw className="w-4 h-4" />
-                              <span>清空筛选</span>
+                              <span>{t('models.modelList.clearFilters')}</span>
                             </button>
                           </div>
                         </>
@@ -793,14 +795,14 @@ const ModelsPage: React.FC = () => {
                             <Package className="w-8 h-8 text-gray-400" />
                           </div>
                           <div className="text-center max-w-lg">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">暂无模型数据</h3>
-                            <p className="text-gray-600 mb-6">还没有创建任何模型，点击下方按钮开始添加第一个模型</p>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('models.modelList.emptyModelList')}</h3>
+                            <p className="text-gray-600 mb-6">{t('models.modelList.emptyModelListDesc')}</p>
                             <button
                               onClick={() => handleOpenModelDialog(null)}
                               className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-xl transform hover:scale-105"
                             >
                               <Plus className="w-5 h-5" />
-                              <span>添加第一个模型</span>
+                              <span>{t('models.modelList.addFirstModel')}</span>
                             </button>
                           </div>
                         </>
@@ -870,7 +872,7 @@ const ModelsPage: React.FC = () => {
                           <Tooltip
                             title={
                               <div className="p-2 max-w-md bg-white">
-                                <div className="text-sm font-semibold mb-2 text-gray-800">更多标签：</div>
+                                <div className="text-sm font-semibold mb-2 text-gray-800">{t('models.modelConfig.basicInfo.moreTags')}: </div>
                                 <div className="space-y-1">
                                   {model.tags.slice(3).map((tag, index) => (
                                     <div key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded break-all">
@@ -967,7 +969,7 @@ const ModelsPage: React.FC = () => {
         {finalTotalItems > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">每页显示:</span>
+              <span className="text-sm text-gray-600">{t('models.modelList.perPage')}:</span>
               <select
                 value={pageSize}
                 onChange={e => {
@@ -980,13 +982,13 @@ const ModelsPage: React.FC = () => {
                 }}
                 className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 shadow-sm"
               >
-                <option value={10}>10条</option>
-                <option value={20}>20条</option>
-                <option value={50}>50条</option>
+                <option value={10}>10 {t('models.modelList.pageItem')}</option>
+                <option value={20}>20 {t('models.modelList.pageItem')}</option>
+                <option value={50}>50 {t('models.modelList.pageItem')}</option>
               </select>
               <span className="text-sm text-gray-600">
-                共 {finalTotalItems} 条记录
-                {hasFilters && <span className="text-blue-600 ml-1">(筛选结果)</span>}
+                {t('models.modelList.totalItems', { totalItems: finalTotalItems })}
+                {hasFilters && <span className="text-blue-600 ml-1">({t('models.modelList.filterResult')})</span>}
               </span>
             </div>
 
@@ -1002,7 +1004,7 @@ const ModelsPage: React.FC = () => {
                   }}
                   disabled={finalCurrentPage === 1}
                   className={`p-2 rounded-lg ${finalCurrentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
-                  title="上一页"
+                  title={t('models.modelList.prevPage')}
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -1060,7 +1062,7 @@ const ModelsPage: React.FC = () => {
                           ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
                           : 'bg-gray-50 text-black font-bold hover:bg-gray-200'
                       }`}
-                      title={`第${pageNum}页`}
+                      title={t('models.modelList.pageNum', { pageNum })}
                     >
                       {pageNum}
                     </button>
@@ -1077,14 +1079,12 @@ const ModelsPage: React.FC = () => {
                   }}
                   disabled={finalCurrentPage === finalTotalPages}
                   className={`p-2 rounded-lg ${finalCurrentPage === finalTotalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
-                  title="下一页"
+                  title={t('models.modelList.nextPage')}
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
 
-                <span className="text-sm text-gray-600 ml-4">
-                  第 {finalCurrentPage} / {finalTotalPages} 页
-                </span>
+                <span className="text-sm text-gray-600 ml-4">{t('models.modelList.pageNumDesc', { finalCurrentPage, finalTotalPages })}</span>
               </div>
             )}
           </div>
@@ -1113,7 +1113,7 @@ const ModelsPage: React.FC = () => {
               {editMode ? <Settings className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
             </div>
             <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
-              {editMode ? '编辑模型' : t('models.dialog.addNewModel')}
+              {editMode ? t('models.dialog.editModel') : t('models.dialog.addNewModel')}
             </Typography>
           </div>
         </DialogTitle>
@@ -1129,7 +1129,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="模型名称"
+                label={t('models.modelConfig.basicInfo.name')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1146,19 +1146,16 @@ const ModelsPage: React.FC = () => {
                 variant="outlined"
                 error={(newModel.name || '').length > 100}
                 helperText={
-                  (newModel.name || '').length > 80 ? (
-                    <span style={{ color: 'orange' }}>模型友好名称过长，请控制在100字符以内.字符数：{newModel.name?.length || 0}/100</span>
-                  ) : (
-                    <span style={{ color: '#666' }}>
-                      {t('models.modelConfig.basicInfo.nameHint')} | 字符数：{newModel.name?.length || 0}/100
-                    </span>
-                  )
+                  <span style={{ color: '#666' }}>
+                    {t('models.modelConfig.basicInfo.nameHint')} | {t('models.modelConfig.basicInfo.charNum')}
+                    {newModel.name?.length || 0}/100
+                  </span>
                 }
               />
             </Grid>
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
-                <InputLabel>API协议</InputLabel>
+                <InputLabel>{t('models.modelConfig.basicInfo.provider')}</InputLabel>
                 <Select value={newModel.provider} label="API协议" onChange={e => setNewModel({ ...newModel, provider: e.target.value })}>
                   <MenuItem value={ModelProvider.OPENAI}>OpenAI</MenuItem>
                   <MenuItem value={ModelProvider.SILICONFLOW}>SiliconFlow</MenuItem>
@@ -1179,7 +1176,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="模型ID"
+                label={t('models.modelConfig.basicInfo.type')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1196,13 +1193,10 @@ const ModelsPage: React.FC = () => {
                 variant="outlined"
                 error={(newModel.modelId || '').length > 100}
                 helperText={
-                  (newModel.modelId || '').length > 80 ? (
-                    <span style={{ color: 'orange' }}>模型标识符过长，请控制在100字符以内.字符数：{newModel.modelId?.length || 0}/100</span>
-                  ) : (
-                    <span style={{ color: '#666' }}>
-                      {t('models.modelConfig.basicInfo.typeHint')} | 字符数：{newModel.modelId?.length || 0}/100
-                    </span>
-                  )
+                  <span style={{ color: '#666' }}>
+                    {t('models.modelConfig.basicInfo.typeHint')} | {t('models.modelConfig.basicInfo.charNum')}
+                    {newModel.modelId?.length || 0}/100
+                  </span>
                 }
               />
             </Grid>
@@ -1210,7 +1204,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="API 密钥"
+                label={t('models.modelConfig.parameters.apiKey')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1229,7 +1223,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="基础服务地址"
+                label={t('models.modelConfig.parameters.baseUrl')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1257,7 +1251,7 @@ const ModelsPage: React.FC = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <TextField
-                    label="标签"
+                    label={t('models.modelConfig.basicInfo.tags')}
                     placeholder=""
                     value={newTag}
                     onChange={e => setNewTag(e.target.value)}
@@ -1293,13 +1287,13 @@ const ModelsPage: React.FC = () => {
                     className="border-gray-300 text-gray-700"
                     disabled={(newModel.tags || []).length >= 10}
                   >
-                    添加
+                    {t('common.buttons.add')}
                   </Button>
                 </div>
                 <div className="flex items-center justify-between mb-2">
                   <Typography variant="caption" className={(newModel.tags || []).length >= 10 ? 'text-red-600' : 'text-gray-600'}>
-                    标签数量：{(newModel.tags || []).length}/10
-                    {(newModel.tags || []).length >= 10 && ' (已达上限)'}
+                    {t('models.modelConfig.basicInfo.tagsNum')}：{(newModel.tags || []).length}/10
+                    {(newModel.tags || []).length >= 10 && ` (${t('models.modelConfig.basicInfo.tagsLimit')})`}
                   </Typography>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1320,7 +1314,7 @@ const ModelsPage: React.FC = () => {
                 fullWidth
                 multiline
                 rows={3}
-                label="描述"
+                label={t('models.modelConfig.basicInfo.description')}
                 value={newModel.description}
                 onChange={e => {
                   const value = e.target.value
@@ -1332,7 +1326,9 @@ const ModelsPage: React.FC = () => {
                 variant="outlined"
                 error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
                 helperText={
-                  <span style={{ color: '#666' }}>字符数：{newModel.description?.length || 0}/500</span>
+                  <span style={{ color: '#666' }}>
+                    {t('models.modelConfig.basicInfo.descriptionLimit')} {newModel.description?.length || 0}/500
+                  </span>
                 }
               />
             </Grid>
@@ -1340,14 +1336,14 @@ const ModelsPage: React.FC = () => {
             {/* 模型参数配置区域 */}
             <Grid item xs={12}>
               <Typography variant="h6" className="text-gray-800 mb-3 font-semibold border-b border-gray-200 pb-2 mt-4">
-                模型参数配置
+                {t('models.modelConfig.parameters.title')}
               </Typography>
             </Grid>
             <Grid item xs={12} md={12}>
               <TextField
                 fullWidth
                 required
-                label="超时时间(s)"
+                label={t('models.modelConfig.parameters.timeout')}
                 type="number"
                 placeholder=""
                 value={newModel.timeout || ''}
@@ -1403,7 +1399,7 @@ const ModelsPage: React.FC = () => {
                   },
                 }}
                 variant="outlined"
-                helperText="超时时间范围：1-300秒（输入超出范围将自动调整）"
+                helperText={t('models.modelConfig.parameters.timeoutDesc')}
               />
             </Grid>
             {/* <Grid item xs={12} md={6}>
@@ -1421,13 +1417,9 @@ const ModelsPage: React.FC = () => {
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
                 <Typography gutterBottom sx={{ mb: 0 }}>
-                  温度: {newModel.temperature}
+                  {t('models.modelConfig.parameters.temperature')}
                 </Typography>
-                <Tooltip
-                  title="temperature:控制模型生成结果的随机性与创造性。值越高，输出越随机、多样；值越低，结果越确定、保守。范围通常为0~2，推荐设置0.1~1.0。示例：0.7（平衡随机性与一致性）、1.2（更具创造性的输出）。"
-                  placement="top"
-                  arrow
-                >
+                <Tooltip title={t('models.modelConfig.parameters.temperatureDesc')} placement="top" arrow>
                   <IconButton size="small" sx={{ p: 0, color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -1461,13 +1453,9 @@ const ModelsPage: React.FC = () => {
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
                 <Typography gutterBottom sx={{ mb: 0 }}>
-                  核采样: {newModel.topp}
+                  {t('models.modelConfig.parameters.topp')}
                 </Typography>
-                <Tooltip
-                  title="Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。"
-                  placement="top"
-                  arrow
-                >
+                <Tooltip title={t('models.modelConfig.parameters.toppDesc')} placement="top" arrow>
                   <IconButton size="small" sx={{ p: 0, color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -1509,7 +1497,7 @@ const ModelsPage: React.FC = () => {
             }}
             className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-200"
           >
-            取消
+            {t('common.buttons.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -1521,7 +1509,7 @@ const ModelsPage: React.FC = () => {
                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-105 hover:shadow-xl'
             }`}
           >
-            {editMode ? '保存更改' : '添加模型'}
+            {editMode ? t('models.saveModel') : t('models.addModel')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1549,7 +1537,7 @@ const ModelsPage: React.FC = () => {
               <Play className="w-4 h-4 text-white" />
             </div>
             <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
-              测试模型: {selectedModel?.name}
+              {t('models.testModel')}: {selectedModel?.name}
             </Typography>
           </div>
         </DialogTitle>
@@ -1558,28 +1546,28 @@ const ModelsPage: React.FC = () => {
             {/* 常用语句 */}
             <div>
               <Typography variant="subtitle2" className="text-gray-700 mb-2 font-medium">
-                常用语句
+                {t('models.commonTestPrompts')}
               </Typography>
               <div className="flex flex-wrap gap-2 mb-3">
                 <Chip
-                  label="你好，请介绍一下你自己"
+                  label={t('models.introducePrompt')}
                   variant="outlined"
                   size="small"
-                  onClick={() => setTestPrompt('你好，请介绍一下你自己')}
+                  onClick={() => setTestPrompt(t('models.introducePrompt'))}
                   className="cursor-pointer hover:bg-blue-50 hover:border-blue-300"
                 />
                 <Chip
-                  label="请解释一下人工智能的基本概念"
+                  label={t('models.aiConceptsPrompt')}
                   variant="outlined"
                   size="small"
-                  onClick={() => setTestPrompt('请解释一下人工智能的基本概念')}
+                  onClick={() => setTestPrompt(t('models.aiConceptsPrompt'))}
                   className="cursor-pointer hover:bg-blue-50 hover:border-blue-300"
                 />
                 <Chip
-                  label="写一个简单的Python Hello World程序"
+                  label={t('models.helloWorldPrompt')}
                   variant="outlined"
                   size="small"
-                  onClick={() => setTestPrompt('写一个简单的Python Hello World程序')}
+                  onClick={() => setTestPrompt(t('models.helloWorldPrompt'))}
                   className="cursor-pointer hover:bg-blue-50 hover:border-blue-300"
                 />
               </div>
@@ -1589,11 +1577,13 @@ const ModelsPage: React.FC = () => {
               fullWidth
               multiline
               rows={4}
-              label="提示词"
+              label={t('models.testPrompt')}
               value={testPrompt}
               onChange={e => setTestPrompt(e.target.value)}
               placeholder=""
-              helperText={testPrompt.length > 1000 ? `字符数超过限制（${testPrompt.length}/1000），请删除多余字符` : `${testPrompt.length}/1000 字符`}
+              helperText={
+                testPrompt.length > 1000 ? t('models.promptLimit', { length: testPrompt.length }) : t('models.promptLength', { length: testPrompt.length })
+              }
               error={testPrompt.length > 1000}
             />
 
@@ -1611,7 +1601,7 @@ const ModelsPage: React.FC = () => {
                       : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-105 hover:shadow-xl'
                 }`}
               >
-                {isTesting ? '测试中...' : '开始测试'}
+                {isTesting ? t('models.testing') : t('models.startTest')}
               </Button>
               <Button
                 variant="outlined"
@@ -1621,14 +1611,14 @@ const ModelsPage: React.FC = () => {
                 }}
                 className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 border-gray-300 hover:border-gray-400 px-4 py-2 rounded-lg transition-all duration-200"
               >
-                重置
+                {t('models.reset')}
               </Button>
             </div>
 
             {testResult && (
               <div>
                 <Typography variant="h6" className="mb-2 text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800 font-bold">
-                  测试结果
+                  {t('models.testResult')}
                 </Typography>
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4">
                   <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-white p-3 rounded-lg border border-gray-200">{testResult}</pre>
@@ -1648,7 +1638,7 @@ const ModelsPage: React.FC = () => {
             }}
             className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-200"
           >
-            关闭
+            {t('models.close')}
           </Button>
         </DialogActions>
       </Dialog>
