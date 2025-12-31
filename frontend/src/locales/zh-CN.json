@@ -563,6 +563,7 @@
     "workflowList": {
       "title": "工作流列表",
       "noWorkflows": "暂无工作流",
+      "searchPlaceholder": "搜索工作流名称或描述...",
       "filter": "筛选",
       "sortBy": "排序方式",
       "name": "名称",

@@ -584,6 +584,7 @@
     "workflowList": {
       "title": "Workflow List",
       "noWorkflows": "No workflows available",
+      "searchPlaceholder": "Search workflow name or description...",
       "filter": "Filter",
       "sortBy": "Sort by",
       "name": "Name",

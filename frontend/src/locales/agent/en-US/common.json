@@ -4,7 +4,7 @@
   "createAgent": "Create Agent",
   "agentList": {
     "noAgents": "No agents available",
-    "searchPlaceholder": "Search agent names, descriptions, or tags...",
+    "searchPlaceholder": "Search agent names or descriptions...",
     "loading": "Loading agents...",
     "sortBy": "Sort by",
     "sortByName": "Sort by name",
