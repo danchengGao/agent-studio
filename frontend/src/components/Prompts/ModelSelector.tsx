@@ -43,7 +43,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         setResponsiveMaxWidth('clamp(5rem, 80vw, 20rem)')
       } else if (window.innerWidth < 2000) {
         // 中等屏幕：平板、14寸笔记本等
-        setResponsiveMaxWidth('clamp(8rem, 60vw, 20rem)')
+        setResponsiveMaxWidth('clamp(8rem, 60vw, 30rem)')
       } else {
         // 大屏幕：15寸以上笔记本、台式显示器
         setResponsiveMaxWidth('clamp(10rem, 60vw, 45rem)')

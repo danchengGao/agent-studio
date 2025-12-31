@@ -1,5 +1,5 @@
 import React from 'react'
-import { Typography, Slider, TextField, Tooltip, IconButton } from '@mui/material'
+import { Typography, Slider, TextField, Tooltip, IconButton, Box } from '@mui/material'
 import { HelpCircle } from 'lucide-react'
 
 interface SliderFieldProps {
@@ -60,7 +60,7 @@ export const SliderField: React.FC<SliderFieldProps> = ({
       <div 
         className="flex items-center flex-shrink-0"
         style={{ 
-          width: 'clamp(2rem, 20vw, 6.5rem)',
+          width: 'clamp(2rem, 20vw, 6.9rem)',
           gap: 0,
         }}
       >
@@ -133,49 +133,60 @@ export const SliderField: React.FC<SliderFieldProps> = ({
           variant="caption" 
           className="text-gray-500 text-left flex-shrink-0" 
           sx={{ 
-            width: 'clamp(0.75rem, 3vw, 1.5rem)',
+            width: 'clamp(0.75rem, 3vw, 2rem)',
             fontSize: 'clamp(0.5rem, 1.25vw, 0.65rem)',
           }}
         >
           {maxLabel ?? max}
         </Typography>
       </div>
-      <TextField
-        size="small"
-        type="number"
-        value={value}
-        onChange={handleTextFieldChange}
-        inputProps={{
-          min,
-          max,
-          step,
-        }}
-        disabled={disabled}
-        className="bg-white/60 flex-shrink-0"
+      <Box
         sx={{
-          width: 'clamp(2.25rem, 8vw, 3.5rem)',
-          fontSize: 'clamp(0.65rem, 1.5vw, 0.8rem)',
+          width: 'clamp(3.5rem, 12vw, 5rem)',
+          flexShrink: 0,
           display: { xs: 'none', sm: 'block' },
-          '& .MuiOutlinedInput-root': {
-            fontSize: 'clamp(0.65rem, 1.5vw, 0.8rem)',
-            '& input': {
-              padding: 'clamp(0.125rem, 0.5vw, 0.375rem)',
-            },
-            '& fieldset': {
-              borderColor: '#d1d5db',
-            },
-            '&:hover fieldset': {
-              borderColor: '#9ca3af',
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: '#10b981',
-            },
-          },
         }}
-        InputProps={inputEndAdornment ? {
-          endAdornment: inputEndAdornment,
-        } : undefined}
-      />
+      >
+        <TextField
+          size="small"
+          type="number"
+          value={value}
+          onChange={handleTextFieldChange}
+          inputProps={{
+            min,
+            max,
+            step,
+          }}
+          disabled={disabled}
+          className="bg-white/60"
+          fullWidth
+          sx={{
+            fontSize: 'clamp(0.65rem, 1.5vw, 0.8rem)',
+            '& .MuiOutlinedInput-root': {
+              fontSize: 'clamp(0.65rem, 1.5vw, 0.8rem)',
+              '& input': {
+                padding: 'clamp(0.125rem, 0.5vw, 0.375rem)',
+                textAlign: 'left',
+              },
+              '& fieldset': {
+                borderColor: '#d1d5db',
+              },
+              '&:hover fieldset': {
+                borderColor: '#9ca3af',
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: '#10b981',
+              },
+            },
+            '& .MuiInputAdornment-root': {
+              marginLeft: '0.125rem',
+            },
+          }}
+          InputProps={inputEndAdornment ? {
+            endAdornment: inputEndAdornment,
+          } : undefined}
+        />
+      </Box>
     </div>
   )
 }

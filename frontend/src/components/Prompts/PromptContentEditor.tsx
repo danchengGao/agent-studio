@@ -116,6 +116,41 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
   // 添加防抖定时器引用，用于非 placeholder 消息
   const normalMessageUpdateTimers = useRef<Record<string, NodeJS.Timeout>>({})
 
+  // 为 placeholder 消息使用本地状态，避免每次输入都触发父组件重新渲染
+  const [localPlaceholderValues, setLocalPlaceholderValues] = React.useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {}
+    promptMessages.forEach(msg => {
+      if (msg.role === 'placeholder') {
+        initial[msg.id] = messageInputValues[msg.id] || msg.content
+      }
+    })
+    return initial
+  })
+
+  // 同步外部 messageInputValues 到本地状态（当外部值变化时，比如从其他地方更新）
+  React.useEffect(() => {
+    const updated: Record<string, string> = {}
+    let hasChanges = false
+    promptMessages.forEach(msg => {
+      if (msg.role === 'placeholder') {
+        const externalValue = messageInputValues[msg.id] || msg.content
+        const localValue = localPlaceholderValues[msg.id]
+        if (externalValue !== localValue) {
+          updated[msg.id] = externalValue
+          hasChanges = true
+        } else {
+          updated[msg.id] = localValue
+        }
+      }
+    })
+    if (hasChanges) {
+      setLocalPlaceholderValues(updated)
+    }
+  }, [messageInputValues, promptMessages])
+
+  // 添加防抖定时器引用，用于 placeholder 消息的更新（每个消息独立的防抖定时器）
+  const placeholderUpdateTimers = useRef<Record<string, NodeJS.Timeout>>({})
+  
   // 添加防抖定时器引用，用于 messageInputValues 的更新（减少父组件渲染）
   const messageInputValuesUpdateTimer = useRef<NodeJS.Timeout | null>(null)
   // 用于保存防抖期间最新的 messageInputValues 值
@@ -369,53 +404,80 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
   const handleMessageContentChange = (messageId: string, index: number, newValue: string, message: PromptMessage) => {
     if (isReadOnly) return
 
-    // 对placeholder类型的消息进行验证
+    // 对 placeholder 类型的消息，使用本地状态和防抖更新
     if (message.role === 'placeholder') {
-      // 先检查是否为空
-      if (!newValue.trim()) {
-        setInternalValidationErrors(prev => ({
-          ...prev,
-          [messageId]: t('components.prompts.promptContentEditor.placeholderCannotBeEmpty'),
-        }))
-      } else {
-        // 如果不为空，进行格式验证
-        const currentValue = messageInputValues[messageId] || message.content
-        const validationResult = onValidatePlaceholderContent?.(newValue, currentValue)
+      // 立即更新本地状态（不会触发父组件重新渲染）
+      setLocalPlaceholderValues(prev => ({
+        ...prev,
+        [messageId]: newValue,
+      }))
 
+      // 验证逻辑
+      if (!newValue.trim()) {
+        const emptyErrorMessage = t('components.prompts.promptContentEditor.placeholderCannotBeEmpty')
+        setInternalValidationErrors(prev => {
+          if (prev[messageId] === emptyErrorMessage) return prev
+          return { ...prev, [messageId]: emptyErrorMessage }
+        })
+      } else {
+        const currentValue = localPlaceholderValues[messageId] || message.content
+        const validationResult = onValidatePlaceholderContent?.(newValue, currentValue)
         if (validationResult) {
-          // 更新验证错误状态，但不修改用户输入
           if (validationResult.isValid) {
             setInternalValidationErrors(prev => {
+              if (!prev[messageId]) return prev
               const newErrors = { ...prev }
               delete newErrors[messageId]
               return newErrors
             })
           } else if (validationResult.hasError) {
-            setInternalValidationErrors(prev => ({
-              ...prev,
-              [messageId]: t('components.prompts.promptContentEditor.placeholderValidationError'),
-            }))
+            const errorMessage = t('components.prompts.promptContentEditor.placeholderValidationError')
+            setInternalValidationErrors(prev => {
+              if (prev[messageId] === errorMessage) return prev
+              return { ...prev, [messageId]: errorMessage }
+            })
           }
         }
       }
+
+      // 清除之前的防抖定时器
+      if (placeholderUpdateTimers.current[messageId]) {
+        clearTimeout(placeholderUpdateTimers.current[messageId])
+      }
+
+      // 设置防抖定时器，延迟更新父组件和触发参数生成
+      placeholderUpdateTimers.current[messageId] = setTimeout(() => {
+        // 更新父组件的 messageInputValues（防抖后）
+        const updatedValues = {
+          ...messageInputValues,
+          [messageId]: newValue,
+        }
+        onMessageInputValuesChange(updatedValues)
+
+        // 触发参数生成（防抖后）
+        if (!compositionState[messageId]) {
+          onDebouncedUpdatePlaceholderContent?.(messageId, index, newValue)
+        }
+
+        // 清理定时器引用
+        delete placeholderUpdateTimers.current[messageId]
+      }, 500) // 500ms 防抖，平衡响应性和性能
+
+      return
     }
 
-    // 直接使用用户输入的原始值，不进行任何修改
-    // 使用防抖更新 messageInputValues（1000ms 防抖）
+    // 非 placeholder 消息的处理逻辑（保持原有逻辑）
     const currentValue = messageInputValues[messageId] || message.content
     if (currentValue !== newValue) {
-      // 更新待发送的值（保存最新的值）
       pendingMessageInputValuesRef.current = {
         ...pendingMessageInputValuesRef.current,
         [messageId]: newValue,
       }
 
-      // 清除之前的定时器
       if (messageInputValuesUpdateTimer.current) {
         clearTimeout(messageInputValuesUpdateTimer.current)
       }
 
-      // 设置新的防抖定时器
       messageInputValuesUpdateTimer.current = setTimeout(() => {
         onMessageInputValuesChange({
           ...pendingMessageInputValuesRef.current,
@@ -426,29 +488,18 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
 
     // 如果不在输入中文，使用防抖更新
     if (!compositionState[messageId]) {
-      if (message.role === 'placeholder') {
-        // Placeholder消息使用防抖更新，避免频繁触发参数生成
-        onDebouncedUpdatePlaceholderContent?.(messageId, index, newValue)
-      } else {
-        // 非placeholder消息也使用防抖更新，减少性能开销
-        // 清除之前的定时器
-        if (normalMessageUpdateTimers.current[messageId]) {
-          clearTimeout(normalMessageUpdateTimers.current[messageId])
-        }
-
-        // 设置新的防抖定时器（300ms，比 placeholder 的 800ms 更短，保持响应性）
-        normalMessageUpdateTimers.current[messageId] = setTimeout(() => {
-          const newMessages = [...promptMessages]
-          newMessages[index].content = newValue
-          onPromptMessagesChange(newMessages)
-          // 更新prompt.content为所有消息的组合
-          const combinedContent = newMessages.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n')
-          onPromptChange?.('content', combinedContent)
-
-          // 清理定时器引用
-          delete normalMessageUpdateTimers.current[messageId]
-        }, 300)
+      if (normalMessageUpdateTimers.current[messageId]) {
+        clearTimeout(normalMessageUpdateTimers.current[messageId])
       }
+
+      normalMessageUpdateTimers.current[messageId] = setTimeout(() => {
+        const newMessages = [...promptMessages]
+        newMessages[index].content = newValue
+        onPromptMessagesChange(newMessages)
+        const combinedContent = newMessages.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n')
+        onPromptChange?.('content', combinedContent)
+        delete normalMessageUpdateTimers.current[messageId]
+      }, 300)
     }
   }
 
@@ -972,7 +1023,7 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                 {message.role === 'placeholder' ? (
                   <TextField
                     fullWidth
-                    value={messageInputValues[message.id] || message.content}
+                    value={localPlaceholderValues[message.id] ?? message.content}
                     onChange={e => handleMessageContentChange(message.id, index, e.target.value, message)}
                     placeholder={t('components.prompts.promptContentEditor.placeholderPlaceholder')}
                     disabled={isReadOnly}
@@ -981,32 +1032,25 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                     inputProps={{ maxLength: 50 }}
                     helperText={
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        {validationErrors[message.id] ? (
-                          <span>
-                            {(() => {
-                              const error = validationErrors[message.id]
-                              if (typeof error === 'string') {
-                                return error
-                              }
-                              if (typeof error === 'object' && error !== null) {
-                                const errorObj = error as { msg?: string; message?: string }
-                                return errorObj.msg || errorObj.message || '验证错误'
-                              }
-                              return '验证错误'
-                            })()}
-                          </span>
-                        ) : (
-                          <span />
-                        )}
+                        {(() => {
+                          const error = validationErrors[message.id]
+                          const errorText = error ? (
+                            typeof error === 'string' ? error :
+                            typeof error === 'object' && error !== null ? 
+                              (error as { msg?: string; message?: string }).msg || (error as { msg?: string; message?: string }).message || '验证错误' :
+                            '验证错误'
+                          ) : null
+                          return errorText ? <span>{errorText}</span> : <span />
+                        })()}
                         <Typography
                           variant="caption"
                           sx={{
-                            color: (messageInputValues[message.id] || message.content).length >= 50 ? '#ef4444' : '#6b7280',
+                            color: (localPlaceholderValues[message.id] ?? message.content).length >= 50 ? '#ef4444' : '#6b7280',
                             fontSize: '0.75rem',
                             marginLeft: 'auto',
                           }}
                         >
-                          {(messageInputValues[message.id] || message.content).length}/50
+                          {(localPlaceholderValues[message.id] ?? message.content).length}/50
                         </Typography>
                       </div>
                     }
