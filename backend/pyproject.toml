@@ -46,3 +46,8 @@ dev = [
 
 [tool.coverage.run]
 omit = ["tests/*"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["logs", "*.egg-info", "resources"]
+include = ["*"]
