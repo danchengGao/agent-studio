@@ -44,6 +44,36 @@
     }
   },
   "agentEditor": {
+    "editPage": {
+      "mode": {
+        "singleReact": "Single Agent (Autonomous Planning Mode)",
+        "multiWorkflow": "Single Agent (Multi-Workflow Mode)",
+        "multiAgents": "Multi-Agents (Master-Worker Mode)"
+      },
+      "labels": {
+        "historyVersionPrefix": "History Version",
+        "lastSavedAt": "Last saved at:"
+      },
+      "buttons": {
+        "save": "Save",
+        "saving": "Saving...",
+        "versionHistory": "Version History",
+        "submitNewVersion": "Submit New Version"
+      },
+      "messages": {
+        "saveSuccess": "Saved successfully",
+        "saveFailed": "Save failed",
+        "updateAgentSuccess": "Agent information updated",
+        "updateAgentFailed": "Update failed, please try again later",
+        "returnToLatestDraft": "Returned to latest draft",
+        "versionInfoIncomplete": "Version information is incomplete",
+        "restoredToVersion": "Restored to version {{version}}",
+        "switchedToLatestContent": "Switched to latest content",
+        "switchedToVersion": "Switched to version {{version}}",
+        "switchVersionFailed": "Failed to switch version",
+        "publishSuccess": "Submitted successfully"
+      }
+    },
     "systemPrompt": {
       "title": "System Prompt Configuration",
       "defineAgentPlaceholder": "Define the agent's role, capabilities, and behavioral guidelines...",
@@ -142,6 +172,52 @@
     },
     "orchestration": {
       "title": "Orchestration Configuration",
+      "orchestrationPage": {
+        "sections": {
+          "modelTitle": "Model Configuration",
+          "skillsTitle": "Skills",
+          "conversationTitle": "Conversation Settings",
+          "greetingTitle": "Greeting",
+          "workflowTitle": "Workflows",
+          "pluginTitle": "Plugins"
+        },
+        "model": {
+          "title": "Model"
+        },
+        "select": {
+          "placeholder": "Select a model",
+          "disabledModel": "Model disabled ({{name}})"
+        },
+        "alerts": {
+          "noModelsInline": "No models configured",
+          "modelDisabledAction": "Enable model",
+          "modelDisabledMessage": "The associated model \"{{name}}\" is disabled. Please select another available model or go to the model management page to enable it.",
+          "noModelSelectedAction": "Select a model above",
+          "noModelSelectedMessage": "No model selected",
+          "noModelsConfiguredAction": "Configure models",
+          "noModelsConfiguredMessage": "No models are configured. Please go to the model configuration page to add models."
+        },
+        "memory": {
+          "title": "Memory Configuration",
+          "variablesTitle": "Variable Configuration",
+          "fields": {
+            "nameLabel": "Variable Name",
+            "descLabel": "Variable Description"
+          },
+          "actions": {
+            "addVariable": "Add"
+          },
+          "duplicateVariableWarning": "Variable name \"{{name}}\" is duplicated",
+          "list": {
+            "noDescription": "No description",
+            "empty": "No variables configured",
+            "enabledLabel": "Enabled",
+            "disabledLabel": "Disabled"
+          },
+          "longTermToggleLabel": "Enable Long-Term Memory",
+          "longTermDescription": "When enabled, the agent can remember user personal information and preferences from the conversation history."
+        }
+      },
       "addWorkflow": {
         "addExisting": "Add existing workflow",
         "createNew": "Create new workflow"
@@ -299,6 +375,41 @@
             "none": "None",
             "nodeFallback": "Node"
           }
+        }
+      },
+      "memoryManager": {
+        "tooltip": "Memory",
+        "ariaLabel": "Memory",
+        "title": "Memory Management",
+        "menus": {
+          "variables": "Variables",
+          "longterm": "Long-term Memory"
+        },
+        "table": {
+          "empty": "No data",
+          "headers": {
+            "longTerm": {
+              "memory": "Memory",
+              "updatedAt": "Last Updated"
+            },
+            "variables": {
+              "field": "Field",
+              "value": "Value"
+            }
+          }
+        },
+        "delete": {
+          "tooltip": "Delete"
+        },
+        "actions": {
+          "close": "Close",
+          "save": "Save"
+        },
+        "errors": {
+          "autoRefreshFailed": "Auto refresh failed",
+          "loadFailed": "Load failed",
+          "saveFailed": "Save failed: ",
+          "unknown": "Unknown error"
         }
       },
       "operationsBar": {

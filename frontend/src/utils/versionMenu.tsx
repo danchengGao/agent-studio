@@ -7,14 +7,18 @@ export const isVersionValid = (workflowId: string, versionsMap: VersionsMap, val
   return published.some(p => p.version === value)
 }
 
-export const renderVersionMenuItems = (workflowId: string, versionsMap: VersionsMap, options?: { includeDraft?: boolean; itemSx?: any }) => {
+export const renderVersionMenuItems = (
+  workflowId: string,
+  versionsMap: VersionsMap,
+  options?: { includeDraft?: boolean; itemSx?: any; draftLabel?: string },
+) => {
   const published = versionsMap[workflowId]?.published || []
   const itemSx = options?.itemSx ?? { fontSize: '0.8125rem', py: 0.5 }
   const items: JSX.Element[] = []
   if (options?.includeDraft !== false) {
     items.push(
       <MenuItem value="draft" sx={itemSx} key={`draft_${workflowId}`}>
-        草稿
+        {options?.draftLabel || 'draft'}
       </MenuItem>,
     )
   }

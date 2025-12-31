@@ -77,7 +77,7 @@ const AccordionDetails = styled(MuiAccordionDetails)(({ theme }) => ({
 interface MemoryVariable {
   id: string
   name: string
-  description: string
+  description?: string
   enabled?: boolean // 新增：是否启用，默认 true
 }
 
@@ -423,14 +423,14 @@ const AgentModelSelector = (props: {
     if (newVariableName.trim()) {
       const duplicateVariable = memoryVariables.find(v => v.name === newVariableName.trim())
       if (duplicateVariable) {
-        setDuplicateVariableWarning(`变量名"${newVariableName.trim()}"重复`)
+        setDuplicateVariableWarning(t('orchestrationPage.memory.duplicateVariableWarning', { name: newVariableName.trim() }))
       } else {
         setDuplicateVariableWarning('')
       }
     } else {
       setDuplicateVariableWarning('')
     }
-  }, [newVariableName, memoryVariables])
+  }, [newVariableName, memoryVariables, t])
 
   // 记忆配置相关函数
   const handleAddMemoryVariable = async () => {
@@ -529,10 +529,10 @@ const AgentModelSelector = (props: {
   return (
     <div className="h-full overflow-auto">
       <div className="model-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>模型配置</Typography>
+        <Typography sx={{ mb: 2 }}>{t('orchestrationPage.sections.modelTitle')}</Typography>
         <Accordion expanded={modelExpanded} onChange={handleAccordionChange}>
           <AccordionSummary aria-controls="model-content" id="model-header">
-            <Typography component="span">模型</Typography>
+            <Typography component="span">{t('orchestrationPage.model.title')}</Typography>
             {modelsList.length > 0 ? (
               <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                 <Select
@@ -540,11 +540,10 @@ const AgentModelSelector = (props: {
                   onChange={event => handleModelChange(event.target.value as string)}
                   displayEmpty
                   renderValue={value => {
-                    // 如果选择的模型不在可用列表中，显示提示
                     if (value && !modelsList.find(model => model.model_name === value && model.is_active)) {
-                      return <span style={{ color: '#d32f2f' }}>模型已禁用（{value}）</span>
+                      return <span style={{ color: '#d32f2f' }}>{t('orchestrationPage.select.disabledModel', { name: value })}</span>
                     }
-                    return value ? value : <span style={{ color: 'rgba(0, 0, 0, 0.38)' }}>请选择模型</span>
+                    return value ? value : <span style={{ color: 'rgba(0, 0, 0, 0.38)' }}>{t('orchestrationPage.select.placeholder')}</span>
                   }}
                   sx={{
                     width: 200,
@@ -572,7 +571,7 @@ const AgentModelSelector = (props: {
               </div>
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                未配置模型
+                {t('orchestrationPage.alerts.noModelsInline')}
               </Typography>
             )}
           </AccordionSummary>
@@ -591,22 +590,22 @@ const AgentModelSelector = (props: {
                         disabled={readonly}
                         sx={{ '&.Mui-disabled': { cursor: 'not-allowed' } }}
                       >
-                        前往启用
+                        {t('orchestrationPage.alerts.modelDisabledAction')}
                       </Button>
                     }
                   >
-                    当前关联的模型&ldquo;{selectedModelName}&rdquo;已被禁用，请选择其他可用模型或前往模型管理页面启用该模型
+                    {t('orchestrationPage.alerts.modelDisabledMessage', { name: selectedModelName })}
                   </Alert>
                 ) : !selectedModel ? (
                   <Alert
                     severity="info"
                     action={
                       <Button color="primary" size="small" onClick={() => setModelExpanded(true)} sx={{ mt: -1 }}>
-                        点击上方选择模型
+                        {t('orchestrationPage.alerts.noModelSelectedAction')}
                       </Button>
                     }
                   >
-                    暂无模型
+                    {t('orchestrationPage.alerts.noModelSelectedMessage')}
                   </Alert>
                 ) : (
                   selectedModel && <ModelDetailForm modelDetail={selectedModel} onModelDetailChange={handleModelDetailChange} readonly={readonly} />
@@ -624,11 +623,11 @@ const AgentModelSelector = (props: {
                     disabled={readonly}
                     sx={{ '&.Mui-disabled': { cursor: 'not-allowed' } }}
                   >
-                    前往配置
+                    {t('orchestrationPage.alerts.noModelsConfiguredAction')}
                   </Button>
                 }
               >
-                当前未配置任何模型，请前往模型配置页面添加模型
+                {t('orchestrationPage.alerts.noModelsConfiguredMessage')}
               </Alert>
             )}
           </AccordionDetails>
@@ -636,13 +635,12 @@ const AgentModelSelector = (props: {
       </div>
 
       <div className="workflow-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>技能</Typography>
+        <Typography sx={{ mb: 2 }}>{t('orchestrationPage.sections.skillsTitle')}</Typography>
 
-        {/* 记忆配置 */}
         <Accordion>
           <AccordionSummary aria-controls="memory-content" id="memory-header">
             <Typography component="span" className="flex items-center">
-              记忆配置
+              {t('orchestrationPage.memory.title')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
                   memoryVariables.length > 0 || longTermMemoryEnabled ? 'bg-blue-500' : 'bg-gray-400'
@@ -654,14 +652,14 @@ const AgentModelSelector = (props: {
           </AccordionSummary>
           <AccordionDetails>
             <Typography variant="subtitle1" sx={{ mb: 1 }}>
-              变量配置
+              {t('orchestrationPage.memory.variablesTitle')}
             </Typography>
 
             {/* 添加新变量表单 */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextField
-                  label="变量名称"
+                  label={t('orchestrationPage.memory.fields.nameLabel')}
                   value={newVariableName}
                   onChange={e => setNewVariableName(e.target.value)}
                   disabled={readonly}
@@ -670,7 +668,7 @@ const AgentModelSelector = (props: {
                   error={!!duplicateVariableWarning}
                 />
                 <TextField
-                  label="变量描述"
+                  label={t('orchestrationPage.memory.fields.descLabel')}
                   value={newVariableDescription}
                   onChange={e => setNewVariableDescription(e.target.value)}
                   disabled={readonly}
@@ -684,7 +682,7 @@ const AgentModelSelector = (props: {
                   size="small"
                   sx={{ alignSelf: 'flex-end', height: '40px' }}
                 >
-                  添加
+                  {t('orchestrationPage.memory.actions.addVariable')}
                 </Button>
               </Box>
 
@@ -709,7 +707,9 @@ const AgentModelSelector = (props: {
                         {!readonly && (
                           <FormControlLabel
                             control={<Switch size="small" checked={variable.enabled !== false} onChange={() => handleToggleVariableEnabled(variable.id)} />}
-                            label={variable.enabled !== false ? '启用' : '禁用'}
+                            label={
+                              variable.enabled !== false ? t('orchestrationPage.memory.list.enabledLabel') : t('orchestrationPage.memory.list.disabledLabel')
+                            }
                             labelPlacement="start"
                             sx={{ mr: 1 }}
                           />
@@ -722,22 +722,22 @@ const AgentModelSelector = (props: {
                       </>
                     }
                   >
-                    <ListItemText primary={variable.name} secondary={<>{variable.description || '无描述'}</>} />
+                    <ListItemText primary={variable.name} secondary={<>{variable.description || t('orchestrationPage.memory.list.noDescription')}</>} />
                   </ListItem>
                 ))}
               </List>
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                暂无配置的变量
+                {t('orchestrationPage.memory.list.empty')}
               </Typography>
             )}
             <Box sx={{ mb: 2, mt: 1 }}>
               <FormControlLabel
                 control={<Switch checked={longTermMemoryEnabled} onChange={handleLongTermMemoryToggle} disabled={readonly} />}
-                label="启用长期记忆"
+                label={t('orchestrationPage.memory.longTermToggleLabel')}
               />
               <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                启用后，智能体将能够记住与用户的对话过程中的用户个人信息和偏好数据
+                {t('orchestrationPage.memory.longTermDescription')}
               </Typography>
             </Box>
           </AccordionDetails>
@@ -746,7 +746,7 @@ const AgentModelSelector = (props: {
         <Accordion>
           <AccordionSummary aria-controls="workflow-content" id="workflow-header">
             <Typography component="span" className="flex items-center">
-              工作流
+              {t('orchestrationPage.sections.workflowTitle')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
                   workflowObjects.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
@@ -806,7 +806,7 @@ const AgentModelSelector = (props: {
         <Accordion>
           <AccordionSummary aria-controls="plugin-content" id="plugin-header">
             <Typography component="span" className="flex items-center">
-              插件
+              {t('orchestrationPage.sections.pluginTitle')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
                   pluginObjects.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
@@ -840,10 +840,10 @@ const AgentModelSelector = (props: {
       </div>
 
       <div className="panel3d-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>对话设置</Typography>
+        <Typography sx={{ mb: 2 }}>{t('orchestrationPage.sections.conversationTitle')}</Typography>
         <Accordion defaultExpanded={true}>
           <AccordionSummary aria-controls="greeting-content" id="greeting-header">
-            <Typography component="span">开场白</Typography>
+            <Typography component="span">{t('orchestrationPage.sections.greetingTitle')}</Typography>
           </AccordionSummary>
           <AccordionDetails>
             <TextField

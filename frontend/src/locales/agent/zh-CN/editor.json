@@ -44,6 +44,36 @@
     }
   },
   "agentEditor": {
+    "editPage": {
+      "mode": {
+        "singleReact": "单Agent (自主规划模式)",
+        "multiWorkflow": "单Agent (多工作流模式)",
+        "multiAgents": "多Agents（主从模式）"
+      },
+      "labels": {
+        "historyVersionPrefix": "历史版本",
+        "lastSavedAt": "最近保存时间："
+      },
+      "buttons": {
+        "save": "保存",
+        "saving": "保存中...",
+        "versionHistory": "版本历史",
+        "submitNewVersion": "提交新版本"
+      },
+      "messages": {
+        "saveSuccess": "保存成功",
+        "saveFailed": "保存失败",
+        "updateAgentSuccess": "已更新智能体信息",
+        "updateAgentFailed": "更新失败，请稍后再试",
+        "returnToLatestDraft": "已返回最新草稿数据",
+        "versionInfoIncomplete": "版本信息不完整",
+        "restoredToVersion": "已还原到版本 {{version}}",
+        "switchedToLatestContent": "已切换到当前最新内容",
+        "switchedToVersion": "已切换到版本 {{version}}",
+        "switchVersionFailed": "切换版本失败",
+        "publishSuccess": "提交成功"
+      }
+    },
     "systemPrompt": {
       "title": "系统提示词配置",
       "defineAgentPlaceholder": "定义智能体的角色、能力和行为准则...",
@@ -142,6 +172,52 @@
     },
     "orchestration": {
       "title": "编排配置",
+      "orchestrationPage": {
+        "sections": {
+          "modelTitle": "模型配置",
+          "skillsTitle": "技能",
+          "conversationTitle": "对话设置",
+          "greetingTitle": "开场白",
+          "workflowTitle": "工作流",
+          "pluginTitle": "插件"
+        },
+        "model": {
+          "title": "模型"
+        },
+        "select": {
+          "placeholder": "请选择模型",
+          "disabledModel": "模型已禁用（{{name}}）"
+        },
+        "alerts": {
+          "noModelsInline": "未配置模型",
+          "modelDisabledAction": "前往启用",
+          "modelDisabledMessage": "当前关联的模型“{{name}}”已被禁用，请选择其他可用模型或前往模型管理页面启用该模型",
+          "noModelSelectedAction": "点击上方选择模型",
+          "noModelSelectedMessage": "暂无模型",
+          "noModelsConfiguredAction": "前往配置",
+          "noModelsConfiguredMessage": "当前未配置任何模型，请前往模型配置页面添加模型"
+        },
+        "memory": {
+          "title": "记忆配置",
+          "variablesTitle": "变量配置",
+          "fields": {
+            "nameLabel": "变量名称",
+            "descLabel": "变量描述"
+          },
+          "actions": {
+            "addVariable": "添加"
+          },
+          "duplicateVariableWarning": "变量名\"{{name}}\"重复",
+          "list": {
+            "noDescription": "无描述",
+            "empty": "暂无配置的变量",
+            "enabledLabel": "启用",
+            "disabledLabel": "禁用"
+          },
+          "longTermToggleLabel": "启用长期记忆",
+          "longTermDescription": "启用后，智能体将能够记住与用户的对话过程中的用户个人信息和偏好数据"
+        }
+      },
       "addWorkflow": {
         "addExisting": "添加已有工作流",
         "createNew": "创建新工作流"
@@ -299,6 +375,41 @@
             "none": "无",
             "nodeFallback": "节点"
           }
+        }
+      },
+      "memoryManager": {
+        "tooltip": "记忆",
+        "ariaLabel": "记忆",
+        "title": "记忆管理",
+        "menus": {
+          "variables": "变量",
+          "longterm": "长期记忆"
+        },
+        "table": {
+          "empty": "暂无数据",
+          "headers": {
+            "longTerm": {
+              "memory": "记忆",
+              "updatedAt": "修改时间"
+            },
+            "variables": {
+              "field": "字段名",
+              "value": "取值"
+            }
+          }
+        },
+        "delete": {
+          "tooltip": "删除"
+        },
+        "actions": {
+          "close": "关闭",
+          "save": "保存"
+        },
+        "errors": {
+          "autoRefreshFailed": "自动刷新失败",
+          "loadFailed": "加载失败",
+          "saveFailed": "保存失败：",
+          "unknown": "未知错误"
         }
       },
       "operationsBar": {

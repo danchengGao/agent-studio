@@ -76,7 +76,13 @@ export const VersionField: React.FC<{
         sx={{ minWidth: 120, width: 'fit-content', fontSize: '0.8rem', '& .MuiSelect-select': { py: 0.25, px: 1.25, lineHeight: '18px', fontSize: '0.8rem' } }}
         MenuProps={{ PaperProps: { sx: { maxHeight: 180 } } }}
       >
-        {workflowId ? renderVersionMenuItems(workflowId, versionsMap, { includeDraft: true, itemSx: { fontSize: '0.8rem', py: 0.25 } }) : null}
+        {workflowId
+          ? renderVersionMenuItems(workflowId, versionsMap, {
+              includeDraft: true,
+              itemSx: { fontSize: '0.8rem', py: 0.25 },
+              draftLabel: t('draftLabel'),
+            })
+          : null}
       </Select>
       {hint}
     </div>
