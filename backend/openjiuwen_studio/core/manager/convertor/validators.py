@@ -218,7 +218,7 @@ def validate_loop_num_range(node: Node, loop_num_value: Any) -> None:
 
 def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
     """
-    校验数组变量：必须是数组类型且不能为空
+    校验数组变量：constant 类型必须是数组类型且不能为空
 
     Args:
         var_name: 变量名
@@ -228,7 +228,11 @@ def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
     Raises:
         JiuWenComponentException: 当数组变量校验失败时
     """
-    # 检查 schema.type 是否为数组类型（var_value.type 是 constant/reference，表示值的来源）
+    # 只对 constant 类型进行校验，ref 类型由被引用节点决定类型
+    if var_value.type != "constant":
+        return
+
+    # 检查 schema.type 是否为数组类型
     schema_type = var_value.schema.type if var_value.schema else None
     if schema_type != "array":
         raise JiuWenComponentException(
@@ -239,16 +243,15 @@ def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
             error_stage="validate"
         )
 
-    # 对于 constant 类型，检查 content 是否为空
-    if var_value.type == "constant":
-        if var_value.content is None or (isinstance(var_value.content, list) and len(var_value.content) == 0):
-            raise JiuWenComponentException(
-                error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Loop 组件'}] 数组变量 {var_name} 不能为空",
-                component_id=node.id,
-                component_type=int(node.type),
-                error_stage="validate"
-            )
+    # 检查 content 是否为空
+    if var_value.content is None or (isinstance(var_value.content, list) and len(var_value.content) == 0):
+        raise JiuWenComponentException(
+            error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+            message=f"[{node.data.title or 'Loop 组件'}] 数组变量 {var_name} 不能为空",
+            component_id=node.id,
+            component_type=int(node.type),
+            error_stage="validate"
+        )
 
 
 def validate_max_response_range(node: Node, max_response: int) -> None:
