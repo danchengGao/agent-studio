@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square } from 'lucide-react'
+import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square, AlertCircle } from 'lucide-react'
 import {
   KnowledgeBase,
   DocumentItem,
@@ -135,12 +135,16 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           setKnowledgeBase(targetKb)
         } else {
           showError(t('knowledgeBases.settings.notFound'))
+          // 设置 knowledgeBase 为 null，避免无限循环
+          setKnowledgeBase(null)
         }
         setIsLoadingKnowledgeBase(false)
       })
       .catch(error => {
         console.error('Failed to fetch knowledge base:', error)
         showError(t('knowledgeBases.settings.fetchError'))
+        // 设置 knowledgeBase 为 null，避免无限循环
+        setKnowledgeBase(null)
         setIsLoadingKnowledgeBase(false)
       })
   }, [id]) // 只依赖 id，当 id 变化时重新加载
@@ -849,12 +853,33 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     setProcessingDocIds(processingDocIdsList)
   }, [documentStatuses])
 
-  if (!knowledgeBase || isLoadingKnowledgeBase) {
+  // 处理知识库不存在的情况
+  if (isLoadingKnowledgeBase) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-2 text-gray-600">{t('knowledgeBases.editor.loading')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果知识库不存在，显示错误信息
+  if (!knowledgeBase) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md px-4">
+          <AlertCircle className="mx-auto w-12 h-12 text-red-500 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{t('knowledgeBases.settings.notFound')}</h2>
+          <p className="text-gray-600 mb-6">{t('knowledgeBases.settings.fetchError')}</p>
+          <button 
+            onClick={() => navigate('/dashboard/knowledge-bases')} 
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center mx-auto"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {t('common.buttons.back')}
+          </button>
         </div>
       </div>
     )

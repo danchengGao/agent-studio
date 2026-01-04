@@ -1,4 +1,6 @@
 import re
+import subprocess
+import shutil
 from typing import Optional, Tuple
 
 from pydantic import BaseModel, Field, ValidationError
@@ -106,3 +108,28 @@ def convert_to_properties_format(input_list) -> dict:
     except (KeyError, TypeError) as e:
         logger.error(f"[AGENT_CONVERT] failed to convert parameters to properties format - Error: {e}")
         raise ValueError(f"Failed to convert properties format: {e}") from e
+
+
+def get_git_version() -> str:
+    """Get version from git tags"""
+    try:
+        # Find git executable path
+        git_path = shutil.which('git')
+        if not git_path:
+            logger.warning("Git executable not found in PATH")
+            return ""
+            
+        # try to get the latest tag
+        version = subprocess.check_output(
+            [git_path, "describe", "--tags", "--abbrev=0"], 
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        
+        # if the tag starts with 'v', remove it
+        if version.startswith('v'):
+            version = version[1:]
+            
+        return version
+    except Exception as e:
+        logger.warning(f"Failed to get git version: {e}")
+        return ""

@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, Edit, Trash2, Copy, ChevronLeft, ChevronRight, AlertCircle, Check, X } from 'lucide-react'
+import { Brain, Plus, Search, Edit, Trash2, Copy, ChevronLeft, ChevronRight, AlertCircle, Check, X, Upload, Download, AlertTriangle } from 'lucide-react'
+import { AgentService, useAgents, useUpdateAgent, useCopyAgent, useSearchAgents, useModels, AgentSortBy, AgentSortOrder } from '@test-agentstudio/api-client'
 import AgentIcon from '@/assets/icons/agent.svg?react'
-import { AgentService, useAgents, useUpdateAgent, useCopyAgent, useSearchAgents, useModels } from '@test-agentstudio/api-client' // 导入useUpdateAgent和useSearchAgents
-import { AgentSortBy, AgentSortOrder } from '@test-agentstudio/api-client' // 导入排序枚举
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
-import { useAuthStore } from '../../stores/useAuthStore' // 导入auth store
-import { useQueryClient } from 'react-query' // 导入useQueryClient
+import { useAuthStore } from '../../stores/useAuthStore'
+import { useQueryClient } from 'react-query'
 import DeleteConfirmationDialog from '../../components/Common/DeleteConfirmationDialog'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../Common/UnifiedSnackbar'
 import { CircularProgress } from '@mui/material'
 
-interface searchModel {
+interface SearchModel {
   model_info: {
     model_name: string
   }
@@ -32,30 +31,35 @@ interface Agent {
   api_endpoint: string
   agent_version: string
   agent_type: string
-  model?: searchModel
+  model?: SearchModel
 }
 
 const AgentsPage: React.FC = () => {
   const { t } = useTranslation()
-  const { user } = useAuthStore() // 获取用户信息
-  const navigate = useNavigate() // 添加导航hook
-  const location = useLocation() // 获取路由位置信息，用于监听路由变化
+  const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [sortBy, setSortBy] = useState<AgentSortBy>(AgentSortBy.update_time)
   const [sortOrder, setSortOrder] = useState<AgentSortOrder>(AgentSortOrder.desc)
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [page_size, setPageSize] = useState<number>(9)
+  const [pageSize, setPageSize] = useState<number>(9)
 
   // 搜索相关状态
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('')
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const lastPathnameRef = useRef<string>('') // 用于跟踪上次的路由路径
-  const refetchAgentsRef = useRef<(() => void) | null>(null) // 存储 refetch 函数的引用
+  const lastPathnameRef = useRef<string>('')
+  const refetchAgentsRef = useRef<(() => void) | null>(null)
 
   const [error, setError] = useState<string>('')
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, agentId: '', agentName: '' })
   const [isDeleting, setIsDeleting] = useState(false)
-  const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
+  const { snackbar, showSuccess, showError, showWarning, closeSnackbar } = useUnifiedSnackbar()
+
+  // 导入导出相关状态
+  const [isImporting, setIsImporting] = useState(false)
+  const [importConflict, setImportConflict] = useState<{ isOpen: boolean; agentName: string; data: any } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 编辑状态相关
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null)
@@ -113,12 +117,12 @@ const AgentsPage: React.FC = () => {
         sort_by: sortBy,
         sort_order: sortOrder,
         page: currentPage,
-        page_size: page_size,
+        page_size: pageSize,
       })
     : useAgents({
         space_id: user?.spaceId || getDefaultSpaceId(),
         page: currentPage,
-        page_size: page_size,
+        page_size: pageSize,
         sort_by: sortBy,
         sort_order: sortOrder,
       })
@@ -171,6 +175,7 @@ const AgentsPage: React.FC = () => {
     if (agentsError) {
       const errorMessage = `${t('common.messages.error')}: ${agentsError instanceof Error ? agentsError.message : t('common.messages.unknownError')}`
       showError(errorMessage)
+      setError(errorMessage)
     } else {
       setError('')
     }
@@ -266,6 +271,121 @@ const AgentsPage: React.FC = () => {
     )
   }
 
+  // 导出智能体
+  const handleExportAgent = async (agentId: string, agentName: string) => {
+    try {
+      const response = await AgentService.exportAgent({
+        space_id: user?.spaceId || getDefaultSpaceId(),
+        agent_id: agentId,
+      })
+
+      if (response.code === 200 && response.data) {
+        const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${agentName}_export.json`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        showSuccess('智能体导出成功')
+      } else {
+        showError(`导出失败: ${response.message || '未知错误'}`)
+      }
+    } catch (error) {
+      console.error('导出异常:', error)
+      showError(`导出异常: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 执行导入操作
+  const executeImport = async (importData: any, overwrite: boolean) => {
+    try {
+      setIsImporting(true)
+      const response = await AgentService.importAgent({
+        space_id: user?.spaceId || getDefaultSpaceId(),
+        import_data: importData,
+        overwrite: overwrite,
+      })
+
+      if (response.code === 200) {
+        // 检查是否有警告信息
+        const warnings = response.data?.warnings
+        if (warnings && Array.isArray(warnings) && warnings.length > 0) {
+          const warningMsg = warnings.join('; ')
+          showWarning(`警告: ${warningMsg}`, 10000)
+        } else {
+          showSuccess(overwrite ? '智能体覆盖导入成功' : '智能体导入成功')
+        }
+        
+        queryClient.invalidateQueries(['agents', 'api', 'list'], { exact: false })
+        refetchAgents()
+      } else {
+        showError(`导入失败: ${response.message || '未知错误'}`)
+      }
+    } catch (error) {
+      console.error('导入异常:', error)
+      showError(`导入异常: ${error instanceof Error ? error.message : '文件解析失败'}`)
+    } finally {
+      setIsImporting(false)
+      setImportConflict(null)
+    }
+  }
+
+  // 触发文件选择
+  const handleImportClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  // 处理文件选择导入
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    event.target.value = ''
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string
+        const importData = JSON.parse(content)
+
+        if (!importData.agent || !importData.dependencies) {
+          throw new Error('无效的导入文件格式')
+        }
+
+        const agentId = importData.agent.agent_id
+        const spaceId = user?.spaceId || getDefaultSpaceId()
+
+        // 检查智能体是否存在
+        try {
+          const checkRes = await AgentService.getAgentDetail({
+            space_id: spaceId,
+            agent_id: agentId,
+          })
+
+          if (checkRes.code === 200) {
+             setImportConflict({
+               isOpen: true,
+               agentName: importData.agent.agent_name,
+               data: importData,
+             })
+          } else {
+             executeImport(importData, false)
+          }
+        } catch (err) {
+          executeImport(importData, false)
+        }
+
+      } catch (error) {
+        console.error('文件解析异常:', error)
+        showError(`文件解析异常: ${error instanceof Error ? error.message : '未知错误'}`)
+      }
+    }
+    reader.readAsText(file)
+  }
+
   // 处理点击进入编辑状态
   const handleStartEditing = (agent: Agent, field: 'name' | 'description') => {
     setEditingAgentId(agent.agent_id)
@@ -349,7 +469,15 @@ const AgentsPage: React.FC = () => {
 
   return (
     <div className="space-y-8 p-6 min-h-full">
-      {/* 渲染部分保持不变，但需要处理loading状态 */}
+      {/* 隐藏的文件输入框 */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept=".json"
+        onChange={handleFileChange}
+      />
+
       {/* Page header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-blue-800 to-indigo-900 mb-2">{t('agents.title')}</h1>
@@ -404,6 +532,16 @@ const AgentsPage: React.FC = () => {
             {sortOrder === 'asc' ? <span className="text-lg font-semibold">↑</span> : <span className="text-lg font-semibold">↓</span>}
           </button>
         </div>
+
+        {/* Import Agent Button */}
+        <button
+          className="inline-flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
+          onClick={handleImportClick}
+          disabled={isImporting}
+        >
+          {isImporting ? <CircularProgress size={20} /> : <Upload className="w-5 h-5" />}
+          <span>导入</span>
+        </button>
 
         {/* Create Agent Button */}
         <button
@@ -574,6 +712,13 @@ const AgentsPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <button
                       className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
+                      title="导出智能体"
+                      onClick={() => handleExportAgent(agent.agent_id, agent.agent_name)}
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
                       title={t('common.tooltips.copyAgent')}
                       onClick={() => handleCopyAgent(agent.agent_id, agent.agent_name)}
                       disabled={isCopying}
@@ -608,15 +753,26 @@ const AgentsPage: React.FC = () => {
               ? t('agents.agentList.searchNoAgentsFoundDesc', { keyword: debouncedSearchTerm.trim() })
               : t('agents.agentList.createFirstAgent')}
           </p>
-          <button
-            className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
-            onClick={() => {
-              navigate('/dashboard/agents/new')
-            }}
-          >
-            <Plus className="w-5 h-5" />
-            <span>{debouncedSearchTerm.trim() ? t('agents.agentList.createNewAgentButton') : t('agents.agentList.createFirst')}</span>
-          </button>
+          <div className="flex justify-center space-x-4">
+            <button
+              className="inline-flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
+              onClick={handleImportClick}
+              disabled={isImporting}
+            >
+              {isImporting ? <CircularProgress size={20} /> : <Upload className="w-5 h-5" />}
+              <span>导入</span>
+            </button>
+            <button
+              className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
+              onClick={() => {
+                console.log('创建智能体按钮被点击，搜索词:', debouncedSearchTerm)
+                navigate('/dashboard/agents/new')
+              }}
+            >
+              <Plus className="w-5 h-5" />
+              <span>{debouncedSearchTerm.trim() ? '创建新智能体' : t('agents.agentList.createFirst')}</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -626,7 +782,7 @@ const AgentsPage: React.FC = () => {
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-600">{t('common.pagination.pageSize')}:</span>
             <select
-              value={page_size}
+              value={pageSize}
               onChange={e => {
                 setPageSize(Number(e.target.value))
                 setCurrentPage(1) // 重置到第一页
@@ -699,6 +855,56 @@ const AgentsPage: React.FC = () => {
         isLoading={isDeleting}
       />
 
+      {/* 导入冲突确认对话框 */}
+      {importConflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setImportConflict(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
+             {/* Close */}
+             <button onClick={() => setImportConflict(null)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">
+               <X className="w-6 h-6" />
+             </button>
+             {/* Icon */}
+             <div className="flex justify-center mb-6">
+               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                 <AlertTriangle className="w-8 h-8 text-orange-600" />
+               </div>
+             </div>
+             {/* Content */}
+             <div className="text-center mb-8">
+               <h3 className="text-2xl font-bold text-gray-900 mb-4">智能体已存在</h3>
+               <p className="text-gray-600 text-lg leading-relaxed">
+                 当前空间下已存在智能体 "{importConflict.agentName}",
+                 <br/>
+                 您希望如何处理？
+               </p>
+             </div>
+             {/* Actions */}
+             <div className="flex flex-col gap-3">
+               <button
+                 onClick={() => executeImport(importConflict.data, true)}
+                 className="w-full px-6 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 font-medium transition-all"
+               >
+                 覆盖现有智能体 (Overwrite)
+               </button>
+               <button
+                 onClick={() => executeImport(importConflict.data, false)}
+                 className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium transition-all"
+               >
+                 创建副本 (Create Copy)
+               </button>
+               <button
+                 onClick={() => setImportConflict(null)}
+                 className="w-full px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-all"
+               >
+                 取消
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unified Snackbar */}
       <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />
     </div>
   )

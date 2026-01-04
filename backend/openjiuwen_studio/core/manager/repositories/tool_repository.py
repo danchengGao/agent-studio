@@ -54,9 +54,9 @@ class ToolRepository():
     def tool_get(self, query_body: dict) -> (dict, dict):
         with get_db_jw() as db:
             tool_db = JiuwenBaseRepository(db, ToolBaseDB)
-            find_id = {
-                "tool_id": get_val_from_dict(query_body, ["tool_id"]),
-                "space_id": get_val_from_dict(query_body, ["space_id", "spaceId"]),
+            find_id = {	 
+                "tool_id": get_val_from_dict(query_body, ["tool_id"]),	 
+                "space_id": get_val_from_dict(query_body, ["space_id", "spaceId"]), 
             }
             res = tool_db.get_dl_in_sql(find_id=find_id, return_first_item=True, return_declarativebase=True)
             if res.code != status.HTTP_200_OK or not res.data:

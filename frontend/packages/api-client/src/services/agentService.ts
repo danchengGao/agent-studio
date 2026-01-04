@@ -158,6 +158,38 @@ export class AgentService {
     }
   }
 
+  // 导出智能体
+  static async exportAgent(request: {
+    space_id: string
+    agent_id: string
+    agent_version?: string
+  }): Promise<{ code: number; message: string; data: any }> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post(API_ENDPOINTS.AGENTS.EXPORT, request)
+      return response.data
+    } catch (error) {
+      console.error('导出智能体API调用失败:', error)
+      throw new Error(`导出智能体失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 导入智能体
+  static async importAgent(request: {
+    space_id: string
+    import_data: any
+    overwrite: boolean
+  }): Promise<{ code: number; message: string; data: any }> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post(API_ENDPOINTS.AGENTS.IMPORT, request)
+      return response.data
+    } catch (error) {
+      console.error('导入智能体API调用失败:', error)
+      throw new Error(`导入智能体失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
   // 获取智能体版本列表
   static async getAgentVersionList(request: AgentVersionListRequest): Promise<AgentVersionListResponse> {
     try {
