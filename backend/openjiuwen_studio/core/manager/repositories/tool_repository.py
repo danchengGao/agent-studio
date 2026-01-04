@@ -56,12 +56,38 @@ class ToolRepository():
             tool_db = JiuwenBaseRepository(db, ToolBaseDB)
             find_id = {
                 "tool_id": get_val_from_dict(query_body, ["tool_id"]),
-                "space_id": get_val_from_dict(query_body, ["space_id", "spaceId"]),
             }
+            # 添加 plugin_version 到 find_id，因为唯一约束是 (tool_id, plugin_version)
+            # 如果没有提供 plugin_version，使用默认值
+            plugin_version = get_val_from_dict(query_body, ["plugin_version"])
+            if not plugin_version:
+                plugin_version = ToolBaseDB.__version_none__
+            find_id["plugin_version"] = plugin_version
             res = tool_db.get_dl_in_sql(find_id=find_id, return_first_item=True, return_declarativebase=True)
             if res.code != status.HTTP_200_OK or not res.data:
                 return res.model_dump(exclude_none=True), {}
-            return res.model_dump(exclude_none=True), res.data.plugin_info.to_dict() if res.data.plugin_info is not None else {}
+            
+            # Prepare plugin info dict
+            plugin_info_dict = {}
+            if hasattr(res.data, 'plugin_info') and res.data.plugin_info is not None:
+                if hasattr(res.data.plugin_info, 'to_dict'):
+                    plugin_info_dict = res.data.plugin_info.to_dict()
+                elif hasattr(res.data.plugin_info, 'model_dump'):
+                    plugin_info_dict = res.data.plugin_info.model_dump()
+                elif hasattr(res.data.plugin_info, '__dict__'):
+                    plugin_info_dict = {k: v for k, v in res.data.plugin_info.__dict__.items() if not k.startswith('_')}
+
+            # Convert ToolBaseDB object to dict
+            final_res = res.model_dump(exclude_none=True)
+            if res.data:
+                if hasattr(res.data, 'to_dict'):
+                    final_res['data'] = res.data.to_dict()
+                elif hasattr(res.data, '__dict__'):
+                    # Fallback to dict conversion if to_dict is not available
+                    # Be careful with relationships, we might need to exclude them or handle them
+                    final_res['data'] = {k: v for k, v in res.data.__dict__.items() if not k.startswith('_')}
+            
+            return final_res, plugin_info_dict
 
     @with_exception_handling
     def tool_save(self, tool_data: dict) -> dict:
