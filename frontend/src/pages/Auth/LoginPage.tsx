@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { Loader2 } from 'lucide-react'
 import { useLogin, useUserSpaces, AuthService } from '@test-agentstudio/api-client'
+import { generateLetterAvatar } from '../../utils/avatar'
+import LanguageDropdown from '../../components/Common/LanguageDropdown'
 
 interface LoginForm {
   username: string
@@ -264,12 +266,14 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col py-12 px-4 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="flex w-48">
-        <div className="w-8 h-8 mr-2">
-          <img src="/jiuwen-logo.svg" width={64} height={64} alt="Jiuwen Logo" />
+      <div className="flex items-center justify-between">
+        <div className="flex w-48">
+          <div className="w-8 h-8 mr-2">
+            <img src="/jiuwen-logo.svg" width={64} height={64} alt="Jiuwen Logo" />
+          </div>
+          <div className="text-xl font-[800] item-end mt-2">openJiuwen</div>
         </div>
-        <div className="text-xl font-[800] item-end mt-2">openJiuwen</div>
+        <LanguageDropdown />
       </div>
       <div className="w-full flex justify-center flex-1 items-center">
         <div className="flex items-center justify-center h-full">
@@ -334,4 +338,3 @@ const LoginPage: React.FC = () => {
 }
 
 export default LoginPage
-import { generateLetterAvatar } from '../../utils/avatar'

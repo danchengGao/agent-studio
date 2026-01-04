@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { Menu, ChevronDown, Users, Globe } from 'lucide-react'
+import { Menu, ChevronDown, Users } from 'lucide-react'
 import { useLogout } from '@test-agentstudio/api-client'
 import { resolveAvatar } from '../../utils/avatar'
+import LanguageDropdown from '../Common/LanguageDropdown'
 
 interface HeaderProps {
   user: any
@@ -12,11 +13,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
-  const languageMenuRef = useRef<HTMLDivElement>(null)
   // const notificationsRef = useRef<HTMLDivElement>(null)
   const { logout } = useAuthStore()
   const navigate = useNavigate()
@@ -29,9 +28,6 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false)
-      }
-      if (languageMenuRef.current && !languageMenuRef.current.contains(event.target as Node)) {
-        setIsLanguageMenuOpen(false)
       }
       // if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
       //   setIsNotificationsOpen(false)
@@ -58,11 +54,6 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
     }
   }
 
-  const handleLanguageChange = (language: string) => {
-    i18n.changeLanguage(language)
-    setIsLanguageMenuOpen(false)
-  }
-
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8">
       {/* Left section */}
@@ -74,41 +65,7 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
 
       {/* Right section */}
       <div className="flex items-center space-x-4">
-        {/* Language switcher */}
-        <div className="relative" ref={languageMenuRef}>
-          <button
-            onClick={() => setIsLanguageMenuOpen(!isLanguageMenuOpen)}
-            className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            title={t('layout.header.language')}
-          >
-            <Globe className="w-4 h-4 text-gray-600" />
-            <span className="hidden sm:block text-sm font-medium text-gray-700">{i18n.language === 'zh-CN' ? '中文' : 'EN'}</span>
-            <ChevronDown className="w-3 h-3 text-gray-400" />
-          </button>
-
-          {isLanguageMenuOpen && (
-            <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-sm border border-gray-200 z-50">
-              <div className="py-1">
-                <button
-                  onClick={() => handleLanguageChange('zh-CN')}
-                  className={`flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100 ${
-                    i18n.language === 'zh-CN' ? 'text-blue-600 font-medium' : 'text-gray-700'
-                  }`}
-                >
-                  {t('layout.header.switchToChinese')}
-                </button>
-                <button
-                  onClick={() => handleLanguageChange('en-US')}
-                  className={`flex items-center w-full px-4 py-2 text-sm hover:bg-gray-100 ${
-                    i18n.language === 'en-US' ? 'text-blue-600 font-medium' : 'text-gray-700'
-                  }`}
-                >
-                  {t('layout.header.switchToEnglish')}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        <LanguageDropdown />
 
         {/* User menu */}
         <div className="relative" ref={userMenuRef}>
