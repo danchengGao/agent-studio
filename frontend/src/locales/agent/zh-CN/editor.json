@@ -75,7 +75,8 @@
         "replaceSystemPrompt": "替换系统提示词",
         "noContentForVersion": "该版本暂无内容",
         "selectPrompt": "请选择左侧提示词",
-        "loadFailed": "加载失败"
+        "loadFailed": "加载失败",
+        "noDescription": "暂无描述"
       },
       "relationBar": {
         "tooltipGoToTemplate": "跳转提示词模板管理",

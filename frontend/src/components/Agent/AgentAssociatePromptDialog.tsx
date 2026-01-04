@@ -261,11 +261,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton
-                      aria-label={t('searchPlaceholder')}
-                      size="small"
-                      onClick={() => loadRecommendedPrompts()}
-                    >
+                    <IconButton aria-label={t('searchPlaceholder')} size="small" onClick={() => loadRecommendedPrompts()}>
                       <Search size={16} />
                     </IconButton>
                   </InputAdornment>
@@ -322,7 +318,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
                         >
                           <div className="font-medium text-gray-900 truncate h-8">{template.name}</div>
                           <div className={`text-xs truncate h-4 ${template.description ? 'text-gray-600' : 'text-gray-400'}`}>
-                            {template.description || '暂无描述'}
+                            {template.description || t('noDescription')}
                           </div>
                         </div>
                         <div className="border-b border-gray-200"></div>
@@ -361,9 +357,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
             className="bg-gradient-to-r from-blue-600 to-purple-600"
             startIcon={replacing ? <CircularProgress size={16} /> : undefined}
           >
-            {replacing
-              ? t('replacing')
-              : t('replaceSystemPrompt')}
+            {replacing ? t('replacing') : t('replaceSystemPrompt')}
           </Button>
         </DialogActions>
       </>
@@ -375,14 +369,7 @@ export default AgentAssociatePromptDialog
 
 // 预览内容渲染：基础高亮（标题与标签）
 const renderPreviewContent = (text: string, hasSelection: boolean, t: (key: string) => string) => {
-  if (!text)
-    return (
-      <span>
-        {hasSelection
-          ? t('noContentForVersion')
-          : t('selectPrompt')}
-      </span>
-    )
+  if (!text) return <span>{hasSelection ? t('noContentForVersion') : t('selectPrompt')}</span>
   const lines = text.split(/\r?\n/)
   const headingRegs = [/^##+\s*/, /^角色[：:]/, /^目标[：:]/, /^工作流[：:]/, /^输出格式[：:]/, /^限制[：:]/]
   return (

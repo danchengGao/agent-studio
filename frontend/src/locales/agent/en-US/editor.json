@@ -75,7 +75,8 @@
         "replaceSystemPrompt": "Replace System Prompt",
         "noContentForVersion": "No content for this version",
         "selectPrompt": "Please select a prompt on the left",
-        "loadFailed": "Load failed"
+        "loadFailed": "Load failed",
+        "noDescription": "No description"
       },
       "relationBar": {
         "tooltipGoToTemplate": "Go to Prompt Template Management",
