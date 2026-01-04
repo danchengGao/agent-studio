@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
 import { ArrowLeft, Save, Plus, Trash2, Settings, Code, FileText, RotateCcw } from 'lucide-react'
 import { validateToolPath, getPathHelpText } from '../../utils/validationUtils'
+import { copyToClipboard } from '../../utils/prompts/utils'
 import {
   Card,
   Typography,
@@ -849,11 +850,11 @@ const ToolConfigurationPage: React.FC = () => {
             }
 
             if (bufferData.code === 200 && bufferData.data) {
-              // 成功响应
-              finalResults.execution_success = true
-              finalResults.error_code = bufferData.data.payload?.error_code || 0
-              finalResults.error_message = bufferData.data.payload?.error_message || 'success'
+              finalResults.error_code = bufferData.data.payload?.error_code ?? null
+              finalResults.error_message = bufferData.data.payload?.error_message || null
               finalResults.output = bufferData.data.payload?.output || null
+              // 根据error_code判断执行是否成功
+              finalResults.execution_success = bufferData.data.payload?.error_code === 0
             } else {
               // 错误响应
               finalResults.execution_success = false
@@ -1984,8 +1985,7 @@ const ToolConfigurationPage: React.FC = () => {
             <Button
               variant="outlined"
               onClick={() => {
-                navigator.clipboard.writeText(testResults)
-                setSnackbar({ open: true, message: '测试结果已复制到剪贴板', severity: 'success' })
+                copyToClipboard(testResults, setSnackbar, '测试结果已复制到剪贴板')
               }}
             >
               复制结果
