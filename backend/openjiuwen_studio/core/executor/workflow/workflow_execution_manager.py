@@ -34,6 +34,7 @@ class WorkflowExecutionManager:
         # 使用 conversation_id 作为key
         self._executions: Dict[str, WorkflowExecutionInfo] = {}
         self._lock = threading.Lock()
+        self._cancelled_flags: Dict[str, bool] = {}
 
     def register_execution(self, registration: WorkflowExecutionRegistration) -> None:
         """注册一个执行任务"""
@@ -48,6 +49,8 @@ class WorkflowExecutionManager:
                 task=registration.task,
                 thread_id=thread_id
             )
+            # 初始化取消标志
+            self._cancelled_flags[registration.conversation_id] = False
             logger.info(
                 f"Registered workflow execution: conversation_id={registration.conversation_id}, thread_id={thread_id}")
 
@@ -56,10 +59,16 @@ class WorkflowExecutionManager:
         with self._lock:
             if conversation_id in self._executions:
                 info = self._executions.pop(conversation_id)
+                self._cancelled_flags.pop(conversation_id, None)
                 logger.info(
                     f"Unregistered workflow execution: conversation_id={info.conversation_id}, "
                     f"thread_id={info.thread_id}"
                 )
+
+    def is_cancelled(self, conversation_id: str) -> bool:
+        """检查指定conversation_id是否已被取消"""
+        with self._lock:
+            return self._cancelled_flags.get(conversation_id, False)
 
     def get_execution(self, conversation_id: str) -> Optional[WorkflowExecutionInfo]:
         """获取执行信息"""
@@ -109,15 +118,28 @@ class WorkflowExecutionManager:
             return False
 
         try:
-            # 1. 清理会话 - 调用 runtime 的 close 方法
+            # 1. 设置取消标志（优先执行，让流式输出能快速响应）
+            with self._lock:
+                self._cancelled_flags[conversation_id] = True
+            logger.info(f"Set cancelled flag for conversation_id: {conversation_id}")
+
+            # 2. 清理会话 - 调用 runtime 的 close 方法
             if execution_info.runtime:
                 try:
+                    stream_writer_manager = execution_info.runtime.stream_writer_manager()
+                    if stream_writer_manager:
+                        # 关闭 stream emitter，这会停止所有的流式输出
+                        stream_emitter = stream_writer_manager.stream_emitter()
+                        if stream_emitter and not stream_emitter.is_closed():
+                            await stream_emitter.close()
+                            logger.info(f"Closed stream emitter for conversation_id: {execution_info.conversation_id}")
+
                     await execution_info.runtime.close()
                     logger.info(f"Closed runtime for conversation_id: {execution_info.conversation_id}")
                 except Exception as e:
                     logger.error(f"Failed to close runtime: {e}", exc_info=True)
 
-            # 2. 取消异步任务
+            # 3. 取消异步任务
             if execution_info.task and not execution_info.task.done():
                 execution_info.task.cancel()
                 try:
@@ -127,7 +149,7 @@ class WorkflowExecutionManager:
                 except Exception as e:
                     logger.error(f"Error cancelling task: {e}", exc_info=True)
 
-            # 3. 强制停止线程（如果需要）
+            # 4. 强制停止线程（如果需要）
             if force and execution_info.thread_id:
                 try:
                     # 注意：Python中无法直接强制杀死线程，但可以通过设置标志来中断

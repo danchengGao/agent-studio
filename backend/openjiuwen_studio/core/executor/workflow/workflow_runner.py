@@ -278,6 +278,11 @@ class WorkflowRunner(IWorkflowLoader):
                 if task and task.cancelled():
                     logger.warning(f"Workflow execution has been cancelled: conversation_id={conversation_id}")
                     break
+                # 检查执行管理器中的取消标志
+                if workflow_execution_manager.is_cancelled(conversation_id):
+                    logger.warning(
+                        f"Workflow execution cancelled via execution manager: conversation_id={conversation_id}")
+                    break
 
                 # 检查是否为需要过滤的workflow trace chunk
                 if isinstance(chunk, TraceSchema) and chunk.type == "tracer_workflow":
@@ -288,9 +293,7 @@ class WorkflowRunner(IWorkflowLoader):
                 # logger.debug(f"get workflow stream chunk: {chunk}")
                 last_chunk = chunk
 
-                rsp, trace_log, _ = result_convert(
-                    chunk, business_type="WORKFLOW", mapping=component_name_map
-                )
+                rsp, trace_log, _ = result_convert(chunk, business_type="WORKFLOW", mapping=component_name_map)
                 # if trace_detail:
                 #     await save_trace_detail(flow_index, trace_detail)
                 #     if trace_id is None:
@@ -306,8 +309,8 @@ class WorkflowRunner(IWorkflowLoader):
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
         except asyncio.CancelledError:
-            logger.error(f"Workflow execution cancelled: conversation_id={conversation_id}")
-            raise
+            logger.warning(f"Workflow execution cancelled: conversation_id={conversation_id}")
+            pass
         except JiuWenExecuteException as e:
             await handle_stream_error(trace_logs, [], last_chunk, e.error_code, e.message, flow_index)
             # if trace_id is not None:
