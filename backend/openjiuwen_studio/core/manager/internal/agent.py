@@ -62,6 +62,7 @@ class AgentItem(BaseModel):
     agent_id: str = Field(..., min_length=1, max_length=100, alias="id")
     agent_name: str = Field(..., min_length=1, max_length=AGENT_NAME_MAX_SIZE, alias="name")
     agent_version: str = Field(..., min_length=1, max_length=100, alias="version")
+    agent_type: str = Field(..., min_length=1, max_length=30, alias="type")
     description: str = Field(..., min_length=1, max_length=500, alias="desc")
     icon: str = Field(..., min_length=1, max_length=100)
     status: str = Field(..., min_length=1, max_length=100)

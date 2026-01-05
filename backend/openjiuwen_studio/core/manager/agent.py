@@ -738,6 +738,7 @@ def agent_get_list(req: AgentList, current_user: dict) -> ResponseModel:
             id=item_data.get("agent_id"),
             name=item_data.get("agent_name"),
             version=item_data.get("agent_version"),
+            type=item_data.get("agent_type"),
             desc=item_data.get("description"),
             icon=item_data.get("icon") or "🤖",
             status=item_data.get("status", "test"),

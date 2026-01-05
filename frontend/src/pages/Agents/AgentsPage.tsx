@@ -30,6 +30,7 @@ interface Agent {
   create_time: number
   api_endpoint: string
   agent_version: string
+  agent_type: string
   model?: searchModel
 }
 
@@ -381,6 +382,7 @@ const AgentsPage: React.FC = () => {
       space_id: user?.spaceId || getDefaultSpaceId(),
       description: editingAgentDescription,
       icon: agents.find(a => a.agent_id === editingAgentId)?.icon || '',
+      agent_type: agents.find(a => a.agent_id === editingAgentId)?.agent_type || '',
     }
 
     updateAgent(updateData, {

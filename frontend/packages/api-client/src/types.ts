@@ -1368,6 +1368,7 @@ export interface UpdateAgentRequest {
   space_id: string
   description: string
   icon: string
+  agent_type: string
 }
 
 // 智能体更新响应类型
@@ -1435,6 +1436,7 @@ export interface AgentListResponse {
       create_time: number
       api_endpoint: string
       agent_version: string
+      agent_type: string
     }>
     pagination: {
       page: number
@@ -1474,6 +1476,7 @@ export interface AgentSearchResponse {
       create_time: number
       api_endpoint: string
       agent_version: string
+      agent_type: string
     }>
     pagination: {
       page: number
