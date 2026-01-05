@@ -5145,7 +5145,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                             }}
                                           />
                                         </IconButton>
-                                        {false && (
+                                        {true && (
                                           <IconButton
                                             size="small"
                                             onClick={() => handleShowDetail('original', 0)}
@@ -5283,7 +5283,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                             }}
                                           />
                                         </IconButton>
-                                        {false && (
+                                        {true && (
                                           <IconButton
                                             size="small"
                                             onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)}
@@ -5917,7 +5917,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                         <IconButton size="small" onClick={() => handleCopyPrompt(originalPrompt)} sx={{ color: '#6b7280' }}>
                           <Copy className="w-3 h-3" />
                         </IconButton>
-                        {false && (
+                        {true && (
                           <IconButton size="small" onClick={() => handleShowDetail('original', 0)} sx={{ color: '#6b7280' }}>
                             <Info className="w-3 h-3" />
                           </IconButton>
@@ -5962,7 +5962,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                         <IconButton size="small" onClick={() => handleCopyPrompt(currentOptimizedPrompt)} sx={{ color: '#6b7280' }}>
                           <Copy className="w-3 h-3" />
                         </IconButton>
-                        {false && (
+                        {true && (
                           <IconButton size="small" onClick={() => handleShowDetail('optimized', currentOptimizedVersion + 1)} sx={{ color: '#6b7280' }}>
                             <Info className="w-3 h-3" />
                           </IconButton>

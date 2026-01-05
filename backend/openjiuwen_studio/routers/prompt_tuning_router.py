@@ -892,7 +892,7 @@ def get_history(
 
     # 查找指定轮次的数据
     for item in history_data:
-        if item.iteration_round == iteration_round:
+        if item.iteration_round == iteration_round - 1:
             # 对找到的item的evaluate_cases进行分页处理
             cases = item.evaluate_cases
             total_cases = len(cases)
