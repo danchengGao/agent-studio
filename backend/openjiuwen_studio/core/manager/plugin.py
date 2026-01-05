@@ -112,7 +112,7 @@ def plugin_get(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get plugin success",
-        data=PluginInfoResponse(plugin_info=PluginInfo(**(canvas_result.data)))
+        data=PluginInfoResponse(plugin_info=PluginInfo(**(canvas_result.data.model_dump())))
     )
 
 
@@ -133,7 +133,7 @@ def plugin_update(
             code=get_result.code,
             message=get_result.message,
         )
-    plugin = PluginBaseDBPd(**(get_result.data))
+    plugin = PluginBaseDBPd(**(get_result.data.model_dump()))
     plugin.name = req.name
     plugin.desc = req.desc
     plugin.url = req.url
@@ -275,7 +275,7 @@ def plugin_convert(
             message=get_result.message,
         )
     tool_info = get_result.data
-    plugin = convert.plugin_convert(PluginBaseDBPd(**plugin_dict), tool_info)
+    plugin = convert.plugin_convert(PluginBaseDBPd(**plugin_dict), tool_info.model_dump())
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="convert plugin success",
@@ -457,7 +457,7 @@ def plugin_get_api(
         )
 
     tool = get_result.data
-    if tool.get('plugin_id') != req.plugin_id:
+    if tool.plugin_id != req.plugin_id:
         return ResponseModel(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="plugin id is not match",
@@ -467,7 +467,7 @@ def plugin_get_api(
         code=status.HTTP_200_OK,
         message="get plugin api success",
         data=PluginApiInfoResponse(
-            api_info=[PluginApiInfo(**tool)],
+            api_info=[PluginApiInfo(**(tool.model_dump()))],
             total=1,
         )
     )
@@ -681,7 +681,7 @@ def plugin_publish(
         if not is_valid:
             return ResponseModel(
                 code=status.HTTP_400_BAD_REQUEST,
-                message="Version check failed",
+                message=f"Version check failed",
                 data=None
             )
 
@@ -702,7 +702,7 @@ def plugin_publish(
         )
 
     plugin_data = draft_response.data
-    plugin_info = PluginBaseDBPd(**(plugin_data))
+    plugin_info = PluginBaseDBPd(**(plugin_data.model_dump()))
 
     # 5. 创建发布版本
     publish_data = {

@@ -62,41 +62,11 @@ class PluginRepository():
             res = plugin_db.get_dl_in_sql(find_id=find_id, return_first_item=True, return_declarativebase=True)
             if res.code != status.HTTP_200_OK or not res.data:
                 return res.model_dump(exclude_none=True), []
-            
-            # Extract tool list from the PluginBaseDB object
             tool_list: list[dict] = []
-            if hasattr(res.data, 'tool_list') and res.data.tool_list:
-                for tool in res.data.tool_list:
-                    tool_list.append(tool.to_dict())
-            
-            # Convert PluginBaseDB object to dict before returning
-            response_model = res.model_dump(exclude_none=True)
-            # Replace the Pydantic object in 'data' with its dictionary representation
-            if hasattr(res.data, 'to_dict'):
-                response_model['data'] = res.data.to_dict()
-            elif hasattr(res.data, 'model_dump'):
-                response_model['data'] = res.data.model_dump()
-            # If we can't convert it easily, let's just use the Pydantic model's data
-            # Note: JiuwenBaseRepository.get_dl_in_sql returns a ResponseModel where data is the DB object
-            # when return_declarativebase=True
-            
-            # Re-construct the response using model_dump but ensure 'data' is a dict
-            final_res = res.model_dump(exclude_none=True)
-            if res.data:
-                # Use SQLAlchemy to Pydantic conversion or manual dict conversion
-                # Assuming PluginBaseDB has a way to be converted to dict
-                # Usually we can use the Pydantic model from the DB model
-                from openjiuwen_studio.models.plugin import PluginBaseDBPd
-                try:
-                    plugin_pd = PluginBaseDBPd.model_validate(res.data)
-                    final_res['data'] = plugin_pd.model_dump()
-                except Exception as e:
-                    jiuwen_db_logger.warning(f"Failed to convert PluginBaseDB to dict: {e}")
-                    # Fallback: try direct dict conversion if available
-                    if hasattr(res.data, '__dict__'):
-                        final_res['data'] = {k: v for k, v in res.data.__dict__.items() if not k.startswith('_')}
+            for tool in res.data.tool_list:
+                tool_list.append(tool.to_dict())
 
-            return final_res, tool_list
+            return res.model_dump(exclude_none=True), tool_list
 
     @with_exception_handling
     def plugin_save(self, plugin_data: dict):

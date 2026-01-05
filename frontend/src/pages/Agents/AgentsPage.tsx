@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Brain, Plus, Search, Edit, Trash2, Copy, ChevronLeft, ChevronRight, AlertCircle, Check, X, Upload, Download, AlertTriangle } from 'lucide-react'
-import { AgentService, useAgents, useUpdateAgent, useCopyAgent, useSearchAgents, useModels } from '@test-agentstudio/api-client'
-import { AgentSortBy, AgentSortOrder } from '@test-agentstudio/api-client'
+import { Brain, Plus, Search, Edit, Trash2, Copy, ChevronLeft, ChevronRight, AlertCircle, Check, X } from 'lucide-react'
+import { AgentService, useAgents, useUpdateAgent, useCopyAgent, useSearchAgents, useModels } from '@test-agentstudio/api-client' // 导入useUpdateAgent和useSearchAgents
+import { AgentSortBy, AgentSortOrder } from '@test-agentstudio/api-client' // 导入排序枚举
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
-import { useAuthStore } from '../../stores/useAuthStore'
-import { useQueryClient } from 'react-query'
+import { useAuthStore } from '../../stores/useAuthStore' // 导入auth store
+import { useQueryClient } from 'react-query' // 导入useQueryClient
 import DeleteConfirmationDialog from '../../components/Common/DeleteConfirmationDialog'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../Common/UnifiedSnackbar'
 import { CircularProgress } from '@mui/material'
@@ -36,9 +36,9 @@ interface Agent {
 
 const AgentsPage: React.FC = () => {
   const { t } = useTranslation()
-  const { user } = useAuthStore()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const { user } = useAuthStore() // 获取用户信息
+  const navigate = useNavigate() // 添加导航hook
+  const location = useLocation() // 获取路由位置信息，用于监听路由变化
   const [sortBy, setSortBy] = useState<AgentSortBy>(AgentSortBy.update_time)
   const [sortOrder, setSortOrder] = useState<AgentSortOrder>(AgentSortOrder.desc)
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -48,18 +48,13 @@ const AgentsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('')
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const lastPathnameRef = useRef<string>('')
-  const refetchAgentsRef = useRef<(() => void) | null>(null)
+  const lastPathnameRef = useRef<string>('') // 用于跟踪上次的路由路径
+  const refetchAgentsRef = useRef<(() => void) | null>(null) // 存储 refetch 函数的引用
 
   const [error, setError] = useState<string>('')
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, agentId: '', agentName: '' })
   const [isDeleting, setIsDeleting] = useState(false)
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
-
-  // 导入导出相关状态
-  const [isImporting, setIsImporting] = useState(false)
-  const [importConflict, setImportConflict] = useState<{ isOpen: boolean; agentName: string; data: any } | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 编辑状态相关
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null)
@@ -81,7 +76,7 @@ const AgentsPage: React.FC = () => {
   const { data: modelsData, isLoading: modelsLoading } = useModels({
     spaceId: user?.spaceId || getDefaultSpaceId(),
     is_active: true,
-    size: 100,
+    size: 100, // 后端限制最大为100
   })
 
   // 创建可用模型名称集合，用于快速查找
@@ -95,7 +90,7 @@ const AgentsPage: React.FC = () => {
 
     debounceTimerRef.current = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm)
-    }, 300)
+    }, 300) // 300ms防抖延迟
 
     return () => {
       if (debounceTimerRef.current) {
@@ -139,16 +134,23 @@ const AgentsPage: React.FC = () => {
 
   // 每次进入页面时（组件挂载或路由变化时）自动刷新列表数据
   useEffect(() => {
+    // 当路由路径是智能体列表页时，刷新数据
+    // 这样可以确保从编辑页返回时自动刷新列表
     if (location.pathname === '/dashboard/agents') {
+      // 如果路径发生变化（从其他页面返回）或首次挂载，则刷新数据
       if (lastPathnameRef.current !== location.pathname) {
+        // 强制刷新：先使缓存失效（忽略 staleTime），然后调用 refetch
+        // 使所有相关的查询缓存失效，确保强制刷新
         queryClient.invalidateQueries(['agents', 'api', 'list'], { exact: false })
         queryClient.invalidateQueries(['agents', 'search'], { exact: false })
+        // 调用 refetch 立即刷新数据（使用 ref 避免依赖问题）
         if (refetchAgentsRef.current) {
           refetchAgentsRef.current()
         }
         lastPathnameRef.current = location.pathname
       }
     } else {
+      // 离开智能体列表页时，重置跟踪的路径，以便下次进入时能触发刷新
       lastPathnameRef.current = ''
     }
   }, [location.pathname, queryClient])
@@ -159,6 +161,7 @@ const AgentsPage: React.FC = () => {
   const totalItems = pagination?.total || 0
   const totalPages = pagination?.total_pages || 1
 
+  // 直接使用后端返回的智能体数据，后端已处理分页和排序
   const agents = allAgents
   const paginatedAgents = agents
 
@@ -170,7 +173,7 @@ const AgentsPage: React.FC = () => {
     } else {
       setError('')
     }
-  }, [agentsError])
+  }, [agentsError]) // 移除 showError 和 t 依赖，避免无限循环
 
   // 打开删除确认对话框
   const handleOpenDeleteDialog = (agentId: string, agentName: string) => {
@@ -188,28 +191,40 @@ const AgentsPage: React.FC = () => {
 
     setIsDeleting(true)
     try {
+      // 调用后端API删除智能体
       const response = await AgentService.deleteAgent({
         space_id: getDefaultSpaceId(),
         agent_id: deleteDialog.agentId,
       })
 
       if (response.code === 200) {
+        // 删除成功，通知React Query刷新缓存
         const spaceId = user?.spaceId || getDefaultSpaceId()
+
+        // Invalidate all agent list queries (exact: false to match all queries starting with ['agents', 'api', 'list'])
         await queryClient.invalidateQueries({
           queryKey: ['agents', 'api', 'list'],
           exact: false,
         })
+
+        // Invalidate all agent search queries (exact: false to match all queries starting with ['agents', 'search'])
         await queryClient.invalidateQueries({
           queryKey: ['agents', 'search'],
           exact: false,
         })
+
+        // 使用refetch方法直接刷新数据
         await refetchAgents()
+
+        // 显示成功提示
         showSuccess(t('common.messages.agentDeleteSuccess'))
       } else {
+        // API调用失败时显示错误信息
         console.error('删除智能体失败:', response)
         showError(`${t('common.messages.agentDeleteFailed')}: ${response.message || t('common.messages.unknownError')}`)
       }
     } catch (err) {
+      // API调用异常时显示错误信息
       const error = err as Error
       console.error('删除智能体异常:', error)
       showError(`${t('common.messages.agentDeleteFailed')}: ${error.message || t('common.messages.unknownError')}`)
@@ -229,9 +244,13 @@ const AgentsPage: React.FC = () => {
       {
         onSuccess: response => {
           if (response.code === 200) {
+            // 复制成功，通知React Query刷新缓存
             const spaceId = user?.spaceId || getDefaultSpaceId()
             queryClient.invalidateQueries(['agents', 'api', 'list', spaceId])
+
+            // 使用refetch方法直接刷新数据
             refetchAgents()
+
             showSuccess(`${t('common.messages.agentCopySuccess')}: "${agentName}"`)
           } else {
             showError(`${t('common.messages.agentCopyFailed')}: ${response.message || t('common.messages.unknownError')}`)
@@ -246,113 +265,6 @@ const AgentsPage: React.FC = () => {
     )
   }
 
-  // 导出智能体
-  const handleExportAgent = async (agentId: string, agentName: string) => {
-    try {
-      const response = await AgentService.exportAgent({
-        space_id: user?.spaceId || getDefaultSpaceId(),
-        agent_id: agentId,
-      })
-
-      if (response.code === 200 && response.data) {
-        const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${agentName}_export.json`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
-        showSuccess('智能体导出成功')
-      } else {
-        showError(`导出失败: ${response.message || '未知错误'}`)
-      }
-    } catch (error) {
-      console.error('导出异常:', error)
-      showError(`导出异常: ${error instanceof Error ? error.message : '未知错误'}`)
-    }
-  }
-
-  // 执行导入操作
-  const executeImport = async (importData: any, overwrite: boolean) => {
-    try {
-      setIsImporting(true)
-      const response = await AgentService.importAgent({
-        space_id: user?.spaceId || getDefaultSpaceId(),
-        import_data: importData,
-        overwrite: overwrite,
-      })
-
-      if (response.code === 200) {
-        showSuccess(overwrite ? '智能体覆盖导入成功' : '智能体导入成功')
-        queryClient.invalidateQueries(['agents', 'api', 'list'], { exact: false })
-        refetchAgents()
-      } else {
-        showError(`导入失败: ${response.message || '未知错误'}`)
-      }
-    } catch (error) {
-      console.error('导入异常:', error)
-      showError(`导入异常: ${error instanceof Error ? error.message : '文件解析失败'}`)
-    } finally {
-      setIsImporting(false)
-      setImportConflict(null)
-    }
-  }
-
-  // 触发文件选择
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  // 处理文件选择导入
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    event.target.value = ''
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const content = e.target?.result as string
-        const importData = JSON.parse(content)
-
-        if (!importData.agent || !importData.dependencies) {
-          throw new Error('无效的导入文件格式')
-        }
-
-        const agentId = importData.agent.agent_id
-        const spaceId = user?.spaceId || getDefaultSpaceId()
-
-        // 检查智能体是否存在
-        try {
-          const checkRes = await AgentService.getAgentDetail({
-            space_id: spaceId,
-            agent_id: agentId,
-          })
-          
-          if (checkRes.code === 200) {
-             setImportConflict({
-               isOpen: true,
-               agentName: importData.agent.agent_name,
-               data: importData,
-             })
-          } else {
-             executeImport(importData, false)
-          }
-        } catch (err) {
-          executeImport(importData, false)
-        }
-
-      } catch (error) {
-        console.error('文件解析异常:', error)
-        showError(`文件解析异常: ${error instanceof Error ? error.message : '未知错误'}`)
-      }
-    }
-    reader.readAsText(file)
-  }
-
   // 处理点击进入编辑状态
   const handleStartEditing = (agent: Agent, field: 'name' | 'description') => {
     setEditingAgentId(agent.agent_id)
@@ -361,10 +273,12 @@ const AgentsPage: React.FC = () => {
     setEditingAgentDescription(agent.description)
     setIsEditing(true)
 
+    // 短暂延迟后聚焦到输入框
     setTimeout(() => {
       const inputElement = document.getElementById(`edit-input-${agent.agent_id}-${field}`)
       if (inputElement) {
         inputElement.focus()
+        // 全选输入框内容
         if (inputElement instanceof HTMLInputElement || inputElement instanceof HTMLTextAreaElement) {
           inputElement.select()
         }
@@ -388,18 +302,24 @@ const AgentsPage: React.FC = () => {
     updateAgent(updateData, {
       onSuccess: response => {
         if (response.code === 200) {
+          // 更新成功，刷新智能体列表
           const spaceId = user?.spaceId || getDefaultSpaceId()
           queryClient.invalidateQueries(['agents', 'api', 'list', spaceId])
+
+          // 显示成功提示
           showSuccess(t('common.messages.agentUpdateSuccess'))
         } else {
+          // API调用失败时显示错误信息
           showError(`${t('common.messages.error')}: ${response.message || t('common.messages.unknownError')}`)
         }
       },
       onError: err => {
         const error = err as Error
+        // API调用异常时显示错误信息
         showError(`${t('common.messages.error')}: ${error.message || t('common.messages.unknownError')}`)
       },
       onSettled: () => {
+        // 无论成功失败，都退出编辑状态
         setIsEditing(false)
         setEditingAgentId(null)
         setEditingAgentField(null)
@@ -417,24 +337,18 @@ const AgentsPage: React.FC = () => {
   // 处理键盘事件
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      // 按下Enter键保存编辑，不触发默认行为（表单提交）
       e.preventDefault()
       handleSaveEditing()
     } else if (e.key === 'Escape') {
+      // 按下Escape键取消编辑
       handleCancelEditing()
     }
   }
 
   return (
     <div className="space-y-8 p-6 min-h-full">
-      {/* 隐藏的文件输入框 */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        accept=".json"
-        onChange={handleFileChange}
-      />
-
+      {/* 渲染部分保持不变，但需要处理loading状态 */}
       {/* Page header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-blue-800 to-indigo-900 mb-2">{t('agents.title')}</h1>
@@ -490,20 +404,11 @@ const AgentsPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Import Agent Button */}
-        <button
-          className="inline-flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
-          onClick={handleImportClick}
-          disabled={isImporting}
-        >
-          {isImporting ? <CircularProgress size={20} /> : <Upload className="w-5 h-5" />}
-          <span>导入</span>
-        </button>
-
         {/* Create Agent Button */}
         <button
           className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
           onClick={() => {
+            // 添加点击日志来调试
             console.log('顶部创建智能体按钮被点击')
             navigate('/dashboard/agents/new')
           }}
@@ -668,13 +573,6 @@ const AgentsPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <button
                       className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
-                      title="导出智能体"
-                      onClick={() => handleExportAgent(agent.agent_id, agent.agent_name)}
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button
-                      className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
                       title={t('common.tooltips.copyAgent')}
                       onClick={() => handleCopyAgent(agent.agent_id, agent.agent_name)}
                       disabled={isCopying}
@@ -710,26 +608,17 @@ const AgentsPage: React.FC = () => {
               ? `没有找到包含 "${debouncedSearchTerm.trim()}" 的智能体，请尝试其他搜索词或创建新的智能体`
               : t('agents.agentList.createFirstAgent')}
           </p>
-          <div className="flex justify-center space-x-4">
-            <button
-              className="inline-flex items-center space-x-2 bg-white text-gray-700 border border-gray-300 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-md"
-              onClick={handleImportClick}
-              disabled={isImporting}
-            >
-              {isImporting ? <CircularProgress size={20} /> : <Upload className="w-5 h-5" />}
-              <span>导入</span>
-            </button>
-            <button
-              className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
-              onClick={() => {
-                console.log('创建智能体按钮被点击，搜索词:', debouncedSearchTerm)
-                navigate('/dashboard/agents/new')
-              }}
-            >
-              <Plus className="w-5 h-5" />
-              <span>{debouncedSearchTerm.trim() ? '创建新智能体' : t('agents.agentList.createFirst')}</span>
-            </button>
-          </div>
+          <button
+            className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
+            onClick={() => {
+              // 添加点击日志来调试
+              console.log('创建智能体按钮被点击，搜索词:', debouncedSearchTerm)
+              navigate('/dashboard/agents/new')
+            }}
+          >
+            <Plus className="w-5 h-5" />
+            <span>{debouncedSearchTerm.trim() ? '创建新智能体' : t('agents.agentList.createFirst')}</span>
+          </button>
         </div>
       )}
 
@@ -742,7 +631,7 @@ const AgentsPage: React.FC = () => {
               value={page_size}
               onChange={e => {
                 setPageSize(Number(e.target.value))
-                setCurrentPage(1)
+                setCurrentPage(1) // 重置到第一页
               }}
               className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 shadow-sm pagination-select"
             >
@@ -765,6 +654,7 @@ const AgentsPage: React.FC = () => {
 
             <div className="flex items-center space-x-1">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // 计算要显示的页码
                 let pageNum: number
                 if (totalPages <= 5) {
                   pageNum = i + 1
@@ -810,55 +700,6 @@ const AgentsPage: React.FC = () => {
         itemName={deleteDialog.agentName}
         isLoading={isDeleting}
       />
-
-      {/* 导入冲突确认对话框 */}
-      {importConflict && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={() => setImportConflict(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all">
-             {/* Close */}
-             <button onClick={() => setImportConflict(null)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600">
-               <X className="w-6 h-6" />
-             </button>
-             {/* Icon */}
-             <div className="flex justify-center mb-6">
-               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
-                 <AlertTriangle className="w-8 h-8 text-orange-600" />
-               </div>
-             </div>
-             {/* Content */}
-             <div className="text-center mb-8">
-               <h3 className="text-2xl font-bold text-gray-900 mb-4">智能体已存在</h3>
-               <p className="text-gray-600 text-lg leading-relaxed">
-                 当前空间下已存在智能体 "{importConflict.agentName}",
-                 <br/>
-                 您希望如何处理？
-               </p>
-             </div>
-             {/* Actions */}
-             <div className="flex flex-col gap-3">
-               <button
-                 onClick={() => executeImport(importConflict.data, true)}
-                 className="w-full px-6 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 font-medium transition-all"
-               >
-                 覆盖现有智能体 (Overwrite)
-               </button>
-               <button
-                 onClick={() => executeImport(importConflict.data, false)}
-                 className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-medium transition-all"
-               >
-                 创建副本 (Create Copy)
-               </button>
-               <button
-                 onClick={() => setImportConflict(null)}
-                 className="w-full px-6 py-3 border-2 border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-all"
-               >
-                 取消
-               </button>
-             </div>
-          </div>
-        </div>
-      )}
 
       {/* Unified Snackbar */}
       <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />

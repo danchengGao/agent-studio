@@ -15,7 +15,7 @@ import openjiuwen_studio.core.manager.agent as mgr
 from openjiuwen_studio.routers.models import get_model_config_manager
 from openjiuwen_studio.schemas.agent import AgentCreate, AgentGet, AgentDisplayInfo, AgentList, AgentPublish, \
     AgentGetVersion, AgentUpdate, AgentCopy, AgentId, AgentSearchRequest, AgentVersionListRequest, \
-    AgentVersionListResponse, AgentExportRequest, AgentImportRequest
+    AgentVersionListResponse
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.execution_log import ExecutionLogsCreateList, ApiExecutionLogGet, \
     ApiExecutionLogsDebugEnter, AgExecutionLogsFilter, AgExecutionLogIndex
@@ -487,35 +487,3 @@ async def enter_agent_execution_logs_debug(
         return handle_response(res)
     except ValidationError as e:
         raise handle_validation_error(e, "AGENT_EXECUTION_DEBUG", current_user.get('user_id', 'unknown')) from e
-
-
-@agents_router.post("/export", response_model=ResponseModel[dict])
-async def agent_export(
-        request: dict,
-        current_user: dict = Depends(get_current_user)
-):
-    """
-    导出智能体及其依赖项。
-    """
-    try:
-        req = validate_request(request, AgentExportRequest)
-        res = mgr.agent_export(req, current_user)
-        return handle_response(res)
-    except ValidationError as e:
-        raise handle_validation_error(e, "AGENT_EXPORT", current_user.get('user_id', 'unknown')) from e
-
-
-@agents_router.post("/import", response_model=ResponseModel[dict])
-async def agent_import(
-        request: dict,
-        current_user: dict = Depends(get_current_user)
-):
-    """
-    导入智能体及其依赖项。
-    """
-    try:
-        req = validate_request(request, AgentImportRequest)
-        res = mgr.agent_import(req, current_user)
-        return handle_response(res)
-    except ValidationError as e:
-        raise handle_validation_error(e, "AGENT_IMPORT", current_user.get('user_id', 'unknown')) from e

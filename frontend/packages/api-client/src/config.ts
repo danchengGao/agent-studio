@@ -133,8 +133,6 @@ export const API_ENDPOINTS = {
     DELETE: '/agents/delete',
     COPY: '/agents/copy',
     PUBLISH: '/agents/publish',
-    EXPORT: '/agents/export',
-    IMPORT: '/agents/import',
     VERSION_LIST: '/agents/version_list',
     DELETE_PUBLISH_VERSION: '/agents/delete_publish',
     EXECUTE: '/agents/:id/execute',
