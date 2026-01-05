@@ -52,6 +52,19 @@ i18n
     },
   })
 
+// TODO：初始化时如果没有存储语言，默认设置为中文，国际化整改后删除
+i18n.on('initialized', () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+  const storage = window.localStorage
+  const storedLanguage = storage.getItem('i18nextLng')
+  if (storedLanguage !== 'zh-CN') {
+    storage.setItem('i18nextLng', 'zh-CN')
+    i18n.changeLanguage('zh-CN')
+  }
+})
+
 // Attach i18next to window for workflow-canvas to access
 // @ts-ignore - i18next global access
 if (typeof window !== 'undefined') {

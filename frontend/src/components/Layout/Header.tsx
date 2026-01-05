@@ -65,7 +65,7 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
 
       {/* Right section */}
       <div className="flex items-center space-x-4">
-        <LanguageDropdown />
+        {/* <LanguageDropdown /> */}
 
         {/* User menu */}
         <div className="relative" ref={userMenuRef}>

@@ -273,7 +273,7 @@ const LoginPage: React.FC = () => {
           </div>
           <div className="text-xl font-[800] item-end mt-2">openJiuwen</div>
         </div>
-        <LanguageDropdown />
+        {/* <LanguageDropdown /> */}
       </div>
       <div className="w-full flex justify-center flex-1 items-center">
         <div className="flex items-center justify-center h-full">
