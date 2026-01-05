@@ -47,7 +47,7 @@ export const renderForm = () => {
       <FormHeader />
       <FormContent>
         <FormInput showAddButton={false} defaultFields={['query']} schema={{ type: 'string' }} />
-        <FormModel />
+        <FormModel showHistoryEnable={true} />
         <FormPrompt />
         <FormMaxResponse />
         <FormOutput defaultFields={['user_response']} minProperties={2} expandable={true} />

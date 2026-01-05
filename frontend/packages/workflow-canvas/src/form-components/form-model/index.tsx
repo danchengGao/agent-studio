@@ -25,9 +25,10 @@ export interface FormModelProps {
   name?: string
   fieldPrefix?: string
   required?: boolean
+  showHistoryEnable?: boolean
 }
 
-export function FormModel({ name, fieldPrefix = 'inputs', required = true }: FormModelProps) {
+export function FormModel({ name, fieldPrefix = 'inputs', required = true, showHistoryEnable = false }: FormModelProps) {
   const { t } = useTranslation()
   const displayName = name || t('workflowCanvas.formModel.model')
   const isSidebar = useIsSidebar()
@@ -164,25 +165,27 @@ export function FormModel({ name, fieldPrefix = 'inputs', required = true }: For
             required={required}
             vertical
             customComponent={
-              <Field<boolean> name={`${fieldPrefix}.historyEnable`} defaultValue={false}>
-                {({ field }) => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '14px' }}>{t('workflowCanvas.formModel.enableHistory')}</span>
-                    <Switch
-                      checked={field.value ?? false}
-                      onChange={field.onChange}
-                      size="small"
-                      style={
-                        {
-                          '--semi-color-success': '#1890ff',
-                          '--semi-color-success-hover': '#40a9ff',
-                          '--semi-color-success-active': '#096dd9',
-                        } as React.CSSProperties
-                      }
-                    />
-                  </div>
-                )}
-              </Field>
+              showHistoryEnable ? (
+                <Field<boolean> name={`${fieldPrefix}.historyEnable`} defaultValue={false}>
+                  {({ field }) => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '14px' }}>{t('workflowCanvas.formModel.enableHistory')}</span>
+                      <Switch
+                        checked={field.value ?? false}
+                        onChange={field.onChange}
+                        size="small"
+                        style={
+                          {
+                            '--semi-color-success': '#1890ff',
+                            '--semi-color-success-hover': '#40a9ff',
+                            '--semi-color-success-active': '#096dd9',
+                          } as React.CSSProperties
+                        }
+                      />
+                    </div>
+                  )}
+                </Field>
+              ) : undefined
             }
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
