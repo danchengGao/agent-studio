@@ -171,7 +171,7 @@ const ToolConfigurationPage: React.FC = () => {
     name: '',
     description: '',
     type: 'string',
-    method: 'query',
+    method: 0,
     is_required: false,
   })
 
@@ -240,7 +240,7 @@ const ToolConfigurationPage: React.FC = () => {
             name: param.name,
             description: param.desc || '',
             type: mapNumberToString(param.type),
-            method: 'query',
+            method: param.method || 1,
             is_required: param.is_required,
           })) || [],
         output_parameters:
@@ -249,7 +249,7 @@ const ToolConfigurationPage: React.FC = () => {
             name: param.name,
             description: param.desc || '',
             type: mapNumberToString(param.type),
-            method: 'query',
+            method: param.method || 1,
             is_required: param.is_required,
           })) || [],
         headers:
@@ -480,6 +480,22 @@ const ToolConfigurationPage: React.FC = () => {
     }
   }
 
+  const getMethodLabel = (method: string | number): string => {
+    const methodNum = typeof method === 'string' ? parseInt(method) : method
+    switch (methodNum) {
+      case 0:
+        return 'None'
+      case 1:
+        return 'Header'
+      case 2:
+        return 'Query'
+      case 3:
+        return 'Body'
+      default:
+        return 'None'
+    }
+  }
+
   const convertToolToApiRequest = (tool: Tool) => {
     const convertParams = (params: ToolParameter[]) =>
       params.map(param => ({
@@ -487,6 +503,7 @@ const ToolConfigurationPage: React.FC = () => {
         desc: param.description,
         type: mapTypeToNumber(param.type),
         is_required: param.is_required ?? false,
+        method: parseInt(param.method) || 0,
       }))
 
     if (pluginType === 'code') {
@@ -548,7 +565,7 @@ const ToolConfigurationPage: React.FC = () => {
         name: '',
         description: '',
         type: 'string',
-        method: 'query',
+        method: 0,
         is_required: false,
       })
     }
@@ -1216,7 +1233,7 @@ const ToolConfigurationPage: React.FC = () => {
                               {param.name}
                             </Typography>
                             <Chip label={param.type} size="small" />
-                            <Chip label={param.method} size="small" variant="outlined" />
+                            <Chip label={getMethodLabel(param.method)} size="small" variant="outlined" />
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
@@ -1272,7 +1289,7 @@ const ToolConfigurationPage: React.FC = () => {
                               {param.name}
                             </Typography>
                             <Chip label={param.type} size="small" />
-                            <Chip label={param.method} size="small" variant="outlined" />
+                            <Chip label={getMethodLabel(param.method)} size="small" variant="outlined" />
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
@@ -1678,7 +1695,10 @@ const ToolConfigurationPage: React.FC = () => {
                   </Typography>
                   <FormControl fullWidth>
                     <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
-                      <MenuItem value="query">Query参数</MenuItem>
+                      <MenuItem value={0}>无</MenuItem>
+                      <MenuItem value={1}>Header参数</MenuItem>
+                      <MenuItem value={2}>Query参数</MenuItem>
+                      {tool.method !== 1 && <MenuItem value={3}>Body参数</MenuItem>}
                     </Select>
                   </FormControl>
                 </div>

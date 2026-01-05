@@ -1654,6 +1654,14 @@ export enum PluginApiMethod {
   patch = 5,
 }
 
+// 参数发送方法枚举
+export enum ParamSendMethod {
+  NONE = 0,
+  HEADER = 1,
+  QUERY = 2,
+  BODY = 3,
+}
+
 export interface PluginCreateRequest {
   name: string
   desc: string
@@ -1778,6 +1786,7 @@ export interface PluginApiParam {
   desc?: string
   type: number
   is_required?: boolean
+  method?: ParamSendMethod
 }
 
 export interface PluginApiHeader {
