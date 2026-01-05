@@ -3,90 +3,70 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { ASTFactory, EffectOptions, FlowNodeRegistry, DataEvent, Effect, EffectFuncProps } from '@flowgram.ai/editor'
+import { ASTFactory, EffectOptions, FlowNodeRegistry, DataEvent, EffectFuncProps } from '@flowgram.ai/editor'
 import { JsonSchemaUtils } from '@flowgram.ai/json-schema'
 import { IFlowValue, FlowValueUtils } from '../../form-materials'
 
+const resolveFlowValueType = (flowVal: IFlowValue, scope: any, privateScope: any) => {
+  if (!flowVal) {
+    return ASTFactory.createString()
+  }
+
+  if (flowVal.type === 'constant' && flowVal.schema) {
+    try {
+      return JsonSchemaUtils.schemaToAST(flowVal.schema)
+    } catch (error) {
+      console.warn('Failed to convert constant schema to AST:', error)
+    }
+  }
+
+  if (flowVal.type === 'ref' || flowVal.type === 'expression') {
+    try {
+      let schema = undefined
+      if (privateScope) {
+        schema = FlowValueUtils.inferJsonSchema(flowVal, privateScope)
+      }
+
+      if (!schema && scope) {
+        schema = FlowValueUtils.inferJsonSchema(flowVal, scope)
+      }
+
+      if (schema) {
+        return JsonSchemaUtils.schemaToAST(schema)
+      }
+    } catch (error) {
+      console.warn('Failed to infer type from variable:', error)
+    }
+  }
+
+  return ASTFactory.createString()
+}
+
 const parseLoopEffect = (value: any, ctx: EffectFuncProps['context']) => {
-  console.log('provideLoopEffect', value)
   const loopParam = value || {}
   const loopType = loopParam.type || 'numLoop'
-  const loopArray: Record<string, IFlowValue> = loopType === 'arrayLoop' ? loopParam.loopArray || {} : {}
+  const loopArray: Record<string, IFlowValue> = loopType === 'arrayLoop' ? (loopParam.loopArray || {}) : {}
   const intermediateVar: Record<string, IFlowValue> = loopParam.intermediateVar || {}
 
   const scope = ctx.node.scope
   const privateScope = ctx.node.privateScope
 
-  const resolveFlowValueType = (flowVal: IFlowValue) => {
-    if (!flowVal) {
-      return ASTFactory.createString()
-    }
-
-    if (flowVal.type === 'constant' && flowVal.schema) {
-      try {
-        return JsonSchemaUtils.schemaToAST(flowVal.schema)
-      } catch (error) {
-        console.warn('Failed to convert constant schema to AST:', error)
-      }
-    }
-
-    if (flowVal.type === 'ref') {
-      try {
-        let schema = undefined
-        if (privateScope) {
-          schema = FlowValueUtils.inferJsonSchema(flowVal, privateScope)
-        }
-
-        if (!schema && scope) {
-          schema = FlowValueUtils.inferJsonSchema(flowVal, scope)
-        }
-
-        if (schema) {
-          return JsonSchemaUtils.schemaToAST(schema)
-        }
-      } catch (error) {
-        console.warn('Failed to infer type from ref variable:', error)
-      }
-    }
-
-    if (flowVal.type === 'expression') {
-      try {
-        let schema = undefined
-        if (privateScope) {
-          schema = FlowValueUtils.inferJsonSchema(flowVal, privateScope)
-        }
-
-        if (!schema && scope) {
-          schema = FlowValueUtils.inferJsonSchema(flowVal, scope)
-        }
-
-        if (schema) {
-          return JsonSchemaUtils.schemaToAST(schema)
-        }
-      } catch (error) {
-        console.warn('Failed to infer type from expression:', error)
-      }
-    }
-
-    return ASTFactory.createString()
-  }
-
   const arrayProperties =
     loopType === 'arrayLoop'
-      ? Object.entries(loopArray).map(([key, flowValue]) => {
-          return ASTFactory.createProperty({
+      ? Object.entries(loopArray).map(([key, flowValue]) =>
+          ASTFactory.createProperty({
             key,
-            type: resolveFlowValueType(flowValue as IFlowValue),
+            type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
           })
-        })
+        )
       : []
 
-  const intermediateProperties = Object.entries(intermediateVar).map(([key, flowValue]) => {
-    return ASTFactory.createProperty({
+  const intermediateProperties = Object.entries(intermediateVar).map(([key, flowValue]) =>
+    ASTFactory.createProperty({
       key,
-      type: resolveFlowValueType(flowValue as IFlowValue),
+      type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
     })
-  })
+  )
 
   const properties = [
     ASTFactory.createProperty({
@@ -106,7 +86,7 @@ const parseLoopEffect = (value: any, ctx: EffectFuncProps['context']) => {
           }),
         }),
       }),
-      ...arrayProperties,
+      ...arrayProperties
     )
   }
 
@@ -125,21 +105,83 @@ const parseLoopEffect = (value: any, ctx: EffectFuncProps['context']) => {
 }
 
 export const provideLoopEffect: EffectOptions[] = [
-  // ʹ�� onValueInitOrChange ȷ����ʼ���ͱ�����ᴥ��
   {
     event: DataEvent.onValueInitOrChange,
-    effect: params => {
+    effect: (params: EffectFuncProps) => {
       const { value, context } = params
-
-      // �ӳ�ִ����ȷ��ǰ��ڵ�� effects �Ѿ����
       setTimeout(() => {
         const variables = parseLoopEffect(value, context)
-
-        // �ֶ����õ� private scope
         variables.forEach(variable => {
           context.node.privateScope?.setVar(variable)
         })
-      }, 0) // ʹ�� setTimeout 0 �������¼�����ĩβִ��
+      }, 0)
+    },
+  },
+]
+
+export const exportIntermediateVarsEffect: EffectOptions[] = [
+  {
+    event: DataEvent.onValueInitOrChange,
+    effect: (params: EffectFuncProps) => {
+      const { value, context } = params
+
+      const loopParam = value || {}
+      const loopType = loopParam.type || 'numLoop'
+      const intermediateVar: Record<string, IFlowValue> = loopParam.intermediateVar || {}
+      const loopArray: Record<string, IFlowValue> = loopType === 'arrayLoop' ? (loopParam.loopArray || {}) : {}
+      const outputsProperties: Record<string, any> = context.node.form?.getValueIn('outputs.properties') || {}
+
+      const scope = context.node.scope
+      const privateScope = context.node.privateScope
+
+      const intermediateProperties = Object.entries(intermediateVar).map(([key, flowValue]) =>
+        ASTFactory.createProperty({
+          key,
+          type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
+        })
+      )
+
+      const arrayProperties =
+        loopType === 'arrayLoop'
+          ? Object.entries(loopArray).map(([key, flowValue]) =>
+              ASTFactory.createProperty({
+                key,
+                type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
+              })
+            )
+          : []
+
+      const outputProperties = Object.entries(outputsProperties).map(([key, refValue]) =>
+        ASTFactory.createProperty({
+          key,
+          initializer: ASTFactory.createWrapArrayExpression({
+            wrapFor: ASTFactory.createKeyPathExpression({
+              keyPath: refValue?.content || [],
+            }),
+          }),
+        })
+      )
+
+      const allProperties = [...intermediateProperties, ...arrayProperties, ...outputProperties]
+
+      if (allProperties.length === 0) {
+        return
+      }
+
+      setTimeout(() => {
+        const declaration = ASTFactory.createVariableDeclaration({
+          key: `${context.node.id}`,
+          meta: {
+            title: context.node.form?.getValueIn('title'),
+            icon: context.node.getNodeRegistry<FlowNodeRegistry>().info?.icon,
+          },
+          type: ASTFactory.createObject({
+            properties: allProperties,
+          }),
+        })
+
+        context.node.scope?.setVar(declaration)
+      }, 0)
     },
   },
 ]

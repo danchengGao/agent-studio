@@ -98,12 +98,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
     }
   }, [clearInterruption])
 
-  useEffect(() => {
-    return () => {
-      testRunRuntimeService.resetAllExecutionStates()
-    }
-  }, [])
-
   const interruptionNodeIcon = useMemo(() => {
     const nodeId = interruption?.nodeId
     if (!nodeId) return null
@@ -265,7 +259,6 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
 
   const onClose = async () => {
     testRunRuntimeService.stopStreamExecution()
-    testRunRuntimeService.resetAllExecutionStates()
     setValues({})
     setInputValues({})
     setIsStreamExecuting(false)

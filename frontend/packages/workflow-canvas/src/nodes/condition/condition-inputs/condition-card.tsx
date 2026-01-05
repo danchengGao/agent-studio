@@ -133,7 +133,11 @@ export const ConditionCard: React.FC<ConditionCardProps> = React.memo(
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
             {enableDrag && (
-              <DragHandle disabled={isDragDisabled} {...dragHandleProps} title={isDragDisabled ? t('workflowCanvas.condition.onlyOneBranch') : t('workflowCanvas.condition.dragSort')}>
+              <DragHandle
+                disabled={isDragDisabled}
+                {...dragHandleProps}
+                title={isDragDisabled ? t('workflowCanvas.condition.onlyOneBranch') : t('workflowCanvas.condition.dragSort')}
+              >
                 <GripVertical size={14} />
               </DragHandle>
             )}
@@ -176,6 +180,8 @@ const ConditionContent: React.FC<{
   onUpdate: (index: number, branch: BranchValue) => void
   onCardDelete?: (index: number) => void
 }> = React.memo(({ branch, branchIndex, branchType, onUpdate, onCardDelete }) => {
+  const { t } = useTranslation()
+
   return (
     <FieldArray name={`branches.${branchIndex}.conditions`}>
       {({ field: conditionsField }) => {

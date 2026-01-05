@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { FC, useState, useEffect, useMemo, useRef } from 'react'
+import { FC, useState, useEffect, useMemo } from 'react'
 import { Button } from '@douyinfe/semi-ui'
-import { type PanelFactory, usePanelManager } from '@flowgram.ai/panel-manager-plugin'
+import { usePanelManager } from '@flowgram.ai/panel-manager-plugin'
 import { X, MessageSquare, Loader2 } from 'lucide-react'
 
 import { NodeInputPanel } from '../node-input-panel'
@@ -78,12 +78,12 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
     loopId: nodeData?.loop_id,
   })
 
-  const valuesRef = useRef({})
+  const [values, setValues] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
     if (!nodeId) return
-    lastNodeTestValuesByNodeId.set(nodeId, valuesRef.current)
-  }, [nodeId])
+    lastNodeTestValuesByNodeId.set(nodeId, values)
+  }, [nodeId, values])
 
   const nodeIcon = useMemo(() => {
     if (!nodeId) return null
@@ -105,7 +105,7 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
   const resetTest = () => {
     if (nodeId && lastNodeTestValuesByNodeId.has(nodeId)) {
       const lastValues = lastNodeTestValuesByNodeId.get(nodeId)
-      valuesRef.current = lastValues || {}
+      setValues(lastValues || {})
     } else {
       const preservedValues: Record<string, unknown> = {}
       inputFormMeta.forEach(meta => {
@@ -113,7 +113,7 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
           preservedValues[meta.name] = meta.defaultValue
         }
       })
-      valuesRef.current = preservedValues
+      setValues(preservedValues)
     }
     resetErrors()
   }
@@ -122,9 +122,8 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
     resetTest()
   }, [nodeId])
 
-  const handleTestRun = async (values: Record<string, unknown>) => {
-    valuesRef.current = values
-    await execute(values)
+  const handleTestRun = async (currentValues: Record<string, unknown>) => {
+    await execute(currentValues)
   }
 
   const handleCancel = () => {
@@ -137,7 +136,7 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
       handleCancel()
     }
     if (nodeId) {
-      lastNodeTestValuesByNodeId.set(nodeId, valuesRef.current)
+      lastNodeTestValuesByNodeId.set(nodeId, values)
     }
     panelManager.close(testDebugPanelFactory.key)
   }
@@ -156,10 +155,8 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
       <NodeInputPanel
         nodeIcon={nodeIcon}
         nodeIconFallback={<MessageSquare size={16} className={styles['interruption-icon']} />}
-        values={valuesRef.current}
-        setValues={vals => {
-          valuesRef.current = vals
-        }}
+        values={values}
+        setValues={setValues}
         inputFormMeta={inputFormMeta}
         inputJSONMode={inputJSONMode}
         setInputJSONMode={handleSetInputJSONMode}
@@ -183,7 +180,7 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
       {t('workflowCanvas.testDebugPanel.cancel')}
     </Button>
   ) : (
-    <Button onClick={() => handleTestRun(valuesRef.current)} className={`${styles.button} ${styles.save}`}>
+    <Button onClick={() => handleTestRun(values)} className={`${styles.button} ${styles.save}`}>
       {t('workflowCanvas.testDebugPanel.run')}
     </Button>
   )

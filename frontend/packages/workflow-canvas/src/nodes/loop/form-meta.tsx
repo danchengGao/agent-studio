@@ -9,18 +9,16 @@ import { SubCanvasRender } from '@flowgram.ai/free-container-plugin'
 import { PrivateScopeProvider, ValidateTrigger } from '@flowgram.ai/editor'
 import {
   BatchOutputs,
-  createBatchOutputsFormPlugin,
   IFlowValue,
   IFlowConstantRefValue,
   DisplayOutputs,
   InputsValues,
   InjectDynamicValueInput,
-  provideBatchInputEffect,
   DisplayInputsValues,
   IFlowRefValue,
 } from '../../form-materials'
-import { provideLoopEffect } from './effects'
 import { useTranslation } from '../../i18n'
+import { provideLoopEffect, exportIntermediateVarsEffect } from './effects'
 
 import { FormHeader, FormContent, FormItem, Feedback, FormSelect, FormDisplay } from '../../form-components'
 import { useIsSidebar, useNodeRenderContext } from '../../hooks'
@@ -247,7 +245,10 @@ export const LoopFormRender = () => {
           return (
             <Field<Record<string, IFlowValue | undefined> | undefined> name={`inputs.loopParam.loopArray`}>
               {({ field: arrayField }) => (
-                <FormDisplay label={t('workflowCanvas.loop.input')} content={<DisplayInputsValues value={arrayField.value} node={node} includePrivateScope={true} />} />
+                <FormDisplay
+                  label={t('workflowCanvas.loop.input')}
+                  content={<DisplayInputsValues value={arrayField.value} node={node} includePrivateScope={true} />}
+                />
               )}
             </Field>
           )
@@ -260,7 +261,12 @@ export const LoopFormRender = () => {
 
   const intermediateVarDisplay = (
     <Field<Record<string, IFlowValue | undefined> | undefined> name="inputs.loopParam.intermediateVar">
-      {({ field }) => <FormDisplay label={t('workflowCanvas.loop.intermediateVar')} content={<DisplayInputsValues value={field.value} node={node} includePrivateScope={true} />} />}
+      {({ field }) => (
+        <FormDisplay
+          label={t('workflowCanvas.loop.intermediateVar')}
+          content={<DisplayInputsValues value={field.value} node={node} includePrivateScope={true} />}
+        />
+      )}
     </Field>
   )
 
@@ -297,7 +303,7 @@ export const formMeta: FormMeta = {
   validateTrigger: ValidateTrigger.onChange,
   validate: validation,
   effect: {
-    'inputs.loopParam': provideLoopEffect,
+    'inputs.loopParam': [...provideLoopEffect, ...exportIntermediateVarsEffect],
   },
-  plugins: [createBatchOutputsFormPlugin({ outputKey: 'outputs.properties' })],
+  plugins: [],
 } as FormMeta<LoopNodeJSON>

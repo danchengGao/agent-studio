@@ -106,10 +106,14 @@ export function ErrorHandler() {
                 <Field<number> name="exceptionConfig.timeoutSeconds">
                   {({ field }) => (
                     <CompactInput
-                      value={field.value || 60}
+                      value={field.value}
                       onChange={(value: string) => {
-                        const numValue = parseInt(value) || 60
-                        if (numValue >= 1 && numValue <= 300) {
+                        if (value === '') {
+                          field.onChange(0)
+                          return
+                        }
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue) && numValue >= 1 && numValue <= 300) {
                           field.onChange(numValue)
                         }
                       }}
