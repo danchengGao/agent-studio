@@ -401,6 +401,7 @@
       "settings": "Settings",
       "changePassword": "Change Password",
       "logout": "Logout",
+      "switchUser": "Switch Userspace",
       "language": "Language",
       "switchToEnglish": "Switch to English",
       "switchToChinese": "Switch to Chinese"
