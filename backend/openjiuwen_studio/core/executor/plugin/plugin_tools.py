@@ -23,9 +23,14 @@ class ServiceTool:
 
     def compile(self) -> RestfulApi:
         params: List[Param] = []
+        headers = self.restfulapischema.headers
         for i in self.restfulapischema.params:
-            param = Param(name=i.name, description=i.description, type=i.type, required=i.required)
-            params.append(param)
+            if i.method == "Headers":
+                headers[i.name] = Param(name=i.name, description=i.description, type=i.type, required=i.required,
+                                        method=i.method)
+            else:
+                param = Param(name=i.name, description=i.description, type=i.type, required=i.required, method=i.method)
+                params.append(param)
         responses: List[Param] = []
         for j in self.restfulapischema.response:
             response_param = Param(name=j.name, description=j.description, type=j.type, required=j.required)
@@ -34,7 +39,7 @@ class ServiceTool:
         tool_name = self.restfulapischema.name or self.restfulapischema.tool_id
         tool = RestfulApi(name=tool_name, description=self.restfulapischema.description,
                           params=params, path=self.restfulapischema.path,
-                          headers=self.restfulapischema.headers, method=self.restfulapischema.method,
+                          headers=headers, method=self.restfulapischema.method,
                           response=responses)
         return tool
 

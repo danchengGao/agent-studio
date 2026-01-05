@@ -328,6 +328,7 @@ def _plugin_input_output_parameters(params: List[PluginToolParam]) -> List[Dict[
             type=param_type_mapping.get(param.type),
             description=param.desc,
             required=param.is_required,
+            method=param.method
         )
         input_output_params.append(input.model_dump())
 

@@ -14,7 +14,7 @@ from openjiuwen_studio.schemas.node import Node
 from openjiuwen_studio.core.manager.convertor.components.common import input_params_convert, exception_config_convert
 from openjiuwen_studio.core.common.dsl import ComponentType
 from openjiuwen_studio.schemas.plugin import PluginApiInfo, PluginApiHeader, PluginToolParam, ParamType, \
-    PluginApiMethod, PluginId, PluginToolId, PluginType, PluginCodeInfo
+    PluginApiMethod, PluginId, PluginToolId, PluginType, PluginCodeInfo, ParamSendMethod
 from openjiuwen_studio.schemas.plugin import PluginPublishInfo
 
 plugin_type_mapping = {
@@ -43,6 +43,13 @@ param_type_mapping = {
     ParamType.PARAM_TYPE_OBJECT: "object",
 }
 
+param_send_method_type_mapping = {
+    ParamSendMethod.PARAM_SEND_METHOD_NONE: "",
+    ParamSendMethod.PARAM_SEND_METHOD_HEADER: "Headers",
+    ParamSendMethod.PARAM_SEND_METHOD_QUERY: "Query",
+    ParamSendMethod.PARAM_SEND_METHOD_BODY: "Body",
+}
+
 
 def _plugin_tool_param_convert(params: List[PluginToolParam]) -> List[dsl.Param]:
     converted_params: List[dsl.Param] = []
@@ -52,6 +59,7 @@ def _plugin_tool_param_convert(params: List[PluginToolParam]) -> List[dsl.Param]
             description=param.desc,
             type=param_type_mapping.get(param.type),
             required=param.is_required,
+            method=param_send_method_type_mapping.get(param.method),
         )
         converted_params.append(converted_param)
 

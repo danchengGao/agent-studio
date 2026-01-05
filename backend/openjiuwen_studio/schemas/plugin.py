@@ -82,6 +82,13 @@ class PluginApiMethod(IntEnum):
     PLUGIN_API_METHOD_DELETE = 4,
 
 
+class ParamSendMethod(IntEnum):
+    PARAM_SEND_METHOD_NONE = 0
+    PARAM_SEND_METHOD_HEADER = 1,
+    PARAM_SEND_METHOD_QUERY = 2,
+    PARAM_SEND_METHOD_BODY = 3,
+
+
 class PluginApiBase(PluginBase):
     name: str = Field(..., alias="name")
     desc: str = Field(..., alias="desc")
@@ -108,6 +115,7 @@ class PluginToolParam(BaseModel):
     desc: Optional[str] = Field("", alias="desc")
     type: ParamType = Field(..., alias="type")
     is_required: Optional[bool] = Field(False, alias="is_required")
+    method: Optional[ParamSendMethod] = Field(ParamSendMethod.PARAM_SEND_METHOD_NONE, alias="method")
 
 
 class PluginApiHeader(BaseModel):

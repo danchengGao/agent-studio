@@ -10,6 +10,7 @@ class InputElem(BaseModel):
     description: Optional[str] = Field("")
     type: Optional[str] = Field("")
     required: Optional[bool] = Field(False)
+    method: Optional[int] = Field(0)
 
 
 class WorkflowCanvas(BaseModel):
