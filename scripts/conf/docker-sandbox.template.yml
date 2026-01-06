@@ -8,6 +8,7 @@ services:
     environment:
       - PYTHON_SANDBOX_URL=http://<<PYTHON_SERVER_SERVICE_NAME>>:<<PYTHON_SERVER_PORT>>/run
       - JS_SANDBOX_URL=http://<<JS_SERVER_SERVICE_NAME>>:<<JS_SERVER_PORT>>/run
+      - ENABLE_LINUX_SANDBOX=<<ENABLE_LINUX_SANDBOX>>
     networks:
       - <<JIUWEN_NETWORK_NAME>>
     restart: unless-stopped
@@ -23,6 +24,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+    <<PRIVILEGED_SECURITY_OPTS>>
 
   <<PYTHON_SERVER_SERVICE_NAME>>:
     image: <<PYTHON_SERVER_IMAGE>>

@@ -61,7 +61,7 @@ parse_args() {
     fi
 
     # should not specify .env when bring up new services
-    if [[ -n "${is_new_svc}" && -n "${env_file}" ]]; then
+    if [[ "${is_new_svc}" == "true" && -n "${env_file}" ]]; then
         error "Please do not specify -f and -n in the sametime"
     fi
 

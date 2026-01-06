@@ -79,6 +79,18 @@ generate_config_files() {
         if [ "${has_it}" == "true" ]; then
             local template_file=${COMPOSE_TEMPLATE_FILES["${module}"]}
             local compose_file=${COMPOSE_FILES["${module}"]}
+            local enable_linux_sandbox=$(echo "${ENV_VARS["ENABLE_LINUX_SANDBOX"]}" | tr '[:upper:]' '[:lower:]') 
+
+            if [ "${module}" == "SANDBOX" -a "${enable_linux_sandbox}" == "true" ]; then
+                ENV_VARS["PRIVILEGED_SECURITY_OPTS"]=$(cat <<'EOF'
+cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+EOF
+                )
+    fi
             generate_config_file ${template_file} ${compose_file} "ENV_VARS"
         fi
     done

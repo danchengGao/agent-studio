@@ -46,12 +46,29 @@ exec_service() {
                         eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} container" 
                     fi
                     ;;
-                JIUWEN|PLUGIN|SANDBOX)
+                JIUWEN|PLUGIN)
                     eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
                     if [ "${cmd}" == "up" ]; then
                         check_containers "${CONTAINERS[${module}]}"
                     fi
                     ;;
+                SANDBOX)
+                    local enable_linux_sandbox=$(echo "${ENV_VARS["ENABLE_LINUX_SANDBOX"]}" | tr '[:upper:]' '[:lower:]')
+                    local sandbox_gateway_service_name=${ENV_VARS["SANDBOX_GATEWAY_SERVICE_NAME"]}
+                    local sandbox_gateway_docker_name=${ENV_VARS["SANDBOX_GATEWAY_DOCKER_NAME"]}
+
+                    if [ "${enable_linux_sandbox}" == "true" ]; then
+                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${sandbox_gateway_service_name}" || error "${cmd} ${sandbox_gateway_service_name} service failed"
+                        if [ "${cmd}" == "up" ]; then
+                            check_containers "${sandbox_gateway_docker_name}"
+                        fi
+                    else
+                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
+                        if [ "${cmd}" == "up" ]; then
+                            check_containers "${CONTAINERS[${module}]}"
+                        fi
+                    fi
+
             esac
             success "${cmd} ${module} container"
         fi
