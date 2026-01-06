@@ -5,6 +5,7 @@ mount:
     {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
     {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
     {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
+    {src: '/usr/share/nodejs', dst: '/usr/share/nodejs', mode: 'read'},
   ]
 
 sandbox:

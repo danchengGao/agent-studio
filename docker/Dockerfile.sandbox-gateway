@@ -16,7 +16,7 @@ RUN uv build --out-dir /sandbox/dist
 # runtime image
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS runtime
-RUN apt-get install -y --no-install-recommends bubblewrap
+RUN apt-get install -y --no-install-recommends bubblewrap nodejs
 
 ARG INDEX_URL
 ARG TRUSTED_HOST

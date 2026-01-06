@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from app.sandbox import SandboxConfig, get_sandbox
 from openjiuwen_sandbox_gateway.app.gateway import remote_python, remote_javascript
 
-ENABLE_LINUX_SANDBOX = bool(os.getenv("ENABLE_LINUX_SANDBOX", False))
+ENABLE_LINUX_SANDBOX = (os.getenv("ENABLE_LINUX_SANDBOX", "false").lower() == "true")
 
 app = FastAPI()
 
