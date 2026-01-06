@@ -4,7 +4,9 @@
 
 from typing import Any, Dict, Optional
 import asyncio
-
+from openjiuwen_studio.core.executor.component.component_execution_manager import (
+    component_execution_manager, ComponentExecutionRegistration
+)
 from openjiuwen_studio.core.executor.workflow.context import Context
 from openjiuwen_studio.core.executor.workflow.workflow import Workflow
 from openjiuwen_studio.core.executor.workflow.workflow_runner import _fetch_workflow_dl, WorkflowRunner
@@ -40,18 +42,21 @@ class ComponentExecutor(WorkflowRunner):
         pass
 
     async def run(
-        self,
-        workflow_id: str,
-        workflow_version: str,
-        inputs: Any,
-        component_id: str,
-        space_id: str,
-        current_user: Dict[str, Any],
-        loop_id: Optional[str] = None
+            self,
+            workflow_id: str,
+            workflow_version: str,
+            inputs: Any,
+            component_id: str,
+            space_id: str,
+            current_user: Dict[str, Any],
+            loop_id: Optional[str] = None,
+            conversation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
+        # 生成 execution_id
+        execution_id = f"{workflow_id}:{component_id}:{conversation_id}"
         workflow = Workflow(await _fetch_workflow_dl(workflow_id, workflow_version, space_id, current_user), space_id,
                             current_user)
-        workflow_context = WorkflowRuntime(workflow_id=workflow_id)
+        workflow_context = WorkflowRuntime(workflow_id=workflow_id, session_id=execution_id)
         workflow_context.config().add_workflow_config(workflow_id, WorkflowConfig())
 
         workflow_context.set_stream_writer_manager(StreamWriterManager(stream_emitter=StreamEmitter()))
@@ -61,7 +66,7 @@ class ComponentExecutor(WorkflowRunner):
         context_config = ContextEngineConfig()
         context_engine = ContextEngine(agent_id="run_single_component_agent_id", config=context_config)
         context = context_engine.get_workflow_context(workflow_id=workflow_id,
-                                                      session_id="run_single_component_session_id")
+                                                      session_id=execution_id)
         if loop_id:
             try:
                 target_loop = next(wf_comp for wf_comp in workflow.dl_workflow.components if wf_comp.id == loop_id)
@@ -150,13 +155,27 @@ class ComponentExecutor(WorkflowRunner):
             workflow_id=workflow_id,
             workflow_version="",
         )
+        # 注册执行
+        task = asyncio.current_task()
+        registration = ComponentExecutionRegistration(
+            execution_id=execution_id,
+            runtime=workflow_context,
+            task=task
+        )
+        component_execution_manager.register_execution(registration)
+
         try:
+            # 执行前检查取消
+            if component_execution_manager.is_cancelled(execution_id):
+                raise asyncio.CancelledError()
             data = await executor.invoke(inputs, runtime, context)
             rsp, trace_log, trace_detail = result_convert(data, business_type="WORKFLOW")
             if trace_log:
                 trace_logs.append(trace_log)
             return self.result_convert(data)
-
+        except asyncio.CancelledError:
+            logger.warning(f"component run cancelled by user: {execution_id}")
+            pass
         except (JiuWenBaseException, JiuWenGraphException) as e:
             logger.error(f"component run got JiuWen error: {e}")
             code = _run_err_code(int(target_comp.type))
@@ -169,6 +188,8 @@ class ComponentExecutor(WorkflowRunner):
             msg = f"{_type_cn(int(target_comp.type))}组件[{component_id}]: {str(e)}"
             await handle_stream_error(trace_logs, [], data, code, msg, flow_index)
             raise JiuWenComponentException(code, msg, component_id, int(target_comp.type), error_stage="execute") from e
+        finally:
+            component_execution_manager.unregister_execution(execution_id)
 
     def result_convert(self, data: Any) -> Dict[str, Any]:
         return ExecuteResponse(

@@ -19,7 +19,7 @@ from openjiuwen_studio.core.executor.plugin.plugin_mgr import plugin_mgr
 from openjiuwen_studio.routers.common import handle_response, validate_request
 from openjiuwen_studio.core.manager.repositories.trace_summary_repository import trace_summary_repository
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
-from openjiuwen_studio.schemas.trace_summary import (TraceSummaryListRequest, TraceSummaryByTraceIdRequest, 
+from openjiuwen_studio.schemas.trace_summary import (TraceSummaryListRequest, TraceSummaryByTraceIdRequest,
                                        TraceSummaryLatestRequest, TraceSummaryBrief)
 from openjiuwen_studio.schemas.execution_log import ExecutionLogSummary
 from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, UpdateLongtermMem, UpdateVariable, GetUserVar, \
@@ -30,6 +30,7 @@ from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, Wor
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponse, ExecuteResponseType
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
+from openjiuwen_studio.core.executor.component.component_execution_manager import component_execution_manager
 execution_router = APIRouter()
 
 
@@ -238,7 +239,8 @@ async def execute_component(
         logger.info(f"request_body: {request_body}")
 
         result = await comp_executor.run(request_body.id, request_body.version, inputs, request_body.component_id,
-                                         request_body.space_id, current_user, request_body.loop_id)
+                                         request_body.space_id, current_user, request_body.loop_id,
+                                         request_body.conversation_id)
         logger.info(f"Received result: {result}")
         return ResponseModel(code=status.HTTP_200_OK, message="Component Executed successfully", data=result)
     except JiuWenComponentException as e:
@@ -254,36 +256,6 @@ async def execute_component(
         raise
     except Exception as e:
         raise handle_http_exception(e, "Component execution failed") from e
-
-
-# {
-#   "id": "workflow03",
-#   "version": "1.0.0",
-#   "inputs": {
-#       "location": "wuhan"
-#   },
-#   "component_id": "Tool1"
-# }
-@execution_router.post("/test_component", response_model=ResponseModel[dict])
-async def execute_component(
-    request_body: CompExecuteParas
-) -> ResponseModel[Dict[str, Any]]:
-    """Run a single component"""
-    try:
-        if isinstance(request_body.inputs, UserInput):
-            inputs = InteractiveInput()
-            inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
-        else:
-            inputs = request_body.inputs
-
-        result = await comp_executor.run(request_body.id, request_body.version, inputs, request_body.component_id,
-                                         request_body.space_id, None, request_body.loop_id)
-        logger.warning(f"Received result: {result}")
-        return ResponseModel(code=status.HTTP_200_OK, message="Component Executed successfully", data=result)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_http_exception(e, "Component test execution failed") from e
 
 
 @execution_router.post("/workflow/validate", response_model=ResponseModel[dict])
@@ -654,5 +626,55 @@ async def cancel_workflow_execution(
         return ResponseModel(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=f"Cancel workflow execution failed: {str(e)}",
+            data=None
+        )
+
+
+# 新增取消单节点接口
+@execution_router.post("/component/cancel", response_model=ResponseModel[dict])
+async def cancel_component_execution(
+        request_body: CompExecuteParas,
+        current_user: Dict[str, Any] = Depends(get_current_user)
+) -> ResponseModel[Dict[str, Any]]:
+    """
+    取消正在执行的单节点
+    """
+    try:
+        _ = check_user_space(request_body.space_id, current_user)
+        execution_id = f"{request_body.id}:{request_body.component_id}:{request_body.conversation_id}"
+        exec_info = component_execution_manager.get_execution(execution_id)
+        if not exec_info:
+            return ResponseModel(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Component execution not found for {execution_id}",
+                data=None
+            )
+
+        success = await component_execution_manager.cancel_execution(
+            execution_id=execution_id,
+            force=request_body.force
+        )
+        if success:
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Component execution cancelled successfully",
+                data={
+                    "workflow_id": request_body.id,
+                    "component_id": request_body.component_id,
+                    "conversation_id": request_body.conversation_id,
+                    "cancelled": True,
+                    "warning": "component execution cancel by user"
+                }
+            )
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to cancel component execution",
+            data=None
+        )
+    except Exception as e:
+        log_exception(e)
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Cancel component execution failed: {str(e)}",
             data=None
         )
