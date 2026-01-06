@@ -29,10 +29,11 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
   const selectedVersion = useWorkflowStore(s => s.selectedVersion)
 
   // 获取工作流名称 - 改进逻辑，支持多种数据结构
-  const workflowName = canvasData?.name ||
-                       canvasData?.workflow?.name ||
-                       canvasData?.data?.workflow?.name ||
-                       (workflowId ? `${t('workflowCanvas.workflow.name')}-${workflowId}` : t('workflowCanvas.workflow.unnamed'))
+  const workflowName =
+    canvasData?.name ||
+    canvasData?.workflow?.name ||
+    canvasData?.data?.workflow?.name ||
+    (workflowId ? `${t('workflowCanvas.workflow.name')}-${workflowId}` : t('workflowCanvas.workflow.unnamed'))
 
   // 调试日志 - 临时注释，需要时可以启用
   // React.useEffect(() => {
@@ -77,16 +78,18 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
       <WorkflowOperationContainer>
         <WorkflowControlSection>
           {/* 工作流名称显示 */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginRight: '12px',
-            padding: '4px 12px',
-            backgroundColor: 'var(--semi-color-bg-2)',
-            borderRadius: '6px',
-            border: '1px solid var(--semi-color-border)',
-            height: '32px'
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginRight: '12px',
+              padding: '4px 12px',
+              backgroundColor: 'var(--semi-color-bg-2)',
+              borderRadius: '6px',
+              border: '1px solid var(--semi-color-border)',
+              height: '32px',
+            }}
+          >
             <Typography.Text
               type="secondary"
               style={{
@@ -96,7 +99,7 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                lineHeight: '24px'
+                lineHeight: '24px',
               }}
               title={workflowName || t('workflowCanvas.workflow.nameLabel')}
             >
@@ -106,41 +109,45 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
 
           {/* 新增的发布和版本历史按钮 */}
           <Tooltip content={t('workflowCanvas.workflow.publish')}>
-            <IconButton type="tertiary" theme="borderless" icon={<Tag size="small" />} onClick={handlePublishClick} disabled={!workflowId || !spaceId} />
+            <IconButton type="tertiary" theme="borderless" icon={<Tag size={16} />} onClick={handlePublishClick} disabled={!workflowId || !spaceId} />
           </Tooltip>
 
           <Tooltip content={t('workflowCanvas.workflow.versionHistory')}>
             <IconButton
               type="tertiary"
               theme="borderless"
-              icon={<History size="small" />}
+              icon={<History size={16} />}
               onClick={handleVersionHistoryClick}
               disabled={!workflowId || !spaceId}
             />
           </Tooltip>
 
           {/* 当前展示版本：仅当为历史版本时显示 */}
-          {selectedVersion && selectedVersion !== 'draft' && <HistoryVersionTag>{t('workflowCanvas.workflow.historyVersion')} {selectedVersion}</HistoryVersionTag>}
+          {selectedVersion && selectedVersion !== 'draft' && (
+            <HistoryVersionTag>
+              {t('workflowCanvas.workflow.historyVersion')} {selectedVersion}
+            </HistoryVersionTag>
+          )}
 
           <Divider layout="vertical" style={{ height: '20px' }} margin={3} />
 
           {/* 原有的保存、导入、导出按钮 */}
           <Tooltip content={t('workflowCanvas.workflow.save')}>
-            <IconButton type="tertiary" theme="borderless" icon={<Save size="small" />} onClick={onSave} />
+            <IconButton type="tertiary" theme="borderless" icon={<Save size={16} />} onClick={onSave} />
           </Tooltip>
 
           <Tooltip content={t('workflowCanvas.workflow.import')}>
-            <IconButton type="tertiary" theme="borderless" icon={<Upload size="small" />} onClick={onImport} />
+            <IconButton type="tertiary" theme="borderless" icon={<Upload size={16} />} onClick={onImport} />
           </Tooltip>
 
           <Tooltip content={t('workflowCanvas.workflow.export')}>
-            <IconButton type="tertiary" theme="borderless" icon={<Download size="small" />} onClick={onExport} />
+            <IconButton type="tertiary" theme="borderless" icon={<Download size={16} />} onClick={onExport} />
           </Tooltip>
 
           <Divider layout="vertical" style={{ height: '16px' }} margin={3} />
 
           <Tooltip content={t('workflowCanvas.workflow.backToList')}>
-            <IconButton type="danger" theme="borderless" icon={<ArrowLeft size="small" />} onClick={handleBack} />
+            <IconButton type="danger" theme="borderless" icon={<ArrowLeft size={16} />} onClick={handleBack} />
           </Tooltip>
         </WorkflowControlSection>
       </WorkflowOperationContainer>

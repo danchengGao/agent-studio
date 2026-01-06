@@ -60,10 +60,10 @@ export function Tools({ workflowId, spaceId }: ToolsProps) {
           <Comment />
 
           <Tooltip content={t('workflowCanvas.tools.undo')}>
-            <IconButton type="tertiary" theme="borderless" icon={<Undo2 size="small" />} disabled={!canUndo} onClick={() => history.undo()} />
+            <IconButton type="tertiary" theme="borderless" icon={<Undo2 size={16} />} disabled={!canUndo} onClick={() => history.undo()} />
           </Tooltip>
           <Tooltip content={t('workflowCanvas.tools.redo')}>
-            <IconButton type="tertiary" theme="borderless" icon={<Redo2 size="small" />} disabled={!canRedo} onClick={() => history.redo()} />
+            <IconButton type="tertiary" theme="borderless" icon={<Redo2 size={16} />} disabled={!canRedo} onClick={() => history.redo()} />
           </Tooltip>
 
           <Divider layout="vertical" style={{ height: '16px' }} margin={3} />

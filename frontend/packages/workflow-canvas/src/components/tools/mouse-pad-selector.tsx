@@ -104,7 +104,7 @@ export const MousePadSelector: React.FC<MousePadSelectorProps & React.RefAttribu
         style={containerStyle}
       >
         <div className={'ui-mouse-pad-selector-icon'} style={iconStyle}>
-          {isMouse ? <Mouse size="small" /> : <Touchpad size="small" />}
+          {isMouse ? <Mouse size={16} /> : <Touchpad size={16} />}
         </div>
       </div>
     </Popover>

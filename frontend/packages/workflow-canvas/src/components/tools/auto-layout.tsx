@@ -30,7 +30,7 @@ export const AutoLayout = () => {
 
   return (
     <Tooltip content={t('workflowCanvas.tools.autoLayout')}>
-      <IconButton type="tertiary" theme="borderless" onClick={autoLayout} icon={<Network size="small" />} />
+      <IconButton type="tertiary" theme="borderless" onClick={autoLayout} icon={<Network size={16} />} />
     </Tooltip>
   )
 }

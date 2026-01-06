@@ -56,7 +56,7 @@ export const Comment = () => {
   return (
     <Tooltip trigger="custom" visible={tooltipVisible} onVisibleChange={setTooltipVisible} content={t('workflowCanvas.tools.comment')}>
       <IconButton
-        icon={<MessageSquare size="small" />}
+        icon={<MessageSquare size={16} />}
         type="tertiary"
         theme="borderless"
         onClick={createComment}
