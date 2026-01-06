@@ -558,7 +558,7 @@ const ToolConfigurationPage: React.FC = () => {
         description: parameter.description,
         type: parameter.type,
         method: parameter.method,
-        is_required: parameter.is_required || false,
+        is_required: isInput ? parameter.is_required || false : false,
       })
     } else {
       setParameterForm({
@@ -1289,7 +1289,6 @@ const ToolConfigurationPage: React.FC = () => {
                               {param.name}
                             </Typography>
                             <Chip label={param.type} size="small" />
-                            <Chip label={getMethodLabel(param.method)} size="small" variant="outlined" />
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
@@ -1719,23 +1718,25 @@ const ToolConfigurationPage: React.FC = () => {
                 </FormControl>
               </div>
             )}
-            <div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_required"
-                  checked={parameterForm.is_required}
-                  onChange={e => handleParameterFormChange('is_required', e.target.checked)}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label htmlFor="is_required" className="text-sm font-medium text-gray-700 cursor-pointer">
-                  {t('plugins.toolConfig.isRequired', '必选参数')}
-                </label>
+            {isInputDialogOpen && (
+              <div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="is_required"
+                    checked={parameterForm.is_required}
+                    onChange={e => handleParameterFormChange('is_required', e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="is_required" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    {t('plugins.toolConfig.isRequired', '必选参数')}
+                  </label>
+                </div>
+                <Typography variant="caption" className="text-gray-500 mt-1 block">
+                  {t('plugins.toolConfig.isRequiredHelper', '勾选后该参数为必填项')}
+                </Typography>
               </div>
-              <Typography variant="caption" className="text-gray-500 mt-1 block">
-                {t('plugins.toolConfig.isRequiredHelper', '勾选后该参数为必填项')}
-              </Typography>
-            </div>
+            )}
           </div>
         </DialogContent>
         <DialogActions>
