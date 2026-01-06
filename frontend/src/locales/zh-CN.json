@@ -35,7 +35,8 @@
       "select": "选择",
       "selectAll": "全选",
       "deselectAll": "取消全选",
-      "add": "添加"
+      "add": "添加",
+      "close": "关闭"
     },
     "tooltips": {
       "clickToEditName": "点击编辑名称",
@@ -1710,7 +1711,7 @@
         "name": "插件名称",
         "namePlaceholder": "例如：高德地图API、天气服务、支付接口等",
         "nameHelperText": "请输入插件的名称，用于在系统中标识和调用",
-        "textPlaceholder": "例如：{\"name\": \"高德地图API\", \"version\": \"v1.0.0\", \"description\": \"提供高德地图服务的API接口\"}",
+        "textPlaceholder": "例如：http://localhost:8185",
         "description": "插件描述",
         "descriptionPlaceholder": "详细描述插件的功能、用途、适用场景等...",
         "descriptionHelperText": "请提供插件的详细功能描述，包括主要功能、适用场景、调用方式等信息",
@@ -2517,23 +2518,23 @@
       "patent": "专利",
       "patentPlaceholder": "请输入专利信息"
     },
-     "versionHistory": {
-        "title": "插件版本历史",
-        "versionCount": "{{count}} 个版本",
-        "loading": "加载中...",
-        "loadError": "无法加载插件版本历史，请稍后重试",
-        "noVersions": "暂无版本记录",
-        "noVersionsDescription": "该插件还没有发布过任何版本",
-        "pluginType": "插件类型",
-        "pluginIcon": "插件图标",
-        "toolCount": "工具数量",
-        "icon": "图标",
-        "description": "版本说明",
-        "confirmDeleteTitle": "确认删除版本",
-        "version": "版本",
-        "versionDescription": "版本说明",
-        "irreversibleAction": "此操作不可撤销",
-        "deleteIrreversibleAction": "删除后，该版本的所有相关数据将被永久删除，无法恢复"
+    "versionHistory": {
+      "title": "插件版本历史",
+      "versionCount": "{{count}} 个版本",
+      "loading": "加载中...",
+      "loadError": "无法加载插件版本历史，请稍后重试",
+      "noVersions": "暂无版本记录",
+      "noVersionsDescription": "该插件还没有发布过任何版本",
+      "pluginType": "插件类型",
+      "pluginIcon": "插件图标",
+      "toolCount": "工具数量",
+      "icon": "图标",
+      "description": "版本说明",
+      "confirmDeleteTitle": "确认删除版本",
+      "version": "版本",
+      "versionDescription": "版本说明",
+      "irreversibleAction": "此操作不可撤销",
+      "deleteIrreversibleAction": "删除后，该版本的所有相关数据将被永久删除，无法恢复"
     },
     "basicInfo": {
       "title": "基本信息",

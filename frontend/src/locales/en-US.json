@@ -35,7 +35,8 @@
       "select": "Select",
       "selectAll": "Select All",
       "deselectAll": "Deselect All",
-      "add": "Add"
+      "add": "Add",
+      "close": "Close"
     },
     "tooltips": {
       "clickToEditName": "Click to edit name",
@@ -1712,11 +1713,12 @@
         "title": "Cloud Plugin",
         "subtitle": "Create plugin based on existing service",
         "name": "Plugin Name",
-        "namePlaceholder": "Enter plugin name",
+        "namePlaceholder": "For example: Amap API, Weather Service, Payment Gateway",
         "description": "Plugin Description",
-        "descriptionPlaceholder": "Describe the plugin's functionality and purpose",
+        "descriptionPlaceholder": "Describe the plugin's functionality, purpose and usage scenarios",
         "url": "Service URL",
         "urlPlaceholder": "Enter the plugin service URL",
+        "textPlaceholder": "For example: http://localhost:8185",
         "authMethod": "Authentication Method",
         "create": "Create Plugin",
         "saveChanges": "Save Changes"
