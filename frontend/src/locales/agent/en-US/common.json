@@ -19,6 +19,13 @@
     "editNamePlaceholder": "Enter agent name (max 100 characters)",
     "editDescriptionPlaceholder": "Enter agent description (max 500 characters)",
     "createFirst": "Create Agent",
+    "clearSearch": "Clear search",
+    "modelLoading": "Loading...",
+    "modelDisabledTooltip": "This model has been disabled",
+    "modelDisabledTag": "(disabled)",
+    "searchNoAgentsFoundTitle": "No matching agents found",
+    "searchNoAgentsFoundDesc": "No agents containing \"{{keyword}}\" were found. Try another keyword or create a new agent",
+    "createNewAgentButton": "Create new agent",
     "characterCount": {
       "name": "/100",
       "description": "/500"

@@ -6,6 +6,8 @@ import CreateAgentIcon from '@/assets/icons/create-agent-react.svg?react'
 import CreateAgentWorkflowIcon from '@/assets/icons/create-agent-workflow.svg?react'
 import CreateAgentReactPreview from '@/assets/icons/create-agent-react-preview.png'
 import CreateAgentWorkflowPreview from '@/assets/icons/create-agent-workflow-preview.png'
+import CreateAgentReactPreviewEn from '@/assets/icons/create-agent-react-preview-en.png'
+import CreateAgentWorkflowPreviewEn from '@/assets/icons/create-agent-workflow-preview-en.png'
 import { TextField, Button, Typography, IconButton, Popover } from '@mui/material'
 import UnifiedSnackbar, { SnackbarMessage } from '../../Common/UnifiedSnackbar'
 import { useCreateAgent } from '@test-agentstudio/api-client'
@@ -31,7 +33,7 @@ interface AgentCreateData {
 }
 
 const AgentCreatePage: React.FC = () => {
-  const { t } = useScopedTranslation('agents.agentCreate')
+  const { t, i18n } = useScopedTranslation('agents.agentCreate')
   const navigate = useNavigate()
   const { user } = useAuthStore()
 
@@ -65,6 +67,10 @@ const AgentCreatePage: React.FC = () => {
   const [iconAnchorEl, setIconAnchorEl] = useState<HTMLElement | null>(null)
   const [descriptionRows, setDescriptionRows] = useState(6)
   const [descriptionMaxHeight, setDescriptionMaxHeight] = useState('45rem')
+
+  const isZh = i18n.language.startsWith('zh')
+  const reactPreviewImage = isZh ? CreateAgentReactPreview : CreateAgentReactPreviewEn
+  const workflowPreviewImage = isZh ? CreateAgentWorkflowPreview : CreateAgentWorkflowPreviewEn
 
   const createAgentMutation = useCreateAgent()
   const selectedModeInfo = MODE_INFO[agentData.mode]
@@ -788,7 +794,7 @@ const AgentCreatePage: React.FC = () => {
                 }}
               >
                 <img
-                  src={agentData.mode === 'single-react-agent' ? CreateAgentReactPreview : CreateAgentWorkflowPreview}
+                  src={agentData.mode === 'single-react-agent' ? reactPreviewImage : workflowPreviewImage}
                   alt={agentData.mode === 'single-react-agent' ? t('preview.singleReactAlt') : t('preview.multiWorkflowAlt')}
                   style={{
                     width: '100%',

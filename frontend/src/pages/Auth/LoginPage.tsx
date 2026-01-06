@@ -14,10 +14,13 @@ interface LoginForm {
 }
 
 const LoginPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const navigate = useNavigate()
   const { login, isAuthenticated, token } = useAuthStore()
+  
+  // 根据当前语言环境选择图片
+  const loginImage = i18n.language.startsWith('zh') ? '/login-page.png' : '/login-page-en.png'
 
   // 使用hooks，传递认证状态管理器
   const loginMutation = useLogin({ login })
@@ -280,7 +283,7 @@ const LoginPage: React.FC = () => {
           {/* Jiuwen image */}
           <div className="w-[60%] max-w-[600px] h-[500px] mr-8">
             <div className="w-[100%] h-[100%]">
-              <img src="/login-page.png" alt="Jiuwen" className="w-full h-full object-contain" />
+              <img src={loginImage} alt="Jiuwen" className="w-full h-full object-contain" />
             </div>
           </div>
 

@@ -19,6 +19,13 @@
     "editNamePlaceholder": "请输入智能体名称（最多100个字符）",
     "editDescriptionPlaceholder": "请输入智能体描述（最多500个字符）",
     "createFirst": "创建智能体",
+    "clearSearch": "清空搜索",
+    "modelLoading": "加载中...",
+    "modelDisabledTooltip": "该模型已被禁用",
+    "modelDisabledTag": "(已禁用)",
+    "searchNoAgentsFoundTitle": "未找到匹配的智能体",
+    "searchNoAgentsFoundDesc": "没有找到包含 \"{{keyword}}\" 的智能体，请尝试其他搜索词或创建新的智能体",
+    "createNewAgentButton": "创建新智能体",
     "characterCount": {
       "name": "/100",
       "description": "/500"

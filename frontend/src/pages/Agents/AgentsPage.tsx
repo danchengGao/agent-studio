@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Brain, Plus, Search, Edit, Trash2, Copy, ChevronLeft, ChevronRight, AlertCircle, Check, X } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Copy, ChevronLeft, ChevronRight, AlertCircle, Check, X } from 'lucide-react'
+import AgentIcon from '@/assets/icons/agent.svg?react'
 import { AgentService, useAgents, useUpdateAgent, useCopyAgent, useSearchAgents, useModels } from '@test-agentstudio/api-client' // 导入useUpdateAgent和useSearchAgents
 import { AgentSortBy, AgentSortOrder } from '@test-agentstudio/api-client' // 导入排序枚举
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
@@ -372,7 +373,7 @@ const AgentsPage: React.FC = () => {
               <button
                 onClick={() => setSearchTerm('')}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                title="清空搜索"
+                title={t('agents.agentList.clearSearch')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -498,13 +499,13 @@ const AgentsPage: React.FC = () => {
                             return t('agents.agentList.noModel')
                           }
                           if (modelsLoading && !modelsData) {
-                            return <span className="text-gray-500">加载中...</span>
+                            return <span className="text-gray-500">{t('agents.agentList.modelLoading')}</span>
                           }
                           const isModelAvailable = availableModelNames.has(modelName)
                           if (!isModelAvailable) {
                             return (
-                              <span className="text-red-600" title="该模型已被禁用">
-                                {modelName} <span className="text-xs">(已禁用)</span>
+                              <span className="text-red-600" title={t('agents.agentList.modelDisabledTooltip')}>
+                                {modelName} <span className="text-xs">{t('agents.agentList.modelDisabledTag')}</span>
                               </span>
                             )
                           }
@@ -594,30 +595,27 @@ const AgentsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Empty state */}
       {!agentsLoading && agents.length === 0 && (
         <div className="text-center py-16">
           <div className="w-24 h-24 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Brain className="w-12 h-12 text-gray-400" />
+            <AgentIcon className="w-12 h-12 text-gray-400" />
           </div>
           <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">
-            {debouncedSearchTerm.trim() ? '未找到匹配的智能体' : t('agents.agentList.noAgentsFound')}
+            {debouncedSearchTerm.trim() ? t('agents.agentList.searchNoAgentsFoundTitle') : t('agents.agentList.noAgentsFound')}
           </h3>
           <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
             {debouncedSearchTerm.trim()
-              ? `没有找到包含 "${debouncedSearchTerm.trim()}" 的智能体，请尝试其他搜索词或创建新的智能体`
+              ? t('agents.agentList.searchNoAgentsFoundDesc', { keyword: debouncedSearchTerm.trim() })
               : t('agents.agentList.createFirstAgent')}
           </p>
           <button
             className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
             onClick={() => {
-              // 添加点击日志来调试
-              console.log('创建智能体按钮被点击，搜索词:', debouncedSearchTerm)
               navigate('/dashboard/agents/new')
             }}
           >
             <Plus className="w-5 h-5" />
-            <span>{debouncedSearchTerm.trim() ? '创建新智能体' : t('agents.agentList.createFirst')}</span>
+            <span>{debouncedSearchTerm.trim() ? t('agents.agentList.createNewAgentButton') : t('agents.agentList.createFirst')}</span>
           </button>
         </div>
       )}
@@ -701,7 +699,6 @@ const AgentsPage: React.FC = () => {
         isLoading={isDeleting}
       />
 
-      {/* Unified Snackbar */}
       <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />
     </div>
   )
