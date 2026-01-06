@@ -175,6 +175,7 @@
       "orchestrationPage": {
         "sections": {
           "modelTitle": "模型配置",
+          "constraintTitle": "规格",
           "skillsTitle": "技能",
           "conversationTitle": "对话设置",
           "greetingTitle": "开场白",
@@ -183,6 +184,10 @@
         },
         "model": {
           "title": "模型"
+        },
+        "constraint": {
+          "maxIteration": "最大迭代次数",
+          "maxChatRounds": "最大对话轮数"
         },
         "select": {
           "placeholder": "请选择模型",

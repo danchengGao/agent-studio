@@ -100,7 +100,7 @@ const AgentModelSelector = (props: {
   onLongTermChange?: (enabled: boolean) => void
 }) => {
   const { agentDetailResponse, saveAgentRequest, onLongTermChange } = props
-  const { updateModelDetail, updateWorkflowDetail, updatePluginDetail, updateKnowledgeDetail, updateRetrievalConfig, updateGreeting, updateMemoryConfig } = useAgentStore()
+  const { updateModelDetail, updateWorkflowDetail, updatePluginDetail, updateKnowledgeDetail, updateRetrievalConfig, updateGreeting, updateMemoryConfig, updateSaveAgentRequest } = useAgentStore()
   const readonly = useAgentStore(s => s.readonly)
   const { user } = useAuthStore()
   const { t } = useScopedTranslation('agents.agentEditor.orchestration')
@@ -176,6 +176,10 @@ const AgentModelSelector = (props: {
   const [newVariableDescription, setNewVariableDescription] = useState<string>('')
   const [duplicateVariableWarning, setDuplicateVariableWarning] = useState<string>('')
 
+  // 限制配置状态
+  const [maxIteration, setMaxIteration] = useState<number>(5)
+  const [maxMessageRounds, setMaxMessageRounds] = useState<number>(10)
+
   // 将模型管理API的数据转换为ModelDetail格式
   useEffect(() => {
     if (modelsData?.items) {
@@ -244,7 +248,7 @@ const AgentModelSelector = (props: {
             streaming: initModelInfo?.streaming ?? true,
             // 优先使用模型列表中的 is_active，如果没有则使用保存的值
             is_active: initModelInfo?.is_active !== undefined ? initModelInfo.is_active : true,
-          }
+          } as ModelDetail
           setSelectedModel(modelFromSaved)
           updateModelDetail(modelFromSaved)
         }
@@ -266,7 +270,7 @@ const AgentModelSelector = (props: {
           streaming: initModelInfo?.streaming ?? true,
           // 如果保存的数据中没有 is_active，默认为 true
           is_active: initModelInfo?.is_active !== undefined ? initModelInfo.is_active : true,
-        }
+        } as ModelDetail
         setSelectedModel(modelFromSaved)
         updateModelDetail(modelFromSaved)
       }
@@ -296,6 +300,12 @@ const AgentModelSelector = (props: {
         })),
       )
       setLongTermMemoryEnabled(initLongTermMemory)
+
+      // 初始化限制配置
+      const initMaxIteration = saveAgentRequest?.constraint?.max_iteration ?? 5
+      const initMaxRounds = saveAgentRequest?.constraint?.reserved_max_chat_rounds ?? 10
+      setMaxIteration(initMaxIteration)
+      setMaxMessageRounds(initMaxRounds)
 
       // 初始化检索配置
       const retrievalConfig = saveAgentRequest?.configs?.retrieval_config as { use_agent?: boolean; use_sync?: boolean; source?: number; topk?: number; score_threshold?: number | null } | undefined
@@ -458,6 +468,92 @@ const AgentModelSelector = (props: {
   // 处理折叠面板展开/收起状态变化
   const handleAccordionChange = (_event: React.SyntheticEvent, isExpanded: boolean) => {
     setModelExpanded(isExpanded)
+  }
+
+  // 处理最大迭代次数变化
+  const handleMaxIterationChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(event.target.value, 10)
+    // 允许空值以便用户修改，但在 blur 时应该有默认值或保留旧值
+    // 但为了限制范围，如果超出范围则截断
+    if (!isNaN(val)) {
+      let finalVal = val
+      if (val > 50) finalVal = 50
+      
+      // 当输入值有效（>=1）时更新 store，否则只更新本地状态
+      if (finalVal >= 1) {
+        setMaxIteration(finalVal)
+        updateSaveAgentRequest({
+          constraint: {
+            ...(saveAgentRequest?.constraint || {}),
+            max_iteration: finalVal,
+            reserved_max_chat_rounds: maxMessageRounds,
+          },
+        })
+      } else {
+        // 如果输入了 0 或负数（虽然 input type=number 可能限制了部分），暂时更新本地状态
+        // 这样用户可以删除或修改，onBlur 会修正
+        setMaxIteration(finalVal)
+      }
+    } else if (event.target.value === '') {
+       // 允许清空，暂时不更新 store，设为 -1 标记为空
+       setMaxIteration(-1)
+    }
+  }
+
+  // 处理最大迭代次数失去焦点
+  const handleMaxIterationBlur = () => {
+    if (maxIteration === -1 || maxIteration < 1) {
+      // 默认值为 5，最小值为 1。如果为空，恢复默认值 5；小于 1 时设为 1
+      const finalVal = maxIteration === -1 ? 5 : 1
+      setMaxIteration(finalVal)
+      updateSaveAgentRequest({
+        constraint: {
+          ...(saveAgentRequest?.constraint || {}),
+          max_iteration: finalVal,
+          reserved_max_chat_rounds: maxMessageRounds,
+        },
+      })
+    }
+  }
+
+  // 处理最大对话轮数变化
+  const handleMaxMessageRoundsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(event.target.value, 10)
+    if (!isNaN(val)) {
+      let finalVal = val
+      if (val > 50) finalVal = 50
+      
+      if (finalVal >= 1) {
+        setMaxMessageRounds(finalVal)
+        updateSaveAgentRequest({
+          constraint: {
+            ...(saveAgentRequest?.constraint || {}),
+            reserved_max_chat_rounds: finalVal,
+            max_iteration: maxIteration,
+          },
+        })
+      } else {
+        setMaxMessageRounds(finalVal)
+      }
+    } else if (event.target.value === '') {
+      setMaxMessageRounds(-1)
+    }
+  }
+
+  // 处理最大对话轮数失去焦点
+  const handleMaxMessageRoundsBlur = () => {
+    if (maxMessageRounds === -1 || maxMessageRounds < 1) {
+      // 默认值为 10，最小值为 1。如果为空，恢复默认值 10；小于 1 时设为 1
+      const finalVal = maxMessageRounds === -1 ? 10 : 1
+      setMaxMessageRounds(finalVal)
+      updateSaveAgentRequest({
+        constraint: {
+          ...(saveAgentRequest?.constraint || {}),
+          reserved_max_chat_rounds: finalVal,
+          max_iteration: maxIteration,
+        },
+      })
+    }
   }
 
   const handleWorkflowConfirm = (_workflowsIds: string[], workflowObjects: WorkflowSelectDetail[]) => {
@@ -884,6 +980,38 @@ const AgentModelSelector = (props: {
                 {t('orchestrationPage.alerts.noModelsConfiguredMessage')}
               </Alert>
             )}
+          </AccordionDetails>
+        </Accordion>
+
+        <Accordion>
+          <AccordionSummary aria-controls="constraint-content" id="constraint-header">
+            <Typography component="span">{t('orchestrationPage.sections.constraintTitle')}</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label={t('orchestrationPage.constraint.maxIteration')}
+                type="number"
+                value={maxIteration === -1 ? '' : maxIteration}
+                onChange={handleMaxIterationChange}
+                onBlur={handleMaxIterationBlur}
+                disabled={readonly}
+                size="small"
+                fullWidth
+                InputProps={{ inputProps: { min: 1, max: 50 } }}
+              />
+              <TextField
+                label={t('orchestrationPage.constraint.maxChatRounds')}
+                type="number"
+                value={maxMessageRounds === -1 ? '' : maxMessageRounds}
+                onChange={handleMaxMessageRoundsChange}
+                onBlur={handleMaxMessageRoundsBlur}
+                disabled={readonly}
+                size="small"
+                fullWidth
+                InputProps={{ inputProps: { min: 1, max: 50 } }}
+              />
+            </Box>
           </AccordionDetails>
         </Accordion>
       </div>

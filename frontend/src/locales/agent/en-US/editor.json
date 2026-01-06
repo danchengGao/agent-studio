@@ -175,6 +175,7 @@
       "orchestrationPage": {
         "sections": {
           "modelTitle": "Model Configuration",
+          "constraintTitle": "Constraint",
           "skillsTitle": "Skills",
           "conversationTitle": "Conversation Settings",
           "greetingTitle": "Greeting",
@@ -183,6 +184,10 @@
         },
         "model": {
           "title": "Model"
+        },
+        "constraint": {
+          "maxIteration": "Max Iterations",
+          "maxChatRounds": "Max Chat Rounds"
         },
         "select": {
           "placeholder": "Select a model",
