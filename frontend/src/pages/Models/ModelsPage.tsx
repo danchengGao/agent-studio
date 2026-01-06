@@ -784,6 +784,9 @@ const ModelsPage: React.FC = () => {
 
   const handleTestModel = async () => {
     if (!testPrompt.trim() || !selectedModel) return
+    if (testPrompt.length > 1000) { 
+      return 
+    }
 
     setIsTesting(true)
 
@@ -893,6 +896,7 @@ const ModelsPage: React.FC = () => {
         await updateEmbeddingModelMutation.mutateAsync({ id: model.id, model: updatedModel, spaceId: user?.spaceId || '' })
       } else {
         await updateModelMutation.mutateAsync({ id: model.id, model: updatedModel, spaceId: user?.spaceId || '' })
+        refetch()
       }
     } catch (error) {
       setSnackbar({ open: true, message: t('models.messages.removeTagFailed'), severity: 'error' })

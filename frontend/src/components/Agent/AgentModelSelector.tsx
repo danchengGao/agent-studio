@@ -1008,6 +1008,13 @@ const AgentModelSelector = (props: {
               >
                 {workflowObjects.length}
               </span>
+              {workflowValidationErrorCount > 0 && ( 
+                 <Tooltip title={`所选工作流存在校验不通过（${workflowValidationErrorCount} 个），请跳转对应工作流进行修改`} arrow> 
+                   <span className="inline-flex items-center ml-2"> 
+                     <AlertCircle className="w-[20px] h-[20px] text-red-500" /> 
+                   </span> 
+                 </Tooltip> 
+               )}
             </Typography>
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
               <Tooltip title="刷新工作流信息" arrow>
@@ -1035,7 +1042,18 @@ const AgentModelSelector = (props: {
           </AccordionSummary>
           <AccordionDetails>
             {/* 工作流列表 */}
-            <WorkflowList workflowObjects={workflowObjects} onClick={handleWorkflowOperation} disabled={readonly} />
+            <WorkflowList	 
+               workflowObjects={workflowObjects} 
+               onClick={handleWorkflowOperation} 
+               disabled={readonly} 
+               refreshToken={workflowListRefreshToken} 
+               validationResults={validationResults} 
+             />
+             {workflowObjects.length === 0 && ( 
+               <Alert severity="info" sx={{ mt: 2 }}> 
+                 暂无工作流，点击上方按钮添加工作流 
+               </Alert> 
+             )}
           </AccordionDetails>
         </Accordion>
 
