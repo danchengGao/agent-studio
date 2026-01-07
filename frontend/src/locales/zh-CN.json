@@ -1584,7 +1584,7 @@
       "tagsLimit": "标签数量不能超过10个",
       "apiKeyEditHint": "当前显示的是脱敏的密钥，留空则不更新，输入新密钥则更新",
       "apiKeyEmptyHint": "留空则不更新密钥",
-      "embeddingBaseUrlHint": "模型 API 服务的根地址（如：https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings）",
+      "embeddingBaseUrlHint": "模型 API 服务的根地址（如：https://dashscope.xxxxxxx.com/compatible-mode/v1/embeddings）",
       "maxBatchSize": "最大Batch数量",
       "maxBatchSizeHint": "每次请求处理的最大文本数量，范围：1-10",
       "maxTokens": "最大输出Token数",

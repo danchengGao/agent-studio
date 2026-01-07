@@ -1604,7 +1604,7 @@
       "tagsLimit": "Tag count cannot exceed 10",
       "apiKeyEditHint": "Currently showing masked key. Leave empty to keep unchanged, enter new key to update",
       "apiKeyEmptyHint": "Leave empty to keep key unchanged",
-      "embeddingBaseUrlHint": "Root address of the model API service (e.g.: https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings)",
+      "embeddingBaseUrlHint": "Root address of the model API service (e.g.: https://dashscope.xxxxxxx.com/compatible-mode/v1/embeddings)",
       "maxBatchSize": "Max Batch Size",
       "maxBatchSizeHint": "Maximum number of texts processed per request, range: 1-10",
       "maxTokens": "Max Output Tokens",
