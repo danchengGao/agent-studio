@@ -3811,7 +3811,8 @@
         "indexing": "索引中",
         "indexed": "已索引",
         "failed": "失败",
-        "deleted": "已删除"
+        "deleted": "已删除",
+        "querying": "查询中"
       },
       "graphEnhancement": "图增强",
       "maxLengthReached": "已达到最大长度",

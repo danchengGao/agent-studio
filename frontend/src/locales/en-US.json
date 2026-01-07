@@ -3231,7 +3231,8 @@
         "indexing": "Indexing",
         "indexed": "Indexed",
         "failed": "Failed",
-        "deleted": "Deleted"
+        "deleted": "Deleted",
+        "querying": "Querying"
       },
       "graphEnhancement": "Graph Enhancement",
       "maxLengthReached": "Maximum length reached",

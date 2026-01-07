@@ -70,6 +70,14 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     documentStatusesRef.current = documentStatuses
   }, [documentStatuses])
 
+  // 用于存储当前文档列表的引用，用于判断新文档是否在第一页
+  const documentsRef = React.useRef<DocumentItem[]>([])
+  
+  // 同步 documents 到 ref
+  React.useEffect(() => {
+    documentsRef.current = documents
+  }, [documents])
+
   // 从路由状态获取知识库数据，如果没有则从状态管理中获取
   const stateKnowledgeBase = location.state?.knowledgeBase as KnowledgeBase
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase | null>(stateKnowledgeBase || null)
@@ -137,91 +145,184 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       })
   }, [id]) // 只依赖 id，当 id 变化时重新加载
 
+  // 用于防止 fetchDocuments 并发执行的锁（按页面索引）
+  const fetchDocumentsLockRef = React.useRef<Map<number, Promise<void>>>(new Map())
+
   // 获取文档列表
-  const fetchDocuments = async (page: number = 1) => {
-    if (!knowledgeBase || !knowledgeBase.id || isDocumentsLoading || currentRequestPage === page) return
+  const fetchDocuments = async (page: number = 1, skipStatusFetch: boolean = false) => {
+    if (!knowledgeBase || !knowledgeBase.id) {
+      return
+    }
+
+    if (isDocumentsLoading && currentRequestPage === page) {
+      return
+    }
 
     const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
-    if (!spaceId) return
+    if (!spaceId) {
+      return
+    }
 
-    setCurrentRequestPage(page)
-    setIsDocumentsLoading(true)
-    try {
-      const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
-
-      const request: GetDocumentsListRequest = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        page,
-        size: pageSize,
+    // 检查是否有相同页面的请求正在进行
+    const existingRequest = fetchDocumentsLockRef.current.get(page)
+    if (existingRequest) {
+      try {
+        await existingRequest
+      } catch (error) {
+        // 忽略错误，让调用方处理
       }
+      return
+    }
 
-      const response = await KnowledgeBaseService.getDocumentsList(request)
-      setDocuments(response.data.items)
-      setTotalDocuments(response.data.total)
-      setCurrentPage(response.data.page)
+    // 创建新的请求并加锁
+    const requestPromise = (async () => {
+      setCurrentRequestPage(page)
+      setIsDocumentsLoading(true)
+      
+      try {
+        const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
 
-      // 查询当前页文档的状态（合并到现有状态中，不替换）
-      const docIds = response.data.items.map(doc => doc.id)
-      await fetchDocumentStatuses(docIds, true) // 合并状态，保留其他页面的文档状态
+        const request: GetDocumentsListRequest = {
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          page,
+          size: pageSize,
+        }
+
+        const response = await KnowledgeBaseService.getDocumentsList(request)
+        
+        // 先设置文档列表，立即显示
+        setDocuments(response.data.items)
+        setTotalDocuments(response.data.total)
+        setCurrentPage(response.data.page)
+        
+        // 只有在不跳过状态查询时才查询当前页文档的状态
+        if (!skipStatusFetch) {
+          const docIds = response.data.items.map(doc => doc.id)
+          if (docIds.length > 0) {
+            fetchDocumentStatuses(docIds, true).catch(error => {
+              console.error(`[fetchDocuments] ⚠️  页面 ${page} 状态查询失败:`, error)
+            })
+          }
+        }
+      } catch (error) {
+        // 不显示错误提示，因为没有文档是正常情况
+        throw error // 重新抛出错误，让调用方知道请求失败
+      } finally {
+        // 清除加载状态
+        setIsDocumentsLoading(false)
+        setCurrentRequestPage(null)
+        // 清除锁
+        fetchDocumentsLockRef.current.delete(page)
+      }
+    })()
+
+    // 保存请求Promise到锁中
+    fetchDocumentsLockRef.current.set(page, requestPromise)
+
+    try {
+      await requestPromise
     } catch (error) {
-      console.error('Failed to fetch documents:', error)
-      // 不显示错误提示，因为没有文档是正常情况
-    } finally {
-      setIsDocumentsLoading(false)
-      setCurrentRequestPage(null)
+      // 错误已经在内部处理，这里只做清理
     }
   }
 
+  // 用于防止 fetchAllDocumentIds 并发执行的锁
+  const fetchAllDocumentIdsLockRef = React.useRef<Promise<{ allDocIds: string[]; firstPageItems: DocumentItem[]; total: number }> | null>(null)
+
   // 获取所有文档的ID（通过分页查询）
   // 返回：{ allDocIds: string[], firstPageItems: DocumentItem[], total: number }
-  // 优化：使用 size=100 一次性获取第一页数据，然后从中取前 pageSize 个用于显示，避免多次请求
+  // 优化：使用并行请求提高性能，避免顺序请求导致的排队延迟
+  // 添加请求锁，防止并发请求导致的阻塞
   const fetchAllDocumentIds = async (): Promise<{ allDocIds: string[]; firstPageItems: DocumentItem[]; total: number }> => {
     if (!knowledgeBase || !knowledgeBase.id) return { allDocIds: [], firstPageItems: [], total: 0 }
 
     const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
     if (!spaceId) return { allDocIds: [], firstPageItems: [], total: 0 }
 
-    try {
-      const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
+    // 如果已经有正在进行的请求，直接返回该请求的结果
+    if (fetchAllDocumentIdsLockRef.current) {
+      return fetchAllDocumentIdsLockRef.current
+    }
 
-      const allDocIds: string[] = []
-      let firstPageItems: DocumentItem[] = []
-      let total = 0
-      let page = 1
-      const size = 100 // 每页获取100个，减少请求次数
+    // 创建新的请求并加锁
+    const requestPromise = (async () => {
+      try {
+        const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
 
-      while (true) {
-        const request: GetDocumentsListRequest = {
+        const allDocIds: string[] = []
+        let firstPageItems: DocumentItem[] = []
+        let total = 0
+        const size = 100 // 每页获取100个，减少请求次数
+
+        // 步骤1: 先获取第一页，获取总数和第一页数据
+        const firstPageRequest: GetDocumentsListRequest = {
           space_id: spaceId,
           kb_id: knowledgeBase.id,
-          page,
+          page: 1,
           size,
         }
 
-        const response = await KnowledgeBaseService.getDocumentsList(request)
-        const docIds = response.data.items.map((doc: DocumentItem) => doc.id)
-        allDocIds.push(...docIds)
+        const firstPageResponse = await KnowledgeBaseService.getDocumentsList(firstPageRequest)
+        total = firstPageResponse.data.total
+        firstPageItems = firstPageResponse.data.items.slice(0, pageSize)
+        const firstPageDocIds = firstPageResponse.data.items.map((doc: DocumentItem) => doc.id)
+        allDocIds.push(...firstPageDocIds)
 
-        // 保存第一页的数据
-        if (page === 1) {
-          total = response.data.total
-          // 从第一页数据中取前 pageSize 个用于显示，避免显示全量文档
-          firstPageItems = response.data.items.slice(0, pageSize)
+        // 如果只有一页，直接返回
+        if (total <= size) {
+          return { allDocIds, firstPageItems, total }
         }
 
-        // 如果当前页的文档数小于size，说明已经是最后一页
-        if (response.data.items.length < size || allDocIds.length >= total) {
-          break
+        // 步骤2: 计算需要获取的总页数
+        const totalPages = Math.ceil(total / size)
+
+        // 步骤3: 并行获取剩余页面（分批并行，避免一次性并发太多请求）
+        const BATCH_SIZE = 3 // 每批最多3个并发请求，避免服务器压力过大
+        const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2) // 从第2页开始
+
+        for (let i = 0; i < remainingPages.length; i += BATCH_SIZE) {
+          const batch = remainingPages.slice(i, i + BATCH_SIZE)
+
+          // 并行请求当前批次
+          const batchPromises = batch.map(page => {
+            const request: GetDocumentsListRequest = {
+              space_id: spaceId,
+              kb_id: knowledgeBase.id,
+              page,
+              size,
+            }
+            return KnowledgeBaseService.getDocumentsList(request)
+          })
+
+          try {
+            const batchResponses = await Promise.all(batchPromises)
+
+          // 处理批次结果
+          batchResponses.forEach((response) => {
+            const docIds = response.data.items.map((doc: DocumentItem) => doc.id)
+            allDocIds.push(...docIds)
+          })
+          } catch (error) {
+            console.error(`[fetchAllDocumentIds] 批次 ${Math.floor(i / BATCH_SIZE) + 1} 失败:`, error)
+            // 批次失败时，继续处理下一批次，而不是完全失败
+          }
         }
-        page++
+
+        return { allDocIds, firstPageItems, total }
+      } catch (error) {
+        console.error('[fetchAllDocumentIds] 获取文档ID失败:', error)
+        return { allDocIds: [], firstPageItems: [], total: 0 }
+      } finally {
+        // 请求完成后释放锁
+        fetchAllDocumentIdsLockRef.current = null
       }
+    })()
 
-      return { allDocIds, firstPageItems, total }
-    } catch (error) {
-      console.error('Failed to fetch all document IDs:', error)
-      return { allDocIds: [], firstPageItems: [], total: 0 }
-    }
+    // 保存请求Promise到锁中
+    fetchAllDocumentIdsLockRef.current = requestPromise
+
+    return requestPromise
   }
 
   // 查询文档状态
@@ -264,36 +365,41 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     }
   }
 
-  // 当知识库数据加载完成后，获取文档列表和所有文档的状态
+  // 当知识库数据加载完成后，先获取第一页显示，然后后台获取全量数据，最后查询状态
   useEffect(() => {
     if (knowledgeBase) {
       // 设置加载状态，避免显示"暂无文档"
       setIsDocumentsLoading(true)
       
-      // 优化：一次性获取所有文档ID和第一页数据，避免重复请求
-      fetchAllDocumentIds()
-        .then(async ({ allDocIds, firstPageItems, total }) => {
-          // 先查询所有文档的状态（包含第一页），然后再设置文档列表，避免显示 unknown
-          if (allDocIds.length > 0) {
-            // 先查询所有文档的状态，这样第一页文档的状态也会被查询到
-            await fetchDocumentStatuses(allDocIds, false) // 完全替换，基于所有文档的状态
-          }
-          
-          // 状态查询完成后再设置文档列表，这样状态已经准备好了，不会显示 unknown
-          // 即使为空也要设置，以清除加载状态
-          setDocuments(firstPageItems)
-          setTotalDocuments(total)
-          setCurrentPage(1)
-          
-          // 加载完成，清除加载状态
-          setIsDocumentsLoading(false)
-        })
-        .catch(error => {
-          console.error('Failed to fetch all document IDs:', error)
-          // 如果失败，回退到原来的方式
-          setIsDocumentsLoading(false)
-          fetchDocuments(1)
-        })
+      // 优化：延迟一小段时间，确保 token 刷新完成后再发起请求
+      const timer = setTimeout(() => {
+        // 步骤1: 先获取第一页（使用 pageSize），立即显示
+        // 跳过状态查询，因为后续会获取全量状态
+        fetchDocuments(1, true)
+          .then(() => {
+            // 步骤2: 异步获取所有文档ID（在后台，不影响显示）
+            fetchAllDocumentIds()
+              .then(({ allDocIds }) => {
+                // 步骤3: 查询所有文档的状态（包括第一页），更新首页状态栏
+                if (allDocIds.length > 0) {
+                  fetchDocumentStatuses(allDocIds, false).catch(error => {
+                    console.error('Failed to fetch document statuses:', error)
+                  })
+                }
+              })
+              .catch(error => {
+                console.error('Failed to fetch all document IDs:', error)
+              })
+          })
+          .catch(error => {
+            console.error('Failed to fetch first page:', error)
+            setIsDocumentsLoading(false)
+          })
+      }, 100) // 延迟100ms，确保 token 刷新完成
+      
+      return () => {
+        clearTimeout(timer)
+      }
     }
   }, [knowledgeBase?.id, user?.spaceId]) // 只依赖ID和spaceId，避免重复调用
 
@@ -316,11 +422,19 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           })
 
           if (processingDocIds.length > 0) {
+            // 有正在处理的文档，只刷新它们的状态
             await fetchDocumentStatuses(processingDocIds, true)
           } else if (Object.keys(existingStatuses).length === 0) {
-            const result = await fetchAllDocumentIds()
-            if (result.allDocIds.length > 0) {
-              await fetchDocumentStatuses(result.allDocIds, false)
+            // 只在没有状态数据时才获取所有文档ID
+            // 注意：由于 fetchAllDocumentIds 有锁机制，不会重复请求
+            try {
+              const result = await fetchAllDocumentIds()
+              if (result.allDocIds.length > 0) {
+                await fetchDocumentStatuses(result.allDocIds, false)
+              }
+            } catch (error) {
+              console.error('[refreshLoop] ❌ fetchAllDocumentIds failed:', error)
+              // 失败时不阻塞，继续下一次循环
             }
           }
         } catch (error) {
@@ -461,6 +575,9 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           return 'bg-red-100 text-red-800'
         case 'deleted':
           return 'bg-gray-100 text-gray-600'
+        case 'unknown':
+        case 'querying':
+          return 'bg-gray-100 text-gray-600'
         default:
           return 'bg-gray-100 text-gray-800'
       }
@@ -482,6 +599,8 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           return t('knowledgeBases.editor.status.failed')
         case 'deleted':
           return t('knowledgeBases.editor.status.deleted')
+        case 'unknown':
+          return t('knowledgeBases.editor.status.querying')
         default:
           return status
       }
@@ -1098,26 +1217,49 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           onClose={() => setShowAddDialog(false)}
           onDocumentUploaded={() => {
             // 如果用户在上传文件后关闭对话框，也需要刷新文档列表
+            // 注意：如果 onSuccess 也会被调用，这里可能会有重复请求
+            // 但 fetchDocuments 内部有防重复调用的保护，所以不会有问题
             // 上传文档后重置到第一页
             setCurrentPage(1)
-            fetchDocuments(1)
+            // 不等待完成，避免阻塞UI
+            fetchDocuments(1).catch(error => {
+              console.error('Failed to fetch documents after upload:', error)
+            })
           }}
           onSuccess={async (docIds?: string[]) => {
             setShowAddDialog(false)
             showSuccess(t('knowledgeBases.settings.documentAdded'))
             // 上传文档后重置到第一页
             setCurrentPage(1)
-            fetchDocuments(1) // 刷新文档列表，显示第一页
-            // 查询新上传文档的状态，并更新所有文档的状态
-            if (docIds && docIds.length > 0) {
-              // 先查询新上传文档的状态
-              await fetchDocumentStatuses(docIds, true)
-              // 然后重新查询所有文档的状态，确保处理中的文档列表是最新的
-              const { allDocIds } = await fetchAllDocumentIds()
-              if (allDocIds.length > 0) {
-                await fetchDocumentStatuses(allDocIds, false) // 完全替换，基于所有文档的状态
+            
+            // 优化：直接使用 fetchDocuments(1) 获取第一页数据，避免遍历所有页面
+            // fetchAllDocumentIds 会遍历所有页面获取所有文档ID，当文档数量很多时非常慢
+            // 添加文档后只需要刷新第一页即可，大大提升性能
+            
+            // 先获取文档列表（不等待状态查询）
+            // fetchDocuments 内部会自动查询当前页文档的状态，避免重复查询
+            fetchDocuments(1).then(() => {
+              // fetchDocuments 完成后，检查新上传的文档是否在第一页
+              // 如果不在第一页，需要单独查询它们的状态
+              if (docIds && docIds.length > 0) {
+                // 使用 setTimeout 确保文档列表状态已经更新
+                setTimeout(() => {
+                  // 使用 ref 获取最新的文档列表，避免闭包陷阱
+                  const currentPageDocIds = new Set(documentsRef.current.map(doc => doc.id))
+                  const newDocIdsNotInPage = docIds.filter(id => !currentPageDocIds.has(id))
+                  
+                  // 只查询不在当前页的新文档的状态
+                  // 如果新文档在第一页，fetchDocuments 已经查询过了，避免重复查询
+                  if (newDocIdsNotInPage.length > 0) {
+                    fetchDocumentStatuses(newDocIdsNotInPage, true).catch(error => {
+                      console.error('Failed to fetch new document statuses:', error)
+                    })
+                  }
+                }, 100)
               }
-            }
+            }).catch(error => {
+              console.error('Failed to fetch documents:', error)
+            })
           }}
         />
       )}
