@@ -1786,7 +1786,21 @@
       "exportConfigInDevelopment": "Export configuration feature under development",
       "pluginInfoInDevelopment": "Plugin info feature under development",
       "checkingForUpdates": "Checking for updates...",
-      "updateSuccess": "Update successful: {{name}}"
+      "updateSuccess": "Update successful: {{name}}",
+      "pluginVersionConfigSaveSuccess": "Plugin version configuration saved successfully",
+      "allApisConfigured": "{{count}} APIs auto-configured",
+      "partialApisConfigured": "{{success}}/{{total}} APIs configured successfully",
+      "allApisFailed": "All APIs failed to configure",
+      "cloudPluginInstallSuccess": "Cloud plugin {{name}} installed successfully",
+      "ideCreationHint": "You can start coding now",
+      "loadPluginsFailedDescription": "Failed to load plugin list, check network connection or retry later",
+      "marketRefreshed": "Market data refreshed",
+      "installing": "Installing...",
+      "fillRequiredFields": "Please fill all required fields",
+      "pluginListRefreshed": "Plugin list refreshed",
+      "refreshPluginListFailed": "Failed to refresh plugin list",
+      "refreshPluginListError": "Error occurred while refreshing plugin list",
+      "createPluginError": "Plugin creation error"
     },
     "errors": {
       "createWeatherServiceFailed": "Create weather service failed",

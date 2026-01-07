@@ -1816,7 +1816,20 @@
       "checkingUpdates": "正在检查更新...",
       "updateSuccess": "更新成功：{{name}}",
       "readOnlyMode": "当前为只读模式，不允许编辑插件配置",
-      "pluginVersionConfigSaveSuccess": "插件版本配置保存成功"
+      "pluginVersionConfigSaveSuccess": "插件版本配置保存成功",
+      "allApisConfigured": "共 {{count}} 个API已自动配置",
+      "partialApisConfigured": "{{success}}/{{total}} 个API配置成功",
+      "allApisFailed": "所有API配置失败",
+      "cloudPluginInstallSuccess": "云侧插件 {{name}} 安装成功",
+      "ideCreationHint": "您可以开始编写代码了",
+      "loadPluginsFailedDescription": "无法加载插件列表，请检查网络连接或稍后重试",
+      "marketRefreshed": "市场数据已刷新",
+      "installing": "安装中...",
+      "fillRequiredFields": "请填写所有必填字段",
+      "pluginListRefreshed": "插件列表已刷新",
+      "refreshPluginListFailed": "刷新插件列表失败",
+      "refreshPluginListError": "刷新插件列表时发生错误",
+      "createPluginError": "插件创建出错"
     },
     "errors": {
       "deleteFailed": "删除失败",
@@ -1850,7 +1863,8 @@
     },
     "types": {
       "cloud": "云侧服务",
-      "ide": "本地代码插件"
+      "ide": "本地代码插件",
+      "pluginTypeUnknown": "未知类型 ({{type}})"
     },
     "tags": {
       "cloud": "云侧",
