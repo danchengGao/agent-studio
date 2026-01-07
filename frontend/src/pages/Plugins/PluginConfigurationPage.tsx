@@ -123,7 +123,7 @@ const PluginConfigurationPage: React.FC = () => {
 
   // Handle name change
   const handleNameChange = (name: string) => {
-    if (name.length <= 20) {
+    if (name.length <= 128) {
       setConfigForm(prev => ({ ...prev, name }))
     }
   }
@@ -305,7 +305,7 @@ const PluginConfigurationPage: React.FC = () => {
     // Validate required fields
     const validation = validateForm()
     if (!validation.isValid) {
-     showError(validation.errors[0])
+      showError(validation.errors[0])
       return
     }
 

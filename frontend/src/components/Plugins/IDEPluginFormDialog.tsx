@@ -78,7 +78,7 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
   onCancel,
 }) => {
   const { t } = useTranslation()
-  
+
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="md" fullWidth>
       <DialogTitle className="flex items-center space-x-2">
@@ -102,8 +102,8 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
               fullWidth
               required
               placeholder={t('plugins.dialog.idePlugin.namePlaceholder', '例如：数据处理器、API调用器、文件转换器')}
-              helperText={`${t('plugins.dialog.idePlugin.nameHelperText')} (${form.name.length}/20)`}
-              inputProps={{ maxLength: 20 }}
+              helperText={`${t('plugins.dialog.idePlugin.nameHelperText')} (${form.name.length}/128)`}
+              inputProps={{ maxLength: 128 }}
             />
           </div>
 
@@ -123,8 +123,8 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
               multiline
               rows={3}
               placeholder={t('plugins.dialog.idePlugin.descriptionPlaceholder')}
-              helperText={`${t('plugins.dialog.idePlugin.descriptionHelperText')} (${form.description.length}/40)`}
-              inputProps={{ maxLength: 40 }}
+              helperText={`${t('plugins.dialog.idePlugin.descriptionHelperText')} (${form.description.length}/258)`}
+              inputProps={{ maxLength: 258 }}
             />
           </div>
 
