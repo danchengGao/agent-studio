@@ -256,12 +256,14 @@ const AgentEditorEditPage = () => {
   const handleSaveSettings = async (nextName: string, nextDescription: string, nextIcon: string) => {
     if (!agentId) return
     try {
+      const agentType = agentDetailResponse?.data?.agent_info?.agent_type || 'react'
       await AgentService.updateAgent({
         agent_id: agentId,
         space_id: getDefaultSpaceId(),
         agent_name: nextName.trim(),
         description: nextDescription,
         icon: nextIcon,
+        agent_type: agentType,
       })
       showSuccess(t('messages.updateAgentSuccess'))
       await fetchAgentDetail(agentId)
