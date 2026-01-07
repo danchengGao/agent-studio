@@ -118,6 +118,7 @@ export const API_ENDPOINTS = {
     AGENT_USERINPUT: '/execution/agent/userInput',
     PLUGIN: '/execution/plugin',
     COMPONENT: '/execution/component',
+    COMPONENT_CANCEL: '/execution/component/cancel',
     GET_TRACE_SUMMARY_LIST: '/execution/get_trace_summary_list',
     GET_TRACE_SUMMARY_BY_TRACE_ID: '/execution/get_trace_summary_by_trace_id',
   },

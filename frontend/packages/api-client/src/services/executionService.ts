@@ -10,6 +10,8 @@ import {
   WorkflowExecutionEventHandler,
   ComponentExecuteRequest,
   ComponentExecuteResponse,
+  ComponentCancelRequest,
+  ComponentCancelResponse,
   SSEMessage,
   SSEData,
   interactionPayload,
@@ -566,6 +568,32 @@ export class ExecutionService {
         errorMessage = error.message
       } else if (error?.detail) {
         // 兼容原有的 detail 字段
+        errorMessage = error.detail
+      }
+
+      throw new Error(errorMessage)
+    }
+  }
+
+  static async cancelComponent(request: ComponentCancelRequest): Promise<ComponentCancelResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<ComponentCancelResponse>(API_ENDPOINTS.EXECUTION.COMPONENT_CANCEL, request)
+      return response.data
+    } catch (error: any) {
+      console.error('取消单节点调试失败:', error)
+
+      let errorMessage = '未知错误'
+
+      if (error?.response) {
+        if (error.response.data?.message) {
+          errorMessage = error.response.data.message
+        } else if (error.response.message) {
+          errorMessage = error.response.message
+        }
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (error?.detail) {
         errorMessage = error.detail
       }
 

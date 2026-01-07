@@ -33,9 +33,10 @@ export const clearLastTestRunValues = () => {
 interface TestRunSidePanelProps {
   workflowId?: string
   spaceId?: string
+  version?: string
 }
 
-export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceId }) => {
+export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceId, version }) => {
   const { t } = useTranslation()
   const panelManager = usePanelManager()
   const executionContext = useExecutionContext()
@@ -254,7 +255,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
     try {
       const params = {
         id: workflowId,
-        version: '',
+        version: version || '',
         space_id: spaceId,
         inputs: values,
         options: {

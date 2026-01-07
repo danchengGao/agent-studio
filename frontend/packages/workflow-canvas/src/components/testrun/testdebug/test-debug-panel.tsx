@@ -128,7 +128,6 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
 
   const handleCancel = () => {
     cancel()
-    executionContext.clearExecution()
   }
 
   const handleClose = () => {

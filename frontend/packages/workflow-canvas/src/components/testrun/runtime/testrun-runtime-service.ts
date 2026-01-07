@@ -140,6 +140,7 @@ export class TestRunRuntimeService implements ITestRunRuntimeService {
           inputs: params.inputs,
           component_id: params.component_id!,
           loop_id: params.loop_id,
+          conversation_id: params.conversation_id,
         },
         options,
       )
@@ -250,8 +251,8 @@ export class TestRunRuntimeService implements ITestRunRuntimeService {
     this.statusManager.clearAllStatuses()
   }
 
-  cancelSingleComponent(componentId: string): void {
-    this.singleNodeExecutor.cancel(componentId)
+  async cancelSingleComponent(componentId: string): Promise<void> {
+    await this.singleNodeExecutor.cancel(componentId)
   }
 
   setNodeFailedStatus(componentId: string, errorMessage: string): void {

@@ -1926,6 +1926,8 @@ export interface ComponentExecuteRequest {
   inputs: Record<string, any>
   component_id: string
   loop_id?: string
+  conversation_id?: string
+  force?: boolean
 }
 // 单节点调试响应类型
 export interface ComponentExecuteResponse {
@@ -1937,6 +1939,29 @@ export interface ComponentExecuteResponse {
   }
   code: number
   message: string
+}
+
+// 单节点调试取消请求类型
+export interface ComponentCancelRequest {
+  space_id: string
+  id: string
+  version: string
+  component_id: string
+  conversation_id?: string
+  force?: boolean
+}
+
+// 单节点调试取消响应类型
+export interface ComponentCancelResponse {
+  code: number
+  message: string
+  data?: {
+    workflow_id?: string
+    component_id?: string
+    conversation_id?: string
+    cancelled?: boolean
+    warning?: string
+  }
 }
 
 // Plugin Code 相关类型

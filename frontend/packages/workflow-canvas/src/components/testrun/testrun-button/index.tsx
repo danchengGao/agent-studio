@@ -59,6 +59,7 @@ export function TestRunButton(props: { disabled: boolean; workflowId?: string; s
         props: {
           workflowId: props.workflowId,
           spaceId: props.spaceId,
+          version: selectedVersion,
         },
       })
     } finally {
