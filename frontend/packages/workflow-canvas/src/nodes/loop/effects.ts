@@ -119,6 +119,7 @@ export const provideLoopEffect: EffectOptions[] = [
   },
 ]
 
+// Export intermediate variables to public scope, merged with outputs
 export const exportIntermediateVarsEffect: EffectOptions[] = [
   {
     event: DataEvent.onValueInitOrChange,
@@ -126,31 +127,13 @@ export const exportIntermediateVarsEffect: EffectOptions[] = [
       const { value, context } = params
 
       const loopParam = value || {}
-      const loopType = loopParam.type || 'numLoop'
       const intermediateVar: Record<string, IFlowValue> = loopParam.intermediateVar || {}
-      const loopArray: Record<string, IFlowValue> = loopType === 'arrayLoop' ? (loopParam.loopArray || {}) : {}
       const outputsProperties: Record<string, any> = context.node.form?.getValueIn('outputs.properties') || {}
 
       const scope = context.node.scope
       const privateScope = context.node.privateScope
 
-      const intermediateProperties = Object.entries(intermediateVar).map(([key, flowValue]) =>
-        ASTFactory.createProperty({
-          key,
-          type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
-        })
-      )
-
-      const arrayProperties =
-        loopType === 'arrayLoop'
-          ? Object.entries(loopArray).map(([key, flowValue]) =>
-              ASTFactory.createProperty({
-                key,
-                type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
-              })
-            )
-          : []
-
+      // Build output properties (wrapArray)
       const outputProperties = Object.entries(outputsProperties).map(([key, refValue]) =>
         ASTFactory.createProperty({
           key,
@@ -162,12 +145,22 @@ export const exportIntermediateVarsEffect: EffectOptions[] = [
         })
       )
 
-      const allProperties = [...intermediateProperties, ...arrayProperties, ...outputProperties]
+      // Build intermediate properties
+      const intermediateProperties = Object.entries(intermediateVar).map(([key, flowValue]) =>
+        ASTFactory.createProperty({
+          key,
+          type: resolveFlowValueType(flowValue as IFlowValue, scope, privateScope),
+        })
+      )
+
+      // Merge outputs and intermediate vars
+      const allProperties = [...outputProperties, ...intermediateProperties]
 
       if (allProperties.length === 0) {
         return
       }
 
+      // Run after provideBatchOutputsEffect to merge with outputs
       setTimeout(() => {
         const declaration = ASTFactory.createVariableDeclaration({
           key: `${context.node.id}`,
@@ -181,7 +174,7 @@ export const exportIntermediateVarsEffect: EffectOptions[] = [
         })
 
         context.node.scope?.setVar(declaration)
-      }, 0)
+      }, 10)
     },
   },
 ]

@@ -9,6 +9,7 @@ import { SubCanvasRender } from '@flowgram.ai/free-container-plugin'
 import { PrivateScopeProvider, ValidateTrigger } from '@flowgram.ai/editor'
 import {
   BatchOutputs,
+  createBatchOutputsFormPlugin,
   IFlowValue,
   IFlowConstantRefValue,
   DisplayOutputs,
@@ -305,5 +306,5 @@ export const formMeta: FormMeta = {
   effect: {
     'inputs.loopParam': [...provideLoopEffect, ...exportIntermediateVarsEffect],
   },
-  plugins: [],
+  plugins: [createBatchOutputsFormPlugin({ outputKey: 'outputs.properties' })],
 } as FormMeta<LoopNodeJSON>
