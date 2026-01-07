@@ -892,7 +892,7 @@ def get_history(
 
     # 查找指定轮次的数据
     for item in history_data:
-        if item.iteration_round == iteration_round - 1:
+        if item.iteration_round == iteration_round:
             # 对找到的item的evaluate_cases进行分页处理
             cases = item.evaluate_cases
             total_cases = len(cases)
@@ -906,6 +906,8 @@ def get_history(
             paged_cases = cases[start_idx:end_idx]
             item.evaluate_cases = paged_cases
             return entities.GetOptimizeResponse(history=[item])
+    if iteration_round <= 1:
+        return entities.GetOptimizeResponse(code=200, msg=f"当前提示词已达到目标准确率，未执行优化", history=[])
     return entities.GetOptimizeResponse(code=200, msg=f"未找到iteration_round为{iteration_round}的历史记录", history=[])
 
 
