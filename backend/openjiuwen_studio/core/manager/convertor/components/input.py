@@ -14,11 +14,15 @@ def _input_config_convert(outputs: Outputs) -> dsl.UserInputsConfig:
         required = False
         if key in outputs.required:
             required = True
+        default = ""
+        if isinstance(value.default, str):
+            default = value.default
         configs.inputs.append(dsl.UserInputElem(
             input_name=key,
             description=value.description,
             type=value.type,
             required=required,
+            default=default,
         ))
     return configs
 

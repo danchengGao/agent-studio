@@ -117,8 +117,49 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
   }, [interruption?.nodeId, document.root.blocks])
 
   const interruptionFormMeta = useMemo(() => {
-    return interruption ? parseInteractionMsgToFormMeta(interruption.message) : undefined
-  }, [interruption?.message])
+    if (!interruption) return undefined
+
+    // 从 workflow document 中提取 input 节点的默认值
+    const inputDefaults: Record<string, unknown> = {}
+    try {
+      const allNodes = document.getAllNodes()
+      for (const node of allNodes) {
+        try {
+          // 安全地获取节点数据
+          let nodeData: any = null
+          if (typeof node.getData === 'function') {
+            nodeData = node.getData()
+          } else if (node.data) {
+            nodeData = node.data
+          }
+
+          if (!nodeData) continue
+
+          // 检查是否是 input 节点
+          const nodeType = nodeData.type ?? nodeData.componentType
+          const nodeId = node.id ?? nodeData.id
+
+          if (nodeType === 8 || nodeType === '8' || nodeId?.startsWith('input_')) {
+            const outputs = nodeData?.outputs ?? nodeData?.data?.outputs
+            if (outputs && outputs.properties) {
+              for (const [fieldName, fieldDef] of Object.entries<any>(outputs.properties)) {
+                if (fieldDef?.default !== undefined && fieldDef?.default !== '') {
+                  inputDefaults[fieldName] = fieldDef.default
+                }
+              }
+            }
+          }
+        } catch (nodeError) {
+          // 忽略单个节点的错误，继续处理其他节点
+          continue
+        }
+      }
+    } catch (error) {
+      // 提取失败时使用空对象
+    }
+
+    return parseInteractionMsgToFormMeta(interruption.message, inputDefaults)
+  }, [interruption?.message, document])
 
   const getNodeDisplayName = useCallback(
     (nodeId: string): string => {
@@ -241,7 +282,20 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
 
   const handleInputResume = async () => {
     const metaForValidation = interruptionFormMeta || []
-    const validationErrors = validateForm(inputValues, metaForValidation)
+
+    // 构建包含默认值的输入对象
+    const valuesWithDefaults: Record<string, unknown> = {}
+    metaForValidation.forEach(meta => {
+      const userValue = inputValues[meta.name]
+      // 如果用户未输入（undefined、null 或空字符串），使用默认值
+      if (userValue === undefined || userValue === null || userValue === '') {
+        valuesWithDefaults[meta.name] = meta.defaultValue
+      } else {
+        valuesWithDefaults[meta.name] = userValue
+      }
+    })
+
+    const validationErrors = validateForm(valuesWithDefaults, metaForValidation)
 
     if (validationErrors) {
       setErrors(validationErrors)
@@ -251,7 +305,7 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
     setIsStreamExecuting(true)
     setErrors(undefined)
 
-    const success = await resumeInput(inputValues)
+    const success = await resumeInput(valuesWithDefaults)
     if (!success) {
       setIsStreamExecuting(false)
     }
