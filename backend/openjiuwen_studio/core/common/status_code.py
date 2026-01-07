@@ -64,6 +64,10 @@ class StatusCode(Enum):
                                          "该会话取消执行失败, conversation_id: {msg}",
                                          "This session: {msg} cannot be canceled by some error.")
 
+    WORKFLOW_GRAPH_START_NODE_ERROR = (BASE_CODE + 2010,
+                                         "工作流图中存在非开始类型的孤立起始节点",
+                                         "Workflow graph contains non-start type isolated source node")
+
     # Component模块 3001~3999
     COMPONENT_UNSUPPORT_RUN_ERROR = (BASE_CODE + 3001, "不支持该组件单独运行",
                                      "Unsupported component type for single component run")
