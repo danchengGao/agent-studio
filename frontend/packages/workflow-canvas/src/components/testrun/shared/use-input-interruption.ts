@@ -14,7 +14,6 @@ export function useInputInterruption() {
 
   const handleInputRequired = useCallback((data: InputInterruption) => {
     setInterruption(data)
-    setInputValues({})
   }, [])
 
   const resume = useCallback(
