@@ -847,7 +847,7 @@ def agent_convert(
     agent_query = AgentId(
         space_id=req.space_id,
         agent_id=req.agent_id,
-        agent_version=None
+        agent_version=req.agent_version
     )
     get_result = agent_repository.get_agent_db(agent_query)
     if get_result.code != status.HTTP_200_OK:
