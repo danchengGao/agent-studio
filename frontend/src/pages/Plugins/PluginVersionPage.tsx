@@ -125,7 +125,7 @@ const PluginVersionPage: React.FC = () => {
 
   // Handle name change
   const handleNameChange = useCallback((name: string) => {
-    if (name.length <= 20) {
+    if (name.length <= 128) {
       setConfigForm(prev => ({ ...prev, name }))
     }
   }, [])
@@ -214,7 +214,7 @@ const PluginVersionPage: React.FC = () => {
       console.error(t('plugins.message.getVersionInfoFailed', '获取插件版本信息失败'), versionError)
       showError(t('plugins.message.getVersionInfoFailed', '获取插件版本信息失败，请稍后重试'))
     } else if (versionDataResponse && versionDataResponse.code !== 200) {
-      showError(`${t('plugins.message.getVersionInfoFailed', '获取插件版本信息失败')}: ${versionDataResponse.message}`) 
+      showError(`${t('plugins.message.getVersionInfoFailed', '获取插件版本信息失败')}: ${versionDataResponse.message}`)
     }
   }, [versionDataResponse, versionLoading, versionError, plugin_id, version])
 
@@ -279,7 +279,8 @@ const PluginVersionPage: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error(t('plugins.errors.savePluginVersionConfigFailed', '保存插件版本配置失败'), error)
-      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.errors.savePluginVersionConfigFailed', '保存插件版本配置失败，请稍后重试')
+      const errorMessage =
+        error?.response?.data?.message || error?.message || t('plugins.errors.savePluginVersionConfigFailed', '保存插件版本配置失败，请稍后重试')
       showError(errorMessage)
     }
   }, [

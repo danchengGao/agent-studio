@@ -177,7 +177,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
   }
 
   const handleNameSubmit = () => {
-    if (tempName.trim() && tempName.length <= 20) {
+    if (tempName.trim() && tempName.length <= 128) {
       handleNameChange(tempName.trim())
     }
     setIsEditingName(false)
@@ -387,12 +387,12 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                     size="small"
                     variant="outlined"
                     placeholder={t('plugins.basicInfo.name', '插件名称')}
-                    inputProps={{ maxLength: 20, style: { fontSize: '2rem', fontWeight: 'bold' } }}
+                    inputProps={{ maxLength: 128, style: { fontSize: '2rem', fontWeight: 'bold' } }}
                     className="font-bold text-gray-900"
                     autoFocus
                   />
                   <Typography variant="body2" color="text.secondary">
-                    ({tempName.length}/20)
+                    ({tempName.length}/128)
                   </Typography>
                 </div>
               ) : (
@@ -472,8 +472,8 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                       value={configForm.desc}
                       onChange={e => setConfigForm(prev => ({ ...prev, desc: e.target.value }))}
                       placeholder={t('plugins.pluginConfig.descriptionPlaceholder', '详细描述插件的功能、用途和特性...')}
-                      helperText={`${t('plugins.pluginConfig.descriptionHelper', '详细描述插件的功能和行为，帮助用户了解插件的作用')} (${configForm.desc.length}/40)`}
-                      inputProps={{ maxLength: 40 }}
+                      helperText={`${t('plugins.pluginConfig.descriptionHelper', '详细描述插件的功能和行为，帮助用户了解插件的作用')} (${configForm.desc.length}/258)`}
+                      inputProps={{ maxLength: 258 }}
                       disabled={isReadOnly}
                     />
                   </div>

@@ -98,8 +98,8 @@ const CloudPluginFormDialog: React.FC<CloudPluginFormDialogProps> = ({
               fullWidth
               required
               placeholder={t('plugins.dialog.cloudPluginForm.namePlaceholder')}
-              helperText={`${t('plugins.dialog.cloudPluginForm.nameHelperText')} (${form.name.length}/20)`}
-              inputProps={{ maxLength: 20 }}
+              helperText={`${t('plugins.dialog.cloudPluginForm.nameHelperText')} (${form.name.length}/128)`}
+              inputProps={{ maxLength: 128 }}
             />
           </div>
 
@@ -116,8 +116,8 @@ const CloudPluginFormDialog: React.FC<CloudPluginFormDialogProps> = ({
               multiline
               rows={3}
               placeholder={t('plugins.dialog.cloudPluginForm.descriptionPlaceholder')}
-              helperText={`${t('plugins.dialog.cloudPluginForm.descriptionHelperText')} (${form.description.length}/40)`}
-              inputProps={{ maxLength: 40 }}
+              helperText={`${t('plugins.dialog.cloudPluginForm.descriptionHelperText')} (${form.description.length}/258)`}
+              inputProps={{ maxLength: 258 }}
             />
           </div>
 
