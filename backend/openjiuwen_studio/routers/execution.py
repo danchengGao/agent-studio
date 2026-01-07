@@ -650,10 +650,7 @@ async def cancel_component_execution(
                 data=None
             )
 
-        success = await component_execution_manager.cancel_execution(
-            execution_id=execution_id,
-            force=request_body.force
-        )
+        success = await component_execution_manager.cancel_execution(execution_id=execution_id)
         if success:
             return ResponseModel(
                 code=status.HTTP_200_OK,
