@@ -6,7 +6,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
+import { t } from '../../../../i18n'
 
 import { ConditionPresetOp, JsonCodeEditor } from '../../..'
 
@@ -19,7 +19,7 @@ export const objectRegistry: Partial<JsonSchemaTypeRegistry> = {
       mini
       value={props.value}
       onChange={v => props.onChange?.(v)}
-      placeholder={I18n.t('Please Input Object')}
+      placeholder={t('workflowCanvas.formMaterials.input.pleaseInputObject')}
       readonly={props.readonly}
       defaultFormat="{}"
       expectedFieldType="object"

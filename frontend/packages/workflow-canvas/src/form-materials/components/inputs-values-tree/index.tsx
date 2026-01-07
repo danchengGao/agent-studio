@@ -5,19 +5,31 @@
 
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
 import { Button } from '@douyinfe/semi-ui'
 import { IconPlus } from '@douyinfe/semi-icons'
 
 import { FlowValueUtils, IFlowValue, IInputsValues } from '../../'
 import { useObjectList } from '../../'
+import { useTranslation } from '../../../i18n'
 
 import { PropsType } from './types'
 import './styles.css'
 import { InputValueRow } from './row'
 
 export function InputsValuesTree(props: PropsType) {
-  const { value, onChange, readonly, hasError, constantProps, deleteable = true, nameEditable = true, schema, showAddButton = true, allowAddChildren = true } = props
+  const { t } = useTranslation()
+  const {
+    value,
+    onChange,
+    readonly,
+    hasError,
+    constantProps,
+    deleteable = true,
+    nameEditable = true,
+    schema,
+    showAddButton = true,
+    allowAddChildren = true,
+  } = props
 
   const { list, updateKey, updateValue, remove, add } = useObjectList<IInputsValues | IFlowValue | undefined>({
     value,
@@ -48,19 +60,19 @@ export function InputsValuesTree(props: PropsType) {
       </div>
       {showAddButton && (
         <Button
-        style={{ marginTop: 10, marginLeft: 16 }}
-        disabled={readonly}
-        icon={<IconPlus />}
-        size="small"
-        onClick={() => {
-          add({
-            type: 'constant',
-            content: '',
-            schema: { type: 'string' },
-          })
-        }}
-      >
-        {I18n.t('Add')}
+          style={{ marginTop: 10, marginLeft: 16 }}
+          disabled={readonly}
+          icon={<IconPlus />}
+          size="small"
+          onClick={() => {
+            add({
+              type: 'constant',
+              content: '',
+              schema: { type: 'string' },
+            })
+          }}
+        >
+          {t('workflowCanvas.formMaterials.common.add')}
         </Button>
       )}
     </div>

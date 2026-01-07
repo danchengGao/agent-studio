@@ -6,8 +6,8 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
 import { InputNumber } from '@douyinfe/semi-ui'
+import { t } from '../../../../i18n'
 
 import { ConditionPresetOp } from '../../..'
 
@@ -15,7 +15,9 @@ import { type JsonSchemaTypeRegistry } from '../types'
 
 export const numberRegistry: Partial<JsonSchemaTypeRegistry> = {
   type: 'number',
-  ConstantRenderer: props => <InputNumber placeholder={I18n.t('Please Input Number')} size="small" disabled={props.readonly} hideButtons {...props} />,
+  ConstantRenderer: props => (
+    <InputNumber placeholder={t('workflowCanvas.formMaterials.input.pleaseInputNumber')} size="small" disabled={props.readonly} hideButtons {...props} />
+  ),
   conditionRule: {
     [ConditionPresetOp.EQ]: { type: 'number' },
     [ConditionPresetOp.NEQ]: { type: 'number' },

@@ -5,7 +5,6 @@
 
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
 import { Button, Input } from '@douyinfe/semi-ui'
 import { IconDelete, IconPlus } from '@douyinfe/semi-icons'
 
