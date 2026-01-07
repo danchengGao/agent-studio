@@ -29,6 +29,7 @@ export interface ComponentExecuteParams {
   inputs: Record<string, any>
   component_id: string
   loop_id?: string
+  conversation_id?: string
 }
 
 export interface ComponentExecuteResult {
@@ -187,6 +188,8 @@ export interface ITestRunRuntimeService {
   resumeStreamExecution(input: { node_id: string; input_value: Record<string, unknown> }): Promise<void>
 
   cancelExecution(taskId: string): Promise<void>
+
+  cancelSingleComponent(componentId: string): Promise<void>
 
   getExecutionReport(taskId: string): Promise<NodeReport[]>
 

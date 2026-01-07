@@ -70,6 +70,7 @@ export function useTestExecution(options: UseTestExecutionOptions): UseTestExecu
           inputs: values,
           component_id: nodeId,
           loop_id: loopId,
+          conversation_id: conversationId,
           options: {
             statusManagement: {
               clearBeforeStart: true,
@@ -113,11 +114,14 @@ export function useTestExecution(options: UseTestExecutionOptions): UseTestExecu
   )
 
   const cancel = useCallback(() => {
-    if (nodeId) {
-      testRunRuntimeService.cancelSingleComponent(nodeId)
-    }
-    executionContext.clearExecution()
     setIsExecuting(false)
+    executionContext.clearExecution()
+
+    if (nodeId) {
+      testRunRuntimeService.cancelSingleComponent(nodeId).catch(error => {
+        console.error('Cancel component execution failed:', error)
+      })
+    }
   }, [nodeId, executionContext])
 
   return {

@@ -9,6 +9,7 @@ import {
   NodeExecutionStatus,
   ComponentExecuteRequest,
   ComponentExecuteResponse,
+  ComponentCancelRequest,
 } from '../types'
 import { API_ENDPOINTS } from '../config'
 import { nanoid } from 'nanoid'
@@ -583,9 +584,26 @@ export const useCancelWorkflowExecution = () => {
   )
 }
 
+export const useCancelComponentExecution = () => {
+  return useMutation(
+    async (request: ComponentCancelRequest) => {
+      return await ExecutionService.cancelComponent(request)
+    },
+    {
+      onSuccess: (data) => {
+        console.log('Component execution cancelled successfully:', data)
+      },
+      onError: (error: Error) => {
+        console.error('Failed to cancel component execution:', error)
+      },
+    },
+  )
+}
+
 export default {
   useStreamWorkflowExecution,
   useComponentExecute,
   useStreamAgentExecution,
   useCancelWorkflowExecution,
+  useCancelComponentExecution,
 }
