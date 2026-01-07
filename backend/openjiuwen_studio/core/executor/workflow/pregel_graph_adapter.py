@@ -6,7 +6,7 @@ from openjiuwen.core.common.exception.exception import JiuWenBaseException
 from openjiuwen.core.common.logging import logger
 
 from openjiuwen_studio.core.common.dsl import BaseFlow, Connection, Component, ComponentType
-from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException
+from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, JiuWenComponentException
 from openjiuwen_studio.core.common.status_code import StatusCode
 
 EMPTY_NODE_ID_PREFIX = 'empty_node_'
@@ -240,11 +240,46 @@ class PregelGraphAdapter():
 
     # 整个图校验，是否存在环
     def _validate_graph(self) -> None:
+        # 先校验孤立起始节点
+        self._validate_isolated_source_nodes()
+
+        # 再校验是否存在环
         cycles: List[List[str]] = list(nx.simple_cycles(self._graph))
         if cycles:
             raise JiuWenGraphException(error_code=StatusCode.WORKFLOW_GRAPH_CIRCLE_ERROR.code,
                                        message=StatusCode.WORKFLOW_GRAPH_CIRCLE_ERROR.errmsg.format(
                                            msg=json.dumps(cycles)))
+
+    # 校验：出度大于0且入度为0的节点必须是start节点
+    def _validate_isolated_source_nodes(self) -> None:
+        """校验图中孤立起始节点的类型
+
+        如果一个节点的出度大于0且入度等于0（即孤立起始节点），
+        那么这个节点的类型必须是 COMPONENT_TYPE_START
+
+        注意：循环体内部的空开始节点（如 block_start_*）会被排除在校验之外
+
+        Raises:
+            JiuWenGraphException: 如果存在非start类型的孤立起始节点
+        """
+        for node in self._graph.nodes():
+            # 跳过循环体内部的开始节点
+            if node.startswith('block_start_'):
+                continue
+
+            out_degree = self._graph.out_degree(node)
+            in_degree = self._graph.in_degree(node)
+
+            # 出度大于0且入度为0的节点必须是start节点
+            if out_degree > 0 and in_degree == 0:
+                node_type = self._graph.nodes[node]['type']
+                if node_type != ComponentType.COMPONENT_TYPE_START:
+                    raise JiuWenComponentException(
+                        error_code=StatusCode.WORKFLOW_GRAPH_START_NODE_ERROR.code,
+                        message=StatusCode.WORKFLOW_GRAPH_START_NODE_ERROR.errmsg,
+                        component_id=node,
+                        component_type=node_type
+                    )
 
     def _is_loop_control_node(self, node: str) -> bool:
         if self._graph.nodes[node]['type'] in [ComponentType.COMPONENT_TYPE_CONTINUE,
