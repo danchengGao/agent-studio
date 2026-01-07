@@ -322,7 +322,7 @@ const ModelsPage: React.FC = () => {
         model.name.toLowerCase().includes(searchLower) ||
         model.provider.toLowerCase().includes(searchLower) ||
         model.modelId.toLowerCase().includes(searchLower) ||
-        (model.tags && model.tags.some(tag => tag.toLowerCase().includes(searchLower)))
+        (currentModelType === 'LLM' && model.tags && model.tags.some(tag => tag.toLowerCase().includes(searchLower)))
       const matchesProvider = filterProvider === 'all' || model.provider === filterProvider
       const matchesStatus = filterStatus === 'all' || (filterStatus === 'active' && model.isActive) || (filterStatus === 'inactive' && !model.isActive)
 
@@ -1009,7 +1009,9 @@ const ModelsPage: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200" />
             <input
               type="text"
-              placeholder={t('models.modelList.searchPlaceholder')}
+              placeholder={currentModelType === 'LLM' 
+                ? t('models.modelList.searchPlaceholder')
+                : t('models.modelList.searchPlaceholder').replace(/或标签|标签/g, '').replace(/\s+/g, ' ').trim()}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition-all duration-200 bg-gray-50 focus:bg-white"
@@ -1071,9 +1073,11 @@ const ModelsPage: React.FC = () => {
                 <TableCell className="text-blue-900 font-semibold">
                   <strong>{t('models.modelList.status')}</strong>
                 </TableCell>
-                <TableCell className="text-blue-900 font-semibold">
-                  <strong>{t('models.modelList.tags')}</strong>
-                </TableCell>
+                {currentModelType === 'LLM' && (
+                  <TableCell className="text-blue-900 font-semibold">
+                    <strong>{t('models.modelList.tags')}</strong>
+                  </TableCell>
+                )}
                 {currentModelType === 'LLM' && (
                   <TableCell className="text-blue-900 font-semibold">
                     <strong>{t('models.modelList.usageStats')}</strong>
@@ -1087,7 +1091,7 @@ const ModelsPage: React.FC = () => {
             <TableBody>
               {finalModels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={currentModelType === 'LLM' ? 7 : 6} className="text-center py-20">
+                  <TableCell colSpan={currentModelType === 'LLM' ? 6 : 5} className="text-center py-20">
                     <div className="flex flex-col items-center justify-center space-y-6">
                       {/* 是否有筛选条件 */}
                       {searchTerm || filterProvider !== 'all' || filterStatus !== 'all' ? (
@@ -1175,63 +1179,66 @@ const ModelsPage: React.FC = () => {
                       />
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 items-center">
-                        {model.tags.slice(0, 3).map((tag, index) => (
-                          <Tooltip key={index} title={tag} arrow>
-                            <Chip
-                              label={tag}
-                              size="small"
-                              onDelete={() => removeTag(model, index)}
-                              className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
-                              sx={{
-                                maxWidth: '120px',
-                                '& .MuiChip-label': {
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                },
-                              }}
-                            />
-                          </Tooltip>
-                        ))}
-                        {model.tags.length > 3 && (
-                          <Tooltip
-                            title={
-                              <div className="p-2 max-w-md bg-white">
-                                <div className="text-sm font-semibold mb-2 text-gray-800">{t('models.modelConfig.basicInfo.moreTags')}: </div>
-                                <div className="space-y-1">
-                                  {model.tags.slice(3).map((tag, index) => (
-                                    <div key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded break-all">
-                                      {tag}
-                                    </div>
-                                  ))}
+                    {/* 标签列 - 仅 LLM 显示 */}
+                    {currentModelType === 'LLM' && (
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {model.tags.slice(0, 3).map((tag, index) => (
+                            <Tooltip key={index} title={tag} arrow>
+                              <Chip
+                                label={tag}
+                                size="small"
+                                onDelete={() => removeTag(model, index)}
+                                className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
+                                sx={{
+                                  maxWidth: '120px',
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
+                                }}
+                              />
+                            </Tooltip>
+                          ))}
+                          {model.tags.length > 3 && (
+                            <Tooltip
+                              title={
+                                <div className="p-2 max-w-md bg-white">
+                                  <div className="text-sm font-semibold mb-2 text-gray-800">{t('models.modelConfig.basicInfo.moreTags')}: </div>
+                                  <div className="space-y-1">
+                                    {model.tags.slice(3).map((tag, index) => (
+                                      <div key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded break-all">
+                                        {tag}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            }
-                            arrow
-                          >
-                            <Chip
-                              label={`+${model.tags.length - 3}`}
-                              size="small"
-                              classes={{
-                                label: 'font-medium',
-                              }}
-                              style={{
-                                background: 'linear-gradient(to right, rgb(219 234 254), rgb(224 231 255))',
-                                color: 'rgb(30 64 175)',
-                                border: '1px solid rgb(191 219 254)',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => {
-                                // 点击更多标签时，可以显示所有标签
-                                console.log(t('models.messages.showAllTags'), model.tags)
-                              }}
-                            />
-                          </Tooltip>
-                        )}
-                      </div>
-                    </TableCell>
+                              }
+                              arrow
+                            >
+                              <Chip
+                                label={`+${model.tags.length - 3}`}
+                                size="small"
+                                classes={{
+                                  label: 'font-medium',
+                                }}
+                                style={{
+                                  background: 'linear-gradient(to right, rgb(219 234 254), rgb(224 231 255))',
+                                  color: 'rgb(30 64 175)',
+                                  border: '1px solid rgb(191 219 254)',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => {
+                                  // 点击更多标签时，可以显示所有标签
+                                  console.log(t('models.messages.showAllTags'), model.tags)
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
                     {/* 使用统计 - 仅 LLM 显示 */}
                     {currentModelType === 'LLM' && (
                       <TableCell>
@@ -1614,68 +1621,71 @@ const ModelsPage: React.FC = () => {
                 }
               />
             </Grid>
-            <Grid item xs={12}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <TextField
-                    label={t('models.modelConfig.basicInfo.tags')}
-                    placeholder=""
-                    value={newTag}
-                    onChange={e => setNewTag(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        const currentTags = newModel.tags || []
-                        if (newTag.trim() && !currentTags.includes(newTag.trim())) {
-                          if (currentTags.length >= 10) {
-                            setSnackbar({
-                              open: true,
-                              message: t('models.messages.tagsLimit'),
-                              severity: 'warning',
+            {/* 标签字段 - 仅 LLM 模型显示 */}
+            {modelType === 'LLM' && (
+              <Grid item xs={12}>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <TextField
+                      label={t('models.modelConfig.basicInfo.tags')}
+                      placeholder=""
+                      value={newTag}
+                      onChange={e => setNewTag(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const currentTags = newModel.tags || []
+                          if (newTag.trim() && !currentTags.includes(newTag.trim())) {
+                            if (currentTags.length >= 10) {
+                              setSnackbar({
+                                open: true,
+                                message: t('models.messages.tagsLimit'),
+                                severity: 'warning',
+                              })
+                              return
+                            }
+                            setNewModel({
+                              ...newModel,
+                              tags: [...currentTags, newTag.trim()],
                             })
-                            return
+                            setNewTag('')
                           }
-                          setNewModel({
-                            ...newModel,
-                            tags: [...currentTags, newTag.trim()],
-                          })
-                          setNewTag('')
                         }
-                      }
-                    }}
-                    variant="outlined"
-                    className="flex-1 !mr-4"
-                    disabled={(newModel.tags || []).length >= 10}
-                  />
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handleAddTag}
-                    className="border-gray-300 text-gray-700"
-                    disabled={(newModel.tags || []).length >= 10}
-                  >
-                    {t('common.buttons.add')}
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between mb-2">
-                  <Typography variant="caption" className={(newModel.tags || []).length >= 10 ? 'text-red-600' : 'text-gray-600'}>
-                    {t('models.modelConfig.basicInfo.tagsNum')}：{(newModel.tags || []).length}/10
-                    {(newModel.tags || []).length >= 10 && ` (${t('models.modelConfig.basicInfo.tagsLimit')})`}
-                  </Typography>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(newModel.tags || []).map((tag, index) => (
-                    <Chip
-                      key={index}
-                      label={tag}
-                      onDelete={() => handleRemoveTag(index)}
-                      className="bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200"
-                      size="small"
+                      }}
+                      variant="outlined"
+                      className="flex-1 !mr-4"
+                      disabled={(newModel.tags || []).length >= 10}
                     />
-                  ))}
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleAddTag}
+                      className="border-gray-300 text-gray-700"
+                      disabled={(newModel.tags || []).length >= 10}
+                    >
+                      {t('common.buttons.add')}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Typography variant="caption" className={(newModel.tags || []).length >= 10 ? 'text-red-600' : 'text-gray-600'}>
+                      {t('models.modelConfig.basicInfo.tagsNum')}：{(newModel.tags || []).length}/10
+                      {(newModel.tags || []).length >= 10 && ` (${t('models.modelConfig.basicInfo.tagsLimit')})`}
+                    </Typography>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(newModel.tags || []).map((tag, index) => (
+                      <Chip
+                        key={index}
+                        label={tag}
+                        onDelete={() => handleRemoveTag(index)}
+                        className="bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200"
+                        size="small"
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </Grid>
+              </Grid>
+            )}
             {/* 描述字段 - 仅 LLM 模型显示 */}
             {modelType === 'LLM' && (
               <Grid item xs={12}>
