@@ -13,7 +13,7 @@ export const FitView = () => {
   const { t } = useTranslation()
   return (
     <Tooltip content={t('workflowCanvas.tools.fitView')}>
-      <IconButton type="tertiary" theme="borderless" icon={<Maximize2 size="small" />} onClick={() => tools.fitView()} />
+      <IconButton type="tertiary" theme="borderless" icon={<Maximize2 size={16} />} onClick={() => tools.fitView()} />
     </Tooltip>
   )
 }
