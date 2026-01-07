@@ -108,7 +108,7 @@ export function PromptEditor(props: PromptEditorPropsType) {
   // 初始化字符计数
   useEffect(() => {
     setCharacterCount(editorValue.length)
-  }, [])
+  }, [value?.content])
 
   // Stable custom extensions to prevent editor recreation
   const stableCustomExtensions = useMemo(() => {
