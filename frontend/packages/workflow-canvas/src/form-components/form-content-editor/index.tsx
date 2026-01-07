@@ -9,6 +9,7 @@ import { Switch } from '@douyinfe/semi-ui'
 import { IFlowTemplateValue, PromptEditorWithInputs } from '../../form-materials'
 import { FormItem } from '../../form-components'
 import { useIsSidebar } from '../../hooks'
+import { useTranslation } from '../../i18n'
 
 interface FormContentEditorProps {
   label?: string
@@ -16,7 +17,9 @@ interface FormContentEditorProps {
   defaultCollapsed?: boolean
 }
 
-export function FormContentEditor({ label = '输出内容', fieldPrefix = 'inputs', defaultCollapsed }: FormContentEditorProps) {
+export function FormContentEditor({ label, fieldPrefix = 'inputs', defaultCollapsed }: FormContentEditorProps) {
+  const { t } = useTranslation()
+  const displayLabel = label || t('workflowCanvas.formContentEditor.outputContent')
   const isSidebar = useIsSidebar()
 
   if (!isSidebar) {
@@ -32,12 +35,12 @@ export function FormContentEditor({ label = '输出内容', fieldPrefix = 'input
         return (
           <>
             <FormItem
-              name={label}
+              name={displayLabel}
               vertical
               defaultCollapsed={defaultCollapsed}
               customComponent={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px' }}>流式输出</span>
+                  <span style={{ fontSize: '14px' }}>{t('workflowCanvas.formContentEditor.streamingOutput')}</span>
                   <Field<boolean> name={`${fieldPrefix}.streaming`}>
                     {({ field }) => (
                       <Switch

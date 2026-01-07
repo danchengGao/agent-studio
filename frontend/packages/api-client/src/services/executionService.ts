@@ -3,11 +3,15 @@ import { API_ENDPOINTS } from '../config'
 import {
   WorkflowExecutionRequest,
   WorkflowUserInputRequest,
+  WorkflowCancelRequest,
+  WorkflowCancelResponse,
   WorkflowExecutionEvent,
   AgentExecutionEvent,
   WorkflowExecutionEventHandler,
   ComponentExecuteRequest,
   ComponentExecuteResponse,
+  ComponentCancelRequest,
+  ComponentCancelResponse,
   SSEMessage,
   SSEData,
   interactionPayload,
@@ -567,8 +571,44 @@ export class ExecutionService {
         errorMessage = error.detail
       }
 
-      // 抛出错误
       throw new Error(errorMessage)
+    }
+  }
+
+  static async cancelComponent(request: ComponentCancelRequest): Promise<ComponentCancelResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<ComponentCancelResponse>(API_ENDPOINTS.EXECUTION.COMPONENT_CANCEL, request)
+      return response.data
+    } catch (error: any) {
+      console.error('取消单节点调试失败:', error)
+
+      let errorMessage = '未知错误'
+
+      if (error?.response) {
+        if (error.response.data?.message) {
+          errorMessage = error.response.data.message
+        } else if (error.response.message) {
+          errorMessage = error.response.message
+        }
+      } else if (error?.message) {
+        errorMessage = error.message
+      } else if (error?.detail) {
+        errorMessage = error.detail
+      }
+
+      throw new Error(errorMessage)
+    }
+  }
+
+  static async cancelWorkflowExecution(request: WorkflowCancelRequest): Promise<WorkflowCancelResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<WorkflowCancelResponse>(API_ENDPOINTS.EXECUTION.WORKFLOW_CANCEL, request)
+      return response.data
+    } catch (error: any) {
+      console.error('取消工作流执行失败:', error)
+      throw error
     }
   }
 }

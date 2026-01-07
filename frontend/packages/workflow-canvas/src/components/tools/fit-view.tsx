@@ -6,12 +6,14 @@
 import { usePlaygroundTools } from '@flowgram.ai/free-layout-editor'
 import { IconButton, Tooltip } from '@douyinfe/semi-ui'
 import { Maximize2 } from 'lucide-react'
+import { useTranslation } from '../../i18n'
 
 export const FitView = () => {
   const tools = usePlaygroundTools()
+  const { t } = useTranslation()
   return (
-    <Tooltip content="适应视图">
-      <IconButton type="tertiary" theme="borderless" icon={<Maximize2 size="small" />} onClick={() => tools.fitView()} />
+    <Tooltip content={t('workflowCanvas.tools.fitView')}>
+      <IconButton type="tertiary" theme="borderless" icon={<Maximize2 size={16} />} onClick={() => tools.fitView()} />
     </Tooltip>
   )
 }

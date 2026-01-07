@@ -16,6 +16,22 @@ const Layout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
+  // 全局路径跟踪：在每次路径变化时更新 sessionStorage
+  useEffect(() => {
+    const currentPath = location.pathname
+    const prevPath = sessionStorage.getItem('kb_prev_pathname') || ''
+    
+    // 只有在路径真正变化时才更新
+    if (prevPath !== currentPath) {
+      sessionStorage.setItem('kb_prev_pathname', currentPath)
+      
+      // 如果当前路径不是 knowledge-bases 相关的，更新 kb_last_non_kb_path
+      if (currentPath !== '/dashboard/knowledge-bases' && !currentPath.startsWith('/dashboard/knowledge-bases/')) {
+        sessionStorage.setItem('kb_last_non_kb_path', currentPath)
+      }
+    }
+  }, [location.pathname])
+
   // Handle mouse leaving the sidebar to collapse it again
   const handleMouseLeave = () => {
     // 只有当侧边栏是临时展开的状态时才收起
@@ -70,9 +86,9 @@ const Layout: React.FC = () => {
         <Header user={user} onMenuClick={() => setSidebarOpen(true)} />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto bg-[#F8F9FC]">
-          <div className="py-6 h-full">
-            <div className="w-full h-full px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 overflow-auto bg-[#F8F9FC]">
+          <div className="py-6 h-full min-w-full">
+            <div className="min-w-full h-full px-4 sm:px-6 lg:px-8">
               <Outlet />
             </div>
           </div>

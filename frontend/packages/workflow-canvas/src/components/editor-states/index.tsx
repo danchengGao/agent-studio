@@ -8,17 +8,22 @@ import { AlertTriangle } from 'lucide-react'
 import { Spin, Empty, Button } from '@douyinfe/semi-ui'
 
 import { LoadingContainer, LoadingText, ErrorContainer } from './styles'
+import { useTranslation } from '../../i18n'
 
 interface LoadingStateProps {
   message?: string
 }
 
-export const LoadingState = ({ message = '正在加载工作流画布...' }: LoadingStateProps) => (
-  <LoadingContainer>
-    <Spin size="large" />
-    <LoadingText>{message}</LoadingText>
-  </LoadingContainer>
-)
+export const LoadingState = ({ message }: LoadingStateProps) => {
+  const { t } = useTranslation()
+  const defaultMessage = t('workflowCanvas.editorStates.loadingWorkflow')
+  return (
+    <LoadingContainer>
+      <Spin size="large" />
+      <LoadingText>{message || defaultMessage}</LoadingText>
+    </LoadingContainer>
+  )
+}
 
 interface ErrorStateProps {
   error?: Error | null
@@ -26,17 +31,22 @@ interface ErrorStateProps {
 }
 
 export const ErrorState = ({ error, onRetry }: ErrorStateProps) => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   return (
     <ErrorContainer>
-      <Empty image={<AlertTriangle size={48} color="#ef4444" />} title="加载工作流画布失败" description={error?.message || '无法获取工作流数据'}>
+      <Empty
+        image={<AlertTriangle size={48} color="#ef4444" />}
+        title={t('workflowCanvas.editorStates.loadFailed')}
+        description={error?.message || t('workflowCanvas.editorStates.cannotGetWorkflowData')}
+      >
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px' }}>
           <Button theme="solid" type="primary" onClick={onRetry || (() => window.location.reload())}>
-            重新加载
+            {t('workflowCanvas.editorStates.retry')}
           </Button>
           <Button theme="light" onClick={() => navigate('/dashboard/workflows')}>
-            返回工作流列表
+            {t('workflowCanvas.editorStates.backToList')}
           </Button>
         </div>
       </Empty>

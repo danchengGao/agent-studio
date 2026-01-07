@@ -8,6 +8,7 @@ import { FileText } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
 import { customNanoid } from '../../utils/nanoid-custom'
+import { t } from '../../i18n'
 
 export const TextEditorNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.TextEditor,
@@ -21,7 +22,7 @@ export const TextEditorNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <FileText size={16} className="text-green-600" />,
-    description: '文本编辑节点，用于在工作流中处理和转换文本内容。',
+    description: t('workflowCanvas.nodes.textEditor.description'),
   },
   /**
    * Render node via formMeta

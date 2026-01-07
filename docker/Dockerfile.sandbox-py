@@ -8,11 +8,8 @@ WORKDIR /sandbox
 COPY sandbox_server/python_server .
 RUN pip install uv -i ${INDEX_URL}
 RUN sed -i "s#url = \"https://mirrors.aliyun.com/pypi/simple/\"#url = \"${INDEX_URL}\"#g" pyproject.toml
-RUN uv venv
-RUN /sandbox/.venv/bin/python3 -m ensurepip --upgrade
-RUN UV_HTTP_TIMEOUT=700 \
-    UV_INDEX_URL=${INDEX_URL} \
-    uv sync --no-cache
+
+RUN uv sync --group dev
 RUN uv build --out-dir /sandbox/dist
 
 
@@ -30,15 +27,14 @@ RUN chown -R app:app /sandbox
 
 USER app
 WORKDIR /sandbox
-COPY --from=builder /sandbox/dist/jiuwen_py_server-0.1.0-py3-none-any.whl /sandbox/dist
-RUN pip3 install /sandbox/dist/jiuwen_py_server-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
+COPY --from=builder /sandbox/dist/openjiuwen_sandbox_pyserver-0.1.0-py3-none-any.whl /sandbox/dist
+RUN pip3 install /sandbox/dist/openjiuwen_sandbox_pyserver-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/sandbox/site-packages --retries=5 --timeout=120
 
-ENV PYTHONPATH=/sandbox/site-packages/jiuwen_py_server:/sandbox/site-packages
-ENV PATH=/sandbox/site-packages/bin:$PATH
+ENV PYTHONPATH=/sandbox/site-packages/openjiuwen_sandbox_pyserver:/sandbox/site-packages
 
 EXPOSE 5001
 # Health check with configurable port
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
     CMD curl -f http://localhost:5001/health || exit 1
 
-CMD ["jiuwen-py-server", "--port", "5001"]
+CMD ["python", "-m", "openjiuwen_sandbox_pyserver.kernel", "--port", "5001"]

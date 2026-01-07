@@ -7,6 +7,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { Play } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 export const StartNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Start,
@@ -23,7 +24,7 @@ export const StartNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <Play size={16} className="text-green-600" />,
-    description: '工作流的起始节点，用于设置启动工作流所需的信息。',
+    description: t('workflowCanvas.nodes.start.description'),
   },
   /**
    * Render node via formMeta

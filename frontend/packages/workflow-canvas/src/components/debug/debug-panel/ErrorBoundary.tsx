@@ -5,6 +5,7 @@
 
 import { Component, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { t } from '../../../i18n'
 
 interface Props {
   children: ReactNode
@@ -52,25 +53,25 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="p-4 border border-red-200 rounded-lg bg-red-50">
           <div className="flex items-center gap-2 text-red-600 mb-2">
             <AlertTriangle size={16} />
-            <span className="font-medium">渲染出错</span>
+            <span className="font-medium">{t('workflowCanvas.errorBoundary.renderError')}</span>
           </div>
           <div className="text-sm text-red-700 mb-3">
-            调试面板渲染时遇到了错误，请尝试刷新页面或重新选择执行日志。
+            {t('workflowCanvas.errorBoundary.errorMessage')}
           </div>
 
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <details className="mb-3">
               <summary className="cursor-pointer text-sm text-red-600 hover:text-red-800 mb-2">
-                查看错误详情 (开发模式)
+                {t('workflowCanvas.errorBoundary.viewDetails')}
               </summary>
               <div className="bg-red-100 p-2 rounded text-xs">
-                <div className="font-medium mb-1">错误信息:</div>
+                <div className="font-medium mb-1">{t('workflowCanvas.errorBoundary.errorInfo')}:</div>
                 <pre className="whitespace-pre-wrap text-red-800">
                   {this.state.error.toString()}
                 </pre>
                 {this.state.errorInfo && (
                   <div className="mt-2">
-                    <div className="font-medium mb-1">组件堆栈:</div>
+                    <div className="font-medium mb-1">{t('workflowCanvas.errorBoundary.componentStack')}:</div>
                     <pre className="whitespace-pre-wrap text-red-700 text-xs">
                       {this.state.errorInfo.componentStack}
                     </pre>
@@ -85,7 +86,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="flex items-center gap-2 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
           >
             <RefreshCw size={12} />
-            重试
+            {t('workflowCanvas.errorBoundary.retry')}
           </button>
         </div>
       )

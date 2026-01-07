@@ -175,3 +175,31 @@ export const useJobDraftDetail = (draftId?: number, workspaceId?: string, userId
     },
   )
 }
+
+// 获取用例历史记录
+export const useJobHistory = (
+  jobId?: string,
+  workspaceId?: string,
+  userId?: string,
+  pageNum?: number,
+  pageSize?: number,
+  iterationRound?: number,
+) => {
+  return useQuery(
+    ['selfOpt', 'jobHistory', jobId, workspaceId, userId, pageNum, pageSize, iterationRound],
+    async () => {
+      const response = await SelfOptService.getJobHistory(jobId!, workspaceId!, userId!, pageNum!, pageSize!, iterationRound!)
+      return response
+    },
+    {
+      enabled: !!(jobId && workspaceId && userId && pageNum !== undefined && pageSize !== undefined && iterationRound !== undefined), // 只有当所有参数都存在时才执行查询
+      staleTime: 30 * 1000, // 30秒内不重新获取
+      cacheTime: 5 * 60 * 1000, // 缓存5分钟
+      retry: 2,
+      retryDelay: 1000,
+      onError: (error: any) => {
+        console.error('获取用例历史记录失败:', error)
+      },
+    },
+  )
+}

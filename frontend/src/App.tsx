@@ -15,13 +15,15 @@ import WorkflowsPage from './pages/Workflows/WorkflowsPage'
 import PromptsPage from './pages/Prompts/PromptsPage'
 
 // 懒加载非核心页面
-const AgentEditorEntryPage = React.lazy(() => import('./pages/Agents/AgentEditorEntryPage'))
+const AgentCreatePage = React.lazy(() => import('./pages/Agents/AgentCreatePage'))
 const AgentEditorEditPage = React.lazy(() => import('./pages/Agents/AgentEditorEditPage'))
 const WorkflowCreationPage = React.lazy(() => import('./pages/Workflows/WorkflowCreationPage'))
 const PromptEditPage = React.lazy(() => import('./pages/Prompts/PromptEditPage'))
 const PromptOptimizePage = React.lazy(() => import('./pages/Prompts/PromptOptimizePage'))
 const PromptOptimizeEditPage = React.lazy(() => import('./pages/Prompts/PromptOptimizeEditPage'))
 const ModelsPage = React.lazy(() => import('./pages/Models/ModelsPage'))
+const KnowledgeBasePage = React.lazy(() => import('./pages/KnowledgeBase/KnowledgeBasePage'))
+const KnowledgeBaseSettingsPage = React.lazy(() => import('./pages/KnowledgeBase/KnowledgeBaseEditorPage'))
 const PluginManagementPage = React.lazy(() => import('./pages/Plugins').then(module => ({ default: module.PluginManagementPage })))
 const PluginConfigurationPage = React.lazy(() => import('./pages/Plugins/PluginConfigurationPage'))
 const PluginVersionPage = React.lazy(() => import('./pages/Plugins/PluginVersionPage'))
@@ -74,7 +76,7 @@ const App: React.FC = () => {
               path="agents/new"
               element={
                 <Suspense fallback={<LoadingFallback />}>
-                  <AgentEditorEntryPage />
+                  <AgentCreatePage />
                 </Suspense>
               }
             />
@@ -149,6 +151,22 @@ const App: React.FC = () => {
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <ModelsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="knowledge-bases/:id/edit"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <KnowledgeBaseSettingsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="knowledge-bases"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <KnowledgeBasePage />
                 </Suspense>
               }
             />

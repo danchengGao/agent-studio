@@ -9,6 +9,7 @@ import { History as HistoryIcon, X, FileText, Tag, Loader2, Trash2 } from 'lucid
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import { WorkflowService } from '@test-agentstudio/api-client'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import { useTranslation } from '../../i18n'
 
 export interface HistoryPanelProps {
   title?: string
@@ -30,7 +31,7 @@ export interface VersionListItem {
 }
 
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({
-  title = '历史版本',
+  title,
   width = 360,
   onClose,
   workflowId,
@@ -39,6 +40,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
   onSelectVersion,
   refreshKey,
 }) => {
+  const { t } = useTranslation()
   const [versions, setVersions] = React.useState<VersionListItem[]>([])
   const [loading, setLoading] = React.useState<boolean>(false)
   const [switchingVersion, setSwitchingVersion] = React.useState<string | null>(null)
@@ -59,7 +61,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         window.open(`/dashboard/workflows/editor/${newId}?spaceId=${spaceId}`, '_blank')
       }
     } catch (e) {
-      console.error('创建副本失败:', e)
+      console.error(t('workflowCanvas.historyPanel.createCopyFailed'), e)
     } finally {
       setSwitchingVersion(null)
     }
@@ -75,11 +77,11 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
     try {
       const canvasResp = await WorkflowService.getWorkflowCanvas({ workflow_id: workflowId, space_id: spaceId, version: restoreTargetVersion })
       const schema = canvasResp?.data?.workflow?.schema || ''
-      if (!schema) throw new Error('历史版本内容不存在')
+      if (!schema) throw new Error(t('workflowCanvas.historyPanel.versionContentNotFound'))
       await WorkflowService.saveWorkflow({ workflow_id: workflowId, workflow_version: 'draft', space_id: spaceId, schema })
       onSelectVersion && onSelectVersion('draft')
     } catch (e) {
-      console.error('还原版本失败:', e)
+      console.error(t('workflowCanvas.historyPanel.restoreVersionFailed'), e)
     } finally {
       setRestoreConfirmOpen(false)
       setRestoreTargetVersion(null)
@@ -101,19 +103,19 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
         workflow_version: deleteTargetVersion,
       })
 
-      // 如果删除的是当前选中的版本，切换到草稿
+      // If deleting selected version, switch to draft
       if (selectedVersion === deleteTargetVersion) {
         onSelectVersion && onSelectVersion('draft')
       }
 
-      // 刷新版本列表
+      // Refresh version list
       const { notifyPublished } = useWorkflowStore.getState()
       notifyPublished({ workflowId, spaceId })
 
       setDeleteConfirmOpen(false)
       setDeleteTargetVersion(null)
     } catch (e) {
-      console.error('删除版本失败:', e)
+      console.error(t('workflowCanvas.historyPanel.deleteVersionFailed'), e)
     } finally {
       setDeletingVersion(null)
     }
@@ -124,14 +126,14 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       try {
         if (typeof ts === 'number') {
           const ms = ts > 1e12 ? ts : ts > 1e10 ? ts : ts > 0 ? ts * 1000 : NaN
-          if (!ms || isNaN(ms)) return '无效时间'
+          if (!ms || isNaN(ms)) return t('workflowCanvas.historyPanel.invalidTime')
           const d = dayjs(ms)
-          return d.isValid() ? d.format('YYYY-MM-DD HH:mm:ss') : '无效时间'
+          return d.isValid() ? d.format('YYYY-MM-DD HH:mm:ss') : t('workflowCanvas.historyPanel.invalidTime')
         }
         const d = dayjs(ts)
-        return d.isValid() ? d.format('YYYY-MM-DD HH:mm:ss') : '无效时间'
+        return d.isValid() ? d.format('YYYY-MM-DD HH:mm:ss') : t('workflowCanvas.historyPanel.invalidTime')
       } catch {
-        return '时间格式错误'
+        return t('workflowCanvas.historyPanel.timeFormatError')
       }
     }
 
@@ -162,24 +164,24 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
               return {
                 id: v.workflow_version || String(idx),
                 version: ver,
-                description: v.version_description || '无版本描述',
+                description: v.version_description || t('workflowCanvas.historyPanel.noVersionDescription'),
                 createdAt: formatTimestamp(v.create_time),
                 createdTs: createdTs ?? undefined,
               }
             },
           )
           const sortedItems = [...items].sort((a, b) => (b.createdTs ?? 0) - (a.createdTs ?? 0))
-          // 始终在列表中加入草稿版本，切换到草稿时将使用最新数据
+          // Always add draft version to list, will use latest data when switching to draft
           const draftItem: VersionListItem = {
             id: 'draft',
             version: 'draft',
           }
           setVersions([draftItem, ...sortedItems])
         } else {
-          throw new Error(resp.message || '获取版本历史失败')
+          throw new Error(resp.message || t('workflowCanvas.historyPanel.fetchVersionHistoryFailed'))
         }
       } catch (err: { message?: string }) {
-        setError(err?.message || '获取版本历史失败')
+        setError(err?.message || t('workflowCanvas.historyPanel.fetchVersionHistoryFailed'))
       } finally {
         setLoading(false)
       }
@@ -214,15 +216,15 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
             <HistoryIcon className="w-5 h-5 text-purple-600" />
           </div>
           <div>
-            <div className="text-sm font-semibold text-gray-800">{title}</div>
-            <div className="text-xs text-gray-500">查看和管理工作流版本</div>
+            <div className="text-sm font-semibold text-gray-800">{title || t('workflowCanvas.historyPanel.title')}</div>
+            <div className="text-xs text-gray-500">{t('workflowCanvas.historyPanel.subtitle')}</div>
           </div>
         </div>
         <button
           className="text-gray-500 hover:text-gray-700 p-2 rounded"
           aria-label="close"
           onClick={() => {
-            // 关闭面板前恢复到草稿版本
+            // Restore to draft version before closing panel
             onSelectVersion && onSelectVersion('draft')
             onClose()
           }}
@@ -234,11 +236,11 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto pr-3 pl-5 py-2" ref={contentRef}>
         {!workflowId || !spaceId ? (
-          <div className="p-4 text-sm text-gray-500">请选择工作流以查看版本历史。</div>
+          <div className="p-4 text-sm text-gray-500">{t('workflowCanvas.historyPanel.selectWorkflowPrompt')}</div>
         ) : error ? (
-          <div className="p-4 text-sm text-red-600">加载失败：{error}</div>
+          <div className="p-4 text-sm text-red-600">{t('workflowCanvas.historyPanel.loadFailed')}: {error}</div>
         ) : loading ? (
-          <div className="p-4 text-sm text-gray-500">加载中...</div>
+          <div className="p-4 text-sm text-gray-500">{t('workflowCanvas.historyPanel.loading')}</div>
         ) : versions && versions.length > 0 ? (
           <ul className="space-y-3">
             {versions.map(item => {
@@ -261,7 +263,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
             })}
           </ul>
         ) : (
-          <div className="p-4 text-sm text-gray-500">暂无版本数据</div>
+          <div className="p-4 text-sm text-gray-500">{t('workflowCanvas.historyPanel.noVersionData')}</div>
         )}
       </div>
       <DeleteConfirmationDialog
@@ -271,9 +273,9 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
           setRestoreTargetVersion(null)
         }}
         onConfirm={openRestoreConfirm}
-        title="还原为此版本"
-        message="还原后，将覆盖最新编写的工作流内容"
-        confirmButtonText="确认"
+        title={t('workflowCanvas.historyPanel.restoreToThisVersion')}
+        message={t('workflowCanvas.historyPanel.restoreConfirmMessage')}
+        confirmButtonText={t('workflowCanvas.historyPanel.confirm')}
         iconType="warning"
       />
       <DeleteConfirmationDialog
@@ -283,9 +285,9 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
           setDeleteTargetVersion(null)
         }}
         onConfirm={handleDeleteVersion}
-        title="删除版本"
-        message={`确定要删除版本 ${deleteTargetVersion} 吗？删除后无法恢复`}
-        confirmButtonText="删除"
+        title={t('workflowCanvas.historyPanel.deleteVersion')}
+        message={t('workflowCanvas.historyPanel.deleteConfirmMessage', { version: deleteTargetVersion })}
+        confirmButtonText={t('workflowCanvas.historyPanel.delete')}
         iconType="danger"
       />
     </div>
@@ -303,6 +305,7 @@ const VersionCard: React.FC<{
   onDeleteVersion?: () => void
   deletingVersion?: string | null
 }> = ({ item, isActive, onSelectVersion, switchingVersion, setSwitchingVersion, onCreateCopy, onRestoreVersion, onDeleteVersion, deletingVersion }) => {
+  const { t } = useTranslation()
   return (
     <div
       className={`group cursor-pointer rounded-2xl border px-4 py-3 transition-all ${
@@ -328,7 +331,7 @@ const VersionCard: React.FC<{
             }`}
           >
             {switchingVersion === item.version ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
-            {switchingVersion === item.version ? '切换中...' : item.createdAt}
+            {switchingVersion === item.version ? t('workflowCanvas.historyPanel.switching') : item.createdAt}
           </span>
         )}
       </div>
@@ -336,12 +339,12 @@ const VersionCard: React.FC<{
         <div className="mt-2 grid grid-cols-[20px_1fr] items-start text-sm">
           <FileText className="w-4 h-4 text-gray-500 mt-0.5" />
           <div>
-            <span className="text-gray-600">版本描述：</span>
+            <span className="text-gray-600">{t('workflowCanvas.historyPanel.versionDescription')}:</span>
             <span
               className="whitespace-pre-line break-words text-gray-800 overflow-hidden text-ellipsis whitespace-nowrap max-w-[180px] inline-block"
-              title={item.description || '无版本描述'}
+              title={item.description || t('workflowCanvas.historyPanel.noVersionDescription')}
             >
-              {item.description || '无版本描述'}
+              {item.description || t('workflowCanvas.historyPanel.noVersionDescription')}
             </span>
           </div>
         </div>
@@ -355,7 +358,7 @@ const VersionCard: React.FC<{
               onCreateCopy && onCreateCopy()
             }}
           >
-            创建副本
+            {t('workflowCanvas.historyPanel.createCopy')}
           </button>
           {item.version !== 'draft' && (
             <button
@@ -365,7 +368,7 @@ const VersionCard: React.FC<{
                 onRestoreVersion && onRestoreVersion()
               }}
             >
-              还原至该版本
+              {t('workflowCanvas.historyPanel.restoreToThisVersion')}
             </button>
           )}
           {item.version !== 'draft' && (
@@ -380,12 +383,12 @@ const VersionCard: React.FC<{
               {deletingVersion === item.version ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  删除中...
+                  {t('workflowCanvas.historyPanel.deleting')}
                 </>
               ) : (
                 <>
                   <Trash2 className="w-3 h-3" />
-                  删除
+                  {t('workflowCanvas.historyPanel.delete')}
                 </>
               )}
             </button>

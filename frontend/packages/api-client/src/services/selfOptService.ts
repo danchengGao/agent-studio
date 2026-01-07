@@ -10,6 +10,7 @@ import {
   SaveJobDraftRequest,
   SaveJobDraftResponse,
   GetJobDraftResponse,
+  GetJobHistoryResponse,
 } from '../types/selfOptTypes'
 import { API_ENDPOINTS } from '../config'
 
@@ -166,6 +167,40 @@ export class SelfOptService {
       // 检查是否是ApiError且包含成功的响应
       if (error.name === 'ApiError' && error.code === 200 && error.response) {
         return error.response as GetJobDraftResponse
+      }
+
+      throw error
+    }
+  }
+
+  /**
+   * 查询用例历史记录
+   * @param jobId 任务ID
+   * @param workspaceId 工作空间ID
+   * @param userId 用户ID
+   * @param pageNum 第几页
+   * @param pageSize 每页多少条数据
+   * @param iterationRound 优化轮次
+   * @returns 用例历史记录响应
+   */
+  static async getJobHistory(
+    jobId: string,
+    workspaceId: string,
+    userId: string,
+    pageNum: number,
+    pageSize: number,
+    iterationRound: number,
+  ): Promise<GetJobHistoryResponse> {
+    try {
+      const baseUrl = API_ENDPOINTS.SELF_OPTIMIZATION.JOB_HISTORY.replace(':jobId', jobId)
+      const url = `${baseUrl}?workspace_id=${workspaceId}&user_id=${userId}&page_num=${pageNum}&page_size=${pageSize}&iteration_round=${iterationRound}`
+      const response = await apiClient.get<GetJobHistoryResponse>(url)
+      return response.data
+    } catch (error: any) {
+      // 检查是否是ApiError且包含响应数据
+      if (error.name === 'ApiError' && error.response) {
+        // 返回错误响应数据，让调用方可以处理错误信息
+        return error.response as GetJobHistoryResponse
       }
 
       throw error

@@ -1,0 +1,3 @@
+include openjiuwen_studio/conf/config.yaml
+include openjiuwen_studio/conf/config.json
+include openjiuwen_studio/ops/conf/default_model_config.yaml

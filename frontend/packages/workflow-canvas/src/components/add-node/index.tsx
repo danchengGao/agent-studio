@@ -7,9 +7,11 @@ import { Button } from '@douyinfe/semi-ui'
 import { Plus } from 'lucide-react'
 
 import { useAddNode } from './use-add-node'
+import { useTranslation } from '../../i18n'
 
 export const AddNode = () => {
   const addNode = useAddNode()
+  const { t } = useTranslation()
 
   return (
     <Button
@@ -22,7 +24,7 @@ export const AddNode = () => {
         addNode(rect)
       }}
     >
-      添加节点
+      {t('workflowCanvas.tools.addNode')}
     </Button>
   )
 }

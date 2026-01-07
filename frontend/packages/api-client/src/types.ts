@@ -750,7 +750,21 @@ export interface WorkflowUserInputRequest {
   }
 }
 
-// 工作流执行状态枚举
+export interface WorkflowCancelRequest {
+  space_id: string
+  conversation_id: string
+  force?: boolean
+}
+
+export interface WorkflowCancelResponse {
+  code: number
+  message: string
+  data?: {
+    conversation_id: string
+    cancelled: boolean
+  }
+}
+
 export enum WorkflowExecutionStatus {
   PENDING = 'pending',
   RUNNING = 'running',
@@ -759,7 +773,6 @@ export enum WorkflowExecutionStatus {
   CANCELLED = 'cancelled',
 }
 
-// 工作流执行结果类型
 export interface WorkflowExecutionResult {
   executionId: string
   status: WorkflowExecutionStatus
@@ -1335,6 +1348,7 @@ export interface CreateAgentRequest {
   space_id: string
   agent_name: string
   description: string
+  agent_type: string
   icon?: string
 }
 
@@ -1354,6 +1368,7 @@ export interface UpdateAgentRequest {
   space_id: string
   description: string
   icon: string
+  agent_type: string
 }
 
 // 智能体更新响应类型
@@ -1421,6 +1436,7 @@ export interface AgentListResponse {
       create_time: number
       api_endpoint: string
       agent_version: string
+      agent_type: string
     }>
     pagination: {
       page: number
@@ -1460,6 +1476,7 @@ export interface AgentSearchResponse {
       create_time: number
       api_endpoint: string
       agent_version: string
+      agent_type: string
     }>
     pagination: {
       page: number
@@ -1637,6 +1654,14 @@ export enum PluginApiMethod {
   patch = 5,
 }
 
+// 参数发送方法枚举
+export enum ParamSendMethod {
+  NONE = 0,
+  HEADER = 1,
+  QUERY = 2,
+  BODY = 3,
+}
+
 export interface PluginCreateRequest {
   name: string
   desc: string
@@ -1761,6 +1786,7 @@ export interface PluginApiParam {
   desc?: string
   type: number
   is_required?: boolean
+  method?: ParamSendMethod
 }
 
 export interface PluginApiHeader {
@@ -1900,6 +1926,8 @@ export interface ComponentExecuteRequest {
   inputs: Record<string, any>
   component_id: string
   loop_id?: string
+  conversation_id?: string
+  force?: boolean
 }
 // 单节点调试响应类型
 export interface ComponentExecuteResponse {
@@ -1911,6 +1939,29 @@ export interface ComponentExecuteResponse {
   }
   code: number
   message: string
+}
+
+// 单节点调试取消请求类型
+export interface ComponentCancelRequest {
+  space_id: string
+  id: string
+  version: string
+  component_id: string
+  conversation_id?: string
+  force?: boolean
+}
+
+// 单节点调试取消响应类型
+export interface ComponentCancelResponse {
+  code: number
+  message: string
+  data?: {
+    workflow_id?: string
+    component_id?: string
+    conversation_id?: string
+    cancelled?: boolean
+    warning?: string
+  }
 }
 
 // Plugin Code 相关类型

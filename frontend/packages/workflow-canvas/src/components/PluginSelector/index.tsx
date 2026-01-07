@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { PluginService, PluginInfo, PluginApiInfo, PluginApiMethod } from '@test-agentstudio/api-client'
 import { getDefaultSpaceId } from '../../../../../src/utils/spaceUtils'
 import { dragStateManager } from '../../utils/drag-state-manager'
+import { useTranslation } from '../../i18n'
 
 interface PluginSelectorProps {
   open: boolean
@@ -24,6 +25,7 @@ interface PluginVersion {
 }
 
 const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfirm }) => {
+  const { t } = useTranslation()
   const [pluginList, setPluginList] = useState<PluginInfo[]>([])
   const [pluginLoading, setPluginLoading] = useState(false)
 
@@ -114,7 +116,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
       // 添加 draft 版本到最后
       versions.push({
         plugin_version: 'draft',
-        description: '草稿版本',
+        description: t('workflowCanvas.pluginSelector.draftVersion'),
       })
 
       setPluginVersions(prev => new Map(prev).set(pluginId, versions))
@@ -136,7 +138,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
       const draftVersions = [
         {
           plugin_version: 'draft',
-          description: '草稿版本',
+          description: t('workflowCanvas.pluginSelector.draftVersion'),
         },
       ]
 
@@ -332,9 +334,9 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
       <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <Typography variant="h6">选择插件工具</Typography>
+            <Typography variant="h6">{t('workflowCanvas.pluginSelector.selectPluginTools')}</Typography>
             <Typography variant="caption" color="textSecondary">
-              支持同时选择多个插件中的多个工具
+              {t('workflowCanvas.pluginSelector.supportMultipleSelection')}
             </Typography>
           </div>
           <IconButton onClick={handleCancel}>
@@ -350,7 +352,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
           <>
             <div className="flex-1 overflow-y-auto mb-4">
               {pluginList.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">暂无可用插件</div>
+                <div className="text-center text-gray-500 py-8">{t('workflowCanvas.pluginSelector.noAvailablePlugins')}</div>
               ) : (
                 <div className="space-y-2">
                   {pluginList.map(plugin => {
@@ -361,17 +363,17 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                             <div className="flex-1">
                               <div className="flex items-center space-x-2">
                                 <Typography variant="subtitle1" className="font-medium">
-                                  {plugin.name || `插件 ${plugin.plugin_id.slice(-5)}`}
+                                  {plugin.name || `${t('workflowCanvas.pluginSelector.plugin')} ${plugin.plugin_id.slice(-5)}`}
                                 </Typography>
                               </div>
                               <Typography variant="body2" color="textSecondary" className="mt-1">
-                                {plugin.desc || '暂无描述'}
+                                {plugin.desc || t('workflowCanvas.pluginSelector.noDescription')}
                               </Typography>
 
                               {/* 版本下拉选择器 */}
                               <div className="flex items-center space-x-2 mt-2">
                                 <Typography variant="caption" color="textSecondary">
-                                  版本:
+                                  {t('workflowCanvas.pluginSelector.version')}:
                                 </Typography>
                                 <Select
                                   size="small"
@@ -391,11 +393,11 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                 >
                                   {pluginVersions.get(plugin.plugin_id)?.map(version => (
                                     <MenuItem key={version.plugin_version} value={version.plugin_version} sx={{ fontSize: '0.75rem' }}>
-                                      {version.plugin_version} {version.plugin_version === 'draft' ? '(草稿)' : ''}
+                                      {version.plugin_version} {version.plugin_version === 'draft' ? `(${t('workflowCanvas.pluginSelector.draft')})` : ''}
                                     </MenuItem>
                                   )) || [
                                     <MenuItem key="draft" value="draft" sx={{ fontSize: '0.75rem' }}>
-                                      请选择插件版本
+                                      {t('workflowCanvas.pluginSelector.selectVersion')}
                                     </MenuItem>,
                                   ]}
                                 </Select>
@@ -410,7 +412,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                   <div className="mt-3">
                                     <div className="flex items-center space-x-2 mb-2">
                                       <Typography variant="caption" color="textSecondary">
-                                        工具列表:
+                                        {t('workflowCanvas.pluginSelector.toolList')}:
                                       </Typography>
                                       {loadingTools.has(toolsKey) && <CircularProgress size={12} />}
                                     </div>
@@ -453,11 +455,11 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                       } else {
                                         return loadingTools.has(toolsKey) ? (
                                           <Typography variant="caption" color="textSecondary">
-                                            正在加载工具列表...
+                                            {t('workflowCanvas.pluginSelector.loadingTools')}
                                           </Typography>
                                         ) : (
                                           <Typography variant="caption" color="textSecondary">
-                                            暂无工具
+                                            {t('workflowCanvas.pluginSelector.noTools')}
                                           </Typography>
                                         )
                                       }
@@ -477,10 +479,10 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
 
             <div className="flex justify-end space-x-2">
               <Button variant="outlined" onClick={handleCancel}>
-                取消
+                {t('workflowCanvas.pluginSelector.cancel')}
               </Button>
               <Button variant="contained" onClick={handleConfirm} disabled={Array.from(selectedTools.values()).every(toolSet => toolSet.size === 0)}>
-                确认选择
+                {t('workflowCanvas.pluginSelector.confirm')}
               </Button>
             </div>
           </>

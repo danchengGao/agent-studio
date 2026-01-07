@@ -9,6 +9,7 @@ import { WorkflowNodeType } from '../constants'
 import { Plug } from 'lucide-react'
 import { PluginInfo, PluginApiInfo } from '../../../../api-client/src/types'
 import { FreeLayoutPluginContext, WorkflowSelectService } from '@flowgram.ai/free-layout-editor'
+import { t } from '../../i18n'
 
 // PluginSelector component
 import PluginSelector from '../../components/PluginSelector'
@@ -227,7 +228,7 @@ export const PluginNodeRegistry: FlowNodeRegistry = {
   formMeta: pluginFormMeta,
   info: {
     icon: <Plug size={16} className="text-green-600" />,
-    description: '工具节点，用于调用具体的插件工具执行特定任务。',
+    description: t('workflowCanvas.nodes.plugin.description'),
   },
   // 使用异步方法，支持多选插件创建多个节点
   onAdd: async (ctx: FreeLayoutPluginContext) => {

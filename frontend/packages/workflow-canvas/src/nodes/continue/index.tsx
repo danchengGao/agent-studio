@@ -9,6 +9,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { SkipForward } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 const index = 0
 export const ContinueNodeRegistry: FlowNodeRegistry = {
@@ -24,7 +25,7 @@ export const ContinueNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <SkipForward size={16} className="text-blue-600" />,
-    description: '继续节点，用于在循环中跳过当前迭代并继续下一次迭代。',
+    description: t('workflowCanvas.nodes.continue.description'),
   },
   /**
    * Render node via formMeta

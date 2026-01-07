@@ -89,7 +89,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
   }
 
   const getPluginTypeLabel = (type: number) => {
-    return type === 1 ? '云侧插件' : '本地插件'
+    return type === 1 ? (t('plugins.types.cloud') || '云侧插件') : (t('plugins.types.ide') || '本地插件')
   }
 
   const handleRetry = () => {
@@ -175,7 +175,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
               </div>
               <div>
                 <Typography variant="h6" className="font-bold text-gray-900">
-                  插件版本历史
+                  {t('plugins.versionHistory.title') || '插件版本历史'}
                 </Typography>
                 <Typography variant="body2" className="text-gray-600">
                   {pluginName}
@@ -195,7 +195,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
               <div className="text-center">
                 <CircularProgress size={40} className="mb-4" />
                 <Typography variant="body2" color="text.secondary">
-                  正在加载版本历史...
+                  {t('plugins.versionHistory.loading') || '加载中...'}
                 </Typography>
               </div>
             </div>
@@ -206,13 +206,13 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                   <Info className="w-8 h-8 text-red-500" />
                 </div>
                 <Typography variant="h6" className="mb-2 text-gray-900">
-                  加载失败
+                  {t('plugins.loadFailed') || '加载失败'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" className="mb-4">
-                  无法加载插件版本历史，请稍后重试
+                  {t('plugins.versionHistory.loadError') || '无法加载插件版本历史，请稍后重试'}
                 </Typography>
                 <Button variant="outlined" onClick={handleRetry}>
-                  重试
+                  {t('plugins.actions.retry') || '重试'}
                 </Button>
               </div>
             </div>
@@ -223,10 +223,10 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                   <History className="w-8 h-8 text-gray-400" />
                 </div>
                 <Typography variant="h6" className="mb-2 text-gray-900">
-                  暂无版本历史
+                  {t('plugins.versionHistory.noVersions') || '暂无版本历史'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  该插件还没有发布过任何版本
+                  {t('plugins.versionHistory.noVersionsDescription') || '该插件还没有发布过任何版本'}
                 </Typography>
               </div>
             </div>
@@ -235,7 +235,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
               {/* 版本统计 */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
-                  <Chip icon={<Calendar className="w-3 h-3" />} label={`共 ${totalVersions} 个版本`} size="small" className="bg-blue-100 text-blue-700" />
+                  <Chip icon={<Calendar className="w-3 h-3" />} label={t('plugins.versionHistory.versionCount', { count: totalVersions }) || `共 ${totalVersions} 个版本`} size="small" className="bg-blue-100 text-blue-700" />
                   <Chip label={getPluginTypeLabel(versions[0]?.plugin_type || 1)} size="small" className="bg-gray-100 text-gray-700" />
                 </div>
               </div>
@@ -263,7 +263,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                                 {version.published && (
                                   <Chip
                                     icon={<CheckCircle className="w-3 h-3" />}
-                                    label="已发布"
+                                    label={t('plugins.status.published') || '已发布'}
                                     size="small"
                                     className="bg-green-100 text-green-700 text-xs"
                                   />
@@ -277,7 +277,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
 
                           <div className="flex items-center space-x-2">
                             {/* 选择按钮 */}
-                            <Tooltip title="查看版本详情" arrow>
+                            <Tooltip title={t('plugins.actions.viewDetails') || '查看版本详情'} arrow>
                               <IconButton
                                 size="small"
                                 onClick={() => handleSelectVersion(version)}
@@ -293,7 +293,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                             </Tooltip>
 
                             {/* 删除按钮 */}
-                            <Tooltip title="删除版本" arrow>
+                            <Tooltip title={t('plugins.actions.deleteVersion') || '删除版本'} arrow>
                               <IconButton
                                 size="small"
                                 onClick={() => handleDeleteClick(version)}
@@ -319,7 +319,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                           <div className="flex items-center space-x-2">
                             <User className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">插件类型:</span>
+                            <span className="text-gray-600">{t('plugins.versionHistory.pluginType') || '插件类型'}:</span>
                             <span className="font-medium">{getPluginTypeLabel(version.plugin_type)}</span>
                           </div>
 
@@ -335,13 +335,13 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
 
                           <div className="flex items-center space-x-2">
                             <History className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-600">工具数量:</span>
+                            <span className="text-gray-600">{t('plugins.versionHistory.toolCount') || '工具数量'}:</span>
                             <span className="font-medium">{version.tools?.length || 0}</span>
                           </div>
 
                           {version.icon_uri && (
                             <div className="flex items-center space-x-2">
-                              <span className="text-gray-600">图标:</span>
+                              <span className="text-gray-600">{t('plugins.versionHistory.icon') || '图标'}:</span>
                               <span className="text-lg">{version.icon_uri}</span>
                             </div>
                           )}
@@ -352,7 +352,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                             <Divider className="my-3" />
                             <div>
                               <Typography variant="body2" className="text-gray-600 mb-1">
-                                版本说明:
+                                {t('plugins.versionHistory.description') || '版本说明'}:
                               </Typography>
                               <Typography variant="body2" className="text-gray-800 bg-gray-50 p-2 rounded">
                                 {version.version_desc}
@@ -372,7 +372,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
         {/* 底部操作区 */}
         <MuiDialogActions className="bg-gray-50 px-6 py-4 border-t border-gray-200">
           <Button onClick={onClose} variant="outlined" className="text-gray-600 hover:text-gray-700 border-gray-300">
-            关闭
+            {t('common.buttons.close') || '关闭'}
           </Button>
         </MuiDialogActions>
       </Dialog>
@@ -396,10 +396,10 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
             </div>
             <div>
               <Typography variant="h6" className="font-bold text-gray-900">
-                确认删除版本
+                {t('plugins.versionHistory.confirmDeleteTitle') || '确认删除版本'}
               </Typography>
               <Typography variant="body2" className="text-gray-600">
-                此操作不可撤销
+                {t('plugins.versionHistory.irreversibleAction') || '此操作不可撤销'}
               </Typography>
             </div>
           </div>
@@ -408,7 +408,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
         <MuiDialogContent className="p-6">
           <div className="space-y-4">
             <Typography variant="body1" className="text-gray-800">
-              确定要删除以下版本吗？
+              {t('plugins.versionHistory.confirmDeleteTitle') || '确定要删除以下版本吗？'}
             </Typography>
 
             {versionToDelete && (
@@ -416,26 +416,26 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                 <div className="flex items-center justify-between">
                   <div>
                     <Typography variant="subtitle2" className="font-semibold text-gray-900">
-                      版本: {versionToDelete.plugin_version || '1.0.0'}
+                      {t('plugins.versionHistory.version') || '版本'}: {versionToDelete.plugin_version || '1.0.0'}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       {versionToDelete.name}
                     </Typography>
                     {versionToDelete.version_desc && (
                       <Typography variant="body2" className="text-gray-600 mt-1">
-                        说明: {versionToDelete.version_desc}
+                        {t('plugins.versionHistory.versionDescription') || '说明'}: {versionToDelete.version_desc}
                       </Typography>
                     )}
                   </div>
                   {versionToDelete.published && (
-                    <Chip icon={<CheckCircle className="w-3 h-3" />} label="已发布" size="small" className="bg-green-100 text-green-700" />
+                    <Chip icon={<CheckCircle className="w-3 h-3" />} label={t('plugins.basicInfo.published') || '已发布'} size="small" className="bg-green-100 text-green-700" />
                   )}
                 </div>
               </div>
             )}
 
             <Typography variant="body2" className="text-red-600">
-              ⚠️ 删除后，该版本的所有相关数据将被永久删除，无法恢复。
+              ⚠️ {t('plugins.versionHistory.deleteIrreversibleAction') || '删除后，该版本的所有相关数据将被永久删除，无法恢复'}
             </Typography>
           </div>
         </MuiDialogContent>
@@ -447,7 +447,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
             className="text-gray-600 hover:text-gray-700 border-gray-300"
             disabled={deletePluginPublish.isLoading}
           >
-            取消
+            {t('common.buttons.cancel') || '取消'}
           </Button>
           <Button
             onClick={handleDeleteConfirm}
@@ -456,7 +456,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
             disabled={deletePluginPublish.isLoading}
             startIcon={deletePluginPublish.isLoading ? <CircularProgress size={16} /> : <Trash2 className="w-4 h-4" />}
           >
-            {deletePluginPublish.isLoading ? '删除中...' : '确认删除'}
+            {deletePluginPublish.isLoading ? t('plugins.tools.deleteDialog.deleting') || '删除中...' : t('plugins.tools.deleteDialog.confirm') || '确认删除'}
           </Button>
         </MuiDialogActions>
       </Dialog>

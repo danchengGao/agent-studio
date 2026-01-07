@@ -11,6 +11,7 @@ import { WorkflowOperationContainer, WorkflowControlSection } from './styles'
 import { HistoryVersionTag } from '../../styles/styles'
 import PublishDialog from '../history-panel/publish-dialog'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import { t } from '../../i18n'
 
 interface WorkflowControlProps {
   onSave: () => void
@@ -28,10 +29,11 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
   const selectedVersion = useWorkflowStore(s => s.selectedVersion)
 
   // 获取工作流名称 - 改进逻辑，支持多种数据结构
-  const workflowName = canvasData?.name ||
-                       canvasData?.workflow?.name ||
-                       canvasData?.data?.workflow?.name ||
-                       (workflowId ? `工作流-${workflowId}` : '未命名工作流')
+  const workflowName =
+    canvasData?.name ||
+    canvasData?.workflow?.name ||
+    canvasData?.data?.workflow?.name ||
+    (workflowId ? `${t('workflowCanvas.workflow.name')}-${workflowId}` : t('workflowCanvas.workflow.unnamed'))
 
   // 调试日志 - 临时注释，需要时可以启用
   // React.useEffect(() => {
@@ -63,7 +65,7 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
 
   const handleVersionHistoryClick = async () => {
     if (!workflowId || !spaceId) {
-      Toast.error('工作流信息不存在')
+      Toast.error(t('workflowCanvas.workflow.notFound'))
       return
     }
     // 使用 store 打开右侧版本历史面板，并传递上下文
@@ -76,16 +78,18 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
       <WorkflowOperationContainer>
         <WorkflowControlSection>
           {/* 工作流名称显示 */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginRight: '12px',
-            padding: '4px 12px',
-            backgroundColor: 'var(--semi-color-bg-2)',
-            borderRadius: '6px',
-            border: '1px solid var(--semi-color-border)',
-            height: '32px'
-          }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginRight: '12px',
+              padding: '4px 12px',
+              backgroundColor: 'var(--semi-color-bg-2)',
+              borderRadius: '6px',
+              border: '1px solid var(--semi-color-border)',
+              height: '32px',
+            }}
+          >
             <Typography.Text
               type="secondary"
               style={{
@@ -95,51 +99,55 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                lineHeight: '24px'
+                lineHeight: '24px',
               }}
-              title={workflowName || '工作流名称'}
+              title={workflowName || t('workflowCanvas.workflow.nameLabel')}
             >
-              {workflowName || '未命名工作流'}
+              {workflowName || t('workflowCanvas.workflow.unnamed')}
             </Typography.Text>
           </div>
 
           {/* 新增的发布和版本历史按钮 */}
-          <Tooltip content="提交新版本">
-            <IconButton type="tertiary" theme="borderless" icon={<Tag size="small" />} onClick={handlePublishClick} disabled={!workflowId || !spaceId} />
+          <Tooltip content={t('workflowCanvas.workflow.publish')}>
+            <IconButton type="tertiary" theme="borderless" icon={<Tag size={16} />} onClick={handlePublishClick} disabled={!workflowId || !spaceId} />
           </Tooltip>
 
-          <Tooltip content="版本历史">
+          <Tooltip content={t('workflowCanvas.workflow.versionHistory')}>
             <IconButton
               type="tertiary"
               theme="borderless"
-              icon={<History size="small" />}
+              icon={<History size={16} />}
               onClick={handleVersionHistoryClick}
               disabled={!workflowId || !spaceId}
             />
           </Tooltip>
 
           {/* 当前展示版本：仅当为历史版本时显示 */}
-          {selectedVersion && selectedVersion !== 'draft' && <HistoryVersionTag>历史版本 {selectedVersion}</HistoryVersionTag>}
+          {selectedVersion && selectedVersion !== 'draft' && (
+            <HistoryVersionTag>
+              {t('workflowCanvas.workflow.historyVersion')} {selectedVersion}
+            </HistoryVersionTag>
+          )}
 
           <Divider layout="vertical" style={{ height: '20px' }} margin={3} />
 
           {/* 原有的保存、导入、导出按钮 */}
-          <Tooltip content="保存工作流">
-            <IconButton type="tertiary" theme="borderless" icon={<Save size="small" />} onClick={onSave} />
+          <Tooltip content={t('workflowCanvas.workflow.save')}>
+            <IconButton type="tertiary" theme="borderless" icon={<Save size={16} />} onClick={onSave} />
           </Tooltip>
 
-          <Tooltip content="导入工作流">
-            <IconButton type="tertiary" theme="borderless" icon={<Upload size="small" />} onClick={onImport} />
+          <Tooltip content={t('workflowCanvas.workflow.import')}>
+            <IconButton type="tertiary" theme="borderless" icon={<Upload size={16} />} onClick={onImport} />
           </Tooltip>
 
-          <Tooltip content="导出工作流">
-            <IconButton type="tertiary" theme="borderless" icon={<Download size="small" />} onClick={onExport} />
+          <Tooltip content={t('workflowCanvas.workflow.export')}>
+            <IconButton type="tertiary" theme="borderless" icon={<Download size={16} />} onClick={onExport} />
           </Tooltip>
 
           <Divider layout="vertical" style={{ height: '16px' }} margin={3} />
 
-          <Tooltip content="返回工作流列表">
-            <IconButton type="danger" theme="borderless" icon={<ArrowLeft size="small" />} onClick={handleBack} />
+          <Tooltip content={t('workflowCanvas.workflow.backToList')}>
+            <IconButton type="danger" theme="borderless" icon={<ArrowLeft size={16} />} onClick={handleBack} />
           </Tooltip>
         </WorkflowControlSection>
       </WorkflowOperationContainer>

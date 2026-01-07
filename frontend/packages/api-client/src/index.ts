@@ -18,6 +18,22 @@ export { API_CONFIG, API_ENDPOINTS, HTTP_STATUS, ERROR_TYPES, updateApiConfig, s
 // 类型定义
 export * from './types'
 export { ModelProvider } from './types/modelTypes'
+
+// Embedding 模型相关类型
+export { EmbeddingProtocol } from './types/embeddingModelTypes'
+export type {
+  EmbeddingModelConfigBase,
+  EmbeddingModelConfigCreate,
+  EmbeddingModelConfigUpdate,
+  EmbeddingModelConfigResponse,
+  EmbeddingModelConfigList,
+  EmbeddingModelConfigRequest,
+  EmbeddingModelTestRequest,
+  EmbeddingModelTestResponse,
+  EmbeddingModelConfigQueryParams,
+  EmbeddingModelApiResponse,
+  EmbeddingModelApiError,
+} from './types/embeddingModelTypes'
 export type {
   ModelParameters as ModelConfigParameters,
   ModelUsageStats,
@@ -60,6 +76,13 @@ export type {
   GetJobDetailResponse,
   SelfOptApiResponse,
   SelfOptApiError,
+  CaseInputs,
+  CaseLabel,
+  CaseDetail,
+  CaseAnswer,
+  EvaluateCase,
+  JobHistoryItem,
+  GetJobHistoryResponse,
 } from './types/selfOptTypes'
 
 // 反馈优化相关类型
@@ -188,6 +211,8 @@ export type {
 export { WorkflowService } from './services/workflowService'
 export { ExecutionService } from './services/executionService'
 export { ModelService, modelService } from './services/modelService'
+export { EmbeddingModelService, embeddingModelService } from './services/embeddingModelService'
+export type { FrontendEmbeddingModelConfig } from './services/embeddingModelService'
 export { AuthService } from './services/authService'
 export { SpaceService } from './services/spaceService'
 export { AgentService } from './services/agentService'
@@ -199,6 +224,7 @@ export { PromptService } from './services/promptService'
 export { PluginService } from './services/pluginService'
 export { TagService } from './services/tagService'
 export { TraceService, traceService } from './services/traceService'
+export { KnowledgeBaseService } from './services/knowledgeBaseService'
 export type { FrontendModelConfig } from './services/modelService'
 export type { Space, SpaceResponse } from './services/spaceService'
 export { MemberType } from './services/relatedMemberService'
@@ -210,6 +236,8 @@ export * from './hooks/useExecution'
 export * from './hooks/useExecutionLogs'
 export type {
   WorkflowExecutionRequest,
+  WorkflowCancelRequest,
+  WorkflowCancelResponse,
   WorkflowExecutionEvent,
   WorkflowExecutionResult,
   WorkflowExecutionStatus,
@@ -218,6 +246,7 @@ export type {
   SSEMessage,
 } from './types'
 export * from './hooks/useModels'
+export * from './hooks/useEmbeddingModels'
 export * from './hooks/useAuth'
 export * from './hooks/useSpace'
 export * from './hooks/useAgent'
@@ -259,3 +288,38 @@ export type {
   CreateWorkflowWithTagsRequest,
   UpdateWorkflowWithTagsRequest,
 } from './types/tagTypes'
+
+// 知识库相关类型
+export type {
+  CreateKnowledgeBaseRequest,
+  CreateKnowledgeBaseResponse,
+  GetKnowledgeBasesRequest,
+  GetKnowledgeBasesResponse,
+  KnowledgeBaseItem,
+  KnowledgeBase,
+  UpdateKnowledgeBaseRequest,
+  UpdateKnowledgeBaseResponse,
+  DeleteKnowledgeBaseRequest,
+  DeleteKnowledgeBaseResponse,
+  GetKnowledgeBaseDetailRequest,
+  GetKnowledgeBaseDetailResponse,
+  UploadFilesRequest,
+  UploadFilesResponse,
+  FileSettingsRequest,
+  FileSettingsResponse,
+  GetDocumentsListRequest,
+  GetDocumentsListResponse,
+  UpdateDocumentRequest,
+  UpdateDocumentResponse,
+  DeleteDocumentsRequest,
+  DeleteDocumentsResponse,
+  ProcessDocumentsRequest,
+  ProcessDocumentsResponse,
+  GetDocumentStatusRequest,
+  GetDocumentStatusResponse,
+  DocumentStatusItem,
+  DocumentItem,
+  SearchKnowledgeBaseRequest,
+  SearchKnowledgeBaseResponse,
+  SearchKnowledgeBaseItem,
+} from './types/knowledgeBase'

@@ -4,6 +4,7 @@
  */
 
 import { FieldArray, FormMeta, ValidateTrigger } from '@flowgram.ai/free-layout-editor'
+import { I18n } from '@flowgram.ai/editor'
 
 import { AssignRows, createInferAssignPlugin, type AssignValueType } from '../../form-materials'
 import { FormHeader, FormContent, FormDisplay, FormItem } from '../../form-components'
@@ -18,14 +19,14 @@ export const FormRender = (): JSX.Element => {
       <FormHeader />
       <FormContent>
         {isSidebar ? (
-          <FormItem name="设置">
+          <FormItem name={I18n.t('Settings')}>
             <AssignRows name="assign" enableDeclaration={false} />
           </FormItem>
         ) : (
           <>
             <FieldArray name="assign">
               {({ field }) => {
-                // 从assign数组中提取所有变量名
+                // Extract all variable names from assign array
                 const getVariableNames = () => {
                   const assignData = field.value as AssignValueType[]
                   if (Array.isArray(assignData) && assignData.length > 0) {
@@ -44,13 +45,13 @@ export const FormRender = (): JSX.Element => {
                       }
                     })
 
-                    return variableNames.length > 0 ? variableNames.join(', ') : '未配置变量'
+                    return variableNames.length > 0 ? variableNames.join(', ') : I18n.t('Not configured')
                   }
 
-                  return '未配置变量'
+                  return I18n.t('Not configured')
                 }
 
-                return <FormDisplay label="设置" content={getVariableNames()} />
+                return <FormDisplay label={I18n.t('Settings')} content={getVariableNames()} />
               }}
             </FieldArray>
           </>
@@ -73,62 +74,62 @@ export const formMeta: FormMeta = {
   validate: {
     assign: ({ value }) => {
       if (!value || !Array.isArray(value)) {
-        return '赋值配置不能为空'
+        return I18n.t('Assignment config cannot be empty')
       }
       if (value.length === 0) {
-        return '至少需要配置一个赋值操作'
+        return I18n.t('At least one assignment operation is required')
       }
       return undefined
     },
     'assign.*.operator': ({ value }) => {
       if (!value) {
-        return '操作符不能为空'
+        return I18n.t('Operator cannot be empty')
       }
       if (value !== 'assign') {
-        return '只支持赋值操作'
+        return I18n.t('Only assignment operation is supported')
       }
       return undefined
     },
     'assign.*.left': ({ value }) => {
       if (!value) {
-        return '左侧变量不能为空'
+        return I18n.t('Left variable cannot be empty')
       }
       return undefined
     },
     'assign.*.left.type': ({ value }) => {
       if (!value) {
-        return '左侧变量类型不能为空'
+        return I18n.t('Left variable type cannot be empty')
       }
       if (value !== 'ref') {
-        return '左侧变量必须是引用类型'
+        return I18n.t('Left variable must be a reference type')
       }
       return undefined
     },
     'assign.*.left.content': ({ value }) => {
       if (!value || !Array.isArray(value)) {
-        return '左侧变量引用路径不能为空'
+        return I18n.t('Left variable reference path cannot be empty')
       }
       if (value.length < 2) {
-        return '左侧变量引用路径必须包含节点和变量名'
+        return I18n.t('Left variable reference path must contain node and variable name')
       }
       if (value.some(item => !item || typeof item !== 'string')) {
-        return '左侧变量引用路径不能包含空值'
+        return I18n.t('Left variable reference path cannot contain empty values')
       }
       return undefined
     },
     'assign.*.right': ({ value }) => {
       if (!value) {
-        return '右侧值不能为空'
+        return I18n.t('Right value cannot be empty')
       }
       return undefined
     },
     'assign.*.right.type': ({ value }) => {
       if (!value) {
-        return '右侧值类型不能为空'
+        return I18n.t('Right value type cannot be empty')
       }
       const validTypes = ['constant', 'ref', 'expression', 'template']
       if (!validTypes.includes(value)) {
-        return '右侧值类型无效'
+        return I18n.t('Right value type is invalid')
       }
       return undefined
     },

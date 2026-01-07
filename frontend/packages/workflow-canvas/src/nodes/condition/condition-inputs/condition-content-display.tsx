@@ -106,10 +106,10 @@ const LogicOperatorText = styled.span`
 `
 
 const formatConditionValue = (value: unknown, available?: { getByKeyPath?: (path: unknown[]) => unknown }, valueType?: string): string => {
-  if (!value) return 'Empty'
+  if (value == null) return 'Empty'
 
   if (typeof value === 'string') {
-    return value || 'Empty'
+    return value === '' ? 'Empty' : value
   }
 
   if (Array.isArray(value)) {
@@ -154,7 +154,7 @@ const formatConditionValue = (value: unknown, available?: { getByKeyPath?: (path
     return formatConditionValue((value as { content: unknown }).content, available)
   }
 
-  return String(value || 'Empty')
+  return String(value)
 }
 
 const getOperatorIcon = (operator: string | number | undefined): string => {

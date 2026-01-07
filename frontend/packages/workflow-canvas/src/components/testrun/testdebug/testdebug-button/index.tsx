@@ -10,6 +10,7 @@ import { usePanelManager } from '@flowgram.ai/panel-manager-plugin'
 import { FlowNodeEntity } from '@flowgram.ai/free-layout-editor'
 
 import { testDebugPanelFactory, type NodeTestData } from '../test-debug-panel'
+import { useTranslation } from '../../../../i18n'
 
 interface TestDebugButtonProps {
   node: FlowNodeEntity
@@ -18,6 +19,7 @@ interface TestDebugButtonProps {
 }
 
 export const TestDebugButton: FC<TestDebugButtonProps> = ({ node, workflowId, spaceId }) => {
+  const { t } = useTranslation()
   const panelManager = usePanelManager()
 
   const getNodeData = (): NodeTestData | null => {
@@ -34,7 +36,7 @@ export const TestDebugButton: FC<TestDebugButtonProps> = ({ node, workflowId, sp
   }
 
   const handleTestNode = (e: React.MouseEvent) => {
-    e.stopPropagation() // 防止事件冒泡
+    e.stopPropagation() // Prevent event bubbling
 
     const nodeData = getNodeData()
 
@@ -52,7 +54,7 @@ export const TestDebugButton: FC<TestDebugButtonProps> = ({ node, workflowId, sp
   }
 
   return (
-    <Tooltip content="测试节点">
+    <Tooltip content={t('workflowCanvas.testdebug.testNode')}>
       <IconButton theme="borderless" icon={<Play size={16} />} onClick={handleTestNode} />
     </Tooltip>
   )

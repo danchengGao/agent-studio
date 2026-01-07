@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { Loader2 } from 'lucide-react'
 import { useLogin, useUserSpaces, AuthService } from '@test-agentstudio/api-client'
+import { generateLetterAvatar } from '../../utils/avatar'
+import LanguageDropdown from '../../components/Common/LanguageDropdown'
 
 interface LoginForm {
   username: string
@@ -12,10 +14,13 @@ interface LoginForm {
 }
 
 const LoginPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const navigate = useNavigate()
   const { login, isAuthenticated, token } = useAuthStore()
+  
+  // 根据当前语言环境选择图片
+  const loginImage = i18n.language.startsWith('zh') ? '/login-page.png' : '/login-page-en.png'
 
   // 使用hooks，传递认证状态管理器
   const loginMutation = useLogin({ login })
@@ -264,19 +269,21 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col py-12 px-4 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="flex w-48">
-        <div className="w-8 h-8 mr-2">
-          <img src="/jiuwen-logo.svg" width={64} height={64} alt="Jiuwen Logo" />
+      <div className="flex items-center justify-between">
+        <div className="flex w-48">
+          <div className="w-8 h-8 mr-2">
+            <img src="/jiuwen-logo.svg" width={64} height={64} alt="Jiuwen Logo" />
+          </div>
+          <div className="text-xl font-[800] item-end mt-2">openJiuwen</div>
         </div>
-        <div className="text-xl font-[800] item-end mt-2">openJiuwen</div>
+        {/* <LanguageDropdown /> */}
       </div>
       <div className="w-full flex justify-center flex-1 items-center">
         <div className="flex items-center justify-center h-full">
           {/* Jiuwen image */}
           <div className="w-[60%] max-w-[600px] h-[500px] mr-8">
             <div className="w-[100%] h-[100%]">
-              <img src="/login-page.png" alt="Jiuwen" className="w-full h-full object-contain" />
+              <img src={loginImage} alt="Jiuwen" className="w-full h-full object-contain" />
             </div>
           </div>
 
@@ -334,4 +341,3 @@ const LoginPage: React.FC = () => {
 }
 
 export default LoginPage
-import { generateLetterAvatar } from '../../utils/avatar'

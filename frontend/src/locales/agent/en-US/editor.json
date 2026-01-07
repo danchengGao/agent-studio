@@ -1,0 +1,484 @@
+{
+  "agentCreate": {
+    "title": "Create Agent",
+    "mode": {
+      "label": "Creation Mode",
+      "singleReact": {
+        "name": "Single Agent (Autonomous Planning Mode)",
+        "description": "An agent built on large model autonomous planning and reflection, intelligent orchestration, and tool invocation, suitable for scenarios relying on complex task planning and deep analysis execution."
+      },
+      "multiWorkflow": {
+        "name": "Single Agent (Multi-Workflow Mode)",
+        "description": "Orchestrate agents through workflows, suitable for scenarios with clear and definite business solution steps."
+      }
+    },
+    "form": {
+      "name": {
+        "label": "Agent Name",
+        "placeholder": "Enter your agent name, e.g., Product Expert. The name cannot be modified after creation.",
+        "required": "Please enter agent name"
+      },
+      "icon": {
+        "title": "Select Icon"
+      },
+      "description": {
+        "label": "Agent Description",
+        "placeholder": "Describe the agent's capabilities in one sentence, e.g., Answer product questions",
+        "required": "Please enter function description"
+      }
+    },
+    "actions": {
+      "cancel": "Cancel",
+      "create": "Create",
+      "creating": "Creating..."
+    },
+    "messages": {
+      "success": "Agent created successfully",
+      "failed": "Creation failed: {{reason}}",
+      "unknownError": "Unknown error",
+      "retry": "Creation failed, please try again"
+    },
+    "preview": {
+      "singleReactAlt": "Single Agent Mode Example",
+      "multiWorkflowAlt": "Multi-Workflow Mode Example"
+    }
+  },
+  "agentEditor": {
+    "editPage": {
+      "mode": {
+        "singleReact": "Single Agent (Autonomous Planning Mode)",
+        "multiWorkflow": "Single Agent (Multi-Workflow Mode)",
+        "multiAgents": "Multi-Agents (Master-Worker Mode)"
+      },
+      "labels": {
+        "historyVersionPrefix": "History Version",
+        "lastSavedAt": "Last saved at:"
+      },
+      "buttons": {
+        "save": "Save",
+        "saving": "Saving...",
+        "versionHistory": "Version History",
+        "submitNewVersion": "Submit New Version"
+      },
+      "messages": {
+        "saveSuccess": "Saved successfully",
+        "saveFailed": "Save failed",
+        "updateAgentSuccess": "Agent information updated",
+        "updateAgentFailed": "Update failed, please try again later",
+        "returnToLatestDraft": "Returned to latest draft",
+        "versionInfoIncomplete": "Version information is incomplete",
+        "restoredToVersion": "Restored to version {{version}}",
+        "switchedToLatestContent": "Switched to latest content",
+        "switchedToVersion": "Switched to version {{version}}",
+        "switchVersionFailed": "Failed to switch version",
+        "publishSuccess": "Submitted successfully"
+      }
+    },
+    "systemPrompt": {
+      "title": "System Prompt Configuration",
+      "defineAgentPlaceholder": "Define the agent's role, capabilities, and behavioral guidelines...",
+      "generationBanner": {
+        "generating": "Generating system prompt...",
+        "generated": "System prompt generated (you can preview and decide whether to apply it).",
+        "cancel": "Cancel",
+        "adopt": "Apply"
+      },
+      "overwritePromptTemplateDialog": {
+        "description": "This operation will overwrite the prompt template draft. Please choose your preferred handling method.",
+        "overwriteAndJump": "Overwrite: Overwrite the prompt editing page with the current agent's system prompt content",
+        "notOverwriteAndJump": "Don't Overwrite: Keep the original content of the prompt editing page unchanged",
+        "overwriteAndJumpLabel": "Overwrite",
+        "notOverwriteAndJumpLabel": "Don't Overwrite",
+        "cancel": "Cancel"
+      },
+      "promptDialog": {
+        "goToTemplateManagement": "Go to Prompt Template Management"
+      },
+      "agentAssociatePromptDialog": {
+        "title": "Prompt Library",
+        "searchPlaceholder": "Search",
+        "createPrompt": "Create Prompt",
+        "versionLabel": "Version",
+        "noTemplates": "No templates available",
+        "insert": "Insert Prompt",
+        "replacing": "Replacing...",
+        "replaceSystemPrompt": "Replace System Prompt",
+        "noContentForVersion": "No content for this version",
+        "selectPrompt": "Please select a prompt on the left",
+        "loadFailed": "Load failed",
+        "noDescription": "No description"
+      },
+      "relationBar": {
+        "tooltipGoToTemplate": "Go to Prompt Template Management",
+        "chipLatest": "Latest Version",
+        "tooltipHasNewVersion": "A newer version {{latestVersion}} is available",
+        "chipHistory": "Older Version",
+        "tooltipUnlink": "Unlink",
+        "ariaUnlink": "Unlink"
+      },
+      "titleActions": {
+        "needContent": "Please enter content first",
+        "optimizePrompt": "Optimize system prompt",
+        "associatePrompt": "Associate prompt",
+        "saveNewVersion": "Submit new version"
+      },
+      "savePromptDialog": {
+        "title": "Save Prompt",
+        "fields": {
+          "promptKeyLabel": "Prompt Key",
+          "promptKeyHelperExisting": "A prompt is already associated, key cannot be modified",
+          "promptKeyHelperInvalid": "Only letters, numbers, underscores (_) and hyphens (-) are allowed, and it must start with a letter",
+          "promptNameLabel": "Prompt Name",
+          "promptNameHelperExisting": "A prompt is already associated, name cannot be modified",
+          "promptNameHelperRequired": "Name cannot be empty",
+          "versionLabel": "Version",
+          "versionPlaceholder": "e.g. 1.0.1",
+          "versionHelperFormat": "Version must follow x.x.x format",
+          "versionHelperMustGreaterExisting": "Version must be greater than existing version {{latestVersion}}",
+          "versionHelperFormatAndGreater": "Must be in x.x.x format and greater than current latest version {{latestVersion}}",
+          "descLabel": "Version Description"
+        },
+        "actions": {
+          "cancel": "Cancel",
+          "save": "Save"
+        }
+      },
+      "defaults": {
+        "unnamedPrompt": "Untitled Prompt"
+      },
+      "messages": {
+        "emptySystemPrompt": "System prompt is empty and cannot be generated.",
+        "emptySystemPromptCannotSave": "System prompt is empty and cannot be saved.",
+        "modelIdNotFound": "No matching model ID found, using default value.",
+        "generateFailedWithError": "Failed to generate prompt: {{error}}",
+        "generateRequestFailed": "System prompt generation request failed",
+        "generateComplete": "System prompt has been generated. You can review and apply it.",
+        "noAdoptableContent": "No content to apply.",
+        "adopted": "The auto-generated system prompt has been applied.",
+        "cancelled": "Auto-generated result cancelled. Original prompt restored.",
+        "prefillFailed": "Failed to prefill prompt information. Please try again later.",
+        "fillKeyNameVersion": "Please fill in prompt key, name and version.",
+        "createPromptFailed": "Failed to create prompt",
+        "versionFormatAndGreaterError": "Version must be in x.x.x format and greater than the existing version.",
+        "savedAndCommitted": "Prompt has been saved and version committed.",
+        "savePromptFailed": "Failed to save prompt. Please try again later.",
+        "commitDescriptionFallback": "Version saved from Agent {{agentName}}"
+      },
+      "unlinkDialog": {
+        "title": "Unlink Prompt",
+        "message": "Are you sure you want to unlink prompt \"{{promptName}}-{{version}}\" from this agent? This action cannot be undone.",
+        "confirmButtonText": "Confirm"
+      }
+    },
+    "orchestration": {
+      "title": "Orchestration Configuration",
+      "orchestrationPage": {
+        "sections": {
+          "modelTitle": "Model Configuration",
+          "constraintTitle": "Constraint",
+          "skillsTitle": "Skills",
+          "conversationTitle": "Conversation Settings",
+          "greetingTitle": "Greeting",
+          "workflowTitle": "Workflows",
+          "pluginTitle": "Plugins"
+        },
+        "model": {
+          "title": "Model"
+        },
+        "constraint": {
+          "maxIteration": "Max Iterations",
+          "maxChatRounds": "Max Chat Rounds"
+        },
+        "select": {
+          "placeholder": "Select a model",
+          "disabledModel": "Model disabled ({{name}})"
+        },
+        "alerts": {
+          "noModelsInline": "No models configured",
+          "modelDisabledAction": "Enable model",
+          "modelDisabledMessage": "The associated model \"{{name}}\" is disabled. Please select another available model or go to the model management page to enable it.",
+          "noModelSelectedAction": "Select a model above",
+          "noModelSelectedMessage": "No model selected",
+          "noModelsConfiguredAction": "Configure models",
+          "noModelsConfiguredMessage": "No models are configured. Please go to the model configuration page to add models."
+        },
+        "memory": {
+          "title": "Memory Configuration",
+          "variablesTitle": "Variable Configuration",
+          "fields": {
+            "nameLabel": "Variable Name",
+            "descLabel": "Variable Description"
+          },
+          "actions": {
+            "addVariable": "Add"
+          },
+          "duplicateVariableWarning": "Variable name \"{{name}}\" is duplicated",
+          "list": {
+            "noDescription": "No description",
+            "empty": "No variables configured",
+            "enabledLabel": "Enabled",
+            "disabledLabel": "Disabled"
+          },
+          "longTermToggleLabel": "Enable Long-Term Memory",
+          "longTermDescription": "When enabled, the agent can remember user personal information and preferences from the conversation history."
+        }
+      },
+      "addWorkflow": {
+        "addExisting": "Add existing workflow",
+        "createNew": "Create new workflow"
+      },
+      "addPlugin": {
+        "addExisting": "Add existing plugin",
+        "createNew": "Create new plugin"
+      },
+      "modelSetting": {
+        "fields": {
+          "timeout": {
+            "label": "Timeout (s)"
+          },
+          "temperature": {
+            "label": "Temperature",
+            "tooltip": "Temperature: controls the randomness and creativity of model outputs. Higher values produce more random, diverse results; lower values make outputs more deterministic and conservative. Typical range is 0–2, recommended 0.1–1.0. Examples: 0.7 (balanced) and 1.2 (more creative)."
+          },
+          "topP": {
+            "label": "Top-p",
+            "tooltip": "Top-p: samples from the smallest set of tokens whose cumulative probability is at least p. Dynamically adjusts candidate count to balance diversity and quality. Typically set to 0.9–0.95. When used together with temperature, it is recommended to adjust only one of them."
+          }
+        },
+        "errors": {
+          "required": "{{label}} cannot be empty",
+          "range": "{{label}} must be between {{min}} and {{max}}",
+          "min": "{{label}} must be at least {{min}}",
+          "integer": "{{label}} must be an integer"
+        }
+      },
+      "pluginSetting": {
+        "list": {
+          "empty": "No plugins added yet. Click the button in the upper right to add."
+        },
+        "delete": {
+          "tooltip": "Delete",
+          "title": "Remove Plugin",
+          "confirmButtonText": "Confirm",
+          "message": "Are you sure you want to remove this plugin? This action cannot be undone."
+        }
+      },
+      "workflowSetting": {
+        "versionField": {
+          "loading": "Loading versions...",
+          "followLatest": "Follow latest content",
+          "hasNewVersion": "Newer version available",
+          "latestPublished": "Latest published version",
+          "draftLabel": "Draft"
+        },
+        "workflowList": {
+          "versionLabel": "Version:",
+          "emptyText": "No workflows added yet. Click the button in the upper right to add.",
+          "settingsTitle": "Settings",
+          "deleteTitle": "Delete"
+        }
+      },
+      "workflowSelector": {
+        "title": "Select Existing Workflows",
+        "searchPlaceholder": "Search workflow names, descriptions...",
+        "loading": "Loading workflow list...",
+        "loadFailed": "Failed to load workflow list. Please try again later.",
+        "noSearchResults": "No matching workflows found",
+        "noWorkflows": "No available workflows",
+        "createdAtLabel": "Created at: ",
+        "unknownDate": "Unknown",
+        "selectedTag": "Selected",
+        "paginationInfo": "Total {{total}} workflows, page {{currentPage}} of {{totalPages}}",
+        "selectedPrefix": "Selected",
+        "selectedSuffix": "workflows",
+        "cancel": "Cancel",
+        "confirmAdd": "Confirm"
+      }
+    },
+    "previewDebug": {
+      "title": "Preview & Debug",
+      "agentDebugChat": {
+        "header": {
+          "debugInfo": "Debug Info"
+        },
+        "tips": {
+          "modelNotConfiguredTitle": "Model Not Configured",
+          "modelNotConfiguredDescription": "Please select a model in the \"Orchestration\" panel on the left before starting debug chat."
+        },
+        "placeholders": {
+          "configModelFirst": "Please configure a model before debugging",
+          "addWorkflowFirst": "Please add a workflow before debugging",
+          "waitInputComplex": "Waiting for input: fill in and submit the form in the card above",
+          "waitInputSimple": "Waiting for input: please enter your feedback",
+          "inputMessage": "Type a message..."
+        },
+        "messages": {
+          "assistantLabel": "AI Assistant",
+          "userLabel": "Me"
+        },
+        "errors": {
+          "executeFailed": "Execution failed"
+        }
+      },
+      "agentDebugPanel": {
+        "viewMode": {
+          "tree": "Call Tree",
+          "flame": "Flame Graph"
+        },
+        "empty": {
+          "noExecData": "No execution data"
+        },
+        "sections": {
+          "nodeDetail": "Node Details"
+        },
+        "filters": {
+          "executionLog": "Execution Logs:"
+        },
+        "select": {
+          "loading": "Loading...",
+          "placeholder": "Select an execution log"
+        },
+        "refresh": {
+          "loading": "Refreshing...",
+          "label": "Refresh List",
+          "ariaLabel": "Refresh"
+        },
+        "summary": {
+          "traceId": "traceId",
+          "duration": "Duration"
+        },
+        "copy": {
+          "tooltip": "Copy traceId",
+          "copied": "Copied",
+          "ariaLabel": "Copy traceId"
+        },
+        "callTree": {
+          "aria": {
+            "expand": "Expand",
+            "collapse": "Collapse"
+          },
+          "labels": {
+            "nodeFallback": "Node"
+          }
+        },
+        "flameGraph": {
+          "labels": {
+            "totalDuration": "Total Duration",
+            "nodeFallback": "Node"
+          }
+        },
+        "nodeDetail": {
+          "empty": {
+            "noNode": "Select a node to view details"
+          },
+          "labels": {
+            "node": "Node",
+            "status": "Status",
+            "duration": "Duration",
+            "input": "Input",
+            "output": "Output",
+            "none": "None",
+            "nodeFallback": "Node"
+          }
+        }
+      },
+      "memoryManager": {
+        "tooltip": "Memory",
+        "ariaLabel": "Memory",
+        "title": "Memory Management",
+        "menus": {
+          "variables": "Variables",
+          "longterm": "Long-term Memory"
+        },
+        "table": {
+          "empty": "No data",
+          "headers": {
+            "longTerm": {
+              "memory": "Memory",
+              "updatedAt": "Last Updated"
+            },
+            "variables": {
+              "field": "Field",
+              "value": "Value"
+            }
+          }
+        },
+        "delete": {
+          "tooltip": "Delete"
+        },
+        "actions": {
+          "close": "Close",
+          "save": "Save"
+        },
+        "errors": {
+          "autoRefreshFailed": "Auto refresh failed",
+          "loadFailed": "Load failed",
+          "saveFailed": "Save failed: ",
+          "unknown": "Unknown error"
+        }
+      },
+      "operationsBar": {
+        "tooltips": {
+          "clearChat": "Clear conversation history"
+        },
+        "placeholders": {
+          "inputMessage": "Type a message to test the agent..."
+        },
+        "buttons": {
+          "send": "Send",
+          "cancel": "Cancel"
+        }
+      },
+      "userInputDialog": {
+        "title": "Please provide the required information to continue the agent",
+        "description": "Please fill in the following information:",
+        "buttons": {
+          "cancel": "Cancel",
+          "submit": "Submit"
+        },
+        "placeholders": {
+          "fieldInput": "Please enter {{fieldName}}..."
+        }
+      }
+    }
+  },
+  "multiAgent": {
+    "sections": {
+      "orchestrationTitle": "Orchestration",
+      "workflowTitle": "Workflows",
+      "modelTitle": "Controller",
+      "defaultResponseTitle": "Default Response",
+      "conversationTitle": "Conversation Settings",
+      "greetingTitle": "Greeting"
+    },
+    "addButton": {
+      "addExistingWorkflow": "Add existing workflow",
+      "createNewWorkflow": "Create new workflow"
+    },
+    "alerts": {
+      "noWorkflow": "No workflows yet. Click the button above to add a workflow.",
+      "noModelsInline": "No models configured",
+      "modelDisabledAction": "Enable model",
+      "modelDisabledMessage": "The associated model \"{{name}}\" is disabled. Please select another available model or go to the model management page to enable it.",
+      "noModelSelectedAction": "Select a model above",
+      "noModelSelectedMessage": "No model selected",
+      "noModelsConfiguredAction": "Configure models",
+      "noModelsConfiguredMessage": "No models are configured. Please go to the model configuration page to add models."
+    },
+    "select": {
+      "placeholder": "Select a model",
+      "disabledModel": "Model disabled ({{name}})"
+    },
+    "defaultResponse": {
+      "placeholder": "Set a default response for cases where no workflow matches or a generic reply is needed..."
+    },
+    "greeting": {
+      "placeholder": "Set the agent's greeting so users know how to start the conversation..."
+    },
+    "popover": {
+      "title": "Conversation Settings",
+      "description": "Configure the maximum number of message turns carried during workflow execution.",
+      "maxRoundsLabel": "Max message turns"
+    }
+  }
+}

@@ -64,13 +64,7 @@ export function FormHeader(props: { titleEditable?: boolean; menuVisible?: boole
       {getIcon(node)}
       <TitleInput updateTitleEdit={updateTitleEdit} titleEdit={titleEdit} editable={titleEditable} />
       {node.renderData.expandable && !isSidebar && (
-        <Button
-          type="primary"
-          icon={expanded ? <ChevronDown size="small" /> : <ChevronLeft size="small" />}
-          size="small"
-          theme="borderless"
-          onClick={handleExpand}
-        />
+        <Button type="primary" icon={expanded ? <ChevronDown size={16} /> : <ChevronLeft size={16} />} size="small" theme="borderless" onClick={handleExpand} />
       )}
 
       {singleComponentDebug && <TestDebugButton node={node} workflowId={workflowId} spaceId={spaceId} />}

@@ -53,11 +53,21 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
   const navigate = useNavigate()
 
   return (
-    <div className="flex items-center bg-white/60 backdrop-blur-sm p-4 border border-gray-200/60 shadow-sm">
+    <div 
+      className="flex items-center bg-white/60 backdrop-blur-sm border border-gray-200/60 shadow-sm"
+      style={{
+        padding: 'clamp(0.5rem, 0.6vw, 0.875rem)',
+        minHeight: 'clamp(3.5rem, 4.5vh, 4rem)',
+        minWidth: 'fit-content',
+        width: '100%',
+      }}
+    >
       <IconButton
         onClick={() => navigate('/dashboard/prompts')}
         className="hover:bg-gray-100/80 transition-colors duration-200"
         sx={{
+          width: 'clamp(1.75rem, 2vw, 2.25rem)',
+          height: 'clamp(1.75rem, 2vw, 2.25rem)',
           '&:hover': {
             backgroundColor: 'rgba(59, 130, 246, 0.1)',
             transform: 'translateX(-2px)',
@@ -65,19 +75,44 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
           transition: 'all 0.2s ease',
         }}
       >
-        <ArrowLeft className="w-5 h-5 text-gray-600" />
+        <ArrowLeft 
+          className="text-gray-600"
+          style={{
+            width: 'clamp(0.875rem, 1vw, 1.125rem)',
+            height: 'clamp(0.875rem, 1vw, 1.125rem)',
+          }}
+        />
       </IconButton>
-      <div className="flex items-center gap-3 flex-1 min-w-0 ml-4">
-        <div className="min-w-0" style={{ maxWidth: '50%' }}>
+      <div 
+        className="flex items-center flex-1 min-w-0"
+        style={{
+          gap: 'clamp(0.375rem, 0.5vw, 0.5rem)',
+          marginLeft: 'clamp(0.5rem, 0.8vw, 0.875rem)',
+        }}
+      >
+        <div className="min-w-0" style={{ maxWidth: '50%', flex: '0 1 auto' }}>
           <ConditionalTooltip title={isNew ? t('prompts.promptEdit.header.createPrompt') : prompt.name || t('prompts.promptEdit.header.promptName')}>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate cursor-pointer">
+            <h1 
+              className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate cursor-pointer"
+              style={{
+                fontSize: 'clamp(0.875rem, 0.85vw, 1.125rem)',
+                lineHeight: 1.5,
+              }}
+            >
               {isNew ? t('prompts.promptEdit.header.createPrompt') : prompt.name || t('prompts.promptEdit.header.promptName')}
             </h1>
           </ConditionalTooltip>
           <ConditionalTooltip
             title={isNew ? t('prompts.promptEdit.header.createDescription') : prompt.description || t('prompts.promptEdit.header.promptDescription')}
           >
-            <p className="text-gray-600 mt-1 truncate cursor-pointer">
+            <p 
+              className="text-gray-600 truncate cursor-pointer"
+              style={{
+                fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                marginTop: 'clamp(0.125rem, 0.1vh, 0.1875rem)',
+                lineHeight: 1.6,
+              }}
+            >
               {isNew ? t('prompts.promptEdit.header.createDescription') : prompt.description || t('prompts.promptEdit.header.promptDescription')}
             </p>
           </ConditionalTooltip>
@@ -87,22 +122,62 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
           className="text-blue-600 hover:bg-blue-50 flex-shrink-0"
           title={t('prompts.promptEdit.header.editBasicInfo')}
           disabled={loading || isReadOnlyMode}
+          sx={{
+            width: 'clamp(1.75rem, 2vw, 2.25rem)',
+            height: 'clamp(1.75rem, 2vw, 2.25rem)',
+          }}
         >
-          <Edit className="w-5 h-5" />
+          <Edit 
+            style={{
+              width: 'clamp(0.875rem, 1vw, 1.125rem)',
+              height: 'clamp(0.875rem, 1vw, 1.125rem)',
+            }}
+          />
         </IconButton>
       </div>
 
-      <div className="flex items-center space-x-6">
+      <div 
+        className="flex items-center"
+        style={{
+          gap: 'clamp(0.5rem, 1vw, 1rem)',
+        }}
+      >
         <div
-          className={`flex items-center space-x-3 transition-opacity ${isReadOnlyMode ? 'opacity-60' : 'opacity-100'}`}
-          style={{ pointerEvents: isReadOnlyMode ? 'none' : 'auto' }}
+          className={`flex items-center transition-opacity ${isReadOnlyMode ? 'opacity-60' : 'opacity-100'}`}
+          style={{ 
+            pointerEvents: isReadOnlyMode ? 'none' : 'auto',
+            gap: 'clamp(0.375rem, 0.7vw, 0.625rem)',
+          }}
         >
           {/* 状态信息 - 只有在非新建场景或用户已编辑时才显示 */}
           {(!isNewPromptScenario || isDraftEdited) && (
-            <div className="flex items-center space-x-4 mr-4">
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${isDraftEdited ? 'bg-orange-500' : 'bg-green-500'}`}></div>
-                <Typography variant="body2" className={`text-sm font-medium ${isDraftEdited ? 'text-orange-600' : 'text-green-600'}`}>
+            <div 
+              className="flex items-center"
+              style={{
+                gap: 'clamp(0.375rem, 0.7vw, 0.75rem)',
+                marginRight: 'clamp(0.375rem, 0.7vw, 0.75rem)',
+              }}
+            >
+              <div 
+                className="flex items-center"
+                style={{
+                  gap: 'clamp(0.25rem, 0.4vw, 0.375rem)',
+                }}
+              >
+                <div 
+                  className={`rounded-full ${isDraftEdited ? 'bg-orange-500' : 'bg-green-500'}`}
+                  style={{
+                    width: 'clamp(0.375rem, 0.5vw, 0.4375rem)',
+                    height: 'clamp(0.375rem, 0.5vw, 0.4375rem)',
+                  }}
+                ></div>
+                <Typography 
+                  variant="body2" 
+                  className={`font-medium ${isDraftEdited ? 'text-orange-600' : 'text-green-600'}`}
+                  sx={{
+                    fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                  }}
+                >
                   {isDraftEdited ? t('prompts.promptEdit.header.modifiedNotSubmitted') : t('prompts.promptEdit.header.submitted')}
                 </Typography>
               </div>
@@ -110,15 +185,37 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
               {/* 根据状态显示不同信息 */}
               {isDraftEdited
                 ? draftSavedTime && (
-                    <div className="flex items-center space-x-2">
-                      <Typography variant="body2" className="text-gray-500 text-sm">
+                    <div 
+                      className="flex items-center"
+                      style={{
+                        gap: 'clamp(0.25rem, 0.35vw, 0.375rem)',
+                      }}
+                    >
+                      <Typography 
+                        variant="body2" 
+                        className="text-gray-500"
+                        sx={{
+                          fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                        }}
+                      >
                         {t('prompts.promptEdit.header.draftSavedTime')}: {formatDraftDateTime(draftSavedTime)}
                       </Typography>
                     </div>
                   )
                 : latestVersion && (
-                    <div className="flex items-center space-x-2">
-                      <Typography variant="body2" className="text-gray-500 text-sm">
+                    <div 
+                      className="flex items-center"
+                      style={{
+                        gap: 'clamp(0.25rem, 0.35vw, 0.375rem)',
+                      }}
+                    >
+                      <Typography 
+                        variant="body2" 
+                        className="text-gray-500"
+                        sx={{
+                          fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
+                        }}
+                      >
                         {t('prompts.promptEdit.header.latestVersion')}: {latestVersion}
                       </Typography>
                     </div>
@@ -130,11 +227,14 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
             <>
               <Button
                 variant="outlined"
-                startIcon={<Code />}
+                startIcon={<Code style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />}
                 onClick={onEnterComparisonMode}
                 sx={{
                   borderColor: '#e5e7eb',
                   color: '#6b7280',
+                  fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                  padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                  minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
                   '&:hover': {
                     borderColor: '#f97316',
                     backgroundColor: 'rgba(249, 115, 22, 0.05)',
@@ -143,7 +243,7 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
                     boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)',
                   },
                   transition: 'all 0.2s ease',
-                  borderRadius: '8px',
+                  borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
                   textTransform: 'none',
                   fontWeight: 500,
                 }}
@@ -152,11 +252,14 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
               </Button>
               <Button
                 variant="outlined"
-                startIcon={<Sparkles />}
+                startIcon={<Sparkles style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />}
                 onClick={onNavigateToOptimization}
                 sx={{
                   borderColor: '#e5e7eb',
                   color: '#6b7280',
+                  fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                  padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                  minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
                   '&:hover': {
                     borderColor: '#a855f7',
                     backgroundColor: 'rgba(168, 85, 247, 0.05)',
@@ -165,7 +268,7 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
                     boxShadow: '0 4px 12px rgba(168, 85, 247, 0.15)',
                   },
                   transition: 'all 0.2s ease',
-                  borderRadius: '8px',
+                  borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
                   textTransform: 'none',
                   fontWeight: 500,
                 }}
@@ -174,11 +277,14 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
               </Button>
               <Button
                 variant="outlined"
-                startIcon={<GitBranch />}
+                startIcon={<GitBranch style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />}
                 onClick={onOpenVersionHistory}
                 sx={{
                   borderColor: '#e5e7eb',
                   color: '#6b7280',
+                  fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                  padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                  minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
                   '&:hover': {
                     borderColor: '#10b981',
                     backgroundColor: 'rgba(16, 185, 129, 0.05)',
@@ -187,7 +293,7 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
                     boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
                   },
                   transition: 'all 0.2s ease',
-                  borderRadius: '8px',
+                  borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
                   textTransform: 'none',
                   fontWeight: 500,
                 }}
@@ -197,17 +303,20 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
 
               <Button
                 variant="contained"
-                startIcon={<Save />}
+                startIcon={<Save style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />}
                 onClick={onSubmitVersion}
                 sx={{
                   background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                  fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                  padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                  minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
                   '&:hover': {
                     background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                     transform: 'translateY(-1px)',
                     boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
                   },
                   transition: 'all 0.2s ease',
-                  borderRadius: '8px',
+                  borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
                   textTransform: 'none',
                   fontWeight: 600,
                   boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
@@ -220,11 +329,14 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
             <>
               <Button
                 variant="outlined"
-                startIcon={<ArrowLeft />}
+                startIcon={<ArrowLeft style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />}
                 onClick={onExitComparison}
                 sx={{
                   borderColor: '#e5e7eb',
                   color: '#6b7280',
+                  fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                  padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                  minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
                   '&:hover': {
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.05)',
@@ -233,7 +345,7 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
                     boxShadow: '0 4px 12px rgba(59, 130, 246, 0.15)',
                   },
                   transition: 'all 0.2s ease',
-                  borderRadius: '8px',
+                  borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
                   textTransform: 'none',
                   fontWeight: 500,
                 }}
@@ -242,7 +354,7 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
               </Button>
               <Button
                 variant="contained"
-                startIcon={<Copy />}
+                startIcon={<Copy style={{ width: 'clamp(0.75rem, 0.75vw, 0.9375rem)', height: 'clamp(0.75rem, 0.75vw, 0.9375rem)' }} />}
                 onClick={onAddControlGroup}
                 disabled={comparisonGroupsData.length >= 3}
                 sx={{
@@ -250,6 +362,9 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
                     comparisonGroupsData.length >= 3
                       ? 'linear-gradient(135deg, #9ca3af 0%, #6b7280 100%)'
                       : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  fontSize: 'clamp(0.6875rem, 0.7vw, 0.8125rem)',
+                  padding: 'clamp(0.3125rem, 0.45vh, 0.4375rem) clamp(0.625rem, 0.75vw, 0.875rem)',
+                  minHeight: 'clamp(1.875rem, 2.75vh, 2.25rem)',
                   '&:hover': {
                     background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
                     transform: 'translateY(-1px)',
@@ -260,7 +375,7 @@ const PromptEditHeader: React.FC<PromptEditHeaderProps> = ({
                     color: '#6b7280',
                   },
                   transition: 'all 0.2s ease',
-                  borderRadius: '8px',
+                  borderRadius: 'clamp(0.3125rem, 0.45vw, 0.4375rem)',
                   textTransform: 'none',
                   fontWeight: 600,
                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',

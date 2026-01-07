@@ -2,15 +2,11 @@
 
 cp ../.env.example .
 
-cp -r ../backend/examples .
+cp -r ../backend/openjiuwen_studio/examples .
 
-cp ../backend/config.yaml conf/.
+cp ../backend/openjiuwen_studio/conf/config.yaml conf/.
 
-cp ../backend/config.json conf/.
-
-cp ../backend/build_AES_master_key.sh .
-
-cp ../backend/build_AES_master_key.ps1 .
+cp ../backend/openjiuwen_studio/conf/config.json conf/.
 
 echo "FRONTEND_DOCKER_IMAGE=your_frontend_image_name:your_frontend_image_version" >> .env.custom
 

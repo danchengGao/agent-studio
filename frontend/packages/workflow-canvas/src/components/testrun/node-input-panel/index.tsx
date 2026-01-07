@@ -11,52 +11,53 @@ import { TestRunForm } from '../testrun-form'
 import { TestRunJsonInput } from '../testrun-json-input'
 import { NodeStatusGroup } from '../node-status-bar/group'
 import { TestRunFormMetaItem } from '../testrun-form/type'
+import { useTranslation } from '../../../i18n'
 
 import styles from './index.module.less'
 
 export interface NodeInputPanelProps {
-  // 基础属性
+  // Basic properties
   title?: string
   description?: string
   nodeIcon?: React.ReactNode
   nodeIconFallback?: React.ReactNode
 
-  // 表单相关
+  // Form related
   values: Record<string, unknown>
   setValues: (values: Record<string, unknown>) => void
   inputFormMeta?: TestRunFormMetaItem[]
 
-  // JSON模式
+  // JSON mode
   inputJSONMode: boolean
   setInputJSONMode: (checked: boolean) => void
 
-  // 中断状态相关
+  // Interruption state related
   isInterruptionMode?: boolean
   interruptionMessage?: string
 
-  // 结果展示
+  // Result display
   result?: {
     inputs?: any
     outputs?: any
   }
 
-  // 错误信息
+  // Error messages
   errors?: string[]
 
-  // 样式类名
+  // Style class names
   className?: string
 }
 
 /**
- * 节点输入面板组件
+ * Node input panel component
  *
- * 用途：
- * 1. TestRunPanel的普通输入和中断状态
- * 2. TestDebugPanel的单节点测试输入
- * 3. 其他需要节点输入的场景
+ * Usage:
+ * 1. Normal input and interruption state for TestRunPanel
+ * 2. Single node test input for TestDebugPanel
+ * 3. Other scenarios requiring node input
  */
 export const NodeInputPanel: FC<NodeInputPanelProps> = ({
-  title = '输入参数',
+  title,
   description,
   nodeIcon,
   nodeIconFallback = <MessageSquare size={16} className={styles['interruption-icon']} />,
@@ -66,36 +67,37 @@ export const NodeInputPanel: FC<NodeInputPanelProps> = ({
   inputJSONMode,
   setInputJSONMode,
   isInterruptionMode = false,
-  interruptionMessage = '完成以下输入后，继续执行',
+  interruptionMessage,
   result,
   errors,
   className,
 }) => {
+  const { t } = useTranslation()
   return (
     <div className={`${styles['node-input-panel']} ${className || ''}`}>
-      {/* 输入标题区域 - 使用原始样式类名 */}
+      {/* Input title area - Use original style class names */}
       {isInterruptionMode ? (
         <div className={styles['interruption-title']}>
-          <span>{interruptionMessage}</span>
+          <span>{interruptionMessage || t('workflowCanvas.nodeInputPanel.completeInputToContinue')}</span>
         </div>
       ) : (
         <div className={styles['testrun-panel-input']}>
-          <div className={styles.title}>{title}</div>
+          <div className={styles.title}>{title || t('workflowCanvas.nodeInputPanel.inputParams')}</div>
           <div>
-            <span style={{ fontSize: '12px', marginRight: 8 }}>JSON 模式</span>
+            <span style={{ fontSize: '12px', marginRight: 8 }}>{t('workflowCanvas.nodeInputPanel.jsonMode')}</span>
             <Switch checked={inputJSONMode} onChange={setInputJSONMode} size="small" />
           </div>
         </div>
       )}
 
-      {/* 表单区域 */}
+      {/* Form area */}
       {isInterruptionMode ? (
-        // 中断模式：使用原始的容器样式
+        // Interruption mode: Use original container style
         <div className={styles['input-interruption-form']}>
           <TestRunForm values={values} setValues={setValues} inputFormMeta={inputFormMeta} />
         </div>
       ) : (
-        // 普通模式：直接渲染内容
+        // Normal mode: Render content directly
         <>
           {inputJSONMode ? (
             <TestRunJsonInput values={values} setValues={setValues} inputFormMeta={inputFormMeta} />
@@ -105,7 +107,7 @@ export const NodeInputPanel: FC<NodeInputPanelProps> = ({
         </>
       )}
 
-      {/* 错误信息 - 使用原始样式 */}
+      {/* Error messages - Use original styles */}
       {errors && errors.length > 0 && (
         <>
           {errors.map((error, index) => (
@@ -116,8 +118,8 @@ export const NodeInputPanel: FC<NodeInputPanelProps> = ({
         </>
       )}
 
-      {/* 输出结果 */}
-      {!isInterruptionMode && result && result.outputs && <NodeStatusGroup title="输出" data={result.outputs} optional disableCollapse size="large" />}
+      {/* Output result */}
+      {!isInterruptionMode && result && result.outputs && <NodeStatusGroup title={t('workflowCanvas.nodeInputPanel.output')} data={result.outputs} optional disableCollapse size="large" />}
     </div>
   )
 }

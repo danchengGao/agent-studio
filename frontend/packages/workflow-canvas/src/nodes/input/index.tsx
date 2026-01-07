@@ -8,6 +8,7 @@ import { MousePointerClick } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
 import { customNanoid } from '../../utils/nanoid-custom'
+import { t } from '../../i18n'
 
 export const InputNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Input,
@@ -20,7 +21,7 @@ export const InputNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <MousePointerClick size={16} className="text-blue-600" />,
-    description: '输入节点，用于在工作流执行过程中暂停并等待用户输入。',
+    description: t('workflowCanvas.nodes.input.description'),
   },
   /**
    * Render node via formMeta

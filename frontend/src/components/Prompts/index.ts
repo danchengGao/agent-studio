@@ -74,3 +74,5 @@ export type { DebugInputAreaGroupProps } from './DebugInputAreaGroup'
 
 export { default as DebugInputArea } from './DebugInputArea'
 export type { DebugInputAreaProps } from './DebugInputArea'
+
+export { SliderField } from './SliderField'

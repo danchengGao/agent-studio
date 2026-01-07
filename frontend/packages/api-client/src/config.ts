@@ -110,12 +110,15 @@ export const API_ENDPOINTS = {
   // 执行管理
   EXECUTION: {
     WORKFLOW: '/execution/workflow',
+    WORKFLOW_CANCEL: '/execution/workflow/cancel',
     USERINPUT: '/execution/userInput',
+    WORKFLOW_VALIDATE: '/execution/workflow/validate',
     AGENT: '/execution/agent',
     AGENT_RESET: '/execution/agent/reset',
     AGENT_USERINPUT: '/execution/agent/userInput',
     PLUGIN: '/execution/plugin',
     COMPONENT: '/execution/component',
+    COMPONENT_CANCEL: '/execution/component/cancel',
     GET_TRACE_SUMMARY_LIST: '/execution/get_trace_summary_list',
     GET_TRACE_SUMMARY_BY_TRACE_ID: '/execution/get_trace_summary_by_trace_id',
   },
@@ -232,6 +235,7 @@ export const API_ENDPOINTS = {
     JOB_DETAIL: '/prompts/tuning/templates_optimization/jobs/:jobId',
     SAVE_JOB_DRAFT: '/prompts/tuning/templates_optimization/job_draft/save',
     GET_JOB_DRAFT: '/prompts/tuning/templates_optimization/job_draft/get',
+    JOB_HISTORY: '/prompts/tuning/templates_optimization/job_history/:jobId',
   },
 
   // 反馈优化管理
@@ -288,6 +292,29 @@ export const API_ENDPOINTS = {
   OBSERVABILITY: {
     TRACE_LIST: '/observability/spans/list',
     TRACE_TREE: '/observability/traces',
+  },
+
+  // 知识库管理
+  KNOWLEDGE_BASES: {
+    LIST: '/knowledge-base/list',
+    DETAIL: '/knowledge-bases/:id',
+    CREATE: '/knowledge-base/create',
+    UPDATE: '/knowledge-base/update',
+    DELETE: '/knowledge-base/delete',
+    GET_REFERENCING_AGENTS: '/knowledge-base/get-referencing-agents',
+    SEARCH: '/knowledge-base/search',
+    STATISTICS: '/knowledge-bases/statistics',
+    UPLOAD: '/knowledge-base/upload',
+    PROCESS: '/knowledge-base/process',
+    STATUS: '/knowledge-base/documents/status',
+    FILE_SETTINGS: '/knowledge-base/filesettings',
+    DOCUMENTS_LIST: '/knowledge-base/documents/list',
+    DOCUMENTS: '/knowledge-bases/:id/documents',
+    DOCUMENT_DELETE: '/knowledge-bases/:id/documents/:documentId',
+    REPROCESS: '/knowledge-bases/:id/reprocess',
+    EXPORT: '/knowledge-bases/:id/export',
+    SHARE: '/knowledge-bases/:id/share',
+    UNSHARE: '/knowledge-bases/:id/share/:userId',
   },
 }
 

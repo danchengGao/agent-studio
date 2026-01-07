@@ -4,23 +4,25 @@ import { useState, useRef, useEffect } from 'react'
 import { FormItem, FormSelect } from '../../../form-components'
 import { useIsSidebar } from '../../../hooks'
 import { Button, Input } from '@douyinfe/semi-ui'
+import { useTranslation } from '../../../i18n'
 
 interface DelimiterOption {
   label: string
   value: string[]
 }
 
-const delimiterOptions: DelimiterOption[] = [
-  { label: '逗号', value: [',', '，'] },
-  { label: '分号', value: [';', '；'] },
-  { label: '句号', value: ['.', '。'] },
-]
-
 export function SplittingSelector() {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [customInputValue, setCustomInputValue] = useState('')
   const inputRef = useRef<any>(null)
+
+  const delimiterOptions: DelimiterOption[] = [
+    { label: t('workflowCanvas.splittingSelector.comma'), value: [',', '，'] },
+    { label: t('workflowCanvas.splittingSelector.semicolon'), value: [';', '；'] },
+    { label: t('workflowCanvas.splittingSelector.period'), value: ['.', '。'] },
+  ]
 
   if (!isSidebar) {
     return null
@@ -160,13 +162,13 @@ export function SplittingSelector() {
                           }}
                           style={{ fontSize: '12px', padding: '0 12px' }}
                         >
-                          取消
+                          {t('workflowCanvas.splittingSelector.cancel')}
                         </Button>
                       </div>
 
                       {customDelimiters.length > 0 && (
                         <div style={{ marginTop: 8 }}>
-                          <div style={{ fontSize: '12px', marginBottom: '4px', color: 'var(--semi-color-text-2)' }}>已添加：</div>
+                          <div style={{ fontSize: '12px', marginBottom: '4px', color: 'var(--semi-color-text-2)' }}>{t('workflowCanvas.splittingSelector.added')}:</div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                             {customDelimiters.map((custom, index) => (
                               <span

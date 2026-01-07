@@ -19,6 +19,7 @@ import { getVersionOptions, getPromptDetailByVersion, extractPromptTextFromDetai
 import { useAuthStore } from '@/stores/useAuthStore'
 import { ENV_CONFIG } from '@/config/environment'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
+import { useScopedTranslation } from '@/i18n'
 
 interface AgentInfo {
   agentId?: string
@@ -48,6 +49,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
 }) => {
   const { user } = useAuthStore()
   const workspaceId = useMemo(() => workspaceIdProp || user?.spaceId || getDefaultSpaceId() || ENV_CONFIG.DEFAULT_SPACE_ID, [workspaceIdProp, user])
+  const { t } = useScopedTranslation('agents.agentEditor.systemPrompt.agentAssociatePromptDialog')
 
   // 推荐模板列表
   const [promptTemplateSearch, setPromptTemplateSearch] = useState('')
@@ -82,7 +84,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
         await loadVersionList(firstId)
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '加载失败'
+      const errorMessage = err instanceof Error ? err.message : t('loadFailed')
       setTemplatesError(errorMessage)
       setPromptTemplates([])
     } finally {
@@ -240,7 +242,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { height: '70vh' } }}>
       <>
         <DialogTitle className="font-bold text-lg bg-gradient-to-r from-blue-50 to-indigo-50 py-4 flex items-center justify-between">
-          提示词库
+          {t('title')}
           <IconButton onClick={onClose} size="small" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100">
             <X size={20} />
           </IconButton>
@@ -248,7 +250,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
         <DialogContent dividers sx={{ overflowY: 'auto', maxHeight: 'calc(70vh - 112px)' }}>
           <div className="flex items-center gap-2 mb-3 small">
             <TextField
-              placeholder="搜索"
+              placeholder={t('searchPlaceholder')}
               size="small"
               value={promptTemplateSearch}
               onChange={e => setPromptTemplateSearch(e.target.value)}
@@ -259,7 +261,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton aria-label="搜索" size="small" onClick={() => loadRecommendedPrompts()}>
+                    <IconButton aria-label={t('searchPlaceholder')} size="small" onClick={() => loadRecommendedPrompts()}>
                       <Search size={16} />
                     </IconButton>
                   </InputAdornment>
@@ -272,11 +274,11 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
               sx={{ height: 40, py: 0, display: 'inline-flex', alignItems: 'center', lineHeight: 1, '& .MuiButton-startIcon': { alignItems: 'center' } }}
               onClick={() => window.open('/dashboard/prompts', '_blank')}
             >
-              新建提示词
+              {t('createPrompt')}
             </Button>
             <TextField
               select
-              label="版本"
+              label={t('versionLabel')}
               size="small"
               value={dialogSelectedVersionId}
               onChange={e => handleVersionChange(String(e.target.value))}
@@ -305,7 +307,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
                     </Alert>
                   ) : promptTemplates.length === 0 ? (
                     <Alert severity="info" className="m-3">
-                      暂无模板
+                      {t('noTemplates')}
                     </Alert>
                   ) : (
                     promptTemplates.map(template => (
@@ -316,7 +318,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
                         >
                           <div className="font-medium text-gray-900 truncate h-8">{template.name}</div>
                           <div className={`text-xs truncate h-4 ${template.description ? 'text-gray-600' : 'text-gray-400'}`}>
-                            {template.description || '暂无描述'}
+                            {template.description || t('noDescription')}
                           </div>
                         </div>
                         <div className="border-b border-gray-200"></div>
@@ -336,7 +338,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
                 ) : (
                   <div className="p-4 h-full">
                     <Paper elevation={0} className="bg-gray-50">
-                      <div className="text-sm max-h-[440px] overflow-y-auto">{renderPreviewContent(extractPreviewContent(), !!selectedTemplateId)}</div>
+                      <div className="text-sm max-h-[440px] overflow-y-auto">{renderPreviewContent(extractPreviewContent(), !!selectedTemplateId, t)}</div>
                     </Paper>
                   </div>
                 )}
@@ -346,7 +348,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
         </DialogContent>
         <DialogActions>
           <Button variant="outlined" onClick={handleInsertAction} disabled={!extractPreviewContent() || replacing}>
-            插入提示词
+            {t('insert')}
           </Button>
           <Button
             variant="contained"
@@ -355,7 +357,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
             className="bg-gradient-to-r from-blue-600 to-purple-600"
             startIcon={replacing ? <CircularProgress size={16} /> : undefined}
           >
-            {replacing ? '替换中...' : '替换系统提示词'}
+            {replacing ? t('replacing') : t('replaceSystemPrompt')}
           </Button>
         </DialogActions>
       </>
@@ -366,8 +368,8 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
 export default AgentAssociatePromptDialog
 
 // 预览内容渲染：基础高亮（标题与标签）
-const renderPreviewContent = (text: string, hasSelection: boolean) => {
-  if (!text) return <span>{hasSelection ? '该版本暂无内容' : '请选择左侧提示词'}</span>
+const renderPreviewContent = (text: string, hasSelection: boolean, t: (key: string) => string) => {
+  if (!text) return <span>{hasSelection ? t('noContentForVersion') : t('selectPrompt')}</span>
   const lines = text.split(/\r?\n/)
   const headingRegs = [/^##+\s*/, /^角色[：:]/, /^目标[：:]/, /^工作流[：:]/, /^输出格式[：:]/, /^限制[：:]/]
   return (

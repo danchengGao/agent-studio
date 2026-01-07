@@ -6,6 +6,7 @@
 import { WorkflowDocument, FlowNodeEntity } from '@flowgram.ai/free-layout-editor'
 import type { ValidationErrorInfo } from '../components/validation/types'
 import { validateWorkflowPath, getNodeDisplayName, hasConnections } from '../utils/validation'
+import { t } from '../i18n'
 
 export interface ValidationResult {
   hasErrors: boolean
@@ -94,7 +95,7 @@ export class ValidationService {
             Object.entries(form.state.errors).forEach(([field, errorArray]) => {
               if (errorArray && errorArray.length > 0) {
                 const firstError = errorArray[0]
-                const errorMessage = typeof firstError === 'string' ? firstError : firstError?.message || '配置有误'
+                const errorMessage = typeof firstError === 'string' ? firstError : firstError?.message || t('workflowCanvas.validation.configurationError')
 
                 errors.push({
                   nodeId: node.id.toString(),
@@ -108,7 +109,7 @@ export class ValidationService {
           }
         }
       } catch (error) {
-        let errorMessage = '配置有误'
+        let errorMessage = t('workflowCanvas.validation.configurationError')
         if (error instanceof Error) {
           errorMessage = error.message
         } else if (typeof error === 'string') {

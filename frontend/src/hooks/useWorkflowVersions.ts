@@ -7,12 +7,19 @@ export type VersionsMap = Record<string, { published: { version: string; create_
 export const useWorkflowVersions = (workflows: WorkflowDetail[], spaceId: string, enabled: boolean = true) => {
   const [versionsMap, setVersionsMap] = useState<VersionsMap>({})
   const [loading, setLoading] = useState(false)
-  const idsKey = useMemo(() => workflows.map(w => w.workflow_id).sort().join(','), [workflows])
+  const idsKey = useMemo(
+    () =>
+      workflows
+        .map(w => w.workflow_id)
+        .sort()
+        .join(','),
+    [workflows],
+  )
 
-  const loadMissing = async () => {
+  const loadVersions = async (force: boolean) => {
     if (!spaceId) return
     setLoading(true)
-    const toFetch = workflows.filter(w => !versionsMap[w.workflow_id])
+    const toFetch = force ? workflows : workflows.filter(w => !versionsMap[w.workflow_id])
     if (toFetch.length === 0) {
       setLoading(false)
       return
@@ -21,9 +28,7 @@ export const useWorkflowVersions = (workflows: WorkflowDetail[], spaceId: string
       toFetch.map(async w => {
         try {
           const res = await WorkflowService.getWorkflowVersionList({ workflow_id: w.workflow_id, space_id: spaceId })
-          const list = Array.isArray(res.data?.versions)
-            ? res.data.versions.map(v => ({ version: v.workflow_version, create_time: v.create_time }))
-            : []
+          const list = Array.isArray(res.data?.versions) ? res.data.versions.map(v => ({ version: v.workflow_version, create_time: v.create_time })) : []
           const latest = list.length > 0 ? [...list].sort((a, b) => b.create_time - a.create_time)[0].version : null
           return [w.workflow_id, { published: list, latestPublished: latest }] as const
         } catch {
@@ -38,13 +43,13 @@ export const useWorkflowVersions = (workflows: WorkflowDetail[], spaceId: string
 
   useEffect(() => {
     if (enabled && spaceId) {
-      loadMissing()
+      loadVersions(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idsKey, spaceId, enabled])
 
   const refresh = async () => {
-    await loadMissing()
+    await loadVersions(true)
   }
 
   return { versionsMap, loading, refresh }
@@ -98,11 +103,7 @@ export const fetchLatestVersionForWorkflow = async (workflow_id: string, spaceId
   }
 }
 
-export const buildDetails = async (
-  existing: WorkflowDetail[],
-  selectedObjs: WorkflowSelectDetail[],
-  spaceId: string,
-): Promise<WorkflowDetail[]> => {
+export const buildDetails = async (existing: WorkflowDetail[], selectedObjs: WorkflowSelectDetail[], spaceId: string): Promise<WorkflowDetail[]> => {
   const map = new Map<string, WorkflowDetail>(existing.map(e => [e.workflow_id, e]))
   const toAdd = selectedObjs.filter(w => !map.has(w.workflow_id))
   const added = await Promise.all(

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogTitle,
@@ -89,14 +90,14 @@ interface CodePluginToolFormDialogProps {
   onCancel: () => void
 }
 
-const runtimeOptions = [
-  { value: 'python3', label: 'Python 3', icon: '🐍', description: '适用于数据分析、机器学习、自动化脚本' },
-  { value: 'nodejs', label: 'Node.js', icon: '🟢', description: '适用于Web API、实时应用、前端构建工具' },
-]
-
 const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ open, loading = false, form, onFormChange, onSubmit, onCancel }) => {
+  const { t } = useTranslation()
   const isFormValid = form.name.trim() && form.description.trim() && form.runtime && form.code.trim()
 
+  const runtimeOptions = [
+    { value: 'python3', label: 'Python 3', icon: '🐍', description: t('plugins.pluginConfig.pythonDescription', '适用于数据分析、机器学习、自动化脚本') },
+    { value: 'nodejs', label: 'Node.js', icon: '🟢', description: t('plugins.pluginConfig.nodejsDescription', '适用于Web API、实时应用、前端构建工具') },
+  ]
   // Template state
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [showTemplates, setShowTemplates] = useState(false)
@@ -140,7 +141,7 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
     <Dialog open={open} onClose={onCancel} maxWidth="md" fullWidth>
       <DialogTitle className="flex items-center space-x-2">
         <Code className="w-5 h-5 text-blue-600" />
-        <span>创建工具</span>
+        <span>{t('plugins.pluginConfig.createTool', '创建工具')}</span>
       </DialogTitle>
 
       <DialogContent>
@@ -148,8 +149,8 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
           {/* Tool Name */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              工具名称 <span className="text-red-500 ml-1">*</span>
-              <Tooltip title="为工具起一个简洁明了的名称，便于识别和使用" placement="top">
+              {t('plugins.tools.name', '工具名称')} <span className="text-red-500 ml-1">*</span>
+              <Tooltip title={t('plugins.pluginConfig.toolNameTooltip', '为工具起一个简洁明了的名称，便于识别和使用')} placement="top">
                 <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
               </Tooltip>
             </label>
@@ -158,17 +159,17 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
               onChange={e => onFormChange('name', e.target.value)}
               fullWidth
               required
-              placeholder="例如：获取用户信息、查询天气数据"
-              helperText={`建议使用简洁明了的名称，便于识别和使用 (${form.name.length}/20)`}
-              inputProps={{ maxLength: 20 }}
+              placeholder={t('plugins.pluginConfig.toolNameExample', '例如：获取用户信息、查询天气数据')}
+              helperText={`${t('plugins.pluginConfig.toolNameHelper', '建议使用简洁明了的名称，便于识别和使用')} (${form.name.length}/128)`}
+              inputProps={{ maxLength: 128 }}
             />
           </div>
 
           {/* Tool Description */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              工具描述 <span className="text-red-500 ml-1">*</span>
-              <Tooltip title="详细描述工具的功能、用途、参数说明等" placement="top">
+              {t('plugins.tools.description', '工具描述')} <span className="text-red-500 ml-1">*</span>
+              <Tooltip title={t('plugins.pluginConfig.toolDescriptionTooltip', '详细描述工具的功能、用途、参数说明等')} placement="top">
                 <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
               </Tooltip>
             </label>
@@ -179,23 +180,27 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
               required
               multiline
               rows={3}
-              placeholder="详细描述工具的功能、用途、参数说明等..."
-              helperText={`建议包含：主要功能、输入参数、输出结果、使用示例等信息 (${form.description.length}/40)`}
-              inputProps={{ maxLength: 40 }}
+              placeholder={t('plugins.tools.descriptionTooltip', '详细描述工具的功能、用途、参数说明等...')}
+              helperText={`${t('plugins.tools.descriptionHelper', '建议包含：主要功能、输入参数、输出结果、使用示例等信息')} (${form.description.length}/256)`}
+              inputProps={{ maxLength: 256 }}
             />
           </div>
 
           {/* Runtime Selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              IDE运行时 <span className="text-red-500 ml-1">*</span>
-              <Tooltip title="选择工具运行的编程语言环境" placement="top">
+              {t('plugins.pluginConfig.runtime', 'IDE运行时')} <span className="text-red-500 ml-1">*</span>
+              <Tooltip title={t('plugins.pluginConfig.runtimeTooltip', '选择工具运行的编程语言环境')} placement="top">
                 <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
               </Tooltip>
             </label>
             <FormControl fullWidth required>
-              <InputLabel>运行时环境</InputLabel>
-              <Select value={form.runtime} onChange={e => onFormChange('runtime', e.target.value)} label="运行时环境">
+              <InputLabel>{t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}</InputLabel>
+              <Select
+                value={form.runtime}
+                onChange={e => onFormChange('runtime', e.target.value)}
+                label={t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}
+              >
                 {runtimeOptions.map(option => (
                   <MenuItem key={option.value} value={option.value}>
                     <div className="flex flex-col space-y-1 py-1">
@@ -216,15 +221,17 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
             <div className="flex items-start space-x-3">
               <Terminal className="w-5 h-5 text-blue-600 mt-0.5" />
               <div>
-                <h4 className="text-sm font-medium text-blue-900 mb-2">运行时环境说明</h4>
+                <h4 className="text-sm font-medium text-blue-900 mb-2">{t('plugins.pluginConfig.runtimeInfoTitle', '运行时环境说明')}</h4>
                 <div className="space-y-2 text-sm text-blue-800">
                   <div>
-                    <strong>Python 3:</strong> 适合数据处理、机器学习、科学计算、自动化脚本等场景
+                    <strong>Python 3:</strong> {t('plugins.pluginConfig.pythonSuitableFor', '适合数据处理、机器学习、科学计算、自动化脚本等场景')}
                   </div>
                   <div>
-                    <strong>Node.js:</strong> 适合Web API开发、实时通信、前端构建工具、微服务等场景
+                    <strong>Node.js:</strong> {t('plugins.pluginConfig.nodejsSuitableFor', '适合Web API开发、实时通信、前端构建工具、微服务等场景')}
                   </div>
-                  <div className="text-blue-600 text-xs mt-2">💡 选择合适的运行时环境有助于获得最佳性能和兼容性</div>
+                  <div className="text-blue-600 text-xs mt-2">
+                    💡 {t('plugins.pluginConfig.runtimeSelectionHelper', '选择合适的运行时环境有助于获得最佳性能和兼容性')}
+                  </div>
                 </div>
               </div>
             </div>
@@ -236,15 +243,17 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
               <div className="flex items-center">
                 <h3 className="text-lg font-medium text-gray-900 flex items-center">
                   <FileCode className="w-5 h-5 mr-2 text-purple-600" />
-                  代码编辑器
+                  {t('plugins.pluginConfig.codeEditor', '代码编辑器')}
                   <span className="text-red-500 ml-1">*</span>
                 </h3>
                 <div className="ml-2 h-px bg-gray-300 flex-1"></div>
               </div>
               <div className="flex items-center space-x-2">
-                <Chip label={`语言: ${form.codeLanguage === 'javascript' ? 'JavaScript' : 'Python'}`} size="small" />
-                <Chip label="语法高亮" size="small" variant="outlined" />
-                {selectedTemplate && <Chip label={`模板: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />}
+                <Chip label={`${t('plugins.pluginConfig.language', '语言')}: ${form.codeLanguage === 'javascript' ? 'JavaScript' : 'Python'}`} size="small" />
+                <Chip label={t('plugins.pluginConfig.syntaxHighlighting', '语法高亮')} size="small" variant="outlined" />
+                {selectedTemplate && (
+                  <Chip label={`${t('plugins.pluginConfig.template', '模板')}: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />
+                )}
               </div>
             </div>
 
@@ -253,17 +262,17 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
                 <div className="flex items-center space-x-2">
                   <Code className="w-5 h-5 text-blue-600" />
                   <Typography variant="body2" className="font-medium">
-                    代码编辑环境
+                    {t('plugins.pluginConfig.codeEditorEnvironment', '代码编辑环境')}
                   </Typography>
                 </div>
                 <div className="flex items-center space-x-3">
                   {availableTemplates.length > 0 && (
                     <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />}>
-                      代码模板
+                      {t('plugins.pluginConfig.codeTemplates', '代码模板')}
                     </Button>
                   )}
                   <Button variant="outlined" size="small" onClick={handleResetCode} startIcon={<RotateCcw className="w-4 h-4" />}>
-                    重置代码
+                    {t('plugins.pluginConfig.resetCode', '重置代码')}
                   </Button>
                 </div>
               </div>
@@ -273,7 +282,7 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <Typography variant="subtitle2" className="mb-3 flex items-center">
                     <FileText className="w-4 h-4 mr-2" />
-                    选择代码模板
+                    {t('plugins.pluginConfig.selectCodeTemplate', '选择代码模板')}
                   </Typography>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -304,7 +313,7 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
 
                   <div className="mt-3 flex justify-end">
                     <Button size="small" onClick={() => setShowTemplates(false)}>
-                      关闭
+                      {t('common.actions.close', '关闭')}
                     </Button>
                   </div>
                 </div>
@@ -314,8 +323,12 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
                 {/* Language selector */}
                 <div className="bg-gray-50 border-b border-gray-200 p-3">
                   <FormControl size="small" className="min-w-32">
-                    <InputLabel>编程语言</InputLabel>
-                    <Select value={form.codeLanguage} label="编程语言" onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}>
+                    <InputLabel>{t('plugins.pluginConfig.programmingLanguage', '编程语言')}</InputLabel>
+                    <Select
+                      value={form.codeLanguage}
+                      label={t('plugins.pluginConfig.programmingLanguage', '编程语言')}
+                      onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}
+                    >
                       <MenuItem value="python">Python</MenuItem>
                       <MenuItem value="javascript">JavaScript</MenuItem>
                     </Select>
@@ -353,28 +366,30 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
               {/* Usage Tips */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <Typography variant="subtitle2" className="mb-2 text-blue-900">
-                  💡 使用提示
+                  {t('plugins.pluginConfig.usageTips', '💡 使用提示')}
                 </Typography>
                 <div className="space-y-1 text-sm text-blue-800">
                   {form.codeLanguage === 'python' ? (
                     <>
                       <div>
-                        • 确保导出 <code className="bg-blue-100 px-1 rounded">main()</code> 函数作为入口点
+                        • {t('plugins.pluginConfig.pythonTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main()</code>{' '}
+                        {t('plugins.pluginConfig.pythonTips2', '函数作为入口点')}
                       </div>
-                      <div>• 使用标准库函数，避免依赖需要额外安装的包</div>
-                      <div>• 返回JSON序列化的数据结构，便于API调用</div>
+                      <div>• {t('plugins.pluginConfig.pythonTips3', '使用标准库函数，避免依赖需要额外安装的包')}</div>
+                      <div>• {t('plugins.pluginConfig.pythonTips4', '返回JSON序列化的数据结构，便于API调用')}</div>
                     </>
                   ) : (
                     <>
                       <div>
-                        • 确保导出 <code className="bg-blue-100 px-1 rounded">main</code> 函数作为入口点
+                        • {t('plugins.pluginConfig.jsTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main</code>{' '}
+                        {t('plugins.pluginConfig.jsTips2', '函数作为入口点')}
                       </div>
-                      <div>• 使用CommonJS模块系统（require/module.exports）</div>
-                      <div>• 避免使用ES6模块语法，除非项目支持</div>
-                      <div>• 返回JSON可序列化的数据结构</div>
+                      <div>• {t('plugins.pluginConfig.jsTips3', '使用CommonJS模块系统（require/module.exports）')}</div>
+                      <div>• {t('plugins.pluginConfig.jsTips4', '避免使用ES6模块语法，除非项目支持')}</div>
+                      <div>• {t('plugins.pluginConfig.jsTips5', '返回JSON可序列化的数据结构')}</div>
                     </>
                   )}
-                  <div>• 使用模板可以快速开始开发</div>
+                  <div>• {t('plugins.pluginConfig.templateTips', '使用模板可以快速开始开发')}</div>
                 </div>
               </div>
             </div>
@@ -384,7 +399,7 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
 
       <DialogActions className="px-6 pb-4">
         <Button onClick={onCancel} variant="outlined" disabled={loading}>
-          取消
+          {t('common.actions.cancel', '取消')}
         </Button>
         <Button
           onClick={onSubmit}
@@ -396,10 +411,10 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
           {loading ? (
             <>
               <CircularProgress size={16} className="mr-2" />
-              创建中...
+              {t('common.actions.creating', '创建中...')}
             </>
           ) : (
-            '创建'
+            t('common.actions.create', '创建')
           )}
         </Button>
       </DialogActions>

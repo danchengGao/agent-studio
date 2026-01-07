@@ -24,6 +24,7 @@ import { Tools } from './components/tools'
 import { ExecutionProvider } from './context'
 import { WorkflowOperation } from './components/workflow-operation'
 import { LoadingState, ErrorState } from './components/editor-states'
+import { t } from './i18n'
 
 import { WorkflowCanvasWrapper, DocFreeFeatureOverview, EditorContainer } from './styles/styles'
 import { WorkflowService } from '@test-agentstudio/api-client'
@@ -182,7 +183,8 @@ export const Editor = () => {
           }, 100)
           // 切换成功后提示版本信息（先清空旧消息，再弹新消息）
           Toast.destroyAll()
-          Toast.success({ content: `已切换到版本 ${versionId === 'draft' ? '草稿' : versionId}` })
+          const versionDisplay = versionId === 'draft' ? t('workflowCanvas.ui.draft') : versionId
+          Toast.success({ content: t('workflowCanvas.ui.switchedToVersion', { version: versionDisplay }) })
         } catch (e) {
           console.error('历史版本 schema 解析失败或导入失败', e)
         }

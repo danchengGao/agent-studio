@@ -8,9 +8,11 @@ import { Button } from '@douyinfe/semi-ui'
 import { Bug } from 'lucide-react'
 
 import { DebugSidePanel } from '../debug-panel'
+import { useTranslation } from '../../../i18n'
 import styles from './index.module.less'
 
 export function DebugButton(props: { disabled: boolean; workflowId?: string; spaceId?: string }) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
 
   const onDebug = () => {
@@ -21,7 +23,7 @@ export function DebugButton(props: { disabled: boolean; workflowId?: string; spa
     <>
       <Button disabled={props.disabled} onClick={onDebug} className={styles.debugButton}>
         <Bug size={16} className={styles['mr-2']} />
-        调试
+        {t('workflowCanvas.debug.debug')}
       </Button>
       <DebugSidePanel visible={visible} onCancel={() => setVisible(false)} workflowId={props.workflowId} spaceId={props.spaceId} />
     </>

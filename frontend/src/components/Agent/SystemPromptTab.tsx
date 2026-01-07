@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react'
-import { t } from 'i18next'
 import { Paper } from '@mui/material'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 
@@ -14,7 +13,6 @@ import {
   PromptService,
   type AgentDetailResponse,
   FeedbackOptService,
-  type GetRelationsResponse,
 } from '@test-agentstudio/api-client'
 import { buildModelInfoFromAgent } from '@/utils/prompts/modelInfoBuilder'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
@@ -27,6 +25,7 @@ import UnifiedSnackbar, { SnackbarMessage } from '@/Common/UnifiedSnackbar'
 import { PromptTitleActions } from '@/components/Agent/PromptTitleActions'
 import { PromptGenerationBanner } from '@/components/Agent/PromptGenerationBanner'
 import { PromptRelationInfoBar } from '@/components/Agent/PromptRelationInfoBar'
+import { useScopedTranslation } from '@/i18n'
 
 const PromptEditor: React.FC<{
   textAreaRef: React.RefObject<HTMLTextAreaElement> | React.MutableRefObject<HTMLTextAreaElement | null>
@@ -34,7 +33,8 @@ const PromptEditor: React.FC<{
   readonly: boolean
   isLockedForCandidate: boolean
   onChange: (value: string) => void
-}> = ({ textAreaRef, effectiveText, readonly, isLockedForCandidate, onChange }) => (
+  placeholder?: string
+}> = ({ textAreaRef, effectiveText, readonly, isLockedForCandidate, onChange, placeholder }) => (
   <Paper elevation={0} className="relative flex-1 min-h-0 flex flex-col">
     <textarea
       ref={textAreaRef}
@@ -44,18 +44,19 @@ const PromptEditor: React.FC<{
         if (readonly || isLockedForCandidate) return
         onChange(newPrompt)
       }}
-      placeholder={t('agents.agentEditor.enhanced.previewDebug.defineAgentPlaceholder')}
+      placeholder={placeholder}
       className={`h-full w-full p-2 text-sm placeholder:text-gray-400 text-gray-600 border rounded-xl resize-y min-h-[240px] max-h-[80vh] overflow-auto${readonly || isLockedForCandidate ? ' cursor-not-allowed' : ''}`}
       readOnly={readonly || isLockedForCandidate}
     />
   </Paper>
 )
 const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | null }> = ({ agentDetailResponse }) => {
+  const { t } = useScopedTranslation('agents.agentEditor.systemPrompt')
   const { saveAgentRequest, updateSaveAgentRequest } = useAgentStore()
   const readonly = useAgentStore(s => s.readonly)
   const { user } = useAuthStore()
 
-  // 关联提示词弹窗开关
+  // Dialog open state for associating prompts
   const [associateDialogOpen, setAssociateDialogOpen] = useState(false)
 
   const handleOpenAssociateDialog = () => setAssociateDialogOpen(true)
@@ -63,22 +64,22 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
 
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
 
-  // 当前关联的提示词与版本信息
+  // Currently associated prompt and version info
   const [currentRelation, setCurrentRelation] = useState<{ promptId: string; promptVersion: string; promptName: string } | null>(null)
-  // 版本下拉相关状态
+  // Version dropdown related state
   const [versionLoading, setVersionLoading] = useState(false)
   const [versionOptions, setVersionOptions] = useState<{ id: string; version: string }[]>([])
   const [selectedVersion, setSelectedVersion] = useState<string>('')
-  // 当选中版本不在选项列表时，回退为空值，避免 MUI Select 越界告警
+  // Fallback to empty when selected version is not in options to avoid MUI Select warnings
   const safeSelectedVersion = useMemo(() => (versionOptions.some(v => v.version === selectedVersion) ? selectedVersion : ''), [selectedVersion, versionOptions])
 
-  // 版本比较改为使用 helper 中的 compareVersions
+  // Compute latest version using helper compareVersions
   const latestVersion = useMemo<string | undefined>(() => {
     if (!versionOptions || versionOptions.length === 0) return undefined
     return versionOptions.map(v => v.version).reduce((acc, cur) => (compareVersions(acc, cur) >= 0 ? acc : cur))
   }, [versionOptions])
 
-  // 保存提示词相关状态
+  // Save prompt related state
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [overrideDraftDialogOpen, setOverrideDraftDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -144,12 +145,12 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         setCurrentRelation(null)
       }
     } catch (e) {
-      // 获取失败不影响主流程
+      // Fetch failure does not block main flow
       setCurrentRelation(null)
     }
   }
 
-  // 拉取当前关联提示词的版本列表
+  // Load version list for the currently associated prompt
   const loadVersionListForCurrentRelation = async () => {
     const pid = currentRelation?.promptId
     if (!pid) {
@@ -168,7 +169,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     }
   }
 
-  // 根据选择的版本加载对应提示词内容并更新编辑器
+  // Load prompt content by selected version and update editor
   const loadPromptContentByVersion = async (promptId: string, commitVersion: string) => {
     const spaceId = workspaceId
     try {
@@ -177,7 +178,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         setSystemPrompt(text)
       }
     } catch (e) {
-      // 获取失败不阻断
+      // Fetch failure does not block
     }
   }
 
@@ -187,12 +188,12 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
 
   useEffect(() => {
     if (!associateDialogOpen) {
-      // 关闭弹窗后重新拉取以获得最新的关联信息（替换时会注册关联）
+      // After dialog closes, reload to get latest relation info (replacement registers relation)
       fetchCurrentRelation()
     }
   }, [associateDialogOpen])
 
-  // 当关联信息变化时同步选中值并拉取版本列表
+  // When relation changes, sync selected version and reload version list
   useEffect(() => {
     setSelectedVersion(currentRelation?.promptVersion || '')
     loadVersionListForCurrentRelation()
@@ -205,11 +206,11 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
       await RelatedMemberService.deletePromptRelation(spaceId, agentInfo)
       setCurrentRelation(null)
     } catch (e) {
-      // 解关联失败不阻断
+      // Unlink failure does not block
     }
   }
 
-  // 选择不同版本时，更新关联关系中的版本
+  // When selecting a different version, update relation version
   const handleVersionSelectChange = async (nextVersion: string) => {
     setSelectedVersion(nextVersion)
     if (!currentRelation) return
@@ -219,28 +220,28 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
       const relatedMemberInfo = agentInfoMemo
       await RelatedMemberService.registerPromptRelation(spaceId, promptInfo, relatedMemberInfo)
       setCurrentRelation(prev => (prev ? { ...prev, promptVersion: nextVersion } : prev))
-      // 切换版本后加载对应内容到编辑器
+      // After switching version, load corresponding content into editor
       await loadPromptContentByVersion(currentRelation.promptId, nextVersion)
     } catch (e) {
-      // 更新失败不阻断主流程
+      // Update failure does not block main flow
     }
   }
 
-  // 接收弹窗内替换成功后的关联信息更新（乐观刷新）
+  // Handle association updates from dialog (optimistic refresh)
   const handleRelationUpdated = (info: { promptId: string; promptName: string; promptVersion: string; promptContent: string }) => {
     setCurrentRelation({ promptId: info.promptId, promptName: info.promptName, promptVersion: info.promptVersion })
     setSelectedVersion(info.promptVersion)
-    // 同步更新编辑器内容，确保版本与内容一起替换
+    // Sync editor content so version and content are updated together
     setSystemPrompt(info.promptContent)
   }
 
-  // 替换系统提示词文本为所选模版内容
+  // Replace system prompt text with selected template content
   const handleReplacePromptText = (text: string) => {
     setSystemPrompt(text)
     setAssociateDialogOpen(false)
   }
 
-  // 插入系统提示词文本到现有末尾（以空行分隔）
+  // Insert system prompt text at current cursor position (separated by a blank line if needed)
   const handleInsertPromptText = (text: string) => {
     if (readonly) return
     const existing = typeof saveAgentRequest?.configs?.system_prompt === 'string' ? saveAgentRequest?.configs?.system_prompt : ''
@@ -251,7 +252,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
 
     const before = existing.slice(0, start)
     const after = existing.slice(end)
-    // 若前面无换行且已有内容，则在插入前加一个换行，避免粘连
+    // If there is existing content and no newline before, prepend a line break to avoid sticking
     const needsLeadingBreak = before && !/\n$/.test(before)
     const insertText = needsLeadingBreak ? `\n${text}` : text
     const combined = `${before}${insertText}${after}`
@@ -259,7 +260,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     setSystemPrompt(combined)
     setAssociateDialogOpen(false)
 
-    // 恢复光标到插入文本末尾
+    // Restore caret to the end of inserted text
     requestAnimationFrame(() => {
       const ref = textAreaRef.current
       if (ref) {
@@ -270,7 +271,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     })
   }
 
-  // 从 store 中派生系统提示词
+  // Derive system prompt from store
   const systemPrompt = useMemo<string>(() => {
     const sp = saveAgentRequest?.configs?.system_prompt
     return typeof sp === 'string' ? sp : ''
@@ -292,7 +293,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     if (readonly) return
     const content = (systemPrompt || '').trim()
     if (!content) {
-      setSnackbar({ open: true, severity: 'error', message: '系统提示词为空，无法生成。' })
+      setSnackbar({ open: true, severity: 'error', message: t('messages.emptySystemPrompt') })
       return
     }
 
@@ -303,20 +304,20 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     setCandidatePrompt('')
     setDisplayOverride('')
 
-    // 从模型列表中查找当前模型的 model_id
+    // Find current model's model_id from model list
     const modelList = agentDetailResponse?.data?.agent_option_info?.model_list || []
     const currentModelName = saveAgentRequest.model?.model_info?.model_name || ''
     const matchedModel = modelList.find(model => model.model_name === currentModelName)
     const modelId = matchedModel?.model_id
 
     if (modelId === undefined || modelId === null) {
-      console.warn('⚠️ [SystemPromptTab] 未找到匹配的模型ID，当前模型名称:', currentModelName, '模型列表:', modelList)
-      setSnackbar({ open: true, severity: 'warning', message: '未找到匹配的模型ID，将使用默认值' })
+      console.warn('⚠️ [SystemPromptTab] No matching model ID found. Current model name:', currentModelName, 'model list:', modelList)
+      setSnackbar({ open: true, severity: 'warning', message: t('messages.modelIdNotFound') })
     } else {
-      console.log('✅ [SystemPromptTab] 找到匹配的模型ID:', modelId, '模型名称:', currentModelName)
+      console.log('✅ [SystemPromptTab] Found matching model ID:', modelId, 'model name:', currentModelName)
     }
 
-    // 将 AgentModelInfo 转换为 QuickOptimizeModelInfo 格式
+    // Convert AgentModelInfo to QuickOptimizeModelInfo format
     const modelInfo = buildModelInfoFromAgent(saveAgentRequest.model, modelId)
 
     const quickOptimizeRequest = {
@@ -334,7 +335,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
           setDisplayOverride(quickOptimizeStreamingRef.current)
         },
         (error: string) => {
-          setSnackbar({ open: true, severity: 'error', message: `提示词生成失败: ${error}` })
+          setSnackbar({ open: true, severity: 'error', message: t('messages.generateFailedWithError', { error }) })
           setIsGenerating(false)
           setDisplayOverride(null)
           quickOptimizeAbortRef.current = null
@@ -342,14 +343,16 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         () => {
           setIsGenerating(false)
           setCandidatePrompt(quickOptimizeStreamingRef.current)
-          setSnackbar({ open: true, severity: 'success', message: '系统提示词自动生成完成，可选择采纳。' })
+          setSnackbar({ open: true, severity: 'success', message: t('messages.generateComplete') })
           setDisplayOverride(quickOptimizeStreamingRef.current)
           quickOptimizeAbortRef.current = null
         },
         quickOptimizeAbortRef.current,
       )
     } catch (e: unknown) {
-      const msg = typeof e?.message === 'string' ? e.message : '提示词生成请求失败'
+      const fallbackMsg = t('messages.generateRequestFailed')
+      const msgFromError = (e as any)?.message
+      const msg = typeof msgFromError === 'string' ? msgFromError : fallbackMsg
       setSnackbar({ open: true, severity: 'error', message: msg })
       setIsGenerating(false)
       setDisplayOverride(null)
@@ -361,14 +364,14 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     if (readonly) return
     const text = candidatePrompt || quickOptimizeStreamingRef.current || ''
     if (!text.trim()) {
-      setSnackbar({ open: true, severity: 'error', message: '无可采纳内容。' })
+      setSnackbar({ open: true, severity: 'error', message: t('messages.noAdoptableContent') })
       return
     }
     setSystemPrompt(text)
     setCandidatePrompt('')
     quickOptimizeStreamingRef.current = ''
     setDisplayOverride(null)
-    setSnackbar({ open: true, severity: 'success', message: '已采纳自动生成的提示词。' })
+    setSnackbar({ open: true, severity: 'success', message: t('messages.adopted') })
   }
 
   const handleCancelCandidate = () => {
@@ -378,19 +381,19 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     setCandidatePrompt('')
     quickOptimizeStreamingRef.current = ''
     setDisplayOverride(null)
-    setSnackbar({ open: true, severity: 'success', message: '已取消自动生成结果，恢复原提示词。' })
+    setSnackbar({ open: true, severity: 'success', message: t('messages.cancelled') })
   }
 
-  // 打开保存提示词对话框并预填信息
+  // Open save prompt dialog and prefill information
   const handleOpenSaveDialog = async () => {
     const content = (systemPrompt || '').trim()
     if (!content) {
-      setSnackbar({ open: true, severity: 'error', message: '系统提示词为空，无法保存。' })
+      setSnackbar({ open: true, severity: 'error', message: t('messages.emptySystemPromptCannotSave') })
       return
     }
 
     try {
-      // 检查是否已有关联的提示词
+      // Check if there is already an associated prompt
       const agentInfo: RelatedMemberInfo = {
         id: agentId,
         version: agentVersion,
@@ -420,9 +423,9 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
           promptDesc: '',
         })
       } else {
-        // 默认填充：基于Agent信息
+        // Default values based on agent info
         const defaultKey = agentId ? `agent_${agentId}` : `prompt_${Date.now()}`
-        const defaultName = agentName || '未命名提示词'
+        const defaultName = agentName || t('defaults.unnamedPrompt')
         setExistingPromptInfo(null)
         setSaveForm({
           promptKey: defaultKey,
@@ -433,7 +436,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
       }
       setSaveDialogOpen(true)
     } catch (e: unknown) {
-      // 如果是404，表示没有关联，走新建保存流程
+      // If 404, treat as no relation and go through create flow
       const status = e?.status ?? e?.response?.status
       if (status === 404) {
         setExistingPromptInfo(null)
@@ -445,7 +448,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         })
         setSaveDialogOpen(true)
       } else {
-        setSnackbar({ open: true, severity: 'error', message: '预填提示词信息失败，请稍后重试。' })
+        setSnackbar({ open: true, severity: 'error', message: t('messages.prefillFailed') })
       }
     }
   }
@@ -453,14 +456,14 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
   const handleConfirmSave = async () => {
     const { promptKey, promptName, promptVersion, promptDesc } = saveForm
     if (!promptKey.trim() || !promptName.trim() || !promptVersion.trim()) {
-      setSnackbar({ open: true, severity: 'error', message: '请填写提示词Key、名称与版本。' })
+      setSnackbar({ open: true, severity: 'error', message: t('messages.fillKeyNameVersion') })
       return
     }
     setSaving(true)
     try {
       let targetPromptId = existingPromptInfo?.id || ''
 
-      // 1) 若无关联，先创建提示词
+      // 1) If no relation, create prompt first
       if (!targetPromptId) {
         const createResp = await PromptService.createPrompt({
           updated_by: userId,
@@ -470,16 +473,16 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
           workspace_id: workspaceId,
         })
         if (createResp.code !== 0 || !createResp.prompt_id) {
-          throw new Error('创建提示词失败')
+          throw new Error(t('messages.createPromptFailed'))
         }
         targetPromptId = String(createResp.prompt_id)
       } else {
-        // 已有提示词时，更新基本信息（可选）
-        // 不强制修改名称/描述，保持现有；如需更新，可启用：
+        // Existing prompt: optional basic info update
+        // Intentionally keep name/description unchanged; enable this if needed:
         // await PromptService.editPromptBasicInfo(targetPromptId, { prompt_name: promptName, prompt_description: promptDesc || '' })
       }
 
-      // 2) 保存草稿（系统提示词）
+      // 2) Save draft (system prompt)
       await PromptService.saveDraft(targetPromptId, userId, workspaceId, {
         promptMessages: [
           {
@@ -503,8 +506,8 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         tools: [],
       })
 
-      // 3) 提交版本
-      // 提交前的版本校验：需为 x.x.x 且大于现有最新版本
+      // 3) Commit version
+      // Before commit: version must be x.x.x and greater than current latest
       if (
         !isVersionFormatValid(promptVersion) ||
         (existingPromptInfo?.latestVersion && compareVersions(promptVersion, existingPromptInfo.latestVersion) <= 0)
@@ -512,17 +515,17 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         setSnackbar({
           open: true,
           severity: 'error',
-          message: `提交版本需为 x.x.x，并且大于已存在版本${existingPromptInfo?.latestVersion ? `（当前：${existingPromptInfo.latestVersion}）` : ''}`,
+          message: t('messages.versionFormatAndGreaterError'),
         })
         setSaving(false)
         return
       }
       await PromptService.commitVersion(targetPromptId, userId, {
         commit_version: promptVersion,
-        commit_description: promptDesc || `Agent ${agentName || agentId} 保存的版本`,
+        commit_description: promptDesc || t('messages.commitDescriptionFallback', { agentName: agentName || agentId }),
       })
 
-      // 4) 注册关联（提示词 -> Agent），确保版本指向最新提交
+      // 4) Register relation (Prompt -> Agent) so the relation points to newest version
       const promptInfo: RelatedMemberInfo = {
         id: targetPromptId,
         version: promptVersion,
@@ -537,16 +540,17 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
       }
       await RelatedMemberService.registerPromptRelation(workspaceId, promptInfo, relatedMemberInfo)
 
-      // 5) 刷新本地关联与版本列表，并更新编辑器内容
+      // 5) Refresh local relation and version list, and update editor content
       setCurrentRelation({ promptId: targetPromptId, promptVersion, promptName })
       setSelectedVersion(promptVersion)
       await loadVersionListForCurrentRelation()
       await loadPromptContentByVersion(targetPromptId, promptVersion)
 
-      setSnackbar({ open: true, severity: 'success', message: '提示词已保存并提交版本。' })
+      setSnackbar({ open: true, severity: 'success', message: t('messages.savedAndCommitted') })
       setSaveDialogOpen(false)
     } catch (e: unknown) {
-      const msg = typeof e?.message === 'string' ? e.message : '保存提示词失败，请稍后重试。'
+      const msgFromError = (e as any)?.message
+      const msg = typeof msgFromError === 'string' ? msgFromError : t('messages.savePromptFailed')
       setSnackbar({ open: true, severity: 'error', message: msg })
     } finally {
       setSaving(false)
@@ -576,7 +580,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         onAdopt={handleAdoptCandidate}
       />
 
-      {/* 当前关联提示词信息与解关联（信息条样式） */}
+      {/* Current associated prompt info and unlink actions (info bar) */}
       <PromptRelationInfoBar
         currentRelation={currentRelation}
         readonly={readonly}
@@ -590,7 +594,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         onOpenUnlinkConfirm={() => setUnlinkConfirmOpen(true)}
       />
 
-      {/* 关联提示词弹窗（独立组件） */}
+      {/* Prompt association dialog (standalone component) */}
       <AgentAssociatePromptDialog
         open={associateDialogOpen}
         onClose={handleCloseAssociateDialog}
@@ -600,7 +604,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         onRelationUpdated={handleRelationUpdated}
       />
 
-      {/* 保存提示词弹窗（独立组件） */}
+      {/* Save prompt dialog (standalone component) */}
       <SavePromptDialog
         open={saveDialogOpen}
         onClose={() => setSaveDialogOpen(false)}
@@ -651,9 +655,12 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         }}
         itemType="agent"
         itemName={agentName || agentId}
-        title="解除关联"
-        message={`确认解除提示词"${currentRelation?.promptName || ''}-${selectedVersion || currentRelation?.promptVersion || ''}"与智能体的关联？此操作无法撤销。`}
-        confirmButtonText="确认"
+        title={t('unlinkDialog.title')}
+        message={t('unlinkDialog.message', {
+          promptName: currentRelation?.promptName || '',
+          version: selectedVersion || currentRelation?.promptVersion || '',
+        })}
+        confirmButtonText={t('unlinkDialog.confirmButtonText')}
       />
 
       <PromptEditor
@@ -662,6 +669,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         readonly={readonly}
         isLockedForCandidate={isLockedForCandidate}
         onChange={setSystemPrompt}
+        placeholder={t('defineAgentPlaceholder')}
       />
 
       <UnifiedSnackbar snackbar={snackbar} onClose={() => setSnackbar(s => ({ ...s, open: false }))} />

@@ -462,11 +462,20 @@ export const processToolCallsIncremental = (
       existingCall.output = mockTool?.mock_response || mockTool?.mock_value || ''
     }
 
-    if (func.arguments !== undefined) {
-      // 防止重复累积：如果当前参数片段已经存在于input的末尾，则跳过
+    if (func.arguments !== undefined && func.arguments !== null) {
+      // 防止重复累积：只有当当前片段与上次添加的完全相同时才跳过
+      // 使用更精确的检查，避免误判导致字符丢失
+      const currentArguments = func.arguments
       const beforeInput = existingCall.input
-      if (!beforeInput.endsWith(func.arguments)) {
-        existingCall.input += func.arguments
+      
+      // 检查是否是完全重复的片段
+      // 只有当整个新片段已经完整存在于末尾时才认为是重复
+      const shouldSkip = currentArguments.length > 0 && 
+                        beforeInput.length >= currentArguments.length &&
+                        beforeInput.endsWith(currentArguments)
+      
+      if (!shouldSkip) {
+        existingCall.input += currentArguments
       }
     }
   })
@@ -477,8 +486,7 @@ export const processToolCallsIncremental = (
     // 清理可能的重复或异常格式
     input: toolCall.input
       .replace(/(\{"\{)/g, '{"')
-      .replace(/(\}"\})/g, '"}')
-      .replace(/([a-zA-Z]+)\1+/g, '$1'),
+      .replace(/(\}"\})/g, '"}'),
   }))
 
   return cleanedToolCalls

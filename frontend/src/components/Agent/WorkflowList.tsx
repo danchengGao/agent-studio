@@ -1,6 +1,7 @@
 import Typography from '@mui/material/Typography'
+import Tooltip from '@mui/material/Tooltip'
 import { WorkflowDetail } from '../../types/agentTypes'
-import { Settings, Trash2, Workflow } from 'lucide-react'
+import { AlertCircle, LoaderCircle, Settings, Trash2, Workflow } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
@@ -8,17 +9,24 @@ import { useAgentStore } from '@/stores/useAgentStore'
 import { useWorkflowVersions, useSelectedVersions } from '@/hooks/useWorkflowVersions'
 import { isVersionValid } from '@/utils/versionMenu'
 import { VersionField } from '@/components/Agent/VersionField'
+import type { WorkflowValidationResult } from '@/hooks/useWorkflowValidation'
 
 // 工作流列表组件
+import { useScopedTranslation } from '@/i18n'
 const WorkflowList = ({
   workflowObjects,
   onClick,
   disabled = false,
+  refreshToken,
+  validationResults,
 }: {
   workflowObjects: WorkflowDetail[]
   onClick: (operate: 'delete' | 'setting', workflowId: string, version?: string) => void
   disabled?: boolean
+  refreshToken?: number
+  validationResults?: Record<string, WorkflowValidationResult>
 }) => {
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration.workflowSetting.workflowList')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
   const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({})
@@ -67,19 +75,47 @@ const WorkflowList = ({
               <Workflow className="w-4 h-4 text-blue-600" />
             </div>
             <div className="flex-1 min-w-0 max-w-[320px]">
-              <Typography
-                sx={{
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  marginBottom: '8px',
-                }}
-                title={workflow.workflow_name}
-              >
-                {workflow.workflow_name}
-              </Typography>
+              <div className="flex items-center gap-1 min-w-0 mb-2">
+                <Typography
+                  sx={{
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  className="min-w-0"
+                  title={workflow.workflow_name}
+                >
+                  {workflow.workflow_name}
+                </Typography>
+                {validationResults?.[workflow.workflow_id]?.status === 'loading' && (
+                  <span className="inline-flex items-center gap-2 text-xs text-gray-500 flex-shrink-0">
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                    <span>校验中...</span>
+                  </span>
+                )}
+                {validationResults?.[workflow.workflow_id]?.status === 'error' && (
+                  <Tooltip title={'工作流校验失败，请跳转对应的工作流进行修改'} arrow>
+                    <span className="inline-flex items-center flex-shrink-0 ml-1">
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (disabled) return
+                          const currentVersion = selectedVersions[workflow.workflow_id] ?? 'draft'
+                          onClick('setting', workflow.workflow_id, currentVersion)
+                        }}
+                        disabled={disabled}
+                        className={`inline-flex items-center text-red-600 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        aria-label="工作流校验失败"
+                      >
+                        <AlertCircle className="w-4 h-4" />
+                      </button>
+                    </span>
+                  </Tooltip>
+                )}
+              </div>
               {workflow.description && (
                 <Typography
                   variant="body2"
@@ -99,39 +135,22 @@ const WorkflowList = ({
                   {workflow.description}
                 </Typography>
               )}
-              {workflow.create_time && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    fontSize: '0.75rem',
-                    lineHeight: 1.4,
-                    marginTop: 0,
-                    marginBottom: '12px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '400px',
-                  }}
-                >
-                  创建时间: {new Date(workflow.create_time).toLocaleDateString()}
-                </Typography>
-              )}
               <div className="flex items-center space-x-3 mt-1">
-                <span className="text-xs font-medium text-gray-600">关联版本：</span>
+                <span className="text-xs font-medium text-gray-600">{t('versionLabel')}</span>
                 <VersionField
                   workflowId={workflow.workflow_id}
                   value={selectedVersions[workflow.workflow_id] ?? 'draft'}
                   onChange={ver => handleVersionChange(workflow.workflow_id, ver)}
                   spaceId={spaceId}
                   readonly={disabled}
+                  refreshToken={refreshToken}
                 />
               </div>
             </div>
           </div>
           <div className="flex space-x-5 pt-2">
             <button
-              title="设置"
+              title={t('settingsTitle')}
               onClick={e => {
                 e.stopPropagation()
                 const currentVersion = selectedVersions[workflow.workflow_id] ?? 'draft'
@@ -141,7 +160,7 @@ const WorkflowList = ({
               <Settings className="w-4 h-4 text-gray-600" />
             </button>
             <button
-              title="删除"
+              title={t('deleteTitle')}
               onClick={e => {
                 e.stopPropagation()
                 if (!disabled) {
@@ -157,7 +176,7 @@ const WorkflowList = ({
           </div>
         </div>
       ))}
-      {workflowObjects.length === 0 && <div className="text-center py-6 text-gray-500">未添加工作流，可点击右上角进行添加</div>}
+      {workflowObjects.length === 0 && <div className="text-center py-6 text-gray-500">{t('emptyText')}</div>}
       <DeleteConfirmationDialog
         isOpen={confirmOpen}
         onClose={() => {
@@ -171,9 +190,6 @@ const WorkflowList = ({
         }}
         itemType="workflow"
         itemName={pendingDelete?.name || ''}
-        title="移除工作流"
-        confirmButtonText="确认"
-        message={`确定移除此工作流？此操作无法撤销。`}
       />
     </div>
   )

@@ -6,6 +6,7 @@
 import { useLayoutEffect } from 'react'
 import { Field, WorkflowNodePortsData } from '@flowgram.ai/free-layout-editor'
 import { Select as SemiSelect } from '@douyinfe/semi-ui'
+import { useTranslation } from '../../../i18n'
 
 import { JsonCodeEditor } from '../../../form-materials'
 import { FormItem, FormDisplay } from '../../../form-components'
@@ -25,22 +26,23 @@ import {
   CodeEditorText,
 } from './styles'
 
-const retryOptions = [
-  { label: '不重试', value: 0 },
-  { label: '重试1次', value: 1 },
-  { label: '重试2次', value: 2 },
-  { label: '重试3次', value: 3 },
-]
-
-const errorHandlingOptions = [
-  { label: '中断流程', value: 'break' },
-  { label: '返回设定内容', value: 'return_content' },
-  { label: '执行异常流程', value: 'execute_exception_step' },
-]
-
 export function ErrorHandler() {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
   const { node } = useNodeRenderContext()
+
+  const retryOptions = [
+    { label: t('workflowCanvas.errorHandler.noRetry'), value: 0 },
+    { label: t('workflowCanvas.errorHandler.retry1'), value: 1 },
+    { label: t('workflowCanvas.errorHandler.retry2'), value: 2 },
+    { label: t('workflowCanvas.errorHandler.retry3'), value: 3 },
+  ]
+
+  const errorHandlingOptions = [
+    { label: t('workflowCanvas.errorHandler.breakWorkflow'), value: 'break' },
+    { label: t('workflowCanvas.errorHandler.returnContent'), value: 'return_content' },
+    { label: t('workflowCanvas.errorHandler.executeExceptionStep'), value: 'execute_exception_step' },
+  ]
 
   useLayoutEffect(() => {
     window.requestAnimationFrame(() => {
@@ -82,18 +84,18 @@ export function ErrorHandler() {
 
       {/* 只在侧边栏模式下显示配置表单 */}
       {isSidebar && (
-        <FormItem name="异常处理" vertical defaultCollapsed={false}>
+        <FormItem name={t('workflowCanvas.errorHandler.exceptionHandling')} vertical defaultCollapsed={false}>
           <ErrorHandlerContainer>
             {/* 描述行 */}
             <DescriptionRow>
               <FlexItem>
-                <SmallText>超时时间</SmallText>
+                <SmallText>{t('workflowCanvas.errorHandler.timeout')}</SmallText>
               </FlexItem>
               <FlexItem>
-                <SmallText>重试次数</SmallText>
+                <SmallText>{t('workflowCanvas.errorHandler.retryTimes')}</SmallText>
               </FlexItem>
               <FlexItem>
-                <SmallText>异常处理方式</SmallText>
+                <SmallText>{t('workflowCanvas.errorHandler.processType')}</SmallText>
               </FlexItem>
             </DescriptionRow>
 
@@ -104,10 +106,14 @@ export function ErrorHandler() {
                 <Field<number> name="exceptionConfig.timeoutSeconds">
                   {({ field }) => (
                     <CompactInput
-                      value={field.value || 60}
+                      value={field.value}
                       onChange={(value: string) => {
-                        const numValue = parseInt(value) || 60
-                        if (numValue >= 1 && numValue <= 300) {
+                        if (value === '') {
+                          field.onChange(0)
+                          return
+                        }
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue) && numValue >= 1 && numValue <= 300) {
                           field.onChange(numValue)
                         }
                       }}
@@ -155,7 +161,7 @@ export function ErrorHandler() {
                 const showReturnContent = field.value === 'return_content'
                 return showReturnContent ? (
                   <ReturnContentContainer>
-                    <ReturnContentLabel>返回内容配置</ReturnContentLabel>
+                    <ReturnContentLabel>{t('workflowCanvas.errorHandler.returnContentConfig')}</ReturnContentLabel>
                     <Field<Record<string, any>> name="exceptionConfig.returnContent">
                       {({ field: returnContentField }) => (
                         <Field<Record<string, any> | undefined> name="outputs">

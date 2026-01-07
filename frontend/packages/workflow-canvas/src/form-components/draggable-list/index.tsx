@@ -11,6 +11,7 @@ import { Button, IconButton } from '@douyinfe/semi-ui'
 import { Plus, GripVertical, MinusCircle } from 'lucide-react'
 
 import { cn } from '../../utils/cn'
+import { useTranslation } from '../../i18n'
 import './styles.css'
 
 interface DraggableItemProps {
@@ -104,13 +105,15 @@ export const DraggableList: React.FC<DraggableListProps> = ({
   canDelete = true,
   showDragHandle = true,
   itemIdKey = 'id',
-  addButtonLabel = '添加',
+  addButtonLabel,
   className,
   style,
   emptyState,
   isDragDisabled,
   isDeleteDisabled,
 }) => {
+  const { t } = useTranslation()
+  const displayAddButtonLabel = addButtonLabel || t('workflowCanvas.draggableList.add')
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -156,7 +159,7 @@ export const DraggableList: React.FC<DraggableListProps> = ({
           <div className="empty-icon">
             <Plus size={24} />
           </div>
-          <div className="empty-text">暂无数据，点击下方按钮添加</div>
+          <div className="empty-text">{t('workflowCanvas.draggableList.noData')}</div>
         </div>
       </div>
     )
@@ -188,7 +191,7 @@ export const DraggableList: React.FC<DraggableListProps> = ({
       {canAdd && !readOnly && (
         <div className="add-item-section">
           <Button type="tertiary" icon={<Plus size={14} />} onClick={onAdd} block size="small">
-            {addButtonLabel}
+            {displayAddButtonLabel}
           </Button>
         </div>
       )}

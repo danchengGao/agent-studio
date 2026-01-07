@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
 import { ArrowLeft, Save, Plus, Trash2, Settings, Code, FileText, RotateCcw } from 'lucide-react'
 import { validateToolPath, getPathHelpText } from '../../utils/validationUtils'
+import { copyToClipboard } from '../../utils/prompts/utils'
 import {
   Card,
   Typography,
@@ -44,6 +46,7 @@ interface ToolParameter {
   description: string
   type: string
   method: string
+  is_required?: boolean
 }
 
 interface HeaderConfig {
@@ -128,6 +131,7 @@ interface TestExecutionResult {
 }
 
 const ToolConfigurationPage: React.FC = () => {
+  const { t } = useTranslation()
   const { plugin_id, tool_id } = useParams<{ plugin_id: string; tool_id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -167,7 +171,8 @@ const ToolConfigurationPage: React.FC = () => {
     name: '',
     description: '',
     type: 'string',
-    method: 'query',
+    method: 0,
+    is_required: false,
   })
 
   const { user } = useAuthStore()
@@ -209,7 +214,7 @@ const ToolConfigurationPage: React.FC = () => {
       if (!targetApiInfo) {
         setSnackbar({
           open: true,
-          message: `未找到ID为 ${tool_id} 的工具配置`,
+          message: t('plugins.toolConfig.notFound', '未找到ID为 {{toolId}} 的工具配置', { toolId: tool_id }),
           severity: 'error',
         })
         return
@@ -235,7 +240,8 @@ const ToolConfigurationPage: React.FC = () => {
             name: param.name,
             description: param.desc || '',
             type: mapNumberToString(param.type),
-            method: 'query',
+            method: param.method || 1,
+            is_required: param.is_required,
           })) || [],
         output_parameters:
           targetApiInfo.response_params?.map(param => ({
@@ -243,7 +249,8 @@ const ToolConfigurationPage: React.FC = () => {
             name: param.name,
             description: param.desc || '',
             type: mapNumberToString(param.type),
-            method: 'query',
+            method: param.method || 1,
+            is_required: param.is_required,
           })) || [],
         headers:
           targetApiInfo.headers?.map(header => ({
@@ -263,14 +270,14 @@ const ToolConfigurationPage: React.FC = () => {
       // API returned an error
       setSnackbar({
         open: true,
-        message: `加载工具配置失败: ${apiData?.message || '未知错误'}`,
+        message: `${t('plugins.config.loadFailed', '加载工具配置失败：{{message}}')}: ${apiData?.message || t('plugins.errors.unknownError', '未知错误')}`,
         severity: 'error',
       })
     } else if (apiData && (!apiData?.data?.[dataKey] || !Array.isArray(apiData.data[dataKey]))) {
       // API returned success but no valid data
       setSnackbar({
         open: true,
-        message: '工具配置数据为空或格式错误，请检查工具是否存在',
+        message: t('plugins.toolConfig.pluginDataNotLoaded', '工具配置数据为空或格式错误，请检查工具是否存在'),
         severity: 'warning',
       })
     }
@@ -279,10 +286,10 @@ const ToolConfigurationPage: React.FC = () => {
   // Handle API errors
   useEffect(() => {
     if (apiError) {
-      console.error('获取工具配置失败:', apiError)
+      console.error(t('plugins.toolConfig.loadFailed', '获取工具配置失败'), apiError)
       setSnackbar({
         open: true,
-        message: '获取工具配置失败，请稍后重试',
+        message: t('plugins.toolConfig.loadFailedRetry', '获取工具配置失败，请稍后重试'),
         severity: 'error',
       })
     }
@@ -438,13 +445,13 @@ const ToolConfigurationPage: React.FC = () => {
         try {
           return JSON.stringify(value, null, 2)
         } catch {
-          return '数组解析错误'
+          return t('plugins.toolConfig.arrayParseError', '数组解析错误')
         }
       case 'object':
         try {
           return JSON.stringify(value, null, 2)
         } catch {
-          return '对象解析错误'
+          return t('plugins.toolConfig.objectParseError', '对象解析错误')
         }
       default:
         return String(value)
@@ -473,7 +480,32 @@ const ToolConfigurationPage: React.FC = () => {
     }
   }
 
+  const getMethodLabel = (method: string | number): string => {
+    const methodNum = typeof method === 'string' ? parseInt(method) : method
+    switch (methodNum) {
+      case 0:
+        return 'None'
+      case 1:
+        return 'Header'
+      case 2:
+        return 'Query'
+      case 3:
+        return 'Body'
+      default:
+        return 'None'
+    }
+  }
+
   const convertToolToApiRequest = (tool: Tool) => {
+    const convertParams = (params: ToolParameter[]) =>
+      params.map(param => ({
+        name: param.name,
+        desc: param.description,
+        type: mapTypeToNumber(param.type),
+        is_required: param.is_required ?? false,
+        method: parseInt(param.method) || 0,
+      }))
+
     if (pluginType === 'code') {
       return {
         space_id: getDefaultSpaceId(),
@@ -484,18 +516,8 @@ const ToolConfigurationPage: React.FC = () => {
         language: tool.language || 'python',
         code: tool.code || '',
         plugin_version: '',
-        request_params: tool.input_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: true,
-        })),
-        response_params: tool.output_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: false,
-        })),
+        request_params: convertParams(tool.input_parameters),
+        response_params: convertParams(tool.output_parameters),
         headers: tool.headers.map(header => ({
           name: header.key,
           value: header.value,
@@ -511,18 +533,8 @@ const ToolConfigurationPage: React.FC = () => {
         path: tool.path,
         method: tool.method,
         plugin_version: '',
-        request_params: tool.input_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: true,
-        })),
-        response_params: tool.output_parameters.map(param => ({
-          name: param.name,
-          desc: param.description,
-          type: mapTypeToNumber(param.type),
-          is_required: false,
-        })),
+        request_params: convertParams(tool.input_parameters),
+        response_params: convertParams(tool.output_parameters),
         headers: tool.headers.map(header => ({
           name: header.key,
           value: header.value,
@@ -531,7 +543,7 @@ const ToolConfigurationPage: React.FC = () => {
     }
   }
 
-  const handleParameterFormChange = (field: keyof typeof parameterForm, value: string) => {
+  const handleParameterFormChange = (field: keyof typeof parameterForm, value: string | boolean) => {
     setParameterForm(prev => ({
       ...prev,
       [field]: value,
@@ -546,13 +558,15 @@ const ToolConfigurationPage: React.FC = () => {
         description: parameter.description,
         type: parameter.type,
         method: parameter.method,
+        is_required: isInput ? parameter.is_required || false : false,
       })
     } else {
       setParameterForm({
         name: '',
         description: '',
         type: 'string',
-        method: 'query',
+        method: 0,
+        is_required: false,
       })
     }
     if (isInput) {
@@ -564,7 +578,7 @@ const ToolConfigurationPage: React.FC = () => {
 
   const handleSaveParameter = async (isInput: boolean) => {
     if (!parameterForm.name.trim() || !parameterForm.description.trim()) {
-      setSnackbar({ open: true, message: '请填写参数名称和描述', severity: 'error' })
+      setSnackbar({ open: true, message: t('plugins.toolConfig.fillNameAndDescription', '请填写参数名称和描述'), severity: 'error' })
       return
     }
 
@@ -574,6 +588,7 @@ const ToolConfigurationPage: React.FC = () => {
       description: parameterForm.description.trim(),
       type: parameterForm.type,
       method: parameterForm.method,
+      is_required: parameterForm.is_required,
     }
 
     if (tool) {
@@ -596,30 +611,38 @@ const ToolConfigurationPage: React.FC = () => {
       // 自动调用update_api接口保存参数更改
       try {
         const apiRequest = convertToolToApiRequest(updatedTool)
-        console.log('自动保存参数配置:', apiRequest)
+        console.log(`${t('plugins.toolConfig.autoSaveConfig', '自动保存参数配置')}:`, apiRequest)
 
         const response = await updatePluginApiMutation.mutateAsync(apiRequest)
 
         if (response.code === 200) {
           setSnackbar({
             open: true,
-            message: `参数${editingParameter ? '更新' : '创建'}并保存成功`,
+            message: editingParameter ? t('plugins.toolConfig.saveSuccess', '参数更新并保存成功') : t('plugins.toolConfig.createSuccess', '参数创建并保存成功'),
             severity: 'success',
           })
           setPathError('') // 清空路径错误
         } else {
           setSnackbar({
             open: true,
-            message: `参数${editingParameter ? '更新' : '创建'}成功但保存失败: ${response.message || '未知错误'}`,
+            message: editingParameter
+              ? t('plugins.toolConfig.saveFailed', '参数更新成功但保存失败: {{message}}', {
+                  message: response.message || t('plugins.errors.unknownError', '未知错误'),
+                })
+              : t('plugins.toolConfig.createFailed', '参数创建成功但保存失败: {{message}}', {
+                  message: response.message || t('plugins.errors.unknownError', '未知错误'),
+                }),
             severity: 'warning',
           })
         }
       } catch (error: unknown) {
-        console.error('保存参数配置失败:', error)
-        const errorMessage = error?.response?.data?.message || error?.message || '保存参数配置失败，请稍后重试'
+        console.error(`${t('plugins.toolConfig.saveFailedRetry', '保存参数配置失败')}:`, error)
+        const errorMessage = error?.response?.data?.message || error?.message || t('plugins.toolConfig.saveFailedRetry', '保存参数配置失败，请稍后重试')
         setSnackbar({
           open: true,
-          message: `参数${editingParameter ? '更新' : '创建'}成功但保存失败: ${errorMessage}`,
+          message: editingParameter
+            ? t('plugins.toolConfig.saveFailed', '参数更新成功但保存失败: {{message}}', { message: errorMessage })
+            : t('plugins.toolConfig.createFailed', '参数创建成功但保存失败: {{message}}', { message: errorMessage }),
           severity: 'warning',
         })
       }
@@ -645,26 +668,28 @@ const ToolConfigurationPage: React.FC = () => {
       // 自动调用update_api接口保存参数更改
       try {
         const apiRequest = convertToolToApiRequest(updatedTool)
-        console.log('自动保存参数删除:', apiRequest)
+        console.log(`${t('plugins.toolConfig.autoSaveDelete', '自动保存参数删除')}:`, apiRequest)
 
         const response = await updatePluginApiMutation.mutateAsync(apiRequest)
 
         if (response.code === 200) {
-          setSnackbar({ open: true, message: '参数删除并保存成功', severity: 'success' })
+          setSnackbar({ open: true, message: t('plugins.toolConfig.autoSaveDeleteSuccess', '参数删除并保存成功'), severity: 'success' })
           setPathError('') // 清空路径错误
         } else {
           setSnackbar({
             open: true,
-            message: `参数删除成功但保存失败: ${response.message || '未知错误'}`,
+            message: t('plugins.toolConfig.autoSaveDeleteFailed', '参数删除成功但保存失败: {{message}}', {
+              message: response.message || t('plugins.errors.unknownError', '未知错误'),
+            }),
             severity: 'warning',
           })
         }
       } catch (error: unknown) {
-        console.error('保存参数删除失败:', error)
+        console.error(`${t('plugins.toolConfig.autoSaveDeleteFailedLog', '保存参数删除失败')}:`, error)
         const errorMessage = error?.response?.data?.message || error?.message || '保存参数删除失败，请稍后重试'
         setSnackbar({
           open: true,
-          message: `参数删除成功但保存失败: ${errorMessage}`,
+          message: t('plugins.toolConfig.autoSaveDeleteFailed', '参数删除成功但保存失败: {{message}}', { message: errorMessage }),
           severity: 'warning',
         })
       }
@@ -717,7 +742,7 @@ const ToolConfigurationPage: React.FC = () => {
 
   const handleSaveTool = async () => {
     if (!tool?.name?.trim()) {
-      setSnackbar({ open: true, message: '名称不能为空', severity: 'warning' })
+      setSnackbar({ open: true, message: t('plugins.toolConfig.nameRequired', '名称不能为空'), severity: 'warning' })
       return
     }
     if (!tool || !plugin_id) return
@@ -739,14 +764,18 @@ const ToolConfigurationPage: React.FC = () => {
       const response = await updatePluginApiMutation.mutateAsync(apiRequest)
 
       if (response.code === 200) {
-        setSnackbar({ open: true, message: '工具配置保存成功', severity: 'success' })
+        setSnackbar({ open: true, message: t('plugins.tools.config.saveSuccess', '工具配置保存成功'), severity: 'success' })
         setPathError('') // 清空路径错误
       } else {
-        setSnackbar({ open: true, message: `保存失败: ${response.message || '未知错误'}`, severity: 'error' })
+        setSnackbar({
+          open: true,
+          message: t('plugins.tools.config.saveFailed', '保存失败: {{message}}', { message: response.message || t('plugins.errors.unknownError', '未知错误') }),
+          severity: 'error',
+        })
       }
     } catch (error: unknown) {
-      console.error('保存工具配置失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || '保存工具配置失败，请稍后重试'
+      console.error(`${t('plugins.tools.config.saveFailedLog', '保存工具配置失败')}:`, error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.tools.config.saveFailedRetry', '保存工具配置失败，请稍后重试')
       setSnackbar({ open: true, message: errorMessage, severity: 'error' })
     }
   }
@@ -764,7 +793,7 @@ const ToolConfigurationPage: React.FC = () => {
       const response = await deletePluginApiMutation.mutateAsync(deleteRequest)
 
       if (response.code === 200) {
-        setSnackbar({ open: true, message: '工具删除成功', severity: 'success' })
+        setSnackbar({ open: true, message: t('plugins.tools.deleteSuccess', '工具删除成功'), severity: 'success' })
         // 立即返回插件页面，避免不必要的 API 调用
         handleBackNavigation()
       } else {
@@ -775,8 +804,8 @@ const ToolConfigurationPage: React.FC = () => {
         })
       }
     } catch (error: unknown) {
-      console.error('删除工具失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || '删除工具失败，请稍后重试'
+      console.error(`${t('plugins.tools.config.deleteFailedLog', '删除工具失败')}:`, error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.tools.deleteFailedRetry', '删除工具失败，请稍后重试')
       setSnackbar({ open: true, message: errorMessage, severity: 'error' })
     } finally {
       setDeleteDialogOpen(false)
@@ -824,19 +853,23 @@ const ToolConfigurationPage: React.FC = () => {
         inputs: getTypedTestParameters(),
       }
 
-      console.log('执行插件测试:', executeRequest)
+      console.log(t('plugins.toolConfig.testConnection', '执行插件测试'), executeRequest)
 
       // 执行插件 - 简化执行逻辑，移除未使用的onEvent
       await executePluginMutation.mutateAsync({
         request: executeRequest,
         onEvent: undefined, // 不使用onEvent，因为它永远不会被执行
         onError: error => {
-          console.error('插件执行错误:', error)
-          setTestError(`执行错误: ${error.message || '未知错误'}`)
+          console.error(t('plugins.toolConfig.testConnectionError', '插件执行错误', { message: error || t('plugins.errors.unknownError', '未知错误') }))
+          setTestError(
+            t('plugins.toolConfig.testConnectionError', '插件执行错误: {{message}}', {
+              message: error.message || t('plugins.errors.unknownError', '未知错误'),
+            }),
+          )
         },
         onComplete: (buffer: string) => {
-          console.log('插件执行完成', buffer)
-          setSnackbar({ open: true, message: '测试执行成功', severity: 'success' })
+          console.log(t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), buffer)
+          setSnackbar({ open: true, message: t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), severity: 'success' })
 
           try {
             // 解析buffer获取最终结果数据
@@ -854,11 +887,11 @@ const ToolConfigurationPage: React.FC = () => {
             }
 
             if (bufferData.code === 200 && bufferData.data) {
-              // 成功响应
-              finalResults.execution_success = true
-              finalResults.error_code = bufferData.data.payload?.error_code || 0
-              finalResults.error_message = bufferData.data.payload?.error_message || 'success'
+              finalResults.error_code = bufferData.data.payload?.error_code ?? null
+              finalResults.error_message = bufferData.data.payload?.error_message || null
               finalResults.output = bufferData.data.payload?.output || null
+              // 根据error_code判断执行是否成功
+              finalResults.execution_success = bufferData.data.payload?.error_code === 0
             } else {
               // 错误响应
               finalResults.execution_success = false
@@ -875,7 +908,7 @@ const ToolConfigurationPage: React.FC = () => {
                 {
                   timestamp: new Date().toISOString(),
                   execution_success: false,
-                  error_message: '无法解析执行结果',
+                  error_message: t('plugins.toolConfig.testConnectionResultError', '无法解析执行结果'),
                   raw_buffer: buffer,
                   parse_error: parseError.message,
                 },
@@ -889,7 +922,7 @@ const ToolConfigurationPage: React.FC = () => {
       })
     } catch (error: unknown) {
       console.error('测试执行失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || '测试执行失败，请检查参数配置'
+      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.toolConfig.testConnectionFailed', '测试执行失败，请检查参数配置')
       setTestError(errorMessage)
       setSnackbar({ open: true, message: errorMessage, severity: 'error' })
     } finally {
@@ -941,7 +974,7 @@ const ToolConfigurationPage: React.FC = () => {
         <div className="text-center">
           <CircularProgress size={48} className="mb-4" />
           <Typography variant="body1" color="text.secondary">
-            正在加载工具配置...
+            {t('plugins.toolConfig.loading', '正在加载工具配置...')}
           </Typography>
         </div>
       </div>
@@ -953,13 +986,13 @@ const ToolConfigurationPage: React.FC = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Typography variant="h6" className="mb-2">
-            工具未找到
+            {t('plugins.toolConfig.toolNotFound', '工具未找到')}
           </Typography>
           <Typography variant="body2" color="text.secondary" className="mb-4">
-            请检查工具ID是否正确
+            {t('plugins.toolConfig.checkToolId', '请检查工具ID是否正确')}
           </Typography>
           <Button variant="contained" onClick={() => navigate(`/dashboard/plugins/${plugin_id}`)}>
-            返回插件配置
+            {t('plugins.toolConfig.returnPluginConfig', '返回插件配置')}
           </Button>
         </div>
       </div>
@@ -973,7 +1006,7 @@ const ToolConfigurationPage: React.FC = () => {
         <div className="mb-8">
           <div className="flex items-center space-x-4">
             <Button variant="outlined" startIcon={<ArrowLeft className="w-4 h-4" />} onClick={handleBackNavigation} className="mb-4">
-              返回{source === 'agent' ? '智能体配置' : '插件配置'}
+              {source === 'agent' ? t('plugins.toolConfig.returnAgentConfig', '返回智能体配置') : t('plugins.toolConfig.returnPluginConfig', '返回插件配置')}
             </Button>
           </div>
 
@@ -988,13 +1021,26 @@ const ToolConfigurationPage: React.FC = () => {
               <div className="flex items-center space-x-4 mt-2">
                 {pluginType === 'code' ? (
                   <>
-                    <Chip label={`语言: ${tool.language || 'python'}`} size="small" />
-                    <Chip label="代码工具" size="small" variant="outlined" />
+                    <Chip label={`${t('plugins.toolConfig.language', '语言')}: ${tool.language || 'python'}`} size="small" />
+                    <Chip label={t('plugins.toolConfig.codeTool', '代码工具')} size="small" variant="outlined" />
                   </>
                 ) : (
                   <>
-                    <Chip label={`方法: ${getMethodString(tool.method || 1)}`} size="small" />
-                    <Chip label={`路径: ${tool.path || ''}`} size="small" variant="outlined" />
+                    <Chip label={`${t('plugins.toolConfig.method', '方法')}: ${getMethodString(tool.method || 1)}`} size="small" />
+                    <Chip
+                      label={`${t('plugins.toolConfig.path', '路径')}: ${tool.path || ''}`}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        maxWidth: '80ch',
+                        '& .MuiChip-label': {
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 'calc(70ch - 24px)',
+                        },
+                      }}
+                    />
                   </>
                 )}
               </div>
@@ -1007,7 +1053,7 @@ const ToolConfigurationPage: React.FC = () => {
                 onClick={() => setDeleteDialogOpen(true)}
                 disabled={deletePluginApiMutation.isPending}
               >
-                {deletePluginApiMutation.isPending ? '删除中...' : '删除工具'}
+                {deletePluginApiMutation.isPending ? t('plugins.actions.deleting', '删除中...') : t('plugins.actions.deleteTool', '删除工具')}
               </Button>
               <Button
                 variant="contained"
@@ -1015,7 +1061,7 @@ const ToolConfigurationPage: React.FC = () => {
                 onClick={handleSaveTool}
                 disabled={updatePluginApiMutation.isPending || !tool.name.trim() || !tool.description.trim()}
               >
-                {updatePluginApiMutation.isPending ? '保存中...' : '保存配置'}
+                {updatePluginApiMutation.isPending ? t('plugins.actions.saving', '保存中...') : t('plugins.actions.saveConfig', '保存配置')}
               </Button>
             </div>
           </div>
@@ -1024,12 +1070,12 @@ const ToolConfigurationPage: React.FC = () => {
         {/* Configuration Tabs */}
         <Card className="p-6">
           <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)} className="mb-6">
-            <Tab label="基本信息" value="basic" />
-            <Tab label="输入参数" value="input" />
-            <Tab label="输出参数" value="output" />
-            {pluginType === 'api' && <Tab label="请求头配置" value="headers" />}
-            {pluginType === 'code' && <Tab label="代码编辑器" value="code" />}
-            <Tab label="测试" value="test" />
+            <Tab label={t('plugins.tools.tabs.basic', '基本信息')} value="basic" />
+            <Tab label={t('plugins.tools.tabs.input', '输入参数')} value="input" />
+            <Tab label={t('plugins.tools.tabs.output', '输出参数')} value="output" />
+            {pluginType === 'api' && <Tab label={t('plugins.tools.tabs.headersConfig', '请求头配置')} value="headers" />}
+            {pluginType === 'code' && <Tab label={t('plugins.tools.tabs.code', '代码编辑器')} value="code" />}
+            <Tab label={t('plugins.tools.tabs.test', '测试')} value="test" />
           </Tabs>
 
           {/* Basic Info Tab */}
@@ -1038,21 +1084,21 @@ const ToolConfigurationPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Typography variant="subtitle2" className="mb-2">
-                    工具名称
+                    {t('plugins.tools.name', '工具名称')}
                   </Typography>
                   <TextField
                     fullWidth
                     value={tool.name}
                     onChange={e => setTool({ ...tool, name: e.target.value })}
-                    placeholder="请输入工具名称..."
-                    helperText={`建议使用简洁明了的名称 (${tool.name.length}/20)`}
-                    inputProps={{ maxLength: 20 }}
+                    placeholder={t('plugins.tools.namePlaceholder', '请输入工具名称...')}
+                    helperText={t('plugins.tools.nameHelper', '建议使用简洁明了的名称 ({{count}}/128)', { count: tool.name.length })}
+                    inputProps={{ maxLength: 128 }}
                   />
                 </div>
                 {pluginType === 'code' ? (
                   <div>
                     <Typography variant="subtitle2" className="mb-2">
-                      运行时环境
+                      {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}
                     </Typography>
                     <FormControl fullWidth>
                       <Select value={tool.language || 'python'} onChange={e => setTool({ ...tool, language: e.target.value })}>
@@ -1064,7 +1110,7 @@ const ToolConfigurationPage: React.FC = () => {
                 ) : (
                   <div>
                     <Typography variant="subtitle2" className="mb-2">
-                      请求方法
+                      {t('plugins.pluginConfig.method', '请求方法')}
                     </Typography>
                     <FormControl fullWidth>
                       <Select value={tool.method} onChange={e => setTool({ ...tool, method: e.target.value as number })}>
@@ -1078,34 +1124,34 @@ const ToolConfigurationPage: React.FC = () => {
               {pluginType === 'code' ? (
                 <div>
                   <Typography variant="subtitle2" className="mb-2">
-                    IDE运行时配置
+                    {t('plugins.pluginConfig.runtimeConfig', 'IDE运行时配置')}
                   </Typography>
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                     <div className="flex items-center space-x-2">
                       <Code className="w-5 h-5 text-blue-600" />
                       <Typography variant="body2" className="font-medium">
-                        代码执行环境
+                        {t('plugins.pluginConfig.codeEnvironment', '代码执行环境')}
                       </Typography>
                     </div>
                     <Typography variant="body2" color="text.secondary" className="ml-7">
-                      支持Python 3和Node.js运行时环境，提供完整的代码编辑和调试功能
+                      {t('plugins.toolConfig.codeEnvironmentHelper', '支持Python 3和Node.js运行时环境，提供完整的代码编辑和调试功能')}
                     </Typography>
                     <div className="flex items-center space-x-2 mt-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <Typography variant="body2" color="text.secondary">
-                        自动依赖管理：系统会自动安装所需的依赖包
+                        {t('plugins.toolConfig.autoDependencyManagement', '自动依赖管理：系统会自动安装所需的依赖包')}
                       </Typography>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <Typography variant="body2" color="text.secondary">
-                        安全沙箱：代码在隔离环境中执行，确保安全性
+                        {t('plugins.toolConfig.securitySandbox', '安全沙箱：代码在隔离环境中执行，确保安全性')}
                       </Typography>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <Typography variant="body2" color="text.secondary">
-                        实时监控：提供代码执行状态和错误日志
+                        {t('plugins.toolConfig.realTimeMonitoring', '实时监控：提供代码执行状态和错误日志')}
                       </Typography>
                     </div>
                   </div>
@@ -1113,21 +1159,33 @@ const ToolConfigurationPage: React.FC = () => {
               ) : (
                 <div>
                   <Typography variant="subtitle2" className="mb-2">
-                    API路径
+                    {t('plugins.config.apiPath', 'API路径')}
                   </Typography>
                   <TextField
                     fullWidth
                     value={tool.path}
                     onChange={e => handlePathChange(e.target.value)}
-                    placeholder="请输入API路径..."
-                    helperText={pathError || '例如：/api/users/:id，必须以/开头，只能包含英文、数字、下划线、连字符和斜杠'}
+                    placeholder={t('plugins.toolConfig.apiPathPlaceholder', '请输入API路径...')}
+                    helperText={
+                      pathError || t('plugins.toolConfig.apiPathHelper', '例如：/api/users/:id，必须以/开头，只能包含英文、数字、下划线、连字符和斜杠')
+                    }
                     error={!!pathError}
+                    InputProps={{
+                      sx: {
+                        '& .MuiInputBase-input': {
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          maxWidth: 'calc(70ch + 20px)',
+                        },
+                      },
+                    }}
                   />
                 </div>
               )}
               <div>
                 <Typography variant="subtitle2" className="mb-2">
-                  工具描述
+                  {t('plugins.toolConfig.toolDescription', '工具描述')}
                 </Typography>
                 <TextField
                   fullWidth
@@ -1135,9 +1193,11 @@ const ToolConfigurationPage: React.FC = () => {
                   rows={3}
                   value={tool.description}
                   onChange={e => setTool({ ...tool, description: e.target.value })}
-                  placeholder="请输入工具描述..."
-                  helperText={`详细描述工具的功能、用途和参数 (${tool.description.length}/40)`}
-                  inputProps={{ maxLength: 40 }}
+                  placeholder={t('plugins.toolConfig.toolDescriptionPlaceholder', '请输入工具描述...')}
+                  helperText={t('plugins.toolConfig.toolDescriptionHelper', '详细描述工具的功能、用途和参数 ({{count}}/256)', {
+                    count: tool.description.length,
+                  })}
+                  inputProps={{ maxLength: 256 }}
                 />
               </div>
             </div>
@@ -1147,19 +1207,19 @@ const ToolConfigurationPage: React.FC = () => {
           {tabValue === 'input' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <Typography variant="h6">输入参数配置</Typography>
+                <Typography variant="h6">{t('plugins.toolConfig.inputParameters', '输入参数配置')}</Typography>
                 <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, true)}>
-                  添加输入参数
+                  {t('plugins.toolConfig.addInputParameter', '添加输入参数')}
                 </Button>
               </div>
 
               {tool.input_parameters.length === 0 ? (
                 <div className="bg-gray-50 rounded-lg p-8 text-center">
                   <Typography variant="body1" color="text.secondary">
-                    暂无输入参数
+                    {t('plugins.toolConfig.noInputParameters', '暂无输入参数')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" className="mt-1">
-                    点击&ldquo;添加输入参数&rdquo;开始配置
+                    {t('plugins.toolConfig.addInputParametersHint', '点击"添加输入参数"开始配置')}
                   </Typography>
                 </div>
               ) : (
@@ -1173,17 +1233,21 @@ const ToolConfigurationPage: React.FC = () => {
                               {param.name}
                             </Typography>
                             <Chip label={param.type} size="small" />
-                            <Chip label={param.method} size="small" variant="outlined" />
+                            {pluginType === 'api' && <Chip label={getMethodLabel(param.method)} size="small" variant="outlined" />}
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <IconButton size="small" onClick={() => openParameterDialog(param, true)} title="编辑参数">
+                          <IconButton size="small" onClick={() => openParameterDialog(param, true)} title={t('plugins.toolConfig.editParameter', '编辑参数')}>
                             <Settings className="w-4 h-4" />
                           </IconButton>
-                          <IconButton size="small" onClick={() => handleDeleteParameter(param.id, true)} title="删除参数">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteParameter(param.id, true)}
+                            title={t('plugins.toolConfig.deleteParameter', '删除参数')}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
                         </div>
@@ -1199,19 +1263,19 @@ const ToolConfigurationPage: React.FC = () => {
           {tabValue === 'output' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <Typography variant="h6">输出参数配置</Typography>
+                <Typography variant="h6">{t('plugins.toolConfig.outputParameters', '输出参数配置')}</Typography>
                 <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, false)}>
-                  添加输出参数
+                  {t('plugins.toolConfig.addOutputParameter', '添加输出参数')}
                 </Button>
               </div>
 
               {tool.output_parameters.length === 0 ? (
                 <div className="bg-gray-50 rounded-lg p-8 text-center">
                   <Typography variant="body1" color="text.secondary">
-                    暂无输出参数
+                    {t('plugins.toolConfig.noOutputParameters', '暂无输出参数')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" className="mt-1">
-                    点击&ldquo;添加输出参数&rdquo;开始配置
+                    {t('plugins.toolConfig.addOutputParametersHint', '点击"添加输出参数"开始配置')}
                   </Typography>
                 </div>
               ) : (
@@ -1225,17 +1289,20 @@ const ToolConfigurationPage: React.FC = () => {
                               {param.name}
                             </Typography>
                             <Chip label={param.type} size="small" />
-                            <Chip label={param.method} size="small" variant="outlined" />
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <IconButton size="small" onClick={() => openParameterDialog(param, false)} title="编辑参数">
+                          <IconButton size="small" onClick={() => openParameterDialog(param, false)} title={t('plugins.toolConfig.editParameter', '编辑参数')}>
                             <Settings className="w-4 h-4" />
                           </IconButton>
-                          <IconButton size="small" onClick={() => handleDeleteParameter(param.id, false)} title="删除参数">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteParameter(param.id, false)}
+                            title={t('plugins.toolConfig.deleteParameter', '删除参数')}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
                         </div>
@@ -1251,9 +1318,9 @@ const ToolConfigurationPage: React.FC = () => {
           {tabValue === 'headers' && pluginType === 'api' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <Typography variant="h6">请求头配置</Typography>
+                <Typography variant="h6">{t('plugins.toolConfig.headers', '请求头配置')}</Typography>
                 <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={handleAddHeader}>
-                  添加请求头
+                  {t('plugins.toolConfig.addHeader', '添加请求头')}
                 </Button>
               </div>
 
@@ -1307,9 +1374,11 @@ const ToolConfigurationPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <Typography variant="h6">代码编辑器</Typography>
                 <div className="flex items-center space-x-2">
-                  <Chip label={`语言: ${tool.language || 'python'}`} size="small" />
-                  <Chip label="语法高亮" size="small" variant="outlined" />
-                  {selectedTemplate && <Chip label={`模板: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />}
+                  <Chip label={` ${t('plugins.toolConfig.language', '语言')}: ${tool.language || 'python'}`} size="small" />
+                  <Chip label={t('plugins.toolConfig.syntaxHighlight', '语法高亮')} size="small" variant="outlined" />
+                  {selectedTemplate && (
+                    <Chip label={`${t('plugins.toolConfig.template', '模板')}: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />
+                  )}
                 </div>
               </div>
 
@@ -1318,17 +1387,17 @@ const ToolConfigurationPage: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <Code className="w-5 h-5 text-blue-600" />
                     <Typography variant="body2" className="font-medium">
-                      代码编辑环境
+                      {t('plugins.pluginConfig.codeEditor', '代码编辑环境')}
                     </Typography>
                   </div>
                   <div className="flex items-center space-x-3">
                     {availableTemplates.length > 0 && (
                       <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />}>
-                        代码模板
+                        {t('plugins.pluginConfig.codeTemplates', '模板')}
                       </Button>
                     )}
                     <Button variant="outlined" size="small" onClick={handleResetCode} startIcon={<RotateCcw className="w-4 h-4" />}>
-                      重置代码
+                      {t('plugins.pluginConfig.resetCode', '重置代码')}
                     </Button>
                   </div>
                 </div>
@@ -1338,7 +1407,7 @@ const ToolConfigurationPage: React.FC = () => {
                   <div className="bg-white border border-gray-200 rounded-lg p-4">
                     <Typography variant="subtitle2" className="mb-3 flex items-center">
                       <FileText className="w-4 h-4 mr-2" />
-                      选择代码模板
+                      {t('plugins.pluginConfig.selectCodeTemplate', '选择代码模板')}
                     </Typography>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1367,7 +1436,7 @@ const ToolConfigurationPage: React.FC = () => {
 
                     <div className="mt-3 flex justify-end">
                       <Button size="small" onClick={() => setShowTemplates(false)}>
-                        关闭
+                        {t('common.buttons.close', '关闭')}
                       </Button>
                     </div>
                   </div>
@@ -1377,10 +1446,10 @@ const ToolConfigurationPage: React.FC = () => {
                   {/* Language selector */}
                   <div className="bg-gray-50 border-b border-gray-200 p-3">
                     <FormControl size="small" className="min-w-32">
-                      <InputLabel>编程语言</InputLabel>
+                      <InputLabel>{t('plugins.pluginConfig.programmingLanguage', '编程语言')}</InputLabel>
                       <Select
                         value={tool.language || 'python'}
-                        label="编程语言"
+                        label={t('plugins.pluginConfig.programmingLanguage', '编程语言')}
                         onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}
                       >
                         <MenuItem value="python">Python</MenuItem>
@@ -1420,28 +1489,30 @@ const ToolConfigurationPage: React.FC = () => {
                 {/* Usage Tips */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <Typography variant="subtitle2" className="mb-2 text-blue-900">
-                    💡 使用提示
+                    {t('plugins.pluginConfig.usageTips', '💡 使用提示')}
                   </Typography>
                   <div className="space-y-1 text-sm text-blue-800">
                     {codeLanguage === 'python' ? (
                       <>
                         <div>
-                          • 确保导出 <code className="bg-blue-100 px-1 rounded">main()</code> 函数作为入口点
+                          • {t('plugins.pluginConfig.pythonTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main</code>{' '}
+                          {t('plugins.pluginConfig.pythonTips2', '函数作为入口点')}
                         </div>
-                        <div>• 使用标准库函数，避免依赖需要额外安装的包</div>
-                        <div>• 返回JSON序列化的数据结构，便于API调用</div>
+                        <div>• {t('plugins.pluginConfig.pythonTips3', '使用标准库函数，避免依赖需要额外安装的包')}</div>
+                        <div>• {t('plugins.pluginConfig.pythonTips4', '返回JSON序列化的数据结构，便于API调用')}</div>
                       </>
                     ) : (
                       <>
                         <div>
-                          • 确保导出 <code className="bg-blue-100 px-1 rounded">main</code> 函数作为入口点
+                          • {t('plugins.pluginConfig.jsTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main</code>{' '}
+                          {t('plugins.pluginConfig.jsTips2', '函数作为入口点')}
                         </div>
-                        <div>• 使用CommonJS模块系统（require/module.exports）</div>
-                        <div>• 避免使用ES6模块语法，除非项目支持</div>
-                        <div>• 返回JSON可序列化的数据结构</div>
+                        <div>• {t('plugins.pluginConfig.jsTips3', '使用CommonJS模块系统（require/module.exports')}）</div>
+                        <div>• {t('plugins.pluginConfig.jsTips4', '避免使用ES6模块语法，除非项目支持')}</div>
+                        <div>• {t('plugins.pluginConfig.jsTips5', '返回JSON序列化的数据结构，便于API调用')}</div>
                       </>
                     )}
-                    <div>• 使用模板可以快速开始开发</div>
+                    <div>• {t('plugins.pluginConfig.templateTips', '• 使用模板可以快速开始开发')}</div>
                   </div>
                 </div>
               </div>
@@ -1452,9 +1523,9 @@ const ToolConfigurationPage: React.FC = () => {
           {tabValue === 'test' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <Typography variant="h6">工具测试</Typography>
+                <Typography variant="h6">{t('plugins.tools.test.toolTest', '工具测试')}</Typography>
                 <Button variant="contained" onClick={handleTestConnection} startIcon={<Settings className="w-4 h-4" />}>
-                  开始测试
+                  {t('plugins.tools.test.startTest', '开始测试')}
                 </Button>
               </div>
 
@@ -1466,10 +1537,12 @@ const ToolConfigurationPage: React.FC = () => {
                     </div>
                     <div>
                       <Typography variant="subtitle1" className="font-medium">
-                        {pluginType === 'code' ? '代码工具测试' : 'API工具测试'}
+                        {pluginType === 'code' ? t('plugins.toolConfig.codeToolTest', '代码工具测试') : t('plugins.toolConfig.apiToolTest', 'API工具测试')}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {pluginType === 'code' ? '测试代码配置是否正确，验证代码执行是否可用' : '测试工具配置是否正确，验证API调用是否可用'}
+                        {pluginType === 'code'
+                          ? t('plugins.toolConfig.testCodeConfig', '测试代码配置是否正确，验证代码执行是否可用')
+                          : t('plugins.toolConfig.testApiConfig', '测试工具配置是否正确，验证API调用是否可用')}
                       </Typography>
                     </div>
                   </div>
@@ -1480,19 +1553,19 @@ const ToolConfigurationPage: React.FC = () => {
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            运行时环境: {tool.language === 'javascript' ? 'Node.js' : 'Python 3'}
+                            {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}: {tool.language === 'javascript' ? 'Node.js' : 'Python 3'}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            代码长度: {tool.code?.length || 0} 字符
+                            {t('plugins.toolConfig.codeLength', '代码长度')}: {tool.code?.length || 0} {t('plugins.toolConfig.characterCount', '字符')}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            输入参数: {tool.input_parameters.length} 个
+                            {t('plugins.toolConfig.inputParametersName', '输入参数')}: {tool.input_parameters.length} {t('plugins.toolConfig.number', '个')}
                           </Typography>
                         </div>
                       </>
@@ -1500,26 +1573,35 @@ const ToolConfigurationPage: React.FC = () => {
                       <>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <Typography variant="body2" color="text.secondary">
-                            API路径: {tool.path}
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '70ch',
+                            }}
+                          >
+                            {t('plugins.toolConfig.apiPath', 'API路径')}: {tool.path}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            请求方法: {getMethodString(tool.method)}
+                            {t('plugins.pluginConfig.method', '请求方法')}: {getMethodString(tool.method)}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            输入参数: {tool.input_parameters.length} 个
+                            {t('plugins.toolConfig.inputParametersName', '输入参数')}: {tool.input_parameters.length} {t('plugins.toolConfig.number', '个')}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            请求头配置: {tool.headers.length} 个
+                            {t('plugins.toolConfig.headers', '请求头配置')}: {tool.headers.length} {t('plugins.toolConfig.number', '个')}
                           </Typography>
                         </div>
                       </>
@@ -1529,11 +1611,13 @@ const ToolConfigurationPage: React.FC = () => {
                   <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                     <Typography variant="body2" color="text.secondary" className="mb-2">
                       {pluginType === 'code'
-                        ? '点击"开始测试"按钮打开代码测试对话框，可以测试代码执行并查看输出结果'
-                        : '点击"开始测试"按钮打开测试对话框，填写参数并查看API调用返回结果'}
+                        ? t('plugins.toolConfig.testCodeConfigHelper', '点击"开始测试"按钮打开代码测试对话框，可以测试代码执行并查看输出结果')
+                        : t('plugins.toolConfig.testApiConfigHelper', '点击"开始测试"按钮打开测试对话框，填写参数并查看API调用返回结果')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {pluginType === 'code' ? '系统将在隔离环境中执行代码，提供执行状态和错误日志' : '左侧填写测试参数，右侧查看API调用返回结果'}
+                      {pluginType === 'code'
+                        ? t('plugins.toolConfig.apiTestResultHelper', '系统将在隔离环境中执行代码，提供执行状态和错误日志')
+                        : t('plugins.toolConfig.apiTestParameterHelper', '左侧填写测试参数，右侧查看API调用返回结果')}
                     </Typography>
                   </div>
                 </div>
@@ -1555,27 +1639,27 @@ const ToolConfigurationPage: React.FC = () => {
         fullWidth
       >
         <DialogTitle>
-          {editingParameter ? '编辑参数' : '添加参数'}
-          {isInputDialogOpen ? ' (输入)' : ' (输出)'}
+          {editingParameter ? t('plugins.toolConfig.editParameter', '编辑参数') : t('plugins.toolConfig.addParameter', '添加参数')}
+          {isInputDialogOpen ? ` (${t('plugins.toolConfig.inputParameter', '输入')})` : ` (${t('plugins.toolConfig.outputParameter', '输出')})`}
         </DialogTitle>
         <DialogContent>
           <div className="space-y-4 mt-2">
             <div>
               <Typography variant="subtitle2" className="mb-2">
-                参数名称 <span className="text-red-500 ml-1">*</span>
+                {t('plugins.toolConfig.parameterName', '参数名称')} <span className="text-red-500 ml-1">*</span>
               </Typography>
               <TextField
                 fullWidth
                 value={parameterForm.name}
                 onChange={e => handleParameterFormChange('name', e.target.value)}
-                placeholder="请输入参数名称..."
-                helperText={`参数名称 (${parameterForm.name.length}/20)`}
-                inputProps={{ maxLength: 20 }}
+                placeholder={t('plugins.toolConfig.parameterNameHelper', '请输入参数名称...')}
+                helperText={`${t('plugins.toolConfig.parameterName', '参数名称')} (${parameterForm.name.length}/128)`}
+                inputProps={{ maxLength: 128 }}
               />
             </div>
             <div>
               <Typography variant="subtitle2" className="mb-2">
-                参数描述 <span className="text-red-500 ml-1">*</span>
+                {t('plugins.toolConfig.parameterDescription', '参数描述')} <span className="text-red-500 ml-1">*</span>
               </Typography>
               <TextField
                 fullWidth
@@ -1583,37 +1667,93 @@ const ToolConfigurationPage: React.FC = () => {
                 rows={2}
                 value={parameterForm.description}
                 onChange={e => handleParameterFormChange('description', e.target.value)}
-                placeholder="请输入参数描述..."
-                helperText={`参数描述 (${parameterForm.description.length}/40)`}
-                inputProps={{ maxLength: 40 }}
+                placeholder={t('plugins.toolConfig.parameterDescriptionHelper', '请输入参数描述...')}
+                helperText={`${t('plugins.toolConfig.parameterDescription', '参数描述')} (${parameterForm.description.length}/256)`}
+                inputProps={{ maxLength: 256 }}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            {isInputDialogOpen ? (
+              pluginType === 'api' ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Typography variant="subtitle2" className="mb-2">
+                      参数类型
+                    </Typography>
+                    <FormControl fullWidth>
+                      <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
+                        <MenuItem value="string">字符串</MenuItem>
+                        <MenuItem value="number">数字</MenuItem>
+                        <MenuItem value="boolean">布尔值</MenuItem>
+                        <MenuItem value="array">数组</MenuItem>
+                        <MenuItem value="object">对象</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </div>
+                  <div>
+                    <Typography variant="subtitle2" className="mb-2">
+                      传入方法
+                    </Typography>
+                    <FormControl fullWidth>
+                      <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
+                        <MenuItem value={0}>无</MenuItem>
+                        <MenuItem value={1}>Header参数</MenuItem>
+                        <MenuItem value={2}>Query参数</MenuItem>
+                        {tool.method !== 1 && <MenuItem value={3}>Body参数</MenuItem>}
+                      </Select>
+                    </FormControl>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <Typography variant="subtitle2" className="mb-2">
+                    参数类型
+                  </Typography>
+                  <FormControl fullWidth>
+                    <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
+                      <MenuItem value="string">字符串</MenuItem>
+                      <MenuItem value="number">数字</MenuItem>
+                      <MenuItem value="boolean">布尔值</MenuItem>
+                      <MenuItem value="array">数组</MenuItem>
+                      <MenuItem value="object">对象</MenuItem>
+                    </Select>
+                  </FormControl>
+                </div>
+              )
+            ) : (
               <div>
                 <Typography variant="subtitle2" className="mb-2">
-                  参数类型
+                  {t('plugins.toolConfig.parameterType', '参数类型')}
                 </Typography>
                 <FormControl fullWidth>
                   <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                    <MenuItem value="string">字符串</MenuItem>
-                    <MenuItem value="number">数字</MenuItem>
-                    <MenuItem value="boolean">布尔值</MenuItem>
-                    <MenuItem value="array">数组</MenuItem>
-                    <MenuItem value="object">对象</MenuItem>
+                    <MenuItem value="string">{t('plugins.toolConfig.parameterTypeOptions.string', '字符串')}</MenuItem>
+                    <MenuItem value="number">{t('plugins.toolConfig.parameterTypeOptions.number', '数字')}</MenuItem>
+                    <MenuItem value="boolean">{t('plugins.toolConfig.parameterTypeOptions.boolean', '布尔值')}</MenuItem>
+                    <MenuItem value="array">{t('plugins.toolConfig.parameterTypeOptions.array', '数组')}</MenuItem>
+                    <MenuItem value="object">{t('plugins.toolConfig.parameterTypeOptions.object', '对象')}</MenuItem>
                   </Select>
                 </FormControl>
               </div>
+            )}
+            {isInputDialogOpen && (
               <div>
-                <Typography variant="subtitle2" className="mb-2">
-                  传入方法
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="is_required"
+                    checked={parameterForm.is_required}
+                    onChange={e => handleParameterFormChange('is_required', e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="is_required" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    {t('plugins.toolConfig.isRequired', '必选参数')}
+                  </label>
+                </div>
+                <Typography variant="caption" className="text-gray-500 mt-1 block">
+                  {t('plugins.toolConfig.isRequiredHelper', '勾选后该参数为必填项')}
                 </Typography>
-                <FormControl fullWidth>
-                  <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
-                    <MenuItem value="query">Query参数</MenuItem>
-                  </Select>
-                </FormControl>
               </div>
-            </div>
+            )}
           </div>
         </DialogContent>
         <DialogActions>
@@ -1624,30 +1764,28 @@ const ToolConfigurationPage: React.FC = () => {
               setEditingParameter(null)
             }}
           >
-            取消
+            {t('common.buttons.cancel', '取消')}
           </Button>
           <Button variant="contained" onClick={() => handleSaveParameter(isInputDialogOpen)}>
-            {editingParameter ? '更新' : '添加'}
+            {editingParameter ? t('common.buttons.update', '更新') : t('common.buttons.add', '添加')}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>确认删除工具</DialogTitle>
+        <DialogTitle>{t('plugins.tools.deleteDialog.title', '确认删除工具')}</DialogTitle>
         <DialogContent>
           <div className="space-y-4 mt-2">
-            <Typography variant="body1">
-              您确定要删除工具 <strong>&quot;{tool?.name}&quot;</strong> 吗？
-            </Typography>
+            <Typography variant="body1">{t('plugins.tools.deleteDialog.content', { name: tool?.name })}</Typography>
             <Typography variant="body2" color="text.secondary">
-              此操作不可撤销，删除后所有相关配置将被永久移除。
+              {t('plugins.tools.deleteDialog.warning', '此操作不可撤销，删除后所有相关配置将被永久移除。')}
             </Typography>
           </div>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)} disabled={deletePluginApiMutation.isPending}>
-            取消
+            {t('common.buttons.cancel', '取消')}
           </Button>
           <Button
             variant="contained"
@@ -1656,7 +1794,7 @@ const ToolConfigurationPage: React.FC = () => {
             disabled={deletePluginApiMutation.isPending}
             startIcon={deletePluginApiMutation.isPending ? <CircularProgress size={16} /> : <Trash2 className="w-4 h-4" />}
           >
-            {deletePluginApiMutation.isPending ? '删除中...' : '确认删除'}
+            {deletePluginApiMutation.isPending ? t('common.buttons.deleting', '删除中...') : t('common.buttons.confirmDelete', '确认删除')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1673,7 +1811,9 @@ const ToolConfigurationPage: React.FC = () => {
       >
         <DialogTitle>
           <div className="flex items-center justify-between">
-            <span>测试工具: {tool?.name}</span>
+            <span>
+              {t('plugins.toolConfig.testTool', '测试工具')}: {tool?.name}
+            </span>
             <IconButton onClick={() => setTestDialogOpen(false)}>
               <Settings className="w-4 h-4" />
             </IconButton>
@@ -1684,9 +1824,9 @@ const ToolConfigurationPage: React.FC = () => {
             {/* Left Side - Test Parameters */}
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
-                <Typography variant="h6">测试参数</Typography>
+                <Typography variant="h6">{t('plugins.toolConfig.testParameters', '测试参数')}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  (根据输入参数配置)
+                  ({t('plugins.toolConfig.testParametersHelper', '根据工具配置填写测试参数')})
                 </Typography>
               </div>
 
@@ -1718,10 +1858,10 @@ const ToolConfigurationPage: React.FC = () => {
               ) : (
                 <div className="bg-gray-50 rounded-lg p-6 text-center">
                   <Typography variant="body1" color="text.secondary">
-                    该工具没有输入参数
+                    {t('plugins.toolConfig.noInputParams', '该工具没有输入参数')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    可以直接执行测试
+                    {t('plugins.toolConfig.canExecuteTest', '可以直接执行测试')}
                   </Typography>
                 </div>
               )}
@@ -1734,7 +1874,7 @@ const ToolConfigurationPage: React.FC = () => {
                   fullWidth
                   startIcon={isTestRunning || executePluginMutation.isPending ? <CircularProgress size={16} /> : <Settings className="w-4 h-4" />}
                 >
-                  {isTestRunning || executePluginMutation.isPending ? '执行中...' : '执行测试'}
+                  {isTestRunning || executePluginMutation.isPending ? t('common.buttons.executing', '执行中...') : t('common.buttons.executeTest', '执行测试')}
                 </Button>
               </div>
             </div>
@@ -1744,14 +1884,14 @@ const ToolConfigurationPage: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Typography variant="h6">测试结果</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  (API调用返回)
+                  ({t('plugins.toolConfig.apiCallReturn', 'API调用返回')})
                 </Typography>
               </div>
 
               {testError ? (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <Typography variant="body1" color="error" className="font-medium">
-                    测试失败
+                    {t('plugins.toolConfig.testFailed', '测试失败')}
                   </Typography>
                   <Typography variant="body2" color="error">
                     {testError}
@@ -1768,11 +1908,11 @@ const ToolConfigurationPage: React.FC = () => {
                           <div className="flex items-center space-x-2">
                             <div className={`w-3 h-3 rounded-full ${results.execution_success ? 'bg-green-500' : 'bg-red-500'}`}></div>
                             <Typography variant="subtitle2" className="font-medium">
-                              执行状态: {results.execution_success ? '成功' : '失败'}
+                              {t('plugins.toolConfig.executionStatus', '执行状态')}: {results.execution_success ? 'success' : 'error'}
                             </Typography>
                             {results.error_code !== null && (
                               <Chip
-                                label={`错误码: ${results.error_code}`}
+                                label={`${t('plugins.toolConfig.errorCode', '错误码')}: ${results.error_code}`}
                                 size="small"
                                 variant={results.error_code === 0 ? 'outlined' : 'filled'}
                                 color={results.error_code === 0 ? 'success' : 'error'}
@@ -1784,7 +1924,7 @@ const ToolConfigurationPage: React.FC = () => {
                           {results.error_message && (
                             <div className={`p-3 rounded border ${results.execution_success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                               <Typography variant="body2" className="font-medium mb-1">
-                                执行消息:
+                                {t('plugins.toolConfig.executionMessage', '执行消息')}:
                               </Typography>
                               <Typography variant="body2" className={results.execution_success ? 'text-green-800' : 'text-red-800'}>
                                 {results.error_message}
@@ -1796,7 +1936,7 @@ const ToolConfigurationPage: React.FC = () => {
                           {tool?.output_parameters && tool.output_parameters.length > 0 && (
                             <div className="bg-blue-50 border border-blue-200 rounded p-3">
                               <Typography variant="subtitle2" className="font-medium text-blue-800 mb-3">
-                                📊 输出参数结果
+                                {t('plugins.toolConfig.outputResult', '📊 输出参数结果')}
                               </Typography>
                               <div className="space-y-3">
                                 {(() => {
@@ -1827,7 +1967,9 @@ const ToolConfigurationPage: React.FC = () => {
                           {/* 原始输出结果 */}
                           {results.output && (
                             <details className="text-sm">
-                              <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium mb-2">📄 查看完整原始输出</summary>
+                              <summary className="cursor-pointer text-blue-600 hover:text-blue-800 font-medium mb-2">
+                                {t('plugins.toolConfig.viewRawOutput', '📄 查看完整原始输出')}
+                              </summary>
                               <div className="bg-white border border-gray-200 rounded p-3 mt-2">
                                 <pre className="text-sm text-gray-800 whitespace-pre-wrap bg-gray-100 p-2 rounded">
                                   {JSON.stringify(results.output, null, 2)}
@@ -1839,7 +1981,9 @@ const ToolConfigurationPage: React.FC = () => {
                           {/* 原始响应（仅在有错误或调试时显示） */}
                           {results.raw_response && !results.execution_success && (
                             <details className="text-sm">
-                              <summary className="cursor-pointer text-blue-600 hover:text-blue-800">查看原始响应数据</summary>
+                              <summary className="cursor-pointer text-blue-600 hover:text-blue-800">
+                                {t('plugins.toolConfig.viewRawResponse', '查看原始响应数据')}
+                              </summary>
                               <pre className="text-xs text-gray-600 mt-2 whitespace-pre-wrap bg-gray-100 p-2 rounded">
                                 {JSON.stringify(results.raw_response, null, 2)}
                               </pre>
@@ -1850,14 +1994,16 @@ const ToolConfigurationPage: React.FC = () => {
                           {results.parse_error && (
                             <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
                               <Typography variant="body2" className="font-medium text-yellow-800 mb-1">
-                                解析错误:
+                                {t('plugins.toolConfig.parseError', '解析错误:')}
                               </Typography>
                               <Typography variant="body2" className="text-yellow-700">
                                 {results.parse_error}
                               </Typography>
                               {results.raw_buffer && (
                                 <details className="text-sm mt-2">
-                                  <summary className="cursor-pointer text-yellow-600 hover:text-yellow-800">查看原始数据</summary>
+                                  <summary className="cursor-pointer text-yellow-600 hover:text-yellow-800">
+                                    {t('plugins.toolConfig.viewRawData', '查看原始数据')}
+                                  </summary>
                                   <pre className="text-xs text-gray-600 mt-1 whitespace-pre-wrap bg-yellow-50 p-2 rounded">{results.raw_buffer}</pre>
                                 </details>
                               )}
@@ -1866,7 +2012,9 @@ const ToolConfigurationPage: React.FC = () => {
 
                           {/* 执行时间戳 */}
                           {results.timestamp && (
-                            <div className="text-xs text-gray-500 border-t pt-2">执行时间: {new Date(results.timestamp).toLocaleString('zh-CN')}</div>
+                            <div className="text-xs text-gray-500 border-t pt-2">
+                              {t('plugins.toolConfig.executionTime', '执行时间:')} {new Date(results.timestamp).toLocaleString('zh-CN')}
+                            </div>
                           )}
                         </div>
                       )
@@ -1875,7 +2023,7 @@ const ToolConfigurationPage: React.FC = () => {
                       return (
                         <div className="space-y-2">
                           <Typography variant="body2" color="error">
-                            结果解析失败，显示原始数据:
+                            {t('plugins.toolConfig.resultParseFailed', '结果解析失败，显示原始数据')}:
                           </Typography>
                           <pre className="text-sm text-gray-800 whitespace-pre-wrap bg-red-50 p-2 rounded border border-red-200">{testResults}</pre>
                         </div>
@@ -1886,20 +2034,30 @@ const ToolConfigurationPage: React.FC = () => {
               ) : (
                 <div className="bg-gray-50 rounded-lg p-6 text-center">
                   <Typography variant="body1" color="text.secondary">
-                    暂无测试结果
+                    {t('plugins.toolConfig.noResults', '暂无测试结果')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    填写参数后点击&ldquo;执行测试&rdquo;查看结果
+                    {t('plugins.toolConfig.fillParamsHint', '填写参数后点击"执行测试"查看结果')}
                   </Typography>
                 </div>
               )}
 
               <div className="pt-4 border-t space-y-2">
                 <Typography variant="subtitle2" className="font-medium">
-                  测试信息
+                  {t('plugins.toolConfig.testInfo', '测试信息')}
                 </Typography>
                 <div className="space-y-1 text-sm text-gray-600">
-                  <div>API路径: {tool?.path}</div>
+                  <Typography
+                    component="div"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '70ch',
+                    }}
+                  >
+                    API路径: {tool?.path}
+                  </Typography>
                   <div>请求方法: {tool && getMethodString(tool.method)}</div>
                   <div>测试时间: {new Date().toLocaleString('zh-CN')}</div>
                 </div>
@@ -1908,16 +2066,15 @@ const ToolConfigurationPage: React.FC = () => {
           </div>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTestDialogOpen(false)}>关闭</Button>
+          <Button onClick={() => setTestDialogOpen(false)}>{t('common.buttons.close', '关闭')}</Button>
           {testResults && (
             <Button
               variant="outlined"
               onClick={() => {
-                navigator.clipboard.writeText(testResults)
-                setSnackbar({ open: true, message: '测试结果已复制到剪贴板', severity: 'success' })
+                copyToClipboard(testResults, setSnackbar, '测试结果已复制到剪贴板')
               }}
             >
-              复制结果
+              {t('plugins.toolConfig.copyResult', '复制结果')}
             </Button>
           )}
         </DialogActions>

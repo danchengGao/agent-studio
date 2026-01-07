@@ -1,0 +1,142 @@
+{
+  "title": "智能体开发",
+  "subtitle": "创建和管理您的AI智能体",
+  "createAgent": "创建智能体",
+  "agentList": {
+    "noAgents": "暂无智能体",
+    "searchPlaceholder": "搜索智能体名称或描述...",
+    "loading": "加载智能体中...",
+    "sortBy": "排序方式",
+    "sortByName": "按名称排序",
+    "sortByCreated": "按创建时间排序",
+    "sortByUpdated": "按更新时间排序",
+    "ascending": "升序排序",
+    "descending": "降序排序",
+    "model": "模型",
+    "noModel": "未配置",
+    "noAgentsFound": "没有找到智能体",
+    "createFirstAgent": "开始创建您的第一个智能体，构建强大的AI助手生态系统",
+    "editNamePlaceholder": "请输入智能体名称（最多100个字符）",
+    "editDescriptionPlaceholder": "请输入智能体描述（最多500个字符）",
+    "createFirst": "创建智能体",
+    "clearSearch": "清空搜索",
+    "modelLoading": "加载中...",
+    "modelDisabledTooltip": "该模型已被禁用",
+    "modelDisabledTag": "(已禁用)",
+    "searchNoAgentsFoundTitle": "未找到匹配的智能体",
+    "searchNoAgentsFoundDesc": "没有找到包含 \"{{keyword}}\" 的智能体，请尝试其他搜索词或创建新的智能体",
+    "createNewAgentButton": "创建新智能体",
+    "characterCount": {
+      "name": "/100",
+      "description": "/500"
+    }
+  },
+  "addBtn": {
+    "addExisting": "添加已有",
+    "createNew": "创建新的"
+  },
+  "agentPublishDialog": {
+    "title": "提交新版本",
+    "subtitle": "创建智能体的版本标签",
+    "fields": {
+      "version": {
+        "label": "版本号",
+        "placeholder": "例如: v1.0.0",
+        "hint": "格式：v主版本.次版本.修订版本（例如: v0.0.1）"
+      },
+      "description": {
+        "label": "版本描述",
+        "placeholder": "请描述此版本的主要更新内容...",
+        "hint": "请输入版本描述，说明此版本的更新内容"
+      }
+    },
+    "buttons": {
+      "cancel": "取消",
+      "confirm": "提交新版本"
+    },
+    "status": {
+      "publishing": "发布中..."
+    },
+    "errors": {
+      "missingAgent": "智能体信息不完整，无法发布",
+      "missingVersion": "请输入版本号",
+      "missingDescription": "请输入版本描述",
+      "saveFailed": "保存失败，无法继续发布",
+      "publishFailed": "发布失败",
+      "publishFailedRetry": "发布失败，请重试"
+    }
+  },
+  "settingDialog": {
+    "title": "编辑智能体信息",
+    "fields": {
+      "name": {
+        "label": "名称",
+        "placeholder": "例如：智能客服助手",
+        "helper": {
+          "required": "请输入智能体名称",
+          "tooLong": "名称过长，请控制在{{max}}字符以内（当前：{{current}}/{{max}}）",
+          "normal": "为您的智能体起一个描述性的名称（{{current}}/{{max}}）"
+        }
+      },
+      "description": {
+        "label": "功能描述",
+        "placeholder": "详细描述智能体的功能、用途和行为特征...",
+        "helper": {
+          "tooLong": "描述过长，请控制在{{max}}字符以内（当前：{{current}}/{{max}}）",
+          "normal": "详细描述智能体的功能和行为（{{current}}/{{max}}）"
+        }
+      }
+    },
+    "icon": {
+      "label": "选择图标",
+      "current": "当前选择："
+    },
+    "buttons": {
+      "cancel": "取消",
+      "save": "保存"
+    }
+  },
+  "historyPanel": {
+    "title": "版本历史",
+    "subtitle": "查看和切换智能体版本",
+    "status": {
+      "loading": "加载中...",
+      "loadFailed": "加载失败：{{error}}",
+      "noData": "暂无版本数据",
+      "loadingFailed": "获取版本列表失败",
+      "deleting": "删除中..."
+    },
+    "fields": {
+      "version": "版本",
+      "description": "版本描述",
+      "createdAt": "创建时间"
+    },
+    "actions": {
+      "createCopy": "创建副本",
+      "restore": "还原至该版本",
+      "delete": "删除",
+      "switching": "切换中..."
+    },
+    "description": {
+      "label": "版本描述：",
+      "empty": "无版本描述",
+      "draft": "当前草稿版本"
+    },
+    "time": {
+      "invalid": "无效时间",
+      "formatError": "时间格式错误"
+    },
+    "dialogs": {
+      "restore": {
+        "title": "还原为此版本",
+        "message": "还原后，将覆盖最新编写的智能体内容",
+        "confirm": "确认"
+      },
+      "delete": {
+        "title": "删除版本",
+        "message": "确定要删除版本 {{version}} 吗？删除后无法恢复",
+        "confirm": "删除"
+      }
+    }
+  }
+}

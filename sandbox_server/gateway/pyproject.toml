@@ -3,18 +3,22 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jiuwen-sandbox-gateway"
+name = "openjiuwen-sandbox-gateway"
 version = "0.1.0"
 requires-python = ">=3.11.4"
 dependencies = [
-    "Quart==0.20.0",
+    "fastapi>=0.124.0",
+    "uvicorn>=0.38.0",
     "httpx==0.28.1",
+    "pyyaml==6.0.3",
 ]
 
-[project.scripts]
-jiuwen-sandbox-gateway = "jiuwen_sandbox_gateway.server:main"
+[tool.uv]
+default-groups = ['dev']
 
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple/"
 
-
+[dependency-groups]
+dev = [
+]

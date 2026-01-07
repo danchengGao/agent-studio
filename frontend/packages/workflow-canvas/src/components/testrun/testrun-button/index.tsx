@@ -13,56 +13,59 @@ import { Play } from 'lucide-react'
 import { testRunPanelFactory } from '../testrun-panel'
 import { testRunRuntimeService } from '../runtime/testrun-runtime-service'
 import { useValidationStatus } from '../../../hooks'
+import { useTranslation } from '../../../i18n'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 
 import styles from './index.module.less'
 
 export function TestRunButton(props: { disabled: boolean; workflowId?: string; spaceId?: string }) {
+  const { t } = useTranslation()
   const [isSaving, setIsSaving] = useState(false)
   const clientContext = useClientContext()
   const panelManager = usePanelManager()
   const { hasValidationErrors, validationErrors, validateAndReturnErrors, showErrorPanel } = useValidationStatus()
+  const selectedVersion = useWorkflowStore(s => s.selectedVersion)
 
-  /**
-   * Validate all nodes and Save
-   */
   const onTestRun = useCallback(async () => {
     try {
       setIsSaving(true)
 
-      // Validate workflow and show errors if any
       const validationResult = await validateAndReturnErrors(true, true)
 
       if (validationResult.hasErrors) {
-        // If there are errors, don't continue execution
         return
       }
 
       const workflowData = clientContext.document.toJSON()
 
-      // Save workflow if IDs are provided
       if (props.workflowId && props.spaceId) {
-        try {
-          await testRunRuntimeService.saveWorkflow({
-            workflow_id: props.workflowId,
-            space_id: props.spaceId,
-            schema: JSON.stringify(workflowData),
-          })
-        } catch (saveError) {
-          // Continue execution even if save fails
+        const viewingVersion = selectedVersion
+        if (viewingVersion && viewingVersion !== 'draft') {
+          console.log('Skip test run save: viewing history version ->', viewingVersion)
+        } else {
+          try {
+            await testRunRuntimeService.saveWorkflow({
+              workflow_id: props.workflowId,
+              version: '',
+              space_id: props.spaceId,
+              schema: JSON.stringify(workflowData),
+            })
+          } catch (saveError) {
+          }
         }
       }
 
-      // Open test run panel
       panelManager.open(testRunPanelFactory.key, 'right', {
         props: {
           workflowId: props.workflowId,
           spaceId: props.spaceId,
+          version: selectedVersion,
         },
       })
     } finally {
       setIsSaving(false)
     }
-  }, [clientContext, panelManager, props.workflowId, props.spaceId, validateAndReturnErrors])
+  }, [clientContext, panelManager, props.workflowId, props.spaceId, validateAndReturnErrors, selectedVersion])
 
   const errorCount = validationErrors.length
   const isDisabled = props.disabled || isSaving
@@ -79,13 +82,13 @@ export function TestRunButton(props: { disabled: boolean; workflowId?: string; s
       {errorCount === 0 ? (
         <Button disabled={isDisabled} loading={isSaving} onClick={onTestRun} className={styles.testrunSuccessButton}>
           <Play size={16} className={styles['mr-2']} />
-          {isSaving ? '保存中...' : '试运行'}
+          {isSaving ? t('workflowCanvas.testrun.saving') : t('workflowCanvas.testrun.testRun')}
         </Button>
       ) : (
         <Badge count={errorCount} position="rightTop" type="danger">
           <Button type="danger" disabled={isDisabled} loading={isSaving} onClick={handleButtonClick} className={styles.testrunErrorButton}>
             <Play size={16} className={styles['mr-2']} />
-            {isSaving ? '保存中...' : '试运行'}
+            {isSaving ? t('workflowCanvas.testrun.saving') : t('workflowCanvas.testrun.testRun')}
           </Button>
         </Badge>
       )}

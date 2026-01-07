@@ -14,6 +14,7 @@ import { nodeRegistries } from '../../nodes'
 import { WorkflowNodeType } from '../../nodes/constants'
 import { canContainNode } from '../../utils'
 import { NodesContainer, SearchContainer, CategoriesContainer, CategoryTitle, NodesGrid, NodeWrap, NodeLabel } from './styled'
+import { t } from '../../i18n'
 
 // 节点类型枚举键到可搜索名称的映射
 const nodeTypeKeyNames: Record<WorkflowNodeType, string> = {
@@ -39,38 +40,44 @@ const nodeTypeKeyNames: Record<WorkflowNodeType, string> = {
   [WorkflowNodeType.Plugin]: 'Plugin',
 }
 
-// Chinese translations for node types
-const nodeTypeTranslations: Record<WorkflowNodeType, string> = {
-  [WorkflowNodeType.Start]: '开始',
-  [WorkflowNodeType.End]: '结束',
-  [WorkflowNodeType.LLM]: '大语言模型',
-  [WorkflowNodeType.Code]: '代码',
-  [WorkflowNodeType.Condition]: '选择器',
-  [WorkflowNodeType.Loop]: '循环',
-  [WorkflowNodeType.BlockStart]: '块开始',
-  [WorkflowNodeType.BlockEnd]: '块结束',
-  [WorkflowNodeType.Comment]: '注释',
-  [WorkflowNodeType.VariableMerge]: '变量聚合',
-  [WorkflowNodeType.Continue]: '继续',
-  [WorkflowNodeType.Break]: '跳出',
-  [WorkflowNodeType.Input]: '输入',
-  [WorkflowNodeType.Output]: '输出',
-  [WorkflowNodeType.Intent]: '意图识别',
-  [WorkflowNodeType.Questioner]: '提问器',
-  [WorkflowNodeType.TextEditor]: '文本编辑',
-  [WorkflowNodeType.Workflow]: '工作流',
-  [WorkflowNodeType.Variable]: '变量',
-  [WorkflowNodeType.Plugin]: '插件',
+// Node type to i18n key mapping
+const nodeTypeI18nKeys: Record<WorkflowNodeType, string> = {
+  [WorkflowNodeType.Start]: 'workflowCanvas.node.Start',
+  [WorkflowNodeType.End]: 'workflowCanvas.node.End',
+  [WorkflowNodeType.LLM]: 'workflowCanvas.node.LLM',
+  [WorkflowNodeType.Code]: 'workflowCanvas.node.Code',
+  [WorkflowNodeType.Condition]: 'workflowCanvas.node.Selector',
+  [WorkflowNodeType.Loop]: 'workflowCanvas.node.Loop',
+  [WorkflowNodeType.BlockStart]: 'workflowCanvas.node.Start',
+  [WorkflowNodeType.BlockEnd]: 'workflowCanvas.node.End',
+  [WorkflowNodeType.Comment]: 'workflowCanvas.node.Comment',
+  [WorkflowNodeType.VariableMerge]: 'workflowCanvas.node.Variable',
+  [WorkflowNodeType.Continue]: 'workflowCanvas.node.Continue',
+  [WorkflowNodeType.Break]: 'workflowCanvas.node.Break',
+  [WorkflowNodeType.Input]: 'workflowCanvas.node.Input',
+  [WorkflowNodeType.Output]: 'workflowCanvas.node.Output',
+  [WorkflowNodeType.Intent]: 'workflowCanvas.node.Intent',
+  [WorkflowNodeType.Questioner]: 'workflowCanvas.node.Questioner',
+  [WorkflowNodeType.TextEditor]: 'workflowCanvas.node.TextEditor',
+  [WorkflowNodeType.Workflow]: 'workflowCanvas.node.Workflow',
+  [WorkflowNodeType.Variable]: 'workflowCanvas.node.Variable',
+  [WorkflowNodeType.Plugin]: 'workflowCanvas.node.Plugin',
+}
+
+// Get translated node name
+const getNodeTypeName = (type: WorkflowNodeType): string => {
+  const i18nKey = nodeTypeI18nKeys[type]
+  return i18nKey ? t(i18nKey) : String(type)
 }
 
 // 节点分类
 const nodeCategories = {
   llmAndWorkflow: {
-    name: '',
+    nameKey: 'workflowCanvas.category.llmAndWorkflow',
     nodes: [WorkflowNodeType.LLM, WorkflowNodeType.Workflow, WorkflowNodeType.Plugin],
   },
   businessLogic: {
-    name: '业务逻辑',
+    nameKey: 'workflowCanvas.category.businessLogic',
     nodes: [
       WorkflowNodeType.Code,
       WorkflowNodeType.Condition,
@@ -83,11 +90,11 @@ const nodeCategories = {
     ],
   },
   inputOutput: {
-    name: '输入&输出',
+    nameKey: 'workflowCanvas.category.inputOutput',
     nodes: [WorkflowNodeType.Input, WorkflowNodeType.Output],
   },
   components: {
-    name: '组件',
+    nameKey: 'workflowCanvas.category.components',
     nodes: [WorkflowNodeType.Questioner, WorkflowNodeType.TextEditor],
   },
 }
@@ -251,7 +258,7 @@ export const NodeList: FC<NodeListProps> = props => {
     if (searchQuery.trim()) {
       filtered = visibleRegistries
         .map(registry => {
-          const translatedName = nodeTypeTranslations[registry.type as keyof typeof nodeTypeTranslations] || String(registry.type)
+          const translatedName = getNodeTypeName(registry.type as WorkflowNodeType)
           const nodeType = String(registry.type)
           const nodeTypeKey = nodeTypeKeyNames[registry.type as WorkflowNodeType] || ''
           const description = registry.info?.description || ''
@@ -295,7 +302,7 @@ export const NodeList: FC<NodeListProps> = props => {
     <NodesContainer>
       {/* 搜索框 */}
       <SearchContainer>
-        <Input placeholder="搜索节点..." value={searchQuery} onChange={setSearchQuery} style={{ width: '100%', height: '32px' }} />
+        <Input placeholder={t('workflowCanvas.nodePanel.searchPlaceholder')} value={searchQuery} onChange={setSearchQuery} style={{ width: '100%', height: '32px' }} />
       </SearchContainer>
 
       <CategoriesContainer>
@@ -307,7 +314,7 @@ export const NodeList: FC<NodeListProps> = props => {
 
           return (
             <div key={categoryKey} style={{ marginBottom: '12px' }}>
-              {category.name && <CategoryTitle>{category.name}</CategoryTitle>}
+              {category.nameKey && <CategoryTitle>{t(category.nameKey)}</CategoryTitle>}
 
               <NodesGrid>
                 {categoryRegistries.map((registry, index) => (
@@ -322,7 +329,7 @@ export const NodeList: FC<NodeListProps> = props => {
                         <div style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{registry.info?.icon}</div>
                       )
                     }
-                    label={String(nodeTypeTranslations[registry.type as keyof typeof nodeTypeTranslations] || registry.type)}
+                    label={getNodeTypeName(registry.type as WorkflowNodeType)}
                     description={registry.info?.description}
                     onClick={e => handleClick(e, registry)}
                   />

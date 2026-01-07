@@ -8,10 +8,13 @@ import { useCallback } from 'react'
 import { usePlayground, usePlaygroundTools } from '@flowgram.ai/free-layout-editor'
 import { IconButton, Tooltip } from '@douyinfe/semi-ui'
 import { Network } from 'lucide-react'
+import { useTranslation } from '../../i18n'
 
 export const AutoLayout = () => {
   const tools = usePlaygroundTools()
   const playground = usePlayground()
+  const { t } = useTranslation()
+
   const autoLayout = useCallback(async () => {
     await tools.autoLayout({
       enableAnimation: true,
@@ -26,8 +29,8 @@ export const AutoLayout = () => {
   }, [tools])
 
   return (
-    <Tooltip content={'自动布局'}>
-      <IconButton type="tertiary" theme="borderless" onClick={autoLayout} icon={<Network size="small" />} />
+    <Tooltip content={t('workflowCanvas.tools.autoLayout')}>
+      <IconButton type="tertiary" theme="borderless" onClick={autoLayout} icon={<Network size={16} />} />
     </Tooltip>
   )
 }

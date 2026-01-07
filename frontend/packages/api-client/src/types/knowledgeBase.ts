@@ -1,0 +1,300 @@
+// 知识库相关类型定义
+
+// 创建知识库请求 (V2)
+export interface CreateKnowledgeBaseRequest {
+  space_id: string
+  name: string
+  description?: string
+  embedding_model_config_id: number // Embedding 模型配置ID（必填）
+  config?: Record<string, any>
+}
+
+// 创建知识库响应 (V2)
+export interface CreateKnowledgeBaseResponse {
+  id: string
+}
+
+// 获取知识库列表请求
+export interface GetKnowledgeBasesRequest {
+  space_id: string
+  page: number
+  size: number
+}
+
+// 知识库列表项
+export interface KnowledgeBaseItem {
+  name: string
+  desc: string
+  id: string
+  type: string
+  embedding_model_config_id?: number
+  created_at: string
+  updated_at: string
+}
+
+// 搜索结果知识库项
+export interface SearchKnowledgeBaseItem {
+  id: string
+  space_id: string
+  name: string
+  description: string
+  embedding_model_config_id?: number
+  config?: Record<string, any>
+  create_time: number
+  update_time: number
+}
+
+// 获取知识库列表响应
+export interface GetKnowledgeBasesResponse {
+  code: number
+  message: string
+  data: {
+    items: KnowledgeBaseItem[]
+    total: number
+    page: number
+    size: number
+  }
+}
+
+// 知识库基础信息
+export interface KnowledgeBase {
+  id: string
+  name: string
+  description?: string
+  type: 'document' | 'web' | 'api' | 'database'
+  status: 'active' | 'processing' | 'error' | 'inactive'
+  documentCount: number
+  size: number
+  space_id: string
+  created_at: string
+  updated_at: string
+  created_by: string
+}
+
+// 更新知识库请求
+export interface UpdateKnowledgeBaseRequest {
+  space_id: string
+  kb_id: string
+  name: string
+  desc: string
+}
+
+// 更新知识库响应
+export interface UpdateKnowledgeBaseResponse {
+  code: number
+  message: string
+}
+
+// 文档项类型
+export interface DocumentItem {
+  name: string
+  id: string
+  created_at: string
+  updated_at: string
+}
+
+// 获取文档列表请求
+export interface GetDocumentsListRequest {
+  space_id: string
+  kb_id: string
+  page: number
+  size: number
+}
+
+// 获取文档列表响应
+export interface GetDocumentsListResponse {
+  code: number
+  message: string
+  data: {
+    items: DocumentItem[]
+    total: number
+    page: number
+    size: number
+  }
+}
+
+// 更新文档请求
+export interface UpdateDocumentRequest {
+  space_id: string
+  kb_id: string
+  document_id: string
+  document_name: string
+}
+
+// 更新文档响应
+export interface UpdateDocumentResponse {
+  code: number
+  message: string
+}
+
+// 删除文档请求
+export interface DeleteDocumentsRequest {
+  space_id: string
+  kb_id: string
+  document_ids: string[]
+}
+
+// 删除文档响应
+export interface DeleteDocumentsResponse {
+  code: number
+  message: string
+}
+
+// 文档处理策略配置
+export interface ParsingStrategy {
+  strategy_type: string
+  strategy_config?: Record<string, any>
+}
+
+export interface SegmentationStrategy {
+  strategy_type: string
+  strategy_config: {
+    max_tokens?: number
+    chunk_overlap_percent?: number
+  }
+}
+
+export interface IndexingStrategy {
+  enable_graph_enhancement?: boolean
+  llm_model_id?: number
+}
+
+// 文档处理请求
+export interface ProcessDocumentsRequest {
+  space_id: string
+  kb_id: string
+  doc_id_list: string[]
+  parsing_strategy: ParsingStrategy
+  segmentation_strategy: SegmentationStrategy
+  indexing_strategy: IndexingStrategy
+}
+
+// 文档处理响应
+export interface ProcessDocumentsResponse {
+  code: number
+  message: string
+  data: {
+    task_id: string
+    processed_count: number
+    failed_count: number
+    failed_docs: string[]
+  }
+}
+
+// 文档状态项
+export interface DocumentStatusItem {
+  id: string
+  doc_id?: string // 文档ID
+  status: string
+  name?: string
+  error_msg?: string // 错误信息
+}
+
+// 查询文档状态请求
+export interface GetDocumentStatusRequest {
+  space_id: string
+  kb_id: string
+  doc_id_list: string[]
+}
+
+// 查询文档状态响应
+export interface GetDocumentStatusResponse {
+  code: number
+  message: string
+  data: {
+    items: DocumentStatusItem[]
+  }
+}
+
+// 删除知识库请求
+export interface DeleteKnowledgeBaseRequest {
+  space_id: string
+  kb_id: string
+}
+
+// 删除知识库响应
+export interface DeleteKnowledgeBaseResponse {
+  code: number
+  message: string
+  data: null
+}
+
+// 获取知识库详情请求
+export interface GetKnowledgeBaseDetailRequest {
+  id: string
+  space_id: string
+}
+
+// 获取知识库详情响应
+export interface GetKnowledgeBaseDetailResponse {
+  code: number
+  message: string
+  data: KnowledgeBase
+}
+
+// 上传文件请求
+export interface UploadFilesRequest {
+  files: File[]
+  space_id: string
+  kb_id: string
+  metadata?: string
+}
+
+// 上传文件响应
+export interface UploadFilesResponse {
+  code: number
+  message: string
+  data?: string[] // 上传成功的文件ID列表
+}
+
+// 文件设置请求
+export interface FileSettingsRequest {
+  space_id: string
+  kb_id: string
+  file_id_list: string[]
+  parsing_strategy: {
+    strategy_type: string
+    strategy_config: Record<string, any>
+  }
+  segmentation_strategy: {
+    strategy_type: string
+    strategy_config: {
+      separator?: string
+      max_tokens?: number
+      remove_extra_spaces?: boolean
+      remove_urls_emails?: boolean
+    }
+  }
+  indexing_strategy: {
+    ennabele_graph_enhancement: boolean
+  }
+}
+
+// 文件设置响应
+export interface FileSettingsResponse {
+  code: number
+  message: string
+  data: null
+}
+
+// 搜索知识库请求
+export interface SearchKnowledgeBaseRequest {
+  space_id: string
+  query: string
+  page?: number
+  page_size?: number
+}
+
+// 搜索知识库响应
+export interface SearchKnowledgeBaseResponse {
+  code: number
+  message: string
+  data: {
+    knowledge_bases: SearchKnowledgeBaseItem[]
+    total: number
+    page: number
+    page_size: number
+    total_pages: number
+  }
+}
+

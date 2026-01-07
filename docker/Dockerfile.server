@@ -2,23 +2,19 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS builder
 
-
-ARG OPENJIUWEN_VERSION
+ARG VERSION
 ARG INDEX_URL
-RUN echo "OPENJIUWEN_VERSION: ${OPENJIUWEN_VERSION}"
+
+RUN echo "VERSION: ${VERSION}"
 RUN echo "INDEX_URL: ${INDEX_URL}"
 
 # Set working directory
 WORKDIR /app
 COPY backend .
 RUN pip install uv -i ${INDEX_URL}
-RUN sed -i "s#openjiuwen==0.1.0#openjiuwen==${OPENJIUWEN_VERSION}#g" pyproject.toml
-RUN sed -i "s#url = \"https://mirrors.aliyun.com/pypi/simple/\"#url = \"${INDEX_URL}\"#g" pyproject.toml
-RUN uv venv
-RUN /app/.venv/bin/python3 -m ensurepip --upgrade
-RUN UV_HTTP_TIMEOUT=700 \
-    UV_INDEX_URL=${INDEX_URL} \
-    uv sync --no-cache
+RUN sed -i "s#url = \"[^\"]*\"#url = \"${INDEX_URL}\"#g" pyproject.toml
+
+RUN uv sync --group dev
 RUN uv build --out-dir /app/dist
 
 
@@ -26,11 +22,17 @@ RUN uv build --out-dir /app/dist
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS runtime
 
-
+ARG VERSION
 ARG INDEX_URL
+
 ARG TRUSTED_HOST
+
+RUN echo "VERSION: ${VERSION}"
 RUN echo "INDEX_URL: ${INDEX_URL}"
 RUN echo "TRUSTED_HOST: ${TRUSTED_HOST}"
+
+ARG WHL_NAME="openjiuwen_studio-${VERSION}-py3-none-any.whl"
+RUN echo "WHL_NAME: ${WHL_NAME}"
 
 RUN useradd --create-home --shell /bin/bash app
 RUN mkdir -p /app/dist /app/logs/run /app/logs/performance /app/logs/interface 
@@ -38,12 +40,11 @@ RUN chown -R app:app /app
 
 USER app
 # Copy Python packages from builder stage
-COPY --from=builder /app/dist/openjiuwen_studio_server-0.1.0-py3-none-any.whl /app/dist
-RUN pip3 install /app/dist/openjiuwen_studio_server-0.1.0-py3-none-any.whl --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/app/site-packages --retries=5 --timeout=120
+COPY --from=builder /app/dist/${WHL_NAME} /app/dist
+RUN pip3 install /app/dist/${WHL_NAME} --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/app/site-packages --retries=5 --timeout=120
 
 USER root
-ENV PYTHONPATH=/app/site-packages/openjiuwen_studio_server:/app/site-packages
-ENV PATH=/app/site-packages/bin:$PATH
+ENV PYTHONPATH=/app/site-packages/openjiuwen_studio:/app/site-packages
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 WORKDIR /app
@@ -56,4 +57,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=5 \
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Start the application
-CMD ["openjiuwen-studio-server", "--port", "8000"]
+CMD ["python", "-m", "openjiuwen_studio.main", "--port", "8000"]
+

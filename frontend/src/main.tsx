@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from 'react-query'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import AppWrapper from './components/AppWrapper'
+import './i18n' // Initialize i18n and attach to window
 import './index.css'
 import './utils/font-loader'
 

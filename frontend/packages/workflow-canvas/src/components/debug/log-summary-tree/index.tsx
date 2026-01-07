@@ -6,6 +6,7 @@
 import { FC, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown, Terminal, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react'
 import type { ExecutionLogSummary, InvokeExecuteInfo } from '@test-agentstudio/api-client'
+import { useTranslation } from '../../../i18n'
 
 interface LogSummaryTreeProps {
   logSummary?: ExecutionLogSummary
@@ -20,6 +21,7 @@ interface TreeNode {
 }
 
 const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) => {
+  const { t } = useTranslation()
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
 
   const mergeInvokeInfo = (invokes: InvokeExecuteInfo[]): InvokeExecuteInfo[] => {
@@ -302,8 +304,8 @@ const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) =>
     return (
       <div className="bg-white rounded-lg p-6 border border-gray-200 text-center">
         <Terminal size={48} className="text-gray-300 mx-auto mb-3" />
-        <div className="text-gray-500">暂无日志摘要数据</div>
-        <div className="text-xs text-gray-400 mt-2">请尝试点击&ldquo;模拟数据&rdquo;按钮查看示例效果</div>
+        <div className="text-gray-500">{t('workflowCanvas.logSummaryTree.noData')}</div>
+        <div className="text-xs text-gray-400 mt-2">{t('workflowCanvas.logSummaryTree.clickToViewSample')}</div>
       </div>
     )
   }
@@ -315,11 +317,11 @@ const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) =>
           <div className="flex items-center gap-2">
             <Terminal size={16} className="text-blue-500" />
             <span className="font-medium text-gray-900">
-              调测树 - {logSummary.execute_info_list?.[0]?.invoke_name || logSummary.executeInfoList?.[0]?.invokeName || 'Workflow'}
+              {t('workflowCanvas.logSummaryTree.debugTree')} - {logSummary.execute_info_list?.[0]?.invoke_name || logSummary.executeInfoList?.[0]?.invokeName || 'Workflow'}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {logSummary.duration && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">总耗时: {formatDuration(logSummary.duration)}</span>}
+            {logSummary.duration && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">{t('workflowCanvas.logSummaryTree.totalDuration')}: {formatDuration(logSummary.duration)}</span>}
             <button
               onClick={() => {
                 if (expandedNodes.size > 0) {
@@ -340,7 +342,7 @@ const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) =>
               }}
               className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
             >
-              {expandedNodes.size > 0 ? '全部折叠' : '全部展开'}
+              {expandedNodes.size > 0 ? t('workflowCanvas.logSummaryTree.collapseAll') : t('workflowCanvas.logSummaryTree.expandAll')}
             </button>
           </div>
         </div>
@@ -350,7 +352,7 @@ const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) =>
         {buildTreeData.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <AlertCircle size={32} className="text-gray-300 mx-auto mb-2" />
-            <div>未找到执行信息</div>
+            <div>{t('workflowCanvas.logSummaryTree.noExecutionInfo')}</div>
           </div>
         ) : (
           <div className="space-y-1">
@@ -367,17 +369,17 @@ const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) =>
             <div className="flex items-center gap-4">
               {logSummary.inputTokens !== undefined && (
                 <span className="text-gray-600">
-                  输入 Tokens: <span className="font-medium text-gray-900">{logSummary.inputTokens}</span>
+                  {t('workflowCanvas.logSummaryTree.inputTokens')}: <span className="font-medium text-gray-900">{logSummary.inputTokens}</span>
                 </span>
               )}
               {logSummary.outputTokens !== undefined && (
                 <span className="text-gray-600">
-                  输出 Tokens: <span className="font-medium text-gray-900">{logSummary.outputTokens}</span>
+                  {t('workflowCanvas.logSummaryTree.outputTokens')}: <span className="font-medium text-gray-900">{logSummary.outputTokens}</span>
                 </span>
               )}
             </div>
             <div className="text-gray-500">
-              节点总数:{' '}
+              {t('workflowCanvas.logSummaryTree.totalNodes')}:{' '}
               {buildTreeData.reduce((total, node) => {
                 const countNodes = (n: TreeNode): number => {
                   return 1 + n.children.reduce((sum, child) => sum + countNodes(child), 0)

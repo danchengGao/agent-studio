@@ -49,11 +49,11 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
   const getPluginTypeText = (pluginType: number) => {
     switch (pluginType) {
       case 1:
-        return '云侧服务'
+        return t('plugins.types.cloud')
       case 2:
-        return '代码插件'
+        return t('plugins.types.ide')
       default:
-        return `插件类型${pluginType}`
+        return t('plugins.types.pluginTypeUnknown', { type: pluginType })
     }
   }
 
@@ -122,7 +122,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
                   )}
                 </div>
                 <p className="text-gray-600 text-sm leading-relaxed truncate max-w-[500px]" title={plugin.desc}>
-                  {plugin.desc || '暂无描述'}
+                  {plugin.desc || t('plugins.messages.noDescription')}
                 </p>
                 {(plugin.tags || []).length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
@@ -143,7 +143,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
               <button
                 onClick={() => onView(plugin)}
                 className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
-                title="查看详情"
+                title={t('plugins.actions.viewDetails')}
               >
                 <Eye className="w-4 h-4" />
               </button>
@@ -157,7 +157,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
                 } disabled:opacity-50`}
               >
                 {isInstalled ? <Check className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-                <span>{installLoading ? '安装中...' : isInstalled ? '已安装' : '安装'}</span>
+                <span>{installLoading ? t('plugins.messages.installing') : isInstalled ? t('plugins.actions.installed') : t('plugins.actions.install')}</span>
               </button>
             </div>
           </div>
@@ -166,7 +166,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
             <div className="mt-3 pt-3 border-t border-red-200">
               <div className="flex items-center text-red-600 text-sm">
                 <AlertTriangle className="w-4 h-4 mr-2" />
-                插件运行异常，请检查配置或重新安装
+                {t('plugins.messages.pluginError')}
               </div>
             </div>
           )}
@@ -201,7 +201,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
                 >
                   {plugin.name}
                 </h3>
-                {isInstalled && <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full flex-shrink-0">已安装</span>}
+                {isInstalled && <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full flex-shrink-0">{t('plugins.actions.installed')}</span>}
               </div>
               <span className="inline-block px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-full">
                 {plugin.category || getPluginTypeText(plugin.plugin_type)}
@@ -212,7 +212,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
 
         {/* Description */}
         <p className="text-sm text-gray-600 mb-3 leading-relaxed overflow-hidden text-ellipsis whitespace-nowrap max-w-full" title={plugin.desc}>
-          {plugin.desc || '暂无描述'}
+          {plugin.desc || t('plugins.messages.noDescription')}
         </p>
 
         {/* Tags */}
@@ -234,7 +234,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
           <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl">
             <div className="flex items-center text-red-600 text-sm">
               <AlertTriangle className="w-4 h-4 mr-2" />
-              插件运行异常
+              {t('plugins.messages.pluginError')}
             </div>
           </div>
         )}
@@ -246,7 +246,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
           <button
             onClick={() => onView(plugin)}
             className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
-            title="查看详情"
+            title={t('plugins.actions.viewDetails')}
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -261,7 +261,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
             } disabled:opacity-50`}
           >
             {isInstalled ? <Check className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-            <span>{installLoading ? '安装中...' : isInstalled ? '已安装' : '安装'}</span>
+            <span>{installLoading ? t('plugins.actions.installing') : isInstalled ? t('plugins.actions.installed') : t('plugins.actions.install')}</span>
           </button>
         </div>
       </div>

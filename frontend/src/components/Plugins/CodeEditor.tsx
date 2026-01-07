@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Box, FormControl, InputLabel, Select, MenuItem, Button, Typography, Tooltip, IconButton, Chip, Snackbar, Alert } from '@mui/material'
 import { Code, Play, RotateCcw, FileText, Copy, Check } from 'lucide-react'
 import CodeMirror from '@uiw/react-codemirror'
@@ -67,6 +68,7 @@ if (require.main === module) {
 ]
 
 const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, onLanguageChange, onRun, height = '400px', readOnly = false }) => {
+  const { t } = useTranslation()
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [showTemplates, setShowTemplates] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
@@ -137,7 +139,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
       }
     } catch (error) {
       console.error('Failed to copy code:', error)
-      setCopyError('复制失败，请手动选择并复制代码')
+      setCopyError(t('plugins.pluginConfig.copyCodeFailed', '复制失败，请手动选择并复制代码'))
       setTimeout(() => setCopyError(null), 3000)
     }
   }
@@ -157,11 +159,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <FormControl size="small" style={{ minWidth: '200px' }}>
-            <InputLabel>语言</InputLabel>
+            <InputLabel>{t('plugins.pluginConfig.language', '语言')}</InputLabel>
             <Select
               value={getLanguageFromRuntime()}
               onChange={e => onLanguageChange(e.target.value as 'javascript' | 'python')}
-              label="语言"
+              label={t('plugins.pluginConfig.language', '语言')}
               disabled={readOnly}
             >
               {languageOptions.map(option => (
@@ -179,20 +181,20 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
           {/* Template Selector */}
           {availableTemplates.length > 0 && (
             <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />}>
-              代码模板
+              {t('plugins.pluginConfig.codeTemplates', '代码模板')}
             </Button>
           )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-2">
-          <Tooltip title={copySuccess ? '复制成功!' : '复制代码'}>
+          <Tooltip title={copySuccess ? t('plugins.pluginConfig.copySuccess', '复制成功!') : t('plugins.pluginConfig.copyCode', '复制代码')}>
             <IconButton size="small" onClick={handleCopyCode} disabled={!code.trim()} color={copySuccess ? 'success' : 'default'}>
               {copySuccess ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </IconButton>
           </Tooltip>
 
-          <Tooltip title="重置代码">
+          <Tooltip title={t('plugins.pluginConfig.resetCode', '重置代码')}>
             <IconButton size="small" onClick={handleResetCode}>
               <RotateCcw className="w-4 h-4" />
             </IconButton>
@@ -200,7 +202,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
 
           {onRun && (
             <Button variant="contained" size="small" onClick={onRun} disabled={!code.trim()} startIcon={<Play className="w-4 h-4" />}>
-              运行代码
+              {t('plugins.pluginConfig.runCode', '运行代码')}
             </Button>
           )}
         </div>
@@ -211,7 +213,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
           <Typography variant="subtitle2" className="mb-3 flex items-center">
             <FileText className="w-4 h-4 mr-2" />
-            选择代码模板
+            {t('plugins.pluginConfig.selectCodeTemplate', '选择代码模板')}
           </Typography>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -238,7 +240,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
 
           <div className="mt-3 flex justify-end">
             <Button size="small" onClick={() => setShowTemplates(false)}>
-              关闭
+              {t('common.actions.close', '关闭')}
             </Button>
           </div>
         </div>
@@ -253,7 +255,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
               main.{languageExtensions[language]}
             </Typography>
           </div>
-          {selectedTemplate && <Chip label={`模板: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />}
+          {selectedTemplate && <Chip label={`${t('plugins.pluginConfig.template', '模板')}: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />}
         </div>
 
         <Box
@@ -289,7 +291,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
               highlightSelectionMatches: true,
             }}
             editable={!readOnly}
-            placeholder={`在此编写您的${language === 'javascript' ? 'JavaScript' : 'Python'}代码...`}
+            placeholder={`${t('plugins.pluginConfig.writeCodeHere', { language: language === 'javascript' ? 'JavaScript' : 'Python' })}`}
           />
         </Box>
       </div>
@@ -297,28 +299,28 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ code, language, onCodeChange, o
       {/* Usage Tips */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <Typography variant="subtitle2" className="mb-2 text-blue-900">
-          💡 使用提示
+          {t('plugins.pluginConfig.usageTips', '💡 使用提示')}
         </Typography>
         <div className="space-y-1 text-sm text-blue-800">
           {language === 'python' ? (
             <>
               <div>
-                • 确保导出 <code className="bg-blue-100 px-1 rounded">main()</code> 函数作为入口点
+                • {t('plugins.pluginConfig.pythonTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main()</code> {t('plugins.pluginConfig.pythonTips2', '函数作为入口点')}
               </div>
-              <div>• 使用标准库函数，避免依赖需要额外安装的包</div>
-              <div>• 返回JSON序列化的数据结构，便于API调用</div>
+              <div>• {t('plugins.pluginConfig.pythonTips3', '使用标准库函数，避免依赖需要额外安装的包')}</div>
+              <div>• {t('plugins.pluginConfig.pythonTips4', '返回JSON序列化的数据结构，便于API调用')}</div>
             </>
           ) : (
             <>
               <div>
-                • 确保导出 <code className="bg-blue-100 px-1 rounded">main</code> 函数作为入口点
+                • {t('plugins.pluginConfig.jsTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main</code> {t('plugins.pluginConfig.jsTips2', '函数作为入口点')}
               </div>
-              <div>• 使用CommonJS模块系统（require/module.exports）</div>
-              <div>• 避免使用ES6模块语法，除非项目支持</div>
-              <div>• 返回JSON可序列化的数据结构</div>
+              <div>• {t('plugins.pluginConfig.jsTips3', '使用CommonJS模块系统（require/module.exports）')}</div>
+              <div>• {t('plugins.pluginConfig.jsTips4', '避免使用ES6模块语法，除非项目支持')}</div>
+              <div>• {t('plugins.pluginConfig.jsTips5', '返回JSON可序列化的数据结构')}</div>
             </>
           )}
-          <div>• 使用模板可以快速开始开发</div>
+          <div>• {t('plugins.pluginConfig.templateTips', '使用模板可以快速开始开发')}</div>
         </div>
       </div>
 

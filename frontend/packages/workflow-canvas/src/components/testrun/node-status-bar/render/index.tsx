@@ -9,6 +9,7 @@ import classnames from 'classnames'
 import { NodeReport, NodeExecutionStatus, normalizeNodeStatus } from '../../runtime/types'
 import { Tag, Button, Select } from '@douyinfe/semi-ui'
 import { CheckCircle, Loader2, XCircle, AlertCircle } from 'lucide-react'
+import { useTranslation } from '../../../../i18n'
 
 import { NodeStatusHeader } from '../header'
 import { NodeStatusGroup } from '../group'
@@ -23,6 +24,7 @@ const msToSeconds = (ms: number): string => (ms / 1000).toFixed(2) + 's'
 const displayCount = 6
 
 export const NodeStatusRender: FC<NodeStatusRenderProps> = ({ report }) => {
+  const { t } = useTranslation()
   const { status: nodeStatus } = report
   const [currentSnapshotIndex, setCurrentSnapshotIndex] = useState(0)
 
@@ -72,13 +74,13 @@ export const NodeStatusRender: FC<NodeStatusRenderProps> = ({ report }) => {
   const renderDesc = () => {
     const getDesc = () => {
       if (isNodeRunning) {
-        return '正在执行'
+        return t('workflowCanvas.nodeStatusBar.running')
       } else if (isNodeSucceed) {
-        return '执行成功'
+        return t('workflowCanvas.nodeStatusBar.success')
       } else if (isNodeFailed) {
-        return '执行失败'
+        return t('workflowCanvas.nodeStatusBar.failed')
       } else if (isNodeCanceled) {
-        return '已取消'
+        return t('workflowCanvas.nodeStatusBar.cancelled')
       }
     }
 
@@ -108,7 +110,7 @@ export const NodeStatusRender: FC<NodeStatusRenderProps> = ({ report }) => {
       return null
     }
 
-    const count = <p className={styles.count}>总计: {snapshots.length}</p>
+    const count = <p className={styles.count}>{t('workflowCanvas.nodeStatusBar.total')}: {snapshots.length}</p>
 
     if (snapshots.length <= displayCount) {
       return (
@@ -193,11 +195,11 @@ export const NodeStatusRender: FC<NodeStatusRenderProps> = ({ report }) => {
     >
       <div className={styles.container}>
         {renderSnapshotNavigation()}
-        <NodeStatusGroup title="输入参数" data={currentSnapshot?.inputs} />
-        <NodeStatusGroup title="输出结果" data={currentSnapshot?.outputs || report.outputs} />
-        {isNodeFailed && <NodeStatusGroup title="错误信息" data={currentSnapshot?.error || report.snapshots?.[0]?.error} optional />}
-        <NodeStatusGroup title="分支信息" data={currentSnapshot?.branch} optional />
-        <NodeStatusGroup title="其他数据" data={currentSnapshot?.data} optional />
+        <NodeStatusGroup title={t('workflowCanvas.nodeStatusBar.inputParams')} data={currentSnapshot?.inputs} />
+        <NodeStatusGroup title={t('workflowCanvas.nodeStatusBar.outputResult')} data={currentSnapshot?.outputs || report.outputs} />
+        {isNodeFailed && <NodeStatusGroup title={t('workflowCanvas.nodeStatusBar.errorMessage')} data={currentSnapshot?.error || report.snapshots?.[0]?.error} optional />}
+        <NodeStatusGroup title={t('workflowCanvas.nodeStatusBar.branchInfo')} data={currentSnapshot?.branch} optional />
+        <NodeStatusGroup title={t('workflowCanvas.nodeStatusBar.otherData')} data={currentSnapshot?.data} optional />
       </div>
     </NodeStatusHeader>
   )

@@ -15,6 +15,7 @@ import CallTree from './CallTree'
 import FlameGraph from './FlameGraph'
 import NodeDetail from './NodeDetail'
 import { getStatusMeta } from './helper/statusUtils'
+import { useScopedTranslation } from '@/i18n'
 
 interface AgentDebugPanelProps {
   title?: string
@@ -25,7 +26,7 @@ interface AgentDebugPanelProps {
 }
 
 const AgentDebugPanel = ({ agentId, agentVersion, agentName }: AgentDebugPanelProps) => {
-  // 面板渲染（挂载）时调用进入调试接口
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugPanel')
   const [logsCreateList, setLogsCreateList] = useState<ExecutionLogCreateInfo[]>([])
   const [selectedLogId, setSelectedLogId] = useState<string>('')
   const [selectedLogInfo, setSelectedLogInfo] = useState<AgentExecutionLogSummary>()
@@ -108,26 +109,26 @@ const AgentDebugPanel = ({ agentId, agentVersion, agentName }: AgentDebugPanelPr
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1">
             <Typography variant="body2" className="text-gray-700">
-              {viewMode === 'tree' ? '调用树' : '火焰图'}
+              {viewMode === 'tree' ? t('viewMode.tree') : t('viewMode.flame')}
             </Typography>
             <div className="flex items-center gap-2">
               <button
                 className={`text-xs px-2 py-1 rounded ${viewMode === 'tree' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-800'}`}
                 onClick={() => setViewMode('tree')}
               >
-                调用树
+                {t('viewMode.tree')}
               </button>
               <button
                 className={`text-xs px-2 py-1 rounded ${viewMode === 'flame' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-800'}`}
                 onClick={() => setViewMode('flame')}
               >
-                火焰图
+                {t('viewMode.flame')}
               </button>
             </div>
           </div>
           <div className="rounded-md border border-gray-100 bg-white p-2">
             {execList.length === 0 ? (
-              <div className="text-xs text-gray-500">暂无调用数据</div>
+              <div className="text-xs text-gray-500">{t('empty.noExecData')}</div>
             ) : viewMode === 'tree' ? (
               <CallTree execList={execList} onSelect={setSelectedNode} selectedId={selectedNode?.invokeId as string | undefined} rootLabel={agentName} />
             ) : (
@@ -137,7 +138,7 @@ const AgentDebugPanel = ({ agentId, agentVersion, agentName }: AgentDebugPanelPr
         </div>
         <div className="mt-3">
           <Typography variant="body2" className="text-gray-700 mb-1">
-            节点详情
+            {t('sections.nodeDetail')}
           </Typography>
           <div className="mt-2 rounded-md border border-gray-100 bg-gray-50 p-2">
             <NodeDetail node={selectedNode} rootName={agentName} rootId={rootId} />
@@ -152,15 +153,15 @@ const AgentDebugPanel = ({ agentId, agentVersion, agentName }: AgentDebugPanelPr
       <div className="flex-1 bg-white p-4 overflow-y-auto overflow-x-hidden shadow-inner border border-gray-100">
         <div className="flex items-center gap-2 mb-3">
           <Typography variant="body2" className="text-gray-700 flex-shrink-0">
-            执行日志：
+            {t('filters.executionLog')}
           </Typography>
           <FormControl size="small" className="w-full">
             <Select
               value={selectedLogId}
               onChange={(e: SelectChangeEvent<string>) => setSelectedLogId(e.target.value)}
               renderValue={value => {
-                if (loadingSelected || loadingList) return '加载中...'
-                if (!value) return '请选择执行日志'
+                if (loadingSelected || loadingList) return t('select.loading')
+                if (!value) return t('select.placeholder')
                 const current = logsCreateList.find(i => i.trace_id === value)
                 return current ? dayjs(current.create_time).format('YYYY/MM/DD HH:mm:ss') : value
               }}
@@ -177,9 +178,9 @@ const AgentDebugPanel = ({ agentId, agentVersion, agentName }: AgentDebugPanelPr
               ))}
             </Select>
           </FormControl>
-          <Tooltip title={loadingList ? '刷新中...' : '刷新列表'} placement="top">
+          <Tooltip title={loadingList ? t('refresh.loading') : t('refresh.label')} placement="top">
             <span>
-              <IconButton size="small" onClick={handleRefresh} disabled={loadingList} aria-label="刷新">
+              <IconButton size="small" onClick={handleRefresh} disabled={loadingList} aria-label={t('refresh.ariaLabel')}>
                 <RefreshCcw className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} />
               </IconButton>
             </span>
@@ -193,15 +194,15 @@ const AgentDebugPanel = ({ agentId, agentVersion, agentName }: AgentDebugPanelPr
 }
 
 const SummaryDetail = ({ logInfo }: { logInfo?: AgentExecutionDebugDetailResponse['data'] }) => {
-  console.log('logInfo', logInfo)
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugPanel.summary')
   return (
     <div className="summary border border-gray-100 p-2 rounded-md bg-gray-50 gap-2 flex flex-col">
       <span className="text-gray-700 text-xs">
-        traceId：{logInfo?.trace_id}
+        {t('traceId')}：{logInfo?.trace_id}
         <CopyButton text={logInfo?.trace_id} />
       </span>
       <span className="text-gray-700 text-xs">
-        执行耗时：{logInfo?.duration || 0} ms
+        {t('duration')}：{logInfo?.duration || 0} ms
         <span className={`text-xs py-0.5 ml-2 px-2 rounded-full ${getStatusMeta(logInfo?.status as string).className}`}>
           {getStatusMeta(logInfo?.status as string).label}
         </span>
@@ -215,6 +216,7 @@ const SummaryDetail = ({ logInfo }: { logInfo?: AgentExecutionDebugDetailRespons
  */
 const CopyButton = ({ text }: { text?: string }) => {
   const [copied, setCopied] = useState(false)
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugPanel.copy')
 
   useEffect(() => {
     // traceId 变化时重置状态
@@ -238,7 +240,6 @@ const CopyButton = ({ text }: { text?: string }) => {
         document.body.removeChild(textarea)
       }
       setCopied(true)
-      // 1.5秒后恢复为未复制状态
       setTimeout(() => setCopied(false), 1500)
     } catch (e) {
       console.error('复制 traceId 失败:', e)
@@ -246,9 +247,9 @@ const CopyButton = ({ text }: { text?: string }) => {
   }
 
   return (
-    <Tooltip title={copied ? '已复制' : '复制 traceId'} placement="top">
+    <Tooltip title={copied ? t('copied') : t('tooltip')} placement="top">
       <span>
-        <IconButton size="small" onClick={handleCopy} disabled={!text} className="ml-2 text-gray-500 hover:text-gray-700" aria-label="复制 traceId">
+        <IconButton size="small" onClick={handleCopy} disabled={!text} className="ml-2 text-gray-500 hover:text-gray-700" aria-label={t('ariaLabel')}>
           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
         </IconButton>
       </span>

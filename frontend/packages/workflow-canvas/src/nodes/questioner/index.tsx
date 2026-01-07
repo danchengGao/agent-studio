@@ -9,12 +9,13 @@ import { HelpCircle } from 'lucide-react'
 import { FlowNodeRegistry } from '../../typings'
 import { WorkflowNodeType } from '../constants'
 import { formMeta } from './form-meta'
+import { t } from '../../i18n'
 
 export const QuestionerNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Questioner,
   info: {
     icon: <HelpCircle size={16} className="text-blue-600" />,
-    description: '提问节点，用于向用户提出问题并收集回答。',
+    description: t('workflowCanvas.nodes.questioner.description'),
   },
   meta: {
     defaultPorts: [{ type: 'input' }, { type: 'output' }],

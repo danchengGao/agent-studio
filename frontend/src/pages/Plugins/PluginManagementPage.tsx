@@ -167,17 +167,17 @@ const PluginManagementPage: React.FC = () => {
   const getPluginTypeText = (pluginType: number) => {
     switch (pluginType) {
       case 1:
-        return '云侧服务'
+        return t('plugins.types.cloud')
       case 2:
-        return '本地代码插件'
+        return t('plugins.types.ide')
       default:
-        return `插件类型${pluginType}`
+        return t('plugins.types.pluginTypeUnknown', { type: pluginType })
     }
   }
 
-  // Get unique categories from both installed and market plugins - using plugin_type as category
-  const allCategories = [...plugins.map(p => getPluginTypeText(p.plugin_type)), ...marketPlugins.map(p => getPluginTypeText(p.plugin_type))]
-  const categories = ['all', ...Array.from(new Set(allCategories))]
+  // Get all plugin type categories - always show all available plugin types regardless of current filters
+  const pluginTypeCategories = [t('plugins.types.cloud'), t('plugins.types.ide')]
+  const categories = ['all', ...pluginTypeCategories]
 
   // Filter plugins - Apply search and filter to all fetched plugins
   // When searching, we fetch all data (up to 1000) so we can search across all plugins
@@ -223,20 +223,20 @@ const PluginManagementPage: React.FC = () => {
           navigate(`/dashboard/plugins/${plugin.plugin_id}`)
         } else {
           setSelectedPlugin(plugin)
-          showInfo(`${plugin.name} 配置功能开发中...`)
+          showInfo(t('plugins.messages.configurationInDevelopment', { name: plugin.name }))
         }
         break
       case 'toggle': {
         const newStatus = plugin.status === 'active' ? 'inactive' : 'active'
         setPlugins(prev => prev.map(p => (p.plugin_id === plugin.plugin_id ? { ...p, status: newStatus as Plugin['status'] } : p)))
-        showSuccess(`${plugin.name} 已${newStatus === 'active' ? '启用' : '禁用'}`)
+        showSuccess(`${plugin.name} ${newStatus === 'active' ? t('plugins.messages.enabled') : t('plugins.messages.disabled')}`)
         break
       }
       case 'delete':
         setDeleteDialog({ isOpen: true, plugin })
         break
       case 'copy':
-        showSuccess(`${plugin.name} 已复制到剪贴板`)
+        showSuccess(t('plugins.messages.pluginCopied', { name: plugin.name }))
         break
     }
   }
@@ -262,9 +262,9 @@ const PluginManagementPage: React.FC = () => {
             })
             // Explicitly refetch to update the UI immediately
             await refetchPluginList()
-            showSuccess(`${deleteDialog.plugin.name} 已删除`)
+            showSuccess(t('plugins.messages.pluginDeleted', { name: deleteDialog.plugin.name }))
           } else {
-            showError(`删除失败: ${response.message || '未知错误'}`)
+            showError(t('plugins.errors.deleteFailed') + ': ' + (response.message || t('plugins.errors.unknownError')))
           }
         } else {
           // For non-cloud plugins, refresh the list
@@ -273,11 +273,11 @@ const PluginManagementPage: React.FC = () => {
             exact: false, // Match all queries starting with ['pluginList', currentSpaceId]
           })
           await refetchPluginList()
-          showSuccess(`${deleteDialog.plugin.name} 已删除`)
+          showSuccess(t('plugins.messages.pluginDeleted', { name: deleteDialog.plugin.name }))
         }
       } catch (error) {
-        console.error('删除插件失败:', error)
-        showError('删除插件失败，请稍后重试')
+        console.error(t('plugins.messages.deleteFailed'), error)
+        showError(t('plugins.messages.deleteFailed'))
       } finally {
         setDeleteDialog({ isOpen: false, plugin: null })
       }
@@ -298,7 +298,7 @@ const PluginManagementPage: React.FC = () => {
   const handleInstallPlugin = async (plugin: Plugin) => {
     // Check if plugin is already installed
     if (isPluginAlreadyInstalled(plugin)) {
-      showWarning(`${plugin.name} 已经安装`)
+      showWarning(t('plugins.messages.pluginAlreadyInstalled', { name: plugin.name }))
       return
     }
 
@@ -383,18 +383,22 @@ const PluginManagementPage: React.FC = () => {
           await refetchPluginList()
 
           if (successCount === totalTools) {
-            showSuccess(`${plugin.name} 安装成功，所有 ${totalTools} 个API已自动配置`)
+            showSuccess(t('plugins.messages.pluginInstalled', { name: plugin.name }) + ' ' + t('plugins.messages.allApisConfigured', { count: totalTools }))
           } else if (successCount > 0) {
-            showWarning(`${plugin.name} 安装成功，但只有 ${successCount}/${totalTools} 个API配置成功`)
+            showWarning(
+              t('plugins.messages.pluginInstalled', { name: plugin.name }) +
+                ' ' +
+                t('plugins.messages.partialApisConfigured', { success: successCount, total: totalTools }),
+            )
           } else {
-            showError(`${plugin.name} 插件创建成功，但所有API配置失败，请稍后重试`)
+            showError(t('plugins.messages.cloudPluginCreated', { name: plugin.name }) + ' ' + t('plugins.messages.allApisFailed'))
           }
         } else {
-          showError(`${plugin.name} 安装失败: ${response.message || '未知错误'}`)
+          showError(t('plugins.messages.installFailed') + ': ' + (response.message || t('plugins.errors.unknownError')))
         }
       } catch (error) {
-        console.error('创建插件失败:', error)
-        showError(`${plugin.name} 安装失败，请稍后重试`)
+        console.error(t('plugins.messages.installFailed'), error)
+        showError(t('plugins.messages.installFailed'))
       }
       return
     }
@@ -434,7 +438,7 @@ const PluginManagementPage: React.FC = () => {
       // Explicitly refetch to update the UI immediately
       await refetchPluginList()
 
-      showSuccess(`插件"${updatedPlugin.name}"更新成功`)
+      showSuccess(t('plugins.messages.updateSuccess', { name: updatedPlugin.name }))
       setIsEditDialogOpen(false)
       setEditingPlugin(null)
     } else {
@@ -460,14 +464,14 @@ const PluginManagementPage: React.FC = () => {
           // Explicitly refetch to update the UI immediately
           await refetchPluginList()
 
-          showSuccess(`云侧插件"${cloudPluginForm.name.trim()}"创建并安装成功`)
+          showSuccess(t('plugins.messages.cloudPluginInstallSuccess', { name: cloudPluginForm.name.trim() }))
           setCloudPluginDialogOpen(false)
         } else {
-          showError(`创建失败: ${response.message || '未知错误'}`)
+          showError(t('plugins.messages.createFailed', { message: response.message || t('plugins.messages.unknownError') }))
         }
       } catch (error) {
-        console.error('创建插件失败:', error)
-        showError('创建插件失败，请稍后重试')
+        console.error(t('plugins.messages.createPluginFailed'), error)
+        showError(t('plugins.messages.createPluginError'))
       }
     }
 
@@ -506,15 +510,15 @@ const PluginManagementPage: React.FC = () => {
         // Explicitly refetch to update the UI immediately
         await refetchPluginList()
 
-        showSuccess(`本地代码插件"${idePluginForm.name.trim()}"创建成功。您可以在插件列表中找到该插件并进入IDE进行开发。`)
+        showSuccess(t('plugins.messages.idePluginCreated', { name: idePluginForm.name.trim() }) + ' ' + t('plugins.messages.ideCreationHint'))
         setIdePluginDialogOpen(false)
         resetIDEForm()
       } else {
-        showError(`插件创建失败: ${pluginResponse.message || '未知错误'}`)
+        showError(t('plugins.messages.createFailed') + ': ' + (pluginResponse.message || t('plugins.errors.unknownError')))
       }
     } catch (error: any) {
-      console.error('创建本地代码插件失败:', error)
-      showError('创建本地代码插件失败，请稍后重试')
+      console.error(t('plugins.messages.ideCreateFailedRetry'), error)
+      showError(t('plugins.messages.ideCreateFailedRetry'))
     }
   }
 
@@ -544,7 +548,7 @@ const PluginManagementPage: React.FC = () => {
       case 'updating':
         return t('plugins.status.updating')
       default:
-        return '未知'
+        return t('plugins.status.unknown')
     }
   }
 
@@ -610,7 +614,7 @@ const PluginManagementPage: React.FC = () => {
 
         {/* Description */}
         <p className="text-sm text-gray-600 mb-4 leading-relaxed overflow-hidden text-ellipsis whitespace-nowrap max-w-full" title={plugin.desc}>
-          {plugin.desc || '暂无描述'}
+          {plugin.desc || t('plugins.noDescription')}
         </p>
 
         {/* Error Alert */}
@@ -618,7 +622,7 @@ const PluginManagementPage: React.FC = () => {
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
             <div className="flex items-center text-red-600 text-sm">
               <AlertTriangle className="w-4 h-4 mr-2" />
-              插件运行异常，请检查配置或重新安装
+              {t('plugins.actions.pluginError')}
             </div>
           </div>
         )}
@@ -649,7 +653,7 @@ const PluginManagementPage: React.FC = () => {
               <button
                 onClick={() => handleEditPlugin(plugin)}
                 className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all duration-200"
-                title="编辑插件"
+                title={t('plugins.actions.edit')}
               >
                 <Edit className="w-4 h-4" />
               </button>
@@ -657,7 +661,7 @@ const PluginManagementPage: React.FC = () => {
             <button
               onClick={() => handlePluginAction('delete', plugin)}
               className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200"
-              title="删除插件"
+              title={t('plugins.actions.delete')}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -689,7 +693,7 @@ const PluginManagementPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-gray-600 text-sm leading-relaxed truncate max-w-[500px]" title={plugin.desc}>
-                {plugin.desc || '暂无描述'}
+                {plugin.desc || t('plugins.noDescription')}
               </p>
             </div>
           </div>
@@ -698,14 +702,14 @@ const PluginManagementPage: React.FC = () => {
             <button
               onClick={() => handlePluginAction('view', plugin)}
               className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
-              title="查看详情"
+              title={t('plugins.actions.view')}
             >
               <Eye className="w-4 h-4" />
             </button>
             <button
               onClick={() => handlePluginAction('configure', plugin)}
               className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all duration-200"
-              title="配置"
+              title={t('plugins.actions.configure')}
             >
               <Settings className="w-4 h-4" />
             </button>
@@ -713,7 +717,7 @@ const PluginManagementPage: React.FC = () => {
               <button
                 onClick={() => handleEditPlugin(plugin)}
                 className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all duration-200"
-                title="编辑插件"
+                title={t('plugins.actions.edit')}
               >
                 <Edit className="w-4 h-4" />
               </button>
@@ -721,7 +725,7 @@ const PluginManagementPage: React.FC = () => {
             <button
               onClick={() => handlePluginAction('delete', plugin)}
               className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200"
-              title="删除插件"
+              title={t('plugins.actions.delete')}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -732,7 +736,7 @@ const PluginManagementPage: React.FC = () => {
           <div className="mt-3 pt-3 border-t border-red-200">
             <div className="flex items-center text-red-600 text-sm">
               <AlertTriangle className="w-4 h-4 mr-2" />
-              插件运行异常，请检查配置或重新安装
+              {t('plugins.messages.pluginError')}
             </div>
           </div>
         )}
@@ -827,7 +831,7 @@ const PluginManagementPage: React.FC = () => {
                 className={`p-3 rounded-xl transition-all duration-200 ${
                   viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
-                title="网格视图"
+                title={t('plugins.viewMode.grid')}
               >
                 <Grid className="w-5 h-5" />
               </button>
@@ -836,7 +840,7 @@ const PluginManagementPage: React.FC = () => {
                 className={`p-3 rounded-xl transition-all duration-200 ${
                   viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                 }`}
-                title="列表视图"
+                title={t('plugins.viewMode.list')}
               >
                 <List className="w-5 h-5" />
               </button>
@@ -849,55 +853,44 @@ const PluginManagementPage: React.FC = () => {
                       exact: false,
                     })
                     await refetchPluginList()
-                    showSuccess('插件列表已刷新')
+                    showSuccess(t('plugins.messages.pluginListRefreshed'))
                   } catch (error) {
-                    console.error('刷新插件列表失败:', error)
-                    showError('刷新插件列表失败，请稍后重试')
+                    console.error(t('plugins.messages.refreshPluginListFailed'), error)
+                    showError(t('plugins.messages.refreshPluginListError'))
                   } finally {
                     setLoading(false)
                   }
                 }}
                 disabled={loading}
                 className="p-3 bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-xl transition-all duration-200"
-                title="刷新"
+                title={t('plugins.actions.refresh')}
               >
                 {loading ? <CircularProgress size={20} /> : <RefreshCw className="w-5 h-5" />}
               </button>
             </div>
           </div>
 
-          {/* Market Error Alert */}
-          {marketError && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center">
-                <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
-                <span className="text-yellow-800">{marketError}</span>
-              </div>
-              <button onClick={refreshMarketPlugins} className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors">
-                重试
-              </button>
-            </div>
-          )}
-
           {/* Plugins Grid/List */}
           {isPluginListLoading ? (
             <div className="text-center py-16">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">正在加载插件列表...</p>
+              <p className="text-gray-600">{t('plugins.messages.loading')}</p>
             </div>
           ) : pluginListError ? (
             <div className="text-center py-16">
               <div className="w-24 h-24 bg-gradient-to-r from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="w-12 h-12 text-red-400" />
               </div>
-              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">加载插件失败</h3>
-              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">无法从服务器获取插件数据，请检查网络连接或稍后重试</p>
+              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">
+                {t('plugins.messages.loadFailed')}
+              </h3>
+              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">{t('plugins.messages.loadPluginsFailedDescription')}</p>
               <button
                 onClick={() => window.location.reload()}
                 className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-indigo-700 transform hover:scale-105 transition-all duration-300 shadow-sm hover:shadow-xl"
               >
                 <RefreshCw className="w-5 h-5" />
-                <span>重新加载</span>
+                <span>{t('plugins.actions.reload')}</span>
               </button>
             </div>
           ) : filteredPlugins.length === 0 ? (
@@ -905,8 +898,10 @@ const PluginManagementPage: React.FC = () => {
               <div className="w-24 h-24 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Plug className="w-12 h-12 text-gray-400" />
               </div>
-              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">未找到匹配的插件</h3>
-              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">请尝试调整搜索条件或分类筛选</p>
+              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-700 to-gray-900 mb-3">
+                {t('plugins.messages.noMatchingPlugins')}
+              </h3>
+              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">{t('plugins.messages.tryAdjustFilters')}</p>
               <button
                 onClick={() => {
                   setSearchTerm('')
@@ -914,7 +909,7 @@ const PluginManagementPage: React.FC = () => {
                 }}
                 className="inline-flex items-center space-x-2 border-2 border-gray-300 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:border-blue-500 hover:text-blue-600 transition-all duration-300"
               >
-                <span>清除筛选</span>
+                <span>{t('plugins.actions.clearFilters')}</span>
               </button>
             </div>
           ) : (
@@ -927,7 +922,7 @@ const PluginManagementPage: React.FC = () => {
           {displayPlugins.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">每页显示:</span>
+                <span className="text-sm text-gray-600">{t('common.pagination.pageSize')}:</span>
                 <select
                   value={pageSize}
                   onChange={e => {
@@ -936,12 +931,12 @@ const PluginManagementPage: React.FC = () => {
                   }}
                   className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 shadow-sm"
                 >
-                  <option value={9}>9条</option>
-                  <option value={18}>18条</option>
-                  <option value={30}>30条</option>
-                  <option value={60}>60条</option>
+                  <option value={9}>9{t('common.pagination.items')}</option>
+                  <option value={18}>18{t('common.pagination.items')}</option>
+                  <option value={30}>30{t('common.pagination.items')}</option>
+                  <option value={60}>60{t('common.pagination.items')}</option>
                 </select>
-                <span className="text-sm text-gray-600">共 {displayTotalItems} 条记录</span>
+                <span className="text-sm text-gray-600">{t('common.pagination.total', { total: displayTotalItems })}</span>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -986,9 +981,7 @@ const PluginManagementPage: React.FC = () => {
                   <ChevronRight className="w-5 h-5" />
                 </button>
 
-                <span className="text-sm text-gray-600 ml-4">
-                  第 {currentPage} 页，共 {displayTotalPages} 页
-                </span>
+                <span className="text-sm text-gray-600 ml-4">{t('common.pagination.page', { current: currentPage, total: displayTotalPages })}</span>
               </div>
             </div>
           )}
@@ -1018,10 +1011,10 @@ const PluginManagementPage: React.FC = () => {
                 exact: false,
               })
               await refetchPluginList()
-              showSuccess('插件市场和配置已刷新')
+              showSuccess(t('plugins.messages.marketRefreshed'))
             } catch (error) {
               console.error('Failed to refresh plugin configurations:', error)
-              showError('刷新插件配置失败')
+              showError(t('plugins.messages.loadFailed'))
             } finally {
               setLoading(false)
             }
@@ -1029,6 +1022,8 @@ const PluginManagementPage: React.FC = () => {
           onPluginAction={handlePluginAction}
           onInstallPlugin={handleInstallPlugin}
           getPluginTypeText={getPluginTypeText}
+          marketError={marketError}
+          refreshMarketPlugins={refreshMarketPlugins}
         />
       )}
 
@@ -1072,7 +1067,7 @@ const PluginManagementPage: React.FC = () => {
               </div>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setDetailDialogOpen(false)}>关闭</Button>
+              <Button onClick={() => setDetailDialogOpen(false)}>{t('common.buttons.close')}</Button>
             </DialogActions>
           </>
         )}
@@ -1080,9 +1075,9 @@ const PluginManagementPage: React.FC = () => {
 
       {/* Install Plugin Dialog */}
       <Dialog open={installDialogOpen} onClose={() => setInstallDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>安装新插件</DialogTitle>
+        <DialogTitle>{t('plugins.dialog.installNewPlugin')}</DialogTitle>
         <DialogContent>
-          <DialogContentText className="mb-4">选择安装方式来添加新的插件到系统中</DialogContentText>
+          <DialogContentText className="mb-4">{t('plugins.dialog.selectInstallMethod')}</DialogContentText>
           <div className="space-y-3">
             <Button
               variant="outlined"
@@ -1101,16 +1096,16 @@ const PluginManagementPage: React.FC = () => {
               <div className="text-left">
                 <div className="flex items-center justify-between w-full">
                   <Typography variant="subtitle1" className="text-gray-500">
-                    上传插件文件
+                    {t('plugins.uploadFile')}
                   </Typography>
                   <div className="px-2 py-1 bg-yellow-100 border border-yellow-200 rounded-full">
                     <Typography variant="caption" className="text-yellow-700 font-medium">
-                      即将开放
+                      {t('plugins.comingSoon')}
                     </Typography>
                   </div>
                 </div>
                 <Typography variant="body2" color="text.secondary" className="text-gray-400">
-                  从本地文件上传插件包
+                  {t('plugins.uploadFileDesc')}
                 </Typography>
               </div>
             </Button>
@@ -1126,9 +1121,11 @@ const PluginManagementPage: React.FC = () => {
               className="justify-start p-3"
             >
               <div className="text-left">
-                <Typography variant="subtitle1">云侧插件-基于已有服务创建</Typography>
+                <Typography variant="subtitle1">
+                  {t('plugins.dialog.cloudPluginForm.title')}-{t('plugins.dialog.cloudPluginForm.subtitle')}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  基于云服务快速创建插件
+                  {t('plugins.cloudPlugin.createFromServiceDescription')}
                 </Typography>
               </div>
             </Button>
@@ -1144,16 +1141,18 @@ const PluginManagementPage: React.FC = () => {
               className="justify-start p-3"
             >
               <div className="text-left">
-                <Typography variant="subtitle1">本地代码插件-手动创建</Typography>
+                <Typography variant="subtitle1">
+                  {t('plugins.types.ide')}-{t('plugins.cloudPlugin.createFromIDE')}
+                </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  手动创建本地代码插件
+                  {t('plugins.cloudPlugin.createFromIDEDescription')}
                 </Typography>
               </div>
             </Button>
           </div>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setInstallDialogOpen(false)}>取消</Button>
+          <Button onClick={() => setInstallDialogOpen(false)}>{t('common.buttons.cancel')}</Button>
         </DialogActions>
       </Dialog>
 
@@ -1195,14 +1194,14 @@ const PluginManagementPage: React.FC = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog.isOpen} onClose={() => setDeleteDialog({ isOpen: false, plugin: null })}>
-        <DialogTitle>确认删除</DialogTitle>
+        <DialogTitle>{t('plugins.dialog.confirmDelete')}</DialogTitle>
         <DialogContent>
-          <DialogContentText>确定要删除插件 &ldquo;{deleteDialog.plugin?.name}&rdquo; 吗？此操作无法撤销。</DialogContentText>
+          <DialogContentText>{t('plugins.dialog.deleteConfirmMessage', { name: deleteDialog.plugin?.name })}</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog({ isOpen: false, plugin: null })}>取消</Button>
+          <Button onClick={() => setDeleteDialog({ isOpen: false, plugin: null })}>{t('common.buttons.cancel')}</Button>
           <Button onClick={handleDeletePlugin} color="error" variant="contained">
-            删除
+            {t('common.buttons.delete')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1220,7 +1219,7 @@ const PluginManagementPage: React.FC = () => {
             }}
           >
             <Download className="w-4 h-4 mr-2" />
-            安装插件
+            {t('plugins.installPlugin')}
           </MenuItem>
         )}
 
@@ -1235,7 +1234,7 @@ const PluginManagementPage: React.FC = () => {
             className="text-red-600"
           >
             <Trash2 className="w-4 h-4 mr-2" />
-            删除插件
+            {t('common.buttons.delete')}
           </MenuItem>
         )}
       </Menu>

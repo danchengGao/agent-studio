@@ -23,6 +23,7 @@ import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { FlowNodeRegistry } from '../../typings'
 import { PasteShortcut } from '../../shortcuts/paste'
 import { CopyShortcut } from '../../shortcuts/copy'
+import { t } from '../../i18n'
 
 interface NodeMenuProps {
   node: WorkflowNodeEntity
@@ -140,18 +141,18 @@ export const NodeMenu: FC<NodeMenuProps> = ({ node, deleteNode, updateTitleEdit,
       position="bottomRight"
       render={
         <Dropdown.Menu>
-          {titleEditable !== false && <Dropdown.Item onClick={handleEditTitle}>编辑标题</Dropdown.Item>}
-          {registry.type === WorkflowNodeType.Workflow && <Dropdown.Item onClick={handleOpenSubWorkflow}>跳转详情</Dropdown.Item>}
-          {canMoveOut && <Dropdown.Item onClick={handleMoveOut}>移出容器</Dropdown.Item>}
+          {titleEditable !== false && <Dropdown.Item onClick={handleEditTitle}>{t('workflowCanvas.nodeMenu.editTitle')}</Dropdown.Item>}
+          {registry.type === WorkflowNodeType.Workflow && <Dropdown.Item onClick={handleOpenSubWorkflow}>{t('workflowCanvas.nodeMenu.openDetails')}</Dropdown.Item>}
+          {canMoveOut && <Dropdown.Item onClick={handleMoveOut}>{t('workflowCanvas.nodeMenu.moveOut')}</Dropdown.Item>}
           {canCopy && (
             <Dropdown.Item onClick={handleCopy} disabled={registry.meta!.copyDisable === true}>
-              创建副本
+              {t('workflowCanvas.nodeMenu.duplicate')}
             </Dropdown.Item>
           )}
-          {registry.meta.isContainer && <Dropdown.Item onClick={handleAutoLayout}>自动布局</Dropdown.Item>}
+          {registry.meta.isContainer && <Dropdown.Item onClick={handleAutoLayout}>{t('workflowCanvas.nodeMenu.autoLayout')}</Dropdown.Item>}
           {canDelete && (
             <Dropdown.Item onClick={handleDelete} disabled={!!(registry.canDelete?.(clientContext, node) || registry.meta!.deleteDisable)}>
-              删除节点
+              {t('workflowCanvas.nodeMenu.delete')}
             </Dropdown.Item>
           )}
         </Dropdown.Menu>

@@ -13,12 +13,12 @@ services:
       - <<no_proxy_str>>
       - <<NO_PROXY_STR>>
     env_file:
-      - ../.env
+      - ../.envs/env.<<NAME_SUFFIX>>
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ../examples:<<BACKEND_PATH>>/examples
-      - ./config.yaml:<<BACKEND_PATH>>/config.yaml
-      - ./config.json:<<BACKEND_PATH>>/config.json
+      - ./config.yaml:<<BACKEND_PATH>>/conf/config.yaml
+      - ./config.json:<<BACKEND_PATH>>/conf/config.json
       - ../logs/run:/app/logs/run
       - ../logs/performance:/app/logs/performance
       - ../logs/interface:/app/logs/interface
@@ -41,12 +41,12 @@ services:
     environment:
       - SSL_PASSWORD
     env_file:
-      - ../.env
+      - ../.envs/env.<<NAME_SUFFIX>>
     volumes:
-      - ../ssl:/etc/nginx/ssl
+      - ../.ssl-dirs/<<SSL_DIR_NAME>>:/etc/nginx/ssl
       - /etc/localtime:/etc/localtime:ro
       - ./config.json:/usr/share/nginx/html/config.json
-      - ./<<NGINX_FILE_NAME>>:/etc/nginx/nginx.conf
+      - ./.nginx-files/<<NGINX_FILE_NAME>>:/etc/nginx/nginx.conf
     depends_on:
       <<BACKEND_SERVICE_NAME>>:
         condition: service_healthy

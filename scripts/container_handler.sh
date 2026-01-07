@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ====== Wait for container to reach Healthy status (infinite wait) ==========
+wait_for_container_healthy() {
+    # Parameter 1: Container name (required)
+    # Parameter 2: Check interval (seconds, optional, default 10)
+    # Note: Infinite wait (no timeout), user can interrupt with Ctrl+C
+    local container_name="$1"
+    local check_interval=${2:-10}  # Default check interval 10 seconds
+
+    # Validate parameters
+    if [ -z "${container_name}" ]; then
+        error "wait_for_container_healthy function missing required parameter: container name"
+    fi
+
+    # Log startup message (inform user about infinite wait and interrupt method)
+    info "Waiting for container [${container_name}] to reach Healthy status (infinite wait - press Ctrl+C to interrupt)"
+
+    local start_time=$(date +%s)  # Only for calculating elapsed wait time (no timeout)
+    local health_status
+    local current_time
+    local elapsed_time
+
+    # Infinite loop to check health status (user can Ctrl+C to interrupt)
+    while true; do
+        # Calculate elapsed time (only for log display)
+        current_time=$(date +%s)
+        elapsed_time=$((current_time - start_time))
+
+        # Get container health status (docker inspect precise value)
+        # Status values: healthy / starting / unhealthy / none (no health check configured)
+        health_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no_healthcheck{{end}}' "${container_name}" 2>/dev/null)
+
+        # Status evaluation
+        case "${health_status}" in
+            "healthy")
+                echo ""
+                success "Container [${container_name}] reached Healthy status! (total wait ${elapsed_time} seconds)"
+                return 0
+                ;;
+            "starting")
+                echo -n "."
+                ;;
+            "unhealthy")
+                echo ""
+                error "Container [${container_name}] health check failed (unhealthy)!"
+                ;;
+            "no_healthcheck")
+                echo ""
+                error "Container [${container_name}] has no health check configured, cannot wait for Healthy status!"
+                ;;
+            *)
+                info "Container [${container_name}] unknown status (${health_status}), waited ${elapsed_time} seconds..."
+                ;;
+        esac
+
+        # Not ready, wait and retry
+        sleep "${check_interval}"
+    done
+}
+
+# ====== Wait for the all listed containers to reach Healthy status ==========
+check_containers() {
+    local container_str="$1"  
+    local container
+
+    if [ -z "${container_str}" ]; then
+        info "No containers to check (empty string received)"
+        return
+    fi
+
+    IFS=' ' read -r -a containers <<< "${container_str}"
+    for container in "${containers[@]}"; do
+        if [ -n "${container}" ]; then
+            info "Checking health for container: ${container}"
+            wait_for_container_healthy "${container}"
+            success "Container ${container} is healthy"
+        fi
+    done
+}
+
+
+
+# ==== Wait for MySQL container to fully start (can connect + execute SQL)======
+wait_for_mysql() {
+    # Parameters: 
+    #   - MySQL container name (from ENV_VARS["MYSQL_DOCKER_NAME"])
+    #   - Root password (from ENV_VARS["DB_ROOT_PASSWORD"])
+    # Behavior: Infinite loop to check MySQL readiness (user can interrupt with Ctrl+C)
+    local mysql_container=${ENV_VARS["MYSQL_DOCKER_NAME"]}
+    local db_password=${ENV_VARS["DB_ROOT_PASSWORD"]}
+    local check_interval=3
+
+    # Log startup message (inform user about infinite wait and interrupt method)
+    info "Waiting for MySQL container [${mysql_container}] to start (infinite wait - press Ctrl+C to interrupt)"
+
+    # Infinite loop to check MySQL status
+    while true; do
+        # Core check: Execute test SQL to verify MySQL is ready (connect + run simple query)
+        # Use docker exec to run "SELECT 1" - success means MySQL is fully ready
+        if docker exec -i "${mysql_container}" mysql -u root -p"${db_password}" -e "SELECT 1" 2>/dev/null; then
+            success "MySQL container [${mysql_container}] is fully ready!"
+            return 0  # Exit function - MySQL is ready
+        fi
+
+        # MySQL not ready yet: print progress dot and retry after 1 second
+        echo -n "."
+        sleep "${check_interval}"
+    done
+}
+
+# ============= Check and create database ====================
+create_db_if_not_exist() {
+    local agent_db=${ENV_VARS["AGENT_DB_NAME"]}
+    local ops_db=${ENV_VARS["OPS_DB_NAME"]}
+    local mysql_container=${ENV_VARS["MYSQL_DOCKER_NAME"]}
+    local db_password=${ENV_VARS["DB_ROOT_PASSWORD"]}
+
+    info "Checking if database [${agent_db} ${ops_db}] is ready"
+    info "docker exec -i ${mysql_container} mysql -u root -p${db_password}"
+    docker exec -i "${mysql_container}" mysql -u root -p"${db_password}" << EOF
+CREATE DATABASE IF NOT EXISTS ${agent_db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS ${ops_db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+EOF
+    if [ $? -eq 0 ]; then
+        success "Database [${agent_db} ${ops_db}] is ready"
+    else
+        error "Database [${agent_db} ${ops_db}] creation failed! Check container logs or network connection"
+    fi
+}

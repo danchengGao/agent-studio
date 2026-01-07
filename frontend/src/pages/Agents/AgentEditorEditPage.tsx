@@ -2,7 +2,7 @@ import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { Button, IconButton, Paper, CircularProgress, Divider, Select, MenuItem, SelectChangeEvent } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AgentDetailResponse, AgentService, ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client'
-import { t } from 'i18next'
+import i18n, { useScopedTranslation } from '@/i18n'
 import { ChevronLeft, Save, History, Brain, Settings, Eye, Clock, Tag } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import AgentModelSelector from '@/components/Agent/AgentModelSelector'
@@ -21,6 +21,7 @@ const MIN_MIDDLE = 20
 const MIN_RIGHT = 15
 
 const AgentEditorEditPage = () => {
+  const { t } = useScopedTranslation('agents.agentEditor.editPage')
   const [leftPanelWidth, setLeftPanelWidth] = useState(30)
   const [rightPanelWidth, setRightPanelWidth] = useState(30)
   const [isDragging, setIsDragging] = useState(false)
@@ -122,7 +123,7 @@ const AgentEditorEditPage = () => {
       setHistoryAgentDetailResponse(null)
       useAgentStore.getState().setReadonly(false)
     } catch (error) {
-      console.error('获取 agent 详情失败:', error)
+      console.error('Failed to fetch agent detail:', error)
     } finally {
       setLoading(false)
     }
@@ -133,7 +134,7 @@ const AgentEditorEditPage = () => {
     if (agentId) {
       fetchAgentDetail(agentId)
     } else {
-      console.warn('agentId 为空')
+      console.warn('agentId is empty')
     }
   }, [agentId])
 
@@ -169,9 +170,9 @@ const AgentEditorEditPage = () => {
 
     const success = await saveAgent()
     if (success) {
-      showSuccess('保存成功')
+      showSuccess(t('messages.saveSuccess'))
     } else {
-      showError(saveError || '保存失败')
+      showError(saveError || t('messages.saveFailed'))
     }
   }
 
@@ -193,7 +194,7 @@ const AgentEditorEditPage = () => {
           conversation_id: agentId,
         })
       } catch (error) {
-        console.error('模式切换时重置调试实例失败:', error)
+        console.error('Failed to reset debug instance when switching mode:', error)
       }
     }
   }
@@ -255,19 +256,21 @@ const AgentEditorEditPage = () => {
   const handleSaveSettings = async (nextName: string, nextDescription: string, nextIcon: string) => {
     if (!agentId) return
     try {
+      const agentType = agentDetailResponse?.data?.agent_info?.agent_type || 'react'
       await AgentService.updateAgent({
         agent_id: agentId,
         space_id: getDefaultSpaceId(),
         agent_name: nextName.trim(),
         description: nextDescription,
         icon: nextIcon,
+        agent_type: agentType,
       })
-      showSuccess('已更新智能体信息')
+      showSuccess(t('messages.updateAgentSuccess'))
       await fetchAgentDetail(agentId)
       setSettingsOpen(false)
     } catch (error) {
-      console.error('更新智能体信息失败:', error)
-      showError('更新失败，请稍后再试')
+      console.error('Failed to update agent info:', error)
+      showError(t('messages.updateAgentFailed'))
     }
   }
 
@@ -286,7 +289,7 @@ const AgentEditorEditPage = () => {
       try {
         if (agentId) {
           await fetchAgentDetail(agentId)
-          showSuccess('已返回最新草稿数据')
+          showSuccess(t('messages.returnToLatestDraft'))
         } else {
           // Fallback: reset readonly and local history state when no agentId
           setSelectedHistoryVersion(null)
@@ -294,7 +297,7 @@ const AgentEditorEditPage = () => {
           useAgentStore.getState().setReadonly(false)
         }
       } catch (e) {
-        console.error('关闭历史面板并刷新草稿失败: ', e)
+        console.error('Failed to close history panel and refresh draft: ', e)
       }
     }
 
@@ -304,7 +307,7 @@ const AgentEditorEditPage = () => {
   // Switch to specified version
   const handleSwitchToVersion = async (versionId: string, restoreTargetVersion?: string) => {
     if (!agentId) {
-      showError('版本信息不完整')
+      showError(t('messages.versionInfoIncomplete'))
       return
     }
 
@@ -317,7 +320,11 @@ const AgentEditorEditPage = () => {
           setSelectedHistoryVersion(null)
           setHistoryAgentDetailResponse(null)
           useAgentStore.getState().setReadonly(false)
-          showSuccess(restoreTargetVersion ? `已还原到版本 ${restoreTargetVersion}` : '已切换到当前最新内容')
+          if (restoreTargetVersion) {
+            showSuccess(t('messages.restoredToVersion', { version: restoreTargetVersion }))
+          } else {
+            showSuccess(t('messages.switchedToLatestContent'))
+          }
         }, 200)
         return
       }
@@ -333,12 +340,12 @@ const AgentEditorEditPage = () => {
       setHistoryAgentDetailResponse(response)
       useAgentStore.getState().setReadonly(true)
 
-      showSuccess(`已切换到版本 ${versionId}`)
+      showSuccess(t('messages.switchedToVersion', { version: versionId }))
       // Keep version list panel open and record currently selected history version
       setSelectedHistoryVersion(versionId)
     } catch (error) {
-      console.error('切换版本失败:', error)
-      const errorMessage = error instanceof Error ? error.message : '切换版本失败'
+      console.error('Failed to switch version:', error)
+      const errorMessage = error instanceof Error ? error.message : t('messages.switchVersionFailed')
       showError(errorMessage)
     } finally {
       setSwitchingToVersion(null)
@@ -487,7 +494,7 @@ const AgentEditorEditPage = () => {
                 </div>
                 {selectedHistoryVersion && (
                   <span className="ml-2 px-2 py-0.5 text-xs rounded border border-yellow-300 bg-yellow-50 text-yellow-800">
-                    历史版本 {selectedHistoryVersion}
+                    {t('labels.historyVersionPrefix')} {selectedHistoryVersion}
                   </span>
                 )}
                 {!selectedHistoryVersion && (
@@ -503,10 +510,10 @@ const AgentEditorEditPage = () => {
                       style={{ minWidth: 180, marginLeft: '8px' }}
                       className="bg-white hover:bg-gray-50"
                     >
-                      <MenuItem value="single-react-agent">单Agent (自主规划模式)</MenuItem>
-                      <MenuItem value="multi-workflow">单Agent (多工作流模式)</MenuItem>
+                      <MenuItem value="single-react-agent">{t('mode.singleReact')}</MenuItem>
+                      <MenuItem value="multi-workflow">{t('mode.multiWorkflow')}</MenuItem>
                       <MenuItem value="multi-agents" disabled>
-                        多Agents（主从模式）
+                        {t('mode.multiAgents')}
                       </MenuItem>
                     </Select>
                   </>
@@ -519,7 +526,7 @@ const AgentEditorEditPage = () => {
                 <>
                   <div className="text-sm text-gray-500 flex items-center">
                     <Clock className="w-4 h-4 mr-1" />
-                    <span className="text-gray-700">最近保存时间：</span>
+                    <span className="text-gray-700">{t('labels.lastSavedAt')}</span>
                     <span className="font-medium">{lastAutoSaveTime}</span>
                   </div>
                   <Divider orientation="vertical" variant="middle" flexItem />
@@ -534,7 +541,7 @@ const AgentEditorEditPage = () => {
                 onClick={onAgentSave}
                 disabled={isSaving || isReadOnly}
               >
-                {isSaving ? '保存中...' : ' 保存 '}
+                {isSaving ? t('buttons.saving') : t('buttons.save')}
               </Button>
               <Button
                 variant="outlined"
@@ -543,7 +550,7 @@ const AgentEditorEditPage = () => {
                 className="hover:bg-gray-50"
                 onClick={handleOpenVersionHistoryDialog}
               >
-                版本历史
+                {t('buttons.versionHistory')}
               </Button>
               <Button
                 variant="contained"
@@ -552,7 +559,7 @@ const AgentEditorEditPage = () => {
                 onClick={handleOpenPublishDialog}
                 disabled={isReadOnly}
               >
-                提交新版本
+                {t('buttons.submitNewVersion')}
               </Button>
             </div>
           </div>
@@ -566,7 +573,7 @@ const AgentEditorEditPage = () => {
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-lg mr-3">
                       <Brain className="w-5 h-5 text-blue-600" />
                     </div>
-                    <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.enhanced.tabs.systemPrompt')}</span>
+                    <span className="text-lg font-semibold text-gray-800">{i18n.t('agents.agentEditor.systemPrompt.title')}</span>
                     <ActionSlotTarget name="system-title-actions" className="ml-auto flex items-center gap-2" />
                   </div>
                   <div className="h-[calc(100%-52px)]">
@@ -590,7 +597,7 @@ const AgentEditorEditPage = () => {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-lg mr-3">
                     <Settings className="w-5 h-5 text-blue-600" />
                   </div>
-                  <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.enhanced.tabs.orchestration')}</span>
+                  <span className="text-lg font-semibold text-gray-800">{i18n.t('agents.agentEditor.orchestration.title')}</span>
                 </div>
                 <div className="h-[calc(100%-52px)] text-gray-600 overflow-auto border rounded-xl p-2">
                   {agentMode === 'multi-workflow' ? (
@@ -619,7 +626,7 @@ const AgentEditorEditPage = () => {
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-2 rounded-lg mr-3">
                     <Eye className="w-5 h-5 text-blue-600" />
                   </div>
-                  <span className="text-lg font-semibold text-gray-800">{t('agents.agentEditor.enhanced.tabs.previewDebug')}</span>
+                  <span className="text-lg font-semibold text-gray-800">{i18n.t('agents.agentEditor.previewDebug.title')}</span>
                   <ActionSlotTarget name="debug-title-actions" className="ml-auto flex items-center gap-2" />
                 </div>
                 {/* 对话调试面板 - 使用独立组件 */}
@@ -680,7 +687,7 @@ const AgentEditorEditPage = () => {
           if (agentId) {
             fetchAgentDetail(agentId)
           }
-          showSuccess('提交成功')
+          showSuccess(t('messages.publishSuccess'))
         }}
       />
       <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />

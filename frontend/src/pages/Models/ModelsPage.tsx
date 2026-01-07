@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useTranslation } from 'react-i18next'
-import { Plus, Settings, Trash2, Play, CheckCircle, Search, XCircle, Loader2, ChevronLeft, ChevronRight, RefreshCw, Package } from 'lucide-react'
+import { Plus, Settings, Trash2, Play, CheckCircle, Search, XCircle, Loader2, ChevronLeft, ChevronRight, RefreshCw, Package, Bot, FileCode2 } from 'lucide-react'
 import {
   Button,
   TextField,
@@ -30,12 +30,56 @@ import {
   Box,
 } from '@mui/material'
 import { useModels, useCreateModel, useUpdateModel, useDeleteModel, useToggleModelStatus, useTestModel } from '@test-agentstudio/api-client'
-import type { FrontendModelConfig } from '@test-agentstudio/api-client'
+import {
+  useEmbeddingModels,
+  useCreateEmbeddingModel,
+  useUpdateEmbeddingModel,
+  useDeleteEmbeddingModel,
+  useToggleEmbeddingModelStatus,
+  useTestEmbeddingModel,
+} from '@test-agentstudio/api-client'
+import type { FrontendModelConfig, FrontendEmbeddingModelConfig } from '@test-agentstudio/api-client'
 import { ModelProvider } from '@test-agentstudio/api-client'
 import DeleteConfirmationDialog from '../../components/Common/DeleteConfirmationDialog'
 
 // 使用FrontendModelConfig作为ModelConfig的类型别名
 type ModelConfig = FrontendModelConfig
+
+// 模型类型枚举
+type ModelType = 'LLM' | 'Embedding'
+
+// 统一的模型列表项类型（用于渲染列表）
+interface UnifiedModelListItem {
+  id: string
+  name: string
+  provider: string
+  modelId: string
+  isActive: boolean
+  tags: string[]
+  description: string
+  createdAt: string
+  updatedAt: string
+  modelType: ModelType // 添加模型类型字段
+  // LLM 特有属性
+  usage?: {
+    totalRequests: number
+    totalTokens: number
+    successRate: number
+    averageResponseTime: number
+    lastUsed: string
+  }
+  temperature?: number
+  maxTokens?: number
+  apiKey?: string
+  baseUrl?: string
+  topp?: number
+  timeout?: number
+  retryCount?: number
+  enableStreaming?: boolean
+  enableFunctionCalling?: boolean
+  // Embedding 特有属性
+  maxBatchSize?: number
+}
 
 const initialModelConfig: Partial<ModelConfig> = {
   name: '',
@@ -55,6 +99,18 @@ const initialModelConfig: Partial<ModelConfig> = {
   description: '',
 }
 
+// Embedding 模型的初始配置
+const initialEmbeddingConfig: Partial<ModelConfig> & { maxBatchSize?: number } = {
+  name: '',
+  provider: ModelProvider.OPENAI,
+  modelId: '',
+  apiKey: '',
+  baseUrl: '',
+  isActive: true,
+  tags: [],
+  maxBatchSize: 5,
+}
+
 const ModelsPage: React.FC = () => {
   const { t } = useTranslation()
   // 使用 hooks 管理模型数据
@@ -64,12 +120,12 @@ const ModelsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [pageSize, setPageSize] = useState<number>(10)
 
-  // 获取模型数据 - 为了支持全量搜索，获取最大量数据
+  // 获取 LLM 模型数据 - 为了支持全量搜索，获取最大量数据
   const {
     data: modelsResponse,
-    isLoading,
-    error,
-    refetch,
+    isLoading: isLoadingLLM,
+    error: errorLLM,
+    refetch: refetchLLM,
   } = useModels({
     spaceId: user?.spaceId,
     page: 1,
@@ -78,19 +134,56 @@ const ModelsPage: React.FC = () => {
     sort_order: 'desc',
   })
 
+  // 获取 Embedding 模型数据
+  const {
+    data: embeddingModelsResponse,
+    isLoading: isLoadingEmbedding,
+    error: errorEmbedding,
+    refetch: refetchEmbedding,
+  } = useEmbeddingModels({
+    spaceId: user?.spaceId,
+    page: 1,
+    size: 100,
+    sort_by: 'updated_at',
+    sort_order: 'desc',
+  })
+
+  // 合并加载状态和错误状态
+  const isLoading = isLoadingLLM || isLoadingEmbedding
+  const error = errorLLM || errorEmbedding
+  const refetch = () => {
+    refetchLLM()
+    refetchEmbedding()
+  }
+
   // 当API返回为空时显示空列表
-  const displayModels = modelsResponse?.items || []
-  const totalItems = modelsResponse?.total || 0
-  const totalPages = pageSize > 0 ? Math.ceil(totalItems / pageSize) : 0
+  const displayLLMModels = (modelsResponse?.items || []).map((model: any) => ({
+    ...model,
+    modelType: 'LLM' as ModelType,
+  }))
+  const displayEmbeddingModels = (embeddingModelsResponse?.items || []).map((model: any) => ({
+    ...model,
+    modelType: 'Embedding' as ModelType,
+  }))
+
+  // Tab 状态：0 = LLM, 1 = Embedding（需要在合并模型之前定义，因为后面会用到）
+  const [activeTab, setActiveTab] = useState<number>(0)
 
   const [showModelDialog, setShowModelDialog] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [showTestDialog, setShowTestDialog] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<ModelConfig | null>(null)
+  const [selectedModel, setSelectedModel] = useState<UnifiedModelListItem | null>(null)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' })
   const [searchTerm, setSearchTerm] = useState('')
   const [filterProvider, setFilterProvider] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+
+  // 合并所有模型到一个列表
+  const allModels: UnifiedModelListItem[] = [...displayLLMModels, ...displayEmbeddingModels] as UnifiedModelListItem[]
+  // 根据当前 tab 计算总数和总页数
+  const currentTabTotalItems = activeTab === 0 ? (modelsResponse?.total || 0) : (embeddingModelsResponse?.total || 0)
+  const totalItems = currentTabTotalItems
+  const totalPages = pageSize > 0 ? Math.ceil(totalItems / pageSize) : 0
 
   // 筛选结果的分页状态
   const [filteredPage, setFilteredPage] = useState(1)
@@ -98,19 +191,27 @@ const ModelsPage: React.FC = () => {
     isOpen: boolean
     modelId: string
     modelName: string
+    modelType: ModelType
+    knowledgeBases?: string[] // 使用该模型的知识库列表
   }>({
     isOpen: false,
     modelId: '',
     modelName: '',
+    modelType: 'LLM',
+    knowledgeBases: undefined,
   })
 
   // New model form state
-  const [newModel, setNewModel] = useState<Partial<ModelConfig>>(initialModelConfig)
+  const [newModel, setNewModel] = useState<Partial<ModelConfig> & { maxBatchSize?: number }>(initialModelConfig)
+
+  // 模型类型状态
+  const [modelType, setModelType] = useState<ModelType>('LLM')
 
   // Test state
   const [testPrompt, setTestPrompt] = useState('')
   const [testResult, setTestResult] = useState('')
   const [isTesting, setIsTesting] = useState(false)
+  const [testingModelId, setTestingModelId] = useState<string | null>(null) // 记录正在测试的模型 ID
 
   // Tag input state
   const [newTag, setNewTag] = useState('')
@@ -118,41 +219,58 @@ const ModelsPage: React.FC = () => {
   // URL validation state
   const [baseUrlError, setBaseUrlError] = useState('')
 
-  // Form submission attempt state
-  const [submitAttempted, setSubmitAttempted] = useState(false)
-
   // 表单验证状态
   const isFormValid = () => {
-    const timeout = newModel.timeout
-    return (
-      newModel.name?.trim() && // 模型名称必填
-      newModel.modelId?.trim() && // 模型ID必填
-      newModel.apiKey?.trim() && // API密钥必填
-      newModel.baseUrl?.trim() && // 基础URL必填
-      newModel.description?.trim() && // 描述必填
-      !baseUrlError && // 基础URL格式正确
-      (newModel.name?.length || 0) <= 100 && // 名称不超过100字符
-      (newModel.modelId?.length || 0) <= 100 && // 模型ID不超过100字符
-      (newModel.description?.length || 0) <= 500 && // 描述不超过500字符
-      (newModel.tags?.length || 0) <= 10 && // 标签最多10个
-      timeout !== undefined &&
-      timeout >= 1 &&
-      timeout <= 300 // 超时时间范围验证
-    )
+    // 基础验证
+    const nameValid = newModel.name?.trim() && (newModel.name?.length || 0) <= 100
+    const modelIdValid = newModel.modelId?.trim() && (newModel.modelId?.length || 0) <= 100
+    const apiKeyValid = editMode ? true : newModel.apiKey?.trim() || false // 编辑时可选，创建时必填
+    const baseUrlValid = newModel.baseUrl?.trim() && !baseUrlError
+    const tagsValid = (newModel.tags?.length || 0) <= 10
+
+    if (modelType === 'Embedding') {
+      // Embedding 类型：不需要 description 验证
+      const baseValid = nameValid && modelIdValid && apiKeyValid && baseUrlValid && tagsValid
+      const maxBatchSize = newModel.maxBatchSize
+      return baseValid && maxBatchSize !== undefined && maxBatchSize >= 1 && maxBatchSize <= 100
+    } else {
+      // LLM 类型：description 为可选字段，只验证长度
+      const descriptionLengthValid = (newModel.description?.length || 0) <= 500
+      const baseValid = nameValid && modelIdValid && apiKeyValid && baseUrlValid && descriptionLengthValid && tagsValid
+      const timeout = newModel.timeout
+      return baseValid && timeout !== undefined && timeout >= 1 && timeout <= 300 // 超时时间范围验证
+    }
   }
 
-  const handleOpenModelDialog = (model: ModelConfig | null) => {
-    setSubmitAttempted(false) // 重置提交尝试状态
+  const handleOpenModelDialog = (model: UnifiedModelListItem | null) => {
     if (model) {
       // Edit mode
       setEditMode(true)
       setSelectedModel(model)
-      setNewModel(model)
+      // 将列表项转换为表单数据
+      if (model.modelType === 'Embedding') {
+        setNewModel({
+          name: model.name,
+          provider: ModelProvider.OPENAI,
+          modelId: model.modelId,
+          apiKey: model.apiKey || '', // 显示脱敏的 API 密钥（如果存在）
+          baseUrl: (model as any).baseUrl || '',
+          isActive: model.isActive,
+          tags: model.tags || [],
+          maxBatchSize: (model as any).maxBatchSize || 8,
+        })
+      } else {
+        setNewModel(model as any)
+      }
+      // 根据模型类型判断
+      setModelType(model.modelType)
     } else {
-      // Add mode
+      // Add mode - 根据当前 tab 设置默认模型类型
       setEditMode(false)
       setSelectedModel(null)
-      setNewModel(initialModelConfig)
+      const defaultType: ModelType = activeTab === 0 ? 'LLM' : 'Embedding'
+      setNewModel(defaultType === 'LLM' ? initialModelConfig : initialEmbeddingConfig)
+      setModelType(defaultType)
     }
     setShowModelDialog(true)
   }
@@ -174,24 +292,37 @@ const ModelsPage: React.FC = () => {
     return true
   }
 
-  // 使用 hooks 进行数据操作
+  // 使用 hooks 进行 LLM 模型数据操作
   const createModelMutation = useCreateModel()
   const updateModelMutation = useUpdateModel()
   const deleteModelMutation = useDeleteModel()
   const toggleStatusMutation = useToggleModelStatus()
   const testModelMutation = useTestModel()
 
+  // 使用 hooks 进行 Embedding 模型数据操作
+  const createEmbeddingModelMutation = useCreateEmbeddingModel()
+  const updateEmbeddingModelMutation = useUpdateEmbeddingModel()
+  const deleteEmbeddingModelMutation = useDeleteEmbeddingModel()
+  const toggleEmbeddingStatusMutation = useToggleEmbeddingModelStatus()
+  const testEmbeddingModelMutation = useTestEmbeddingModel()
+
+  // 根据当前 tab 确定显示的模型类型
+  const currentModelType: ModelType = activeTab === 0 ? 'LLM' : 'Embedding'
+
+  // 首先根据当前 tab 过滤模型类型
+  const currentTabModels = allModels.filter(model => model.modelType === currentModelType)
+
   // 筛选状态检查
   const hasFilters = searchTerm || filterProvider !== 'all' || filterStatus !== 'all'
 
-  const filteredModels = displayModels
+  const filteredModels = currentTabModels
     .filter(model => {
       const searchLower = searchTerm.toLowerCase()
       const matchesSearch =
         model.name.toLowerCase().includes(searchLower) ||
         model.provider.toLowerCase().includes(searchLower) ||
         model.modelId.toLowerCase().includes(searchLower) ||
-        (model.tags && model.tags.some(tag => tag.toLowerCase().includes(searchLower)))
+        (currentModelType === 'LLM' && model.tags && model.tags.some(tag => tag.toLowerCase().includes(searchLower)))
       const matchesProvider = filterProvider === 'all' || model.provider === filterProvider
       const matchesStatus = filterStatus === 'all' || (filterStatus === 'active' && model.isActive) || (filterStatus === 'inactive' && !model.isActive)
 
@@ -209,15 +340,16 @@ const ModelsPage: React.FC = () => {
   const filteredTotalPages = pageSize > 0 ? Math.ceil(filteredTotalItems / pageSize) : 0
 
   // 非筛选状态下的前端分页
-  const paginatedDisplayModels = displayModels.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const paginatedDisplayModels = currentTabModels.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   // 筛选状态下的前端分页
   const paginatedFilteredModels = filteredModels.slice((filteredPage - 1) * pageSize, filteredPage * pageSize)
 
-  // 监听筛选条件变化，重置筛选分页
+  // 监听筛选条件和 tab 变化，重置筛选分页
   useEffect(() => {
     setFilteredPage(1)
-  }, [searchTerm, filterProvider, filterStatus])
+    setCurrentPage(1)
+  }, [searchTerm, filterProvider, filterStatus, activeTab])
 
   // 确定最终显示的模型数据
   const finalModels = hasFilters ? paginatedFilteredModels : paginatedDisplayModels
@@ -226,40 +358,49 @@ const ModelsPage: React.FC = () => {
   const finalCurrentPage = hasFilters ? filteredPage : currentPage
 
   const handleSave = async () => {
-    // 设置提交尝试状态
-    setSubmitAttempted(true)
-
     // 验证名称长度
     if ((newModel.name || '').length > 100) {
-      setSnackbar({ open: true, message: '模型名称不能超过100个字符', severity: 'error' })
+      setSnackbar({ open: true, message: t('models.messages.nameMaxLength'), severity: 'error' })
       return
     }
 
     // 验证模型ID长度
     if ((newModel.modelId || '').length > 100) {
-      setSnackbar({ open: true, message: '模型ID不能超过100个字符', severity: 'error' })
+      setSnackbar({ open: true, message: t('models.messages.modelIdMaxLength'), severity: 'error' })
       return
     }
 
-    // 验证描述长度
-    if ((newModel.description || '').length > 500) {
-      setSnackbar({ open: true, message: '描述不能超过500个字符', severity: 'error' })
+    // 验证描述长度（仅 LLM 模型）
+    if (modelType === 'LLM' && (newModel.description || '').length > 500) {
+      setSnackbar({ open: true, message: t('models.messages.descriptionMaxLength'), severity: 'error' })
       return
     }
 
-    // 验证超时时间范围
-    const timeout = newModel.timeout
-    if (timeout === undefined || timeout < 1 || timeout > 300) {
-      setSnackbar({ open: true, message: '超时时间必须在1-300秒之间', severity: 'error' })
-      return
+    // LLM 模型需要验证超时时间范围
+    if (modelType === 'LLM') {
+      const timeout = newModel.timeout
+      if (timeout === undefined || timeout < 1 || timeout > 300) {
+        setSnackbar({ open: true, message: t('models.messages.timeoutRange'), severity: 'error' })
+        return
+      }
     }
 
     // 验证必填字段
     if (!isFormValid()) {
-      setSnackbar({ open: true, message: '请填写所有必填字段', severity: 'error' })
+      setSnackbar({ open: true, message: t('models.messages.fillRequiredFields'), severity: 'error' })
       return
     }
 
+    // 根据模型类型选择不同的保存逻辑
+    if (modelType === 'Embedding') {
+      await handleSaveEmbeddingModel()
+    } else {
+      await handleSaveLLMModel()
+    }
+  }
+
+  // 保存 LLM 模型
+  const handleSaveLLMModel = async () => {
     if (editMode) {
       // Handle edit logic
       if (selectedModel) {
@@ -267,11 +408,9 @@ const ModelsPage: React.FC = () => {
           await updateModelMutation.mutateAsync({ id: selectedModel.id, model: newModel as ModelConfig, spaceId: user?.spaceId || '' })
           setShowModelDialog(false)
           setCurrentPage(1) // 重置到第一页
-          // 刷新数据以更新统计信息
-          refetch()
           setSnackbar({ open: true, message: t('models.messages.updateSuccess'), severity: 'success' })
-        } catch (error) {
-          let errorMessage = error.error || t('models.messages.updateFailed')
+        } catch (error: any) {
+          let errorMessage = t('models.messages.updateFailed')
 
           // 尝试多种访问路径来获取detail数据
           let detailData = null
@@ -306,41 +445,41 @@ const ModelsPage: React.FC = () => {
                   // 当loc数组有第二个元素时，显示这个元素
                   const fieldName = errorDetail.loc[1]
                   const fieldMap: Record<string, string> = {
-                    name: '模型名称',
-                    modelId: '模型ID',
-                    apiKey: 'API密钥',
-                    provider: 'API协议',
-                    baseUrl: '基础服务地址',
-                    description: '描述',
+                    name: t('models.messages.fieldNames.name'),
+                    modelId: t('models.messages.fieldNames.modelId'),
+                    apiKey: t('models.messages.fieldNames.apiKey'),
+                    provider: t('models.messages.fieldNames.provider'),
+                    baseUrl: t('models.messages.fieldNames.baseUrl'),
+                    description: t('models.messages.fieldNames.description'),
                   }
                   const displayName = fieldMap[fieldName] || fieldName
 
                   // 根据错误类型生成友好的提示信息
                   let friendlyMessage = ''
                   if (errorDetail.msg?.includes('at least 1 character')) {
-                    friendlyMessage = '最少需要1个字符'
+                    friendlyMessage = t('models.messages.validationErrors.minLength')
                   } else if (errorDetail.msg?.includes('at most') && errorDetail.msg?.includes('characters')) {
                     const match = errorDetail.msg.match(/at most (\d+) characters/)
                     const maxLength = match ? match[1] : '限制'
-                    friendlyMessage = `最多${maxLength}个字符`
+                    friendlyMessage = t('models.messages.validationErrors.maxLength', { max: maxLength })
                   } else if (errorDetail.msg?.includes('required') || errorDetail.msg?.includes('field required')) {
-                    friendlyMessage = '此字段为必填项'
+                    friendlyMessage = t('models.messages.validationErrors.required')
                   } else if (errorDetail.msg?.includes('valid') && errorDetail.msg?.includes('url')) {
-                    friendlyMessage = '请输入有效的URL地址'
+                    friendlyMessage = t('models.messages.validationErrors.invalidUrl')
                   } else if (errorDetail.msg?.includes('valid email')) {
-                    friendlyMessage = '请输入有效的邮箱地址'
+                    friendlyMessage = t('models.messages.validationErrors.invalidEmail')
                   } else if (errorDetail.msg?.includes('already exists')) {
-                    friendlyMessage = '该值已存在'
+                    friendlyMessage = t('models.messages.validationErrors.alreadyExists')
                   } else if (errorDetail.msg?.includes('invalid')) {
-                    friendlyMessage = '格式无效'
+                    friendlyMessage = t('models.messages.validationErrors.invalidFormat')
                   } else {
-                    friendlyMessage = errorDetail.msg || '格式不正确'
+                    friendlyMessage = errorDetail.msg || t('models.messages.validationErrors.incorrectFormat')
                   }
 
                   errorInfo = `${displayName}${friendlyMessage}`
                 } else {
                   // 没有loc第二个元素时，显示msg
-                  errorInfo = errorDetail.msg || '格式错误'
+                  errorInfo = errorDetail.msg || t('models.messages.validationErrors.formatError')
                 }
 
                 return errorInfo
@@ -388,11 +527,9 @@ const ModelsPage: React.FC = () => {
         await createModelMutation.mutateAsync({ model, spaceId: user?.spaceId || '' })
         setShowModelDialog(false)
         setCurrentPage(1) // 重置到第一页
-        // 刷新数据以更新统计信息
-        refetch()
         setSnackbar({ open: true, message: t('models.messages.addSuccess'), severity: 'success' })
-      } catch (error) {
-        let errorMessage = error.error || t('models.messages.addFailed')
+      } catch (error: any) {
+        let errorMessage = t('models.messages.addFailed')
 
         // 尝试多种访问路径来获取detail数据
         let detailData = null
@@ -427,37 +564,37 @@ const ModelsPage: React.FC = () => {
                 // 当loc数组有第二个元素时，显示这个元素
                 const fieldName = errorDetail.loc[1]
                 const fieldMap: Record<string, string> = {
-                  name: '模型名称',
-                  modelId: '模型类型',
-                  apiKey: 'API密钥',
-                  provider: '提供商',
-                  baseUrl: '基础URL',
-                  description: '描述',
+                  name: t('models.messages.fieldNames.name'),
+                  modelId: t('models.messages.fieldNames.modelId'),
+                  apiKey: t('models.messages.fieldNames.apiKey'),
+                  provider: t('models.messages.fieldNames.provider'),
+                  baseUrl: t('models.messages.fieldNames.baseUrl'),
+                  description: t('models.messages.fieldNames.description'),
                 }
                 const displayName = fieldMap[fieldName] || fieldName
 
                 // 根据错误类型生成友好的提示信息
                 let friendlyMessage = ''
                 if (errorDetail.msg?.includes('at least 1 character')) {
-                  friendlyMessage = '最少需要1个字符'
+                  friendlyMessage = t('models.messages.validationErrors.minLength')
                 } else if (errorDetail.msg?.includes('at most') && errorDetail.msg?.includes('characters')) {
                   const match = errorDetail.msg.match(/at most (\d+) characters/)
                   const maxLength = match ? match[1] : '限制'
-                  friendlyMessage = `最多${maxLength}个字符`
+                  friendlyMessage = t('models.messages.validationErrors.maxLength', { max: maxLength })
                 } else if (errorDetail.msg?.includes('required') || errorDetail.msg?.includes('field required')) {
-                  friendlyMessage = '此字段为必填项'
+                  friendlyMessage = t('models.messages.validationErrors.required')
                 } else if (errorDetail.msg?.includes('valid') && errorDetail.msg?.includes('url')) {
-                  friendlyMessage = '请输入有效的URL地址'
+                  friendlyMessage = t('models.messages.validationErrors.invalidUrl')
                 } else if (errorDetail.msg?.includes('valid email')) {
-                  friendlyMessage = '请输入有效的邮箱地址'
+                  friendlyMessage = t('models.messages.validationErrors.invalidEmail')
                 } else {
-                  friendlyMessage = errorDetail.msg || '格式不正确'
+                  friendlyMessage = errorDetail.msg || t('models.messages.validationErrors.incorrectFormat')
                 }
 
                 errorInfo = `${displayName}${friendlyMessage}`
               } else {
                 // 没有loc第二个元素时，显示msg
-                errorInfo = errorDetail.msg || '格式错误'
+                errorInfo = errorDetail.msg || t('models.messages.validationErrors.formatError')
               }
 
               return errorInfo
@@ -482,40 +619,173 @@ const ModelsPage: React.FC = () => {
     }
   }
 
-  const handleDeleteModel = async (modelId: string) => {
-    const _model = displayModels.find(m => m.id === modelId)
-    if (_model) {
-      setDeleteDialog({
-        isOpen: true,
-        modelId,
-        modelName: _model.name,
-      })
+  // 保存 Embedding 模型
+  const handleSaveEmbeddingModel = async () => {
+    if (!validateBaseUrl(newModel.baseUrl || '')) {
+      setSnackbar({ open: true, message: t('models.messages.invalidBaseUrl'), severity: 'error' })
+      return
     }
+
+    // 构建 Embedding 模型数据
+    const embeddingModel: Partial<FrontendEmbeddingModelConfig> = {
+      name: newModel.name || '',
+      protocol: 'openai', // Embedding 目前只支持 OpenAI 协议
+      modelId: newModel.modelId || '',
+      // 编辑模式下：如果 apiKey 为空或与脱敏密钥相同，则不更新密钥（不传 apiKey 字段）
+      // 创建模式下：必须提供 apiKey
+      apiKey: editMode && (!newModel.apiKey || newModel.apiKey === selectedModel?.apiKey) ? undefined : newModel.apiKey || '',
+      baseUrl: newModel.baseUrl || '',
+      maxBatchSize: newModel.maxBatchSize || 8,
+      isActive: newModel.isActive ?? true,
+    }
+
+    if (editMode && selectedModel) {
+      // 更新 Embedding 模型
+      try {
+        await updateEmbeddingModelMutation.mutateAsync({
+          id: selectedModel.id,
+          model: embeddingModel,
+          spaceId: user?.spaceId || '',
+        })
+        setShowModelDialog(false)
+        setCurrentPage(1)
+        setSnackbar({ open: true, message: t('models.messages.embeddingModel.updateSuccess'), severity: 'success' })
+      } catch (error: any) {
+        console.error('更新 Embedding 模型失败:', error)
+        const errorMessage = error?.response?.data?.message || error?.message || t('models.messages.embeddingModel.updateFailed')
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' })
+      }
+    } else {
+      // 创建 Embedding 模型
+      try {
+        await createEmbeddingModelMutation.mutateAsync({
+          model: embeddingModel,
+          spaceId: user?.spaceId || '',
+        })
+        setShowModelDialog(false)
+        setCurrentPage(1)
+        setSnackbar({ open: true, message: t('models.messages.embeddingModel.createSuccess'), severity: 'success' })
+      } catch (error: any) {
+        console.error('创建 Embedding 模型失败:', error)
+        const errorMessage = error?.response?.data?.message || error?.message || t('models.messages.embeddingModel.createFailed')
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' })
+      }
+    }
+  }
+
+  const handleDeleteModel = async (modelId: string, modelName: string) => {
+    setDeleteDialog({
+      isOpen: true,
+      modelId,
+      modelName,
+      modelType: currentModelType,
+    })
   }
 
   const confirmDeleteModel = async () => {
     if (deleteDialog.modelId) {
       try {
-        await deleteModelMutation.mutateAsync({ id: deleteDialog.modelId, spaceId: user?.spaceId || '' })
+        // 根据保存的模型类型调用不同的删除 API
+        if (deleteDialog.modelType === 'Embedding') {
+          await deleteEmbeddingModelMutation.mutateAsync({ id: deleteDialog.modelId, spaceId: user?.spaceId || '' })
+        } else {
+          await deleteModelMutation.mutateAsync({ id: deleteDialog.modelId, spaceId: user?.spaceId || '' })
+        }
         setSnackbar({ open: true, message: t('models.messages.deleteSuccess'), severity: 'success' })
-        setDeleteDialog({ isOpen: false, modelId: '', modelName: '' })
-        // 删除成功后刷新数据
-        refetch()
-      } catch (error) {
-        setSnackbar({ open: true, message: t('models.messages.deleteFailed'), severity: 'error' })
-        setDeleteDialog({ isOpen: false, modelId: '', modelName: '' })
+        setDeleteDialog({ isOpen: false, modelId: '', modelName: '', modelType: 'LLM', knowledgeBases: undefined })
+      } catch (error: any) {
+        // 检查是否是"正在被使用"的错误
+        // 错误可能来自 error.response.data.detail 或 error.detail 或 error.message
+        const errorMessage = error?.response?.data?.detail || error?.detail || error?.message || String(error)
+        const isInUseError = errorMessage.toLowerCase().includes('in use') ||
+                            errorMessage.toLowerCase().includes('being used') ||
+                            errorMessage.toLowerCase().includes('cannot delete') ||
+                            errorMessage.toLowerCase().includes(t('models.messages.inUse').toLowerCase())
+
+        if (isInUseError && deleteDialog.modelType === 'Embedding') {
+          // 解析知识库列表
+          // 错误信息格式: "Cannot delete embedding model config 'xxx' (ID: 4) because it is being used by 96 knowledge base(s): name1, name2, ..."
+          // 使用更宽松的正则表达式，匹配到字符串末尾
+          const kbMatch = errorMessage.match(/knowledge base\(s\):\s*(.+)/i)
+          let knowledgeBases: string[] = []
+
+          if (kbMatch && kbMatch[1]) {
+            // 分割知识库名称（用逗号分隔）
+            knowledgeBases = kbMatch[1]
+              .split(',')
+              .map((kb: string) => kb.trim())
+              .filter((kb: string) => kb.length > 0)
+          }
+
+          // 显示警告对话框，列出使用的知识库
+          setDeleteDialog({
+            isOpen: true,
+            modelId: deleteDialog.modelId,
+            modelName: deleteDialog.modelName,
+            modelType: deleteDialog.modelType,
+            knowledgeBases: knowledgeBases.length > 0 ? knowledgeBases : undefined,
+          })
+        } else {
+          setSnackbar({ open: true, message: t('models.messages.deleteFailed'), severity: 'error' })
+          setDeleteDialog({ isOpen: false, modelId: '', modelName: '', modelType: 'LLM', knowledgeBases: undefined })
+        }
       }
     }
   }
 
   const cancelDeleteModel = () => {
-    setDeleteDialog({ isOpen: false, modelId: '', modelName: '' })
+    setDeleteDialog({ isOpen: false, modelId: '', modelName: '', modelType: 'LLM', knowledgeBases: undefined })
+  }
+
+  // 测试 Embedding 模型
+  const handleTestEmbeddingModel = async (modelId: string) => {
+    setTestingModelId(modelId)
+    try {
+      const result = await testEmbeddingModelMutation.mutateAsync({
+        id: modelId,
+        testRequest: { text: t('models.messages.testText') },
+      })
+
+      // 格式化测试结果（result 是 EmbeddingModelTestResponse，包含 data, model, usage 等字段）
+      const embeddingData = result.data?.[0]
+      const dimension = embeddingData?.embedding?.length || 0
+      const usage = result.usage || {}
+      const model = result.model || 'unknown'
+
+      setSnackbar({
+        open: true,
+        message: `测试成功！模型: ${model}，向量维度: ${dimension}，Token 使用: ${usage.total_tokens || 0}`,
+        severity: 'success',
+      })
+    } catch (error: any) {
+      console.error('Embedding 模型测试失败:', error)
+      const errorMessage = error?.response?.data?.detail || error?.response?.data?.message || error?.message || t('models.messages.embeddingModel.testFailed')
+
+      // 测试失败，自动禁用该 Embedding 模型
+      try {
+        await toggleEmbeddingStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
+        setSnackbar({
+          open: true,
+          message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}。${t('models.messages.embeddingModel.modelDisabled')}。`,
+          severity: 'error',
+        })
+      } catch (disableError) {
+        console.error('禁用 Embedding 模型失败:', disableError)
+        setSnackbar({
+          open: true,
+          message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}。${t('models.messages.embeddingModel.disableFailed')}，请手动禁用。`,
+          severity: 'error',
+        })
+      }
+    } finally {
+      setTestingModelId(null)
+    }
   }
 
   const handleTestModel = async () => {
     if (!testPrompt.trim() || !selectedModel) return
-    if (testPrompt.length > 1000) {
-      return
+    if (testPrompt.length > 1000) { 
+      return 
     }
 
     setIsTesting(true)
@@ -523,13 +793,13 @@ const ModelsPage: React.FC = () => {
     try {
       const result = await testModelMutation.mutateAsync({ id: selectedModel.id, prompt: testPrompt, spaceId: user?.spaceId || '' })
       setTestResult(
-        `测试成功！\n\n模型: ${selectedModel.name}\n提示: ${testPrompt}\n\n响应: ${result.response || '测试完成'}\n\n配置信息：\n- 温度: ${selectedModel.temperature}\n- API协议: ${selectedModel.provider}`,
+        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
       )
 
       // 测试成功后刷新模型列表以更新统计信息
       refetch()
-    } catch (error) {
-      let errorMessage = error.error || '模型测试失败'
+    } catch (error: any) {
+      let errorMessage = t('models.testFailed')
 
       // 尝试多种访问路径来获取detail数据
       let detailData = null
@@ -564,7 +834,9 @@ const ModelsPage: React.FC = () => {
         errorMessage = error.message
       }
 
-      setTestResult(`测试失败：${errorMessage}\n\n模型: ${selectedModel.name}\n提示: ${testPrompt}`)
+      setTestResult(
+        `${t('models.testFailed')}: ${errorMessage}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}`,
+      )
     } finally {
       setIsTesting(false)
     }
@@ -603,24 +875,27 @@ const ModelsPage: React.FC = () => {
 
   const toggleModelStatus = async (modelId: string) => {
     try {
-      await toggleStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
-      // 切换状态成功后刷新数据
-      refetch()
+      // 根据当前 tab 的模型类型调用不同的切换状态 API
+      if (currentModelType === 'Embedding') {
+        await toggleEmbeddingStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
+      } else {
+        await toggleStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
+      }
     } catch (error) {
       setSnackbar({ open: true, message: t('models.messages.toggleStatusFailed'), severity: 'error' })
     }
   }
 
-  const removeTag = async (modelId: string, tagIndex: number) => {
+  const removeTag = async (model: UnifiedModelListItem, tagIndex: number) => {
     try {
-      const _model = displayModels.find(m => m.id === modelId)
-      if (_model) {
-        const updatedModel = {
-          ..._model,
-          tags: _model.tags.filter((_, i) => i !== tagIndex),
-        }
-        await updateModelMutation.mutateAsync({ id: modelId, model: updatedModel, spaceId: user?.spaceId || '' })
-        // 删除标签成功后刷新数据
+      const updatedModel = {
+        ...model,
+        tags: model.tags.filter((_, i) => i !== tagIndex),
+      }
+      if (currentModelType === 'Embedding') {
+        await updateEmbeddingModelMutation.mutateAsync({ id: model.id, model: updatedModel, spaceId: user?.spaceId || '' })
+      } else {
+        await updateModelMutation.mutateAsync({ id: model.id, model: updatedModel, spaceId: user?.spaceId || '' })
         refetch()
       }
     } catch (error) {
@@ -682,6 +957,50 @@ const ModelsPage: React.FC = () => {
         <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-6">{t('models.subtitle')}</p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex space-x-2">
+        <button
+          onClick={() => {
+            setActiveTab(0)
+            setCurrentPage(1)
+            setFilteredPage(1)
+          }}
+          className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+            activeTab === 0
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+              : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          <Bot className="w-5 h-5" />
+          <span>{t('models.tabs.llm')}</span>
+          <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+            activeTab === 0 ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'
+          }`}>
+            {modelsResponse?.total || 0}
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab(1)
+            setCurrentPage(1)
+            setFilteredPage(1)
+          }}
+          className={`flex items-center space-x-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+            activeTab === 1
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg'
+              : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+          }`}
+        >
+          <FileCode2 className="w-5 h-5" />
+          <span>{t('models.tabs.embedding')}</span>
+          <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+            activeTab === 1 ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-600'
+          }`}>
+            {embeddingModelsResponse?.total || 0}
+          </span>
+        </button>
+      </div>
+
       {/* Filters and search */}
       <div className="flex flex-col sm:flex-row items-center gap-4">
         {/* Search */}
@@ -690,7 +1009,9 @@ const ModelsPage: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors duration-200" />
             <input
               type="text"
-              placeholder={t('models.modelList.searchPlaceholder')}
+              placeholder={currentModelType === 'LLM' 
+                ? t('models.modelList.searchPlaceholder')
+                : t('models.modelList.searchPlaceholder').replace(/或标签|标签/g, '').replace(/\s+/g, ' ').trim()}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 transition-all duration-200 bg-gray-50 focus:bg-white"
@@ -752,12 +1073,16 @@ const ModelsPage: React.FC = () => {
                 <TableCell className="text-blue-900 font-semibold">
                   <strong>{t('models.modelList.status')}</strong>
                 </TableCell>
-                <TableCell className="text-blue-900 font-semibold">
-                  <strong>{t('models.modelList.tags')}</strong>
-                </TableCell>
-                <TableCell className="text-blue-900 font-semibold">
-                  <strong>{t('models.modelList.usageStats')}</strong>
-                </TableCell>
+                {currentModelType === 'LLM' && (
+                  <TableCell className="text-blue-900 font-semibold">
+                    <strong>{t('models.modelList.tags')}</strong>
+                  </TableCell>
+                )}
+                {currentModelType === 'LLM' && (
+                  <TableCell className="text-blue-900 font-semibold">
+                    <strong>{t('models.modelList.usageStats')}</strong>
+                  </TableCell>
+                )}
                 <TableCell className="text-blue-900 font-semibold">
                   <strong>{t('models.modelList.actions')}</strong>
                 </TableCell>
@@ -766,7 +1091,7 @@ const ModelsPage: React.FC = () => {
             <TableBody>
               {finalModels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-20">
+                  <TableCell colSpan={currentModelType === 'LLM' ? 6 : 5} className="text-center py-20">
                     <div className="flex flex-col items-center justify-center space-y-6">
                       {/* 是否有筛选条件 */}
                       {searchTerm || filterProvider !== 'all' || filterStatus !== 'all' ? (
@@ -776,14 +1101,14 @@ const ModelsPage: React.FC = () => {
                             <Search className="w-8 h-8 text-gray-400" />
                           </div>
                           <div className="text-center max-w-lg">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">当前筛选状态下未能找到相关结果</h3>
-                            <p className="text-gray-600 mb-6">请尝试调整筛选条件或清空所有筛选条件查看更多内容</p>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('models.modelList.filterEmpty')}</h3>
+                            <p className="text-gray-600 mb-6">{t('models.modelList.filterEmptyDesc')}</p>
                             <button
                               onClick={handleClearFilters}
                               className="inline-flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-xl transform hover:scale-105"
                             >
                               <RefreshCw className="w-4 h-4" />
-                              <span>清空筛选</span>
+                              <span>{t('models.modelList.clearFilters')}</span>
                             </button>
                           </div>
                         </>
@@ -794,14 +1119,14 @@ const ModelsPage: React.FC = () => {
                             <Package className="w-8 h-8 text-gray-400" />
                           </div>
                           <div className="text-center max-w-lg">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">暂无模型数据</h3>
-                            <p className="text-gray-600 mb-6">还没有创建任何模型，点击下方按钮开始添加第一个模型</p>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('models.modelList.emptyModelList')}</h3>
+                            <p className="text-gray-600 mb-6">{t('models.modelList.emptyModelListDesc')}</p>
                             <button
                               onClick={() => handleOpenModelDialog(null)}
                               className="inline-flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 shadow-sm hover:shadow-xl transform hover:scale-105"
                             >
                               <Plus className="w-5 h-5" />
-                              <span>添加第一个模型</span>
+                              <span>{t('models.modelList.addFirstModel')}</span>
                             </button>
                           </div>
                         </>
@@ -821,9 +1146,16 @@ const ModelsPage: React.FC = () => {
                         >
                           {model.name}
                         </Typography>
-                        <Typography variant="caption" className="text-gray-600 block max-w-[250px] truncate" title={model.description}>
-                          {model.description}
-                        </Typography>
+                        {currentModelType === 'Embedding' && (
+                          <Typography variant="caption" className="text-gray-600 block max-w-[250px] truncate mt-1" title={model.modelId}>
+                            {model.modelId}
+                          </Typography>
+                        )}
+                        {currentModelType === 'LLM' && model.description && (
+                          <Typography variant="caption" className="text-gray-600 block max-w-[250px] truncate mt-1" title={model.description}>
+                            {model.description}
+                          </Typography>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -847,98 +1179,125 @@ const ModelsPage: React.FC = () => {
                       />
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 items-center">
-                        {model.tags.slice(0, 3).map((tag, index) => (
-                          <Tooltip key={index} title={tag} arrow>
-                            <Chip
-                              label={tag}
-                              size="small"
-                              onDelete={() => removeTag(model.id, index)}
-                              className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
-                              sx={{
-                                maxWidth: '120px',
-                                '& .MuiChip-label': {
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                },
-                              }}
-                            />
-                          </Tooltip>
-                        ))}
-                        {model.tags.length > 3 && (
-                          <Tooltip
-                            title={
-                              <div className="p-2 max-w-md bg-white">
-                                <div className="text-sm font-semibold mb-2 text-gray-800">更多标签：</div>
-                                <div className="space-y-1">
-                                  {model.tags.slice(3).map((tag, index) => (
-                                    <div key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded break-all">
-                                      {tag}
-                                    </div>
-                                  ))}
+                    {/* 标签列 - 仅 LLM 显示 */}
+                    {currentModelType === 'LLM' && (
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {model.tags.slice(0, 3).map((tag, index) => (
+                            <Tooltip key={index} title={tag} arrow>
+                              <Chip
+                                label={tag}
+                                size="small"
+                                onDelete={() => removeTag(model, index)}
+                                className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200 hover:from-blue-200 hover:to-indigo-200 transition-all duration-200"
+                                sx={{
+                                  maxWidth: '120px',
+                                  '& .MuiChip-label': {
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  },
+                                }}
+                              />
+                            </Tooltip>
+                          ))}
+                          {model.tags.length > 3 && (
+                            <Tooltip
+                              title={
+                                <div className="p-2 max-w-md bg-white">
+                                  <div className="text-sm font-semibold mb-2 text-gray-800">{t('models.modelConfig.basicInfo.moreTags')}: </div>
+                                  <div className="space-y-1">
+                                    {model.tags.slice(3).map((tag, index) => (
+                                      <div key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded break-all">
+                                        {tag}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            }
-                            arrow
-                          >
-                            <Chip
-                              label={`+${model.tags.length - 3}`}
-                              size="small"
-                              classes={{
-                                label: 'font-medium',
-                              }}
-                              style={{
-                                background: 'linear-gradient(to right, rgb(219 234 254), rgb(224 231 255))',
-                                color: 'rgb(30 64 175)',
-                                border: '1px solid rgb(191 219 254)',
-                                cursor: 'pointer',
-                              }}
-                              onClick={() => {
-                                // 点击更多标签时，可以显示所有标签
-                                console.log('显示所有标签:', model.tags)
-                              }}
-                            />
-                          </Tooltip>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-600">{t('models.modelList.requests')}:</span>
-                          <span className="font-semibold text-blue-700">{model.usage?.totalRequests?.toLocaleString() || '0'}</span>
+                              }
+                              arrow
+                            >
+                              <Chip
+                                label={`+${model.tags.length - 3}`}
+                                size="small"
+                                classes={{
+                                  label: 'font-medium',
+                                }}
+                                style={{
+                                  background: 'linear-gradient(to right, rgb(219 234 254), rgb(224 231 255))',
+                                  color: 'rgb(30 64 175)',
+                                  border: '1px solid rgb(191 219 254)',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => {
+                                  // 点击更多标签时，可以显示所有标签
+                                  console.log(t('models.messages.showAllTags'), model.tags)
+                                }}
+                              />
+                            </Tooltip>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-600">{t('models.modelList.successRate')}:</span>
-                          <span className="font-semibold text-green-700">{((model.usage?.successRate || 0) * 100).toFixed(1)}%</span>
+                      </TableCell>
+                    )}
+                    {/* 使用统计 - 仅 LLM 显示 */}
+                    {currentModelType === 'LLM' && (
+                      <TableCell>
+                        <div className="text-sm space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-600">{t('models.modelList.requests')}:</span>
+                            <span className="font-semibold text-blue-700">{model.usage?.totalRequests?.toLocaleString() || '0'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-600">{t('models.modelList.successRate')}:</span>
+                            <span className="font-semibold text-green-700">{((model.usage?.successRate || 0) * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-600">{t('models.modelList.avgResponse')}:</span>
+                            <span className="font-semibold text-orange-700">{model.usage?.averageResponseTime || 0}s</span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gray-600">{t('models.modelList.avgResponse')}:</span>
-                          <span className="font-semibold text-orange-700">{model.usage?.averageResponseTime || 0}s</span>
-                        </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
+                    )}
+                    {/* 操作列 */}
                     <TableCell>
                       <div className="flex space-x-1">
-                        <Tooltip title={t('models.testModel')}>
+                        {/* 测试按钮 */}
+                        {currentModelType === 'LLM' ? (
+                          <Tooltip title={t('models.testModel')}>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setSelectedModel(model)
+                                setShowTestDialog(true)
+                              }}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            >
+                              <Play className="w-4 h-4" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip title={!model.isActive ? t('models.messages.embeddingModel.modelDisabled') : t('models.testModel')}>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleTestEmbeddingModel(model.id)}
+                              disabled={testingModelId !== null || !model.isActive}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              {testingModelId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {/* 编辑按钮 */}
+                        <Tooltip title={t('models.editModel')}>
                           <IconButton
                             size="small"
-                            onClick={() => {
-                              setSelectedModel(model)
-                              setShowTestDialog(true)
-                            }}
-                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() => handleOpenModelDialog(model)}
+                            className="text-gray-500 hover:text-blue-600 hover:bg-blue-50"
                           >
-                            <Play className="w-4 h-4" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title={t('models.editModel')}>
-                          <IconButton size="small" onClick={() => handleOpenModelDialog(model)} className="text-gray-500 hover:text-blue-600 hover:bg-blue-50">
                             <Settings className="w-4 h-4" />
                           </IconButton>
                         </Tooltip>
+                        {/* 禁用/启用按钮 - 两种模式都有 */}
                         <Tooltip title={model.isActive ? t('models.modelList.deactivateModel') : t('models.modelList.activateModel')}>
                           <IconButton
                             size="small"
@@ -950,8 +1309,9 @@ const ModelsPage: React.FC = () => {
                             {model.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                           </IconButton>
                         </Tooltip>
+                        {/* 删除按钮 - 两种模式都有 */}
                         <Tooltip title={t('models.modelList.deleteModel')}>
-                          <IconButton size="small" onClick={() => handleDeleteModel(model.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                          <IconButton size="small" onClick={() => handleDeleteModel(model.id, model.name)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
                         </Tooltip>
@@ -964,11 +1324,10 @@ const ModelsPage: React.FC = () => {
           </Table>
         </TableContainer>
 
-        {/* 分页组件 */}
-        {finalTotalItems > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+        {/* 分页组件 - 始终显示 */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">每页显示:</span>
+              <span className="text-sm text-gray-600">{t('models.modelList.perPage')}:</span>
               <select
                 value={pageSize}
                 onChange={e => {
@@ -981,18 +1340,17 @@ const ModelsPage: React.FC = () => {
                 }}
                 className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-300 shadow-sm"
               >
-                <option value={10}>10条</option>
-                <option value={20}>20条</option>
-                <option value={50}>50条</option>
+                <option value={10}>10 {t('models.modelList.pageItem')}</option>
+                <option value={20}>20 {t('models.modelList.pageItem')}</option>
+                <option value={50}>50 {t('models.modelList.pageItem')}</option>
               </select>
               <span className="text-sm text-gray-600">
-                共 {finalTotalItems} 条记录
-                {hasFilters && <span className="text-blue-600 ml-1">(筛选结果)</span>}
+                {t('models.modelList.totalItems', { totalItems: finalTotalItems })}
+                {hasFilters && <span className="text-blue-600 ml-1">({t('models.modelList.filterResult')})</span>}
               </span>
             </div>
 
-            {finalTotalPages > 1 && (
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
                 <button
                   onClick={() => {
                     if (hasFilters) {
@@ -1003,7 +1361,7 @@ const ModelsPage: React.FC = () => {
                   }}
                   disabled={finalCurrentPage === 1}
                   className={`p-2 rounded-lg ${finalCurrentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
-                  title="上一页"
+                  title={t('models.modelList.prevPage')}
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -1061,7 +1419,7 @@ const ModelsPage: React.FC = () => {
                           ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
                           : 'bg-gray-50 text-black font-bold hover:bg-gray-200'
                       }`}
-                      title={`第${pageNum}页`}
+                      title={t('models.modelList.pageNum', { pageNum })}
                     >
                       {pageNum}
                     </button>
@@ -1078,35 +1436,25 @@ const ModelsPage: React.FC = () => {
                   }}
                   disabled={finalCurrentPage === finalTotalPages}
                   className={`p-2 rounded-lg ${finalCurrentPage === finalTotalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
-                  title="下一页"
+                  title={t('models.modelList.nextPage')}
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
 
-                <span className="text-sm text-gray-600 ml-4">
-                  第 {finalCurrentPage} / {finalTotalPages} 页
-                </span>
-              </div>
-            )}
+                <span className="text-sm text-gray-600 ml-4">{t('models.modelList.pageNumDesc', { finalCurrentPage, finalTotalPages })}</span>
+            </div>
           </div>
-        )}
       </div>
 
       {/* Unified Model Dialog for Add/Edit */}
       <Dialog
         open={showModelDialog}
-        onClose={() => {
-          setShowModelDialog(false)
-          // 弹窗关闭后自动刷新数据
-          refetch()
-        }} // 完全禁用自动关闭，只能通过取消按钮退出
+        onClose={() => {}} // 完全禁用自动关闭，只能通过取消按钮退出
         maxWidth="md"
         fullWidth
         disableRestoreFocus
         // 禁用ESC键
         disableEscapeKeyDown={true}
-        // 禁用背景点击
-        disableBackdropClick={true}
       >
         <DialogTitle className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
           <div className="flex items-center space-x-3">
@@ -1114,7 +1462,7 @@ const ModelsPage: React.FC = () => {
               {editMode ? <Settings className="w-4 h-4 text-white" /> : <Plus className="w-4 h-4 text-white" />}
             </div>
             <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
-              {editMode ? '编辑模型' : t('models.dialog.addNewModel')}
+              {editMode ? t('models.dialog.editModel') : t('models.dialog.addNewModel')}
             </Typography>
           </div>
         </DialogTitle>
@@ -1130,7 +1478,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="模型名称"
+                label={t('models.modelConfig.basicInfo.name')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1148,10 +1496,13 @@ const ModelsPage: React.FC = () => {
                 error={(newModel.name || '').length > 100}
                 helperText={
                   (newModel.name || '').length > 80 ? (
-                    <span style={{ color: 'orange' }}>模型友好名称过长，请控制在100字符以内.字符数：{newModel.name?.length || 0}/100</span>
+                    <span style={{ color: 'orange' }}>模型友好名称过长，请控制在100字符以内</span>
                   ) : (
                     <span style={{ color: '#666' }}>
-                      {t('models.modelConfig.basicInfo.nameHint')} | 字符数：{newModel.name?.length || 0}/100
+                      {modelType === 'Embedding' 
+                        ? t('models.modelConfig.basicInfo.embeddingNameHint') 
+                        : t('models.modelConfig.basicInfo.nameHint')} | {t('models.modelConfig.basicInfo.charNum')}
+                      {newModel.name?.length || 0}/100
                     </span>
                   )
                 }
@@ -1159,10 +1510,15 @@ const ModelsPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <FormControl fullWidth>
-                <InputLabel>API协议</InputLabel>
-                <Select value={newModel.provider} label="API协议" onChange={e => setNewModel({ ...newModel, provider: e.target.value })}>
+                <InputLabel>{t('models.modelConfig.basicInfo.provider')}</InputLabel>
+                <Select
+                  value={newModel.provider}
+                  label={t('models.modelConfig.basicInfo.provider')}
+                  onChange={e => setNewModel({ ...newModel, provider: e.target.value })}
+                  disabled={modelType === 'Embedding'} // Embedding 只支持 OpenAI
+                >
                   <MenuItem value={ModelProvider.OPENAI}>OpenAI</MenuItem>
-                  <MenuItem value={ModelProvider.SILICONFLOW}>SiliconFlow</MenuItem>
+                  {modelType === 'LLM' && <MenuItem value={ModelProvider.SILICONFLOW}>SiliconFlow</MenuItem>}
                   {/* Temporarily commented out other providers */}
                   {/* <MenuItem value={ModelProvider.ANTHROPIC}>Anthropic</MenuItem> */}
                   {/* <MenuItem value={ModelProvider.DEEPSEEK}>DeepSeek</MenuItem> */}
@@ -1172,7 +1528,7 @@ const ModelsPage: React.FC = () => {
                   {/* <MenuItem value={ModelProvider.CUSTOM}>自定义</MenuItem> */}
                 </Select>
                 <Typography variant="caption" className="text-gray-600 mt-1">
-                  {t('models.modelConfig.basicInfo.providerHint')}
+                  {modelType === 'Embedding' ? t('models.modelConfig.basicInfo.embeddingProviderHint') : t('models.modelConfig.basicInfo.providerHint')}
                 </Typography>
               </FormControl>
             </Grid>
@@ -1180,7 +1536,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="模型ID"
+                label={t('models.modelConfig.basicInfo.type')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1195,13 +1551,16 @@ const ModelsPage: React.FC = () => {
                 }}
                 placeholder=""
                 variant="outlined"
-                error={(newModel.name || '').length > 100}
+                error={(newModel.modelId || '').length > 100}
                 helperText={
                   (newModel.modelId || '').length > 80 ? (
-                    <span style={{ color: 'orange' }}>模型标识符过长，请控制在100字符以内.字符数：{newModel.modelId?.length || 0}/100</span>
+                    <span style={{ color: 'orange' }}>模型标识符过长，请控制在100字符以内</span>
                   ) : (
                     <span style={{ color: '#666' }}>
-                      {t('models.modelConfig.basicInfo.typeHint')} | 字符数：{newModel.modelId?.length || 0}/100
+                      {modelType === 'Embedding' 
+                        ? t('models.modelConfig.basicInfo.embeddingTypeHint') 
+                        : t('models.modelConfig.basicInfo.typeHint')} | {t('models.modelConfig.basicInfo.charNum')}
+                      {newModel.modelId?.length || 0}/100
                     </span>
                   )
                 }
@@ -1211,7 +1570,7 @@ const ModelsPage: React.FC = () => {
               <TextField
                 fullWidth
                 required
-                label="API 密钥"
+                label={t('models.modelConfig.parameters.apiKey')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1219,18 +1578,22 @@ const ModelsPage: React.FC = () => {
                 }}
                 type="password"
                 value={newModel.apiKey}
-                onChange={e => setNewModel({ ...newModel, apiKey: e.target.value?.trim() })}
-                placeholder=""
+                onChange={e => setNewModel({ ...newModel, apiKey: e.target.value })}
+                placeholder={editMode ? t('models.messages.apiKeyEmptyHint') : ''}
                 variant="outlined"
                 error={false} // 不显示红色边框，只在下方显示红色提示文本
-                helperText={<span style={{ color: '#666' }}>{t('models.modelConfig.parameters.apiKeyHint')}</span>}
+                helperText={
+                  <span style={{ color: '#666' }}>
+                    {editMode ? t('models.messages.apiKeyEditHint') : t('models.modelConfig.parameters.apiKeyHint')}
+                  </span>
+                }
               />
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 required
-                label="基础服务地址"
+                label={t('models.modelConfig.parameters.baseUrl')}
                 sx={{
                   '& .MuiInputLabel-asterisk': {
                     color: 'red',
@@ -1249,174 +1612,172 @@ const ModelsPage: React.FC = () => {
                   baseUrlError ? (
                     <span style={{ color: 'red' }}>{baseUrlError}</span>
                   ) : (
-                    <span style={{ color: '#666' }}>{t('models.modelConfig.parameters.baseUrlHint')}</span>
+                    <span style={{ color: '#666' }}>
+                      {modelType === 'Embedding'
+                        ? t('models.messages.embeddingBaseUrlHint')
+                        : t('models.modelConfig.parameters.baseUrlHint')}
+                    </span>
                   )
                 }
               />
             </Grid>
-            <Grid item xs={12}>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <TextField
-                    label="标签"
-                    placeholder=""
-                    value={newTag}
-                    onChange={e => setNewTag(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        const currentTags = newModel.tags || []
-                        if (newTag.trim() && !currentTags.includes(newTag.trim())) {
-                          if (currentTags.length >= 10) {
-                            setSnackbar({
-                              open: true,
-                              message: '标签数量不能超过10个',
-                              severity: 'warning',
+            {/* 标签字段 - 仅 LLM 模型显示 */}
+            {modelType === 'LLM' && (
+              <Grid item xs={12}>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <TextField
+                      label={t('models.modelConfig.basicInfo.tags')}
+                      placeholder=""
+                      value={newTag}
+                      onChange={e => setNewTag(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const currentTags = newModel.tags || []
+                          if (newTag.trim() && !currentTags.includes(newTag.trim())) {
+                            if (currentTags.length >= 10) {
+                              setSnackbar({
+                                open: true,
+                                message: t('models.messages.tagsLimit'),
+                                severity: 'warning',
+                              })
+                              return
+                            }
+                            setNewModel({
+                              ...newModel,
+                              tags: [...currentTags, newTag.trim()],
                             })
-                            return
+                            setNewTag('')
                           }
-                          setNewModel({
-                            ...newModel,
-                            tags: [...currentTags, newTag.trim()],
-                          })
-                          setNewTag('')
                         }
-                      }
-                    }}
-                    variant="outlined"
-                    className="flex-1 !mr-4"
-                    disabled={(newModel.tags || []).length >= 10}
-                  />
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={handleAddTag}
-                    className="border-gray-300 text-gray-700"
-                    disabled={(newModel.tags || []).length >= 10}
-                  >
-                    添加
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between mb-2">
-                  <Typography variant="caption" className={(newModel.tags || []).length >= 10 ? 'text-red-600' : 'text-gray-600'}>
-                    标签数量：{(newModel.tags || []).length}/10
-                    {(newModel.tags || []).length >= 10 && ' (已达上限)'}
-                  </Typography>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(newModel.tags || []).map((tag, index) => (
-                    <Chip
-                      key={index}
-                      label={tag}
-                      onDelete={() => handleRemoveTag(index)}
-                      className="bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200"
-                      size="small"
+                      }}
+                      variant="outlined"
+                      className="flex-1 !mr-4"
+                      disabled={(newModel.tags || []).length >= 10}
                     />
-                  ))}
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleAddTag}
+                      className="border-gray-300 text-gray-700"
+                      disabled={(newModel.tags || []).length >= 10}
+                    >
+                      {t('common.buttons.add')}
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Typography variant="caption" className={(newModel.tags || []).length >= 10 ? 'text-red-600' : 'text-gray-600'}>
+                      {t('models.modelConfig.basicInfo.tagsNum')}：{(newModel.tags || []).length}/10
+                      {(newModel.tags || []).length >= 10 && ` (${t('models.modelConfig.basicInfo.tagsLimit')})`}
+                    </Typography>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(newModel.tags || []).map((tag, index) => (
+                      <Chip
+                        key={index}
+                        label={tag}
+                        onDelete={() => handleRemoveTag(index)}
+                        className="bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200"
+                        size="small"
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                required
-                multiline
-                rows={3}
-                label="描述"
-                sx={{
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red',
-                  },
-                }}
-                value={newModel.description}
-                onChange={e => {
-                  const value = e.target.value
-                  if (value.length <= 500) {
-                    setNewModel({ ...newModel, description: value })
+              </Grid>
+            )}
+            {/* 描述字段 - 仅 LLM 模型显示 */}
+            {modelType === 'LLM' && (
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  label={t('models.modelConfig.basicInfo.description')}
+                  value={newModel.description}
+                  onChange={e => {
+                    const value = e.target.value
+                    if (value.length <= 500) {
+                      setNewModel({ ...newModel, description: value })
+                    }
+                  }}
+                  placeholder=""
+                  variant="outlined"
+                  error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
+                  helperText={
+                    (newModel.description || '').length > 450 ? (
+                      <span style={{ color: 'orange' }}>描述过长，请控制在500字符以内</span>
+                    ) : (
+                      <span style={{ color: '#666' }}>
+                        {t('models.modelConfig.basicInfo.descriptionLimit')} {newModel.description?.length || 0}/500
+                      </span>
+                    )
                   }
-                }}
-                placeholder=""
-                variant="outlined"
-                error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
-                helperText={
-                  (newModel.description || '').length > 450 ? (
-                    <span style={{ color: 'orange' }}>描述过长，请控制在500字符以内.字符数：{newModel.description?.length || 0}/500</span>
-                  ) : (
-                    <span style={{ color: '#666' }}>字符数：{newModel.description?.length || 0}/500</span>
-                  )
-                }
-              />
-            </Grid>
+                />
+              </Grid>
+            )}
 
             {/* 模型参数配置区域 */}
             <Grid item xs={12}>
               <Typography variant="h6" className="text-gray-800 mb-3 font-semibold border-b border-gray-200 pb-2 mt-4">
-                模型参数配置
+                {t('models.modelConfig.parameters.title')}
               </Typography>
             </Grid>
-            <Grid item xs={12} md={12}>
-              <TextField
-                fullWidth
-                required
-                label="超时时间(s)"
-                type="number"
-                placeholder=""
-                value={newModel.timeout || ''}
-                error={!(newModel.timeout >= 1 && newModel.timeout <= 300)} // 只在URL格式错误时显示红色边框
-                onChange={e => {
-                  const value = e.target.value
-                  if (value === '') {
-                    setNewModel({ ...newModel, timeout: undefined })
-                    return
-                  }
+            {/* LLM 模型参数 */}
+            {modelType === 'LLM' && (
+              <>
+                <Grid item xs={12} md={12}>
+                  <TextField
+                    fullWidth
+                    required
+                    label={t('models.modelConfig.parameters.timeout')}
+                    type="number"
+                    placeholder=""
+                    value={newModel.timeout || ''}
+                    error={!(newModel.timeout && newModel.timeout >= 1 && newModel.timeout <= 300)} // 只在URL格式错误时显示红色边框
+                    onChange={e => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewModel({ ...newModel, timeout: undefined })
+                        return
+                      }
 
-                  let numValue = parseInt(value)
-                  if (!isNaN(numValue)) {
-                    // 自动将值限制在有效范围内
-                    if (numValue < 1) {
-                      numValue = 1
-                    } else if (numValue > 300) {
-                      numValue = 300
-                    }
-                    setNewModel({ ...newModel, timeout: numValue })
-                  }
-                }}
-                inputProps={{
-                  style: {
-                    MozAppearance: 'textfield',
-                    '&::-webkit-outer-spin-button': {
-                      WebkitAppearance: 'none',
-                      margin: 0,
-                    },
-                    '&::-webkit-inner-spin-button': {
-                      WebkitAppearance: 'none',
-                      margin: 0,
-                    },
-                    '& .MuiInputLabel-asterisk': {
-                      color: 'red',
-                    },
-                  },
-                }}
-                sx={{
-                  '& input[type=number]::-webkit-outer-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                  '& input[type=number]::-webkit-inner-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                  '& input[type=number]': {
-                    MozAppearance: 'textfield',
-                  },
-                  '& .MuiInputLabel-asterisk': {
-                    color: 'red',
-                  },
-                }}
-                variant="outlined"
-                helperText="超时时间范围：1-300秒（输入超出范围将自动调整）"
-              />
-            </Grid>
+                      let numValue = parseInt(value)
+                      if (!isNaN(numValue)) {
+                        // 自动将值限制在有效范围内
+                        if (numValue < 1) {
+                          numValue = 1
+                        } else if (numValue > 300) {
+                          numValue = 300
+                        }
+                        setNewModel({ ...newModel, timeout: numValue })
+                      }
+                    }}
+                    inputProps={{
+                      style: {
+                        MozAppearance: 'textfield',
+                      },
+                    }}
+                    sx={{
+                      '& input[type=number]::-webkit-outer-spin-button': {
+                        WebkitAppearance: 'none',
+                        margin: 0,
+                      },
+                      '& input[type=number]::-webkit-inner-spin-button': {
+                        WebkitAppearance: 'none',
+                        margin: 0,
+                      },
+                      '& input[type=number]': {
+                        MozAppearance: 'textfield',
+                      },
+                      '& .MuiInputLabel-asterisk': {
+                        color: 'red',
+                      },
+                    }}
+                    variant="outlined"
+                    helperText={t('models.modelConfig.parameters.timeoutDesc')}
+                  />
+                </Grid>
             {/* <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
@@ -1432,13 +1793,9 @@ const ModelsPage: React.FC = () => {
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
                 <Typography gutterBottom sx={{ mb: 0 }}>
-                  温度: {newModel.temperature}
+                  {t('models.modelConfig.parameters.temperature')}
                 </Typography>
-                <Tooltip
-                  title="temperature:控制模型生成结果的随机性与创造性。值越高，输出越随机、多样；值越低，结果越确定、保守。范围通常为0~2，推荐设置0.1~1.0。示例：0.7（平衡随机性与一致性）、1.2（更具创造性的输出）。"
-                  placement="top"
-                  arrow
-                >
+                <Tooltip title={t('models.modelConfig.parameters.temperatureDesc')} placement="top" arrow>
                   <IconButton size="small" sx={{ p: 0, color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -1472,13 +1829,9 @@ const ModelsPage: React.FC = () => {
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
                 <Typography gutterBottom sx={{ mb: 0 }}>
-                  核采样: {newModel.topp}
+                  {t('models.modelConfig.parameters.topp')}
                 </Typography>
-                <Tooltip
-                  title="Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。"
-                  placement="top"
-                  arrow
-                >
+                <Tooltip title={t('models.modelConfig.parameters.toppDesc')} placement="top" arrow>
                   <IconButton size="small" sx={{ p: 0, color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -1509,18 +1862,66 @@ const ModelsPage: React.FC = () => {
                 ]}
               />
             </Grid>
+              </>
+            )}
+
+            {/* Embedding 模型参数 */}
+            {modelType === 'Embedding' && (
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label={t('models.messages.maxBatchSize')}
+                  type="number"
+                  placeholder=""
+                  value={newModel.maxBatchSize || ''}
+                  onChange={e => {
+                    const value = e.target.value
+                    if (value === '') {
+                      setNewModel({ ...newModel, maxBatchSize: undefined })
+                      return
+                    }
+
+                    let numValue = parseInt(value)
+                    if (!isNaN(numValue)) {
+                      // 自动将值限制在有效范围内
+                      if (numValue < 1) {
+                        numValue = 1
+                      } else if (numValue > 10) {
+                        numValue = 10
+                      }
+                      setNewModel({ ...newModel, maxBatchSize: numValue })
+                    }
+                  }}
+                  inputProps={{
+                    min: 1,
+                    max: 10,
+                  }}
+                  sx={{
+                    '& input[type=number]::-webkit-outer-spin-button': {
+                      WebkitAppearance: 'none',
+                      margin: 0,
+                    },
+                    '& input[type=number]::-webkit-inner-spin-button': {
+                      WebkitAppearance: 'none',
+                      margin: 0,
+                    },
+                    '& input[type=number]': {
+                      MozAppearance: 'textfield',
+                    },
+                  }}
+                  variant="outlined"
+                  helperText={t('models.messages.maxBatchSizeHint')}
+                />
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions className="bg-gray-50 px-6 py-4">
           <Button
-            onClick={() => {
-              setShowModelDialog(false)
-              // 弹窗关闭后自动刷新数据
-              refetch()
-            }}
+            onClick={() => setShowModelDialog(false)}
             className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-200"
           >
-            取消
+            {t('common.buttons.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -1532,7 +1933,7 @@ const ModelsPage: React.FC = () => {
                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-105 hover:shadow-xl'
             }`}
           >
-            {editMode ? '保存更改' : '添加模型'}
+            {editMode ? t('models.saveModel') : t('models.addModel')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1544,8 +1945,6 @@ const ModelsPage: React.FC = () => {
           setShowTestDialog(false)
           setTestPrompt('')
           setTestResult('')
-          // 弹窗关闭后自动刷新数据以更新统计次数
-          refetch()
         }}
         maxWidth="md"
         fullWidth
@@ -1560,37 +1959,37 @@ const ModelsPage: React.FC = () => {
               <Play className="w-4 h-4 text-white" />
             </div>
             <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
-              测试模型: {selectedModel?.name}
+              {t('models.testModel')}: {selectedModel?.name}
             </Typography>
           </div>
         </DialogTitle>
         <DialogContent>
           <div className="space-y-4 pt-4">
-            {/* 常用测试语句 */}
+            {/* 常用语句 */}
             <div>
               <Typography variant="subtitle2" className="text-gray-700 mb-2 font-medium">
-                常用测试语句
+                {t('models.commonTestPrompts')}
               </Typography>
               <div className="flex flex-wrap gap-2 mb-3">
                 <Chip
-                  label="你好，请介绍一下你自己"
+                  label={t('models.introducePrompt')}
                   variant="outlined"
                   size="small"
-                  onClick={() => setTestPrompt('你好，请介绍一下你自己')}
+                  onClick={() => setTestPrompt(t('models.introducePrompt'))}
                   className="cursor-pointer hover:bg-blue-50 hover:border-blue-300"
                 />
                 <Chip
-                  label="请解释一下人工智能的基本概念"
+                  label={t('models.aiConceptsPrompt')}
                   variant="outlined"
                   size="small"
-                  onClick={() => setTestPrompt('请解释一下人工智能的基本概念')}
+                  onClick={() => setTestPrompt(t('models.aiConceptsPrompt'))}
                   className="cursor-pointer hover:bg-blue-50 hover:border-blue-300"
                 />
                 <Chip
-                  label="写一个简单的Python Hello World程序"
+                  label={t('models.helloWorldPrompt')}
                   variant="outlined"
                   size="small"
-                  onClick={() => setTestPrompt('写一个简单的Python Hello World程序')}
+                  onClick={() => setTestPrompt(t('models.helloWorldPrompt'))}
                   className="cursor-pointer hover:bg-blue-50 hover:border-blue-300"
                 />
               </div>
@@ -1600,11 +1999,13 @@ const ModelsPage: React.FC = () => {
               fullWidth
               multiline
               rows={4}
-              label="测试提示词"
+              label={t('models.testPrompt')}
               value={testPrompt}
               onChange={e => setTestPrompt(e.target.value)}
               placeholder=""
-              helperText={testPrompt.length > 1000 ? `字符数超过限制（${testPrompt.length}/1000），请删除多余字符` : `${testPrompt.length}/1000 字符`}
+              helperText={
+                testPrompt.length > 1000 ? t('models.promptLimit', { length: testPrompt.length }) : t('models.promptLength', { length: testPrompt.length })
+              }
               error={testPrompt.length > 1000}
             />
 
@@ -1613,16 +2014,16 @@ const ModelsPage: React.FC = () => {
                 variant="contained"
                 startIcon={isTesting ? <Loader2 className="animate-spin" /> : <Play />}
                 onClick={handleTestModel}
-                disabled={!isTesting && (!testPrompt.trim() || testPrompt.length > 1000)}
-                className={`px-6 py-2 rounded-lg font-semibold transform transition-all duration-300 shadow-sm ${
+                disabled={!isTesting && !testPrompt.trim()}
+                className={`px-6 py-2 rounded-lg font-semibold transform transition-all duration-300 shadow-lg ${
                   isTesting
                     ? 'bg-gray-600 text-white cursor-not-allowed'
-                    : !testPrompt.trim() || testPrompt.length > 1000
+                    : !testPrompt.trim()
                       ? 'bg-gray-400 text-white cursor-not-allowed'
                       : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-105 hover:shadow-xl'
                 }`}
               >
-                {isTesting ? '测试中...' : '开始测试'}
+                {isTesting ? t('models.testing') : t('models.startTest')}
               </Button>
               <Button
                 variant="outlined"
@@ -1632,14 +2033,14 @@ const ModelsPage: React.FC = () => {
                 }}
                 className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 border-gray-300 hover:border-gray-400 px-4 py-2 rounded-lg transition-all duration-200"
               >
-                重置
+                {t('models.reset')}
               </Button>
             </div>
 
             {testResult && (
               <div>
                 <Typography variant="h6" className="mb-2 text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800 font-bold">
-                  测试结果
+                  {t('models.testResult')}
                 </Typography>
                 <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4">
                   <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-white p-3 rounded-lg border border-gray-200">{testResult}</pre>
@@ -1654,12 +2055,10 @@ const ModelsPage: React.FC = () => {
               setShowTestDialog(false)
               setTestPrompt('')
               setTestResult('')
-              // 弹窗关闭后自动刷新数据以更新统计次数
-              refetch()
             }}
             className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-200"
           >
-            关闭
+            {t('models.close')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1668,15 +2067,40 @@ const ModelsPage: React.FC = () => {
       <DeleteConfirmationDialog
         isOpen={deleteDialog.isOpen}
         onClose={cancelDeleteModel}
-        onConfirm={confirmDeleteModel}
+        onConfirm={
+          deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0
+            ? cancelDeleteModel // 如果有知识库使用，点击确认只是关闭对话框
+            : confirmDeleteModel // 否则执行删除
+        }
         itemType="model"
         itemName={deleteDialog.modelName}
-        isLoading={deleteModelMutation.isLoading}
+        isLoading={deleteModelMutation.isLoading || deleteEmbeddingModelMutation.isLoading}
+        iconType={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? 'warning' : 'danger'}
+        title={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? '无法删除模型' : undefined}
+        message={
+          deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? (
+            <div className="space-y-3 text-base text-left">
+              <p className="text-gray-600">该模型正在被以下知识库使用：</p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-h-60 overflow-y-auto">
+                <ul className="list-disc list-inside space-y-1">
+                  {deleteDialog.knowledgeBases.map((kbName: string, index: number) => (
+                    <li key={index} className="text-gray-800 font-medium">
+                      {kbName}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <p className="text-gray-600">请先删除或修改这些知识库的模型配置，然后才能删除该模型。</p>
+            </div>
+          ) : undefined
+        }
+        confirmButtonText={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? '我知道了' : undefined}
+        cancelButtonText={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? undefined : t('common.cancel')}
       />
 
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={3000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >

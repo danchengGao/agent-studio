@@ -1,6 +1,7 @@
 import { Button, TextField, Tooltip } from '@mui/material'
 import { Play, Square, BrushCleaning } from 'lucide-react'
 import { useRef } from 'react'
+import { useScopedTranslation } from '@/i18n'
 
 interface AgentOperationsBarProps {
   value: string
@@ -27,11 +28,12 @@ const AgentOperationsBar = ({
   isProcessing = false,
   onInputFocusChange,
 }: AgentOperationsBarProps) => {
+  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.operationsBar')
   const inputRef = useRef<HTMLInputElement | null>(null)
   return (
     <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm">
       <div className="flex items-center space-x-3">
-        <Tooltip title="删除对话记录" placement="top">
+        <Tooltip title={t('tooltips.clearChat')} placement="top">
           <Button
             variant="text"
             onClick={onClearChat ? onClearChat : undefined}
@@ -65,7 +67,7 @@ const AgentOperationsBar = ({
             if (inputDisabled) return
             onChange(e.target.value)
           }}
-          placeholder={placeholder || '输入消息来测试智能体...'}
+          placeholder={placeholder || t('placeholders.inputMessage')}
           onFocus={() => onInputFocusChange?.(true)}
           onBlur={() => onInputFocusChange?.(false)}
           onKeyPress={e => {
@@ -116,7 +118,7 @@ const AgentOperationsBar = ({
               fontWeight: 600,
             }}
           >
-            发送
+            {t('buttons.send')}
           </Button>
         )}
         {isProcessing && (
@@ -139,7 +141,7 @@ const AgentOperationsBar = ({
               fontWeight: 600,
             }}
           >
-            取消
+            {t('buttons.cancel')}
           </Button>
         )}
       </div>

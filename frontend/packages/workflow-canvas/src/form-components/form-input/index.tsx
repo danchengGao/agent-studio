@@ -9,6 +9,7 @@ import { IJsonSchema } from '@flowgram.ai/json-schema'
 import { useIsSidebar } from '../../hooks'
 import { FormItem, FormDisplay } from '../../form-components'
 import { DisplayInputsValues, IFlowValue, InputsValues } from '../../form-materials'
+import { useTranslation } from '../../i18n'
 
 export interface FormInputProps {
   name?: string
@@ -23,7 +24,7 @@ export interface FormInputProps {
 }
 
 export function FormInput({
-  name = '输入',
+  name,
   inputParametersName = 'inputs.inputParameters',
   showAddButton,
   defaultFields,
@@ -32,18 +33,20 @@ export function FormInput({
   nameEditable = true,
   useFieldSchema = false,
 }: FormInputProps) {
+  const { t } = useTranslation()
+  const displayName = name || t('workflowCanvas.formInput.input')
   const isSidebar = useIsSidebar()
 
   if (!isSidebar) {
     return (
       <Field<Record<string, IFlowValue | undefined> | undefined> name={inputParametersName}>
-        {({ field }) => <FormDisplay label={name} content={<DisplayInputsValues value={field.value} schema={schema} />} />}
+        {({ field }) => <FormDisplay label={displayName} content={<DisplayInputsValues value={field.value} schema={schema} />} />}
       </Field>
     )
   }
 
   return (
-    <FormItem name={name} vertical>
+    <FormItem name={displayName} vertical>
       <Field<Record<string, IFlowValue | undefined> | undefined> name={inputParametersName}>
         {({ field }) => {
           return (

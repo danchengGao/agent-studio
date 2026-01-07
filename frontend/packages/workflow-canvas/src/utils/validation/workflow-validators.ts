@@ -3,29 +3,30 @@
  * SPDX-License-Identifier: MIT
  */
 
+import { I18n } from '@flowgram.ai/editor'
 import type { ValidationErrorInfo } from '../../components/validation/types'
 import { WorkflowDocument } from '@flowgram.ai/free-layout-editor'
 
 /**
- * 工作流路径验证配置
+ * Workflow path validation options
  */
 export interface WorkflowPathValidationOptions {
-  /** 开始节点类型 */
+  /** Start node type */
   startNodeType?: string
-  /** 结束节点类型 */
+  /** End node type */
   endNodeType?: string
-  /** 错误消息 */
+  /** Error message */
   errorMessage?: string
 }
 
 /**
- * 验证工作流路径完整性
- * @param document 工作文档
- * @param options 验证配置
- * @returns 验证错误列表
+ * Validate workflow path completeness
+ * @param document - Workflow document
+ * @param options - Validation configuration
+ * @returns Validation error list
  */
 export const validateWorkflowPath = (document: WorkflowDocument, options: WorkflowPathValidationOptions = {}): ValidationErrorInfo[] => {
-  const { startNodeType = '1', endNodeType = '2', errorMessage = '工作流必须包含从开始节点到结束节点的完整路径' } = options
+  const { startNodeType = '1', endNodeType = '2', errorMessage = I18n.t('Workflow must contain a complete path from start node to end node') } = options
 
   const workflowErrors: ValidationErrorInfo[] = []
 
@@ -44,7 +45,7 @@ export const validateWorkflowPath = (document: WorkflowDocument, options: Workfl
       return workflowErrors
     }
 
-    // 构建邻接表
+    // Build adjacency list
     const graph = new Map<string, string[]>()
     nodes.forEach(node => graph.set(node.id, []))
 
@@ -56,7 +57,7 @@ export const validateWorkflowPath = (document: WorkflowDocument, options: Workfl
       }
     })
 
-    // 检查是否存在从开始到结束的路径
+    // Check if path exists from start to end
     const hasPath = (graph: Map<string, string[]>, start: string, end: string): boolean => {
       const visited = new Set<string>()
       const queue = [start]
@@ -75,12 +76,12 @@ export const validateWorkflowPath = (document: WorkflowDocument, options: Workfl
       return false
     }
 
-    // 检查每个开始节点是否都能到达某个结束节点
+    // Check if each start node can reach an end node
     startNodes.forEach(startNode => {
       if (!endNodes.some(endNode => hasPath(graph, startNode.id, endNode.id))) {
         workflowErrors.push({
           nodeId: 'workflow',
-          nodeTitle: '工作流',
+          nodeTitle: I18n.t('Workflow'),
           error: errorMessage,
           severity: 'error',
           field: 'workflow.path',
@@ -88,14 +89,14 @@ export const validateWorkflowPath = (document: WorkflowDocument, options: Workfl
       }
     })
   } catch (error) {
-    // 忽略验证过程中的错误
+    // Ignore validation errors
   }
 
   return workflowErrors
 }
 
 /**
- * 工作流完整性验证器集合
+ * Workflow completeness validator collection
  */
 export const workflowValidators = {
   validateWorkflowPath,

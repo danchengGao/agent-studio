@@ -19,7 +19,6 @@ import {
   Box,
   Tabs,
   Tab,
-  Chip,
   Snackbar,
   Alert,
 } from '@mui/material'
@@ -604,10 +603,10 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
     // 根据切换方向设置提示信息
     if (mode === 'json') {
       // 从可视化配置切换到JSON配置
-      setConfirmDialogMessage('切换到JSON配置并编辑后，会覆盖可视化配置内容，确认切换？')
+      setConfirmDialogMessage(t('components.prompts.toolEditDialog.switchToJsonMessage'))
     } else {
       // 从JSON模式切换到可视化配置
-      setConfirmDialogMessage('切换到可视化配置并编辑后，会覆盖JSON配置内容，确认切换？')
+      setConfirmDialogMessage(t('components.prompts.toolEditDialog.switchToVisualMessage'))
     }
 
     // 显示确认对话框
@@ -1042,8 +1041,8 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
                       },
                     }}
                   >
-                    <Tab label="可视化配置" value="visual" icon={<Eye className="w-4 h-4" />} iconPosition="start" />
-                    <Tab label="JSON配置" value="json" icon={<Code className="w-4 h-4" />} iconPosition="start" />
+                    <Tab label={t('components.prompts.toolEditDialog.visualConfig')} value="visual" icon={<Eye className="w-4 h-4" />} iconPosition="start" />
+                    <Tab label={t('components.prompts.toolEditDialog.jsonConfig')} value="json" icon={<Code className="w-4 h-4" />} iconPosition="start" />
                   </Tabs>
                 </Box>
 
@@ -1081,7 +1080,7 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">{param.name.length}/100</div>
                               </div>
 
-                              <FormControl size="small" className="bg-white/60 flex-[1] min-w-0" sx={{ minWidth: '60px' }}>
+                              <FormControl size="small" className="bg-white/60 flex-[1] min-w-0" sx={{ minWidth: '140px', maxWidth: '180px' }}>
                                 <InputLabel>{t('components.prompts.toolEditDialog.parameterType')}</InputLabel>
                                 <Select
                                   value={param.type}
@@ -1089,55 +1088,39 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
                                   label={t('components.prompts.toolEditDialog.parameterType')}
                                 >
                                   <MenuItem value={DATA_TYPES.STRING}>
-                                    <div className="flex items-center space-x-2">
-                                      <span>String</span>
-                                      <Chip label="单值" size="small" className="bg-gray-100 text-gray-600 text-xs" />
-                                    </div>
+                                    <span>String</span>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.INTEGER}>
-                                    <div className="flex items-center space-x-2">
-                                      <span>Integer</span>
-                                      <Chip label="单值" size="small" className="bg-gray-100 text-gray-600 text-xs" />
-                                    </div>
+                                    <span>Integer</span>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.NUMBER}>
-                                    <div className="flex items-center space-x-2">
-                                      <span>Number</span>
-                                      <Chip label="单值" size="small" className="bg-gray-100 text-gray-600 text-xs" />
-                                    </div>
+                                    <span>Number</span>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.BOOLEAN}>
-                                    <div className="flex items-center space-x-2">
-                                      <span>Boolean</span>
-                                      <Chip label="单值" size="small" className="bg-gray-100 text-gray-600 text-xs" />
-                                    </div>
+                                    <span>Boolean</span>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.ARRAY_STRING}>
                                     <div className="flex items-center space-x-2">
                                       <Layers className="w-4 h-4 text-purple-600" />
                                       <span>Array&lt;String&gt;</span>
-                                      <Chip label="数组" size="small" className="bg-purple-100 text-purple-600 text-xs" />
                                     </div>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.ARRAY_INTEGER}>
                                     <div className="flex items-center space-x-2">
                                       <Layers className="w-4 h-4 text-purple-600" />
                                       <span>Array&lt;Integer&gt;</span>
-                                      <Chip label="数组" size="small" className="bg-purple-100 text-purple-600 text-xs" />
                                     </div>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.ARRAY_NUMBER}>
                                     <div className="flex items-center space-x-2">
                                       <Layers className="w-4 h-4 text-purple-600" />
                                       <span>Array&lt;Number&gt;</span>
-                                      <Chip label="数组" size="small" className="bg-purple-100 text-purple-600 text-xs" />
                                     </div>
                                   </MenuItem>
                                   <MenuItem value={DATA_TYPES.ARRAY_BOOLEAN}>
                                     <div className="flex items-center space-x-2">
                                       <Layers className="w-4 h-4 text-purple-600" />
                                       <span>Array&lt;Boolean&gt;</span>
-                                      <Chip label="数组" size="small" className="bg-purple-100 text-purple-600 text-xs" />
                                     </div>
                                   </MenuItem>
                                 </Select>
@@ -1220,10 +1203,9 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
                     <JsonEditor
                       value={parametersJsonSchema}
                       onChange={handleUpdateJsonSchema}
-                      placeholder="请输入JSON Schema格式的参数定义"
+                      placeholder={t('components.prompts.toolEditDialog.jsonSchemaPlaceholder')}
                       minHeight={200}
                       maxHeight={400}
-                      helperText="支持enum（枚举值）和format（格式约束）等高级特性"
                     />
                   </Box>
                 )}
@@ -1286,7 +1268,7 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
           <div className="flex items-center space-x-2">
             <Code className="w-5 h-5 text-green-600" />
             <Typography variant="h6" className="text-gray-800 font-semibold">
-              确认切换配置模式
+              {t('components.prompts.toolEditDialog.confirmSwitchModeTitle')}
             </Typography>
           </div>
         </DialogTitle>
@@ -1303,14 +1285,14 @@ const ToolEditDialog: React.FC<ToolEditDialogProps> = ({ open, editingTool, onCl
             variant="outlined"
             className="border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 min-w-[80px]"
           >
-            取消
+            {t('components.prompts.toolEditDialog.cancel')}
           </Button>
           <Button
             onClick={handleConfirmModeSwitch}
             variant="contained"
             className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 min-w-[100px] shadow-sm hover:shadow-sm transition-shadow"
           >
-            确认切换
+            {t('components.prompts.toolEditDialog.confirmSwitch')}
           </Button>
         </DialogActions>
       </Dialog>

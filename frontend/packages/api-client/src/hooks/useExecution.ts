@@ -2,12 +2,14 @@ import { useState, useCallback, useRef } from 'react'
 import ExecutionService from '../services/executionService'
 import {
   WorkflowExecutionRequest,
+  WorkflowCancelRequest,
   WorkflowExecutionEvent,
   WorkflowExecutionResult,
   WorkflowExecutionStatus,
   NodeExecutionStatus,
   ComponentExecuteRequest,
   ComponentExecuteResponse,
+  ComponentCancelRequest,
 } from '../types'
 import { API_ENDPOINTS } from '../config'
 import { nanoid } from 'nanoid'
@@ -566,8 +568,42 @@ export const useStreamAgentExecution = () => {
   }
 }
 
+export const useCancelWorkflowExecution = () => {
+  return useMutation(
+    async (request: WorkflowCancelRequest) => {
+      return await ExecutionService.cancelWorkflowExecution(request)
+    },
+    {
+      onSuccess: (data) => {
+        console.log('Workflow execution cancelled successfully:', data)
+      },
+      onError: (error: Error) => {
+        console.error('Failed to cancel workflow execution:', error)
+      },
+    },
+  )
+}
+
+export const useCancelComponentExecution = () => {
+  return useMutation(
+    async (request: ComponentCancelRequest) => {
+      return await ExecutionService.cancelComponent(request)
+    },
+    {
+      onSuccess: (data) => {
+        console.log('Component execution cancelled successfully:', data)
+      },
+      onError: (error: Error) => {
+        console.error('Failed to cancel component execution:', error)
+      },
+    },
+  )
+}
+
 export default {
   useStreamWorkflowExecution,
   useComponentExecute,
   useStreamAgentExecution,
+  useCancelWorkflowExecution,
+  useCancelComponentExecution,
 }

@@ -90,7 +90,7 @@ export const usePluginMarketConfigs = (): UsePluginMarketConfigsReturn => {
         setMarketConfigUrl(ENV_CONFIG.PLUGIN_SERVICE_URL)
       } catch (localError) {
         console.error('Failed to load plugin configurations from both market API and local config:', localError)
-        setError('加载插件配置失败，请稍后重试')
+        setError('加载插件市场失败，请稍后重试')
         setMarketPlugins([])
         setMarketConfigUrl(ENV_CONFIG.PLUGIN_SERVICE_URL)
       }

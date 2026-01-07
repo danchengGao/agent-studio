@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { TextField, Box, Slider, Typography, Tooltip, IconButton } from '@mui/material'
 import { ModelDetail } from '../../types/agentTypes'
+import { useScopedTranslation } from '@/i18n'
 
 interface ModelDetailFormProps {
   modelDetail: ModelDetail
@@ -8,7 +9,7 @@ interface ModelDetailFormProps {
   readonly?: boolean
 }
 
-// 定义错误状态接口
+// Error state interface
 interface ValidationErrors {
   temperature?: string
   // max_tokens?: string
@@ -18,8 +19,7 @@ interface ValidationErrors {
 
 export const ModelDetailForm = (props: ModelDetailFormProps) => {
   const { modelDetail, onModelDetailChange, readonly = false } = props
-  // 直接使用传入的 modelDetail，确保所有值都有定义
-  // 取消ts校验
+  // Use the incoming modelDetail directly to ensure all values are defined
   const [localModel, setLocalModel] = useState<ModelDetail>({
     model_name: modelDetail.model_name || '',
     model_id: modelDetail.model_id || 0,
@@ -36,6 +36,8 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
   })
   const [errors, setErrors] = useState<ValidationErrors>({})
 
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration.modelSetting')
+
   const CORRECTION_DELAY = 500
   const correctionTimers = useRef<Partial<Record<keyof ModelDetail, number>>>({})
   useEffect(() => {
@@ -46,15 +48,23 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
     }
   }, [])
 
-  // 字段配置 + 通用规范化/校验
+  // Field configuration + shared normalization/validation
   // type FieldKey = 'temperature' | 'top_p' | 'max_tokens' | 'timeout'
   type FieldKey = 'temperature' | 'top_p' | 'timeout'
-  type FieldMeta = { label: string; min: number; max?: number; step?: number; decimals?: number; integerOnly?: boolean; unitSuffix?: string }
+  type FieldMeta = {
+    labelKey: string
+    tooltipKey?: string
+    min: number
+    max?: number
+    step?: number
+    decimals?: number
+    integerOnly?: boolean
+  }
   const FIELD_META: Record<FieldKey, FieldMeta> = {
-    temperature: { label: '温度', min: 0, max: 2, step: 0.1, decimals: 1 },
-    top_p: { label: '核采样', min: 0, max: 1, step: 0.1, decimals: 1 },
-    // max_tokens: { label: '最大输出Token数', min: 100, step: 1, integerOnly: true },
-    timeout: { label: '超时时间(s)', min: 1, max: 300, step: 1, integerOnly: true },
+    temperature: { labelKey: 'fields.temperature.label', tooltipKey: 'fields.temperature.tooltip', min: 0, max: 2, step: 0.1, decimals: 1 },
+    top_p: { labelKey: 'fields.topP.label', tooltipKey: 'fields.topP.tooltip', min: 0, max: 1, step: 0.1, decimals: 1 },
+    // max_tokens: { labelKey: 'fields.maxTokens.label', min: 100, step: 1, integerOnly: true },
+    timeout: { labelKey: 'fields.timeout.label', min: 1, max: 300, step: 1, integerOnly: true },
   }
 
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
@@ -80,26 +90,25 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
 
   const validateField = (field: keyof ModelDetail, value: any): string => {
     const meta = FIELD_META[field as keyof typeof FIELD_META]
+    const label = t(meta.labelKey)
     if (value === null || value === undefined || isNaN(value)) {
-      return `${meta.label}不能为空`
+      return t('errors.required', { label })
     }
     const v = Number(value)
     if (meta.max !== undefined) {
       if (v < meta.min || v > meta.max) {
-        return `${meta.label}必须在 ${meta.min}-${meta.max} 之间`
+        return t('errors.range', { label, min: meta.min, max: meta.max })
       }
-    } else {
-      if (v < meta.min) {
-        return `${meta.label}必须大于等于 ${meta.min}${meta.unitSuffix ?? ''}`
-      }
+    } else if (v < meta.min) {
+      return t('errors.min', { label, min: meta.min })
     }
     if (meta.integerOnly && !Number.isInteger(v)) {
-      return `${meta.label}必须是整数`
+      return t('errors.integer', { label })
     }
     return ''
   }
 
-  // 当外部 modelDetail 变化时更新本地状态
+  // Sync local state when external modelDetail changes
   useEffect(() => {
     setLocalModel({
       model_name: modelDetail.model_name || '',
@@ -115,32 +124,30 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
       streaming: modelDetail.streaming ?? true,
       is_active: modelDetail.is_active ?? true,
     })
-    // 重置错误状态
+    // Reset validation errors
     setErrors({})
   }, [modelDetail])
 
-  // 校验函数已重构为通用版本（见上）
-
-  // 处理字段变化 - 立即更新，确保保存时使用最新值
+  // Handle field change - update immediately so parent always sees latest value
   const handleFieldChange = (field: keyof ModelDetail, value: any) => {
     const updatedModel = { ...localModel, [field]: value }
     setLocalModel(updatedModel)
     setErrors(prev => ({ ...prev, [field]: '' }))
-    // 立即通知父组件更新，确保保存时使用最新值
+    // Immediately notify parent with latest values
     onModelDetailChange(updatedModel)
-    // 延迟规范化值（不影响保存，只是UI显示）
+    // Schedule delayed normalization (UI only, no impact on saved values)
     scheduleAutoCorrect(field, value)
   }
 
-  // 处理失焦事件（自动纠正数值并校验）
+  // Handle blur event (auto-correct value and validate)
   const handleBlur = (field: keyof ModelDetail) => {
     const value = localModel[field] as number
-    // 规范化值
+    // Normalize value
     const corrected = normalizeValue(field, value)
     const updatedModel = { ...localModel, [field]: corrected }
     if (corrected !== value) {
       setLocalModel(updatedModel)
-      // 立即通知父组件更新规范化后的值
+      // Notify parent with normalized value
       onModelDetailChange(updatedModel)
     }
     const errorMessage = validateField(field, corrected)
@@ -166,7 +173,7 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: '180px 1fr', alignItems: 'center', gap: 1 }}>
-        <Typography variant="body2">{FIELD_META.timeout.label}</Typography>
+        <Typography variant="body2">{t(FIELD_META.timeout.labelKey)}</Typography>
         <TextField
           type="number"
           value={localModel.timeout}
@@ -214,12 +221,8 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
       {/* 温度 */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: 180 }}>
-          <Typography variant="body2">{FIELD_META.temperature.label}</Typography>
-          <Tooltip
-            title="temperature:控制模型生成结果的随机性与创造性。值越高，输出越随机、多样；值越低，结果越确定、保守。范围通常为0~2，推荐设置0.1~1.0。示例：0.7（平衡随机性与一致性）、1.2（更具创造性的输出）。"
-            placement="top"
-            arrow
-          >
+          <Typography variant="body2">{t(FIELD_META.temperature.labelKey)}</Typography>
+          <Tooltip title={FIELD_META.temperature.tooltipKey ? t(FIELD_META.temperature.tooltipKey) : ''} placement="top" arrow>
             <IconButton size="small" sx={{ p: 0, color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -281,12 +284,8 @@ export const ModelDetailForm = (props: ModelDetailFormProps) => {
       {/* Top P */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, width: 180 }}>
-          <Typography variant="body2">{FIELD_META.top_p.label}</Typography>
-          <Tooltip
-            title="Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。"
-            placement="top"
-            arrow
-          >
+          <Typography variant="body2">{t(FIELD_META.top_p.labelKey)}</Typography>
+          <Tooltip title={FIELD_META.top_p.tooltipKey ? t(FIELD_META.top_p.tooltipKey) : ''} placement="top" arrow>
             <IconButton size="small" sx={{ p: 0, color: 'text.secondary', '&:hover': { color: 'text.primary' } }}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

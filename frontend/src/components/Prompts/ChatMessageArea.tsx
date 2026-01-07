@@ -215,51 +215,83 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
       {/* 消息滚动区域 */}
       <div
         ref={chatContainerRef}
-        className="space-y-4 overflow-y-auto scrollbar-hide"
+        className="overflow-y-auto scrollbar-hide"
         style={{
           height: '100%',
           maxHeight: '100%',
           minHeight: 0,
-          paddingBottom: isProcessing && !isStreamingStopped && onStopStreaming ? '60px' : '0px', // 为停止按钮预留空间
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'clamp(0.75rem, 2vh, 0.875rem)',
+          paddingBottom: isProcessing && !isStreamingStopped && onStopStreaming ? 'clamp(3rem, 8vh, 3.5rem)' : '0px', // 为停止按钮预留空间
         }}
       >
         {messages.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <TestTube className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p>{defaultEmptyStateText}</p>
-            <p className="text-sm">{defaultEmptyStateSubtext}</p>
+          <div className="text-center text-gray-500" style={{ padding: 'clamp(1.5rem, 3vh, 2rem) 0' }}>
+            <TestTube 
+              className="mx-auto text-gray-300" 
+              style={{ 
+                width: 'clamp(2rem, 5vw, 2.5rem)', 
+                height: 'clamp(2rem, 5vw, 2.5rem)',
+                marginBottom: 'clamp(0.5rem, 1.5vh, 0.625rem)'
+              }} 
+            />
+            <p style={{ fontSize: 'clamp(0.875rem, 2vw, 0.9375rem)' }}>{defaultEmptyStateText}</p>
+            <p style={{ fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)' }}>{defaultEmptyStateSubtext}</p>
           </div>
         ) : (
           messages.map((message, index) => (
-            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} items-start space-x-3`}>
+            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} items-start`} style={{ gap: 'clamp(0.375rem, 1vw, 0.625rem)' }}>
               {/* 头像 - 在左侧显示（AI消息）*/}
               {message.type === 'ai' && (
-                <div className="flex-shrink-0 mt-6">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-white" />
+                <div className="flex-shrink-0" style={{ marginTop: 'clamp(0.75rem, 2vh, 1.25rem)' }}>
+                  <div 
+                    className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center"
+                    style={{ 
+                      width: 'clamp(1.5rem, 4vw, 1.75rem)', 
+                      height: 'clamp(1.5rem, 4vw, 1.75rem)' 
+                    }}
+                  >
+                    <Bot style={{ width: 'clamp(0.75rem, 2vw, 0.875rem)', height: 'clamp(0.75rem, 2vw, 0.875rem)' }} className="text-white" />
                   </div>
                 </div>
               )}
 
               <div className={`max-w-[70%] relative ${message.type === 'user' ? 'order-1' : ''}`}>
                 {/* 时间戳显示在对话框上方 */}
-                <div className={`text-xs text-gray-500 mb-1 ${message.type === 'user' ? 'text-right' : ''}`}>{message.timestamp}</div>
+                <div 
+                  className={`text-gray-500 ${message.type === 'user' ? 'text-right' : ''}`}
+                  style={{ 
+                    fontSize: 'clamp(0.625rem, 1.5vw, 0.6875rem)',
+                    marginBottom: 'clamp(0.125rem, 0.5vh, 0.1875rem)'
+                  }}
+                >
+                  {message.timestamp}
+                </div>
 
                 {/* 消息内容气泡 */}
                 <div
                   className={`
                 ${message.type === 'user' ? 'bg-blue-500 text-white' : 'bg-white border border-gray-200'} 
-                rounded-lg p-3 relative
+                rounded-lg relative
               `}
+                  style={{ padding: 'clamp(0.5rem, 1.5vw, 0.625rem)' }}
                 >
                   {/* AI思考过程显示区域 - 放在最前面 */}
                   {message.type === 'ai' && message.reasoningContent && (
-                    <div className="mb-3 pb-3 border-b border-gray-200">
+                    <div 
+                      className="border-b border-gray-200"
+                      style={{ 
+                        marginBottom: 'clamp(0.5rem, 1.5vw, 0.625rem)',
+                        paddingBottom: 'clamp(0.5rem, 1.5vw, 0.625rem)'
+                      }}
+                    >
                       <div
                         role="button"
                         tabIndex={isReadOnly ? -1 : 0}
                         aria-disabled={isReadOnly}
-                        className={`flex items-center mb-2 ${isReadOnly ? 'cursor-not-allowed opacity-60 pointer-events-none' : 'cursor-pointer'}`}
+                        className={`flex items-center ${isReadOnly ? 'cursor-not-allowed opacity-60 pointer-events-none' : 'cursor-pointer'}`}
+                        style={{ marginBottom: 'clamp(0.25rem, 1vw, 0.375rem)' }}
                         onClick={() => {
                           if (isReadOnly) {
                             return
@@ -267,13 +299,28 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                           onToggleReasoningExpanded(index)
                         }}
                       >
-                        <span className="text-sm font-medium text-gray-700">{t('components.prompts.chatMessageArea.aiThinking')}</span>
-                        <div className="ml-1 text-gray-500 hover:text-gray-700 transition-colors">
-                          {expandedReasoningMessages.has(index) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        <span 
+                          className="font-medium text-gray-700"
+                          style={{ fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)' }}
+                        >
+                          {t('components.prompts.chatMessageArea.aiThinking')}
+                        </span>
+                        <div className="text-gray-500 hover:text-gray-700 transition-colors" style={{ marginLeft: 'clamp(0.125rem, 0.5vw, 0.1875rem)' }}>
+                          {expandedReasoningMessages.has(index) ? (
+                            <ChevronDown style={{ width: 'clamp(0.75rem, 2vw, 0.875rem)', height: 'clamp(0.75rem, 2vw, 0.875rem)' }} />
+                          ) : (
+                            <ChevronRight style={{ width: 'clamp(0.75rem, 2vw, 0.875rem)', height: 'clamp(0.75rem, 2vw, 0.875rem)' }} />
+                          )}
                         </div>
                       </div>
                       {expandedReasoningMessages.has(index) && (
-                        <div className="text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 p-2 rounded border">
+                        <div 
+                          className="text-gray-600 whitespace-pre-wrap bg-gray-50 rounded border"
+                          style={{ 
+                            fontSize: 'clamp(0.625rem, 1.5vw, 0.6875rem)',
+                            padding: 'clamp(0.375rem, 1vw, 0.4375rem)'
+                          }}
+                        >
                           {/* AI思考过程直接显示，与消息内容保持一致 */}
                           <span>{message.reasoningContent || ''}</span>
                         </div>
@@ -283,12 +330,19 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
 
                   {/* 工具调用信息显示区域 - 放在第二位 */}
                   {message.type === 'ai' && message.toolCalls && message.toolCalls.length > 0 && (
-                    <div className="mb-3 pb-3 border-b border-gray-200">
+                    <div 
+                      className="border-b border-gray-200"
+                      style={{ 
+                        marginBottom: 'clamp(0.5rem, 1.5vw, 0.625rem)',
+                        paddingBottom: 'clamp(0.5rem, 1.5vw, 0.625rem)'
+                      }}
+                    >
                       <div
                         role="button"
                         tabIndex={isReadOnly ? -1 : 0}
                         aria-disabled={isReadOnly}
-                        className={`flex items-center mb-2 ${isReadOnly ? 'cursor-not-allowed opacity-60 pointer-events-none' : 'cursor-pointer'}`}
+                        className={`flex items-center ${isReadOnly ? 'cursor-not-allowed opacity-60 pointer-events-none' : 'cursor-pointer'}`}
+                        style={{ marginBottom: 'clamp(0.25rem, 1vw, 0.375rem)' }}
                         onClick={() => {
                           if (isReadOnly) {
                             return
@@ -296,29 +350,73 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                           onToggleToolCallExpanded(index)
                         }}
                       >
-                        <span className="text-sm font-medium text-gray-700">{t('components.prompts.chatMessageArea.toolCall')}</span>
-                        <div className="ml-1 text-gray-500 hover:text-gray-700 transition-colors">
-                          {expandedToolCallMessages.has(index) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        <span 
+                          className="font-medium text-gray-700"
+                          style={{ fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)' }}
+                        >
+                          {t('components.prompts.chatMessageArea.toolCall')}
+                        </span>
+                        <div className="text-gray-500 hover:text-gray-700 transition-colors" style={{ marginLeft: 'clamp(0.125rem, 0.5vw, 0.1875rem)' }}>
+                          {expandedToolCallMessages.has(index) ? (
+                            <ChevronDown style={{ width: 'clamp(0.75rem, 2vw, 0.875rem)', height: 'clamp(0.75rem, 2vw, 0.875rem)' }} />
+                          ) : (
+                            <ChevronRight style={{ width: 'clamp(0.75rem, 2vw, 0.875rem)', height: 'clamp(0.75rem, 2vw, 0.875rem)' }} />
+                          )}
                         </div>
                       </div>
                       {expandedToolCallMessages.has(index) && (
-                        <div className="space-y-2">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 1vw, 0.4375rem)' }}>
                           {message.toolCalls.map((toolCall, toolIndex) => (
-                            <div key={toolIndex} className="bg-blue-50 border border-blue-100 rounded-md p-3">
-                              <div className="text-sm font-medium text-blue-800 mb-2">
+                            <div 
+                              key={toolIndex} 
+                              className="bg-blue-50 border border-blue-100 rounded-md"
+                              style={{ padding: 'clamp(0.5rem, 1.5vw, 0.625rem)' }}
+                            >
+                              <div 
+                                className="font-medium text-blue-800"
+                                style={{ 
+                                  fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)',
+                                  marginBottom: 'clamp(0.25rem, 1vw, 0.375rem)'
+                                }}
+                              >
                                 {t('components.prompts.chatMessageArea.toolName')}
-                                <span className="ml-1">{toolCall.name}</span>
+                                <span style={{ marginLeft: 'clamp(0.125rem, 0.5vw, 0.1875rem)' }}>{toolCall.name}</span>
                               </div>
-                              <div className="text-xs text-gray-600 mb-1">
+                              <div 
+                                className="text-gray-600"
+                                style={{ 
+                                  fontSize: 'clamp(0.625rem, 1.5vw, 0.6875rem)',
+                                  marginBottom: 'clamp(0.125rem, 0.5vw, 0.1875rem)'
+                                }}
+                              >
                                 <span className="font-medium">{t('components.prompts.chatMessageArea.input')}</span>
-                                <pre className="font-mono bg-white px-2 py-1 rounded border ml-1 whitespace-pre-wrap break-words leading-5 text-xs m-0">
+                                <pre 
+                                  className="font-mono bg-white rounded border whitespace-pre-wrap break-words m-0"
+                                  style={{ 
+                                    fontSize: 'clamp(0.625rem, 1.5vw, 0.6875rem)',
+                                    lineHeight: 'clamp(1rem, 2vw, 1.125rem)',
+                                    padding: 'clamp(0.25rem, 0.75vw, 0.3125rem) clamp(0.375rem, 1vw, 0.4375rem)',
+                                    marginLeft: 'clamp(0.125rem, 0.5vw, 0.1875rem)'
+                                  }}
+                                >
                                   {/* 工具调用输入直接显示，如果没有值则显示 "-" */}
                                   {toolCall.input || '-'}
                                 </pre>
                               </div>
-                              <div className="text-xs text-gray-600">
+                              <div 
+                                className="text-gray-600"
+                                style={{ fontSize: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }}
+                              >
                                 <span className="font-medium">{t('components.prompts.chatMessageArea.output')}</span>
-                                <pre className="font-mono bg-green-50 px-2 py-1 rounded border text-green-800 ml-1 whitespace-pre-wrap break-words leading-5 text-xs m-0">
+                                <pre 
+                                  className="font-mono bg-green-50 rounded border text-green-800 whitespace-pre-wrap break-words m-0"
+                                  style={{ 
+                                    fontSize: 'clamp(0.625rem, 1.5vw, 0.6875rem)',
+                                    lineHeight: 'clamp(1rem, 2vw, 1.125rem)',
+                                    padding: 'clamp(0.25rem, 0.75vw, 0.3125rem) clamp(0.375rem, 1vw, 0.4375rem)',
+                                    marginLeft: 'clamp(0.125rem, 0.5vw, 0.1875rem)'
+                                  }}
+                                >
                                   {/* 工具调用输出直接显示，如果没有值则显示 "-" */}
                                   {toolCall.output || '-'}
                                 </pre>
@@ -407,7 +505,8 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                   ) : (
                     // 显示模式
                     <div
-                      className={`text-sm ${message.type === 'user' ? 'text-white' : 'text-gray-700'} ${messageFormats[index] === 'markdown' ? '' : 'whitespace-pre-wrap'}`}
+                      className={`${message.type === 'user' ? 'text-white' : 'text-gray-700'} ${messageFormats[index] === 'markdown' ? '' : 'whitespace-pre-wrap'}`}
+                      style={{ fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)' }}
                     >
                       {messageFormats[index] === 'markdown' ? (
                         <div
@@ -416,8 +515,10 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                           style={{
                             backgroundColor: 'transparent',
                             color: message.type === 'user' ? 'white' : 'inherit',
-                            fontSize: '14px',
+                            fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)',
                             lineHeight: '1.5',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
                           }}
                         >
                           <MarkdownPreview
@@ -426,10 +527,12 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                             style={{
                               backgroundColor: 'transparent',
                               color: message.type === 'user' ? 'white' : 'inherit',
-                              fontSize: '14px',
+                              fontSize: 'clamp(0.75rem, 1.75vw, 0.8125rem)',
                               lineHeight: '1.5',
                               padding: 0,
                               margin: 0,
+                              wordBreak: 'break-word',
+                              overflowWrap: 'break-word',
                             }}
                             wrapperElement={{
                               'data-color-mode': message.type === 'user' ? 'dark' : 'light',
@@ -437,7 +540,12 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                           />
                         </div>
                       ) : (
-                        <div className={message.content === '......' ? 'animate-pulse text-gray-400' : ''}>{message.content}</div>
+                        <div 
+                          className={message.content === '......' ? 'animate-pulse text-gray-400' : ''}
+                          style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}
+                        >
+                          {message.content}
+                        </div>
                       )}
                     </div>
                   )}
@@ -447,7 +555,7 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                     <div className="mt-3 pt-2 border-t border-gray-200">
                       <div className="text-xs text-gray-500">
                         {t('components.prompts.chatMessageArea.costTime')}
-                        {message.cost_ms ? `${Math.round((parseInt(message.cost_ms) / 1000) * 100) / 100}s` : '0s'}
+                        {message.cost_ms ? `${Math.round((parseInt(message.cost_ms || '0') / 1000) * 100) / 100}s` : '0s'}
                         {t('components.prompts.chatMessageArea.inputTokens')}
                         {message.input_tokens || '0'}
                         {t('components.prompts.chatMessageArea.outputTokens')}
@@ -459,7 +567,12 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                   {/* 消息控制按钮 */}
                   {completedMessages.has(index) && message.content !== '......' && editingMessageIndex !== index && (
                     <div
-                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} space-x-1 px-3 pb-2 border-t ${message.type === 'user' ? 'border-blue-400/30' : 'border-gray-100'} mt-2 pt-2`}
+                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} border-t ${message.type === 'user' ? 'border-blue-400/30' : 'border-gray-100'}`}
+                      style={{ 
+                        gap: 'clamp(0.125rem, 0.5vw, 0.1875rem)',
+                        padding: 'clamp(0.375rem, 1vw, 0.4375rem) clamp(0.5rem, 1.5vw, 0.625rem) clamp(0.25rem, 0.75vw, 0.4375rem)',
+                        marginTop: 'clamp(0.375rem, 1vw, 0.4375rem)'
+                      }}
                     >
                       {/* 优化按钮 - 只在AI消息显示 */}
                       {message.type === 'ai' && onOptimizeReply && (
@@ -475,14 +588,14 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                             }}
                             disabled={isReadOnly}
                             sx={{
-                              minWidth: '24px',
-                              minHeight: '24px',
-                              padding: '4px',
+                              minWidth: 'clamp(20px, 3vw, 22px)',
+                              minHeight: 'clamp(20px, 3vw, 22px)',
+                              padding: 'clamp(2px, 0.5vw, 3px)',
                               color: '#9ca3af',
                               '&:hover': { backgroundColor: '#f3f4f6' },
                             }}
                           >
-                            <Sparkles className="w-3 h-3" />
+                            <Sparkles style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
                           </Button>
                         </Tooltip>
                       )}
@@ -501,14 +614,14 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                             }}
                             disabled={isReadOnly}
                             sx={{
-                              minWidth: '24px',
-                              minHeight: '24px',
-                              padding: '4px',
+                              minWidth: 'clamp(20px, 3vw, 22px)',
+                              minHeight: 'clamp(20px, 3vw, 22px)',
+                              padding: 'clamp(2px, 0.5vw, 3px)',
                               color: '#9ca3af',
                               '&:hover': { backgroundColor: '#f3f4f6' },
                             }}
                           >
-                            <RotateCw className="w-3 h-3" />
+                            <RotateCw style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
                           </Button>
                         </Tooltip>
                       )}
@@ -523,7 +636,7 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                               if (isReadOnly) {
                                 return
                               }
-                              onViewTrace(index)
+                              onViewTrace?.(index)
                             }}
                             disabled={isReadOnly}
                             sx={{
@@ -559,14 +672,18 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                           }}
                           disabled={isReadOnly}
                           sx={{
-                            minWidth: '24px',
-                            minHeight: '24px',
-                            padding: '4px',
+                            minWidth: 'clamp(20px, 3vw, 22px)',
+                            minHeight: 'clamp(20px, 3vw, 22px)',
+                            padding: 'clamp(2px, 0.5vw, 3px)',
                             color: message.type === 'user' ? 'rgba(255,255,255,0.8)' : '#9ca3af',
                             '&:hover': { backgroundColor: message.type === 'user' ? 'rgba(255,255,255,0.1)' : '#f3f4f6' },
                           }}
                         >
-                          {messageFormats[index] === 'markdown' ? <FileText className="w-3 h-3" /> : <Code className="w-3 h-3" />}
+                          {messageFormats[index] === 'markdown' ? (
+                            <FileText style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
+                          ) : (
+                            <Code style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
+                          )}
                         </Button>
                       </Tooltip>
 
@@ -585,14 +702,14 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                             }}
                             disabled={isReadOnly}
                             sx={{
-                              minWidth: '24px',
-                              minHeight: '24px',
-                              padding: '4px',
+                              minWidth: 'clamp(20px, 3vw, 22px)',
+                              minHeight: 'clamp(20px, 3vw, 22px)',
+                              padding: 'clamp(2px, 0.5vw, 3px)',
                               color: message.type === 'user' ? 'rgba(255,255,255,0.8)' : '#9ca3af',
                               '&:hover': { backgroundColor: message.type === 'user' ? 'rgba(255,255,255,0.1)' : '#f3f4f6' },
                             }}
                           >
-                            <Edit3 className="w-3 h-3" />
+                            <Edit3 style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
                           </Button>
                         </Tooltip>
                       )}
@@ -611,14 +728,14 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                             }}
                             disabled={isReadOnly}
                             sx={{
-                              minWidth: '24px',
-                              minHeight: '24px',
-                              padding: '4px',
+                              minWidth: 'clamp(20px, 3vw, 22px)',
+                              minHeight: 'clamp(20px, 3vw, 22px)',
+                              padding: 'clamp(2px, 0.5vw, 3px)',
                               color: message.type === 'user' ? 'rgba(255,255,255,0.8)' : '#9ca3af',
                               '&:hover': { backgroundColor: message.type === 'user' ? 'rgba(255,255,255,0.1)' : '#f3f4f6' },
                             }}
                           >
-                            <Copy className="w-3 h-3" />
+                            <Copy style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
                           </Button>
                         </Tooltip>
                       )}
@@ -640,9 +757,9 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                               }}
                               disabled={isReadOnly}
                               sx={{
-                                minWidth: '24px',
-                                minHeight: '24px',
-                                padding: '4px',
+                                minWidth: 'clamp(20px, 3vw, 22px)',
+                                minHeight: 'clamp(20px, 3vw, 22px)',
+                                padding: 'clamp(2px, 0.5vw, 3px)',
                                 color: message.type === 'user' ? 'rgba(255,255,255,0.8)' : '#9ca3af',
                                 '&:hover': {
                                   backgroundColor: message.type === 'user' ? 'rgba(255,255,255,0.1)' : '#f3f4f6',
@@ -650,7 +767,7 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
                                 },
                               }}
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 style={{ width: 'clamp(0.625rem, 1.5vw, 0.6875rem)', height: 'clamp(0.625rem, 1.5vw, 0.6875rem)' }} />
                             </Button>
                           </Tooltip>
 
@@ -720,9 +837,15 @@ const ChatMessageArea: React.FC<ChatMessageAreaProps> = ({
 
               {/* 头像 - 在右侧显示（用户消息）*/}
               {message.type === 'user' && (
-                <div className="flex-shrink-0 mt-6 order-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
+                <div className="flex-shrink-0 order-2" style={{ marginTop: 'clamp(0.75rem, 2vh, 1.25rem)' }}>
+                  <div 
+                    className="bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center"
+                    style={{ 
+                      width: 'clamp(1.5rem, 4vw, 1.75rem)', 
+                      height: 'clamp(1.5rem, 4vw, 1.75rem)' 
+                    }}
+                  >
+                    <User style={{ width: 'clamp(0.75rem, 2vw, 0.875rem)', height: 'clamp(0.75rem, 2vw, 0.875rem)' }} className="text-white" />
                   </div>
                 </div>
               )}

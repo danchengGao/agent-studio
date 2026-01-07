@@ -3,6 +3,7 @@ import { Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material
 import { Button } from '@mui/material'
 import { TextField } from '@mui/material'
 import { Save } from '@mui/icons-material'
+import { useScopedTranslation } from '@/i18n'
 
 export type SavePromptForm = {
   promptKey: string
@@ -31,12 +32,15 @@ import { isVersionFormatValid, compareVersions } from './helper/promptHelpers'
 
 const SavePromptDialog: React.FC<SavePromptDialogProps> = ({ open, onClose, onConfirm, saving, existingPromptInfo, saveForm, setSaveForm }) => {
   const [touched, setTouched] = React.useState<{ key: boolean; name: boolean; version: boolean }>({ key: false, name: false, version: false })
+  const { t } = useScopedTranslation('agents.agentEditor.systemPrompt.savePromptDialog')
+  const latestVersion = existingPromptInfo?.latestVersion
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ pt: 1.5, pb: 1 }}>保存提示词</DialogTitle>
+      <DialogTitle sx={{ pt: 1.5, pb: 1 }}>{t('title')}</DialogTitle>
       <DialogContent dividers sx={{ pt: 1.5, pb: 1.5 }}>
         <TextField
-          label="提示词 Key"
+          label={t('fields.promptKeyLabel')}
           value={saveForm.promptKey}
           onChange={e => setSaveForm(s => ({ ...s, promptKey: e.target.value }))}
           onBlur={() => setTouched(t => ({ ...t, key: true }))}
@@ -50,14 +54,14 @@ const SavePromptDialog: React.FC<SavePromptDialogProps> = ({ open, onClose, onCo
           }
           helperText={
             existingPromptInfo
-              ? '已有绑定关系，Key不可修改'
+              ? t('fields.promptKeyHelperExisting')
               : saveForm.promptKey.trim() !== '' && !isPromptKeyValid(saveForm.promptKey)
-                ? '只能包含英文字母、数字、下划线（_）、连字符（-），必须以英文字母开头'
+                ? t('fields.promptKeyHelperInvalid')
                 : ''
           }
         />
         <TextField
-          label="提示词名称"
+          label={t('fields.promptNameLabel')}
           value={saveForm.promptName}
           onChange={e => setSaveForm(s => ({ ...s, promptName: e.target.value }))}
           onBlur={() => setTouched(t => ({ ...t, name: true }))}
@@ -68,18 +72,18 @@ const SavePromptDialog: React.FC<SavePromptDialogProps> = ({ open, onClose, onCo
           error={touched.name && hasPromptNameError(saveForm.promptName, saveForm.promptKey)}
           helperText={
             existingPromptInfo
-              ? '已有绑定关系，名称不可修改'
+              ? t('fields.promptNameHelperExisting')
               : !isPromptNameValid(saveForm.promptName) && saveForm.promptKey.trim() !== ''
-                ? '名称不能为空'
+                ? t('fields.promptNameHelperRequired')
                 : ''
           }
         />
         <TextField
-          label="提交版本"
+          label={t('fields.versionLabel')}
           value={saveForm.promptVersion}
           onChange={e => setSaveForm(s => ({ ...s, promptVersion: e.target.value }))}
           onBlur={() => setTouched(t => ({ ...t, version: true }))}
-          placeholder="如 1.0.1"
+          placeholder={t('fields.versionPlaceholder')}
           fullWidth
           size="small"
           margin="dense"
@@ -91,19 +95,19 @@ const SavePromptDialog: React.FC<SavePromptDialogProps> = ({ open, onClose, onCo
                 compareVersions(saveForm.promptVersion, existingPromptInfo.latestVersion) <= 0))
           }
           helperText={
-            !existingPromptInfo?.latestVersion
+            !latestVersion
               ? saveForm.promptVersion.trim() !== '' && !isVersionFormatValid(saveForm.promptVersion)
-                ? '版本号需为 x.x.x 格式'
+                ? t('fields.versionHelperFormat')
                 : ''
               : saveForm.promptVersion.trim() !== '' && !isVersionFormatValid(saveForm.promptVersion)
-                ? '版本号需为 x.x.x 格式'
-                : isVersionFormatValid(saveForm.promptVersion) && compareVersions(saveForm.promptVersion, existingPromptInfo.latestVersion) <= 0
-                  ? `版本号必须大于已存在的版本 ${existingPromptInfo.latestVersion}`
-                  : `需为 x.x.x，并且大于当前最新版本 ${existingPromptInfo.latestVersion}`
+                ? t('fields.versionHelperFormat')
+                : isVersionFormatValid(saveForm.promptVersion) && compareVersions(saveForm.promptVersion, latestVersion) <= 0
+                  ? t('fields.versionHelperMustGreaterExisting', { latestVersion })
+                  : t('fields.versionHelperFormatAndGreater', { latestVersion })
           }
         />
         <TextField
-          label="版本说明"
+          label={t('fields.descLabel')}
           value={saveForm.promptDesc}
           onChange={e => setSaveForm(s => ({ ...s, promptDesc: e.target.value }))}
           fullWidth
@@ -115,7 +119,7 @@ const SavePromptDialog: React.FC<SavePromptDialogProps> = ({ open, onClose, onCo
       </DialogContent>
       <DialogActions sx={{ py: 1 }}>
         <Button onClick={onClose} disabled={saving}>
-          取消
+          {t('actions.cancel')}
         </Button>
         <Button
           onClick={onConfirm}
@@ -124,7 +128,7 @@ const SavePromptDialog: React.FC<SavePromptDialogProps> = ({ open, onClose, onCo
           variant="contained"
           color="success"
         >
-          保存
+          {t('actions.save')}
         </Button>
       </DialogActions>
     </Dialog>

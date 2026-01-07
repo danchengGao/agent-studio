@@ -8,6 +8,7 @@ import { AlertCircle, AlertTriangle } from 'lucide-react'
 
 import { ValidationErrorInfo } from './types'
 import styles from './styles/index.module.less'
+import { useTranslation } from '../../i18n'
 
 interface ValidationErrorListProps {
   errors: ValidationErrorInfo[]
@@ -15,11 +16,13 @@ interface ValidationErrorListProps {
 }
 
 export const ValidationErrorList: FC<ValidationErrorListProps> = ({ errors, onNodeSelect }) => {
+  const { t } = useTranslation()
+
   if (errors.length === 0) {
     return (
       <div className={styles['validation-error-empty']}>
         <AlertCircle size={48} className={styles['empty-icon']} />
-        <p>没有发现校验问题</p>
+        <p>{t('workflowCanvas.validation.noValidationIssues')}</p>
       </div>
     )
   }

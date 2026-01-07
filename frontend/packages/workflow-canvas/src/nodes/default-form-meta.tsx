@@ -17,6 +17,7 @@ import {
   listenRefSchemaChange,
   autoRenameRefEffect,
 } from '../form-materials'
+import { t } from '../i18n'
 
 export const renderForm = ({}: FormRenderProps<FlowNodeJSON>) => (
   <>
@@ -38,7 +39,7 @@ export const defaultFormMeta: FormMeta<FlowNodeJSON> = {
    * 2: validate as dynamic function: (values,  ctx) => ({ title: () => {}, ... })
    */
   validate: {
-    title: ({ value }) => (value ? undefined : '标题是必需的'),
+    title: ({ value }) => (value ? undefined : t('workflowCanvas.validation.titleRequired')),
     'inputsValues.*': ({ value, context, formValues, name }) => {
       const valuePropertyKey = name.replace(/^inputsValues\./, '')
       const required = formValues.inputs?.required || []
@@ -47,7 +48,7 @@ export const defaultFormMeta: FormMeta<FlowNodeJSON> = {
         node: context.node,
         required: required.includes(valuePropertyKey),
         errorMessages: {
-          required: `${valuePropertyKey} 是必需的`,
+          required: t('workflowCanvas.validation.paramRequired', { param: valuePropertyKey }),
         },
       })
     },

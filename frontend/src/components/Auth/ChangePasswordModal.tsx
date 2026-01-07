@@ -229,14 +229,14 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
               className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               disabled={changePasswordMutation?.isLoading}
             >
-              {t('common.cancel')}
+              {t('common.buttons.cancel')}
             </button>
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={changePasswordMutation?.isLoading}
             >
-              {changePasswordMutation?.isLoading ? t('common.loading') : t('auth.changePassword.submit')}
+              {changePasswordMutation?.isLoading ? t('common.status.loading') : t('auth.changePassword.submit')}
             </button>
           </ModalFooter>
         </form>

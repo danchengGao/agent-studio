@@ -4,30 +4,30 @@
  */
 
 import { isNil } from 'lodash-es'
-import { FeedbackLevel, FlowNodeEntity, getNodeScope, getNodePrivateScope } from '@flowgram.ai/editor'
+import { I18n, FeedbackLevel, FlowNodeEntity, getNodeScope, getNodePrivateScope } from '@flowgram.ai/editor'
 
 import { type IFlowValue, FlowValueUtils } from '../../'
 
 /**
- * 校验变量名是否只包含字母、数字、下划线
- * @param variableName 变量名
- * @returns 校验结果
+ * Validate variable name contains only letters, numbers, underscores
+ * @param variableName - Variable name
+ * @returns Validation result
  */
 export function validateVariableName(variableName: string): { isValid: boolean; message?: string } {
   if (!variableName || variableName.trim() === '') {
     return {
       isValid: false,
-      message: '变量名不能为空',
+      message: I18n.t('Variable name cannot be empty'),
     }
   }
 
-  // 变量名只能包含字母、数字、下划线，且只能以字母开头
+  // Variable name can only contain letters, numbers, underscores, and must start with a letter
   const variableNamePattern = /^[a-zA-Z][a-zA-Z0-9_]*$/
 
   if (!variableNamePattern.test(variableName)) {
     return {
       isValid: false,
-      message: '变量名只能包含字母、数字、下划线，且只能以字母开头',
+      message: I18n.t('Variable name can only contain letters, numbers, underscores, and must start with a letter'),
     }
   }
 

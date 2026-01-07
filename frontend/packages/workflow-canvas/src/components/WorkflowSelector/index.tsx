@@ -5,6 +5,7 @@ import WorkflowService from '../../../../api-client/src/services/workflowService
 import { WorkflowItem } from '../../../../api-client/src/types'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { dragStateManager } from '../../utils/drag-state-manager'
+import { useTranslation } from '../../i18n'
 
 interface WorkflowSelectorProps {
   open: boolean
@@ -23,6 +24,7 @@ interface WorkflowSelectorProps {
 }
 
 const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onConfirm, initialSelected = [], allowDuplicate = false, excludeWorkflowId }) => {
+  const { t } = useTranslation()
   const [workflowList, setWorkflowList] = useState<WorkflowItem[]>([])
   const [workflowLoading, setWorkflowLoading] = useState(false)
   // 如果允许重复添加，使用Map来存储每个工作流的选择次数和对象
@@ -353,7 +355,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
       >
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <Typography variant="h6" className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 font-bold">
-            选择已有工作流
+            {t('workflowCanvas.workflowSelector.selectWorkflow')}
           </Typography>
           <IconButton onClick={handleCancel} className="text-gray-500 hover:text-gray-700">
             <X className="w-5 h-5" />
@@ -363,10 +365,10 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
         {workflowLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">加载工作流列表中...</span>
+            <span className="ml-3 text-gray-600">{t('workflowCanvas.workflowSelector.loadingWorkflows')}</span>
           </div>
         ) : workflowList.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">暂无可用工作流</div>
+          <div className="text-center py-12 text-gray-500">{t('workflowCanvas.workflowSelector.noAvailableWorkflows')}</div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto">
@@ -404,7 +406,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                           </h4>
                           <p className="text-gray-600 text-sm overflow-hidden text-ellipsis whitespace-nowrap leading-relaxed mb-1">{workflow.desc}</p>
                           <p className="text-xs text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
-                            创建时间: {new Date(workflow.create_time).toLocaleDateString()}
+                            {t('workflowCanvas.workflowSelector.createdAt')}: {new Date(workflow.create_time).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
@@ -432,7 +434,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                         selectedWorkflows.includes(workflow.workflow_id) && (
                           <div className="flex items-center space-x-2">
                             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            <span className="text-sm text-blue-700 font-medium">已选择</span>
+                            <span className="text-sm text-blue-700 font-medium">{t('workflowCanvas.workflowSelector.selected')}</span>
                           </div>
                         )
                       )}
@@ -446,7 +448,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                 <div className="flex justify-center px-6 pb-6">
                   <Box display="flex" justifyContent="center" alignItems="center" gap={2}>
                     <Typography variant="body2" color="textSecondary">
-                      共 {totalWorkflows} 个工作流，第 {currentPage} / {totalPages} 页
+                      {t('workflowCanvas.workflowSelector.pagination', { total: totalWorkflows, current: currentPage, total: totalPages })}
                     </Typography>
                     <Pagination
                       count={totalPages}
@@ -466,15 +468,13 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
 
             <div className="flex items-center justify-between pt-4 border-t border-gray-200 p-6">
               <Typography variant="body2" className="text-gray-500 font-medium">
-                已选择{' '}
-                <span className="text-blue-600 font-bold">
-                  {allowDuplicate ? Array.from(selectedWorkflowsMap.values()).reduce((sum, item) => sum + item.count, 0) : selectedWorkflows.length}
-                </span>{' '}
-                个工作流
+                {t('workflowCanvas.workflowSelector.selectedCount', {
+                  count: allowDuplicate ? Array.from(selectedWorkflowsMap.values()).reduce((sum, item) => sum + item.count, 0) : selectedWorkflows.length,
+                })}
               </Typography>
               <div className="flex items-center space-x-3">
                 <Button variant="outlined" onClick={handleCancel} className="border-2 border-gray-300 text-gray-700 hover:border-gray-500 hover:bg-gray-50">
-                  取消
+                  {t('workflowCanvas.workflowSelector.cancel')}
                 </Button>
                 <Button
                   variant="contained"
@@ -482,7 +482,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ open, onClose, onCo
                   disabled={allowDuplicate ? selectedWorkflowsMap.size === 0 : selectedWorkflows.length === 0}
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                 >
-                  确认添加
+                  {t('workflowCanvas.workflowSelector.confirmAdd')}
                 </Button>
               </div>
             </div>

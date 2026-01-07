@@ -9,6 +9,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { XCircle } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 const index = 0
 export const BreakNodeRegistry: FlowNodeRegistry = {
@@ -24,7 +25,7 @@ export const BreakNodeRegistry: FlowNodeRegistry = {
   },
   info: {
     icon: <XCircle size={16} className="text-red-600" />,
-    description: '中断节点，用于在循环中立即退出循环。',
+    description: t('workflowCanvas.nodes.break.description'),
   },
   /**
    * Render node via formMeta

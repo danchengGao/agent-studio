@@ -1,12 +1,16 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Bot, Workflow, Plus, Brain, Plug } from 'lucide-react'
+import AgentIcon from '@/assets/icons/agent.svg?react'
+import WorkflowIcon from '@/assets/icons/workflow.svg?react'
+import ModelIcon from '@/assets/icons/modelManagement.svg?react'
+import PluginIcon from '@/assets/icons/plugin.svg?react'
 import { useAgents } from '@test-agentstudio/api-client'
 import { useWorkflows } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import { Plus } from 'lucide-react'
 
 // 配置dayjs使用相对时间插件
 dayjs.extend(relativeTime)
@@ -242,7 +246,7 @@ const DashboardPage: React.FC = () => {
       value: agentCount.toString(),
       change: dailyAgentCount > 0 ? `+${dailyAgentCount}` : undefined,
       changeType: dailyAgentCount > 0 ? 'positive' : 'neutral',
-      icon: Bot,
+      icon: AgentIcon,
       color: agentCount > 0 ? 'bg-blue-500' : 'bg-gray-500',
     },
     {
@@ -250,7 +254,7 @@ const DashboardPage: React.FC = () => {
       value: workflowCount.toString(),
       change: dailyWorkflowCount > 0 ? `+${dailyWorkflowCount}` : undefined,
       changeType: dailyWorkflowCount > 0 ? 'positive' : 'neutral',
-      icon: Workflow,
+      icon: WorkflowIcon,
       color: workflowCount > 0 ? 'bg-green-500' : 'bg-gray-500',
     },
   ]
@@ -259,28 +263,28 @@ const DashboardPage: React.FC = () => {
     {
       name: t('dashboard.quickActions.createAgent.name'),
       description: t('dashboard.quickActions.createAgent.description'),
-      icon: Bot,
+      icon: AgentIcon,
       href: '/dashboard/agents/new',
       color: 'bg-blue-500 hover:bg-blue-600',
     },
     {
       name: t('dashboard.quickActions.createWorkflow.name'),
       description: t('dashboard.quickActions.createWorkflow.description'),
-      icon: Workflow,
+      icon: WorkflowIcon,
       href: '/dashboard/workflows/new',
       color: 'bg-green-500 hover:bg-green-600',
     },
     {
       name: t('dashboard.quickActions.manageModels.name'),
       description: t('dashboard.quickActions.manageModels.description'),
-      icon: Brain,
+      icon: ModelIcon,
       href: '/dashboard/models',
       color: 'bg-purple-500 hover:bg-purple-600',
     },
     {
-      name: '安装插件',
-      description: '管理和安装插件扩展功能',
-      icon: Plug,
+      name: t('dashboard.quickActions.installPlugins.name'),
+      description: t('dashboard.quickActions.installPlugins.description'),
+      icon: PluginIcon,
       href: '/dashboard/plugins',
       color: 'bg-orange-500 hover:bg-orange-600',
     },
@@ -398,7 +402,7 @@ const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-3">
-                <Bot className="w-5 h-5 text-white" />
+                <AgentIcon className="w-5 h-5 text-white" />
               </div>
               <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
                 {t('dashboard.recent.agents.title')}
@@ -430,7 +434,7 @@ const DashboardPage: React.FC = () => {
             ) : (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
-                  <Bot className="w-8 h-8 text-blue-400" />
+                  <AgentIcon className="w-8 h-8 text-blue-400" />
                 </div>
                 <p className="text-lg text-gray-500 font-medium">{t('dashboard.recent.agents.noData')}</p>
                 <p className="text-sm text-gray-400 mt-2 mb-6">{t('dashboard.recent.agents.emptyDescription')}</p>
@@ -451,7 +455,7 @@ const DashboardPage: React.FC = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center">
               <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mr-3">
-                <Workflow className="w-5 h-5 text-white" />
+                <WorkflowIcon className="w-5 h-5 text-white" />
               </div>
               <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-green-800">
                 {t('dashboard.recent.workflows.title')}
@@ -471,7 +475,7 @@ const DashboardPage: React.FC = () => {
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="w-12 h-12 bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 border border-green-200">
-                    <Workflow className="w-6 h-6 text-green-600" />
+                    <WorkflowIcon className="w-6 h-6 text-green-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 group-hover:text-green-900 transition-colors duration-300">{workflow.name}</p>
@@ -485,7 +489,7 @@ const DashboardPage: React.FC = () => {
             ) : (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gradient-to-r from-green-50 to-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-100">
-                  <Workflow className="w-8 h-8 text-green-400" />
+                  <WorkflowIcon className="w-8 h-8 text-green-400" />
                 </div>
                 <p className="text-lg text-gray-500 font-medium">{t('dashboard.recent.workflows.noData')}</p>
                 <p className="text-sm text-gray-400 mt-2 mb-6">{t('dashboard.recent.workflows.emptyDescription')}</p>

@@ -1,20 +1,25 @@
 import { useState, MouseEvent } from 'react'
+import { useScopedTranslation } from '@/i18n'
 import { Menu, MenuItem } from '@mui/material'
 import { Plus } from 'lucide-react'
 
 // 通用的添加按钮组件
 const AddButton = ({
   onSelect,
-  options = [
-    { label: '添加已有', value: 'existing' },
-    { label: '创建新的', value: 'new' },
-  ],
+  options,
   disabled = false,
 }: {
   onSelect: (addType: string) => void
   options?: Array<{ label: string; value: string }>
   disabled?: boolean
 }) => {
+  const { t } = useScopedTranslation('agents')
+  const defaultOptions = [
+    { label: t('addBtn.addExisting'), value: 'existing' },
+    { label: t('addBtn.createNew'), value: 'new' },
+  ]
+  const finalOptions = options || defaultOptions
+
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const open = Boolean(anchorEl)
 
@@ -54,7 +59,7 @@ const AddButton = ({
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        {options.map((option, index) => (
+        {finalOptions.map((option, index) => (
           <MenuItem
             key={index}
             onClick={() => {

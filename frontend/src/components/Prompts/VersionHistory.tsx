@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { GitBranch } from 'lucide-react'
-import { Typography, Card, CardContent, IconButton, Chip, CircularProgress } from '@mui/material'
+import { GitBranch, Copy, RefreshCw } from 'lucide-react'
+import { Typography, Card, CardContent, IconButton, Chip, CircularProgress, Button } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { formatDateTime, formatDraftDateTime, handleRelationObjNavigate } from '@/utils/prompts/utils'
 import type { PromptVersion } from '@/types/promptType'
@@ -58,13 +58,13 @@ export interface VersionHistoryProps {
   draftSavedTime?: Date | null
 
   // 布局配置
-  maxHeight?: string | number // 组件最大高度，支持CSS字符串或数字（px）
-  minHeight?: string | number // 组件最小高度，支持CSS字符串或数字（px）
+  height?: string | number // 组件高度，支持CSS字符串或数字（px）
   width?: string | number // 组件宽度，支持CSS字符串或数字（px）
-  showBottomRadius?: boolean // 是否显示底部圆角，默认true，当有操作按钮时设为false
 
   // 操作回调
   onOpenAssociationsDialog: (relationObjs: RelationObj[], versionName: string) => void
+  onCreateCopy?: () => void // 创建副本回调
+  onRollbackToVersion?: () => void // 回滚到版本回调
 }
 
 const VersionHistory: React.FC<VersionHistoryProps> = ({
@@ -75,11 +75,11 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
   onSelectVersion,
   loading = false,
   draftSavedTime,
-  maxHeight = 'calc(100vh - 220px)', // 默认最大高度
-  minHeight = '400px', // 默认最小高度
+  height = 'calc(100vh - 220px)', // 默认高度
   width, // 组件宽度
-  showBottomRadius = true, // 默认显示底部圆角
   onOpenAssociationsDialog,
+  onCreateCopy,
+  onRollbackToVersion,
 }) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -100,114 +100,133 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
 
   const publishedVersionsCount = versions.filter(v => !v.isDraft).length
 
-  // 内部计算版本列表区域的高度
-  // 假设头部状态栏高度约为 120px
-  const calculateListHeight = (componentMaxHeight: string | number, componentMinHeight: string | number, headerHeight = 120) => {
-    // 计算最大高度
-    let listMaxHeight: string
-    if (typeof componentMaxHeight === 'number') {
-      listMaxHeight = `${componentMaxHeight - headerHeight}px`
-    } else if (typeof componentMaxHeight === 'string' && componentMaxHeight.includes('calc(')) {
-      // 修复 calc 表达式处理
-      const calcContent = componentMaxHeight.replace('calc(', '').replace(')', '')
-      listMaxHeight = `calc(${calcContent} - ${headerHeight}px)`
-    } else {
-      const numericValue = parseInt(componentMaxHeight.toString())
-      if (!isNaN(numericValue)) {
-        listMaxHeight = `${numericValue - headerHeight}px`
-      } else {
-        listMaxHeight = 'calc(100vh - 380px)' // 默认值
-      }
-    }
-
-    // 计算最小高度（基于外部传入的组件最小高度）
-    let listMinHeight: string
-    if (typeof componentMinHeight === 'number') {
-      listMinHeight = `${Math.max(200, componentMinHeight - headerHeight)}px` // 至少200px
-    } else if (typeof componentMinHeight === 'string' && componentMinHeight.includes('calc(')) {
-      // 修复 calc 表达式处理
-      const calcContent = componentMinHeight.replace('calc(', '').replace(')', '')
-      listMinHeight = `calc(${calcContent} - ${headerHeight}px)`
-    } else {
-      const numericValue = parseInt(componentMinHeight.toString())
-      if (!isNaN(numericValue)) {
-        listMinHeight = `${Math.max(200, numericValue - headerHeight)}px` // 至少200px
-      } else {
-        listMinHeight = '200px' // 默认值
-      }
-    }
-
-    return { maxHeight: listMaxHeight, minHeight: listMinHeight }
-  }
-
-  const listHeights = calculateListHeight(maxHeight, minHeight)
-
   return (
     <>
       {/* 添加滚动条样式 */}
       <style>{scrollbarStyles}</style>
 
-      <div className="xl:col-span-1 w-full">
+      <div className="w-full">
         <Card
           className="shadow-sm border-0 !bg-white flex flex-col"
           sx={{
             background: 'white !important',
-            maxHeight: formatHeight(maxHeight), // 使用可配置的最大高度
-            minHeight: formatHeight(minHeight), // 使用可配置的最小高度
-            width: width ? formatHeight(width) : '100%', // 使用可配置的宽度
-            height: '100%', // 改为100%以填充父容器
+            height: formatHeight(height), // 使用固定高度
+            width: '100%', // 始终使用100%宽度以适应父容器
             display: 'flex',
             flexDirection: 'column',
-            borderBottomLeftRadius: showBottomRadius ? undefined : 0,
-            borderBottomRightRadius: showBottomRadius ? undefined : 0,
             margin: '0 !important',
             padding: '0 !important',
             overflow: 'hidden', // 防止内容溢出
           }}
         >
-          <CardContent className="p-0 flex flex-col" sx={{ height: '100%', padding: '0 !important' }}>
+          <CardContent className="p-0 flex flex-col" sx={{ height: '100%', padding: '0 !important', flex: 1, minHeight: 0 }}>
             {/* 顶部状态栏 */}
             <div className="border-b border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between px-0 py-4">
-                <div className="flex items-center space-x-2 px-4">
-                  <div className="w-6 h-6 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center">
-                    <GitBranch className="w-4 h-4 text-white" />
+              <div 
+                className="flex items-center justify-between"
+                style={{
+                  paddingLeft: 'clamp(0.5rem, 1vw, 0.75rem)',
+                  paddingRight: 'clamp(0.5rem, 1vw, 0.75rem)',
+                  paddingTop: 'clamp(0.5rem, 1vh, 0.75rem)',
+                  paddingBottom: 'clamp(0.5rem, 1vh, 0.75rem)',
+                }}
+              >
+                <div className="flex items-center min-w-0 flex-1" style={{ gap: 'clamp(0.375rem, 0.75vw, 0.5rem)' }}>
+                  <div 
+                    className="flex-shrink-0 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center"
+                    style={{
+                      width: 'clamp(1.25rem, 2.5vw, 1.5rem)',
+                      height: 'clamp(1.25rem, 2.5vw, 1.5rem)',
+                    }}
+                  >
+                    <GitBranch 
+                      className="text-white" 
+                      style={{
+                        width: 'clamp(0.75rem, 1.5vw, 1rem)',
+                        height: 'clamp(0.75rem, 1.5vw, 1rem)',
+                      }}
+                    />
                   </div>
-                  <Typography variant="h6" className="text-gray-800 font-semibold">
+                  <Typography 
+                    variant="subtitle1" 
+                    className="text-gray-800 font-semibold truncate"
+                    sx={{
+                      fontSize: 'clamp(0.75rem, 1.2vw, 0.875rem)',
+                      lineHeight: 1.2,
+                    }}
+                  >
                     {t('components.prompts.versionHistory.title')}
                   </Typography>
                 </div>
-                <div className="flex items-center space-x-2 px-4">
+                <div className="flex items-center flex-shrink-0" style={{ gap: 'clamp(0.25rem, 0.5vw, 0.375rem)' }}>
                   <Chip
                     label={t('components.prompts.versionHistory.versionCount', { count: publishedVersionsCount })}
                     size="small"
                     className="bg-gray-100 text-gray-700"
+                    sx={{
+                      height: 'clamp(1.25rem, 2.5vh, 1.5rem)',
+                      fontSize: 'clamp(0.625rem, 1vw, 0.75rem)',
+                      '& .MuiChip-label': {
+                        padding: 'clamp(0.125rem, 0.25vw, 0.25rem) clamp(0.375rem, 0.75vw, 0.5rem)',
+                      },
+                    }}
                   />
-                  <IconButton size="small" onClick={onClose} className="text-gray-600 hover:bg-gray-50">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <IconButton 
+                    size="small" 
+                    onClick={onClose} 
+                    className="text-gray-600 hover:bg-gray-50"
+                    sx={{
+                      width: 'clamp(1.5rem, 3vw, 1.75rem)',
+                      height: 'clamp(1.5rem, 3vw, 1.75rem)',
+                      padding: 0,
+                    }}
+                  >
+                    <svg 
+                      className="text-gray-600" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                      style={{
+                        width: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                        height: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                      }}
+                    >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </IconButton>
                 </div>
               </div>
-              <div className="flex items-center justify-between mt-2 px-4">
-                {loading && (
-                  <div className="flex items-center space-x-1">
-                    <CircularProgress size={12} />
-                    <span className="text-xs text-gray-500">{t('components.prompts.versionHistory.loading')}</span>
-                  </div>
-                )}
-              </div>
+              {loading && (
+                <div 
+                  className="flex items-center"
+                  style={{
+                    gap: 'clamp(0.25rem, 0.5vw, 0.375rem)',
+                    paddingLeft: 'clamp(0.5rem, 1vw, 0.75rem)',
+                    paddingBottom: 'clamp(0.375rem, 0.75vh, 0.5rem)',
+                  }}
+                >
+                  <CircularProgress size={12} />
+                  <span 
+                    className="text-gray-500"
+                    style={{ fontSize: 'clamp(0.625rem, 1vw, 0.75rem)' }}
+                  >
+                    {t('components.prompts.versionHistory.loading')}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* 版本列表 */}
             <div
-              className="p-4 space-y-3 overflow-y-auto version-history-scroll"
+              className="overflow-y-auto version-history-scroll flex-1"
               style={{
-                maxHeight: listHeights.maxHeight, // 使用内部计算的版本列表最大高度
-                minHeight: listHeights.minHeight, // 使用内部计算的版本列表最小高度
+                padding: 'clamp(0.5rem, 1vw, 0.75rem)',
+                gap: 'clamp(0.375rem, 0.75vh, 0.625rem)',
                 scrollbarWidth: 'thin', // Firefox
                 scrollbarColor: '#d1d5db #f3f4f6', // Firefox
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0, // 允许flex子元素缩小
               }}
             >
               {versions.length === 0 ? (
@@ -220,84 +239,138 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
                 versions.map((version, index) => (
                   <div
                     key={version.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                    className={`rounded-lg border cursor-pointer transition-all ${
                       selectedVersion === version.id ? 'border-green-500 bg-green-50 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}
+                    style={{
+                      padding: 'clamp(0.5rem, 1vw, 0.625rem)',
+                      marginBottom: index < versions.length - 1 ? 'clamp(0.375rem, 0.75vh, 0.5rem)' : 0,
+                    }}
                     onClick={() => onSelectVersion(version.id)}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
+                    <div 
+                      className="flex items-start justify-between"
+                      style={{
+                        marginBottom: 'clamp(0.375rem, 0.75vh, 0.5rem)',
+                        gap: 'clamp(0.375rem, 0.75vw, 0.5rem)',
+                      }}
+                    >
+                      <div 
+                        className="flex items-center min-w-0 flex-shrink"
+                        style={{ gap: 'clamp(0.375rem, 0.75vw, 0.5rem)' }}
+                      >
                         <div
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          className={`flex-shrink-0 rounded-full flex items-center justify-center font-bold ${
                             version.isDraft ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white'
                           }`}
+                          style={{
+                            width: 'clamp(1.25rem, 2.5vw, 1.5rem)',
+                            height: 'clamp(1.25rem, 2.5vw, 1.5rem)',
+                            fontSize: 'clamp(0.625rem, 1vw, 0.75rem)',
+                          }}
                         >
                           {version.isDraft ? '草' : 'V'}
                         </div>
-                        <Typography variant="subtitle2" className="font-medium text-gray-800">
+                        <Typography 
+                          variant="subtitle2" 
+                          className="font-medium text-gray-800 truncate"
+                          sx={{
+                            fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
+                            lineHeight: 1.2,
+                          }}
+                        >
                           {version.isDraft ? version.version : `${version.version}`}
                         </Typography>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        {version.isDraft && (
-                          <Chip label={t('components.prompts.versionHistory.draft')} size="small" className="bg-orange-100 text-orange-700 text-xs" />
-                        )}
+                      <div 
+                        className="flex flex-col items-end flex-shrink-0"
+                      >
                         <Chip
                           label={version.isDraft && draftSavedTime ? formatDraftDateTime(draftSavedTime) : formatDateTime(version.createdAt)}
                           size="small"
-                          className="bg-gray-100 text-gray-600 text-xs"
+                          className="bg-gray-100 text-gray-600"
+                          sx={{
+                            height: 'clamp(1rem, 2vh, 1.25rem)',
+                            fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)',
+                            '& .MuiChip-label': {
+                              padding: 'clamp(0.0625rem, 0.125vw, 0.125rem) clamp(0.25rem, 0.5vw, 0.375rem)',
+                            },
+                          }}
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="text-xs text-gray-600">
-                        <div className="space-y-1">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.375rem, 0.75vh, 0.5rem)' }}>
+                      <div 
+                        className="text-gray-600"
+                        style={{ fontSize: 'clamp(0.625rem, 1vw, 0.75rem)' }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(0.25rem, 0.5vh, 0.375rem)' }}>
                           {!version.isDraft && (
                             <>
-                              <div className="flex items-center space-x-1">
-                                <span>{t('components.prompts.versionHistory.author')}:</span>
-                                <div className="flex items-center space-x-1">
-                                  <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
+                              <div className="flex items-start space-x-1">
+                                <span className="flex-shrink-0">{t('components.prompts.versionHistory.author')}:</span>
+                                <div className="flex items-center space-x-1 min-w-0">
+                                  <div className="w-3 h-3 flex-shrink-0 bg-blue-500 rounded-full flex items-center justify-center">
                                     <span className="text-white text-xs">U</span>
                                   </div>
-                                  <span className="font-medium">{version.author}</span>
+                                  <span className="font-medium truncate">{version.author}</span>
                                 </div>
                               </div>
                               <div className="flex items-start space-x-1">
-                                <span>{t('components.prompts.versionHistory.description')}:</span>
-                                <span className="font-medium">{version.description}</span>
+                                <span className="flex-shrink-0 whitespace-nowrap">{t('components.prompts.versionHistory.description')}:</span>
+                                <span className="font-medium break-words">{version.description}</span>
                               </div>
                             </>
                           )}
                           {version.associations?.relationObjs && version.associations.relationObjs.length > 0 && (
-                            <div className="flex items-start space-x-1">
-                              <span>{t('components.prompts.versionHistory.associated')}:</span>
-                              <div className="flex flex-wrap gap-1">
-                                {version.associations.relationObjs.slice(0, 3).map(relationObj => (
+                            <div 
+                              className="flex items-start"
+                              style={{ gap: 'clamp(0.125rem, 0.25vw, 0.25rem)' }}
+                            >
+                              <span 
+                                className="flex-shrink-0 whitespace-nowrap"
+                                style={{ fontSize: 'clamp(0.625rem, 1vw, 0.75rem)' }}
+                              >
+                                {t('components.prompts.versionHistory.associated')}:
+                              </span>
+                              <div 
+                                className="flex flex-wrap min-w-0"
+                                style={{ gap: 'clamp(0.125rem, 0.25vw, 0.25rem)' }}
+                              >
+                                {version.associations.relationObjs.slice(0, 2).map(relationObj => (
                                   <span
                                     key={relationObj.obj_id}
-                                    className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-200 transition-colors"
+                                    className="bg-blue-100 text-blue-700 rounded cursor-pointer hover:bg-blue-200 transition-colors truncate max-w-full inline-block"
+                                    style={{
+                                      fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)',
+                                      padding: 'clamp(0.0625rem, 0.125vh, 0.125rem) clamp(0.25rem, 0.5vw, 0.375rem)',
+                                    }}
                                     onClick={e => {
                                       e.stopPropagation()
                                       handleRelationObjNavigate(relationObj, workspaceId, navigate)
                                     }}
+                                    title={`${relationObj.obj_type_name}${t('components.prompts.versionHistory.colon')}${relationObj.obj_name}`}
                                   >
                                     {relationObj.obj_type_name}
                                     {t('components.prompts.versionHistory.colon')}
                                     {relationObj.obj_name}
                                   </span>
                                 ))}
-                                {version.associations.relationObjs.length > 3 && (
+                                {version.associations.relationObjs.length > 2 && (
                                   <span
-                                    className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded cursor-pointer hover:bg-gray-200 transition-colors"
+                                    className="bg-gray-100 text-gray-700 rounded cursor-pointer hover:bg-gray-200 transition-colors flex-shrink-0"
+                                    style={{
+                                      fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)',
+                                      padding: 'clamp(0.0625rem, 0.125vh, 0.125rem) clamp(0.25rem, 0.5vw, 0.375rem)',
+                                    }}
                                     onClick={e => {
                                       e.stopPropagation()
                                       const versionName = version.isDraft ? version.version : `v${version.version}`
                                       onOpenAssociationsDialog(version.associations!.relationObjs, versionName)
                                     }}
                                   >
-                                    ...
+                                    +{version.associations.relationObjs.length - 2}
                                   </span>
                                 )}
                               </div>
@@ -305,16 +378,25 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
                           )}
                           {version.baseVersion && (
                             <div className="flex items-start space-x-1">
-                              <span>{t('components.prompts.versionHistory.baseVersion')}:</span>
-                              <span className="font-medium">{version.baseVersion}</span>
+                              <span className="flex-shrink-0 whitespace-nowrap">{t('components.prompts.versionHistory.baseVersion')}:</span>
+                              <span className="font-medium truncate">{version.baseVersion}</span>
                             </div>
                           )}
                         </div>
                       </div>
 
                       {selectedVersion === version.id && (
-                        <div className="mt-3 pt-2 border-t border-gray-200">
-                          <div className="text-xs text-green-600 font-medium">
+                        <div 
+                          className="border-t border-gray-200"
+                          style={{
+                            marginTop: 'clamp(0.375rem, 0.75vh, 0.5rem)',
+                            paddingTop: 'clamp(0.375rem, 0.75vh, 0.5rem)',
+                          }}
+                        >
+                          <div 
+                            className="text-green-600 font-medium"
+                            style={{ fontSize: 'clamp(0.625rem, 1vw, 0.75rem)' }}
+                          >
                             {version.isDraft
                               ? t('components.prompts.versionHistory.loadedToEditor')
                               : t('components.prompts.versionHistory.loadedToEditorVersion')}
@@ -326,6 +408,68 @@ const VersionHistory: React.FC<VersionHistoryProps> = ({
                 ))
               )}
             </div>
+
+            {/* 版本操作按钮 - 当选中非草稿版本时显示 */}
+            {selectedVersion && selectedVersion !== 'current-draft' && (onCreateCopy || onRollbackToVersion) && (
+              <div 
+                className="border-t border-gray-200 bg-gradient-to-br from-green-50 to-emerald-50 flex-shrink-0"
+                style={{
+                  padding: 'clamp(0.5rem, 1vw, 0.75rem)',
+                }}
+              >
+                <div 
+                  className="flex"
+                  style={{ gap: 'clamp(0.375rem, 0.75vw, 0.5rem)' }}
+                >
+                  {onCreateCopy && (
+                    <Button
+                      variant="outlined"
+                      startIcon={
+                        <Copy 
+                          style={{
+                            width: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                            height: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                          }}
+                        />
+                      }
+                      onClick={onCreateCopy}
+                      className="flex-1 border-green-300 text-green-700 hover:bg-green-50"
+                      size="small"
+                      sx={{
+                        fontSize: 'clamp(0.625rem, 1vw, 0.75rem)',
+                        padding: 'clamp(0.25rem, 0.5vh, 0.375rem) clamp(0.375rem, 0.75vw, 0.5rem)',
+                        minHeight: 'clamp(1.75rem, 3.5vh, 2rem)',
+                      }}
+                    >
+                      <span className="truncate">{t('components.prompts.promptEditPage.createCopy')}</span>
+                    </Button>
+                  )}
+                  {onRollbackToVersion && (
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        <RefreshCw 
+                          style={{
+                            width: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                            height: 'clamp(0.75rem, 1.5vw, 0.875rem)',
+                          }}
+                        />
+                      }
+                      onClick={onRollbackToVersion}
+                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                      size="small"
+                      sx={{
+                        fontSize: 'clamp(0.625rem, 1vw, 0.75rem)',
+                        padding: 'clamp(0.25rem, 0.5vh, 0.375rem) clamp(0.375rem, 0.75vw, 0.5rem)',
+                        minHeight: 'clamp(1.75rem, 3.5vh, 2rem)',
+                      }}
+                    >
+                      <span className="truncate">{t('components.prompts.promptEditPage.revertToVersion')}</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

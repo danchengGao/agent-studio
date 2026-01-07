@@ -7,6 +7,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { PlayCircle } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { t } from '../../i18n'
 
 export const BlockStartNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.BlockStart,
@@ -33,10 +34,10 @@ export const BlockStartNodeRegistry: FlowNodeRegistry = {
     icon: (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '4px 0', flexDirection: 'column' }}>
         <PlayCircle size={20} className="text-green-600" />
-        <span style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>开始</span>
+        <span style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '2px' }}>{t('workflowCanvas.block.start')}</span>
       </div>
     ),
-    description: '块的起始节点。',
+    description: t('workflowCanvas.nodes.blockStart.description'),
   },
   /**
    * Render node via formMeta
