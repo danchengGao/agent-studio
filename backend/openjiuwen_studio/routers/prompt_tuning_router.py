@@ -175,12 +175,14 @@ class OptimizationCallbacks(Callbacks):
             update_data = {
                 "progress_rate": progress_rate,
                 "timeCost": time_cost,
-                "bestIteration": progress.current_epoch if progress.best_score <= progress.best_batch_score else None,
-                "bestTemplates": current_prompt if progress.best_score <= progress.best_batch_score else None,
                 "success_rate": float(progress.best_score),
                 "updated_at": get_china_datetime(),
                 "status": "running"
             }
+
+            if progress.best_score <= progress.current_epoch_score:
+                update_data["bestIteration"] = progress.current_epoch
+                update_data["bestTemplates"] = current_prompt
 
             # 如果有历史记录，更新历史
             if self.history_records:
