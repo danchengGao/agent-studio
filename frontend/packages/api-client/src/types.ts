@@ -753,7 +753,7 @@ export interface WorkflowUserInputRequest {
 export interface WorkflowCancelRequest {
   space_id: string
   conversation_id: string
-  force?: boolean
+
 }
 
 export interface WorkflowCancelResponse {
