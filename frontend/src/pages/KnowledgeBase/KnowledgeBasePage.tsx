@@ -75,7 +75,6 @@ const KnowledgeBasePage: React.FC = () => {
                                !prevNonKbPath.startsWith('/dashboard/knowledge-bases/')
         
         if (isFromOtherPage) {
-          console.log('[KnowledgeBasePage] 从其他页面切换回来，重置分页', { prevNonKbPath, currentPath })
           isResettingRef.current = true
           const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
           const currentSearchTerm = searchTerm.trim()

@@ -150,21 +150,21 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   }, [id]) // 只依赖 id，当 id 变化时重新加载
 
   // 用于防止 fetchDocuments 并发执行的锁（按页面索引）
-  const fetchDocumentsLockRef = React.useRef<Map<number, Promise<void>>>(new Map())
+  const fetchDocumentsLockRef = React.useRef<Map<number, Promise<{ items: DocumentItem[]; total: number; page: number } | null>>>(new Map())
 
   // 获取文档列表
-  const fetchDocuments = async (page: number = 1, skipStatusFetch: boolean = false) => {
+  const fetchDocuments = async (page: number = 1, skipStatusFetch: boolean = false): Promise<{ items: DocumentItem[]; total: number; page: number } | null> => {
     if (!knowledgeBase || !knowledgeBase.id) {
-      return
+      return null
     }
 
     if (isDocumentsLoading && currentRequestPage === page) {
-      return
+      return null
     }
 
     const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
     if (!spaceId) {
-      return
+      return null
     }
 
     // 检查是否有相同页面的请求正在进行
@@ -175,7 +175,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       } catch (error) {
         // 忽略错误，让调用方处理
       }
-      return
+      return null
     }
 
     // 创建新的请求并加锁
@@ -209,6 +209,13 @@ const KnowledgeBaseEditorPage: React.FC = () => {
             })
           }
         }
+
+        // 返回响应数据，供调用方使用
+        return {
+          items: response.data.items,
+          total: response.data.total,
+          page: response.data.page,
+        }
       } catch (error) {
         // 不显示错误提示，因为没有文档是正常情况
         throw error // 重新抛出错误，让调用方知道请求失败
@@ -225,9 +232,10 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     fetchDocumentsLockRef.current.set(page, requestPromise)
 
     try {
-      await requestPromise
+      return await requestPromise
     } catch (error) {
       // 错误已经在内部处理，这里只做清理
+      return null
     }
   }
 
@@ -733,8 +741,17 @@ const KnowledgeBaseEditorPage: React.FC = () => {
 
       showSuccess(t('knowledgeBases.editor.deleteSuccess'))
 
+      // 保存删除前的页码
+      const pageBeforeDelete = currentPage
+      
       // 刷新文档列表，确保数据同步
-      await fetchDocuments(currentPage)
+      const result = await fetchDocuments(pageBeforeDelete)
+      
+      // 如果当前页没有文档了，且不是第一页，则跳转到前一页
+      if (result && result.items.length === 0 && pageBeforeDelete > 1) {
+        const previousPage = pageBeforeDelete - 1
+        await fetchDocuments(previousPage)
+      }
     } catch (error) {
       console.error('Failed to delete document:', error)
       showError(t('knowledgeBases.editor.deleteFailed'))
@@ -811,8 +828,17 @@ const KnowledgeBaseEditorPage: React.FC = () => {
 
       showSuccess(t('knowledgeBases.editor.batchDeleteSuccess', { count: deletedCount }))
 
+      // 保存删除前的页码
+      const pageBeforeDelete = currentPage
+      
       // 刷新文档列表，确保数据同步
-      await fetchDocuments(currentPage)
+      const result = await fetchDocuments(pageBeforeDelete)
+      
+      // 如果当前页没有文档了，且不是第一页，则跳转到前一页
+      if (result && result.items.length === 0 && pageBeforeDelete > 1) {
+        const previousPage = pageBeforeDelete - 1
+        await fetchDocuments(previousPage)
+      }
     } catch (error) {
       console.error('Failed to batch delete documents:', error)
       showError(t('knowledgeBases.editor.batchDeleteFailed'))

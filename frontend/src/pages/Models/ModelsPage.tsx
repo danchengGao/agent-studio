@@ -1277,14 +1277,16 @@ const ModelsPage: React.FC = () => {
                           </Tooltip>
                         ) : (
                           <Tooltip title={!model.isActive ? t('models.messages.embeddingModel.modelDisabled') : t('models.testModel')}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleTestEmbeddingModel(model.id)}
-                              disabled={testingModelId !== null || !model.isActive}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                            >
-                              {testingModelId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            </IconButton>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleTestEmbeddingModel(model.id)}
+                                disabled={testingModelId !== null || !model.isActive}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                              >
+                                {testingModelId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         )}
                         {/* 编辑按钮 */}
