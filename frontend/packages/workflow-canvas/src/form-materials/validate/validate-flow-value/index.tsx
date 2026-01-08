@@ -4,8 +4,9 @@
  */
 
 import { isNil } from 'lodash-es'
-import { I18n, FeedbackLevel, FlowNodeEntity, getNodeScope, getNodePrivateScope } from '@flowgram.ai/editor'
+import { FeedbackLevel, FlowNodeEntity, getNodeScope, getNodePrivateScope } from '@flowgram.ai/editor'
 
+import { t } from '../../../i18n'
 import { type IFlowValue, FlowValueUtils } from '../../'
 
 /**
@@ -17,7 +18,7 @@ export function validateVariableName(variableName: string): { isValid: boolean; 
   if (!variableName || variableName.trim() === '') {
     return {
       isValid: false,
-      message: I18n.t('Variable name cannot be empty'),
+      message: t('workflowCanvas.formMaterials.validate.variableNameEmpty'),
     }
   }
 
@@ -27,7 +28,7 @@ export function validateVariableName(variableName: string): { isValid: boolean; 
   if (!variableNamePattern.test(variableName)) {
     return {
       isValid: false,
-      message: I18n.t('Variable name can only contain letters, numbers, underscores, and must start with a letter'),
+      message: t('workflowCanvas.formMaterials.validate.variableNamePattern'),
     }
   }
 
@@ -49,7 +50,10 @@ interface Context {
 export function validateFlowValue(value: IFlowValue | undefined, ctx: Context) {
   const { node, required, includePrivateScope = false, errorMessages } = ctx
 
-  const { required: requiredMessage = 'Field is required', unknownVariable: unknownVariableMessage = 'Unknown Variable' } = errorMessages || {}
+  const {
+    required: requiredMessage = t('workflowCanvas.formMaterials.validate.fieldRequired'),
+    unknownVariable: unknownVariableMessage = t('workflowCanvas.formMaterials.validate.unknownVariable'),
+  } = errorMessages || {}
 
   if (required && (isNil(value) || isNil(value?.content) || value?.content === '')) {
     return {

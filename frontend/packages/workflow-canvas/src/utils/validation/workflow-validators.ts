@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { I18n } from '@flowgram.ai/editor'
 import type { ValidationErrorInfo } from '../../components/validation/types'
 import { WorkflowDocument } from '@flowgram.ai/free-layout-editor'
+import { t } from '../../i18n'
 
 /**
  * Workflow path validation options
@@ -26,7 +26,7 @@ export interface WorkflowPathValidationOptions {
  * @returns Validation error list
  */
 export const validateWorkflowPath = (document: WorkflowDocument, options: WorkflowPathValidationOptions = {}): ValidationErrorInfo[] => {
-  const { startNodeType = '1', endNodeType = '2', errorMessage = I18n.t('Workflow must contain a complete path from start node to end node') } = options
+  const { startNodeType = '1', endNodeType = '2', errorMessage = t('workflowCanvas.validators.workflowMustContainPath') } = options
 
   const workflowErrors: ValidationErrorInfo[] = []
 
@@ -81,7 +81,7 @@ export const validateWorkflowPath = (document: WorkflowDocument, options: Workfl
       if (!endNodes.some(endNode => hasPath(graph, startNode.id, endNode.id))) {
         workflowErrors.push({
           nodeId: 'workflow',
-          nodeTitle: I18n.t('Workflow'),
+          nodeTitle: t('workflowCanvas.validators.workflow'),
           error: errorMessage,
           severity: 'error',
           field: 'workflow.path',

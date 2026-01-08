@@ -6,8 +6,8 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
 import { Select } from '@douyinfe/semi-ui'
+import { t } from '../../../../i18n'
 
 import { ConditionPresetOp } from '../../..'
 
@@ -19,12 +19,12 @@ export const booleanRegistry: Partial<JsonSchemaTypeRegistry> = {
     const { value, onChange, ...rest } = props
     return (
       <Select
-        placeholder={I18n.t('Please Select Boolean')}
+        placeholder={t('workflowCanvas.formMaterials.input.pleaseSelectBoolean')}
         size="small"
         disabled={props.readonly}
         optionList={[
-          { label: I18n.t('True'), value: 1 },
-          { label: I18n.t('False'), value: 0 },
+          { label: t('workflowCanvas.formMaterials.input.true'), value: 1 },
+          { label: t('workflowCanvas.formMaterials.input.false'), value: 0 },
         ]}
         value={value !== undefined && value !== null ? (value ? 1 : 0) : undefined}
         onChange={value => onChange?.(value !== undefined ? !!value : undefined)}

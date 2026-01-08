@@ -2,11 +2,11 @@
  * Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
  * SPDX-License-Identifier: MIT
  */
-import { I18n } from '@flowgram.ai/editor'
 import { Button, IconButton, Typography } from '@douyinfe/semi-ui'
 import { IconDelete, IconPlus } from '@douyinfe/semi-icons'
 
 import React from 'react'
+import { useTranslation } from '../../../i18n'
 import { BlurInput, InjectDynamicValueInput, useObjectList, IFlowConstantRefValue, IFlowValue, IFlowConstantValue } from '../../'
 
 import { PropsType } from './types'
@@ -30,6 +30,7 @@ export function InputsValues({
   hideDefaultAddButton = false,
   defaultItem,
 }: PropsType) {
+  const { t } = useTranslation()
   const { list, updateKey, updateValue, remove, add } = useObjectList<IFlowValue | undefined>({
     value,
     onChange,
@@ -66,7 +67,7 @@ export function InputsValues({
                   }
                   updateKey(item.id, v)
                 }}
-                placeholder={I18n.t('Input Key')}
+                placeholder={t('workflowCanvas.formMaterials.common.inputKey')}
               />
               <InjectDynamicValueInput
                 style={{ flexGrow: 1 }}

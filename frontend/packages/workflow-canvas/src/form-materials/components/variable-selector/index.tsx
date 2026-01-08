@@ -6,13 +6,13 @@
 import React, { useMemo } from 'react'
 
 import { IJsonSchema } from '@flowgram.ai/json-schema'
-import { I18n } from '@flowgram.ai/editor'
 import { type TriggerRenderProps } from '@douyinfe/semi-ui/lib/es/treeSelect'
 import { type TreeNodeData } from '@douyinfe/semi-ui/lib/es/tree'
 import { Popover, Tag, TreeSelect } from '@douyinfe/semi-ui'
 import { IconChevronDownStroked, IconIssueStroked } from '@douyinfe/semi-icons'
 
 import { createInjectMaterial } from '../../'
+import { useTranslation } from '../../../i18n'
 
 import { useVariableTree } from './use-variable-tree'
 import { useVariableSelectorContext } from './context'
@@ -48,6 +48,7 @@ export const VariableSelector = ({
   triggerRender,
 }: VariableSelectorProps) => {
   const { skipVariable } = useVariableSelectorContext()
+  const { t } = useTranslation()
 
   const treeData = useVariableTree({
     includeSchema,
@@ -132,7 +133,7 @@ export const VariableSelector = ({
         showClear={false}
         arrowIcon={<IconChevronDownStroked size="small" />}
         triggerRender={triggerRender}
-        placeholder={config?.placeholder ?? I18n.t('Select Variable')}
+        placeholder={config?.placeholder ?? t('workflowCanvas.formMaterials.common.selectVariable')}
       />
     </>
   )

@@ -11,6 +11,12 @@ import agentEditorZh from '../locales/agent/zh-CN/editor.json'
 import agentCommonEn from '../locales/agent/en-US/common.json'
 import agentEditorEn from '../locales/agent/en-US/editor.json'
 
+import workflowCommonZh from '../locales/workflow/zh-CN/common.json'
+import workflowNodesZh from '../locales/workflow/zh-CN/nodes.json'
+
+import workflowCommonEn from '../locales/workflow/en-US/common.json'
+import workflowNodesEn from '../locales/workflow/en-US/nodes.json'
+
 const resources = {
   'zh-CN': {
     translation: {
@@ -18,6 +24,10 @@ const resources = {
       agents: {
         ...agentCommonZh,
         ...agentEditorZh,
+      },
+      workflowCanvas: {
+        ...workflowCommonZh,
+        ...workflowNodesZh,
       },
     },
   },
@@ -27,6 +37,10 @@ const resources = {
       agents: {
         ...agentCommonEn,
         ...agentEditorEn,
+      },
+      workflowCanvas: {
+        ...workflowCommonEn,
+        ...workflowNodesEn,
       },
     },
   },

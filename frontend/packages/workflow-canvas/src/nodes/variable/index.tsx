@@ -4,19 +4,19 @@
  */
 
 import { nanoid } from 'nanoid'
-import { I18n } from '@flowgram.ai/editor'
 
 import { WorkflowNodeType } from '../constants'
 import { FlowNodeRegistry } from '../../typings'
 import { Key } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { customNanoid } from '../../utils/nanoid-custom'
+import { t } from '../../i18n'
 
 export const VariableNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Variable,
   info: {
     icon: <Key size={16} className="text-blue-600" />,
-    description: I18n.t('Used to reset the value of a loop variable for the next iteration'),
+    description: t('workflowCanvas.nodes.variable.description'),
   },
   meta: {
     size: {
@@ -30,7 +30,7 @@ export const VariableNodeRegistry: FlowNodeRegistry = {
       id: `variable__${customNanoid(5)}`,
       type: WorkflowNodeType.Variable,
       data: {
-        title: I18n.t('Variable'),
+        title: t('workflowCanvas.nodes.variable.title'),
         assign: [
           {
             operator: 'assign',

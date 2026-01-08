@@ -6,11 +6,11 @@
 import { useMemo, useState } from 'react'
 
 import { IJsonSchema } from '@flowgram.ai/json-schema'
-import { I18n } from '@flowgram.ai/editor'
 import { Button, Checkbox, IconButton } from '@douyinfe/semi-ui'
 import { IconExpand, IconShrink, IconPlus, IconChevronDown, IconChevronRight, IconMinus } from '@douyinfe/semi-icons'
 
 import { InjectTypeSelector, BlurInput } from '../../'
+import { t } from '../../../i18n'
 
 import { ConfigType, PropertyValueType } from './types'
 import { IconAddChildren } from './icon'
@@ -207,7 +207,7 @@ function PropertyEdit(props: {
             <div className="gedit-m-json-schema-editor-name">
               <BlurInput
                 disabled={isFieldLocked}
-                placeholder={config?.placeholder ?? I18n.t('Input Variable Name')}
+                placeholder={config?.placeholder ?? t('workflowCanvas.formMaterials.editor.inputVariableName')}
                 size="small"
                 value={name}
                 validateVariable={true}
@@ -270,24 +270,24 @@ function PropertyEdit(props: {
           </div>
           {expandable && expand && (
             <div className="gedit-m-json-schema-editor-expand-detail">
-              <div className="gedit-m-json-schema-editor-label">{config?.descTitle ?? I18n.t('Description')}</div>
+              <div className="gedit-m-json-schema-editor-label">{config?.descTitle ?? t('workflowCanvas.formMaterials.editor.description')}</div>
               <BlurInput
                 disabled={isFieldLocked}
                 size="small"
                 value={description}
                 onChange={value => onChange('description', value)}
-                placeholder={config?.descPlaceholder ?? I18n.t('Help LLM to understand the property')}
+                placeholder={config?.descPlaceholder ?? t('workflowCanvas.formMaterials.editor.helpLLMUnderstandProperty')}
               />
               {$level === 0 && (
                 <>
                   <div className="gedit-m-json-schema-editor-label" style={{ marginTop: 10 }}>
-                    {config?.defaultValueTitle ?? I18n.t('Default Value')}
+                    {config?.defaultValueTitle ?? t('workflowCanvas.formMaterials.editor.defaultValue')}
                   </div>
                   <div className="gedit-m-json-schema-editor-default-value-wrapper">
                     <DefaultValue
                       value={defaultValue}
                       schema={value}
-                      placeholder={config?.defaultValuePlaceholder ?? I18n.t('Default Value')}
+                      placeholder={config?.defaultValuePlaceholder ?? t('workflowCanvas.formMaterials.editor.defaultValue')}
                       onChange={value => onChange('default', value)}
                       locked={isFieldLocked}
                     />
