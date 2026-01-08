@@ -1,8 +1,7 @@
 import { Paper, Switch } from '@mui/material'
 import { useState, useEffect, useRef, memo } from 'react'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
-import { ExecutionService } from '@test-agentstudio/api-client'
-import { useAgentStore } from '@/stores/useAgentStore'
+import { ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client'
 import { ActionSlotMount } from '@/components/Common/ActionSlot'
 import AgentOperationsBar from './AgentOperationsBar'
 import AgentDebugPanel from './AgentDebugPanel'
@@ -28,23 +27,21 @@ const extractTextFromOutput = (outputRaw: any) => {
 interface AgentDebugChatProps {
   /** 智能体ID */
   agentId: string
-  /** 智能体版本，默认为'latest' */
-  agentVersion?: string
   /** 调试信息面板开关变化回调 */
   onDebugInfoChange?: (open: boolean) => void
   /** 是否显示长期记忆，透传给MemoryButton */
   enableLongTerm?: boolean
   /** 是否隐藏记忆按钮（单Agent多工作流模式下隐藏） */
   hideMemoryButton?: boolean
-  /** 智能体名称（用于调试信息展示） */
-  agentName?: string
+  /** 智能体保存请求（包含所有业务数据和版本信息） */
+  saveAgentRequest: SaveAgentRequest
 }
 
 /**
  * 智能体调试聊天组件
  * 提供与智能体交互的聊天界面，支持调试信息显示
  */
-const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, enableLongTerm, hideMemoryButton, agentName }: AgentDebugChatProps) => {
+const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest }: AgentDebugChatProps) => {
   // 提供给MemoryEngine
   const userIdForMem = getDefaultSpaceId()
   const groupIdForMem = agentId
@@ -62,27 +59,24 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
   const cancelStreamRef = useRef<(() => void) | null>(null)
   const userCancelRequestedRef = useRef(false)
 
-  // 订阅开场白内容（来自 useAgentStore.saveAgentRequest.opening_remarks）
-  const openingRemarks = useAgentStore(s => s.saveAgentRequest?.opening_remarks || '')
-  const agentType = useAgentStore(s => s.saveAgentRequest?.agent_type || 'react')
-  const workflowsCount = useAgentStore(s => s.saveAgentRequest?.workflows?.length || 0)
+  // 从 saveAgentRequest 读取所有数据（统一数据源）
+  const openingRemarks = saveAgentRequest.opening_remarks || ''
+  const agentType = saveAgentRequest.agent_type || 'react'
+  const workflowsCount = saveAgentRequest.workflows?.length || 0
+  const model = saveAgentRequest.model
+  const agentName = saveAgentRequest.name
+  // agent_version 为空字符串表示草稿状态，执行 API 使用空字符串或 'draft' 均可
+  const agentVersion = saveAgentRequest.agent_version || 'draft'
 
-  // 获取完整的模型信息
-  const model = useAgentStore(s => s.saveAgentRequest?.model)
   const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
 
-  // 模型未配置的判断：
-  // 1. model 对象本身不存在或为空
+  // 模型未配置的判断
   const modelNotConfigured = !model
-
+  // 聊天被阻止：多工作流模式且没有工作流
   const chatBlocked = agentType === 'workflow' && workflowsCount === 0
 
   // 创建聊天容器的引用
   const chatContainerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    console.log(1111111, chatHistory)
-  }, chatHistory)
 
   // 实时同步开场白：作为第一条助手消息展示与更新
   useEffect(() => {

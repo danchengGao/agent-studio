@@ -1147,7 +1147,14 @@ const AgentModelSelector = (props: {
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
               <Tooltip title="刷新工作流信息" arrow>
                 <span>
-                  <IconButton size="small" onClick={handleRefreshWorkflows} disabled={workflowObjects.length === 0} aria-label="刷新">
+                  <IconButton 
+                    component="div"
+                    size="small" 
+                    onClick={handleRefreshWorkflows} 
+                    disabled={workflowObjects.length === 0} 
+                    aria-label="刷新"
+                    sx={{ cursor: workflowObjects.length === 0 ? 'not-allowed' : 'pointer' }}
+                  >
                     <RefreshCcw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
                   </IconButton>
                 </span>
