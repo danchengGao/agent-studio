@@ -38,9 +38,9 @@ replace_placeholder() {
 
 # ==== Generates final config file by replacing placeholders in template ===
 generate_config_file() {
-    local templatefile="$1"
-    local destfile="$2"
-    local var_name="$3"
+    local templatefile=$1
+    local destfile=$2
+    local var_name=$3
     # Verify template file exists
     if [ ! -f "${templatefile}" ]; then
         error "Template file does not exist: ${templatefile}"
@@ -69,20 +69,29 @@ generate_config_file() {
 generate_config_files() {
     local nginx_template_file=${CONFIG["NGINX_TEMPLE_FILE"]}
     local nginx_dir="${CONFIG["CONFIG_DIR"]}/.nginx-files"
-    local nginx_file="${nginx_dir}/${ENV_VARS["NGINX_FILE_NAME"]}"
+    local nginx_file="${nginx_dir}/${DEPLOY_VARS["NGINX_FILE_NAME"]}"
+    declare -A ALL_VARS
+
+    for key in "${!DEPLOY_VARS[@]}"; do
+        ALL_VARS["${key}"]="${DEPLOY_VARS[$key]}"
+    done
+
+    for key in "${!RUNTIME_VARS[@]}"; do
+        ALL_VARS["${key}"]="${RUNTIME_VARS[$key]}"
+    done
 
     mkdir -p ${nginx_dir}
-    generate_config_file ${nginx_template_file} ${nginx_file} "ENV_VARS"
+    generate_config_file ${nginx_template_file} ${nginx_file} "ALL_VARS"
 
     for module in "${ALL_MODULES[@]}"; do
-        local has_it="${ENV_VARS["HAS_${module}_CONTAINER"]}"
+        local has_it="${DEPLOY_VARS["HAS_${module}_CONTAINER"]}"
         if [ "${has_it}" == "true" ]; then
             local template_file=${COMPOSE_TEMPLATE_FILES["${module}"]}
             local compose_file=${COMPOSE_FILES["${module}"]}
-            local enable_linux_sandbox=$(echo "${ENV_VARS["ENABLE_LINUX_SANDBOX"]}" | tr '[:upper:]' '[:lower:]') 
+            local enable_linux_sandbox=$(echo "${DEPLOY_VARS["ENABLE_LINUX_SANDBOX"]}" | tr '[:upper:]' '[:lower:]')
 
             if [ "${module}" == "SANDBOX" -a "${enable_linux_sandbox}" == "true" ]; then
-                ENV_VARS["PRIVILEGED_SECURITY_OPTS"]=$(cat <<'EOF'
+                ALL_VARS["PRIVILEGED_SECURITY_OPTS"]=$(cat <<'EOF'
 cap_add:
       - SYS_ADMIN
     security_opt:
@@ -91,7 +100,7 @@ cap_add:
 EOF
                 )
     fi
-            generate_config_file ${template_file} ${compose_file} "ENV_VARS"
+            generate_config_file ${template_file} ${compose_file} "ALL_VARS"
         fi
     done
 }

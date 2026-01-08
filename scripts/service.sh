@@ -28,7 +28,7 @@ exec_service() {
     fi
 
     for module in "${modules[@]}"; do
-        local has_it="${ENV_VARS["HAS_${module}_CONTAINER"]}"
+        local has_it="${DEPLOY_VARS["HAS_${module}_CONTAINER"]}"
         if [ "${has_it}" == "true" ]; then
             local compose_file=${COMPOSE_FILES["${module}"]}
             case "${module}" in
@@ -47,20 +47,21 @@ exec_service() {
                     fi
                     ;;
                 JIUWEN|PLUGIN)
+                    echo "huchen: ${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}"
                     eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
                     if [ "${cmd}" == "up" ]; then
                         check_containers "${CONTAINERS[${module}]}"
                     fi
                     ;;
                 SANDBOX)
-                    local enable_linux_sandbox=$(echo "${ENV_VARS["ENABLE_LINUX_SANDBOX"]}" | tr '[:upper:]' '[:lower:]')
-                    local sandbox_gateway_service_name=${ENV_VARS["SANDBOX_GATEWAY_SERVICE_NAME"]}
-                    local sandbox_gateway_docker_name=${ENV_VARS["SANDBOX_GATEWAY_DOCKER_NAME"]}
+                    local enable_linux_sandbox=$(echo "${DEPLOY_VARS["ENABLE_LINUX_SANDBOX"]}" | tr '[:upper:]' '[:lower:]')
+                    local sandbox_gateway_service=${DEPLOY_VARS["SANDBOX_GATEWAY_SERVICE"]}
+                    local sandbox_gateway_docker=${DEPLOY_VARS["SANDBOX_GATEWAY_DOCKER"]}
 
                     if [ "${enable_linux_sandbox}" == "true" ]; then
-                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${sandbox_gateway_service_name}" || error "${cmd} ${sandbox_gateway_service_name} service failed"
+                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${sandbox_gateway_service}" || error "${cmd} ${sandbox_gateway_service} service failed"
                         if [ "${cmd}" == "up" ]; then
-                            check_containers "${sandbox_gateway_docker_name}"
+                            check_containers "${sandbox_gateway_docker}"
                         fi
                     else
                         eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"

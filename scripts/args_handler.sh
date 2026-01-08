@@ -28,7 +28,7 @@ parse_args() {
                 is_new_svc="true"
                 i=$((i+1))
                 ;;
-            up|down|stop|conf)
+            up|down|stop)
                 # treat as commands
                 if [ -n "$cmd" ]; then
                     error "please not specify two cmds: ${cmd} and ${args[$i]}"
@@ -41,7 +41,7 @@ parse_args() {
                 local module=$(echo "${args[$i]}" | tr 'a-z' 'A-Z')
                 modules+=("${module}")
                 key="HAS_${module}_CONTAINER"
-                ENV_VARS["${key}"]="true"
+                DEPLOY_VARS["${key}"]="true"
                 i=$((i+1))
                 ;;
             *)

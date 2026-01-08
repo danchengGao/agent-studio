@@ -1,13 +1,13 @@
 services:
-  <<SANDBOX_GATEWAY_SERVICE_NAME>>:
+  <<SANDBOX_GATEWAY_SERVICE>>:
     image: <<SANDBOX_GATEWAY_IMAGE>>
     pull_policy: if_not_present
-    container_name: <<SANDBOX_GATEWAY_DOCKER_NAME>>
+    container_name: <<SANDBOX_GATEWAY_DOCKER>>
     ports:
       - "<<SANDBOX_GATEWAY_HOST_PORT>>:<<SANDBOX_GATEWAY_PORT>>"
     environment:
-      - PYTHON_SANDBOX_URL=http://<<PYTHON_SERVER_SERVICE_NAME>>:<<PYTHON_SERVER_PORT>>/run
-      - JS_SANDBOX_URL=http://<<JS_SERVER_SERVICE_NAME>>:<<JS_SERVER_PORT>>/run
+      - PYTHON_SANDBOX_URL=http://<<PYTHON_SERVER_SERVICE>>:<<PYTHON_SERVER_PORT>>/run
+      - JS_SANDBOX_URL=http://<<JS_SERVER_SERVICE>>:<<JS_SERVER_PORT>>/run
       - ENABLE_LINUX_SANDBOX=<<ENABLE_LINUX_SANDBOX>>
     networks:
       - <<JIUWEN_NETWORK_NAME>>
@@ -26,10 +26,10 @@ services:
       start_period: 60s
     <<PRIVILEGED_SECURITY_OPTS>>
 
-  <<PYTHON_SERVER_SERVICE_NAME>>:
+  <<PYTHON_SERVER_SERVICE>>:
     image: <<PYTHON_SERVER_IMAGE>>
     pull_policy: if_not_present
-    container_name: <<PYTHON_SERVER_DOCKER_NAME>>
+    container_name: <<PYTHON_SERVER_DOCKER>>
     ports:
       - "<<PYTHON_SERVER_HOST_PORT>>:<<PYTHON_SERVER_PORT>>"
     networks:
@@ -43,10 +43,10 @@ services:
       retries: 5
       start_period: 60s
 
-  <<JS_SERVER_SERVICE_NAME>>:
+  <<JS_SERVER_SERVICE>>:
     image: <<JS_SERVER_IMAGE>>
     pull_policy: if_not_present
-    container_name: <<JS_SERVER_DOCKER_NAME>>
+    container_name: <<JS_SERVER_DOCKER>>
     ports:
       - "<<JS_SERVER_HOST_PORT>>:<<JS_SERVER_PORT>>"
     networks:
