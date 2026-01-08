@@ -133,5 +133,5 @@ get_public_ip() {
             ;;
     esac
 
-    ENV_VARS["IP"]=${local_ip}
+    DEPLOY_VARS["IP"]=${local_ip}
 }
