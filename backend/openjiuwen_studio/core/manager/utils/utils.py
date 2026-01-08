@@ -1,9 +1,10 @@
+import os
 import re
-import subprocess
-import shutil
 from typing import Optional, Tuple
+import tomllib
 
 from pydantic import BaseModel, Field, ValidationError
+
 from openjiuwen.core.common.logging import logger
 
 
@@ -110,26 +111,24 @@ def convert_to_properties_format(input_list) -> dict:
         raise ValueError(f"Failed to convert properties format: {e}") from e
 
 
-def get_git_version() -> str:
-    """Get version from git tags"""
+def get_current_project_version() -> str:
+    """Get current project version from pyproject.toml"""
     try:
-        # Find git executable path
-        git_path = shutil.which('git')
-        if not git_path:
-            logger.warning("Git executable not found in PATH")
-            return ""
-            
-        # try to get the latest tag
-        version = subprocess.check_output(
-            [git_path, "describe", "--tags", "--abbrev=0"], 
-            stderr=subprocess.DEVNULL
-        ).decode().strip()
+        # Build path to pyproject.toml file
+        current_file = os.path.abspath(__file__)
+        # Navigate up the directory structure to find pyproject.toml
+        # utils.py is in backend/openjiuwen_studio/core/manager/utils/
+        # pyproject.toml is in backend/
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file)))))
+        pyproject_path = os.path.join(backend_dir, "pyproject.toml")
         
-        # if the tag starts with 'v', remove it
-        if version.startswith('v'):
-            version = version[1:]
-            
+        # Read and parse pyproject.toml
+        with open(pyproject_path, "rb") as f:
+            pyproject_data = tomllib.load(f)
+        
+        # Get version from project section
+        version = pyproject_data.get("project", {}).get("version", "")
         return version
     except Exception as e:
-        logger.warning(f"Failed to get git version: {e}")
+        logger.warning(f"Failed to get current project version from pyproject.toml: {e}")
         return ""

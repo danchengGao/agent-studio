@@ -50,7 +50,7 @@ from openjiuwen_studio.core.manager.repositories.tool_repository import tool_rep
 from openjiuwen_studio.core.manager.utils.utils import (
     Version,
     check_version,
-    get_git_version,
+    get_current_project_version,
 )
 from openjiuwen_studio.models.agent import AgentBaseDBPd
 from openjiuwen_studio.models.agent import AgentPublishDBPd
@@ -94,7 +94,6 @@ from openjiuwen_studio.schemas.plugin import (
 )
 from openjiuwen_studio.schemas.knowledge_base import (
     KnowledgeBaseGet,
-    KnowledgeBaseCreate,
 )
 from openjiuwen_studio.core.manager.convertor.components.plugin import (
     param_type_mapping,
@@ -2102,7 +2101,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> ResponseModel:
                     agent_data["model"]["model_info"]["api_base"] = ""
 
     # 5. 构建导出数据
-    version = get_git_version()
+    version = get_current_project_version()
     export_data = AgentExportData(
         version=version,  # 暂定和代码发布版本相同
         agent=agent_data,
