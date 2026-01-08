@@ -212,3 +212,34 @@ class AgentResponsePublish(BaseModel):
 class AgentUpdateMemory(AgentUpdate):  # 假设你有 AgentUpdate 基类
     memory_config: AgentMemoryConfig
     model_config = ConfigDict(populate_by_name=True)
+
+
+class AgentExportRequest(BaseModel):
+    space_id: str = Field(..., min_length=1, max_length=100)
+    agent_id: str = Field(..., min_length=1, max_length=100)
+    agent_version: Optional[str] = Field(None, max_length=100)
+
+
+class AgentDependencies(BaseModel):
+    workflows: List[Dict[str, Any]] = Field(default_factory=list)
+    plugins: List[Dict[str, Any]] = Field(default_factory=list)
+    knowledge_bases: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class AgentExportMetadata(BaseModel):
+    export_time: str
+    export_by: str
+    agent_studio_version: Optional[str] = None
+
+
+class AgentExportData(BaseModel):
+    version: str = ""
+    agent: Dict[str, Any]
+    dependencies: AgentDependencies
+    metadata: AgentExportMetadata
+
+
+class AgentImportRequest(BaseModel):
+    space_id: str = Field(..., min_length=1, max_length=100)
+    import_data: AgentExportData
+    overwrite: bool = Field(False)

@@ -63,7 +63,7 @@ class PluginRepository():
             if res.code != status.HTTP_200_OK or not res.data:
                 return res.model_dump(exclude_none=True), []
             tool_list: list[dict] = []
-            for tool in res.data.tool_list:
+            for tool in res.data.tool_list:	 
                 tool_list.append(tool.to_dict())
 
             return res.model_dump(exclude_none=True), tool_list
@@ -73,7 +73,7 @@ class PluginRepository():
         with get_db_jw() as db:
             plugin_db = JiuwenBaseRepository(db, PluginBaseDB)
             if not plugin_data:
-                jiuwen_db_logger.debug(f"No plugin data to update")
+                jiuwen_db_logger.debug("No plugin data to update")
                 return ResponseModel(code=status.HTTP_400_BAD_REQUEST,
                                      message="No plugin data to update").model_dump(exclude_none=True)
             find_id = {
