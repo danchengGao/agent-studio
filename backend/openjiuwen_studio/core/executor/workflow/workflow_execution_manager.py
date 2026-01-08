@@ -99,15 +99,13 @@ class WorkflowExecutionManager:
 
     async def cancel_execution(
             self,
-            conversation_id: str,
-            force: bool = True
+            conversation_id: str
     ) -> bool:
         """
         取消正在执行的工作流
 
         Args:
             conversation_id: 对话ID
-            force: 是否强制停止线程
 
         Returns:
             bool: 是否成功取消
@@ -149,19 +147,7 @@ class WorkflowExecutionManager:
                 except Exception as e:
                     logger.error(f"Error cancelling task: {e}", exc_info=True)
 
-            # 4. 强制停止线程（如果需要）
-            if force and execution_info.thread_id:
-                try:
-                    # 注意：Python中无法直接强制杀死线程，但可以通过设置标志来中断
-                    # 这里记录线程ID，实际的中断需要在执行代码中检查标志
-                    logger.info(
-                        f"Marked thread for cancellation: thread_id={execution_info.thread_id}, "
-                        f"conversation_id={conversation_id}"
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to cancel thread: {e}", exc_info=True)
-
-            # 5. 清理状态 - 重置 runtime 的状态
+            # 4. 清理状态 - 重置 runtime 的状态
             if execution_info.runtime and hasattr(execution_info.runtime, 'state'):
                 try:
                     state = execution_info.runtime.state()
@@ -172,7 +158,7 @@ class WorkflowExecutionManager:
                 except Exception as e:
                     logger.error(f"Failed to clear state: {e}", exc_info=True)
 
-            # 6. 从注册表中移除
+            # 5. 从注册表中移除
             self.unregister_execution(conversation_id)
 
             logger.info(

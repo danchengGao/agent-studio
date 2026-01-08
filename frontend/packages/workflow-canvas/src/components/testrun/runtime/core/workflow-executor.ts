@@ -181,7 +181,6 @@ export class WorkflowExecutor {
       ExecutionService.cancelWorkflowExecution({
         space_id: this.currentSpaceId,
         conversation_id: this.currentConversationId,
-        force: true,
       }).catch((error) => {
         console.error('Failed to cancel workflow execution on server:', error)
       })
