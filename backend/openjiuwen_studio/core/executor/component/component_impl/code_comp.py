@@ -2,6 +2,7 @@
 # coding: utf-8
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved
 import textwrap
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Tuple, Union
 
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
@@ -128,10 +129,100 @@ class CodeComponent(ComponentExecutable, WorkflowComponent):
         else:
             if response:
                 for param in output_params:
-                    response_result[param.name] = response.get(param.name)  # 不存在的参数返回None
+                    raw_value = response.get(param.name)
+                    if not raw_value:
+                        response_result[param.name] = None
+                        continue
+                    # 按 ParamConfig.type 做类型校验和强制转换
+                    response_result[param.name] = self._convert_output_value(
+                        param_name=param.name,
+                        value=raw_value,
+                        expect_type=param.type,
+                    )
             response_result["is_success"] = True
 
         return response_result
+
+    def _convert_output_value(self, param_name: str, value: Any, expect_type: str) -> Any:
+        """
+        根据 ParamConfig.type 对输出参数做类型校验和强制转换。
+        转换失败时抛 JiuWenExecuteException。
+        """
+        try:
+            if expect_type == "string":
+                # 任意值都可转成字符串
+                return str(value)
+
+            if expect_type == "bool":
+                if not isinstance(value, bool):
+                    raise ValueError(f"expected boolean, but got {type(value).__name__}")
+                return value
+
+            if expect_type == "int":
+                # int类型：支持int、float、数字字符串转换
+                if isinstance(value, int):
+                    return value
+                elif isinstance(value, float):
+                    # 浮点数转int，会截断小数部分
+                    return int(value)
+                elif isinstance(value, str):
+                    # 字符串转int，先尝试直接转int，失败则尝试转float再转int
+                    try:
+                        return int(value)
+                    except ValueError:
+                        try:
+                            # 处理浮点数字符串
+                            return int(float(value))
+                        except (ValueError, TypeError) as e:
+                            raise ValueError(f"can not convert '{value}' into integer") from e
+                else:
+                    raise ValueError(f"expected integer, but got {type(value).__name__}")
+
+            if expect_type == "float":
+                # float类型：支持int、float、数字字符串转换
+                if isinstance(value, (int, float)):
+                    return float(value)
+                elif isinstance(value, str):
+                    try:
+                        return float(value)
+                    except (ValueError, TypeError) as e:
+                        raise ValueError(f"can not convert '{value}' into float") from e
+                else:
+                    raise ValueError(f"expected float, but got {type(value).__name__}")
+
+            if expect_type == "list":
+                if not isinstance(value, list):
+                    raise ValueError(f"expected list, but got {type(value).__name__}")
+                return value
+
+            if expect_type == "object":
+                if isinstance(value, dict):
+                    return value
+                raise ValueError(f"expected dict, got {type(value).__name__}")
+
+            if expect_type == "date-time":
+                if isinstance(value, str):
+                    try:
+                        return datetime.strptime(value, '%Y-%m-%dT%H:%M:%S.%fZ')
+                    except Exception as e:
+                        raise ValueError(f"can not convert '{value}' into datetime") from e
+                raise ValueError(f"expected date-time, got {type(value).__name__}")
+
+            # 未知类型：直接返回原值或按需抛错，这里选择抛错更安全
+            raise ValueError(f"unsupported expect_type '{expect_type}'")
+
+        except Exception as e:
+            # 转换失败时抛执行异常，便于前端/调用方感知
+            message = (
+                f"{StatusCode.CODE_COMPONENT_INVOKE_ERROR.errmsg}: "
+                f"output param '{param_name}' {e.args} "
+                f"value={value!r}"
+            )
+            raise JiuWenExecuteException(
+                error_code=StatusCode.CODE_COMPONENT_INVOKE_ERROR.code,
+                message=message,
+                node_id=self.node_id,
+            ) from e
 
     @staticmethod
     def _process_error_body(except_config: ExceptConfig, error_body: ErrorBody, excepted_condition: ExceptedCondition,
