@@ -6,13 +6,16 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 
-import { format } from 'date-fns'
 import { type DatePickerProps } from '@douyinfe/semi-ui/lib/es/datePicker'
 import { DatePicker } from '@douyinfe/semi-ui'
+import dayjs from 'dayjs'
 
 import { ConditionPresetOp } from '../../..'
 
 import { type JsonSchemaTypeRegistry } from '../types'
+
+// Convert Date to ISO 8601 format with local timezone offset
+const toLocalISOString = (date: Date): string => dayjs(date).format('YYYY-MM-DDTHH:mm:ss.SSSZ')
 
 export const dateTimeRegistry: Partial<JsonSchemaTypeRegistry> = {
   type: 'date-time',
@@ -26,11 +29,7 @@ export const dateTimeRegistry: Partial<JsonSchemaTypeRegistry> = {
       disabled={props.readonly}
       {...props}
       onChange={date => {
-        if (!date) {
-          props.onChange?.(undefined)
-          return
-        }
-        props.onChange?.(format(date as Date, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+        props.onChange?.(toLocalISOString(date as Date))
       }}
       value={props.value}
     />
