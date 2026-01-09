@@ -17,6 +17,8 @@ const ConditionContainer = styled.div`
   border-radius: 4px;
   padding: 4px;
   min-height: 24px;
+  max-width: 100%;
+  overflow: hidden;
   background-color: white;
 `
 
@@ -25,6 +27,7 @@ const ConditionRowContainer = styled.div`
   display: flex;
   align-items: center;
   padding: 0 2px;
+  min-width: 0;
 
   &:not(:last-child) {
     margin-bottom: 4px;
@@ -240,7 +243,7 @@ export const ConditionContentDisplay: React.FC<ConditionContentDisplayProps> = R
     )
   }
 
-  const logic = branch?.logic || 2
+  const logic = typeof branch?.logic === 'number' ? branch.logic : parseInt(branch?.logic as string, 10) || 2
   const logicText = logic === 1 ? '或' : '且'
 
   return (

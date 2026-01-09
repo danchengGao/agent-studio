@@ -15,11 +15,17 @@ const validateConstantValueSchema = (value: any): string | undefined => {
   }
 
   const { schema, content } = value
-  const expectedType = schema.type
+  const originalExpectedType = schema.type
 
-  if (!expectedType || expectedType === 'any') {
+  if (!originalExpectedType || originalExpectedType === 'any') {
     return undefined
   }
+
+  // Map format types to base types (e.g., "date-time" → "string")
+  const formatToBaseType: Record<string, string> = {
+    'date-time': 'string',
+  }
+  const expectedType = formatToBaseType[originalExpectedType] || originalExpectedType
 
   let actualType: string
   if (content === null || content === undefined) {
@@ -50,6 +56,15 @@ const validateConstantValueSchema = (value: any): string | undefined => {
     const actualTypeName = typeMap[actualType] || actualType
 
     return `期望${expectedTypeName}类型，但输入的是${actualTypeName}类型`
+  }
+
+  // Validate format types
+  if (originalExpectedType === 'date-time') {
+    // ISO 8601 date-time format: YYYY-MM-DDTHH:mm:ss.sssZ
+    const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+    if (!dateTimeRegex.test(content)) {
+      return '期望日期时间格式（ISO 8601），例如：2026-01-09T15:44:53.043Z'
+    }
   }
 
   return undefined
