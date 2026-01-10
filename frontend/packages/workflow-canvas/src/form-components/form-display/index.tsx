@@ -10,6 +10,7 @@ import { FormDisplayStyle } from './styles'
 export interface FormDisplayProps {
   label: string
   content: ReactNode
+  labelExtra?: ReactNode
 }
 
 export function FormDisplay(props: FormDisplayProps) {
@@ -30,7 +31,10 @@ export function FormDisplay(props: FormDisplayProps) {
 
   return (
     <FormDisplayStyle>
-      <span className="form-label">{props.label}</span>
+      <span className="form-label">
+        {props.label}
+        {props.labelExtra && <span style={{ marginLeft: '8px' }}>{props.labelExtra}</span>}
+      </span>
       <span
         className="form-content"
         data-is-long-string={shouldTruncate}

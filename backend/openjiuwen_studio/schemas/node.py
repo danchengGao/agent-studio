@@ -200,6 +200,7 @@ class NodeData(BaseModel):
     title: str = Field("", alias="title")
     inputs: Optional[Inputs] = Field(None, alias="inputs")
     outputs: Optional[Outputs] = Field(None, alias="outputs")
+    output_format: dsl.LLMResponseFormatType = Field(dsl.LLMResponseFormatType.Text, alias="output_format")
     branches: Optional[List[BranchInfo]] = Field([], alias="branches")
     configs: Optional[NodeConfigs] = Field(None, alias="configs")
     exception_config: Optional[ExceptionConfig] = Field(None, alias="exceptionConfig")

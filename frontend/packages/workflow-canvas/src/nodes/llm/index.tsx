@@ -10,6 +10,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { Sparkles } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { t } from '../../i18n'
+import { OutputFormat } from './type'
 
 export const LLMNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.LLM,
@@ -139,6 +140,7 @@ export const LLMNodeRegistry: FlowNodeRegistry = {
       type: WorkflowNodeType.LLM,
       data: {
         title: title,
+        output_format: OutputFormat.TEXT,
         inputs: {
           llmParam: {
             systemPrompt: {

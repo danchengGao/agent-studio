@@ -12,6 +12,7 @@ import { TestRunJsonInput } from '../testrun-json-input'
 import { NodeStatusGroup } from '../node-status-bar/group'
 import { TestRunFormMetaItem } from '../testrun-form/type'
 import { useTranslation } from '../../../i18n'
+import { OutputFormat } from '../../../nodes/llm/type'
 
 import styles from './index.module.less'
 
@@ -41,6 +42,9 @@ export interface NodeInputPanelProps {
     outputs?: any
   }
 
+  // Output format for rendering
+  outputFormat?: OutputFormat
+
   // Error messages
   errors?: string[]
 
@@ -69,6 +73,7 @@ export const NodeInputPanel: FC<NodeInputPanelProps> = ({
   isInterruptionMode = false,
   interruptionMessage,
   result,
+  outputFormat,
   errors,
   className,
 }) => {
@@ -119,7 +124,9 @@ export const NodeInputPanel: FC<NodeInputPanelProps> = ({
       )}
 
       {/* Output result */}
-      {!isInterruptionMode && result && result.outputs && <NodeStatusGroup title={t('workflowCanvas.nodeInputPanel.output')} data={result.outputs} optional disableCollapse size="large" />}
+      {!isInterruptionMode && result && result.outputs && (
+        <NodeStatusGroup title={t('workflowCanvas.nodeInputPanel.output')} data={result.outputs} optional disableCollapse size="large" outputFormat={outputFormat} />
+      )}
     </div>
   )
 }
