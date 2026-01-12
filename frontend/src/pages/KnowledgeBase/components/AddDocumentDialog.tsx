@@ -954,26 +954,28 @@ const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({ open, knowledgeBa
                           </select>
                           {/* 测试按钮 */}
                           <Tooltip title={modelTestPassed && formData.llmModelId === testedModelId ? '测试已通过' : '测试模型连接'}>
-                            <button
-                              type="button"
-                              onClick={handleTestModel}
-                              disabled={!formData.llmModelId || isTestingModel}
-                              className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 ${
-                                modelTestPassed && formData.llmModelId === testedModelId
-                                  ? 'text-green-600 bg-green-50 hover:bg-green-100'
-                                  : !formData.llmModelId || isTestingModel
-                                    ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
-                                    : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
-                              }`}
-                            >
-                              {isTestingModel ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                              ) : modelTestPassed && formData.llmModelId === testedModelId ? (
-                                <CheckCircle className="w-5 h-5" />
-                              ) : (
-                                <Play className="w-5 h-5" />
-                              )}
-                            </button>
+                            <span>
+                              <button
+                                type="button"
+                                onClick={handleTestModel}
+                                disabled={!formData.llmModelId || isTestingModel}
+                                className={`flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-200 ${
+                                  modelTestPassed && formData.llmModelId === testedModelId
+                                    ? 'text-green-600 bg-green-50 hover:bg-green-100'
+                                    : !formData.llmModelId || isTestingModel
+                                      ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                                      : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+                                }`}
+                              >
+                                {isTestingModel ? (
+                                  <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : modelTestPassed && formData.llmModelId === testedModelId ? (
+                                  <CheckCircle className="w-5 h-5" />
+                                ) : (
+                                  <Play className="w-5 h-5" />
+                                )}
+                              </button>
+                            </span>
                           </Tooltip>
                         </div>
                         {modelsLoading && <p className="mt-1 text-xs text-gray-500">{t('common.loading') || '加载中...'}</p>}
