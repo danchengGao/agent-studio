@@ -35,13 +35,15 @@ interface AgentDebugChatProps {
   hideMemoryButton?: boolean
   /** 智能体保存请求（包含所有业务数据和版本信息） */
   saveAgentRequest: SaveAgentRequest
+  /** 模型是否可用（未被禁用） */
+  isModelActive?: boolean
 }
 
 /**
  * 智能体调试聊天组件
  * 提供与智能体交互的聊天界面，支持调试信息显示
  */
-const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest }: AgentDebugChatProps) => {
+const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest, isModelActive = true }: AgentDebugChatProps) => {
   // 提供给MemoryEngine
   const userIdForMem = getDefaultSpaceId()
   const groupIdForMem = agentId
@@ -72,6 +74,8 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
 
   // 模型未配置的判断
   const modelNotConfigured = !model
+  // 模型已被禁用的判断
+  const modelDisabled = !isModelActive
   // 聊天被阻止：多工作流模式且没有工作流
   const chatBlocked = agentType === 'workflow' && workflowsCount === 0
 
@@ -505,6 +509,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
   const handleSendMessage = async () => {
     if (isProcessing) return
     if (modelNotConfigured) return
+    if (modelDisabled) return
     if (chatBlocked) return
     const trimmed = inputMessage.trim()
     if (!trimmed) return
@@ -735,6 +740,26 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
               </div>
             </div>
           )}
+          {/* 模型已被禁用的提示 */}
+          {modelDisabled && !modelNotConfigured && (
+            <div className="mx-4 mt-4 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{t('tips.modelDisabledTitle')}</h3>
+                  <p className="mt-1 text-sm text-red-700">{t('tips.modelDisabledDescription')}</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={chatContainerRef} className="flex-1 bg-white p-4 mb-4 overflow-y-auto overflow-x-hidden">
             <ChatMessageList
               messages={chatHistory}
@@ -750,8 +775,8 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
             onChange={setInputMessage}
             onSend={handleSendMessage}
             onCancel={handleCancel}
-            disabled={!inputMessage.trim() || isProcessing || modelNotConfigured || chatBlocked}
-            inputDisabled={modelNotConfigured || chatBlocked}
+            disabled={!inputMessage.trim() || isProcessing || modelNotConfigured || modelDisabled || chatBlocked}
+            inputDisabled={modelNotConfigured || modelDisabled || chatBlocked}
             onClearChat={async () => {
               // 重置交互状态
               resetInteractionState()
@@ -789,13 +814,15 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
             placeholder={
               modelNotConfigured
                 ? t('placeholders.configModelFirst')
-                : chatBlocked
-                  ? t('placeholders.addWorkflowFirst')
-                  : isInterrupted && !isSimpleInteraction
-                    ? t('placeholders.waitInputComplex')
-                    : isInterrupted
-                      ? t('placeholders.waitInputSimple')
-                      : t('placeholders.inputMessage')
+                : modelDisabled
+                  ? t('placeholders.modelDisabled')
+                  : chatBlocked
+                    ? t('placeholders.addWorkflowFirst')
+                    : isInterrupted && !isSimpleInteraction
+                      ? t('placeholders.waitInputComplex')
+                      : isInterrupted
+                        ? t('placeholders.waitInputSimple')
+                        : t('placeholders.inputMessage')
             }
           />
         </div>

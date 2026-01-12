@@ -303,10 +303,13 @@
         },
         "tips": {
           "modelNotConfiguredTitle": "Model Not Configured",
-          "modelNotConfiguredDescription": "Please select a model in the \"Orchestration\" panel on the left before starting debug chat."
+          "modelNotConfiguredDescription": "Please select a model in the \"Orchestration\" panel on the left before starting debug chat.",
+          "modelDisabledTitle": "Model Disabled",
+          "modelDisabledDescription": "The current model has been disabled and cannot be used for debugging. Please enable the model in the model management page or select another available model."
         },
         "placeholders": {
           "configModelFirst": "Please configure a model before debugging",
+          "modelDisabled": "Model is disabled and cannot be used for debugging",
           "addWorkflowFirst": "Please add a workflow before debugging",
           "waitInputComplex": "Waiting for input: fill in and submit the form in the card above",
           "waitInputSimple": "Waiting for input: please enter your feedback",

@@ -1,7 +1,7 @@
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { Button, IconButton, Paper, CircularProgress, Divider, Select, MenuItem, SelectChangeEvent } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AgentDetailResponse, AgentService, ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client'
+import { AgentDetailResponse, AgentService, ExecutionService, SaveAgentRequest, useModels } from '@test-agentstudio/api-client'
 import i18n, { useScopedTranslation } from '@/i18n'
 import { ChevronLeft, Save, History, Brain, Settings, Eye, Clock, Tag } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -10,11 +10,13 @@ import MultiWorkflowSelector from '@/components/Agent/MultiWorkflowSelector'
 import AgentDebugChat from '@/components/Agent/AgentDebugChat'
 import AgentPublishDialog from '@/components/Agent/AgentPublishDialog'
 import { useAgentStore } from '@/stores/useAgentStore'
+import { useAuthStore } from '@/stores/useAuthStore'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import SystemPromptTab from '@/components/Agent/SystemPromptTab'
 import { ActionSlotTarget } from '@/components/Common/ActionSlot'
 import AgentVersionListPanel from '@/components/Agent/AgentVersionListPanel'
 import AgentSettingsDialog from '@/components/Agent/AgentSettingsDialog'
+import type { ModelDetail } from '@/types/agentTypes'
 
 const MIN_LEFT = 15
 const MIN_MIDDLE = 20
@@ -43,7 +45,16 @@ const AgentEditorEditPage = () => {
   const { saveAgentRequest, setSaveAgentRequest, updateSaveAgentRequest, saveAgent, isSaving, saveError, setReadonly } = useAgentStore()
   const lastAutoSaveTime = useAgentStore(s => s.lastAutoSaveTime)
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
+  const { user } = useAuthStore()
   const [historyAgentDetailResponse, setHistoryAgentDetailResponse] = useState<AgentDetailResponse | null>(null)
+
+  // 获取模型管理API的完整模型列表（最新数据，包含is_active状态）
+  const { data: modelsData } = useModels({
+    spaceId: user?.spaceId || '0',
+    size: 100,
+    sort_by: 'update_time',
+    sort_order: 'desc',
+  })
 
   // Publish dialog state
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
@@ -461,6 +472,37 @@ const AgentEditorEditPage = () => {
     }
   }, [displayedSaveAgentRequest?.memory?.longterm_memory_config])
 
+  // 将模型管理API的数据转换为ModelDetail格式（获取最新的is_active状态）
+  const modelsList = useMemo<ModelDetail[]>(() => {
+    if (!modelsData?.items) return []
+    return modelsData.items.map(model => ({
+      model_id: parseInt(model.id),
+      model_name: model.name,
+      model_type: model.modelId,
+      model_provider: model.provider,
+      max_tokens: model.maxTokens,
+      temperature: model.temperature,
+      top_p: model.topp,
+      timeout: model.timeout,
+      retry_count: model.retryCount,
+      enable_streaming: model.enableStreaming,
+      enable_function_calling: model.enableFunctionCalling,
+      is_active: model.isActive,
+      api_key: model.apiKey,
+      api_base: model.baseUrl,
+      streaming: model.enableStreaming,
+    }))
+  }, [modelsData])
+
+  // 检查当前选择的模型是否可用
+  const isModelActive = useMemo(() => {
+    const currentModelName = displayedSaveAgentRequest?.model?.model_info?.model_name || ''
+    if (!currentModelName) return false // 如果没有选择模型，认为不可用
+    const matchedModel = modelsList.find(model => model.model_name === currentModelName)
+    // 只有找到模型且is_active为true时才认为可用
+    return matchedModel?.is_active === true
+  }, [modelsList, displayedSaveAgentRequest?.model?.model_info?.model_name])
+
   return (
     <div className="agent-editor-enhanced-page flex flex-col h-full w-full overflow-x-hidden" key={selectedHistoryVersion || 'draft'}>
       {loading ? (
@@ -624,6 +666,7 @@ const AgentEditorEditPage = () => {
                       enableLongTerm={enableLongTerm ?? true}
                       hideMemoryButton={agentMode === 'multi-workflow'}
                       saveAgentRequest={displayedSaveAgentRequest}
+                      isModelActive={isModelActive}
                     />
                   )}
                 </div>
