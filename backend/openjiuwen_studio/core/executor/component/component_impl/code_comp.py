@@ -153,12 +153,12 @@ class CodeComponent(ComponentExecutable, WorkflowComponent):
                 # 任意值都可转成字符串
                 return str(value)
 
-            if expect_type == "bool":
+            if expect_type == "bool" or expect_type == "boolean":
                 if not isinstance(value, bool):
                     raise ValueError(f"expected boolean, but got {type(value).__name__}")
                 return value
 
-            if expect_type == "int":
+            if expect_type == "int" or expect_type == "integer":
                 # int类型：支持int、float、数字字符串转换
                 if isinstance(value, int):
                     return value
@@ -178,7 +178,7 @@ class CodeComponent(ComponentExecutable, WorkflowComponent):
                 else:
                     raise ValueError(f"expected integer, but got {type(value).__name__}")
 
-            if expect_type == "float":
+            if expect_type == "float" or expect_type == "number":
                 # float类型：支持int、float、数字字符串转换
                 if isinstance(value, (int, float)):
                     return float(value)
@@ -190,7 +190,7 @@ class CodeComponent(ComponentExecutable, WorkflowComponent):
                 else:
                     raise ValueError(f"expected float, but got {type(value).__name__}")
 
-            if expect_type == "list":
+            if expect_type == "list" or expect_type == "array":
                 if not isinstance(value, list):
                     raise ValueError(f"expected list, but got {type(value).__name__}")
                 return value

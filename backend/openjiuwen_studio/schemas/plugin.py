@@ -15,11 +15,13 @@ class PluginType(IntEnum):
 class ParamType(IntEnum):
     PARAM_TYPE_STRING = 1,
     PARAM_TYPE_INT = 2,
-    PARAM_TYPE_BOOL = 3,
-    PARAM_TYPE_ARRAY_STRING = 4,
-    PARAM_TYPE_ARRAY_INT = 5,
-    PARAM_TYPE_ARRAY_BOOL = 6,
-    PARAM_TYPE_OBJECT = 7,
+    PARAM_TYPE_FLOAT = 3,
+    PARAM_TYPE_BOOL = 4,
+    PARAM_TYPE_OBJECT = 5,
+    PARAM_TYPE_ARRAY_STRING = 6,
+    PARAM_TYPE_ARRAY_INT = 7,
+    PARAM_TYPE_ARRAY_FLOAT = 8,
+    PARAM_TYPE_ARRAY_BOOL = 9,
 
 
 class ParamSendMethod(IntEnum):

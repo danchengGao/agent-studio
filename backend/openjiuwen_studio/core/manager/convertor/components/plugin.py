@@ -37,11 +37,13 @@ api_method_mapping = {
 param_type_mapping = {
     ParamType.PARAM_TYPE_STRING: "string",
     ParamType.PARAM_TYPE_INT: "integer",
+    ParamType.PARAM_TYPE_FLOAT: "number",
     ParamType.PARAM_TYPE_BOOL: "boolean",
+    ParamType.PARAM_TYPE_OBJECT: "object",
     ParamType.PARAM_TYPE_ARRAY_STRING: "array",
     ParamType.PARAM_TYPE_ARRAY_INT: "array",
+    ParamType.PARAM_TYPE_ARRAY_FLOAT: "array",
     ParamType.PARAM_TYPE_ARRAY_BOOL: "array",
-    ParamType.PARAM_TYPE_OBJECT: "object",
 }
 
 param_send_method_type_mapping = {
