@@ -9,7 +9,7 @@ import { AssignRows, createInferAssignPlugin, type AssignValueType } from '../..
 import { FormHeader, FormContent, FormDisplay, FormItem } from '../../form-components'
 import { defaultFormMeta } from '../default-form-meta'
 import { useIsSidebar } from '../../hooks'
-import { t } from '../../i18n'
+import { t, useTranslation } from '../../i18n'
 
 export const FormRender = (): JSX.Element => {
   const { t } = useTranslation()

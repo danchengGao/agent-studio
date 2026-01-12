@@ -5,6 +5,4 @@
 
 import { commonValidators } from '../../utils/validation'
 
-export const validation = {
-  title: commonValidators.title,
-}
+export const validation = {}

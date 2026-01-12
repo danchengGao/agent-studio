@@ -206,7 +206,6 @@ export const validateBranchConnections = ({ value, context }: any) => {
 }
 
 export const validation = {
-  title: commonValidators.title,
   'branches.*': validateBranch,
   'branches.*.conditions.*': validateCondition,
   branches: validateBranchConnections,

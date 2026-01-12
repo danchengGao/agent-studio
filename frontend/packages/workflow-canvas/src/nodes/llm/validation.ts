@@ -6,7 +6,6 @@
 import { commonValidators } from '../../utils/validation'
 
 export const validation = {
-  title: commonValidators.title,
   'inputs.inputParameters.*': commonValidators.optionalInputParameters,
   'inputs.llmParam.model': commonValidators.model,
 }

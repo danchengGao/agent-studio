@@ -6,8 +6,9 @@
 import React from 'react'
 import dayjs from 'dayjs'
 import { History as HistoryIcon, X, FileText, Tag, Loader2, Trash2 } from 'lucide-react'
+import { Toast } from '@douyinfe/semi-ui'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
-import { WorkflowService } from '@test-agentstudio/api-client'
+import { WorkflowService, getErrorMessage } from '@test-agentstudio/api-client'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { useTranslation } from '../../i18n'
 
@@ -62,6 +63,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       }
     } catch (e) {
       console.error(t('workflowCanvas.historyPanel.createCopyFailed'), e)
+      Toast.error({ content: getErrorMessage(e) || t('workflowCanvas.historyPanel.createCopyFailed'), showClose: false })
     } finally {
       setSwitchingVersion(null)
     }
@@ -82,6 +84,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       onSelectVersion && onSelectVersion('draft')
     } catch (e) {
       console.error(t('workflowCanvas.historyPanel.restoreVersionFailed'), e)
+      Toast.error({ content: getErrorMessage(e) || t('workflowCanvas.historyPanel.restoreVersionFailed'), showClose: false })
     } finally {
       setRestoreConfirmOpen(false)
       setRestoreTargetVersion(null)
@@ -116,6 +119,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       setDeleteTargetVersion(null)
     } catch (e) {
       console.error(t('workflowCanvas.historyPanel.deleteVersionFailed'), e)
+      Toast.error({ content: getErrorMessage(e) || t('workflowCanvas.historyPanel.deleteVersionFailed'), showClose: false })
     } finally {
       setDeletingVersion(null)
     }
