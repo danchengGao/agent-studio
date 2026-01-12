@@ -1579,14 +1579,23 @@ const ModelsPage: React.FC = () => {
                 }}
                 type="password"
                 value={newModel.apiKey}
-                onChange={e => setNewModel({ ...newModel, apiKey: e.target.value })}
+                onChange={e => {
+                  const value = e.target.value
+                  if (value.length <= 500) {
+                    setNewModel({ ...newModel, apiKey: value })
+                  }
+                }}
                 placeholder={editMode ? t('models.messages.apiKeyEmptyHint') : ''}
                 variant="outlined"
-                error={false} // 不显示红色边框，只在下方显示红色提示文本
+                error={(newModel.apiKey || '').length > 500}
                 helperText={
-                  <span style={{ color: '#666' }}>
-                    {editMode ? t('models.messages.apiKeyEditHint') : t('models.modelConfig.parameters.apiKeyHint')}
-                  </span>
+                  (newModel.apiKey || '').length > 500 ? (
+                    <span style={{ color: 'orange' }}>API Key 长度超限，请控制在500字符以内</span>
+                  ) : (
+                    <span style={{ color: '#666' }}>
+                      {editMode ? t('models.messages.apiKeyEditHint') : t('models.modelConfig.parameters.apiKeyHint')}: {newModel.apiKey?.length || 0}/500
+                    </span>
+                  )
                 }
               />
             </Grid>
@@ -1602,21 +1611,26 @@ const ModelsPage: React.FC = () => {
                 }}
                 value={newModel.baseUrl}
                 onChange={e => {
-                  setNewModel({ ...newModel, baseUrl: e.target.value })
-                  validateBaseUrl(e.target.value)
+                  const value = e.target.value
+                  if (value.length <= 100) {
+                    setNewModel({ ...newModel, baseUrl: value })
+                    validateBaseUrl(value)
+                  }
                 }}
                 placeholder=""
                 variant="outlined"
                 disabled={false} // 允许编辑基础URL
-                error={!!baseUrlError} // 只在URL格式错误时显示红色边框
+                error={!!baseUrlError || (newModel.baseUrl || '').length > 100}
                 helperText={
                   baseUrlError ? (
                     <span style={{ color: 'red' }}>{baseUrlError}</span>
+                  ) : (newModel.baseUrl || '').length > 100 ? (
+                    <span style={{ color: 'orange' }}>Base URL 长度超限，请控制在100字符以内</span>
                   ) : (
                     <span style={{ color: '#666' }}>
                       {modelType === 'Embedding'
                         ? t('models.messages.embeddingBaseUrlHint')
-                        : t('models.modelConfig.parameters.baseUrlHint')}
+                        : t('models.modelConfig.parameters.baseUrlHint')}: {newModel.baseUrl?.length || 0}/100
                     </span>
                   )
                 }
