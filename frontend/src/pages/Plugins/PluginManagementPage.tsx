@@ -13,6 +13,7 @@ import IDEPluginFormDialog from '../../components/Plugins/IDEPluginFormDialog'
 import MarketPluginList from '../../components/Plugins/MarketPluginList'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../Common/UnifiedSnackbar'
 import { usePluginMarketConfigs } from '../../hooks/usePluginMarketConfigs'
+import ReactMarkdown from 'react-markdown'
 import {
   Plug,
   Plus,
@@ -124,6 +125,7 @@ const PluginManagementPage: React.FC = () => {
       plugin_version: pluginInfo.plugin_version || '',
       name: pluginInfo.name || pluginInfo.plugin_name || '',
       desc: pluginInfo.desc || pluginInfo.description || pluginInfo.plugin_desc || '',
+      desc_mk: pluginInfo.desc_mk || '',
       plugin_type: pluginInfo.plugin_type || 1,
       published: pluginInfo.published || false,
       url: pluginInfo.url || '',
@@ -255,31 +257,40 @@ const PluginManagementPage: React.FC = () => {
           const response = await deletePluginMutation.mutateAsync(request)
 
           if (response.code === 200) {
-            // Refresh plugin list to get latest data from server
-            await queryClient.invalidateQueries({
+            // Close dialog immediately after successful deletion
+            setDeleteDialog({ isOpen: false, plugin: null })
+            // Refresh plugin list in background
+            queryClient.invalidateQueries({
               queryKey: ['pluginList', currentSpaceId],
               exact: false, // Match all queries starting with ['pluginList', currentSpaceId]
             })
-            // Explicitly refetch to update the UI immediately
-            await refetchPluginList()
+            refetchPluginList()
             showSuccess(t('plugins.messages.pluginDeleted', { name: deleteDialog.plugin.name }))
+            return
           } else {
             showError(t('plugins.errors.deleteFailed') + ': ' + (response.message || t('plugins.errors.unknownError')))
           }
         } else {
           // For non-cloud plugins, refresh the list
-          await queryClient.invalidateQueries({
+          // Close dialog immediately
+          setDeleteDialog({ isOpen: false, plugin: null })
+          // Refresh plugin list in background
+          queryClient.invalidateQueries({
             queryKey: ['pluginList', currentSpaceId],
             exact: false, // Match all queries starting with ['pluginList', currentSpaceId]
           })
-          await refetchPluginList()
+          refetchPluginList()
           showSuccess(t('plugins.messages.pluginDeleted', { name: deleteDialog.plugin.name }))
+          return
         }
       } catch (error) {
         console.error(t('plugins.messages.deleteFailed'), error)
         showError(t('plugins.messages.deleteFailed'))
       } finally {
-        setDeleteDialog({ isOpen: false, plugin: null })
+        // Close dialog in case of error
+        if (deleteDialog.isOpen) {
+          setDeleteDialog({ isOpen: false, plugin: null })
+        }
       }
     }
   }
@@ -343,6 +354,10 @@ const PluginManagementPage: React.FC = () => {
                       desc: param.description || key,
                       type: param.type === 'string' ? 1 : param.type === 'integer' ? 2 : param.type === 'boolean' ? 3 : 1,
                       is_required: param.required || false,
+                      is_runtime: false,
+                      value: '',
+                      method: 0,
+                      priority: 1,
                     }))
                   : []
 
@@ -447,6 +462,7 @@ const PluginManagementPage: React.FC = () => {
         const request = {
           name: cloudPluginForm.name.trim(),
           desc: cloudPluginForm.description.trim(),
+          desc_mk: cloudPluginForm.desc_mk?.trim(),
           space_id: getDefaultSpaceId(),
           plugin_type: 1, // Cloud plugin type
           url: cloudPluginForm.url.trim(), // Add URL field from API configuration
@@ -494,6 +510,7 @@ const PluginManagementPage: React.FC = () => {
         plugin_type: 2, // Code plugin type (IDE plugin)
         name: idePluginForm.name.trim(),
         desc: idePluginForm.description.trim(),
+        desc_mk: idePluginForm.desc_mk?.trim(),
         icon_uri: '💻',
       }
 
@@ -1045,6 +1062,16 @@ const PluginManagementPage: React.FC = () => {
                   </Typography>
                   <Typography variant="body1">{selectedPlugin.desc}</Typography>
                 </div>
+                {selectedPlugin.desc_mk && (
+                  <div>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                      插件详情
+                    </Typography>
+                    <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <ReactMarkdown>{selectedPlugin.desc_mk}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     {t('plugins.url')}
@@ -1199,9 +1226,17 @@ const PluginManagementPage: React.FC = () => {
           <DialogContentText>{t('plugins.dialog.deleteConfirmMessage', { name: deleteDialog.plugin?.name })}</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog({ isOpen: false, plugin: null })}>{t('common.buttons.cancel')}</Button>
-          <Button onClick={handleDeletePlugin} color="error" variant="contained">
-            {t('common.buttons.delete')}
+          <Button onClick={() => setDeleteDialog({ isOpen: false, plugin: null })} disabled={deletePluginMutation.isLoading}>
+            {t('common.buttons.cancel')}
+          </Button>
+          <Button
+            onClick={handleDeletePlugin}
+            color="error"
+            variant="contained"
+            disabled={deletePluginMutation.isLoading}
+            startIcon={deletePluginMutation.isLoading ? <CircularProgress size={16} /> : null}
+          >
+            {deletePluginMutation.isLoading ? t('common.buttons.deleting', '删除中...') : t('common.buttons.delete')}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1662,9 +1662,27 @@ export enum ParamSendMethod {
   BODY = 3,
 }
 
+// 插件参数类型枚举
+export enum ParamType {
+  STRING = 1,
+  INT = 2,
+  BOOL = 3,
+  ARRAY_STRING = 4,
+  ARRAY_INT = 5,
+  ARRAY_BOOL = 6,
+  OBJECT = 7,
+}
+
+// 插件参数优先级枚举
+export enum Priority {
+  TOOL = 0,
+  PLUGIN = 1,
+}
+
 export interface PluginCreateRequest {
   name: string
   desc: string
+  desc_mk?: string
   space_id: string
   plugin_type: PluginType | number
   url?: string
@@ -1691,10 +1709,12 @@ export interface PluginInfo {
   plugin_version?: string
   name: string
   desc: string
+  desc_mk?: string
   plugin_type: number
   published: boolean
   url?: string
   icon_uri?: string
+  request_params?: PluginRequestParam[]
 }
 
 export interface PluginGetResponse {
@@ -1723,10 +1743,12 @@ export interface PluginUpdateRequest {
   plugin_version?: string
   name?: string
   desc?: string
+  desc_mk?: string
   plugin_type?: PluginType | number
   published?: boolean
   url?: string
   icon_uri?: string
+  request_params?: PluginRequestParam[]
 }
 
 export interface PluginUpdateResponse {
@@ -1781,12 +1803,25 @@ export interface PluginListApi extends PluginApiBase {
   size?: number
 }
 
+export interface PluginRequestParam {
+  name: string
+  desc?: string
+  type: ParamType | number
+  is_required: boolean
+  value: string
+  is_runtime: boolean
+  priority: Priority | number
+}
+
 export interface PluginApiParam {
   name: string
   desc?: string
-  type: number
+  type: ParamType | number
   is_required?: boolean
   method?: ParamSendMethod
+  is_runtime?: boolean
+  value?: string
+  priority?: Priority | number
 }
 
 export interface PluginApiHeader {
@@ -1799,6 +1834,7 @@ export interface PluginApiInfo extends PluginApiBase {
   request_params?: PluginApiParam[]
   response_params?: PluginApiParam[]
   headers?: PluginApiHeader[]
+  available?: boolean
 }
 
 export interface PluginApiInfoResponse {
@@ -1822,6 +1858,7 @@ export interface PluginCreateApiRequest {
   request_params?: PluginApiParam[]
   response_params?: PluginApiParam[]
   headers?: PluginApiHeader[]
+  available?: boolean
 }
 
 export interface PluginUpdateApiRequest extends PluginApiInfo {}

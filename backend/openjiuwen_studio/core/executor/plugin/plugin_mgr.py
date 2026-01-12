@@ -15,13 +15,15 @@ from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException
 from openjiuwen_studio.core.common.status_code import StatusCode
 from openjiuwen_studio.core.manager.convertor.components.plugin import plugin_type_mapping
 from openjiuwen_studio.core.manager.convertor.plugin import plugin_tool_convert
+from openjiuwen_studio.core.manager.plugin import plugin_tool_update_available
+
 
 async def _fetch_plugin_dl(
-    tool_id: str,
-    space_id: str,
-    plugin_id: str,
-    version: str,
-    current_user: Optional[Dict[str, Any]]
+        tool_id: str,
+        space_id: str,
+        plugin_id: str,
+        version: str,
+        current_user: Optional[Dict[str, Any]]
 ) -> Any:
     if not current_user:
         import os
@@ -49,14 +51,15 @@ async def _fetch_plugin_dl(
         if plugin_publish_dsl is None:
             raise JiuWenExecuteException(
                 error_code=StatusCode.PLUGIN_DL_FETCH_FAILED.code,
-                message=StatusCode.PLUGIN_DL_FETCH_FAILED.errmsg.format(msg=str(f"fetch plugin failed with version: {version}")),
+                message=StatusCode.PLUGIN_DL_FETCH_FAILED.errmsg.format(
+                    msg=str(f"fetch plugin failed with version: {version}")),
                 node_id=tool_id
             )
         tools = plugin_publish_dsl.plugin_info.tools
         for tool in tools:
             if tool.get("tool_id") == tool_id:
                 convert_tools = plugin_tool_convert(plugin_publish_dsl.plugin_info, tool)
-                plugin_dl= DlPlugin(
+                plugin_dl = DlPlugin(
                     plugin_id=plugin_id,
                     plugin_name=plugin_publish_dsl.plugin_info.name,
                     plugin_description=plugin_publish_dsl.plugin_info.desc,
@@ -79,12 +82,12 @@ class PluginManager:
         pass
 
     async def get_tool(
-        self,
-        tool_id: str,
-        space_id: str,
-        plugin_id: str,
-        version: str,
-        current_user: Optional[Dict[str, Any]]
+            self,
+            tool_id: str,
+            space_id: str,
+            plugin_id: str,
+            version: str,
+            current_user: Optional[Dict[str, Any]]
     ) -> Any:
         logger.warning(f"get_tool: tool_id={tool_id}")
         plugin = await _fetch_plugin_dl(tool_id, space_id, plugin_id, version, current_user)
@@ -100,12 +103,12 @@ class PluginManager:
         return tool
 
     async def get_compiled_tool(
-        self,
-        plugin_id: str,
-        tool_id: str,
-        space_id: str,
-        version: str,
-        current_user: Optional[Dict[str, Any]]
+            self,
+            plugin_id: str,
+            tool_id: str,
+            space_id: str,
+            version: str,
+            current_user: Optional[Dict[str, Any]]
     ) -> Any:
         logger.warning(f"get_compiled_tool: plugin_id={plugin_id} tool_id={tool_id}")
         tool = await self.get_tool(tool_id, space_id, plugin_id, version, current_user)
@@ -120,16 +123,23 @@ class PluginManager:
         return compiled_tool
 
     async def run(
-        self,
-        plugin_id: str,
-        tool_id: str,
-        inputs: Any,
-        space_id: str,
-        version: str,
-        current_user: Optional[Dict[str, Any]]
+            self,
+            plugin_id: str,
+            tool_id: str,
+            inputs: Any,
+            space_id: str,
+            version: str,
+            current_user: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
         tool = await self.get_compiled_tool(plugin_id, tool_id, space_id, version, current_user)
         data = await tool.ainvoke(inputs)
+        available = True
+        if data.get("errCode"):
+            available = False
+        available_res = plugin_tool_update_available(tool_id, space_id, available, version)
+        if available_res.code != status.HTTP_200_OK:
+            data["errCode"] = available_res.code
+            data["errMessage"] = available_res.message
         return PluginManager.result_convert(data)
 
     @staticmethod
