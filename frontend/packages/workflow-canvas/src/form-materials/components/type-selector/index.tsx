@@ -19,6 +19,8 @@ export interface TypeSelectorProps {
    */
   disabled?: boolean
   style?: React.CSSProperties
+  /** Types to exclude from the type selector */
+  excludeTypes?: string[]
 }
 
 const labelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 5 }
@@ -42,7 +44,7 @@ export const parseTypeSelectValue = (value?: string[]): Partial<IJsonSchema> | u
 }
 
 export function TypeSelector(props: TypeSelectorProps) {
-  const { value, onChange, readonly, disabled, style } = props
+  const { value, onChange, readonly, disabled, style, excludeTypes } = props
 
   const selectValue = useMemo(() => getTypeSelectValue(value), [value])
 
@@ -52,37 +54,43 @@ export function TypeSelector(props: TypeSelectorProps) {
 
   const options = useMemo(
     () =>
-      typeManager.getTypeRegistriesWithParentType().map(_type => {
-        const isArray = _type.type === 'array'
+      typeManager
+        .getTypeRegistriesWithParentType()
+        .filter(_type => !excludeTypes?.includes(_type.type))
+        .map(_type => {
+          const isArray = _type.type === 'array'
 
-        return {
-          label: (
-            <div style={labelStyle}>
-              <Icon size="small" svg={_type.icon} />
-              {typeManager.getTypeBySchema(_type)?.label || _type.type}
-            </div>
-          ),
-          value: _type.type,
-          children: isArray
-            ? typeManager.getTypeRegistriesWithParentType('array').map(_type => ({
-                label: (
-                  <div style={labelStyle}>
-                    <Icon
-                      size="small"
-                      svg={typeManager.getDisplayIcon({
-                        type: 'array',
-                        items: { type: _type.type },
-                      })}
-                    />
-                    {typeManager.getTypeBySchema(_type)?.label || _type.type}
-                  </div>
-                ),
-                value: _type.type,
-              }))
-            : [],
-        }
-      }),
-    [],
+          return {
+            label: (
+              <div style={labelStyle}>
+                <Icon size="small" svg={_type.icon} />
+                {typeManager.getTypeBySchema(_type)?.label || _type.type}
+              </div>
+            ),
+            value: _type.type,
+            children: isArray
+              ? typeManager
+                  .getTypeRegistriesWithParentType('array')
+                  .filter(_type => !excludeTypes?.includes(_type.type))
+                  .map(_type => ({
+                    label: (
+                      <div style={labelStyle}>
+                        <Icon
+                          size="small"
+                          svg={typeManager.getDisplayIcon({
+                            type: 'array',
+                            items: { type: _type.type },
+                          })}
+                        />
+                        {typeManager.getTypeBySchema(_type)?.label || _type.type}
+                      </div>
+                    ),
+                    value: _type.type,
+                  }))
+              : [],
+          }
+        }),
+    [excludeTypes],
   )
 
   const isDisabled = readonly || disabled

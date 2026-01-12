@@ -6,6 +6,12 @@ export enum ValueExpressionType {
   OBJECT_REF = 'object_ref',
 }
 
+export enum OutputFormat {
+  TEXT = 'text',
+  MARKDOWN = 'markdown',
+  JSON = 'json',
+}
+
 export type FormData = {
   title: string
   inputs: {
@@ -14,6 +20,7 @@ export type FormData = {
     fcParamVar: JsonSchema
   }
   outputs: JsonSchema
+  output_format?: OutputFormat
   [key: string]: any
 }
 

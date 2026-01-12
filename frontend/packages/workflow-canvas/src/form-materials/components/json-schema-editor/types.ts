@@ -22,4 +22,6 @@ export interface ConfigType {
   defaultValueTitle?: string
   defaultValuePlaceholder?: string
   addButtonText?: string
+  /** Types to exclude from the type selector */
+  excludeTypes?: string[]
 }

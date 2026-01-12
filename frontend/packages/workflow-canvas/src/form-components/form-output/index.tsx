@@ -18,6 +18,9 @@ export interface FormOutputProps {
   minProperties?: number
   expandable?: boolean
   readonly?: boolean
+  labelExtra?: React.ReactNode
+  /** Types to exclude from the type selector */
+  excludeTypes?: string[]
 }
 
 export function FormOutput({
@@ -28,18 +31,20 @@ export function FormOutput({
   minProperties,
   expandable = false,
   readonly = false,
+  labelExtra,
+  excludeTypes,
 }: FormOutputProps) {
   const { t } = useTranslation()
   const displayName = name || t('workflowCanvas.formOutput.output')
   const isSidebar = useIsSidebar()
 
   if (!isSidebar) {
-    return <Field<IJsonSchema> name={outputName}>{({ field }) => <FormDisplay label={displayName} content={<DisplayOutputs value={field.value} />} />}</Field>
+    return <Field<IJsonSchema> name={outputName}>{({ field }) => <FormDisplay label={displayName} labelExtra={labelExtra} content={<DisplayOutputs value={field.value} />} />}</Field>
   }
 
   return (
     <>
-      <FormItem name={displayName} vertical>
+      <FormItem name={displayName} vertical customComponent={labelExtra}>
         <Field<IJsonSchema> name={outputName}>
           {({ field }) => (
             <JsonSchemaEditor
@@ -48,7 +53,7 @@ export function FormOutput({
               showAddButton={showAddButton}
               defaultFields={defaultFields}
               minProperties={minProperties}
-              config={{ addButtonText: '' }}
+              config={{ addButtonText: '', excludeTypes }}
               expandable={expandable}
               readonly={readonly}
             />

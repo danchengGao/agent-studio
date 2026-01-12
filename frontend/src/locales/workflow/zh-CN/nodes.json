@@ -2,7 +2,14 @@
   "nodes": {
     "llm": {
       "titlePrefix": "大模型",
-      "description": "调用，使用变量和提示词生成响应。"
+      "description": "调用，使用变量和提示词生成响应。",
+      "outputFormat": {
+        "label": "输出格式",
+        "placeholder": "请选择输出格式",
+        "text": "文本",
+        "markdown": "Markdown",
+        "json": "JSON"
+      }
     },
     "code": {
       "title": "代码",

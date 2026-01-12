@@ -78,7 +78,7 @@ def llm_convert(node: Node, space_id: str) -> dsl.Component:
 
         llm_configs = dsl.LLMConfig(
             model=model,
-            response_format_type=dsl.LLMResponseFormatType.Text,
+            response_format_type=data.output_format,
             output_config=_llm_output_config_convert(data_outputs),
             template_content=[
                 {"role": "system", "content": llm_params.system_prompt.content},

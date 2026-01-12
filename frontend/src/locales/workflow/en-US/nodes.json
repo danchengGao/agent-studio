@@ -2,7 +2,14 @@
   "nodes": {
     "llm": {
       "titlePrefix": "LLM",
-      "description": "Call and use variables and prompts to generate responses."
+      "description": "Call and use variables and prompts to generate responses.",
+      "outputFormat": {
+        "label": "Output Format",
+        "placeholder": "Please select output format",
+        "text": "Text",
+        "markdown": "Markdown",
+        "json": "JSON"
+      }
     },
     "code": {
       "title": "Code",

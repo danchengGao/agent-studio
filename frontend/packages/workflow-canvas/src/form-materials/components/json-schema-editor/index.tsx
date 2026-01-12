@@ -218,6 +218,7 @@ function PropertyEdit(props: {
               <InjectTypeSelector
                 value={typeSelectorValue}
                 readonly={isFieldLocked}
+                excludeTypes={config?.excludeTypes}
                 onChange={_value => {
                   // Check if type has changed, if so reset default value
                   const hasTypeChanged = _value.type !== type || JSON.stringify(_value.items) !== JSON.stringify(items)
