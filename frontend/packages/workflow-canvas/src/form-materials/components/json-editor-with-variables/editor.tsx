@@ -5,7 +5,7 @@
 
 import React from 'react'
 
-import { useTranslation } from '../../../../i18n'
+import { useTranslation } from '../../../i18n'
 
 // Simple Text interface for our implementation
 interface Text {
