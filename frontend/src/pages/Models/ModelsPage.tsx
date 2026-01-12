@@ -784,8 +784,8 @@ const ModelsPage: React.FC = () => {
 
   const handleTestModel = async () => {
     if (!testPrompt.trim() || !selectedModel) return
-    if (testPrompt.length > 1000) { 
-      return 
+    if (testPrompt.length > 1000) {
+      return
     }
 
     setIsTesting(true)
@@ -795,9 +795,6 @@ const ModelsPage: React.FC = () => {
       setTestResult(
         `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
       )
-
-      // 测试成功后刷新模型列表以更新统计信息
-      refetch()
     } catch (error: any) {
       let errorMessage = t('models.testFailed')
 
@@ -839,6 +836,8 @@ const ModelsPage: React.FC = () => {
       )
     } finally {
       setIsTesting(false)
+      // 无论测试成功还是失败，都刷新模型列表以更新统计信息
+      await Promise.all([refetchLLM(), refetchEmbedding()])
     }
   }
 
@@ -1707,7 +1706,7 @@ const ModelsPage: React.FC = () => {
                   variant="outlined"
                   error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
                   helperText={
-                    (newModel.description || '').length > 450 ? (
+                    (newModel.description || '').length > 500 ? (
                       <span style={{ color: 'orange' }}>描述过长，请控制在500字符以内</span>
                     ) : (
                       <span style={{ color: '#666' }}>
