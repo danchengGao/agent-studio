@@ -793,7 +793,7 @@ const ModelsPage: React.FC = () => {
     try {
       const result = await testModelMutation.mutateAsync({ id: selectedModel.id, prompt: testPrompt, spaceId: user?.spaceId || '' })
       setTestResult(
-        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
+        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
       )
 
       // 测试成功后刷新模型列表以更新统计信息
@@ -1253,7 +1253,7 @@ const ModelsPage: React.FC = () => {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-gray-600">{t('models.modelList.avgResponse')}:</span>
-                            <span className="font-semibold text-orange-700">{model.usage?.averageResponseTime || 0}s</span>
+                            <span className="font-semibold text-orange-700">{(model.usage?.averageResponseTime || 0).toFixed(3)}s</span>
                           </div>
                         </div>
                       </TableCell>
