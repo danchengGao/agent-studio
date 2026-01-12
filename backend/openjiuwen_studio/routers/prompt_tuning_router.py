@@ -129,6 +129,8 @@ class ModelConfigConverter:
             "temperature", None) is not None else model_config_info["params"]["temperature"]
         result["params"]["top_p"] = headers.get("top_p") if headers.get(
             "top_p", None) is not None else model_config_info["params"]["top_p"]
+        result["params"]["timeout"] = headers.get("timeout") if headers.get(
+            "timeout", None) is not None else model_config_info["params"]["timeout"]
 
         logger.info(f"convert_to_sdk_format model config : {result}")
         return result
@@ -454,6 +456,7 @@ class OptimizationTaskExecutor:
                 model=llm_config.get("model_name"),
                 top_p=llm_config.get("params").get("top_p"),
                 temperature=llm_config.get("params").get("temperature"),
+                timeout=llm_config.get("params").get("timeout"),
             )
         )
 
@@ -488,6 +491,7 @@ class OptimizationTaskExecutor:
                 model=llm_config.get("model_name"),
                 top_p=llm_config.get("params").get("top_p"),
                 temperature=llm_config.get("params").get("temperature"),
+                timeout=llm_config.get("params").get("timeout"),
             )
         )
 
@@ -975,6 +979,7 @@ async def prompt_generate(
                     model=llm_config.get("model_name"),
                     top_p=llm_config.get("params").get("top_p"),
                     temperature=llm_config.get("params").get("temperature"),
+                    timeout=llm_config.get("params").get("timeout"),
                 )
             )
 
@@ -1109,6 +1114,7 @@ async def optimize_feedback(
                     model=llm_config.get("model_name"),
                     top_p=llm_config.get("params").get("top_p"),
                     temperature=llm_config.get("params").get("temperature"),
+                    timeout=llm_config.get("params").get("timeout"),
                 )
             )
         logger.info(f"optimize_feedback model_config： {model_config}")
@@ -1213,6 +1219,7 @@ async def prompt_bad_cases(
                 model=llm_config.get("model_name"),
                 top_p=llm_config.get("params").get("top_p"),
                 temperature=llm_config.get("params").get("temperature"),
+                timeout=llm_config.get("params").get("timeout"),
             )
         )
         logger.info(f"prompt_bad_cases model_config : {model_config}")
