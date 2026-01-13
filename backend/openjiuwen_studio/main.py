@@ -27,7 +27,7 @@ from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelC
     PromptRelationDB, TagDB, UserDB, SpaceDB, SpaceUserDB, WorkflowBaseDB, WorkflowPublishDB, PluginBaseDB, \
     PluginPublishDB, ToolBaseDB, \
     WorkflowExecutionDB, WorkflowExecutionDetailsDB, AgentExecutionDB, AgentExecutionDetailsDB, \
-    AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB
+    AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB, ReferenceDB
 # Import database sync tool
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.db_sync import run_database_sync
@@ -66,6 +66,7 @@ async def lifespan_func(app: FastAPI):
         AgentExecutionDB.__table__,
         AgentExecutionDetailsDB.__table__,
         AgentWorkflowRelationDB.__table__,
+        ReferenceDB.__table__,
         # Trace tables
         TraceDetailDB.__table__,
         TraceSummaryDB.__table__,

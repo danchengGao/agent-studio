@@ -242,7 +242,7 @@ class PregelGraphAdapter():
     def _validate_graph(self) -> None:
         # 先校验孤立起始节点
         self._validate_isolated_source_nodes()
-
+        self._validate_connectivity()  # 检查连通性
         # 再校验是否存在环
         cycles: List[List[str]] = list(nx.simple_cycles(self._graph))
         if cycles:
@@ -350,11 +350,12 @@ class PregelGraphAdapter():
         Raises:
             JiuWenGraphCircleError: 如果图中存在环
             JiuWenGraphBranchReduceError: 如果拥有不同祖先的分支在同一节点汇合时，消减后有多于1个祖先
+            JiuWenGraphException: 如果从开始节点无法到达结束节点
 
         """
         self._workflow.connections = []
         self._pre_process_graph()
-        self._validate_graph()  # 先检查环
+        self._validate_graph()  # 再检查环
         self._travel_all_nodes()
         self._dfx()
         return self._workflow
