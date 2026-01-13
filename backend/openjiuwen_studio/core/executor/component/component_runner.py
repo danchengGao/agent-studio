@@ -54,8 +54,11 @@ class ComponentExecutor(WorkflowRunner):
     ) -> Dict[str, Any]:
         # 生成 execution_id
         execution_id = f"{workflow_id}:{component_id}:{conversation_id}"
-        workflow = Workflow(await _fetch_workflow_dl(workflow_id, workflow_version, space_id, current_user), space_id,
-                            current_user)
+        # 单组件调试时跳过工作流全局校验，只关注被调试组件
+        workflow = Workflow(
+            await _fetch_workflow_dl(workflow_id, workflow_version, space_id, current_user, skip_validation=True),
+            space_id,
+            current_user)
         workflow_context = WorkflowRuntime(workflow_id=workflow_id, session_id=execution_id)
         workflow_context.config().add_workflow_config(workflow_id, WorkflowConfig())
 

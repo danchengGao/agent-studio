@@ -129,7 +129,7 @@ def _friendly_validation_message(err: dict, schema: dict) -> tuple[str, str, int
     return hint, field_path, component_type, component_id
 
 
-def workflow_convert(workflow_info: WorkflowBase) -> dsl.Workflow:
+def workflow_convert(workflow_info: WorkflowBase, skip_validation: bool = False) -> dsl.Workflow:
     try:
         workflow_schema = json.loads(getattr(workflow_info, "workflow_schema", "{}") or "{}")
         try:
@@ -151,7 +151,9 @@ def workflow_convert(workflow_info: WorkflowBase) -> dsl.Workflow:
                 error_stage="validate"
             ) from e
         # 2. 业务逻辑校验（在 Pydantic 验证后、DSL 转换前）
-        validate_canvas_nodes(canvas)
+        # 单组件调试时跳过全局校验，只验证被调试组件即可
+        if not skip_validation:
+            validate_canvas_nodes(canvas)
 
         # 3. DSL 转换
         nodes = canvas.nodes

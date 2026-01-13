@@ -337,7 +337,8 @@ def workflow_canvas(
 @with_exception_handling
 def workflow_convert(
         req: WorkflowId,
-        current_user: dict
+        current_user: dict,
+        skip_validation: bool = False
 ) -> ResponseModel:
     """转换工作流数据格式"""
     _ = check_user_space(req.space_id, current_user)
@@ -351,7 +352,7 @@ def workflow_convert(
             message=canvas_result.message,
         )
 
-    workflow = convert.workflow_convert(WorkflowBase(**canvas_result.data))
+    workflow = convert.workflow_convert(WorkflowBase(**canvas_result.data), skip_validation=skip_validation)
     logger.debug(f"workflow info convert dl: {workflow}")
     logger.info(f"Converted workflow to data list format: {req.workflow_id}")
     return ResponseModel(
@@ -816,7 +817,7 @@ def deal_db_error(result: ResponseModel) -> ResponseModel:
     if result is None:
         return ResponseModel(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message=f"publish workflow failed, error: result can not be None",
+            message="publish workflow failed, error: result can not be None",
             data=None
         )
 
