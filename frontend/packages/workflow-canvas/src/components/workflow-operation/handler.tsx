@@ -139,7 +139,9 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
       const dataBlob = new Blob([dataStr], { type: 'application/json' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(dataBlob)
-      link.download = `workflow-export-${new Date().toISOString().split('T')[0]}.json`
+      // 使用工作流名称和时间戳生成文件名
+      const workflowName = canvasData?.name || 'workflow'
+      link.download = `${workflowName}_${new Date().toISOString().split('T')[0]}.json`
       link.click()
       URL.revokeObjectURL(link.href)
 
