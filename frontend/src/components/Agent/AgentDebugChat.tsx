@@ -766,6 +766,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
               onSubmitInteraction={handleInlineInteractionSubmit}
               interactionNodeIds={activeInteractionNodeIds}
               inputFocused={inputFocused}
+              agentName={agentName}
             />
           </div>
 
@@ -842,11 +843,13 @@ const ChatMessageList = ({
   onSubmitInteraction,
   interactionNodeIds,
   inputFocused,
+  agentName,
 }: {
   messages: ChatMessage[]
   onSubmitInteraction?: (value: string, ts: number) => void
   interactionNodeIds?: string[]
   inputFocused?: boolean
+  agentName?: string
 }) => {
   const activeNodeIds = interactionNodeIds || []
 
@@ -859,6 +862,7 @@ const ChatMessageList = ({
           onSubmitInteraction={onSubmitInteraction}
           isActiveInteraction={message.kind === 'interaction' && !message.detailInfo?.submittedValue && !(message.detailInfo as any)?.isHistorical}
           inputFocused={inputFocused}
+          agentName={agentName}
         />
       ))}
     </div>
@@ -874,11 +878,13 @@ const ChatMessageItem = memo(
     onSubmitInteraction,
     isActiveInteraction,
     inputFocused,
+    agentName,
   }: {
     message: ChatMessage
     onSubmitInteraction?: (value: string, ts: number) => void
     isActiveInteraction?: boolean
     inputFocused?: boolean
+    agentName?: string
   }) => {
     const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
     return (
@@ -889,7 +895,7 @@ const ChatMessageItem = memo(
               <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">AI</span>
               </div>
-              <span className="text-sm text-gray-600 font-medium">{t('messages.assistantLabel')}</span>
+              <span className="text-sm text-gray-600 font-medium">{agentName || t('messages.assistantLabel')}</span>
             </div>
           )}
 
