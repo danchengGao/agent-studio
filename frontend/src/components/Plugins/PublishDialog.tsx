@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, Typography, Box, CircularProgress } from '@mui/material'
 import { Rocket, Upload } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -10,12 +10,22 @@ interface PublishDialogProps {
   onClose: () => void
   onPublish: (version: string, versionDesc: string) => void
   loading?: boolean
+  latestVersion?: string
 }
 
-const PublishDialog: React.FC<PublishDialogProps> = ({ open, pluginName, pluginId, onClose, onPublish, loading = false }) => {
+const PublishDialog: React.FC<PublishDialogProps> = ({ open, pluginName, pluginId, onClose, onPublish, loading = false, latestVersion }) => {
   const { t } = useTranslation()
-  const [version, setVersion] = useState('v0.0.1')
+  const [version, setVersion] = useState(latestVersion || 'v0.0.1')
   const [versionDesc, setVersionDesc] = useState('')
+
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (open) {
+      // Dialog opened - initialize with latest version
+      setVersion(latestVersion || 'v0.0.1')
+      setVersionDesc('')
+    }
+  }, [open, latestVersion])
 
   const handleSubmit = () => {
     if (!version.trim()) {

@@ -1076,18 +1076,7 @@ const PluginManagementPage: React.FC = () => {
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     {t('plugins.url')}
                   </Typography>
-                  <Typography
-                    variant="body1"
-                    component="a"
-                    href={selectedPlugin.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    sx={{
-                      color: 'primary.main',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                    }}
-                  >
+                  <Typography variant="body1" color="text.primary">
                     {selectedPlugin.url}
                   </Typography>
                 </div>

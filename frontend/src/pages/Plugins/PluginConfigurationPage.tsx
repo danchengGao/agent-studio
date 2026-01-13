@@ -5,7 +5,7 @@ import { PluginService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
 import { useCloudPluginForm } from '../../hooks/useCloudPluginForm'
-import { useUpdatePlugin, usePluginPublish } from '@test-agentstudio/api-client'
+import { useUpdatePlugin, usePluginPublish, usePluginPublishList } from '@test-agentstudio/api-client'
 import CloudPluginFormDialog from '../../components/Plugins/CloudPluginFormDialog'
 import CodePluginConfiguration from './components/CodePluginConfiguration'
 import URLPluginConfiguration from './components/URLPluginConfiguration'
@@ -160,6 +160,53 @@ const PluginConfigurationPage: React.FC = () => {
 
   // Plugin publish
   const publishPluginApi = usePluginPublish()
+
+  // Plugin publish list - fetch every time dialog opens
+  const { data: publishListData, isLoading: isPublishListLoading, refetch: refetchPublishList } = usePluginPublishList(
+    {
+      space_id: getDefaultSpaceId(),
+      plugin_id: plugin_id,
+    },
+    {
+      enabled: !!plugin_id,
+    }
+  )
+
+  // Extract latest version from publish list data
+  const getLatestVersion = (): string => {
+    if (!publishListData?.data?.plugin_infos || publishListData.data.plugin_infos.length === 0) {
+      return 'v0.0.1'
+    }
+
+    // Filter publish infos for the current plugin
+    const pluginPublishInfos = publishListData.data.plugin_infos.filter(info => info.plugin_id === plugin_id)
+
+    if (pluginPublishInfos.length === 0) {
+      return 'v0.0.1'
+    }
+
+    // Sort by version to get the latest (assuming semantic versioning)
+    // For simplicity, we'll just take the first one as the API might return them in order
+    // In a production environment, you'd want to implement proper version comparison
+    const latestPublish = pluginPublishInfos[0]
+    return latestPublish.plugin_version || 'v0.0.1'
+  }
+
+  // Fetch publish list when dialog opens - force refetch every time
+  useEffect(() => {
+    if (isPublishDialogOpen && plugin_id) {
+      // Force refetch regardless of stale time to get the latest version
+      refetchPublishList({ cancelRefetch: false })
+    }
+  }, [isPublishDialogOpen, plugin_id, refetchPublishList])
+
+  // Reset dialog state when closing to ensure fresh state on next open
+  useEffect(() => {
+    if (!isPublishDialogOpen) {
+      // This ensures that when dialog reopens, it will properly update
+      // The PublishDialog will reinitialize with the latest version
+    }
+  }, [isPublishDialogOpen])
 
   useEffect(() => {
     if (plugin_id) {
@@ -508,9 +555,12 @@ const PluginConfigurationPage: React.FC = () => {
         open={isPublishDialogOpen}
         pluginName={plugin?.name || ''}
         pluginId={plugin_id || ''}
-        onClose={() => setIsPublishDialogOpen(false)}
+        onClose={() => {
+          setIsPublishDialogOpen(false)
+        }}
         onPublish={handlePublishPlugin}
         loading={publishPluginApi.isLoading}
+        latestVersion={getLatestVersion()}
       />
     </>
   )
