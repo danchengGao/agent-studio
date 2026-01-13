@@ -10,10 +10,6 @@ import {
   Card,
   Typography,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Button,
   IconButton,
   Dialog,
@@ -28,7 +24,12 @@ import {
   CircularProgress,
   Switch,
   FormControlLabel,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel,
 } from '@mui/material'
+import { ParameterTypeSelector } from './components/ParameterTypeSelector'
 import { PythonCodeEditor, TypeScriptCodeEditor } from '../../../packages/workflow-canvas/src/form-materials/components/code-editor'
 // Import the base-editor styles for the code editors to work properly
 import '../../../packages/workflow-canvas/src/form-materials/components/base-editor/styles.css'
@@ -186,7 +187,6 @@ const ToolConfigurationPage: React.FC = () => {
     value: '',
     priority: Priority.TOOL,
   })
-
   const { user } = useAuthStore()
 
   // Space ID calculation
@@ -334,10 +334,17 @@ const ToolConfigurationPage: React.FC = () => {
   const mapTypeToNumber = (type: string): number => {
     const typeMap: Record<string, number> = {
       string: 1,
-      number: 2,
-      boolean: 3,
-      array: 4,
+      int: 2,
+      float: 3,
+      boolean: 4,
       object: 5,
+      array_string: 6,
+      array_int: 7,
+      array_float: 8,
+      array_boolean: 9,
+      // Legacy support for old generic types
+      number: 2, // Default to int for backward compatibility
+      array: 6, // Default to string array for backward compatibility
     }
     return typeMap[type] || 1
   }
@@ -345,10 +352,14 @@ const ToolConfigurationPage: React.FC = () => {
   const mapNumberToString = (typeNumber: number): string => {
     const typeMap: Record<number, string> = {
       1: 'string',
-      2: 'number',
-      3: 'boolean',
-      4: 'array',
+      2: 'int',
+      3: 'float',
+      4: 'boolean',
       5: 'object',
+      6: 'array_string',
+      7: 'array_int',
+      8: 'array_float',
+      9: 'array_boolean',
     }
     return typeMap[typeNumber] || 'string'
   }
@@ -359,13 +370,27 @@ const ToolConfigurationPage: React.FC = () => {
     }
 
     switch (type) {
+      case 'int': {
+        const intValue = parseInt(value, 10)
+        return isNaN(intValue) ? 0 : intValue
+      }
+      case 'float': {
+        const floatValue = parseFloat(value)
+        return isNaN(floatValue) ? 0.0 : floatValue
+      }
       case 'number': {
+        // Legacy support - treat as float
         const numValue = parseFloat(value)
         return isNaN(numValue) ? 0 : numValue
       }
       case 'boolean':
         return value.toLowerCase() === 'true' || value === '1'
-      case 'array':
+      case 'array_string':
+      case 'array_int':
+      case 'array_float':
+      case 'array_boolean':
+      case 'array': {
+        // Legacy 'array' support - treat as string array
         try {
           return JSON.parse(value)
         } catch {
@@ -374,6 +399,7 @@ const ToolConfigurationPage: React.FC = () => {
             .map(item => item.trim())
             .filter(item => item.length > 0)
         }
+      }
       case 'object':
         try {
           return JSON.parse(value)
@@ -1816,25 +1842,20 @@ const ToolConfigurationPage: React.FC = () => {
               />
             </div>
             {isInputDialogOpen ? (
-              pluginType === 'api' ? (
-                <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Typography variant="subtitle2" className="mb-2">
+                    {t('plugins.toolConfig.parameterType', '参数类型')}
+                  </Typography>
+                  <ParameterTypeSelector
+                    value={parameterForm.type}
+                    onChange={(value) => handleParameterFormChange('type', value)}
+                  />
+                </div>
+                {pluginType === 'api' && (
                   <div>
                     <Typography variant="subtitle2" className="mb-2">
-                      参数类型
-                    </Typography>
-                    <FormControl fullWidth>
-                      <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                        <MenuItem value="string">字符串</MenuItem>
-                        <MenuItem value="number">数字</MenuItem>
-                        <MenuItem value="boolean">布尔值</MenuItem>
-                        <MenuItem value="array">数组</MenuItem>
-                        <MenuItem value="object">对象</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </div>
-                  <div>
-                    <Typography variant="subtitle2" className="mb-2">
-                      传入方法
+                      {t('plugins.toolConfig.transferMethod', '传入方法')}
                     </Typography>
                     <FormControl fullWidth>
                       <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
@@ -1845,23 +1866,8 @@ const ToolConfigurationPage: React.FC = () => {
                       </Select>
                     </FormControl>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <Typography variant="subtitle2" className="mb-2">
-                    参数类型
-                  </Typography>
-                  <FormControl fullWidth>
-                    <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                      <MenuItem value="string">字符串</MenuItem>
-                      <MenuItem value="number">数字</MenuItem>
-                      <MenuItem value="boolean">布尔值</MenuItem>
-                      <MenuItem value="array">数组</MenuItem>
-                      <MenuItem value="object">对象</MenuItem>
-                    </Select>
-                  </FormControl>
-                </div>
-              )
+                )}
+              </div>
             ) : (
               <div>
                 <Typography variant="subtitle2" className="mb-2">
@@ -1870,10 +1876,14 @@ const ToolConfigurationPage: React.FC = () => {
                 <FormControl fullWidth>
                   <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
                     <MenuItem value="string">{t('plugins.toolConfig.parameterTypeOptions.string', '字符串')}</MenuItem>
-                    <MenuItem value="number">{t('plugins.toolConfig.parameterTypeOptions.number', '数字')}</MenuItem>
+                    <MenuItem value="int">{t('plugins.toolConfig.parameterTypeOptions.int', '整数')}</MenuItem>
+                    <MenuItem value="float">{t('plugins.toolConfig.parameterTypeOptions.float', '浮点数')}</MenuItem>
                     <MenuItem value="boolean">{t('plugins.toolConfig.parameterTypeOptions.boolean', '布尔值')}</MenuItem>
-                    <MenuItem value="array">{t('plugins.toolConfig.parameterTypeOptions.array', '数组')}</MenuItem>
                     <MenuItem value="object">{t('plugins.toolConfig.parameterTypeOptions.object', '对象')}</MenuItem>
+                    <MenuItem value="array_string">{t('plugins.toolConfig.parameterTypeOptions.arrayString', '字符串数组')}</MenuItem>
+                    <MenuItem value="array_int">{t('plugins.toolConfig.parameterTypeOptions.arrayInt', '整数数组')}</MenuItem>
+                    <MenuItem value="array_float">{t('plugins.toolConfig.parameterTypeOptions.arrayFloat', '浮点数数组')}</MenuItem>
+                    <MenuItem value="array_boolean">{t('plugins.toolConfig.parameterTypeOptions.arrayBoolean', '布尔数组')}</MenuItem>
                   </Select>
                 </FormControl>
               </div>

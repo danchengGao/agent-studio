@@ -26,15 +26,12 @@ import {
   Tabs,
   Tab,
   CircularProgress,
-  Box,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControl,
-  Select,
-  MenuItem,
 } from '@mui/material'
+import { ParameterTypeSelector } from './ParameterTypeSelector'
 import ReactMarkdown from 'react-markdown'
 
 interface Plugin {
@@ -142,7 +139,6 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
     method: ParamSendMethod.NONE,
     priority: Priority.PLUGIN,
   })
-
   // API工具列表查询 - only for code plugins, enabled when advanced tab is active and not in read-only mode
   const codeToolsQuery = usePluginListCode(
     {
@@ -336,12 +332,14 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
   const getParamTypeName = (type: number): string => {
     const typeMap: Record<number, string> = {
       1: '字符串',
-      2: '数字',
-      3: '布尔值',
-      4: '字符串数组',
-      5: '数字数组',
-      6: '布尔数组',
-      7: '对象',
+      2: '整数',
+      3: '浮点数',
+      4: '布尔值',
+      5: '对象',
+      6: '字符串数组',
+      7: '整数数组',
+      8: '浮点数数组',
+      9: '布尔数组',
     }
     return typeMap[type] || '未知'
   }
@@ -998,17 +996,11 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               <Typography variant="subtitle2" className="mb-2">
                 参数类型
               </Typography>
-              <FormControl fullWidth>
-                <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                  <MenuItem value={1}>字符串</MenuItem>
-                  <MenuItem value={2}>数字</MenuItem>
-                  <MenuItem value={3}>布尔值</MenuItem>
-                  <MenuItem value={4}>字符串数组</MenuItem>
-                  <MenuItem value={5}>数字数组</MenuItem>
-                  <MenuItem value={6}>布尔数组</MenuItem>
-                  <MenuItem value={7}>对象</MenuItem>
-                </Select>
-              </FormControl>
+              <ParameterTypeSelector
+                value={parameterForm.type}
+                onChange={(value) => handleParameterFormChange('type', value)}
+                useNumericValues={true}
+              />
             </div>
             <div>
               <div className="flex items-center space-x-2">

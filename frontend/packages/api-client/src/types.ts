@@ -1666,11 +1666,13 @@ export enum ParamSendMethod {
 export enum ParamType {
   STRING = 1,
   INT = 2,
-  BOOL = 3,
-  ARRAY_STRING = 4,
-  ARRAY_INT = 5,
-  ARRAY_BOOL = 6,
-  OBJECT = 7,
+  FLOAT = 3,
+  BOOL = 4,
+  OBJECT = 5,
+  ARRAY_STRING = 6,
+  ARRAY_INT = 7,
+  ARRAY_FLOAT = 8,
+  ARRAY_BOOL = 9,
 }
 
 // 插件参数优先级枚举
