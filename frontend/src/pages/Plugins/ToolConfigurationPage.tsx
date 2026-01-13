@@ -1873,19 +1873,10 @@ const ToolConfigurationPage: React.FC = () => {
                 <Typography variant="subtitle2" className="mb-2">
                   {t('plugins.toolConfig.parameterType', '参数类型')}
                 </Typography>
-                <FormControl fullWidth>
-                  <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                    <MenuItem value="string">{t('plugins.toolConfig.parameterTypeOptions.string', '字符串')}</MenuItem>
-                    <MenuItem value="int">{t('plugins.toolConfig.parameterTypeOptions.int', '整数')}</MenuItem>
-                    <MenuItem value="float">{t('plugins.toolConfig.parameterTypeOptions.float', '浮点数')}</MenuItem>
-                    <MenuItem value="boolean">{t('plugins.toolConfig.parameterTypeOptions.boolean', '布尔值')}</MenuItem>
-                    <MenuItem value="object">{t('plugins.toolConfig.parameterTypeOptions.object', '对象')}</MenuItem>
-                    <MenuItem value="array_string">{t('plugins.toolConfig.parameterTypeOptions.arrayString', '字符串数组')}</MenuItem>
-                    <MenuItem value="array_int">{t('plugins.toolConfig.parameterTypeOptions.arrayInt', '整数数组')}</MenuItem>
-                    <MenuItem value="array_float">{t('plugins.toolConfig.parameterTypeOptions.arrayFloat', '浮点数数组')}</MenuItem>
-                    <MenuItem value="array_boolean">{t('plugins.toolConfig.parameterTypeOptions.arrayBoolean', '布尔数组')}</MenuItem>
-                  </Select>
-                </FormControl>
+                <ParameterTypeSelector
+                  value={parameterForm.type}
+                  onChange={(value) => handleParameterFormChange('type', value)}
+                />
               </div>
             )}
             {isInputDialogOpen && (
