@@ -644,13 +644,21 @@ def agent_save(
 
     # 5. 管理引用关系
     try:
-        # 5.1 删除旧的草稿引用关系
-        delete_result = reference_repository.reference_delete_by_referer_with_version(
-            req.space_id, "AGENT", req.agent_id, "draft"
-        )
-        if delete_result["code"] != status.HTTP_200_OK:
+        # 查询是否存在旧关系
+        search_result = reference_repository.get_records_by_referer_with_version(req.space_id, "AGENT",
+                                                                                 req.agent_id, "draft")
+        if search_result["code"] == status.HTTP_200_OK and search_result["data"]:
+            # 5.1 删除旧的草稿引用关系
+            delete_result = reference_repository.reference_delete_by_referer_with_version(
+                req.space_id, "AGENT", req.agent_id, "draft"
+            )
+            if delete_result["code"] != status.HTTP_200_OK:
+                logger.warning(
+                    f"[AGENT_SAVE] Failed to delete old references for agent {req.agent_id}: {delete_result['message']}"
+                )
+        else:
             logger.warning(
-                f"[AGENT_SAVE] Failed to delete old references for agent {req.agent_id}: {delete_result['message']}"
+                f"[AGENT_SAVE] Search old references for agent {req.agent_id} failed: {search_result['message']}"
             )
 
         # 5.2 提取并创建新的引用关系

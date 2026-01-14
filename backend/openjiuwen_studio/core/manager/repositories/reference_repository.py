@@ -101,6 +101,30 @@ class ReferenceRepository():
             return res.model_dump(exclude_none=True)
 
     @with_exception_handling
+    def get_records_by_referer_with_version(self, space_id: str, referer_type: str, referer_id: str,
+                                           referer_version: str):
+        """
+        根据引用者（带版本）查询引用关系记录
+
+        入参:
+        - space_id: str           # 空间ID
+        - referer_type: str       # 引用者类型: WORKFLOW/AGENT
+        - referer_id: str         # 引用者ID
+        - referer_version: str    # 引用者版本
+        """
+        with get_db_jw() as db:
+            reference_db = JiuwenBaseRepository(db, ReferenceDB)
+
+            find_id = {
+                "space_id": space_id,
+                "referer_type": referer_type,
+                "referer_id": referer_id,
+                "referer_version": referer_version,
+            }
+            return reference_db.get_dl_in_sql(find_id=find_id).model_dump(exclude_none=True)
+
+
+    @with_exception_handling
     def reference_delete_by_referer_with_version(
         self, space_id: str, referer_type: str, referer_id: str, referer_version: str
     ) -> dict:
