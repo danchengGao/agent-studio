@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 import React from 'react'
+import { Button, IconButton } from '@douyinfe/semi-ui'
+import { IconPlus, IconDelete, IconSetting } from '@douyinfe/semi-icons'
 
 import { FlowNodeJSON, Field, FormMeta } from '@flowgram.ai/free-layout-editor'
 import { SubCanvasRender } from '@flowgram.ai/free-container-plugin'
@@ -12,11 +14,14 @@ import {
   createBatchOutputsFormPlugin,
   IFlowValue,
   IFlowConstantRefValue,
+  IFlowConstantValue,
   DisplayOutputs,
   InputsValues,
-  InjectDynamicValueInput,
+  InjectVariableSelector,
   DisplayInputsValues,
   IFlowRefValue,
+  BlurInput,
+  ConstantInput,
 } from '../../form-materials'
 import { useTranslation } from '../../i18n'
 import { provideLoopEffect, exportIntermediateVarsEffect } from './effects'
@@ -25,6 +30,7 @@ import { FormHeader, FormContent, FormItem, Feedback, FormSelect, FormDisplay } 
 import { useIsSidebar, useNodeRenderContext } from '../../hooks'
 import { useObjectList } from '../../form-materials'
 import { validation } from './validation'
+import { TypeSelector } from '../../form-materials/components/type-selector'
 
 export enum LoopType {
   ARRAY_LOOP = 'arrayLoop',
@@ -55,14 +61,12 @@ interface LoopNodeJSON extends FlowNodeJSON {
 const ArrayInputsValues = ({
   value,
   onChange,
-  schema,
 }: {
   value?: Record<string, IFlowValue | undefined>
   onChange: (value?: Record<string, IFlowValue | undefined>) => void
-  schema?: unknown
 }) => {
   const { t } = useTranslation()
-  const { list, add } = useObjectList<IFlowValue | undefined>({
+  const { list, updateKey, updateValue, remove, add } = useObjectList<IFlowValue | undefined>({
     value,
     onChange,
     sortIndexKey: 'extra.index',
@@ -74,34 +78,136 @@ const ArrayInputsValues = ({
       add({
         type: 'constant',
         content: [],
-        schema: { type: 'array' },
+        schema: { type: 'array', items: { type: 'string' } },
       })
     }
   }, [value, list.length, add])
 
   return (
-    <InputsValues
-      value={value}
-      onChange={onChange}
-      schema={schema}
-      showAddButton={true}
-      deleteable={true}
-      onValidateKey={(key, itemId, allItems) => {
-        if (key === 'index') {
-          return t('workflowCanvas.loop.indexReserved')
+    <div>
+      {list.map(item => {
+        const itemSchema = (item.value as IFlowConstantValue)?.schema
+        const itemsType = itemSchema?.items?.type || 'string'
+        const fullSchema = { type: 'array', items: { type: itemsType } }
+
+        const handleTypeChange = (_v?: { type: string }) => {
+          if (!_v) return
+          updateValue(item.id, {
+            ...item.value,
+            schema: { type: 'array', items: { type: _v.type } },
+          } as IFlowValue)
         }
-        const isDuplicate = allItems.some(item => item.id !== itemId && item.key === key)
-        if (isDuplicate && key) {
-          return t('workflowCanvas.loop.variableExists', { key })
+
+        const handleContentChange = (content: unknown) => {
+          updateValue(item.id, {
+            ...item.value,
+            content,
+          } as IFlowValue)
         }
-        return undefined
-      }}
-      defaultItem={{
-        type: 'constant',
-        content: [],
-        schema: { type: 'array' },
-      }}
-    />
+
+        const handleRefChange = (ref: string[] | undefined) => {
+          if (ref) {
+            updateValue(item.id, { type: 'ref', content: ref, schema: itemSchema } as IFlowValue)
+          } else {
+            updateValue(item.id, {
+              type: 'constant',
+              content: [],
+              schema: itemSchema || fullSchema,
+            } as IFlowValue)
+          }
+        }
+
+        return (
+          <div key={item.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+            <BlurInput
+              style={{ width: 100, minWidth: 100, maxWidth: 100 }}
+              size="small"
+              value={item.key}
+              onChange={v => updateKey(item.id, v)}
+              placeholder={t('workflowCanvas.formMaterials.common.inputKey')}
+            />
+            <div className="gedit-m-dynamic-value-input-container" style={{ flexGrow: 1 }}>
+              {item.value?.type === 'ref' ? (
+                <>
+                  <div className="gedit-m-dynamic-value-input-type">
+                    <TypeSelector value={fullSchema} readonly={true} />
+                  </div>
+                  <div className="gedit-m-dynamic-value-input-main">
+                    <InjectVariableSelector
+                      style={{ width: '100%' }}
+                      value={item.value.content}
+                      onChange={handleRefChange}
+                      includeSchema={{ type: 'array', extra: { weak: true } } }
+                    />
+                  </div>
+                  <div className="gedit-m-dynamic-value-input-trigger">
+                    <IconButton
+                      theme="borderless"
+                      icon={<IconDelete size="small" />}
+                      size="small"
+                      onClick={() => handleRefChange(undefined)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="gedit-m-dynamic-value-input-type">
+                    <TypeSelector
+                      value={{ type: itemsType }}
+                      onChange={handleTypeChange}
+                      excludeTypes={['array', 'object']}
+                    />
+                  </div>
+                  <div className="gedit-m-dynamic-value-input-main">
+                    <ConstantInput
+                      value={item.value?.content}
+                      onChange={handleContentChange}
+                      schema={fullSchema}
+                      fallbackRenderer={() => (
+                        <InjectVariableSelector
+                          style={{ width: '100%' }}
+                          onChange={handleRefChange}
+                          includeSchema={{ type: 'array', extra: { weak: true } } }
+                        />
+                      )}
+                    />
+                  </div>
+                  <div className="gedit-m-dynamic-value-input-trigger">
+                    <InjectVariableSelector
+                      value={undefined}
+                      onChange={handleRefChange}
+                      includeSchema={{ type: 'array', extra: { weak: true } } }
+                      triggerRender={() => (
+                        <IconButton theme="borderless" icon={<IconSetting size="small" />} size="small" />
+                      )}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <IconButton
+              theme="borderless"
+              icon={<IconDelete size="small" />}
+              size="small"
+              onClick={() => remove(item.id)}
+            />
+          </div>
+        )
+      })}
+      <Button
+        icon={<IconPlus />}
+        size="small"
+        onClick={() =>
+          add({
+            type: 'constant',
+            content: [],
+            schema: { type: 'array', items: { type: 'string' } },
+          })
+        }
+      >
+        {t('workflowCanvas.formMaterials.common.add')}
+      </Button>
+    </div>
   )
 }
 
@@ -175,7 +281,7 @@ export const LoopFormRender = () => {
                 <Field<Record<string, IFlowValue | undefined> | undefined> name={`inputs.loopParam.loopArray`}>
                   {({ field: arrayField }) => (
                     <PrivateScopeProvider>
-                      <ArrayInputsValues value={arrayField.value} onChange={value => arrayField.onChange(value)} schema={{ type: 'array' }} />
+                      <ArrayInputsValues value={arrayField.value} onChange={value => arrayField.onChange(value)} />
                     </PrivateScopeProvider>
                   )}
                 </Field>
