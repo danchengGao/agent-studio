@@ -2018,6 +2018,7 @@ export interface PluginCodeInfo extends PluginCodeBase {
   tool_id: string
   request_params?: PluginApiParam[]
   response_params?: PluginApiParam[]
+  available?: boolean
 }
 
 export interface PluginCodeInfoResponse {

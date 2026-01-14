@@ -228,6 +228,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
               request_params: codeTool.request_params || [],
               response_params: codeTool.response_params || [],
               headers: [],
+              available: codeTool.available,
             }))
             console.log(`Loaded ${tools.length} draft code tools for plugin ${pluginId}`)
           } else {

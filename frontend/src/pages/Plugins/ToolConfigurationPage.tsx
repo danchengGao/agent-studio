@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useQueryClient } from 'react-query'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
@@ -188,6 +189,7 @@ const ToolConfigurationPage: React.FC = () => {
     priority: Priority.TOOL,
   })
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
 
   // Space ID calculation
   const getDefaultSpaceId = () => {
@@ -496,27 +498,27 @@ const ToolConfigurationPage: React.FC = () => {
 
   const formatOutputValue = (value: unknown, paramType: string): string => {
     if (value === null || value === undefined) {
-      return '未设置'
+      return 'undefined'
     }
 
     switch (paramType) {
       case 'string':
         return String(value)
       case 'number':
-        return typeof value === 'number' ? value.toString() : '无效数字'
+        return typeof value === 'number' ? value.toString() : 'invalid number'
       case 'boolean':
-        return value === true ? '是' : value === false ? '否' : '未知'
+        return typeof value === 'boolean' ? value.toString() : 'invalid boolean'
       case 'array':
         try {
           return JSON.stringify(value, null, 2)
         } catch {
-          return t('plugins.toolConfig.arrayParseError', '数组解析错误')
+          return t('plugins.toolConfig.arrayParseError', 'array parse error')
         }
       case 'object':
         try {
           return JSON.stringify(value, null, 2)
         } catch {
-          return t('plugins.toolConfig.objectParseError', '对象解析错误')
+          return t('plugins.toolConfig.objectParseError', 'object parse error')
         }
       default:
         return String(value)
@@ -1027,6 +1029,51 @@ const ToolConfigurationPage: React.FC = () => {
               finalResults.output = bufferData.data.payload?.output || null
               // 根据error_code判断执行是否成功
               finalResults.execution_success = bufferData.data.payload?.error_code === 0
+
+              // 如果执行成功，立即更新工具状态为启用
+              if (bufferData.data.payload?.error_code === 0 && tool) {
+                // 更新本地工具状态
+                setTool(prev => prev ? { ...prev, available: true } : prev)
+
+                // 乐观更新React Query缓存
+                const queryKey = pluginType === 'code' ? ['pluginCodeList', spaceId, plugin_id] : ['pluginApiList', spaceId, plugin_id]
+
+                queryClient.setQueryData(queryKey, (oldData: any) => {
+                  if (!oldData || oldData.code !== 200) return oldData
+
+                  const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+                  const updatedList = oldData.data[dataKey].map((item: any) =>
+                    item.tool_id === tool_id ? { ...item, available: true } : item
+                  )
+
+                  return {
+                    ...oldData,
+                    data: {
+                      ...oldData.data,
+                      [dataKey]: updatedList,
+                    },
+                  }
+                })
+
+                // 也更新单个工具的缓存
+                const singleQueryKey = pluginType === 'code' ? ['pluginCode', spaceId, plugin_id, tool_id] : ['pluginApi', spaceId, plugin_id, tool_id]
+                queryClient.setQueryData(singleQueryKey, (oldData: any) => {
+                  if (!oldData || oldData.code !== 200) return oldData
+
+                  const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+                  return {
+                    ...oldData,
+                    data: {
+                      ...oldData.data,
+                      [dataKey]: oldData.data[dataKey].map((item: any) =>
+                        item.tool_id === tool_id ? { ...item, available: true } : item
+                      ),
+                    },
+                  }
+                })
+
+                console.log('工具状态已更新为启用')
+              }
             } else {
               // 错误响应
               finalResults.execution_success = false

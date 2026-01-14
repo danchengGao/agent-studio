@@ -10,6 +10,7 @@ import { Plug } from 'lucide-react'
 import { PluginInfo, PluginApiInfo } from '../../../../api-client/src/types'
 import { FreeLayoutPluginContext, WorkflowSelectService } from '@flowgram.ai/free-layout-editor'
 import { t } from '../../i18n'
+import { IJsonSchema } from '@flowgram.ai/json-schema'
 
 // PluginSelector component
 import PluginSelector from '../../components/PluginSelector'
@@ -47,16 +48,21 @@ export const handlePluginNodesSelection = (
   return true
 }
 
-// 参数类型映射函数
-const getParameterType = (type: number): string => {
-  const typeMap: Record<number, string> = {
-    1: 'string',
-    2: 'number',
-    3: 'boolean',
-    4: 'object',
-    5: 'array',
+// 参数类型映射函数 - 返回IJsonSchema格式
+const getParameterType = (type: number): IJsonSchema => {
+  // 映射到IJsonSchema格式，支持嵌套的数组类型
+  const typeToSchemaMap: Record<number, IJsonSchema> = {
+    1: { type: 'string' },
+    2: { type: 'integer' }, // int
+    3: { type: 'number' }, // float
+    4: { type: 'boolean' },
+    5: { type: 'object' },
+    6: { type: 'array', items: { type: 'string' } }, // array_string
+    7: { type: 'array', items: { type: 'integer' } }, // array_int
+    8: { type: 'array', items: { type: 'number' } }, // array_float
+    9: { type: 'array', items: { type: 'boolean' } }, // array_boolean
   }
-  return typeMap[type] || 'string'
+  return typeToSchemaMap[type] || { type: 'string' }
 }
 
 // 格式化插件输入参数
@@ -83,9 +89,7 @@ const formatPluginInputs = (toolInfo: PluginApiInfo | null | undefined, plugin: 
         formattedInputs.inputParameters[paramName] = {
           type: 'constant',
           content: '',
-          schema: {
-            type: paramType,
-          },
+          schema: paramType,
         }
       })
   }
@@ -102,9 +106,7 @@ const formatPluginInputs = (toolInfo: PluginApiInfo | null | undefined, plugin: 
         formattedInputs.inputParameters[paramName] = {
           type: 'constant',
           content: '',
-          schema: {
-            type: paramType,
-          },
+          schema: paramType,
         }
       })
   }
@@ -125,7 +127,7 @@ const formatPluginOutputData = (toolInfo: PluginApiInfo | null | undefined) => {
     const paramType = getParameterType(param.type)
 
     dataProperties[paramName] = {
-      type: paramType,
+      ...paramType,
       extra: {
         index: Object.keys(dataProperties).length + 1,
       },
