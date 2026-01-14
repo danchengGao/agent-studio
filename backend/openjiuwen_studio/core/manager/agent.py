@@ -1964,12 +1964,53 @@ def _import_knowledge_bases(
                 kb_id_map[old_kb_id] = old_kb_id
                 target_kb_id = old_kb_id
             else:
-                # Reuse existing KB
-                kb_id_map[old_kb_id] = old_kb_id
-                # Do not set target_kb_id, so we skip document import for reused KB
+                # Reuse existing KB but create copy if overwrite is False (Force Copy)
                 logger.info(
-                    f"Reusing existing Knowledge Base '{kb_data.get('name')}'"
+                    f"Creating copy of Knowledge Base '{kb_data.get('name')}' because overwrite=False"
                 )
+                
+                # 1. Generate new ID
+                new_kb_id = str(uuid.uuid4())
+                kb_id_map[old_kb_id] = new_kb_id
+                
+                # 2. Check embedding model
+                emb_id = _resolve_embedding_model_id(
+                    space_id, kb_data.get("embedding_model_info")
+                )
+                if not emb_id:
+                    model_id = (
+                        kb_data.get("embedding_model_info", {}).get("model_id") or "unknown"
+                    )
+                    warning_msg = (
+                        f"Embedding模型 '{model_id}' 未找到。请手动添加模型信息后再重新配置知识库！\n"
+                    )
+                    logger.warning(warning_msg)
+                    warnings.append(warning_msg)
+                    # Even if model missing, we mapped ID, but can't create KB effectively without model
+                    # skips creation if model missing
+                    continue
+
+                # 3. Prepare data for new KB
+                new_kb_data = {
+                    "space_id": space_id,
+                    "kb_id": new_kb_id,
+                    "name": f"{kb_data.get('name')}_copy",
+                    "description": kb_data.get("description"),
+                    "embedding_model_config_id": emb_id,
+                    "config": kb_data.get("config"),
+                    "create_time": milliseconds(),
+                    "update_time": milliseconds(),
+                }
+                
+                # 4. Create KB
+                res = knowledge_base_repository.knowledge_base_create(new_kb_data)
+                if res.code == status.HTTP_200_OK:
+                    created_resources.append({"type": "knowledge_base", "id": new_kb_id})
+                    target_kb_id = new_kb_id
+                    is_new_kb = True
+                else:
+                    logger.error(f"Failed to create copy of KB: {res.message}")
+                    warnings.append(f"知识库副本 {new_kb_data['name']} 创建失败！\n")
         else:
             # Create new with original ID
             emb_id = _resolve_embedding_model_id(
@@ -2367,8 +2408,49 @@ def agent_import(req: AgentImportRequest, current_user: dict) -> ResponseModel:
                     # For simplicity, we only track completely new resources.
                     for tid in created_tools:
                         created_resources.append({"type": "tool", "id": tid})
-                # 记录ID映射
-                plugin_id_map[old_plugin_id] = old_plugin_id
+                    
+                    # 记录ID映射
+                    plugin_id_map[old_plugin_id] = old_plugin_id
+                else:
+                    # 如果选择创建副本
+                    # 1. 生成新 Plugin ID
+                    new_plugin_id = str(uuid.uuid4())
+                    plugin_id_map[old_plugin_id] = new_plugin_id
+                    
+                    # 2. 更新 Plugin 数据
+                    plugin_data["plugin_id"] = new_plugin_id
+                    plugin_data["name"] = f"{plugin_data.get('name')}_copy"
+                    plugin_data["create_time"] = None
+                    plugin_data["update_time"] = None
+                    
+                    # 3. 更新 Tool IDs
+                    if "tool_list" in plugin_data and isinstance(plugin_data["tool_list"], list):
+                        for tool in plugin_data["tool_list"]:
+                            old_tool_id = tool.get("tool_id")
+                            if old_tool_id:
+                                new_tool_id = str(uuid.uuid4())
+                                tool_id_map[old_tool_id] = new_tool_id
+                                tool["tool_id"] = new_tool_id
+                    
+                    # 4. 创建新插件副本
+                    logger.info(f"[AGENT_IMPORT] Creating plugin copy {plugin_data.get('name')}")
+                    
+                    created_pid, created_tools = _create_plugin_and_tools(
+                        space_id, plugin_data, tool_id_map
+                    )
+                    
+                    if created_pid:
+                        created_resources.append({"type": "plugin", "id": created_pid})
+                        for tid in created_tools:
+                            created_resources.append({"type": "tool", "id": tid})
+                        
+                        # 更新 map 为实际创建的 ID
+                        plugin_id_map[old_plugin_id] = created_pid
+                        logger.info(
+                            f"[AGENT_IMPORT] Created plugin copy {plugin_data.get('name')} with ID {created_pid}"
+                        )
+                    else:
+                        logger.error(f"[AGENT_IMPORT] Failed to create plugin copy for {old_plugin_id}")
             else:
                 # 使用_create_plugin_and_tools创建插件和工具
                 logger.info(f"[AGENT_IMPORT] Creating plugin {plugin_data.get('name')}")
@@ -2718,7 +2800,7 @@ def agent_import(req: AgentImportRequest, current_user: dict) -> ResponseModel:
                     new_wf_id = str(uuid.uuid4())
                     workflow_id_map[old_wf_id] = new_wf_id
                     wf_data["workflow_id"] = new_wf_id
-                    wf_data["workflow_name"] = f"{wf_data.get('workflow_name')}_copy"
+                    wf_data["name"] = f"{wf_data.get('name')}_copy"
                     
                     # 创建新工作流
                     wf_data["space_id"] = space_id
