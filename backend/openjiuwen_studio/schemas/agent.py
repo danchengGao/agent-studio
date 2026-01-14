@@ -224,6 +224,7 @@ class AgentDependencies(BaseModel):
     workflows: List[Dict[str, Any]] = Field(default_factory=list)
     plugins: List[Dict[str, Any]] = Field(default_factory=list)
     knowledge_bases: List[Dict[str, Any]] = Field(default_factory=list)
+    prompt_templates: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AgentExportMetadata(BaseModel):

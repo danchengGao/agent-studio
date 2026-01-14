@@ -8,6 +8,7 @@ import os
 import time
 import uuid
 import json
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Callable, Type, Set, Any, Dict, Optional
 
 from fastapi import status
@@ -47,6 +48,7 @@ from openjiuwen_studio.core.manager.repositories.knowledge_base_repository impor
 )
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
 from openjiuwen_studio.core.manager.repositories.tool_repository import tool_repository
+from openjiuwen_studio.ops.dependencies import get_db_ops
 from openjiuwen_studio.core.manager.utils.utils import (
     Version,
     check_version,
@@ -57,6 +59,14 @@ from openjiuwen_studio.models.agent import AgentPublishDBPd
 from openjiuwen_studio.models.embedding_model_config import EmbeddingModelConfig
 from openjiuwen_studio.models.knowledge_base_document import KnowledgeBaseDocumentDB
 from openjiuwen_studio.models.workflow import WorkflowBaseDBPd
+from openjiuwen_studio.core.manager.repositories.prompt_relation_repository import prompt_relation_repository
+from openjiuwen_studio.schemas import related_member
+from sqlalchemy import and_
+from openjiuwen_studio.ops.modules.prompt.infra.repositories.orm_repo import (
+    PromptBasicModel,
+    PromptCommitModel,
+    PromptUserDraftModel
+)
 from openjiuwen_studio.schemas.agent import (
     AGENT_NAME_MAX_SIZE,
     AgentConstraint,
@@ -108,6 +118,17 @@ DEFAULT_OPENING_REMARKS = (
 )
 DEFAULT_PAGE = 1
 DEFAULT_PAGE_SIZE = 10
+
+
+@contextmanager
+def get_db_ops_session():
+    """Helper to get ops database session as context manager"""
+    gen = get_db_ops()
+    try:
+        db = next(gen)
+        yield db
+    finally:
+        gen.close()
 
 
 def with_exception_handling(func: Callable) -> Callable:
@@ -2056,11 +2077,13 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> ResponseModel:
     workflows = []
     plugins = []
     knowledge_bases = []
+    prompt_templates = []
 
     # 收集已处理的依赖项ID，防止重复
     processed_workflow_ids: Set[str] = set()
     processed_plugin_ids: Set[str] = set()
     processed_kb_ids: Set[str] = set()
+    processed_prompt_ids: Set[str] = set()
 
     # 3.1 处理直接依赖的Workflows
     agent_workflows = agent_data.get("workflows", []) or []
@@ -2095,6 +2118,140 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> ResponseModel:
             processed_kb_ids,
         )
 
+    # 3.4 处理提示词模板依赖
+    # 获取Agent关联的prompt模板
+    agent_related_info = related_member.RelatedMemberInfo(
+        id=req.agent_id,
+        version=req.agent_version or "draft",
+        type=related_member.MemberType.AGENT,
+        name=agent_data.get("agent_name", "")
+    )
+    
+    prompt_relations_res = prompt_relation_repository.get_prompt_relate_tbl(
+        space_id=req.space_id,
+        find_member_info=agent_related_info,
+        only_active=True
+    )
+    
+    if prompt_relations_res.code == status.HTTP_200_OK and prompt_relations_res.data:
+        prompt_relations = prompt_relations_res.data
+        
+        # 使用直接数据库查询获取完整的prompt模板信息
+        with get_db_ops_session() as db:
+            # 动态导入prompt相关模型
+            for relation in prompt_relations:
+                prompt_id = relation.get("prompt_id")
+                prompt_version = relation.get("prompt_version")
+                
+                # 只要有prompt_id就尝试导出，增加容错性
+                if prompt_id and prompt_id not in processed_prompt_ids:
+                    processed_prompt_ids.add(prompt_id)
+                    
+                    try:
+                        # 查询prompt基本信息
+                        prompt_basic = db.query(PromptBasicModel).filter(
+                            and_(
+                                PromptBasicModel.id == int(prompt_id),
+                                PromptBasicModel.deleted_at.is_(None)
+                            )
+                        ).first()
+                        
+                        # 查询prompt提交信息
+                        prompt_commit = None
+                        
+                        # 1. 尝试根据关联的版本号查找
+                        if prompt_version and prompt_version != "draft":
+                            prompt_commit = db.query(PromptCommitModel).filter(
+                                and_(
+                                    PromptCommitModel.prompt_id == int(prompt_id),
+                                    PromptCommitModel.version == prompt_version
+                                )
+                            ).first()
+                        
+                        # 2. 如果没找到，或者版本是draft，或者关联版本查找失败，尝试查找最新提交
+                        if not prompt_commit and prompt_basic and prompt_basic.latest_version:
+                            prompt_commit = db.query(PromptCommitModel).filter(
+                                and_(
+                                    PromptCommitModel.prompt_id == int(prompt_id),
+                                    PromptCommitModel.version == prompt_basic.latest_version
+                                )
+                            ).first()
+                            
+                        # 3. 如果还是没找到，尝试查找用户草稿
+                        prompt_draft = None
+                        if not prompt_commit:
+                            prompt_draft = db.query(PromptUserDraftModel).filter(
+                                and_(
+                                    PromptUserDraftModel.prompt_id == int(prompt_id),
+                                    PromptUserDraftModel.user_id == user_id,
+                                    PromptUserDraftModel.deleted_at == 0
+                                )
+                            ).first()
+                        
+                        # 构建prompt_commit_dict
+                        prompt_commit_dict = {}
+                        if prompt_commit:
+                            prompt_commit_dict = {
+                                "id": prompt_commit.id,
+                                "space_id": prompt_commit.space_id,
+                                "prompt_id": prompt_commit.prompt_id,
+                                "prompt_key": prompt_commit.prompt_key,
+                                "template_type": prompt_commit.template_type,
+                                "messages": prompt_commit.messages,
+                                "prompt_model_config": prompt_commit.prompt_model_config,
+                                "variable_defs": prompt_commit.variable_defs,
+                                "tools": prompt_commit.tools,
+                                "tool_call_config": prompt_commit.tool_call_config,
+                                "version": prompt_commit.version,
+                                "base_version": prompt_commit.base_version,
+                                "committed_by": prompt_commit.committed_by,
+                                "description": prompt_commit.description
+                            }
+                        elif prompt_draft:
+                            # 使用草稿模拟commit数据
+                            prompt_commit_dict = {
+                                "id": None, # 草稿没有commit id
+                                "space_id": prompt_draft.space_id,
+                                "prompt_id": prompt_draft.prompt_id,
+                                "prompt_key": prompt_basic.prompt_key if prompt_basic else "",
+                                "template_type": prompt_draft.template_type,
+                                "messages": prompt_draft.messages,
+                                "prompt_model_config": prompt_draft.prompt_model_config,
+                                "variable_defs": prompt_draft.variable_defs,
+                                "tools": prompt_draft.tools,
+                                "tool_call_config": prompt_draft.tool_call_config,
+                                "version": prompt_version if prompt_version and prompt_version != "draft" else "draft",
+                                "base_version": prompt_draft.base_version,
+                                "committed_by": prompt_draft.user_id,
+                                "description": "Exported from draft"
+                            }
+                        
+                        # 构建完整的prompt模板数据
+                        prompt_template = {
+                            "prompt_id": prompt_id,
+                            "prompt_version": prompt_version,
+                            "prompt_name": relation.get("prompt_name", ""),
+                            "prompt_basic": {
+                                "id": prompt_basic.id if prompt_basic else None,
+                                "space_id": prompt_basic.space_id if prompt_basic else None,
+                                "prompt_key": prompt_basic.prompt_key if prompt_basic else "",
+                                "name": prompt_basic.name if prompt_basic else "",
+                                "description": prompt_basic.description if prompt_basic else "",
+                                "latest_version": prompt_basic.latest_version if prompt_basic else ""
+                            } if prompt_basic else {},
+                            "prompt_commit": prompt_commit_dict
+                        }
+                        prompt_templates.append(prompt_template)
+                    except Exception as e:
+                        logger.error(f"[AGENT_EXPORT] Failed to get prompt detail for {prompt_id}: {e}")
+                        # 如果获取失败，使用基本信息
+                        prompt_template = {
+                            "prompt_id": prompt_id,
+                            "prompt_version": prompt_version,
+                            "prompt_name": relation.get("prompt_name", "")
+                        }
+                        prompt_templates.append(prompt_template)
+
     # 4. 清理敏感信息 (如 API Key)
     if "model" in agent_data and agent_data["model"]:
         if "model_info" in agent_data["model"]:
@@ -2114,7 +2271,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> ResponseModel:
         version=version,  # 暂定和代码发布版本相同
         agent=agent_data,
         dependencies=AgentDependencies(
-            workflows=workflows, plugins=plugins, knowledge_bases=knowledge_bases
+            workflows=workflows, plugins=plugins, knowledge_bases=knowledge_bases, prompt_templates=prompt_templates
         ),
         metadata=AgentExportMetadata(
             export_time=datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -2306,6 +2463,209 @@ def agent_import(req: AgentImportRequest, current_user: dict) -> ResponseModel:
             created_resources.extend(created_kbs)
             import_warnings.extend(warnings)
 
+        # 2.6 导入 Prompt Templates
+        prompt_id_map = {}
+        prompt_templates_data = []  # 保存导入的prompt模板数据，用于后续建立关联
+        if dependencies.prompt_templates:
+            logger.info("[AGENT_IMPORT] Installing prompt templates from import data")
+            
+            # 使用直接数据库操作导入prompt模板
+            with get_db_ops_session() as db:
+                for prompt_data in dependencies.prompt_templates:
+                    old_prompt_id = prompt_data.get("prompt_id")
+                    if not old_prompt_id:
+                        continue
+                    
+                    raw_version = prompt_data.get("prompt_version")
+                    # 如果版本为空，默认设为0.0.1，以确保能生成有效的Commit记录
+                    if not raw_version:
+                        prompt_version = "0.0.1"
+                    else:
+                        prompt_version = raw_version
+                        
+                    prompt_name = prompt_data.get("prompt_name", f"导入的提示词_{old_prompt_id}")  # 默认名称
+                    
+                    # 确保prompt_basic_data和prompt_commit_data不为空
+                    prompt_basic_data = prompt_data.get("prompt_basic", {})
+                    prompt_commit_data = prompt_data.get("prompt_commit", {})
+
+                    # 容错处理：如果 prompt_commit 为空，尝试从 agent config 中恢复 system prompt
+                    if not prompt_commit_data or not prompt_commit_data.get("messages"):
+                        logger.warning(
+                            f"[AGENT_IMPORT] Prompt commit data is empty for {prompt_name}, "
+                            f"trying to recover from agent config"
+                        )
+                        
+                        # 尝试从 agent.configs.system_prompt 恢复
+                        system_prompt = agent_data.get("configs", {}).get("system_prompt")
+                        if system_prompt:
+                            # 构造 messages 结构
+                            recovered_messages = json.dumps([
+                                {
+                                    "role": "system",
+                                    "content": system_prompt
+                                }
+                            ], ensure_ascii=False)
+                            
+                            if not prompt_commit_data:
+                                prompt_commit_data = {}
+                            
+                            prompt_commit_data["messages"] = recovered_messages
+                            prompt_commit_data["template_type"] = "normal" # 默认为普通模板
+                            prompt_commit_data["version"] = prompt_version
+                            prompt_commit_data["description"] = "Recovered from agent config"
+                            
+                            # 尝试恢复 prompt_model_config
+                            if not prompt_commit_data.get("prompt_model_config"):
+                                agent_model = agent_data.get("model", {}).get("model_info", {})
+                                if agent_model:
+                                    prompt_commit_data["prompt_model_config"] = json.dumps({
+                                        "parameters": {
+                                            "temperature": agent_model.get("temperature", 0.7),
+                                            "max_tokens": agent_model.get("max_tokens", 4096),
+                                            "top_p": agent_model.get("top_p", 0.9),
+                                        }
+                                    })
+                            
+                            logger.info(f"[AGENT_IMPORT] Recovered prompt messages from agent config for {prompt_name}")
+                    
+                    try:
+                        # 2.1 检查是否存在 (根据 prompt_key 和 version)
+                        original_key = prompt_basic_data.get("prompt_key") or f"prompt_{old_prompt_id}"
+                        target_version = prompt_commit_data.get("version") or prompt_version
+                        
+                        existing_basic = db.query(PromptBasicModel).filter(
+                            and_(
+                                PromptBasicModel.space_id == space_id,
+                                PromptBasicModel.prompt_key == original_key,
+                                PromptBasicModel.deleted_at.is_(None)
+                            )
+                        ).first()
+                        
+                        current_prompt_id = None
+                        
+                        if existing_basic:
+                            # 检查版本是否匹配
+                            existing_commit = db.query(PromptCommitModel).filter(
+                                and_(
+                                    PromptCommitModel.prompt_id == existing_basic.id,
+                                    PromptCommitModel.version == target_version
+                                )
+                            ).first()
+                            
+                            if existing_commit:
+                                # 存在且版本匹配，直接复用
+                                current_prompt_id = existing_basic.id
+                        
+                        if not current_prompt_id:
+                            # 2.2 不存在或版本不匹配，创建新的
+                            # 确定新的prompt_key
+                            if existing_basic:
+                                # Key已存在但版本不匹配，需要使用新Key避免冲突
+                                unique_suffix = str(uuid.uuid4())[:8]
+                                new_prompt_key = f"{original_key}_{unique_suffix}"
+                                logger.info(
+                                    f"[AGENT_IMPORT] Prompt key {original_key} exists but version mismatch. "
+                                    f"Creating new with key: {new_prompt_key}"
+                                )
+                            else:
+                                # Key不存在，尝试使用原始Key
+                                new_prompt_key = original_key
+                                logger.info(f"[AGENT_IMPORT] Creating new prompt template with key: {new_prompt_key}")
+
+                            # 创建 PromptBasicModel
+                            new_prompt_basic = PromptBasicModel(
+                                space_id=space_id,
+                                prompt_key=new_prompt_key,
+                                name=prompt_basic_data.get("name", prompt_name),
+                                description=prompt_basic_data.get("description", "导入的提示词模板"),
+                                created_by=data.get("user_id_str", "unknown"),
+                                updated_by=data.get("user_id_str", "unknown"),
+                                latest_version=target_version,  # 使用当前导入的版本作为最新版本，确保一致性
+                                latest_commit_time=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            )
+                            db.add(new_prompt_basic)
+                            db.flush()  # 获取数据库生成的自增ID
+                            
+                            current_prompt_id = new_prompt_basic.id
+                            
+                            # 创建 PromptCommitModel
+                            new_prompt_commit = PromptCommitModel(
+                                space_id=space_id,
+                                prompt_id=current_prompt_id,
+                                prompt_key=new_prompt_key,
+                                template_type=prompt_commit_data.get("template_type", "normal"),
+                                messages=prompt_commit_data.get("messages", ""),
+                                prompt_model_config=prompt_commit_data.get("prompt_model_config", ""),
+                                variable_defs=prompt_commit_data.get("variable_defs", ""),
+                                tools=prompt_commit_data.get("tools", ""),
+                                tool_call_config=prompt_commit_data.get("tool_call_config", ""),
+                                version=prompt_commit_data.get("version", prompt_version),
+                                base_version=prompt_commit_data.get("base_version", ""),
+                                committed_by=prompt_commit_data.get("committed_by", data.get("username", "unknown")),
+                                description=prompt_commit_data.get("description", "导入的提示词版本")
+                            )
+                            db.add(new_prompt_commit)
+                            
+                            logger.info(
+                                f"[AGENT_IMPORT] Created new prompt {current_prompt_id} "
+                                f"(version: {new_prompt_commit.version})"
+                            )
+                        
+                        # 记录ID映射
+                        prompt_id_map[old_prompt_id] = str(current_prompt_id)
+                        
+                        # 无论prompt模板是否已存在，都要为目标用户创建prompt草稿
+                        # 这样用户才能在前端提示词管理中看到导入的模板
+                        user_id = data.get("user_id_str", "unknown")
+                        
+                        # 检查草稿是否已存在
+                        existing_draft = db.query(PromptUserDraftModel).filter(
+                            PromptUserDraftModel.prompt_id == int(current_prompt_id),
+                            PromptUserDraftModel.user_id == user_id,
+                            PromptUserDraftModel.deleted_at == 0
+                        ).first()
+                        
+                        if not existing_draft:
+                            # 获取提交数据（如果存在的话）
+                            # 由于总是创建新的提交记录，所以直接使用prompt_commit_data
+                            commit_data = prompt_commit_data or {}
+                            
+                            # 创建新草稿
+                            new_draft = PromptUserDraftModel(
+                                space_id=int(space_id),
+                                prompt_id=int(current_prompt_id),
+                                user_id=user_id,
+                                template_type=commit_data.get("template_type", "normal"),
+                                messages=commit_data.get("messages", ""),
+                                prompt_model_config=commit_data.get("prompt_model_config", ""),
+                                variable_defs=commit_data.get("variable_defs", ""),
+                                tools=commit_data.get("tools", ""),
+                                tool_call_config=commit_data.get("tool_call_config", ""),
+                                base_version=target_version,
+                                is_draft_edited=False,
+                                deleted_at=0
+                            )
+                            db.add(new_draft)
+                        
+                        logger.info(
+                            f"[AGENT_IMPORT] Processed prompt template: {prompt_name} "
+                            f"(ID: {prompt_id_map[old_prompt_id]})"
+                        )
+                        # 保存prompt模板数据，用于后续建立关联
+                        prompt_templates_data.append({
+                            "old_prompt_id": old_prompt_id,
+                            "prompt_version": prompt_version,
+                            "prompt_name": prompt_name
+                        })
+                    except Exception as e:
+                        logger.error(f"[AGENT_IMPORT] Failed to import prompt template {old_prompt_id}: {e}")
+                        # 记录原始ID映射，以便后续处理
+                        prompt_id_map[old_prompt_id] = old_prompt_id
+                
+                # 提交所有更改
+                db.commit()
+
         # 3. 导入 Workflows
         workflow_id_map = {}
 
@@ -2346,82 +2706,65 @@ def agent_import(req: AgentImportRequest, current_user: dict) -> ResponseModel:
             )
             existing_wf = workflow_repository.workflow_get(wf_query)
 
-            # 如果当前空间下已存在该ID
+            # 根据用户需求：如果当前用户空间下不存在同样workflow_id的工作流，就直接生成新ID
+            # 这是为了避免id冲突错误，因为workflow_id在数据库中是全局唯一的，可能在其他空间已存在
             if existing_wf.code == status.HTTP_200_OK and existing_wf.data:
                 if req.overwrite:
-                    # 覆盖
+                    # 覆盖现有工作流
                     wf_data["space_id"] = space_id
                     workflow_repository.workflow_save(wf_data)
                 else:
-                    # 不覆盖，重新生成ID
+                    # 当前空间存在且不允许覆盖，生成新ID
                     new_wf_id = str(uuid.uuid4())
                     workflow_id_map[old_wf_id] = new_wf_id
                     wf_data["workflow_id"] = new_wf_id
                     wf_data["workflow_name"] = f"{wf_data.get('workflow_name')}_copy"
+                    
+                    # 创建新工作流
                     wf_data["space_id"] = space_id
                     wf_data["create_time"] = None
                     wf_data["update_time"] = None
+                    
                     try:
                         wf_obj = WorkflowBaseDBPd(**wf_data)
+                        wf_obj.create_time = None
+                        wf_obj.update_time = None
+                        
                         create_res = workflow_repository.workflow_create(wf_obj)
                         if create_res.code == status.HTTP_200_OK:
-                            created_resources.append(
-                                {"type": "workflow", "id": new_wf_id}
-                            )
+                            created_resources.append({"type": "workflow", "id": new_wf_id})
+                            logger.info(f"[AGENT_IMPORT] Created copy workflow: {new_wf_id} (original: {old_wf_id})")
                         else:
                             logger.error(
-                                f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: {create_res.message}"
+                                f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: "
+                                f"{create_res.message}"
                             )
                     except Exception as e:
-                        logger.error(
-                            f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: {e}"
-                        )
+                        logger.error(f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: {e}")
             else:
-                # 尝试直接创建
+                # 当前用户空间下不存在该workflow_id，直接生成新的workflow_id来写入，避免id冲突
+                new_wf_id = str(uuid.uuid4())
+                workflow_id_map[old_wf_id] = new_wf_id
+                wf_data["workflow_id"] = new_wf_id
+                
+                # 创建新工作流
                 wf_data["space_id"] = space_id
-
-                # 需要转换为 Pydantic 模型
-                wf_obj = WorkflowBaseDBPd(**wf_data)
-                # 显式清除 create_time 和 update_time，让 workflow_create 重新生成
-                wf_obj.create_time = None
-                wf_obj.update_time = None
-
-                create_res = workflow_repository.workflow_create(wf_obj)
-
-                if create_res.code == status.HTTP_200_OK:
-                    created_resources.append({"type": "workflow", "id": old_wf_id})
-                else:
-                    # 捕获 IntegrityError 等数据库错误 (Repository层捕获了异常并返回错误信息)
-                    if "Duplicate entry" in str(
-                        create_res.message
-                    ) or "IntegrityError" in str(create_res.message):
-                        # 说明数据库中已存在该ID（但不在当前space_id下），需要重新生成ID
-                        logger.warning(
-                            f"[AGENT_IMPORT] Workflow {old_wf_id} exists in another space, generating new ID."
-                        )
-                        new_wf_id = str(uuid.uuid4())
-                        workflow_id_map[old_wf_id] = new_wf_id
-                        wf_data["workflow_id"] = new_wf_id
-                        wf_data["workflow_name"] = (
-                            f"{wf_data.get('workflow_name')}_copy"
-                        )
-                        wf_data["create_time"] = None
-                        wf_data["update_time"] = None
-
-                        wf_obj = WorkflowBaseDBPd(**wf_data)
-                        retry_res = workflow_repository.workflow_create(wf_obj)
-                        if retry_res.code == status.HTTP_200_OK:
-                            created_resources.append(
-                                {"type": "workflow", "id": new_wf_id}
-                            )
-                        else:
-                            logger.error(
-                                f"[AGENT_IMPORT] Failed to create workflow with new ID: {retry_res.message}"
-                            )
+                wf_data["create_time"] = None
+                wf_data["update_time"] = None
+                
+                try:
+                    wf_obj = WorkflowBaseDBPd(**wf_data)
+                    wf_obj.create_time = None
+                    wf_obj.update_time = None
+                    
+                    create_res = workflow_repository.workflow_create(wf_obj)
+                    if create_res.code == status.HTTP_200_OK:
+                        created_resources.append({"type": "workflow", "id": new_wf_id})
+                        logger.info(f"[AGENT_IMPORT] Created workflow with new ID: {new_wf_id} (original: {old_wf_id})")
                     else:
-                        logger.error(
-                            f"[AGENT_IMPORT] Failed to create workflow {old_wf_id}: {create_res.message}"
-                        )
+                        logger.error(f"[AGENT_IMPORT] Failed to create workflow {old_wf_id}: {create_res.message}")
+                except Exception as e:
+                    logger.error(f"[AGENT_IMPORT] Failed to create workflow {old_wf_id}: {e}")
 
         # 4. 导入 Agent
 
@@ -2532,6 +2875,18 @@ def agent_import(req: AgentImportRequest, current_user: dict) -> ResponseModel:
                 else:
                     new_knowledge_list.append(k_id)
             agent_data["knowledge"] = new_knowledge_list
+        
+        # Update prompt template references
+        if "prompt_template" in agent_data and agent_data["prompt_template"]:
+            logger.info(
+                f"[AGENT_IMPORT] Updating prompt template references in agent config: {prompt_id_map}"
+            )
+            # 这里需要根据实际的prompt_template结构进行更新
+            # 假设prompt_template中包含prompt_id字段
+            if isinstance(agent_data["prompt_template"], dict):
+                old_prompt_id = agent_data["prompt_template"].get("prompt_id")
+                if old_prompt_id and old_prompt_id in prompt_id_map:
+                    agent_data["prompt_template"]["prompt_id"] = prompt_id_map[old_prompt_id]
 
         old_agent_id = agent_data.get("agent_id")
 
@@ -2605,6 +2960,45 @@ def agent_import(req: AgentImportRequest, current_user: dict) -> ResponseModel:
 
             final_agent_id = new_agent_id
 
+        # 建立prompt与agent的关联关系
+        if prompt_templates_data:
+            for prompt_data in prompt_templates_data:
+                old_prompt_id = prompt_data.get("old_prompt_id")
+                prompt_version = prompt_data.get("prompt_version")
+                prompt_name = prompt_data.get("prompt_name", "")
+                
+                # 获取实际的prompt_id（可能是原始ID或新生成的ID）
+                actual_prompt_id = prompt_id_map.get(old_prompt_id, old_prompt_id)
+                
+                try:
+                    # 构建prompt信息
+                    prompt_info = related_member.RelatedMemberInfo(
+                        id=actual_prompt_id,
+                        version=prompt_version,
+                        type=related_member.MemberType.PROMPT,
+                        name=prompt_name
+                    )
+                    
+                    # 构建agent信息
+                    agent_info = related_member.RelatedMemberInfo(
+                        id=final_agent_id,  # 这是导入后的agent_id
+                        version="draft",  # 导入的agent默认是draft版本
+                        type=related_member.MemberType.AGENT,
+                        name=agent_data.get("agent_name", "")
+                    )
+                    
+                    # 创建或更新关联关系
+                    prompt_relation_repository.create_prompt_relate_tbl(
+                        space_id=space_id,
+                        prompt_info=prompt_info,
+                        relate_member_info=agent_info
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"[AGENT_IMPORT] Failed to create relation between prompt {actual_prompt_id} "
+                        f"and agent {final_agent_id}: {e}"
+                    )
+        
         return ResponseModel(
             code=status.HTTP_200_OK,
             message="import agent success",
