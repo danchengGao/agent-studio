@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Switch,
 } from '@mui/material'
 import { ParameterTypeSelector } from './ParameterTypeSelector'
 import ReactMarkdown from 'react-markdown'
@@ -1024,14 +1025,30 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                 <Typography variant="subtitle2" className="mb-2">
                   默认值 <span className="text-red-500 ml-1">*</span>
                 </Typography>
-                <TextField
-                  fullWidth
-                  value={parameterForm.value}
-                  onChange={e => handleParameterFormChange('value', e.target.value)}
-                  placeholder="请输入默认值..."
-                  helperText="非运行时参数的默认值"
-                  required
-                />
+                {(() => {
+                  const isBooleanType = String(parameterForm.type) === '4' || parameterForm.type === 4
+                  return isBooleanType ? (
+                    <div className="flex items-center space-x-2">
+                      <Typography variant="body2" className="text-gray-600">
+                        {parameterForm.value === 'true' || parameterForm.value === true ? 'True' : 'False'}
+                      </Typography>
+                      <Switch
+                        checked={parameterForm.value === 'true' || parameterForm.value === true}
+                        onChange={e => handleParameterFormChange('value', e.target.checked ? 'true' : 'false')}
+                        color="primary"
+                      />
+                    </div>
+                  ) : (
+                    <TextField
+                      fullWidth
+                      value={parameterForm.value}
+                      onChange={e => handleParameterFormChange('value', e.target.value)}
+                      placeholder="请输入默认值..."
+                      helperText="非运行时参数的默认值"
+                      required
+                    />
+                  )
+                })()}
               </div>
             )}
           </div>

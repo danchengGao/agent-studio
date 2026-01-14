@@ -417,11 +417,20 @@ const ToolConfigurationPage: React.FC = () => {
   const getTypedTestParameters = (): Record<string, ParameterValue> => {
     const typedParameters: Record<string, ParameterValue> = {}
 
+    // Get tool parameter names to filter out plugin parameters with the same name
+    const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+
     // First, add plugin-level parameters with their default values if not provided
+    // Exclude plugin parameters that have the same name as tool parameters
     if (pluginData?.data?.plugin_info?.request_params) {
       pluginData.data.plugin_info.request_params.forEach(param => {
+        // Skip this plugin parameter if there's a tool parameter with the same name
+        if (toolParamNames.has(param.name)) {
+          return
+        }
+
         // 如果是非运行时参数(is_runtime为false)，使用默认值；否则使用用户输入或默认值
-        const stringValue = param.is_runtime === false ? param.value || '' : testParameters[param.name] || param.value || ''
+        const stringValue = param.is_runtime === false ? param.value || '' : testParameters[`plugin_${param.name}`] || param.value || ''
         const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
         typedParameters[param.name] = convertParameterToCorrectType(stringValue, typeString)
       })
@@ -431,7 +440,7 @@ const ToolConfigurationPage: React.FC = () => {
     if (tool?.input_parameters) {
       tool.input_parameters.forEach(param => {
         // 如果是非运行时参数(is_runtime为false)，使用默认值；否则使用用户输入
-        const stringValue = param.is_runtime === false ? param.value || '' : testParameters[param.name] || ''
+        const stringValue = param.is_runtime === false ? param.value || '' : testParameters[`tool_${param.name}`] || ''
         typedParameters[param.name] = convertParameterToCorrectType(stringValue, param.type)
       })
     }
@@ -912,13 +921,17 @@ const ToolConfigurationPage: React.FC = () => {
     // 初始化参数值 - 只初始化运行时参数(is_runtime: true 或 undefined)
     const initialParams: Record<string, string> = {}
 
-    // 初始化插件级参数
+    // Get tool parameter names to filter out plugin parameters with the same name
+    const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+
+    // 初始化插件级参数 - 排除与工具参数同名的参数
     if (pluginData?.data?.plugin_info?.request_params) {
       pluginData.data.plugin_info.request_params.forEach(param => {
-        if (param.is_runtime !== false) {
+        // Skip plugin parameters that have the same name as tool parameters
+        if (param.is_runtime !== false && !toolParamNames.has(param.name)) {
           const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
           // 布尔类型参数默认为false，其他为空字符串
-          initialParams[param.name] = typeString === 'boolean' ? 'false' : ''
+          initialParams[`plugin_${param.name}`] = typeString === 'boolean' ? 'false' : ''
         }
       })
     }
@@ -928,7 +941,7 @@ const ToolConfigurationPage: React.FC = () => {
       tool.input_parameters.forEach(param => {
         if (param.is_runtime !== false) {
           // 布尔类型参数默认为false，其他为空字符串
-          initialParams[param.name] = param.type === 'boolean' ? 'false' : ''
+          initialParams[`tool_${param.name}`] = param.type === 'boolean' ? 'false' : ''
         }
       })
     }
@@ -936,23 +949,27 @@ const ToolConfigurationPage: React.FC = () => {
     setTestParameters(initialParams)
   }
 
-  const handleTestParameterChange = (paramName: string, value: string) => {
+  const handleTestParameterChange = (paramName: string, value: string, paramType: 'plugin' | 'tool') => {
+    const key = `${paramType}_${paramName}`
     setTestParameters(prev => ({
       ...prev,
-      [paramName]: value,
+      [key]: value,
     }))
   }
 
   const validateRequiredParameters = (): { isValid: boolean; missingParams: string[] } => {
     const missing: string[] = []
 
-    // Check plugin-level required runtime parameters
+    // Get tool parameter names to filter out plugin parameters with the same name
+    const toolParamNames = new Set(tool?.input_parameters?.filter(p => p.is_runtime !== false).map(p => p.name) || [])
+
+    // Check plugin-level required runtime parameters (excluding those with same name as tool parameters)
     pluginData?.data?.plugin_info?.request_params
-      ?.filter(p => p.is_runtime !== false && p.is_required)
+      ?.filter(p => p.is_runtime !== false && p.is_required && !toolParamNames.has(p.name))
       ?.forEach(param => {
-        const paramValue = testParameters[param.name]
+        const paramValue = testParameters[`plugin_${param.name}`]
         if (!paramValue || paramValue.trim() === '') {
-          missing.push(param.name)
+          missing.push(`${param.name} (插件参数)`)
         }
       })
 
@@ -960,9 +977,9 @@ const ToolConfigurationPage: React.FC = () => {
     tool?.input_parameters
       ?.filter(p => p.is_runtime !== false && p.is_required)
       ?.forEach(param => {
-        const paramValue = testParameters[param.name]
+        const paramValue = testParameters[`tool_${param.name}`]
         if (!paramValue || paramValue.trim() === '') {
-          missing.push(param.name)
+          missing.push(`${param.name} (工具参数)`)
         }
       })
 
@@ -1906,7 +1923,6 @@ const ToolConfigurationPage: React.FC = () => {
                     </Typography>
                     <FormControl fullWidth>
                       <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
-                        <MenuItem value={0}>无</MenuItem>
                         <MenuItem value={1}>Header参数</MenuItem>
                         <MenuItem value={2}>Query参数</MenuItem>
                         {tool.method !== 1 && <MenuItem value={3}>Body参数</MenuItem>}
@@ -1950,14 +1966,30 @@ const ToolConfigurationPage: React.FC = () => {
                     <Typography variant="subtitle2" className="mb-2">
                       默认值 <span className="text-red-500 ml-1">*</span>
                     </Typography>
-                    <TextField
-                      fullWidth
-                      value={parameterForm.value}
-                      onChange={e => handleParameterFormChange('value', e.target.value)}
-                      placeholder="请输入默认值..."
-                      helperText="非运行时参数的默认值"
-                      required
-                    />
+                    {(() => {
+                      const isBooleanType = String(parameterForm.type) === 'boolean'
+                      return isBooleanType ? (
+                        <div className="flex items-center space-x-2">
+                          <Typography variant="body2" className="text-gray-600">
+                            {parameterForm.value === 'true' || parameterForm.value === true ? 'True' : 'False'}
+                          </Typography>
+                          <Switch
+                            checked={parameterForm.value === 'true' || parameterForm.value === true}
+                            onChange={e => handleParameterFormChange('value', e.target.checked ? 'true' : 'false')}
+                            color="primary"
+                          />
+                        </div>
+                      ) : (
+                        <TextField
+                          fullWidth
+                          value={parameterForm.value}
+                          onChange={e => handleParameterFormChange('value', e.target.value)}
+                          placeholder="请输入默认值..."
+                          helperText="非运行时参数的默认值"
+                          required
+                        />
+                      )
+                    })()}
                   </div>
                 )}
               </>
@@ -2036,20 +2068,34 @@ const ToolConfigurationPage: React.FC = () => {
               </div>
 
               <div className="space-y-6">
-                {/* Plugin-level Parameters - 只显示运行时参数 */}
-                {pluginData?.data?.plugin_info?.request_params && pluginData.data.plugin_info.request_params.filter(p => p.is_runtime !== false).length > 0 && (
+                {/* Plugin-level Parameters - 只显示运行时参数，且排除与工具参数同名的参数 */}
+                {pluginData?.data?.plugin_info?.request_params && (() => {
+                  const toolParamNames = new Set(tool?.input_parameters?.filter(p => p.is_runtime !== false).map(p => p.name) || [])
+                  const visiblePluginParams = pluginData.data.plugin_info.request_params.filter(p =>
+                    p.is_runtime !== false && !toolParamNames.has(p.name)
+                  )
+                  return visiblePluginParams.length > 0
+                })() && (
                   <div className="space-y-4">
                     <div className="flex items-center space-x-2">
                       <Typography variant="subtitle1" className="font-medium text-blue-600">
                         {t('plugins.toolConfig.pluginParams', '插件参数')}
                       </Typography>
-                      <Chip label={`${pluginData.data.plugin_info.request_params.filter(p => p.is_runtime !== false).length}`} size="small" color="primary" />
+                      <Chip label={`${(() => {
+                        const toolParamNames = new Set(tool?.input_parameters?.filter(p => p.is_runtime !== false).map(p => p.name) || [])
+                        return pluginData.data.plugin_info.request_params.filter(p =>
+                          p.is_runtime !== false && !toolParamNames.has(p.name)
+                        ).length
+                      })()}`} size="small" color="primary" />
                     </div>
                     {pluginData.data.plugin_info.request_params
-                      .filter(p => p.is_runtime !== false)
+                      .filter(p => {
+                        const toolParamNames = new Set(tool?.input_parameters?.filter(p => p.is_runtime !== false).map(p => p.name) || [])
+                        return p.is_runtime !== false && !toolParamNames.has(p.name)
+                      })
                       .map((param, index) => {
                         const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
-                        const paramValue = testParameters[param.name] || ''
+                        const paramValue = testParameters[`plugin_${param.name}`] || ''
                         const isRequiredAndEmpty = param.is_required && (!paramValue || paramValue.trim() === '')
                         return (
                           <div
@@ -2072,7 +2118,7 @@ const ToolConfigurationPage: React.FC = () => {
                                 control={
                                   <Switch
                                     checked={paramValue === 'true'}
-                                    onChange={e => handleTestParameterChange(param.name, e.target.checked.toString())}
+                                    onChange={e => handleTestParameterChange(param.name, e.target.checked.toString(), 'plugin')}
                                     color="primary"
                                   />
                                 }
@@ -2083,7 +2129,7 @@ const ToolConfigurationPage: React.FC = () => {
                                 fullWidth
                                 size="small"
                                 value={paramValue}
-                                onChange={e => handleTestParameterChange(param.name, e.target.value)}
+                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'plugin')}
                                 placeholder={`请输入${param.name}...`}
                                 multiline={typeString === 'object'}
                                 rows={typeString === 'object' ? 3 : 1}
@@ -2109,7 +2155,7 @@ const ToolConfigurationPage: React.FC = () => {
                     {tool.input_parameters
                       .filter(p => p.is_runtime !== false)
                       .map(param => {
-                        const paramValue = testParameters[param.name] || ''
+                        const paramValue = testParameters[`tool_${param.name}`] || ''
                         const isRequiredAndEmpty = param.is_required && (!paramValue || paramValue.trim() === '')
                         return (
                           <div
@@ -2132,7 +2178,7 @@ const ToolConfigurationPage: React.FC = () => {
                                 control={
                                   <Switch
                                     checked={paramValue === 'true'}
-                                    onChange={e => handleTestParameterChange(param.name, e.target.checked.toString())}
+                                    onChange={e => handleTestParameterChange(param.name, e.target.checked.toString(), 'tool')}
                                     color="primary"
                                   />
                                 }
@@ -2143,7 +2189,7 @@ const ToolConfigurationPage: React.FC = () => {
                                 fullWidth
                                 size="small"
                                 value={paramValue}
-                                onChange={e => handleTestParameterChange(param.name, e.target.value)}
+                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'tool')}
                                 placeholder={`请输入${param.name}...`}
                                 multiline={param.type === 'object'}
                                 rows={param.type === 'object' ? 3 : 1}
