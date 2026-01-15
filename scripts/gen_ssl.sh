@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # ======== Generate locally trusted SSL certificates ======== 
 generate_ssl_certs() {

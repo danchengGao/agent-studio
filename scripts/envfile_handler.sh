@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 
 # ===== Merges default/custom .env files, and writes to final .env file ===== 
@@ -12,6 +12,7 @@ generate_env_file() {
     read_env_from_file "${default_deploy_env_file}" "DEPLOY_VARS"
     read_env_from_file "${default_runtime_env_file}" "RUNTIME_VARS"
     read_custom_env_file
+    get_public_ip
     setup_env_vars
 
     local suffix=${DEPLOY_VARS["NAME_SUFFIX"]}
@@ -51,6 +52,7 @@ read_custom_env_file() {
     local -a default_runtime_keys=("${!RUNTIME_VARS[@]}")
     local -a other_deploy_keys=("${!NAMES[@]}")
     other_deploy_keys+=("${PORTS[@]}")
+    default_deploy_keys+=("IP")
 
     # Read .env line by line, exclude comments and empty lines, store in associative array
     while IFS= read -r line || [[ -n "${line}" ]]; do
@@ -152,7 +154,6 @@ process_env_file() {
     local arg_new_svc=${ARGS["IS_NEW_SVC"]}
     local current_env_file=${CONFIG["ENV_FILE"]}
 
-    get_public_ip
     case "${cmd}" in
         up)
             if [[ "${arg_new_svc}" == "true" || ( -z "${arg_env_file}" && ! -f "${current_env_file}" ) ]]; then

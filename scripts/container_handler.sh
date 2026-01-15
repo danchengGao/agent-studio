@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # ====== Wait for container to reach Healthy status (infinite wait) ==========
 wait_for_container_healthy() {

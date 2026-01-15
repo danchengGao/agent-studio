@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # === Generates unique suffix for container/service/volume/... names (uses random chars if not set in .env)  =====
 generate_final_names() {
