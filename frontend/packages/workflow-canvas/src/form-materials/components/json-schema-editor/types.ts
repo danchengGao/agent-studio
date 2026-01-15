@@ -24,4 +24,6 @@ export interface ConfigType {
   addButtonText?: string
   /** Types to exclude from the type selector */
   excludeTypes?: string[]
+  /** Whether to exclude array type as array item (nested arrays) */
+  excludeNestedArray?: boolean
 }

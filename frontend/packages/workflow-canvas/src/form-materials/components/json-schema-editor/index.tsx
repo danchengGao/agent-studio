@@ -222,6 +222,7 @@ function PropertyEdit(props: {
                 value={typeSelectorValue}
                 readonly={isFieldLocked}
                 excludeTypes={config?.excludeTypes}
+                excludeNestedArray={config?.excludeNestedArray}
                 onChange={_value => {
                   // Check if type has changed, if so reset default value
                   const hasTypeChanged = _value.type !== type || JSON.stringify(_value.items) !== JSON.stringify(items)
