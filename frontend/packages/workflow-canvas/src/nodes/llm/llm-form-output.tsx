@@ -54,6 +54,7 @@ function LLMFormOutputInner({ formatField, outputsField }: { formatField: FieldR
       readonly={!isJsonFormat}
       labelExtra={<LLMOutputFormatSelector />}
       excludeTypes={isJsonFormat ? ['date-time'] : undefined}
+      maxNameBytes={isJsonFormat ? 20 : undefined}
     />
   )
 }

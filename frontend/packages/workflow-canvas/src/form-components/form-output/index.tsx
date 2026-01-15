@@ -19,8 +19,8 @@ export interface FormOutputProps {
   expandable?: boolean
   readonly?: boolean
   labelExtra?: React.ReactNode
-  /** Types to exclude from the type selector */
   excludeTypes?: string[]
+  maxNameBytes?: number
 }
 
 export function FormOutput({
@@ -33,6 +33,7 @@ export function FormOutput({
   readonly = false,
   labelExtra,
   excludeTypes,
+  maxNameBytes,
 }: FormOutputProps) {
   const { t } = useTranslation()
   const displayName = name || t('workflowCanvas.formOutput.output')
@@ -56,6 +57,7 @@ export function FormOutput({
               config={{ addButtonText: '', excludeTypes }}
               expandable={expandable}
               readonly={readonly}
+              maxNameBytes={maxNameBytes}
             />
           )}
         </Field>
