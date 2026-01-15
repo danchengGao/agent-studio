@@ -822,7 +822,19 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                 ) : (
                   <div className="space-y-4">
                     {currentToolsQuery.data.data.api_info.map((tool: PluginApiInfo) => (
-                      <Card key={tool.tool_id} className="p-4 border border-gray-200">
+                      <Card
+                        key={tool.tool_id}
+                        className="p-4 border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => {
+                          navigate(`/dashboard/plugins/${plugin_id}/tools/${tool.tool_id}`, {
+                            state: {
+                              source: 'plugin',
+                              pluginType: 'api',
+                              fromPublishVersion: isReadOnly,
+                            },
+                          })
+                        }}
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <Typography variant="subtitle1" className="font-medium mb-1">
@@ -859,11 +871,13 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                             {!isReadOnly && (
                               <IconButton
                                 size="small"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation()
                                   navigate(`/dashboard/plugins/${plugin_id}/tools/${tool.tool_id}`, {
                                     state: {
                                       source: 'plugin',
                                       pluginType: 'api',
+                                      fromPublishVersion: isReadOnly,
                                     },
                                   })
                                 }}
@@ -883,7 +897,14 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                                   删除中
                                 </Button>
                               ) : (
-                                <IconButton size="small" onClick={() => handleDeleteTool(tool)} title={t('plugins.pluginConfig.deleteTool', '删除工具')}>
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteTool(tool)
+                                  }}
+                                  title={t('plugins.pluginConfig.deleteTool', '删除工具')}
+                                >
                                   <Trash2 className="w-4 h-4 text-red-500 hover:text-red-700" />
                                 </IconButton>
                               ))}
