@@ -361,7 +361,8 @@
             "collapse": "折叠"
           },
           "labels": {
-            "nodeFallback": "节点"
+            "nodeFallback": "节点",
+            "knowledgeBaseRetrieval": "知识库检索"
           }
         },
         "flameGraph": {
@@ -381,7 +382,8 @@
             "input": "输入",
             "output": "输出",
             "none": "无",
-            "nodeFallback": "节点"
+            "nodeFallback": "节点",
+            "knowledgeBaseRetrieval": "知识库检索"
           }
         }
       },

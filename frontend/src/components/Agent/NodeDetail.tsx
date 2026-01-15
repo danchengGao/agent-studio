@@ -25,6 +25,10 @@ const NodeDetail: React.FC<NodeDetailProps> = ({ node, rootName, rootId }) => {
 
   const getNodeLabel = (n: InvokeExecuteInfo): string => {
     if (rootName && rootId && String(n.invoke_id) === String(rootId)) return rootName
+    // 处理知识库检索节点的显示名称
+    if (n.invoke_type === 'retriever' || n.invoke_name === 'knowledge_base_retrieval') {
+      return t('labels.knowledgeBaseRetrieval')
+    }
     return n.invoke_name || n.invoke_type || t('labels.nodeFallback')
   }
 

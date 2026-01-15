@@ -361,7 +361,8 @@
             "collapse": "Collapse"
           },
           "labels": {
-            "nodeFallback": "Node"
+            "nodeFallback": "Node",
+            "knowledgeBaseRetrieval": "Knowledge Base Retrieval"
           }
         },
         "flameGraph": {
@@ -381,7 +382,8 @@
             "input": "Input",
             "output": "Output",
             "none": "None",
-            "nodeFallback": "Node"
+            "nodeFallback": "Node",
+            "knowledgeBaseRetrieval": "Knowledge Base Retrieval"
           }
         }
       },
