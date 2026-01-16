@@ -25,6 +25,7 @@ dependencies = [
     "pycryptodome==3.23.0",
     "python-jose[cryptography]==3.3.0",
     "minio==7.2.20",
+    "psutil>=5.9.0",
 ]
 
 [tool.uv]

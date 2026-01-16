@@ -29,6 +29,10 @@
     "characterCount": {
       "name": "/100",
       "description": "/500"
+    },
+    "messages": {
+      "exportSuccess": "Agent exported successfully",
+      "invalidFile": "Please select a valid JSON or ZIP file"
     }
   },
   "addBtn": {

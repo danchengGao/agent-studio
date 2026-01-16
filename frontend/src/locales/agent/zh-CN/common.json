@@ -29,6 +29,10 @@
     "characterCount": {
       "name": "/100",
       "description": "/500"
+    },
+    "messages": {
+      "exportSuccess": "智能体导出成功",
+      "invalidFile": "请选择有效的JSON或ZIP文件"
     }
   },
   "addBtn": {

@@ -1323,7 +1323,7 @@ async def _index_documents(
             logger.warning(f"[INDEX] Failed to close knowledge base: {str(e)}")
 
 
-async def _process_single_document(
+async def process_single_document(
         space_id: str,
         kb_id: str,
         doc_id: str,
@@ -1451,7 +1451,7 @@ async def _process_documents_sequentially(
             }
 
             # 处理单个文档
-            await _process_single_document(
+            await process_single_document(
                 space_id=space_id,
                 kb_id=kb_id,
                 doc_id=doc_id,

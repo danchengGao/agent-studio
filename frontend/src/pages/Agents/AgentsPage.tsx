@@ -279,12 +279,34 @@ const AgentsPage: React.FC = () => {
         agent_id: agentId,
       })
 
-      if (response.code === 200 && response.data) {
+      if (response.isBlob) {
+        // 处理二进制文件(ZIP)下载
+        const url = window.URL.createObjectURL(response.blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = response.filename
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        showSuccess(t('agents.agentList.messages.exportSuccess'))
+      } else if (response.code === 200 && response.data) {
+        // 处理JSON下载
+        // 格式化时间戳 YYYYMMDDHHmmss
+        const now = new Date()
+        const timestamp = now.getFullYear().toString() +
+          (now.getMonth() + 1).toString().padStart(2, '0') +
+          now.getDate().toString().padStart(2, '0') +
+          now.getHours().toString().padStart(2, '0') +
+          now.getMinutes().toString().padStart(2, '0') +
+          now.getSeconds().toString().padStart(2, '0')
+        
         const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `${agentName}_export.json`
+        // 使用短横线连接，保持一致性
+        a.download = `${agentName}-export-${timestamp}.json`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -342,6 +364,21 @@ const AgentsPage: React.FC = () => {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+
+    // 检查是否为zip文件
+    if (file.name.endsWith('.zip') || file.type.includes('zip') || file.type.includes('compressed')) {
+      // ZIP文件直接上传导入，默认不覆盖
+      event.target.value = ''
+      executeImport(file, false)
+      return
+    }
+
+    // 检查是否为JSON文件
+    if (!file.name.endsWith('.json') && !file.type.includes('json')) {
+      event.target.value = ''
+      showError(t('agents.agentList.messages.invalidFile'))
+      return
+    }
 
     event.target.value = ''
 
@@ -474,7 +511,7 @@ const AgentsPage: React.FC = () => {
         type="file"
         ref={fileInputRef}
         className="hidden"
-        accept=".json"
+        accept=".json,.zip"
         onChange={handleFileChange}
       />
 
