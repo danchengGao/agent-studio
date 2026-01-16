@@ -22,6 +22,8 @@ export interface FormOutputProps {
   excludeTypes?: string[]
   maxNameBytes?: number
   excludeNestedArray?: boolean
+  showDefaultValue?: boolean
+  maxDescBytes?: number
 }
 
 export function FormOutput({
@@ -36,6 +38,8 @@ export function FormOutput({
   excludeTypes,
   maxNameBytes,
   excludeNestedArray,
+  showDefaultValue,
+  maxDescBytes,
 }: FormOutputProps) {
   const { t } = useTranslation()
   const displayName = name || t('workflowCanvas.formOutput.output')
@@ -56,7 +60,7 @@ export function FormOutput({
               showAddButton={showAddButton}
               defaultFields={defaultFields}
               minProperties={minProperties}
-              config={{ addButtonText: '', excludeTypes, excludeNestedArray }}
+              config={{ addButtonText: '', excludeTypes, excludeNestedArray, showDefaultValue, maxDescBytes }}
               expandable={expandable}
               readonly={readonly}
               maxNameBytes={maxNameBytes}

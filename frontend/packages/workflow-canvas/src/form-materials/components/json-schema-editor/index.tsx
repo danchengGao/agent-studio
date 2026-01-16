@@ -282,8 +282,9 @@ function PropertyEdit(props: {
                 value={description}
                 onChange={value => onChange('description', value)}
                 placeholder={config?.descPlaceholder ?? t('workflowCanvas.formMaterials.editor.helpLLMUnderstandProperty')}
+                maxBytes={config?.maxDescBytes}
               />
-              {$level === 0 && (
+              {$level === 0 && config?.showDefaultValue !== false && (
                 <>
                   <div className="gedit-m-json-schema-editor-label" style={{ marginTop: 10 }}>
                     {config?.defaultValueTitle ?? t('workflowCanvas.formMaterials.editor.defaultValue')}

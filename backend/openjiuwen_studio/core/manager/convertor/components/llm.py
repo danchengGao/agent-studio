@@ -37,7 +37,7 @@ def _llm_output_config_convert(outputs: Outputs) -> Dict[str, Any]:
     result: Dict[str, Any] = {}
     if outputs.type == "object":
         for key, value in outputs.properties.items():
-            result[key] = {"type": value.type, "description": "", "required": True}
+            result[key] = {"type": value.type, "description": value.description, "required": True}
 
     return result
 

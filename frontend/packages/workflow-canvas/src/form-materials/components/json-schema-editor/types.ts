@@ -26,4 +26,8 @@ export interface ConfigType {
   excludeTypes?: string[]
   /** Whether to exclude array type as array item (nested arrays) */
   excludeNestedArray?: boolean
+  /** Whether to show default value field */
+  showDefaultValue?: boolean
+  /** Max bytes for description field */
+  maxDescBytes?: number
 }
