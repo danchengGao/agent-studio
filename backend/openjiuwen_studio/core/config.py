@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     sqlite_db_path: str = "data/databases"
     agent_sqlite_db: str = "agent.db"
 
+    # OBS配置(MinIO)
+    minio_host: str = ""
+    minio_port: int = 9000
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
+    minio_secure: bool = False
+    minio_bucket: str = ""
+
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"
