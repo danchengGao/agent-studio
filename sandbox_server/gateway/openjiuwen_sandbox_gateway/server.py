@@ -2,10 +2,14 @@
 import os
 import sys
 import uvicorn
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from app.sandbox import SandboxConfig, get_sandbox
 from openjiuwen_sandbox_gateway.app.gateway import remote_python, remote_javascript
+
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 ENABLE_LINUX_SANDBOX = (os.getenv("ENABLE_LINUX_SANDBOX", "false").lower() == "true")
 
