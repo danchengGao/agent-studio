@@ -119,6 +119,10 @@ configure_module_env() {
                     RUNTIME_VARS["MILVUS_HOST"]=${DEPLOY_VARS["MILVUS_SERVICE"]}
                     DEPLOY_VARS["HAS_MILVUS_CONTAINER"]="true"
                 fi
+
+                if [[ -z "${RUNTIME_VARS["MINIO_HOST"]:-}" ]]; then
+                    RUNTIME_VARS["MINIO_HOST"]=${DEPLOY_VARS["MINIO_SERVICE"]}
+                fi
                 ;;
             PLUGIN)
                 if [[ -z "${RUNTIME_VARS["VITE_PLUGIN_SERVICE_URL"]:-}" ]]; then

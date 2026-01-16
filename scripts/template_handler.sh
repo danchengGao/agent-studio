@@ -99,7 +99,7 @@ cap_add:
       - apparmor=unconfined
 EOF
                 )
-    fi
+            fi
             generate_config_file ${template_file} ${compose_file} "ALL_VARS"
         fi
     done

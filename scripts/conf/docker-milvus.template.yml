@@ -33,19 +33,25 @@ services:
     container_name: <<MINIO_DOCKER>>
     image: <<MINIO_IMAGE>>
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ACCESS_KEY: <<MINIO_ACCESS_KEY>>
+      MINIO_SECRET_KEY: <<MINIO_SECRET_KEY>>
     ports:
-      - "<<MINIO_SERVICE_HOST_PORT>>:9000" # MinIO 服务端口
+      - "<<MINIO_SERVICE_HOST_PORT>>:<<MINIO_PORT>>" # MinIO 服务端口
       - "<<MINIO_CONSOLE_HOST_PORT>>:9001" # MinIO 控制台端口
     volumes:
       - <<MINIO_VOLUME>>:/minio_data
     networks:
       - <<JIUWEN_NETWORK_NAME>>
-    command: minio server /minio_data --console-address ":9001"
+    command: minio server /minio_data --address ":<<MINIO_PORT>>" --console-address ":9001"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:<<MINIO_PORT>>/minio/health/live",
+        ]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -58,7 +64,7 @@ services:
       - seccomp:unconfined
     environment:
       ETCD_ENDPOINTS: <<ETCD_SERVICE>>:<<ETCD_HOST_PORT>>
-      MINIO_ADDRESS: <<MINIO_SERVICE>>:9000
+      MINIO_ADDRESS: <<MINIO_SERVICE>>:<<MINIO_PORT>>
       MQ_TYPE: woodpecker
     volumes:
       - <<MILVUS_VOLUME>>:/var/lib/milvus
