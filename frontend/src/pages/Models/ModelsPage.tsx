@@ -759,24 +759,23 @@ const ModelsPage: React.FC = () => {
       })
     } catch (error: any) {
       console.error('Embedding 模型测试失败:', error)
-      const errorMessage = error?.response?.data?.detail || error?.response?.data?.message || error?.message || t('models.messages.embeddingModel.testFailed')
+      // 提取错误信息
+      // embeddingModelService.handleError 返回的是 error.response.data，所以 error 对象本身就是响应体
+      // 同时也要兼容原始的 axios error 格式
+      const errorMessage = error?.detail || 
+                          error?.message || 
+                          error?.error ||
+                          error?.response?.data?.detail || 
+                          error?.response?.data?.message || 
+                          error?.response?.data?.error ||
+                          t('models.messages.embeddingModel.testFailed')
 
-      // 测试失败，自动禁用该 Embedding 模型
-      try {
-        await toggleEmbeddingStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
-        setSnackbar({
-          open: true,
-          message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}。${t('models.messages.embeddingModel.modelDisabled')}。`,
-          severity: 'error',
-        })
-      } catch (disableError) {
-        console.error('禁用 Embedding 模型失败:', disableError)
-        setSnackbar({
-          open: true,
-          message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}。${t('models.messages.embeddingModel.disableFailed')}，请手动禁用。`,
-          severity: 'error',
-        })
-      }
+      // 测试失败，只显示错误信息，不自动禁用模型
+      setSnackbar({
+        open: true,
+        message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}`,
+        severity: 'error',
+      })
     } finally {
       setTestingModelId(null)
     }

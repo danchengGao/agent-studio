@@ -106,11 +106,37 @@ class EmbeddingModelTester:
                     
             except requests.exceptions.RequestException as api_error:
                 response_time = time.time() - start_time
+                
+                # 尝试从响应中提取更详细的错误信息
                 error_message = str(api_error)
+                if hasattr(api_error, 'response') and api_error.response is not None:
+                    try:
+                        # 尝试解析响应体中的错误信息
+                        error_response = api_error.response.json()
+                        if isinstance(error_response, dict):
+                            # 优先使用 error.message, error.error, 或 error.detail
+                            error_message = (
+                                error_response.get('error', {}).get('message') or
+                                error_response.get('error', {}).get('message') or
+                                error_response.get('message') or
+                                error_response.get('error') or
+                                error_response.get('detail') or
+                                str(api_error)
+                            )
+                        else:
+                            error_message = api_error.response.text or str(api_error)
+                    except (ValueError, AttributeError):
+                        # 如果无法解析 JSON，使用响应文本或默认错误信息
+                        error_message = api_error.response.text or str(api_error)
+                
+                # 获取状态码
+                status_code = None
+                if hasattr(api_error, 'response') and api_error.response:
+                    status_code = getattr(api_error.response, 'status_code', None)
                 
                 logger.error(
                     f"Embedding model API call failed: {model.model_name} (ID: {model_id}), "
-                    f"error: {error_message}"
+                    f"error: {error_message}, status_code: {status_code}"
                 )
                 
                 # 返回错误信息
@@ -118,7 +144,7 @@ class EmbeddingModelTester:
                     "error": error_message,
                     "status_code": (
                         getattr(api_error.response, 'status_code', None)
-                        if hasattr(api_error, 'response')
+                        if hasattr(api_error, 'response') and api_error.response
                         else None
                     )
                 }
