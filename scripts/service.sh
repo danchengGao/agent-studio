@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 source "./global_vars.sh"
 source "./common.sh"
@@ -47,7 +47,6 @@ exec_service() {
                     fi
                     ;;
                 JIUWEN|PLUGIN)
-                    echo "huchen: ${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}"
                     eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
                     if [ "${cmd}" == "up" ]; then
                         check_containers "${CONTAINERS[${module}]}"

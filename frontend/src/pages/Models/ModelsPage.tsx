@@ -798,6 +798,8 @@ const ModelsPage: React.FC = () => {
           errorType = 'apiServerError'
         } else if (errorText.includes('configuration') && errorText.includes('is invalid')) {
           errorType = 'configInvalid'
+        } else if (errorText.includes('insufficient quota') && errorText.includes('is invalid')) {
+          errorType = 'insufficientQuota'
         } else if (errorText.includes('API call failed')) {
           errorType = 'apiCallFailed'
         }

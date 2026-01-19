@@ -30,6 +30,7 @@ class WorkflowDBMixin:
     input_parameters: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=None, nullable=True)
     output_parameters: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=None, nullable=True)
     _rest_: Mapped[dict | None] = mapped_column(JSON, default=None, nullable=True)
+    object_key: Mapped[str | None] = mapped_column(String(512), nullable=True, default=None)
 
     create_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     update_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

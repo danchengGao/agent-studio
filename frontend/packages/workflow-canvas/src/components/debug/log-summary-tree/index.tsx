@@ -175,7 +175,7 @@ const LogSummaryTree: FC<LogSummaryTreeProps> = ({ logSummary, onNodeClick }) =>
           invoke,
           level,
           id: nodeId,
-          children: deduplicatedChildren.sort((a, b) => (a.startTimestamp || 0) - (b.startTimestamp || 0)).map(child => buildNodeTree(child, level + 1)),
+          children: deduplicatedChildren.map(child => buildNodeTree(child, level + 1)),
         }
       }
 

@@ -1588,6 +1588,7 @@
           "apiServerError": "Embedding 模型 '{{modelName}}' 的 API 服务器错误：{{detail}}",
           "configInvalid": "Embedding 模型 '{{modelName}}' 的配置无效：{{detail}}",
           "apiCallFailed": "Embedding 模型 '{{modelName}}' API 调用失败：{{detail}}",
+          "insufficientQuota": "Embedding 模型 '{{modelName}}' 配额不足：{{detail}}",
           "modelNotActive": "Embedding 模型 '{{modelName}}' 未启用",
           "unknownError": "Embedding 模型测试失败：{{detail}}"
         }

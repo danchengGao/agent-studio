@@ -117,7 +117,12 @@ class EmbeddingModelTester:
                     try:
                         error_response = api_error.response.json()
                         if isinstance(error_response, dict):
-                            error_msg_from_api = error_response.get('error', {}).get('message', '') or error_response.get('message', '') or error_response.get('error', '')
+                            # 尝试从多个可能的字段中提取错误信息
+                            error_msg_from_api = (
+                                error_response.get('error', {}).get('message', '') or
+                                error_response.get('message', '') or
+                                error_response.get('error', '')
+                            )
                             if error_msg_from_api:
                                 error_detail = error_msg_from_api
                     except Exception:
@@ -126,7 +131,20 @@ class EmbeddingModelTester:
                     
                     # Determine which config is wrong based on status code and error message
                     error_lower = error_detail.lower()
-                    if status_code == 401 or status_code == 403:
+                    # 检查是否是配额不足（429 Too Many Requests, 402 Payment Required）
+                    # 或错误信息中包含配额相关关键词
+                    is_quota_status = status_code == 429 or status_code == 402
+                    has_quota_keyword = (
+                        "quota" in error_lower or
+                        "insufficient" in error_lower or
+                        "limit exceeded" in error_lower or
+                        "rate limit" in error_lower
+                    )
+                    is_quota_error = is_quota_status or has_quota_keyword
+                    
+                    if is_quota_error:
+                        config_issue = "insufficient quota"
+                    elif status_code == 401 or status_code == 403:
                         config_issue = "API key"
                     elif status_code == 404:
                         # 404 可能是 URL 不对或 model name 不对
@@ -142,8 +160,13 @@ class EmbeddingModelTester:
                             config_issue = "API URL"
                     elif status_code == 400:
                         # 400 可能是 model name、API key 或请求参数问题
-                        if "model" in error_lower and ("does not exist" in error_lower or 
-                                                       "invalid" in error_lower and "model" in error_lower.split()[:3]):
+                        # 检查是否是 model name 问题
+                        is_model_error = "model" in error_lower
+                        model_not_exist = "does not exist" in error_lower
+                        model_invalid = "invalid" in error_lower and "model" in error_lower.split()[:3]
+                        is_model_name_issue = is_model_error and (model_not_exist or model_invalid)
+                        
+                        if is_model_name_issue:
                             config_issue = "model name"
                         elif "key" in error_lower or "auth" in error_lower or "unauthorized" in error_lower:
                             config_issue = "API key"

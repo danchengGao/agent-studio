@@ -33,8 +33,10 @@ export function JsonSchemaEditor(props: {
   /** 最少属性数量限制 */
   minProperties?: number
   expandable?: boolean
+  /** 变量名称最大字节长度 */
+  maxNameBytes?: number
 }) {
-  const { value = DEFAULT, config = {}, onChange: onChangeProps, readonly, showAddButton = true, defaultFields, minProperties = 0, expandable = false } = props
+  const { value = DEFAULT, config = {}, onChange: onChangeProps, readonly, showAddButton = true, defaultFields, minProperties = 0, expandable = false, maxNameBytes } = props
   const [error, setError] = useState<string>()
   const { propertyList, onAddProperty, onRemoveProperty, onEditProperty } = usePropertiesEdit(value, onChangeProps)
 
@@ -90,7 +92,8 @@ export function JsonSchemaEditor(props: {
             defaultFields={defaultFields}
             minProperties={minProperties}
             propertyListLength={propertyList.length}
-            expandable={expandable} // 传递expandable属性
+            expandable={expandable}
+            maxNameBytes={maxNameBytes}
             onChange={_v => {
               handleEditProperty(_property.key!, _v)
             }}
@@ -124,16 +127,14 @@ function PropertyEdit(props: {
   onRemove?: () => void
   readonly?: boolean
   $isLast?: boolean
-  $level?: number // 添加层级属性
+  $level?: number
   showAddButton?: boolean
-  /** 不可变的字段，这些字段整行不可编辑 */
   defaultFields?: string[]
-  /** 最少属性数量限制 */
   minProperties?: number
-  /** 当前属性列表长度 */
   propertyListLength?: number
   expandable?: boolean
-  onError?: (error: string) => void // 错误处理函数
+  onError?: (error: string) => void
+  maxNameBytes?: number
 }) {
   const {
     value,
@@ -149,6 +150,7 @@ function PropertyEdit(props: {
     propertyListLength = 0,
     expandable,
     onError,
+    maxNameBytes,
   } = props
 
   const [expand, setExpand] = useState(false)
@@ -211,6 +213,7 @@ function PropertyEdit(props: {
                 size="small"
                 value={name}
                 validateVariable={true}
+                maxBytes={maxNameBytes}
                 onChange={value => onChange('name', value)}
               />
             </div>
@@ -219,6 +222,7 @@ function PropertyEdit(props: {
                 value={typeSelectorValue}
                 readonly={isFieldLocked}
                 excludeTypes={config?.excludeTypes}
+                excludeNestedArray={config?.excludeNestedArray}
                 onChange={_value => {
                   // Check if type has changed, if so reset default value
                   const hasTypeChanged = _value.type !== type || JSON.stringify(_value.items) !== JSON.stringify(items)
@@ -278,8 +282,9 @@ function PropertyEdit(props: {
                 value={description}
                 onChange={value => onChange('description', value)}
                 placeholder={config?.descPlaceholder ?? t('workflowCanvas.formMaterials.editor.helpLLMUnderstandProperty')}
+                maxBytes={config?.maxDescBytes}
               />
-              {$level === 0 && (
+              {$level === 0 && config?.showDefaultValue !== false && (
                 <>
                   <div className="gedit-m-json-schema-editor-label" style={{ marginTop: 10 }}>
                     {config?.defaultValueTitle ?? t('workflowCanvas.formMaterials.editor.defaultValue')}
@@ -311,8 +316,9 @@ function PropertyEdit(props: {
                   defaultFields={defaultFields}
                   minProperties={minProperties}
                   propertyListLength={propertyList.length}
-                  $level={$level + 1} // 传递递增的层级
-                  expandable={expandable} // 传递expandable属性
+                  $level={$level + 1}
+                  expandable={expandable}
+                  maxNameBytes={maxNameBytes}
                   onChange={_v => {
                     const result = onEditProperty(_property.key!, _v)
                     if (result && !result.shouldUpdate) {
@@ -320,11 +326,9 @@ function PropertyEdit(props: {
                     }
                   }}
                   onRemove={() => {
-                    // 检查字段是否在 defaultFields 中，如果是则不允许删除
                     if (defaultFields?.includes(_property.name || '')) {
                       return
                     }
-                    // 检查是否达到最少属性数量限制
                     if (propertyList.length <= minProperties) {
                       return
                     }

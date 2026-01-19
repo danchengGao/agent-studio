@@ -308,7 +308,7 @@ const PluginConfigurationPage: React.FC = () => {
         published: pluginConfigData.published,
         url: configForm.url,
         icon_uri: configForm.icon_uri,
-        request_params: configForm.request_params,
+        request_params: pluginConfigData.plugin_type === 2 ? [] : configForm.request_params,
       }
 
       console.log('Updating plugin configuration:', updateRequest)

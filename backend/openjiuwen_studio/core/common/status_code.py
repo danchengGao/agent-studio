@@ -32,6 +32,24 @@ class StatusCode(Enum):
                                    "agent校验服务器内部错误: {msg}",
                                    "agent verification internal server error: {msg}")
 
+    # Agent Import/Export 1020~1049
+    AGENT_EXPORT_FAILED = (BASE_CODE + 1020, "智能体导出失败: {msg}", "agent export failed: {msg}")
+    AGENT_EXPORT_AGENT_NOT_FOUND = (BASE_CODE + 1021, "导出失败，智能体不存在", "agent not found for export")
+    AGENT_EXPORT_DEPENDENCY_ERROR = (BASE_CODE + 1022, "导出失败，获取依赖项错误: {msg}", "failed to collect dependencies: {msg}")
+    
+    AGENT_IMPORT_FAILED = (BASE_CODE + 1030, "智能体导入失败: {msg}", "agent import failed: {msg}")
+    AGENT_IMPORT_FILE_FORMAT_ERROR = (BASE_CODE + 1031, "导入文件格式错误: {msg}", "invalid import file format: {msg}")
+    AGENT_IMPORT_CONFIG_MISSING = (BASE_CODE + 1032, "导入包中缺少配置文件", "missing configuration file in import package")
+    AGENT_IMPORT_DATA_VALIDATION_ERROR = (BASE_CODE + 1033, "导入数据校验失败: {msg}", "import data validation failed: {msg}")
+    AGENT_IMPORT_DEPENDENCY_ERROR = (BASE_CODE + 1034, "导入依赖项失败: {msg}", "failed to import dependencies: {msg}")
+    AGENT_IMPORT_PLUGIN_ERROR = (BASE_CODE + 1035, "导入插件失败: {msg}", "failed to import plugin: {msg}")
+    AGENT_IMPORT_WORKFLOW_ERROR = (BASE_CODE + 1036, "导入工作流失败: {msg}", "failed to import workflow: {msg}")
+    AGENT_IMPORT_KB_ERROR = (BASE_CODE + 1037, "导入知识库失败: {msg}", "failed to import knowledge base: {msg}")
+    AGENT_IMPORT_PROMPT_ERROR = (BASE_CODE + 1038, "导入提示词模板失败: {msg}", "failed to import prompt template: {msg}")
+    AGENT_IMPORT_AGENT_CREATE_ERROR = (BASE_CODE + 1039, 
+                                       "创建智能体失败: {msg}", 
+                                       "failed to create agent from import data: {msg}")
+
     # Workflow模块 2001~2999
     WORKFLOW_DL_FETCH_FAILED = (BASE_CODE + 2001, "获取工作流描述语言失败: {msg}",
                                 "Failed to fetch workflow dl: {msg}")

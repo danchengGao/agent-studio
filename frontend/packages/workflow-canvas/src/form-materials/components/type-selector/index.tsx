@@ -21,6 +21,8 @@ export interface TypeSelectorProps {
   style?: React.CSSProperties
   /** Types to exclude from the type selector */
   excludeTypes?: string[]
+  /** Whether to exclude array type as array item (nested arrays) */
+  excludeNestedArray?: boolean
 }
 
 const labelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 5 }
@@ -44,7 +46,7 @@ export const parseTypeSelectValue = (value?: string[]): Partial<IJsonSchema> | u
 }
 
 export function TypeSelector(props: TypeSelectorProps) {
-  const { value, onChange, readonly, disabled, style, excludeTypes } = props
+  const { value, onChange, readonly, disabled, style, excludeTypes, excludeNestedArray } = props
 
   const selectValue = useMemo(() => getTypeSelectValue(value), [value])
 
@@ -71,7 +73,11 @@ export function TypeSelector(props: TypeSelectorProps) {
             children: isArray
               ? typeManager
                   .getTypeRegistriesWithParentType('array')
-                  .filter(_type => !excludeTypes?.includes(_type.type))
+                  .filter(_type => {
+                    if (excludeTypes?.includes(_type.type)) return false
+                    if (excludeNestedArray && _type.type === 'array') return false
+                    return true
+                  })
                   .map(_type => ({
                     label: (
                       <div style={labelStyle}>
@@ -90,7 +96,7 @@ export function TypeSelector(props: TypeSelectorProps) {
               : [],
           }
         }),
-    [excludeTypes],
+    [excludeTypes, excludeNestedArray],
   )
 
   const isDisabled = readonly || disabled

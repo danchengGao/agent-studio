@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # ==================== Log functions ====================
 info() { echo -e "\033[36m=== $@ ===\033[0m"; }
@@ -93,6 +93,11 @@ get_public_ip() {
     local local_ip=""
     local os_type=${CONFIG["OS_TYPE"]}
     local cmd=${ARGS["CMD"]}
+
+    if [[ -n "${DEPLOY_VARS["IP"]:-}" ]]; then
+        info "Predefined IP address detected: ${DEPLOY_VARS["IP"]}"
+        return
+    fi
 
     if [ "${cmd}" == "down" ]; then
         return

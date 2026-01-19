@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # === Extracts and deduplicates <<variable>> placeholders from template ===
 extract_placeholders() {
@@ -99,7 +99,7 @@ cap_add:
       - apparmor=unconfined
 EOF
                 )
-    fi
+            fi
             generate_config_file ${template_file} ${compose_file} "ALL_VARS"
         fi
     done

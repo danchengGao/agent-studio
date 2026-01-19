@@ -12,12 +12,14 @@ import { validateVariableName } from '../../validate'
 
 type InputProps = React.ComponentPropsWithRef<typeof Input> & {
   validateVariable?: boolean
+  maxBytes?: number
 }
 
 export function BlurInput(props: InputProps) {
-  const { validateVariable, ...restProps } = props
+  const { validateVariable, maxBytes, ...restProps } = props
   const [value, setValue] = useState('')
   const [error, setError] = useState<string>('')
+  const [focused, setFocused] = useState(false)
 
   useEffect(() => {
     setValue(props.value as string)
@@ -29,13 +31,14 @@ export function BlurInput(props: InputProps) {
       if (!result.isValid) {
         setError(result.message || '变量名格式不正确')
         return false
-      } else {
-        setError('')
-        return true
       }
     }
+    setError('')
     return true
   }
+
+  // 计算当前值的字节长度
+  const currentByteLength = new Blob([value]).size
 
   return (
     <div className="blur-input-wrapper">
@@ -44,14 +47,41 @@ export function BlurInput(props: InputProps) {
         {...restProps}
         value={value}
         validateStatus={error ? 'error' : undefined}
+        suffix={maxBytes && focused ? (
+          <span style={{ fontSize: '12px', color: '#999' }}>
+            {currentByteLength}/{maxBytes}
+          </span>
+        ) : undefined}
         onChange={val => {
-          setValue(val)
-          // 实时清除错误，但只有失焦时才校验
-          if (error && validateVariable) {
+          let newValue = val
+          // 实时限制字节长度
+          if (maxBytes !== undefined) {
+            const byteLength = new Blob([val]).size
+            if (byteLength > maxBytes) {
+              // 截断到最大字节长度
+              let truncated = ''
+              for (let i = 0; i < val.length; i++) {
+                const testStr = truncated + val[i]
+                if (new Blob([testStr]).size <= maxBytes) {
+                  truncated = testStr
+                } else {
+                  break
+                }
+              }
+              newValue = truncated
+            }
+          }
+          if (error) {
             setError('')
           }
+          setValue(newValue)
+        }}
+        onFocus={e => {
+          setFocused(true)
+          props.onFocus?.(e)
         }}
         onBlur={e => {
+          setFocused(false)
           if (validateVariable) {
             if (validateValue(value)) {
               props.onChange?.(value, e)

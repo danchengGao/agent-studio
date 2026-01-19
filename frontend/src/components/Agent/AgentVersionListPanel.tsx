@@ -322,9 +322,11 @@ const VersionCard: React.FC<{
       }}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
-          <span className="font-semibold text-gray-900 tracking-tight">{item.version}</span>
+          <span className="font-semibold text-gray-900 tracking-tight truncate max-w-[180px]" title={item.version}>
+            {item.version}
+          </span>
         </div>
         {item.createdAt && (
           <span

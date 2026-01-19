@@ -133,6 +133,7 @@ const AgentModelSelector = (props: {
   const [greeting, setGreeting] = useState<string>('')
 
   const spaceId = getDefaultSpaceId() || ''
+  const maxGreetingLength = 2000
 
   const { validationResults, setValidationResults, validateWorkflows, isValidating, workflowValidationErrorCount } = useWorkflowValidation({
     workflows: workflowObjects,
@@ -1293,6 +1294,8 @@ const AgentModelSelector = (props: {
                 setGreeting(e.target.value)
                 updateGreeting(e.target.value)
               }}
+              inputProps={{ maxLength: maxGreetingLength }}
+              helperText={`${greeting.length}/${maxGreetingLength}`}
               fullWidth
               multiline
               rows={4}

@@ -1608,6 +1608,7 @@
           "apiServerError": "Embedding model '{{modelName}}' API server error: {{detail}}",
           "configInvalid": "Embedding model '{{modelName}}' configuration is invalid: {{detail}}",
           "apiCallFailed": "Embedding model '{{modelName}}' API call failed: {{detail}}",
+          "insufficientQuota": "Embedding model '{{modelName}}' insufficient quota: {{detail}}",
           "modelNotActive": "Embedding model '{{modelName}}' is not active",
           "unknownError": "Embedding model test failed: {{detail}}"
         }

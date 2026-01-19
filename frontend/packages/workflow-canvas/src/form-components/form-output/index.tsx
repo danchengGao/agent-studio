@@ -19,8 +19,11 @@ export interface FormOutputProps {
   expandable?: boolean
   readonly?: boolean
   labelExtra?: React.ReactNode
-  /** Types to exclude from the type selector */
   excludeTypes?: string[]
+  maxNameBytes?: number
+  excludeNestedArray?: boolean
+  showDefaultValue?: boolean
+  maxDescBytes?: number
 }
 
 export function FormOutput({
@@ -33,6 +36,10 @@ export function FormOutput({
   readonly = false,
   labelExtra,
   excludeTypes,
+  maxNameBytes,
+  excludeNestedArray,
+  showDefaultValue,
+  maxDescBytes,
 }: FormOutputProps) {
   const { t } = useTranslation()
   const displayName = name || t('workflowCanvas.formOutput.output')
@@ -53,9 +60,10 @@ export function FormOutput({
               showAddButton={showAddButton}
               defaultFields={defaultFields}
               minProperties={minProperties}
-              config={{ addButtonText: '', excludeTypes }}
+              config={{ addButtonText: '', excludeTypes, excludeNestedArray, showDefaultValue, maxDescBytes }}
               expandable={expandable}
               readonly={readonly}
+              maxNameBytes={maxNameBytes}
             />
           )}
         </Field>

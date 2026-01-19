@@ -1,10 +1,10 @@
 import { TextField, InputAdornment, IconButton, Tooltip, Button, Divider } from '@mui/material'
 import type { ChatMessage } from './chatTypes'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Type, Hash, List, Braces, ToggleLeft, Calendar, Info, X } from 'lucide-react'
 import { MessageContent } from './NormalMessage'
 
-type InteractionField = { input_name: string; description?: string; type?: string; required?: boolean }
+type InteractionField = { input_name: string; description?: string; type?: string; required?: boolean; defaultValue?: string }
 
 const typeIconFor = (t?: string) => {
   const s = String(t || '').toLowerCase()
@@ -32,11 +32,13 @@ const TypeBadge = ({ type }: { type?: string }) => {
 
 const normalizeField = (v: any): InteractionField => {
   if (v && typeof v === 'object') {
+    const defaultValue = v.default ?? v.default_value ?? v.value ?? v.initial ?? v.defaultValue
     return {
       input_name: String(v.input_name || v.label || v.name || ''),
       description: v.description ? String(v.description) : undefined,
       type: v.type ? String(v.type) : undefined,
       required: Boolean(v.required),
+      defaultValue: defaultValue != null ? String(defaultValue) : undefined,
     }
   }
   return { input_name: String(v) }
@@ -101,6 +103,21 @@ export function InteractionMessage({
     if (typeof s === 'object') return s as Record<string, string>
     return undefined
   }, [submitted])
+
+  useEffect(() => {
+    if (parsedSubmitted) return
+    const hasAnyFormValue = Object.keys(formValues).length > 0
+    if (hasAnyFormValue) return
+
+    const defaults: Record<string, string> = {}
+    fields.forEach(f => {
+      if (f.defaultValue !== undefined) defaults[f.input_name] = f.defaultValue as string
+    })
+
+    if (Object.keys(defaults).length > 0) {
+      setFormValues(prev => ({ ...defaults, ...prev }))
+    }
+  }, [fields, parsedSubmitted])
 
   const handleChange = (key: string, v: string) => {
     setFormValues(prev => ({ ...prev, [key]: v }))

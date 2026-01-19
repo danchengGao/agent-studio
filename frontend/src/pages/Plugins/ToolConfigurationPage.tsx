@@ -173,6 +173,8 @@ const ToolConfigurationPage: React.FC = () => {
   const source = location.state?.source || urlParams.get('source')
   const agentId = location.state?.agentId || urlParams.get('agentId')
   const pluginType = location.state?.pluginType || 'api'
+  const fromPublishVersion = location.state?.fromPublishVersion || false
+  const isReadOnly = fromPublishVersion // Disable editing when from published version
 
   // Parameter dialogs
   const [isInputDialogOpen, setIsInputDialogOpen] = useState(false)
@@ -645,7 +647,7 @@ const ToolConfigurationPage: React.FC = () => {
         type: parameter.type,
         method: parameter.method,
         is_required: isInput ? parameter.is_required || false : false,
-        is_runtime: isInput ? parameter.is_runtime || false : false,
+        is_runtime: isInput ? (pluginType === 'code' ? true : parameter.is_runtime || false) : false,
         value: isInput ? parameter.value || '' : '',
         priority: parameter.priority ?? Priority.TOOL,
       })
@@ -686,7 +688,7 @@ const ToolConfigurationPage: React.FC = () => {
       type: parameterForm.type,
       method: parameterForm.method,
       is_required: parameterForm.is_required,
-      is_runtime: isInput ? parameterForm.is_runtime : undefined,
+      is_runtime: isInput ? (pluginType === 'code' ? true : parameterForm.is_runtime) : undefined,
       value: isInput ? parameterForm.value : undefined,
       priority: isInput ? parameterForm.priority : undefined,
     }
@@ -1161,6 +1163,9 @@ const ToolConfigurationPage: React.FC = () => {
       } else {
         navigate('/dashboard/agents')
       }
+    } else if (fromPublishVersion) {
+      // 从插件发布版本页面跳转过来的，返回到插件版本页面
+      navigate(`/dashboard/plugins/${plugin_id}/versions`)
     } else {
       // 从插件管理页面跳转过来的，返回到插件配置页面
       navigate(`/dashboard/plugins/${plugin_id}`)
@@ -1256,7 +1261,7 @@ const ToolConfigurationPage: React.FC = () => {
                 color="error"
                 startIcon={<Trash2 className="w-4 h-4" />}
                 onClick={() => setDeleteDialogOpen(true)}
-                disabled={deletePluginApiMutation.isPending}
+                disabled={deletePluginApiMutation.isPending || isReadOnly}
               >
                 {deletePluginApiMutation.isPending ? t('plugins.actions.deleting', '删除中...') : t('plugins.actions.deleteTool', '删除工具')}
               </Button>
@@ -1264,7 +1269,7 @@ const ToolConfigurationPage: React.FC = () => {
                 variant="contained"
                 startIcon={updatePluginApiMutation.isPending ? <CircularProgress size={16} /> : <Save className="w-4 h-4" />}
                 onClick={handleSaveTool}
-                disabled={updatePluginApiMutation.isPending || !tool.name.trim() || !tool.description.trim()}
+                disabled={updatePluginApiMutation.isPending || !tool.name.trim() || !tool.description.trim() || isReadOnly}
               >
                 {updatePluginApiMutation.isPending ? t('plugins.actions.saving', '保存中...') : t('plugins.actions.saveConfig', '保存配置')}
               </Button>
@@ -1298,6 +1303,7 @@ const ToolConfigurationPage: React.FC = () => {
                     placeholder={t('plugins.tools.namePlaceholder', '请输入工具名称...')}
                     helperText={t('plugins.tools.nameHelper', '建议使用简洁明了的名称 ({{count}}/128)', { count: tool.name.length })}
                     inputProps={{ maxLength: 128 }}
+                    disabled={isReadOnly}
                   />
                 </div>
                 {pluginType === 'code' ? (
@@ -1306,7 +1312,7 @@ const ToolConfigurationPage: React.FC = () => {
                       {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}
                     </Typography>
                     <FormControl fullWidth>
-                      <Select value={tool.language || 'python'} onChange={e => setTool({ ...tool, language: e.target.value })}>
+                      <Select value={tool.language || 'python'} onChange={e => setTool({ ...tool, language: e.target.value })} disabled={isReadOnly}>
                         <MenuItem value="python">Python 3</MenuItem>
                         <MenuItem value="javascript">Node.js</MenuItem>
                       </Select>
@@ -1318,7 +1324,7 @@ const ToolConfigurationPage: React.FC = () => {
                       {t('plugins.pluginConfig.method', '请求方法')}
                     </Typography>
                     <FormControl fullWidth>
-                      <Select value={tool.method} onChange={e => setTool({ ...tool, method: e.target.value as number })}>
+                      <Select value={tool.method} onChange={e => setTool({ ...tool, method: e.target.value as number })} disabled={isReadOnly}>
                         <MenuItem value={1}>GET</MenuItem>
                         <MenuItem value={2}>POST</MenuItem>
                       </Select>
@@ -1385,6 +1391,7 @@ const ToolConfigurationPage: React.FC = () => {
                         },
                       },
                     }}
+                    disabled={isReadOnly}
                   />
                 </div>
               )}
@@ -1403,6 +1410,7 @@ const ToolConfigurationPage: React.FC = () => {
                     count: tool.description.length,
                   })}
                   inputProps={{ maxLength: 256 }}
+                  disabled={isReadOnly}
                 />
               </div>
             </div>
@@ -1413,7 +1421,7 @@ const ToolConfigurationPage: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Typography variant="h6">{t('plugins.toolConfig.inputParameters', '输入参数配置')}</Typography>
-                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, true)}>
+                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, true)} disabled={isReadOnly}>
                   {t('plugins.toolConfig.addInputParameter', '添加输入参数')}
                 </Button>
               </div>
@@ -1451,13 +1459,14 @@ const ToolConfigurationPage: React.FC = () => {
                           )}
                         </div>
                         <div className="flex items-center space-x-2">
-                          <IconButton size="small" onClick={() => openParameterDialog(param, true)} title={t('plugins.toolConfig.editParameter', '编辑参数')}>
+                          <IconButton size="small" onClick={() => openParameterDialog(param, true)} title={t('plugins.toolConfig.editParameter', '编辑参数')} disabled={isReadOnly}>
                             <Settings className="w-4 h-4" />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteParameter(param.id, true)}
                             title={t('plugins.toolConfig.deleteParameter', '删除参数')}
+                            disabled={isReadOnly}
                           >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
@@ -1475,7 +1484,7 @@ const ToolConfigurationPage: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Typography variant="h6">{t('plugins.toolConfig.outputParameters', '输出参数配置')}</Typography>
-                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, false)}>
+                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, false)} disabled={isReadOnly}>
                   {t('plugins.toolConfig.addOutputParameter', '添加输出参数')}
                 </Button>
               </div>
@@ -1512,13 +1521,14 @@ const ToolConfigurationPage: React.FC = () => {
                           )}
                         </div>
                         <div className="flex items-center space-x-2">
-                          <IconButton size="small" onClick={() => openParameterDialog(param, false)} title={t('plugins.toolConfig.editParameter', '编辑参数')}>
+                          <IconButton size="small" onClick={() => openParameterDialog(param, false)} title={t('plugins.toolConfig.editParameter', '编辑参数')} disabled={isReadOnly}>
                             <Settings className="w-4 h-4" />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteParameter(param.id, false)}
                             title={t('plugins.toolConfig.deleteParameter', '删除参数')}
+                            disabled={isReadOnly}
                           >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
@@ -1536,7 +1546,7 @@ const ToolConfigurationPage: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Typography variant="h6">{t('plugins.toolConfig.headers', '请求头配置')}</Typography>
-                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={handleAddHeader}>
+                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={handleAddHeader} disabled={isReadOnly}>
                   {t('plugins.toolConfig.addHeader', '添加请求头')}
                 </Button>
               </div>
@@ -1558,6 +1568,7 @@ const ToolConfigurationPage: React.FC = () => {
                         size="small"
                         fullWidth
                         placeholder="例如：Authorization"
+                        disabled={isReadOnly}
                       />
                     </div>
                     <div className="col-span-5">
@@ -1567,6 +1578,7 @@ const ToolConfigurationPage: React.FC = () => {
                         size="small"
                         fullWidth
                         placeholder="例如：Bearer token123"
+                        disabled={isReadOnly}
                       />
                     </div>
                     <div className="col-span-2 flex justify-center">
@@ -1575,6 +1587,7 @@ const ToolConfigurationPage: React.FC = () => {
                         onClick={() => handleRemoveHeader(index)}
                         color="error"
                         title={tool.headers.length > 1 ? '删除此行' : '清空内容'}
+                        disabled={isReadOnly}
                       >
                         <Trash2 className="w-4 h-4" />
                       </IconButton>
@@ -1609,11 +1622,11 @@ const ToolConfigurationPage: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-3">
                     {availableTemplates.length > 0 && (
-                      <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />}>
+                      <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />} disabled={isReadOnly}>
                         {t('plugins.pluginConfig.codeTemplates', '模板')}
                       </Button>
                     )}
-                    <Button variant="outlined" size="small" onClick={handleResetCode} startIcon={<RotateCcw className="w-4 h-4" />}>
+                    <Button variant="outlined" size="small" onClick={handleResetCode} startIcon={<RotateCcw className="w-4 h-4" />} disabled={isReadOnly}>
                       {t('plugins.pluginConfig.resetCode', '重置代码')}
                     </Button>
                   </div>
@@ -1668,6 +1681,7 @@ const ToolConfigurationPage: React.FC = () => {
                         value={tool.language || 'python'}
                         label={t('plugins.pluginConfig.programmingLanguage', '编程语言')}
                         onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}
+                        disabled={isReadOnly}
                       >
                         <MenuItem value="python">Python</MenuItem>
                         <MenuItem value="javascript">JavaScript</MenuItem>
@@ -1944,23 +1958,25 @@ const ToolConfigurationPage: React.FC = () => {
             )}
             {isInputDialogOpen && (
               <>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="is_runtime"
-                      checked={!parameterForm.is_runtime}
-                      onChange={e => handleParameterFormChange('is_runtime', !e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <label htmlFor="is_runtime" className="text-sm font-medium text-gray-700 cursor-pointer">
-                      非运行时参数
-                    </label>
+                {pluginType === 'api' && (
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_runtime"
+                        checked={!parameterForm.is_runtime}
+                        onChange={e => handleParameterFormChange('is_runtime', !e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="is_runtime" className="text-sm font-medium text-gray-700 cursor-pointer">
+                        非运行时参数
+                      </label>
+                    </div>
+                    <Typography variant="caption" className="text-gray-500 mt-1 block">
+                      勾选后需要设置参数默认值
+                    </Typography>
                   </div>
-                  <Typography variant="caption" className="text-gray-500 mt-1 block">
-                    勾选后需要设置参数默认值
-                  </Typography>
-                </div>
+                )}
                 {!parameterForm.is_runtime && (
                   <div>
                     <Typography variant="subtitle2" className="mb-2">

@@ -6,6 +6,7 @@ import uuid
 import time
 import random
 from typing import Callable
+from minio import Minio
 
 from fastapi import status
 from openjiuwen.core.common.logging import logger
@@ -15,6 +16,7 @@ from openjiuwen_studio.core.manager.internal.workflow import WorkflowResponseUpd
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.utils.utils import Version, check_version
 from openjiuwen_studio.core.utils.exception import log_exception
+from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.models.workflow import WorkflowBaseDBPd, WorkflowPublishDBPd
 from openjiuwen_studio.schemas.workflow import WorkflowBase, WorkflowSave, WorkflowResponseSave, \
     WorkflowList, WorkflowResponse, WorkflowResponseList, WorkflowPublish, \
@@ -1229,4 +1231,147 @@ def workflow_version_list(
         code=status.HTTP_200_OK,
         message="Get workflow version list success",
         data=response_data
+    )
+
+
+# @with_exception_handling
+def get_upload_url(
+        req: dict,
+        current_user: dict,
+        minio_client: Minio
+) -> ResponseModel:
+    """获取文件上传自签名URL"""
+    workflow_id = req.get("workflow_id")
+    space_id = req.get("space_id")
+    object_key = req.get("object_key")
+
+    if not all([workflow_id, space_id, object_key]):
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Missing required fields: workflow_id, space_id, or object_key"
+        )
+
+    # 1. 校验用户是否有权限访问该 space
+    _ = check_user_space(space_id, current_user)
+
+    # 2. 更新 workflow 表中的 object_key 字段
+    update_data = {
+        "workflow_id": workflow_id,
+        "space_id": space_id,
+        "object_key": object_key
+    }
+
+    save_result = workflow_repository.workflow_save(update_data)
+    if not save_result or save_result.code != status.HTTP_200_OK:
+        logger.error(
+            f"Failed to save object_key for workflow "
+            f"{workflow_id}: {save_result.message if save_result else 'Unknown error'}")
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message="Failed to associate object_key with workflow"
+        )
+
+    logger.info(f"Successfully saved object_key '{object_key}' for workflow {workflow_id}")
+
+    # 3. 生成 MinIO 上传 URL
+    bucket_name = settings.minio_bucket
+
+    if not minio_client.bucket_exists(bucket_name):
+        minio_client.make_bucket(bucket_name)
+        logger.info(f"桶 '{bucket_name}' 创建成功")
+    else:
+        logger.info(f"桶 '{bucket_name}' 已存在")
+
+    from datetime import timedelta
+    upload_url = minio_client.presigned_put_object(
+        bucket_name=bucket_name,
+        object_name=object_key,
+        expires=timedelta(hours=100)  # URL 有效期：1 小时
+    )
+
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Get upload_url success",
+        data={"upload_url": upload_url}
+    )
+
+
+# @with_exception_handling
+def get_download_url(
+        req: dict,
+        current_user: dict,
+        minio_client: Minio
+) -> ResponseModel:
+    """获取文件上传自签名URL"""
+    workflow_id = req.get("workflow_id")
+    space_id = req.get("space_id")
+    object_key = req.get("object_key")
+
+    if not workflow_id or not space_id:
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Missing required fields: workflow_id or space_id"
+        )
+
+    # 1. 校验用户是否有权限访问该 space
+    _ = check_user_space(space_id, current_user)
+
+    # 2. 如果object_key为空，则从数据库查询
+    if not object_key:
+        logger.info(f"Object key not provided, querying from database for workflow {workflow_id}")
+
+        # 构建查询请求
+        workflow_query = WorkflowId(
+            workflow_id=workflow_id,
+            space_id=space_id
+        )
+
+        # 查询工作流信息
+        canvas_result = workflow_repository.workflow_canvas(workflow_query)
+        logger.debug(f"Query workflow from db result: {canvas_result}")
+
+        if canvas_result.code != status.HTTP_200_OK:
+            logger.error(f"Failed to query workflow {workflow_id}: {canvas_result.message}")
+            return ResponseModel(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"Workflow {workflow_id} not found"
+            )
+
+        # 从查询结果中提取object_key
+        workflow_data = canvas_result.data
+        object_key = workflow_data.get("object_key")
+
+        if not object_key:
+            logger.warning(f"No object_key found for workflow {workflow_id} in database")
+            return ResponseModel(
+                code=status.HTTP_404_NOT_FOUND,
+                message=f"No file associated with workflow {workflow_id}"
+            )
+
+        logger.info(f"Retrieved object_key '{object_key}' from database for workflow {workflow_id}")
+
+    # 3. 生成 MinIO 下载 URL
+    bucket_name = settings.minio_bucket
+
+    try:
+        # 检查对象是否存在
+        minio_client.stat_object(bucket_name, object_key)
+    except Exception as e:
+        logger.error(f"Object not found in MinIO: {object_key}, error: {str(e)}")
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message=f"File {object_key} not found in storage"
+        )
+
+    from datetime import timedelta
+    download_url = minio_client.presigned_get_object(
+        bucket_name=bucket_name,
+        object_name=object_key,
+        expires=timedelta(hours=100)  # URL 有效期：1 小时
+    )
+
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Get download_url success",
+        data={"download_url": download_url}
     )

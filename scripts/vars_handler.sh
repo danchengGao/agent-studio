@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # === Generates unique suffix for container/service/volume/... names (uses random chars if not set in .env)  =====
 generate_final_names() {
@@ -118,6 +118,10 @@ configure_module_env() {
                 if [[ -z "${RUNTIME_VARS["MILVUS_HOST"]:-}" ]]; then
                     RUNTIME_VARS["MILVUS_HOST"]=${DEPLOY_VARS["MILVUS_SERVICE"]}
                     DEPLOY_VARS["HAS_MILVUS_CONTAINER"]="true"
+                fi
+
+                if [[ -z "${RUNTIME_VARS["MINIO_HOST"]:-}" ]]; then
+                    RUNTIME_VARS["MINIO_HOST"]=${DEPLOY_VARS["MINIO_SERVICE"]}
                 fi
                 ;;
             PLUGIN)
