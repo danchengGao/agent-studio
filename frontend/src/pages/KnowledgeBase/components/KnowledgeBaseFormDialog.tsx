@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, ExternalLink } from 'lucide-react'
 import { useQueryClient } from 'react-query'
 import { KnowledgeBase, CreateKnowledgeBaseRequest } from '@/types/knowledgeBase'
 import { useKnowledgeBaseStore } from '@/stores/useKnowledgeBaseStore'
@@ -423,13 +423,16 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
                         {t('knowledgeBases.form.loadingModels')}
                       </div>
                     ) : embeddingModels.length === 0 ? (
-                      <div className="text-sm text-red-500">
-                        {t('knowledgeBases.form.noModels')}{' '}
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-red-500">
+                          {t('knowledgeBases.form.noModels')}
+                        </p>
                         <Link
                           to="/dashboard/models"
-                          className="text-blue-600 hover:text-blue-800 underline"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
                           {t('knowledgeBases.form.createModelLink')}
+                          <ExternalLink className="w-4 h-4" />
                         </Link>
                       </div>
                     ) : (
