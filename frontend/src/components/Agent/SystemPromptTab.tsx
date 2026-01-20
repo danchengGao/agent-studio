@@ -424,7 +424,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         })
       } else {
         // Default values based on agent info
-        const defaultKey = agentId ? `agent_${agentId}` : `prompt_${Date.now()}`
+        const defaultKey = `agent_${Date.now()}`
         const defaultName = agentName || t('defaults.unnamedPrompt')
         setExistingPromptInfo(null)
         setSaveForm({

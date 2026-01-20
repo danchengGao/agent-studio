@@ -941,8 +941,8 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       customParameters?: any[], // 使用 any[] 以兼容 Parameter 类型
     ) => {
       try {
-        // 过滤掉系统分隔符消息（如采纳分隔符），只保留用户和AI消息
-        const filteredMessages = messages.filter(msg => msg.type !== 'system' || !msg.content.includes('--- 以下内容采纳自实例'))
+        // 过滤掉系统类型消息，只保留用户和AI消息
+        const filteredMessages = messages.filter(msg => msg.type === 'user' || msg.type === 'ai')
 
         // 构建mock_contexts
         const mockContexts: MockContext[] = filteredMessages.map((msg, index) => {

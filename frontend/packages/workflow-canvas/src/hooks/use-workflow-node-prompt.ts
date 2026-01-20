@@ -373,7 +373,7 @@ export function useWorkflowNodePrompt({ nodeId, nodeName, systemPrompt, onSystem
           promptDesc: '',
         })
       } else {
-        const defaultKey = nodeId ? `workflow_node_${nodeId}` : `prompt_${Date.now()}`
+        const defaultKey = nodeId ? `workflow_${nodeId}_${Date.now()}` : `workflow_${Date.now()}`
         const defaultName = nodeName || '未命名提示词'
         setExistingPromptInfo(null)
         setSaveForm({

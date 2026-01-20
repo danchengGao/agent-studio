@@ -18,6 +18,7 @@ interface MultiRunDialogProps {
   onAdoptConversation: (instanceIndex: number) => void
   onViewTrace?: (messageIndex: number) => void
   onDeleteMessage?: (instanceIndex: number, messageIndex: number) => void
+  onUpdateMessage?: (instanceIndex: number, messageIndex: number, content: string) => void
   onStopStreaming?: (instanceIndex?: number) => void
   prompt: any
   modelConfig: any
@@ -45,6 +46,7 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
   onAdoptConversation,
   onViewTrace,
   onDeleteMessage,
+  onUpdateMessage,
   onStopStreaming,
   prompt,
   modelConfig,
@@ -67,6 +69,7 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
   const [messageFormats, setMessageFormats] = useState<{ [key: number]: 'txt' | 'markdown' }>({})
   const [completedMessages, setCompletedMessages] = useState<Set<number>>(new Set())
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null)
+  const [editingInstanceIndex, setEditingInstanceIndex] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState<string>('')
   const isReadOnly = !!readOnly
 
@@ -101,18 +104,42 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
     }))
   }
 
-  const handleStartEdit = (index: number, content: string) => {
-    setEditingMessageIndex(index)
+  const handleStartEdit = (instanceIndex: number, messageIndex: number, content: string) => {
+    setEditingInstanceIndex(instanceIndex)
+    setEditingMessageIndex(messageIndex)
     setEditingContent(content)
   }
 
-  const handleSaveEdit = (index: number, content: string) => {
-    // TODO: Implement message editing functionality
+  const handleSaveEdit = (messageIndex: number, content: string) => {
+    if (editingInstanceIndex === null || editingMessageIndex === null) {
+      return
+    }
+
+    const instanceIndex = editingInstanceIndex
+    const messages = multiRunChatMessages[instanceIndex]
+    if (!messages || messageIndex < 0 || messageIndex >= messages.length) {
+      return
+    }
+
+    // 如果有回调函数，使用回调函数来更新消息
+    if (onUpdateMessage) {
+      onUpdateMessage(instanceIndex, messageIndex, content)
+    } else {
+      // 否则直接修改消息数组中的内容（不推荐，但作为后备方案）
+      messages[messageIndex] = {
+        ...messages[messageIndex],
+        content: content,
+      }
+    }
+
+    // 清除编辑状态
+    setEditingInstanceIndex(null)
     setEditingMessageIndex(null)
     setEditingContent('')
   }
 
   const handleCancelEdit = () => {
+    setEditingInstanceIndex(null)
     setEditingMessageIndex(null)
     setEditingContent('')
   }
@@ -180,6 +207,7 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
 
   useEffect(() => {
     if (isReadOnly) {
+      setEditingInstanceIndex(null)
       setEditingMessageIndex(null)
       setEditingContent('')
     }
@@ -460,9 +488,9 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
                   onToggleReasoningExpanded={onToggleMultiRunReasoningExpanded}
                   expandedToolCallMessages={multiRunExpandedToolCallMessages}
                   onToggleToolCallExpanded={onToggleMultiRunToolCallExpanded}
-                  editingMessageIndex={editingMessageIndex}
+                  editingMessageIndex={editingInstanceIndex === selectedTab - 1 ? editingMessageIndex : null}
                   editingContent={editingContent}
-                  onStartEdit={handleStartEdit}
+                  onStartEdit={(index, content) => handleStartEdit(selectedTab - 1, index, content)}
                   onSaveEdit={handleSaveEdit}
                   onCancelEdit={handleCancelEdit}
                   onEditContentChange={handleEditContentChange}
@@ -563,9 +591,9 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
                           onToggleReasoningExpanded={onToggleMultiRunReasoningExpanded}
                           expandedToolCallMessages={multiRunExpandedToolCallMessages}
                           onToggleToolCallExpanded={onToggleMultiRunToolCallExpanded}
-                          editingMessageIndex={editingMessageIndex}
+                          editingMessageIndex={editingInstanceIndex === index ? editingMessageIndex : null}
                           editingContent={editingContent}
-                          onStartEdit={handleStartEdit}
+                          onStartEdit={(msgIndex, content) => handleStartEdit(index, msgIndex, content)}
                           onSaveEdit={handleSaveEdit}
                           onCancelEdit={handleCancelEdit}
                           onEditContentChange={handleEditContentChange}

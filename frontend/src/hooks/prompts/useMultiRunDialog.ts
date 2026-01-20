@@ -982,6 +982,22 @@ export const useMultiRunDialog = (options: UseMultiRunDialogOptions) => {
     [multiRunChatMessages, setMultiRunChatMessages],
   )
 
+  // 处理多实例更新消息
+  const handleUpdateMultiRunMessage = useCallback(
+    (instanceIndex: number, messageIndex: number, content: string) => {
+      const newMessages = [...multiRunChatMessages]
+      if (newMessages[instanceIndex] && newMessages[instanceIndex][messageIndex]) {
+        newMessages[instanceIndex] = [...newMessages[instanceIndex]]
+        newMessages[instanceIndex][messageIndex] = {
+          ...newMessages[instanceIndex][messageIndex],
+          content: content,
+        }
+        setMultiRunChatMessages(newMessages)
+      }
+    },
+    [multiRunChatMessages, setMultiRunChatMessages],
+  )
+
   // 采纳多实例运行的对话历史
   const handleAdoptConversation = useCallback(
     (instanceIndex: number) => {
@@ -1112,6 +1128,7 @@ export const useMultiRunDialog = (options: UseMultiRunDialogOptions) => {
     handleClearAllMultiRun,
     handleClearMultiRunInstance,
     handleDeleteMultiRunMessage,
+    handleUpdateMultiRunMessage,
     handleAdoptConversation,
     handleToggleMultiRunToolCallExpanded,
     handleToggleMultiRunReasoningExpanded,

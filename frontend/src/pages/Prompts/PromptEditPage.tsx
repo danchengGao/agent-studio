@@ -963,7 +963,7 @@ const PromptEditPage: React.FC = () => {
   // 统一的拖拽处理函数
   const handleGroupDragStart = (e: React.DragEvent, messageId: string, groupId: number) => {
     setComparisonGroupsData(prev => prev.map(g => (g.id === groupId ? { ...g, draggedMessageId: messageId } : g)))
-    e.dataTransfer.setData('text/plain', messageId)
+    e.dataTransfer.setData('application/x-prompt-message-id', messageId)
   }
 
   const handleGroupDragEnd = (groupId: number) => {
@@ -976,7 +976,7 @@ const PromptEditPage: React.FC = () => {
 
   const handleGroupDrop = (e: React.DragEvent, index: number, groupId: number) => {
     e.preventDefault()
-    const draggedMessageId = e.dataTransfer.getData('text/plain')
+    const draggedMessageId = e.dataTransfer.getData('application/x-prompt-message-id')
 
     setComparisonGroupsData(prev =>
       prev.map(group => {
@@ -2859,7 +2859,7 @@ const PromptEditPage: React.FC = () => {
   const handleDragStart = (e: React.DragEvent, messageId: string) => {
     setDraggedMessageId(messageId)
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', messageId)
+    e.dataTransfer.setData('application/x-prompt-message-id', messageId)
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -2921,9 +2921,18 @@ const PromptEditPage: React.FC = () => {
   }
 
   const saveEditMessage = (index: number, content: string) => {
-    setChatMessages(prev => prev.map((msg, i) => (i === index ? { ...msg, content } : msg)))
+    // 更新消息内容
+    const updatedMessages = chatMessages.map((msg, i) => (i === index ? { ...msg, content } : msg))
+    setChatMessages(updatedMessages)
     setEditingMessage(null)
     setEditContent('')
+
+    // 非对比模式下，保存调试上下文
+    if (!isComparisonMode) {
+      saveDebugContext(updatedMessages, debugTraceInfo, undefined, undefined, parameters).catch(err => {
+        console.error('保存调试上下文失败:', err)
+      })
+    }
   }
 
   const cancelEditMessage = () => {
@@ -3422,6 +3431,7 @@ const PromptEditPage: React.FC = () => {
     handleClearAllMultiRun,
     handleClearMultiRunInstance,
     handleDeleteMultiRunMessage,
+    handleUpdateMultiRunMessage,
     handleAdoptConversation,
     handleToggleMultiRunToolCallExpanded,
     handleToggleMultiRunReasoningExpanded,
@@ -5039,6 +5049,7 @@ const PromptEditPage: React.FC = () => {
         onAdoptConversation={handleAdoptConversation}
         onViewTrace={handleViewTrace}
         onDeleteMessage={handleDeleteMultiRunMessage}
+        onUpdateMessage={handleUpdateMultiRunMessage}
         onStopStreaming={handleStopMultiRunStreaming}
         prompt={prompt}
         modelConfig={modelConfig}
