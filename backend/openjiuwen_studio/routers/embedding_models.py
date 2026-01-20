@@ -232,7 +232,7 @@ async def test_embedding_model_config(
         # 模型配置不存在，透传错误信息
         raise HTTPException(status_code=404, detail=str(e)) from e
     except ModelTestError as e:
-        # 模型测试失败，透传错误信息
+        # 模型测试失败，透传错误信息（包含详细的配置问题，如 API key、model name、URL 等）
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ValidationError as e:
         # 数据验证失败，透传错误信息

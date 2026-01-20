@@ -107,32 +107,81 @@ class EmbeddingModelTester:
             except requests.exceptions.RequestException as api_error:
                 response_time = time.time() - start_time
                 
-                # 尝试从响应中提取更详细的错误信息
-                error_message = str(api_error)
+                # Extract detailed error message from response if available
+                error_detail = str(api_error)
+                config_issue = None
+                status_code = None
+                
                 if hasattr(api_error, 'response') and api_error.response is not None:
+                    status_code = api_error.response.status_code
                     try:
-                        # 尝试解析响应体中的错误信息
                         error_response = api_error.response.json()
                         if isinstance(error_response, dict):
-                            # 优先使用 error.message, error.error, 或 error.detail
-                            error_message = (
-                                error_response.get('error', {}).get('message') or
-                                error_response.get('error', {}).get('message') or
-                                error_response.get('message') or
-                                error_response.get('error') or
-                                error_response.get('detail') or
-                                str(api_error)
+                            # 尝试从多个可能的字段中提取错误信息
+                            error_msg_from_api = (
+                                error_response.get('error', {}).get('message', '') or
+                                error_response.get('message', '') or
+                                error_response.get('error', '')
                             )
+                            if error_msg_from_api:
+                                error_detail = error_msg_from_api
+                    except Exception:
+                        # If JSON parsing fails, use status code to determine issue
+                        pass
+                    
+                    # Determine which config is wrong based on status code and error message
+                    error_lower = error_detail.lower()
+                    # 检查是否是配额不足（429 Too Many Requests, 402 Payment Required）
+                    # 或错误信息中包含配额相关关键词
+                    is_quota_status = status_code == 429 or status_code == 402
+                    has_quota_keyword = (
+                        "quota" in error_lower or
+                        "insufficient" in error_lower or
+                        "limit exceeded" in error_lower or
+                        "rate limit" in error_lower
+                    )
+                    is_quota_error = is_quota_status or has_quota_keyword
+                    
+                    if is_quota_error:
+                        config_issue = "insufficient quota"
+                    elif status_code == 401 or status_code == 403:
+                        config_issue = "API key"
+                    elif status_code == 404:
+                        # 404 可能是 URL 不对或 model name 不对
+                        # 优先检查是否是 URL 问题（错误信息中包含 "for url:" 或 "url:"）
+                        if "for url:" in error_lower or "url:" in error_lower or "endpoint" in error_lower:
+                            config_issue = "API URL"
+                        # 如果错误信息明确提到 model 不存在，则是 model name 问题
+                        elif "model" in error_lower and ("does not exist" in error_lower or 
+                                                          "not found" in error_lower):
+                            config_issue = "model name"
                         else:
-                            error_message = api_error.response.text or str(api_error)
-                    except (ValueError, AttributeError):
-                        # 如果无法解析 JSON，使用响应文本或默认错误信息
-                        error_message = api_error.response.text or str(api_error)
+                            # 默认情况下，404 更可能是 URL 问题
+                            config_issue = "API URL"
+                    elif status_code == 400:
+                        # 400 可能是 model name、API key 或请求参数问题
+                        # 检查是否是 model name 问题
+                        is_model_error = "model" in error_lower
+                        model_not_exist = "does not exist" in error_lower
+                        model_invalid = "invalid" in error_lower and "model" in error_lower.split()[:3]
+                        is_model_name_issue = is_model_error and (model_not_exist or model_invalid)
+                        
+                        if is_model_name_issue:
+                            config_issue = "model name"
+                        elif "key" in error_lower or "auth" in error_lower or "unauthorized" in error_lower:
+                            config_issue = "API key"
+                        else:
+                            config_issue = "request parameters"
+                    elif status_code >= 500:
+                        config_issue = "API server"
+                    else:
+                        config_issue = "configuration"
                 
-                # 获取状态码
-                status_code = None
-                if hasattr(api_error, 'response') and api_error.response:
-                    status_code = getattr(api_error.response, 'status_code', None)
+                # Build error message with config issue
+                if config_issue:
+                    error_message = f"Embedding model '{model.model_name}' {config_issue} is invalid: {error_detail}"
+                else:
+                    error_message = f"Embedding model '{model.model_name}' API call failed: {error_detail}"
                 
                 logger.error(
                     f"Embedding model API call failed: {model.model_name} (ID: {model_id}), "
@@ -142,11 +191,7 @@ class EmbeddingModelTester:
                 # 返回错误信息
                 return {
                     "error": error_message,
-                    "status_code": (
-                        getattr(api_error.response, 'status_code', None)
-                        if hasattr(api_error, 'response') and api_error.response
-                        else None
-                    )
+                    "status_code": status_code
                 }
                 
         except (ModelConfigNotFoundError, ModelTestError):
