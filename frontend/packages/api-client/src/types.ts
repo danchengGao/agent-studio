@@ -2273,3 +2273,33 @@ export interface AgentVersionListResponse {
     versions: AgentVersionInfo[]
   }
 }
+
+// 文件上传/下载相关类型
+
+// 获取文件上传URL请求类型
+export interface GetUploadUrlRequest {
+  object_key: string
+}
+
+// 获取文件上传URL响应类型
+export interface GetUploadUrlResponse {
+  code: number
+  message: string
+  data: {
+    upload_url: string
+  }
+}
+
+// 获取文件下载URL请求类型
+export interface GetDownloadUrlRequest {
+  object_key?: string
+}
+
+// 获取文件下载URL响应类型
+export interface GetDownloadUrlResponse {
+  code: number
+  message: string
+  data: {
+    download_url: string
+  }
+}

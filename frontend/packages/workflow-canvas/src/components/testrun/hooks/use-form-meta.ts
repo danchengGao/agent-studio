@@ -60,6 +60,7 @@ export const useFormMeta = (): TestRunFormMetaItem[] => {
           defaultValue: property.default,
           required: workflowInputs.required?.includes(name) ?? false,
           itemsType: property.items?.type as JsonSchemaBasicType,
+          fileType: property.fileType as string,
         })
       })
     }

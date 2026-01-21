@@ -174,6 +174,8 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
         }
         outputFormat={outputFormat}
         errors={errors}
+        workflowId={workflowId}
+        spaceId={finalSpaceId}
       />
     </div>
   )

@@ -70,6 +70,10 @@ export function DynamicValueInput({ value, onChange, readonly, style, schema: sc
           if (_v?.type === 'array') {
             content = '[]'
           }
+          if (_v?.type === 'file') {
+            // File type defaults to undefined (will be set after upload)
+            content = undefined
+          }
 
           onChange({
             type: 'constant',

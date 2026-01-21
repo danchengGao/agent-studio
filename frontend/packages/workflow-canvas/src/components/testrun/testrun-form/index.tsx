@@ -6,13 +6,15 @@
 import { FC } from 'react'
 
 import classNames from 'classnames'
-import { Input, Switch, InputNumber } from '@douyinfe/semi-ui'
+import { Input, Switch, InputNumber, DatePicker } from '@douyinfe/semi-ui'
+import dayjs from 'dayjs'
 import { useTranslation } from '../../../i18n'
 
 import { DisplaySchemaTag, JsonCodeEditor } from '../../../form-materials'
 import { useFormMeta } from '../hooks/use-form-meta'
 import { useFields } from '../hooks/use-fields'
 import { useSyncDefault } from '../hooks'
+import { FileInput } from '../../../form-materials/plugins/json-schema-preset/type-definition/file'
 
 import styles from './index.module.less'
 
@@ -22,9 +24,11 @@ interface TestRunFormProps {
   values: Record<string, unknown>
   setValues: (values: Record<string, unknown>) => void
   inputFormMeta?: TestRunFormMetaItem[] // 可选的输入节点表单定义
+  workflowId?: string
+  spaceId?: string
 }
 
-export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputFormMeta }) => {
+export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputFormMeta, workflowId, spaceId }) => {
   const { t } = useTranslation()
   const formMeta = useFormMeta()
 
@@ -95,6 +99,33 @@ export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputForm
             />
           </div>
         )
+      case 'file':
+        return (
+          <div className={styles.fieldInput}>
+            <FileInput
+              value={field.value}
+              onChange={value => field.onChange(value)}
+              readonly={false}
+              context="testrun"
+              fileType={field.fileType || 'default'}
+            />
+            {hasError && <div className={styles.errorMessage}>{field.error}</div>}
+          </div>
+        )
+      case 'date-time':
+        return (
+          <div className={styles.fieldInput}>
+            <DatePicker
+              size="small"
+              type="dateTime"
+              density="compact"
+              style={{ width: '100%' }}
+              value={field.value ? dayjs(field.value).toDate() : undefined}
+              onChange={date => field.onChange(date ? dayjs(date).format('YYYY-MM-DDTHH:mm:ss.SSSZ') : undefined)}
+            />
+            {hasError && <div className={styles.errorMessage}>{field.error}</div>}
+          </div>
+        )
       default:
         return (
           <div className={styles.fieldInput}>
@@ -132,6 +163,7 @@ export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputForm
                         type: field.itemsType,
                       }
                     : undefined,
+                  fileType: field.fileType,
                 }}
               />
             </span>

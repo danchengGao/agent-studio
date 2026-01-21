@@ -124,6 +124,20 @@
       "inputKey": "Input Key",
       "configureViaChildFields": "Configure via child fields"
     },
+    "fileType": {
+      "default": "Default",
+      "image": "Image",
+      "svg": "SVG",
+      "audio": "Audio",
+      "video": "Video",
+      "voice": "Voice",
+      "doc": "Document",
+      "ppt": "Presentation",
+      "excel": "Spreadsheet",
+      "txt": "Text",
+      "code": "Code",
+      "zip": "Archive"
+    },
     "input": {
       "pleaseInputArray": "Please Input Array",
       "pleaseSelectBoolean": "Please Select Boolean",
@@ -133,7 +147,18 @@
       "pleaseInputMap": "Please Input Map",
       "pleaseInputNumber": "Please Input Number",
       "pleaseInputObject": "Please Input Object",
-      "pleaseInputString": "Please Input String"
+      "pleaseInputString": "Please Input String",
+      "uploadFile": "Upload File",
+      "uploadMode": "Upload",
+      "urlMode": "URL",
+      "enterFileUrl": "Enter file URL",
+      "dragUploadText": "Drag to upload or click to browse",
+      "dragUploadSubText": "Maximum file size: 500 MB",
+      "fileUploadError": "Please upload a file",
+      "fileUrlError": "Please enter a file URL",
+      "uploading": "Uploading",
+      "uploadSuccess": "File uploaded successfully",
+      "fileWillUploadAtRuntime": "File will be uploaded when workflow runs"
     },
     "editor": {
       "noDefaultValue": "No default value",

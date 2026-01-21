@@ -4,6 +4,7 @@
  */
 
 import { TestRunFormField, TestRunFormMeta } from '../testrun-form/type'
+import { t } from '../../../i18n'
 
 // Validation functions for different types
 const validateValue = (type: string, value: unknown): { isValid: boolean; error?: string } => {
@@ -82,6 +83,23 @@ const validateValue = (type: string, value: unknown): { isValid: boolean; error?
           isValid: false,
           error: '请输入有效的JSON数组',
         }
+      }
+      return { isValid: true }
+    }
+    case 'file': {
+      // File value is { url: string; object_key: string; metadata?: {...} }
+      if (typeof value === 'object' && value !== null) {
+        const fileValue = value as Record<string, unknown>
+        const url = fileValue.url
+        const objectKey = fileValue.object_key
+        if (!url || (typeof url === 'string' && url.trim() === '')) {
+          return { isValid: false, error: t('workflowCanvas.formMaterials.input.fileUrlError') }
+        }
+        if (!objectKey || (typeof objectKey === 'string' && objectKey.trim() === '')) {
+          return { isValid: false, error: t('workflowCanvas.formMaterials.input.fileUrlError') }
+        }
+      } else {
+        return { isValid: false, error: t('workflowCanvas.formMaterials.input.fileUrlError') }
       }
       return { isValid: true }
     }

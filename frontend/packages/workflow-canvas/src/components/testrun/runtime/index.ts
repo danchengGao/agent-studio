@@ -4,5 +4,7 @@
  */
 
 export { testRunRuntimeService, TestRunRuntimeService } from './testrun-runtime-service'
+export { fileUploadService, FileUploadService } from './file-upload-service'
 export type * from './types'
+export type * from './file-upload-service'
 export * from './core'

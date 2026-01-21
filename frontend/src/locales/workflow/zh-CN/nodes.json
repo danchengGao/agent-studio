@@ -124,6 +124,20 @@
       "inputKey": "输入键名",
       "configureViaChildFields": "通过子字段配置"
     },
+    "fileType": {
+      "default": "默认",
+      "image": "图片",
+      "svg": "SVG",
+      "audio": "音频",
+      "video": "视频",
+      "voice": "语音",
+      "doc": "文档",
+      "ppt": "演示文稿",
+      "excel": "表格",
+      "txt": "文本",
+      "code": "代码",
+      "zip": "压缩包"
+    },
     "input": {
       "pleaseInputArray": "请输入数组",
       "pleaseSelectBoolean": "请选择布尔值",
@@ -133,7 +147,17 @@
       "pleaseInputMap": "请输入映射",
       "pleaseInputNumber": "请输入数字",
       "pleaseInputObject": "请输入对象",
-      "pleaseInputString": "请输入字符串"
+      "pleaseInputString": "请输入字符串",
+      "uploadFile": "上传文件",
+      "uploadMode": "上传",
+      "urlMode": "链接",
+      "enterFileUrl": "请输入文件链接",
+      "dragUploadText": "拖拽文件上传 或 点击上传",
+      "dragUploadSubText": "单个文件大小不得超过 500 MB",
+      "fileUploadError": "请上传文件",
+      "fileUrlError": "请输入文件链接",
+      "uploading": "上传中",
+      "uploadSuccess": "文件上传成功"
     },
     "editor": {
       "noDefaultValue": "无默认值",

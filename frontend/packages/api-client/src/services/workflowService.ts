@@ -27,6 +27,10 @@ import {
   ExecutionLogDetailResponse,
   ExecutionDebugRequest,
   ExecutionDebugResponse,
+  GetUploadUrlRequest,
+  GetUploadUrlResponse,
+  GetDownloadUrlRequest,
+  GetDownloadUrlResponse,
 } from '../types'
 
 // 工作流服务
@@ -130,6 +134,26 @@ export class WorkflowService {
   }): Promise<{ code: number; message: string; data?: any }> {
     const apiClient = getApiClient()
     const response = await apiClient.post(API_ENDPOINTS.WORKFLOWS.DELETE_PUBLISH_VERSION, request)
+    return response.data
+  }
+
+  // 获取文件上传URL
+  static async getUploadUrl(request: GetUploadUrlRequest): Promise<GetUploadUrlResponse> {
+    const apiClient = getApiClient()
+    const { object_key } = request
+    const response = await apiClient.get<GetUploadUrlResponse>(
+      `${API_ENDPOINTS.WORKFLOWS.GET_UPLOAD_URL}/${object_key}`
+    )
+    return response.data
+  }
+
+  // 获取文件下载URL
+  static async getDownloadUrl(request: GetDownloadUrlRequest): Promise<GetDownloadUrlResponse> {
+    const apiClient = getApiClient()
+    const { object_key } = request
+    const response = await apiClient.get<GetDownloadUrlResponse>(
+      `${API_ENDPOINTS.WORKFLOWS.GET_DOWNLOAD_URL}/${object_key || ''}`
+    )
     return response.data
   }
 }

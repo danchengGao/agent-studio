@@ -125,7 +125,14 @@ export const NodeInputPanel: FC<NodeInputPanelProps> = ({
 
       {/* Output result */}
       {!isInterruptionMode && result && result.outputs && (
-        <NodeStatusGroup title={t('workflowCanvas.nodeInputPanel.output')} data={result.outputs} optional disableCollapse size="large" outputFormat={outputFormat} />
+        <NodeStatusGroup
+          title={t('workflowCanvas.nodeInputPanel.output')}
+          data={result.outputs}
+          optional
+          disableCollapse
+          size="large"
+          outputFormat={outputFormat}
+        />
       )}
     </div>
   )

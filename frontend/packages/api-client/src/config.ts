@@ -105,6 +105,8 @@ export const API_ENDPOINTS = {
     EXECUTION_LOGS_LIST: '/workflows/get_execution_logs_create_list',
     EXECUTION_LOG_DETAIL: '/workflows/get_execution_log',
     ENTER_EXECUTION_DEBUG: '/workflows/enter_execution_logs_debug',
+    GET_UPLOAD_URL: '/workflows/get_upload_url',
+    GET_DOWNLOAD_URL: '/workflows/get_download_url',
   },
 
   // 执行管理
