@@ -1237,41 +1237,16 @@ def workflow_version_list(
 # @with_exception_handling
 def get_upload_url(
         req: dict,
-        current_user: dict,
         minio_client: Minio
 ) -> ResponseModel:
     """获取文件上传自签名URL"""
-    workflow_id = req.get("workflow_id")
-    space_id = req.get("space_id")
     object_key = req.get("object_key")
 
-    if not all([workflow_id, space_id, object_key]):
+    if not object_key:
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message="Missing required fields: workflow_id, space_id, or object_key"
+            message="Missing required fields: object_key"
         )
-
-    # 1. 校验用户是否有权限访问该 space
-    _ = check_user_space(space_id, current_user)
-
-    # 2. 更新 workflow 表中的 object_key 字段
-    update_data = {
-        "workflow_id": workflow_id,
-        "space_id": space_id,
-        "object_key": object_key
-    }
-
-    save_result = workflow_repository.workflow_save(update_data)
-    if not save_result or save_result.code != status.HTTP_200_OK:
-        logger.error(
-            f"Failed to save object_key for workflow "
-            f"{workflow_id}: {save_result.message if save_result else 'Unknown error'}")
-        return ResponseModel(
-            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            message="Failed to associate object_key with workflow"
-        )
-
-    logger.info(f"Successfully saved object_key '{object_key}' for workflow {workflow_id}")
 
     # 3. 生成 MinIO 上传 URL
     bucket_name = settings.minio_bucket
@@ -1286,7 +1261,7 @@ def get_upload_url(
     upload_url = minio_client.presigned_put_object(
         bucket_name=bucket_name,
         object_name=object_key,
-        expires=timedelta(hours=100)  # URL 有效期：1 小时
+        expires=timedelta(hours=1)
     )
 
     return ResponseModel(
@@ -1299,56 +1274,16 @@ def get_upload_url(
 # @with_exception_handling
 def get_download_url(
         req: dict,
-        current_user: dict,
         minio_client: Minio
 ) -> ResponseModel:
     """获取文件上传自签名URL"""
-    workflow_id = req.get("workflow_id")
-    space_id = req.get("space_id")
     object_key = req.get("object_key")
 
-    if not workflow_id or not space_id:
+    if not object_key:
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message="Missing required fields: workflow_id or space_id"
+            message="Missing required fields: object_key"
         )
-
-    # 1. 校验用户是否有权限访问该 space
-    _ = check_user_space(space_id, current_user)
-
-    # 2. 如果object_key为空，则从数据库查询
-    if not object_key:
-        logger.info(f"Object key not provided, querying from database for workflow {workflow_id}")
-
-        # 构建查询请求
-        workflow_query = WorkflowId(
-            workflow_id=workflow_id,
-            space_id=space_id
-        )
-
-        # 查询工作流信息
-        canvas_result = workflow_repository.workflow_canvas(workflow_query)
-        logger.debug(f"Query workflow from db result: {canvas_result}")
-
-        if canvas_result.code != status.HTTP_200_OK:
-            logger.error(f"Failed to query workflow {workflow_id}: {canvas_result.message}")
-            return ResponseModel(
-                code=status.HTTP_404_NOT_FOUND,
-                message=f"Workflow {workflow_id} not found"
-            )
-
-        # 从查询结果中提取object_key
-        workflow_data = canvas_result.data
-        object_key = workflow_data.get("object_key")
-
-        if not object_key:
-            logger.warning(f"No object_key found for workflow {workflow_id} in database")
-            return ResponseModel(
-                code=status.HTTP_404_NOT_FOUND,
-                message=f"No file associated with workflow {workflow_id}"
-            )
-
-        logger.info(f"Retrieved object_key '{object_key}' from database for workflow {workflow_id}")
 
     # 3. 生成 MinIO 下载 URL
     bucket_name = settings.minio_bucket
@@ -1363,12 +1298,9 @@ def get_download_url(
             message=f"File {object_key} not found in storage"
         )
 
-    from datetime import timedelta
-    download_url = minio_client.presigned_get_object(
-        bucket_name=bucket_name,
-        object_name=object_key,
-        expires=timedelta(hours=100)  # URL 有效期：1 小时
-    )
+    # 生成永久公开访问URL
+    protocol = "https" if settings.minio_secure else "http"
+    download_url = f"{protocol}://{settings.minio_host}:{settings.minio_port}/{bucket_name}/{object_key}"
 
     return ResponseModel(
         code=status.HTTP_200_OK,

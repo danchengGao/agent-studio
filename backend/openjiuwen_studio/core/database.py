@@ -5,6 +5,8 @@ from pathlib import Path
 
 from minio import Minio
 from minio.error import S3Error
+from minio.commonconfig import ENABLED, Filter
+from minio.lifecycleconfig import LifecycleConfig, Rule, Expiration
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -89,6 +91,45 @@ class LazyMinioClient:
             cls._instance = super(LazyMinioClient, cls).__new__(cls)
         return cls._instance
 
+    def ensure_minio_lifecycle(self, minio_client: Minio, bucket_name: str, days: int = 99):
+        """
+        确保 MinIO bucket 设置了自动过期规则（days 天后删除）
+        使URL永久有效（在文件存在期间），但文件会自动过期删除
+        只需调用一次，幂等安全。
+        """
+        try:
+            if not minio_client.bucket_exists(bucket_name):
+                minio_client.make_bucket(bucket_name)
+                self._logger.info(f"Bucket '{bucket_name}' created.")
+            # 构造生命周期规则
+            config = LifecycleConfig(
+                [
+                    Rule(
+                        ENABLED,
+                        rule_filter=Filter(prefix=""),
+                        expiration=Expiration(days=days)
+                    )
+                ]
+            )
+            minio_client.set_bucket_lifecycle(bucket_name, config)
+            # 设置桶策略为公开读（URL永久有效直到文件被删除）
+            import json
+            policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"AWS": "*"},
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{bucket_name}/*"]
+                    }
+                ]
+            }
+            minio_client.set_bucket_policy(bucket_name, json.dumps(policy))
+            self._logger.info(f"Bucket '{bucket_name}' configured: lifecycle {days} days, public read enabled.")
+        except Exception as e:
+            self._logger.exception(f"Failed to set lifecycle rule for bucket '{bucket_name}': {e}")
+
     def get_client(self) -> Minio:
         """获取 MinIO 客户端实例，如果尚未初始化或上次初始化失败，则尝试初始化。"""
         if not self._initialized:
@@ -118,6 +159,7 @@ class LazyMinioClient:
             buckets = client.list_buckets()
 
             self._client = client
+            self.ensure_minio_lifecycle(client, settings.minio_bucket)
             self._initialized = True
             self._logger.info("MinIO client initialized successfully.")
         except (ValueError, S3Error) as e:
