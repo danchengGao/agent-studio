@@ -315,6 +315,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
             state: {
               source: 'plugin',
               pluginType: 'api',
+              publishVersion: pluginConfigData?.plugin_version,
             },
           })
         }
@@ -831,6 +832,8 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                               source: 'plugin',
                               pluginType: 'api',
                               fromPublishVersion: isReadOnly,
+                              publishVersion: pluginConfigData?.plugin_version,
+                              toolsData: isReadOnly ? currentToolsQuery?.data?.data?.api_info : undefined,
                             },
                           })
                         }}
@@ -878,6 +881,8 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                                       source: 'plugin',
                                       pluginType: 'api',
                                       fromPublishVersion: isReadOnly,
+                                      publishVersion: pluginConfigData?.plugin_version,
+                                      toolsData: isReadOnly ? currentToolsQuery?.data?.data?.api_info : undefined,
                                     },
                                   })
                                 }}

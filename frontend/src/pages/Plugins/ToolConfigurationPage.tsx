@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useQueryClient } from 'react-query'
 import { useTranslation } from 'react-i18next'
@@ -174,6 +174,8 @@ const ToolConfigurationPage: React.FC = () => {
   const agentId = location.state?.agentId || urlParams.get('agentId')
   const pluginType = location.state?.pluginType || 'api'
   const fromPublishVersion = location.state?.fromPublishVersion || false
+  const publishVersion = location.state?.publishVersion || null
+  const toolsData = location.state?.toolsData || null // Tools data from publish info
   const isReadOnly = fromPublishVersion // Disable editing when from published version
 
   // Parameter dialogs
@@ -214,8 +216,37 @@ const ToolConfigurationPage: React.FC = () => {
         }
       : null
 
-  // Use different API hooks based on plugin type
-  const { data: apiData, isLoading: isLoadingApi, error: apiError } = pluginType === 'code' ? usePluginGetCode(apiRequest!) : usePluginGetApi(apiRequest!)
+  // Create mock API data from toolsData when available (from publish version)
+  // Use useMemo to prevent creating new object on every render
+  const mockApiData = useMemo(() => {
+    if (!toolsData || !Array.isArray(toolsData)) {
+      return null
+    }
+
+    const targetTool = toolsData.find(tool => tool.tool_id === tool_id)
+    if (!targetTool) {
+      return null
+    }
+
+    const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+
+    return {
+      code: 200,
+      data: {
+        [dataKey]: [targetTool],
+        total: 1,
+      },
+    }
+  }, [toolsData, tool_id, pluginType])
+
+  // Use different API hooks based on plugin type, but skip if we have toolsData
+  const shouldFetchApi = !toolsData && !!apiRequest
+  const { data: apiData, isLoading: isLoadingApi, error: apiError } = pluginType === 'code'
+    ? usePluginGetCode(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
+    : usePluginGetApi(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
+
+  // Use mock data if available, otherwise use API data
+  const effectiveApiData = mockApiData || apiData
 
   // Fetch plugin info to get plugin-level request_params
   const pluginGetRequest =
@@ -232,8 +263,8 @@ const ToolConfigurationPage: React.FC = () => {
   useEffect(() => {
     const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
 
-    if (apiData?.code === 200 && apiData?.data?.[dataKey] && Array.isArray(apiData.data[dataKey])) {
-      const infoArray = apiData.data[dataKey]
+    if (effectiveApiData?.code === 200 && effectiveApiData?.data?.[dataKey] && Array.isArray(effectiveApiData.data[dataKey])) {
+      const infoArray = effectiveApiData.data[dataKey]
 
       // Find the specific API info by tool_id from the URL parameters
       const targetApiInfo = infoArray.find(info => info.tool_id === tool_id)
@@ -295,14 +326,14 @@ const ToolConfigurationPage: React.FC = () => {
         setCodeLanguage((transformedTool.language as 'javascript' | 'python') || 'python')
         setCodeContent(transformedTool.code || '')
       }
-    } else if (apiData && apiData?.code !== 200) {
+    } else if (effectiveApiData && effectiveApiData?.code !== 200) {
       // API returned an error
       setSnackbar({
         open: true,
-        message: `${t('plugins.config.loadFailed', '加载工具配置失败：{{message}}')}: ${apiData?.message || t('plugins.errors.unknownError', '未知错误')}`,
+        message: `${t('plugins.config.loadFailed', '加载工具配置失败：{{message}}')}: ${effectiveApiData?.message || t('plugins.errors.unknownError', '未知错误')}`,
         severity: 'error',
       })
-    } else if (apiData && (!apiData?.data?.[dataKey] || !Array.isArray(apiData.data[dataKey]))) {
+    } else if (effectiveApiData && (!effectiveApiData?.data?.[dataKey] || !Array.isArray(effectiveApiData.data[dataKey]))) {
       // API returned success but no valid data
       setSnackbar({
         open: true,
@@ -310,7 +341,8 @@ const ToolConfigurationPage: React.FC = () => {
         severity: 'warning',
       })
     }
-  }, [apiData, tool_id, pluginType])
+  // Use stable dependencies: only re-run when data content actually changes
+  }, [mockApiData !== null ? JSON.stringify(mockApiData) : apiData, tool_id, pluginType, t])
 
   // Handle API errors
   useEffect(() => {
@@ -1163,16 +1195,19 @@ const ToolConfigurationPage: React.FC = () => {
       } else {
         navigate('/dashboard/agents')
       }
-    } else if (fromPublishVersion) {
+    } else if (fromPublishVersion && publishVersion) {
       // 从插件发布版本页面跳转过来的，返回到插件版本页面
-      navigate(`/dashboard/plugins/${plugin_id}/versions`)
+      navigate(`/dashboard/plugins/${plugin_id}/${publishVersion}`)
     } else {
       // 从插件管理页面跳转过来的，返回到插件配置页面
       navigate(`/dashboard/plugins/${plugin_id}`)
     }
   }
 
-  if (isLoadingApi) {
+  // Don't show loading if we have toolsData (data is already available from publish version)
+  const isLoadingEffective = isLoadingApi && !toolsData
+
+  if (isLoadingEffective) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

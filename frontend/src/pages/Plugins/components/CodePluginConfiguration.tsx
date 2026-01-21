@@ -258,6 +258,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
             state: {
               source: 'plugin',
               pluginType: 'code',
+              publishVersion: pluginConfigData?.plugin_version,
             },
           })
         }
@@ -549,6 +550,8 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                               source: 'plugin',
                               pluginType: 'code',
                               fromPublishVersion: isReadOnly,
+                              publishVersion: pluginConfigData?.plugin_version,
+                              toolsData: isReadOnly ? codeTools : undefined,
                             },
                           })
                         }}
@@ -582,6 +585,8 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                                       source: 'plugin',
                                       pluginType: 'code',
                                       fromPublishVersion: isReadOnly,
+                                      publishVersion: pluginConfigData?.plugin_version,
+                                      toolsData: isReadOnly ? codeTools : undefined,
                                     },
                                   })
                                 }}
