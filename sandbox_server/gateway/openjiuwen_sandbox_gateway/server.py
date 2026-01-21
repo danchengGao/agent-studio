@@ -5,8 +5,6 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from app.sandbox import SandboxConfig, get_sandbox
-from app.util import get_base_code, parse_result
 from openjiuwen_sandbox_gateway.app.gateway import remote_python, remote_javascript
 
 
@@ -18,6 +16,8 @@ app = FastAPI()
 
 arch = sys.platform
 if arch == "linux" and ENABLE_LINUX_SANDBOX:
+    from app.sandbox import SandboxConfig, get_sandbox
+    from app.util import get_base_code, parse_result
     config = SandboxConfig.init_from_file(os.path.join(os.path.dirname(__file__), './conf/sandbox_config.yaml'))
 
 
