@@ -393,7 +393,7 @@ class UserInputElem(BaseModel):
     description: Optional[str] = Field("")
     type: Optional[str] = Field("")
     required: Optional[bool] = Field(False)
-    default: Optional[str] = Field("")
+    default: Optional[Any] = Field(None)
 
 
 class UserInputsConfig(BaseModel):

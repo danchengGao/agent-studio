@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from sqlalchemy import (JSON, BigInteger, ForeignKey, Index, String, Text,
                         UniqueConstraint, and_, func, select, Integer)
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import (Mapped, declarative_mixin,
                             foreign, mapped_column, relationship)
 from openjiuwen_studio.core.database import milliseconds
@@ -24,7 +25,10 @@ class WorkflowDBMixin:
     space_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     url: Mapped[str | None] = mapped_column(String(512), nullable=True, default=None)
     icon_uri: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
-    schema: Mapped[str | None] = mapped_column(Text, default=None, nullable=True)
+    if settings.DB_TYPE.lower() == "mysql":
+        schema: Mapped[str | None] = mapped_column(LONGTEXT, default=None, nullable=True)
+    else:
+        schema: Mapped[str | None] = mapped_column(Text, default=None, nullable=True)
 
     # 通用 JSON，MySQL/PostgreSQL/SQLite 均支持
     input_parameters: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=None, nullable=True)
