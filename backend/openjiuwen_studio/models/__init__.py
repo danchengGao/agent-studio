@@ -1,4 +1,4 @@
-from openjiuwen_studio.core.database import Base
+from .db_fun_base import Base
 from .agent import AgentBaseDB, AgentPublishDB
 from .agent_execution import AgentExecutionDB, AgentExecutionDetailsDB
 from .awp_relation import AgentWorkflowRelationDB

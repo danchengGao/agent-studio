@@ -392,4 +392,4 @@ class OptBadCaseInfo(BaseModel):
                 if not query.strip() or not label.strip():
                     raise ValueError("'query' and 'label' fields in badcase cannot be empty")
         return value
-    
+

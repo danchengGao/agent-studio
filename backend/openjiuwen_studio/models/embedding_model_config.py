@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from sqlalchemy.sql import func
-from openjiuwen_studio.core.database import Base
+from .db_fun_base import Base
 
 
 class EmbeddingModelConfig(Base):

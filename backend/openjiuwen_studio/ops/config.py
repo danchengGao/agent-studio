@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # 应用配置
     DEBUG: bool = Field(False, env="DEBUG")
+    AUTO_SYNC_DB: bool = Field(False, env="AUTO_SYNC_DB")
 
      # 按 DB_TYPE 校验必选字段
     @model_validator(mode="after")

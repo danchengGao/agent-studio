@@ -21,7 +21,8 @@ from openjiuwen_studio.ops.modules.prompt.infra.database import create_database_
 from openjiuwen_studio.memory_engine_start import MemoryEngineManager
 
 from openjiuwen_studio.routers import register
-from openjiuwen_studio.core.database import engine, Base
+from openjiuwen_studio.core.database import engine
+from openjiuwen_studio.models.db_fun_base import Base
 # Import all models to ensure they are registered with SQLAlchemy
 from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelConfig, AgentBaseDB, AgentPublishDB, \
     PromptRelationDB, TagDB, UserDB, SpaceDB, SpaceUserDB, WorkflowBaseDB, WorkflowPublishDB, PluginBaseDB, \
@@ -31,6 +32,7 @@ from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelC
 # Import database sync tool
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.db_sync import run_database_sync
+from openjiuwen_studio.ops.config import settings as ops_settings
 # Import Trace models
 from openjiuwen_studio.models.trace_detail import TraceDetailDB
 from openjiuwen_studio.models.trace_summary import TraceSummaryDB
@@ -102,8 +104,11 @@ async def lifespan_func(app: FastAPI):
     workflow_tag_association.create(bind=engine, checkfirst=True)
 
     # 运行数据库字段同步（添加新字段）
-    run_database_sync()
-    logger.info("✅ Database field sync completed")
+    if ops_settings.AUTO_SYNC_DB:
+        logger.info("🔵 [Config] AUTO_SYNC_DB is enabled. Running database field sync...")
+        run_database_sync()
+    else:
+        logger.info("⚪️ [Config] AUTO_SYNC_DB is disabled. Skipping automatic database field sync.")
 
     # ops数据库相关表自动创建
     create_database_tables()
