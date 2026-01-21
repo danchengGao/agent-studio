@@ -7,6 +7,7 @@ from openjiuwen.core.common.logging import logger
 from openjiuwen.core.memory.config.config import SysMemConfig
 from openjiuwen.core.memory.embed_models.api import APIEmbedModel
 from openjiuwen.core.memory.engine.memory_engine import MemoryEngine
+from openjiuwen.core.memory.store.impl.chroma_semantic_store import ChromaSemanticStore
 from openjiuwen.core.memory.store.impl.dbm_kv_store import DbmKVStore
 from openjiuwen.core.memory.store.impl.default_db_store import DefaultDbStore
 from openjiuwen.core.memory.store.impl.milvus_semantic_store import \
@@ -47,14 +48,26 @@ class MemoryEngineManager:
             timeout=int(os.getenv("EMBED_TIMEOUT", 60)),
             max_retries=int(os.getenv("EMBED_MAX_RETRIES", 3)),
         )
-        semantic_store = MilvusSemanticStore(
-            milvus_host=os.getenv("MILVUS_HOST"),
-            milvus_port=os.getenv("MILVUS_PORT"),
-            collection_name=os.getenv("MILVUS_COLLECTION_NAME"),
-            embedding_dims=os.getenv("EMBEDDING_MODEL_DIMENTION", 1024),
-            embed_model=embed_model,
-            token=os.getenv("MILVUS_TOKEN", None)
-        )
+        vector_db_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+        semantic_store = None
+        if vector_db_type == "milvus":
+            semantic_store = MilvusSemanticStore(
+                milvus_host=os.getenv("MILVUS_HOST"),
+                milvus_port=os.getenv("MILVUS_PORT"),
+                collection_name=os.getenv("MILVUS_COLLECTION_NAME"),
+                embedding_dims=os.getenv("EMBEDDING_MODEL_DIMENTION", 1024),
+                embed_model=embed_model,
+                token=os.getenv("MILVUS_TOKEN", None)
+            )
+            logger.info("✅ milvus semantic store created")
+        elif vector_db_type == "chroma":
+            semantic_store = ChromaSemanticStore(
+                persist_directory=data_dir,
+                embed_model=embed_model,
+            )
+            logger.info("✅ chroma semantic store created")
+        else:
+            logger.error(f"Unknown vector db type: {vector_db_type}, please set INDEX_MANAGER_TYPE to milvus or chroma")
 
         agent_database_url = get_database_url("agent")
         async_agent_database_url = get_async_database_url(agent_database_url)
