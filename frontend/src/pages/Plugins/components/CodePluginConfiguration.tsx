@@ -179,6 +179,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
     code: '',
     codeLanguage: 'python' as 'javascript' | 'python',
   })
+  const [deletingToolId, setDeletingToolId] = useState<string | null>(null)
 
   // Tool creation API
   const createCodeToolApi = usePluginCreateCode()
@@ -276,6 +277,8 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
     if (!plugin_id || !tool?.tool_id) return
 
     try {
+      setDeletingToolId(tool.tool_id)
+
       const deleteRequest = {
         space_id: getDefaultSpaceId(),
         plugin_id,
@@ -299,6 +302,8 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
       console.error('删除工具失败:', error)
       const errorMessage = error?.response?.data?.message || error?.message || t('plugins.pluginConfig.deleteFailedRetry', '删除工具失败，请稍后重试')
       showError(errorMessage)
+    } finally {
+      setDeletingToolId(null)
     }
   }
 
@@ -596,7 +601,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                               </IconButton>
                             )}
                             {!isReadOnly &&
-                              (deleteToolApi.isLoading ? (
+                              (deletingToolId === tool.tool_id ? (
                                 <Button
                                   size="small"
                                   disabled

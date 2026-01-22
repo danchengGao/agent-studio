@@ -187,6 +187,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
     path: '',
     method: '',
   })
+  const [deletingToolId, setDeletingToolId] = useState<string | null>(null)
 
   // Tool creation API
   const createToolApi = usePluginCreateApi()
@@ -333,6 +334,8 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
     if (!plugin_id || !tool?.tool_id) return
 
     try {
+      setDeletingToolId(tool.tool_id)
+
       const deleteRequest = {
         space_id: getDefaultSpaceId(),
         plugin_id,
@@ -354,6 +357,8 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
       console.error(t('plugins.pluginConfig.deleteFailed', '删除工具失败'), error)
       const errorMessage = error?.response?.data?.message || error?.message || t('plugins.pluginConfig.deleteFailedRetry', '删除工具失败，请稍后重试')
       showError(errorMessage)
+    } finally {
+      setDeletingToolId(null)
     }
   }
 
@@ -892,7 +897,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                               </IconButton>
                             )}
                             {!isReadOnly &&
-                              (deleteToolApi.isLoading ? (
+                              (deletingToolId === tool.tool_id ? (
                                 <Button
                                   size="small"
                                   disabled

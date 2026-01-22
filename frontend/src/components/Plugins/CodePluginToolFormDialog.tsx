@@ -198,7 +198,7 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
               <InputLabel>{t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}</InputLabel>
               <Select
                 value={form.runtime}
-                onChange={e => onFormChange('runtime', e.target.value)}
+                onChange={e => handleRuntimeChange(e.target.value as 'python3' | 'nodejs')}
                 label={t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}
               >
                 {runtimeOptions.map(option => (
@@ -320,19 +320,11 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
               )}
 
               <div className="border border-gray-200 rounded-lg overflow-hidden">
-                {/* Language selector */}
+                {/* Code editor based on runtime language - no selector here */}
                 <div className="bg-gray-50 border-b border-gray-200 p-3">
-                  <FormControl size="small" className="min-w-32">
-                    <InputLabel>{t('plugins.pluginConfig.programmingLanguage', '编程语言')}</InputLabel>
-                    <Select
-                      value={form.codeLanguage}
-                      label={t('plugins.pluginConfig.programmingLanguage', '编程语言')}
-                      onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}
-                    >
-                      <MenuItem value="python">Python</MenuItem>
-                      <MenuItem value="javascript">JavaScript</MenuItem>
-                    </Select>
-                  </FormControl>
+                  <Typography variant="body2" className="text-gray-600">
+                    {t('plugins.pluginConfig.programmingLanguage', '编程语言')}: <span className="font-medium">{form.codeLanguage === 'javascript' ? 'JavaScript' : 'Python'}</span>
+                  </Typography>
                 </div>
 
                 {/* Code editor based on language */}

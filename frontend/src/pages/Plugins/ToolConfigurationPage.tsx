@@ -158,6 +158,7 @@ const ToolConfigurationPage: React.FC = () => {
   const [testResults, setTestResults] = useState('')
   const [testError, setTestError] = useState('')
   const [testParameters, setTestParameters] = useState<Record<string, string>>({})
+  const [testParameterErrors, setTestParameterErrors] = useState<Record<string, string>>({})
   const [isTestRunning, setIsTestRunning] = useState(false)
   // Code editor state for code tools
   const [codeLanguage, setCodeLanguage] = useState<'javascript' | 'python'>('python')
@@ -838,6 +839,16 @@ const ToolConfigurationPage: React.FC = () => {
     }
   }
 
+  const handleRuntimeLanguageChange = (language: 'python' | 'javascript' | 'nodejs') => {
+    // Normalize language value: nodejs -> javascript for code editor
+    const normalizedLanguage = language === 'nodejs' ? 'javascript' : language
+    setCodeLanguage(normalizedLanguage as 'javascript' | 'python')
+    if (tool) {
+      const updatedTool = { ...tool, language: normalizedLanguage }
+      setTool(updatedTool)
+    }
+  }
+
   const handleCodeChange = (code: string) => {
     setCodeContent(code)
     if (tool) {
@@ -983,16 +994,93 @@ const ToolConfigurationPage: React.FC = () => {
     setTestParameters(initialParams)
   }
 
-  const handleTestParameterChange = (paramName: string, value: string, paramType: 'plugin' | 'tool') => {
+  const handleTestParameterChange = (paramName: string, value: string, paramType: 'plugin' | 'tool', fieldType?: string) => {
     const key = `${paramType}_${paramName}`
     setTestParameters(prev => ({
       ...prev,
       [key]: value,
     }))
+
+    if (fieldType === 'int' || fieldType === 'float' || fieldType === 'object' || fieldType === 'array_int' || fieldType === 'array_float') {
+      const error = validateTestParameterValue(value, fieldType)
+      setTestParameterErrors(prev => ({
+        ...prev,
+        [key]: error,
+      }))
+    } else {
+      setTestParameterErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[key]
+        return newErrors
+      })
+    }
+  }
+
+  const validateTestParameterValue = (value: string, type: string): string => {
+    if (!value || value.trim() === '') return ''
+
+    const trimmedValue = value.trim()
+
+    if (type === 'int') {
+      if (!/^-?\d+$/.test(trimmedValue)) return '请输入有效的整数'
+    } else if (type === 'float') {
+      const num = Number(trimmedValue)
+      if (isNaN(num)) return '请输入有效的数字'
+    } else if (type === 'object') {
+      try {
+        const parsed = JSON.parse(trimmedValue)
+        if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+          return '请输入有效的JSON对象格式，例如: {"key":"value"}'
+        }
+      } catch (e) {
+        return '请输入有效的JSON格式，例如: {"key":"value"}'
+      }
+    } else if (type === 'array_int') {
+      try {
+        const parsed = JSON.parse(trimmedValue)
+        if (!Array.isArray(parsed)) {
+          return '请输入有效的数组格式，例如: [1,2,3]'
+        }
+        if (parsed.length > 0) {
+          const allIntegers = parsed.every((item: unknown) => Number.isInteger(item))
+          if (!allIntegers) {
+            return '数组中的所有元素必须是整数，例如: [1,2,3]'
+          }
+        }
+      } catch (e) {
+        return '请输入有效的JSON数组格式，例如: [1,2,3]'
+      }
+    } else if (type === 'array_float') {
+      try {
+        const parsed = JSON.parse(trimmedValue)
+        if (!Array.isArray(parsed)) {
+          return '请输入有效的数组格式，例如: [1.5,2.3,3.14]'
+        }
+        if (parsed.length > 0) {
+          const allNumbers = parsed.every((item: unknown) => typeof item === 'number' && !isNaN(item))
+          if (!allNumbers) {
+            return '数组中的所有元素必须是数字，例如: [1.5,2.3,3.14]'
+          }
+        }
+      } catch (e) {
+        return '请输入有效的JSON数组格式，例如: [1.5,2.3,3.14]'
+      }
+    }
+
+    return ''
   }
 
   const validateRequiredParameters = (): { isValid: boolean; missingParams: string[] } => {
     const missing: string[] = []
+
+    // Check for validation errors first
+    const hasValidationErrors = Object.values(testParameterErrors).some(error => error !== '')
+    if (hasValidationErrors) {
+      return {
+        isValid: false,
+        missingParams: [],
+      }
+    }
 
     // Get tool parameter names to filter out plugin parameters with the same name
     const toolParamNames = new Set(tool?.input_parameters?.filter(p => p.is_runtime !== false).map(p => p.name) || [])
@@ -1056,8 +1144,8 @@ const ToolConfigurationPage: React.FC = () => {
           )
         },
         onComplete: (buffer: string) => {
-          console.log(t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), buffer)
-          setSnackbar({ open: true, message: t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), severity: 'success' })
+          // console.log(t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), buffer)
+          // setSnackbar({ open: true, message: t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), severity: 'success' })
 
           try {
             // 解析buffer获取最终结果数据
@@ -1164,10 +1252,10 @@ const ToolConfigurationPage: React.FC = () => {
   }
 
   // Template handling functions
-  const availableTemplates = codeTemplates.filter(template => template.language === codeLanguage)
+  const availableTemplates = codeTemplates.filter(template => template.language === (tool?.language || 'python'))
 
   const handleTemplateSelect = (templateName: string) => {
-    const template = codeTemplates.find(t => t.name === templateName && t.language === codeLanguage)
+    const template = codeTemplates.find(t => t.name === templateName && t.language === (tool?.language || 'python'))
     if (template) {
       setCodeContent(template.template)
       setSelectedTemplate(templateName)
@@ -1347,7 +1435,7 @@ const ToolConfigurationPage: React.FC = () => {
                       {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}
                     </Typography>
                     <FormControl fullWidth>
-                      <Select value={tool.language || 'python'} onChange={e => setTool({ ...tool, language: e.target.value })} disabled={isReadOnly}>
+                      <Select value={tool.language || 'python'} onChange={e => handleRuntimeLanguageChange(e.target.value as 'python' | 'javascript' | 'nodejs')} disabled={isReadOnly}>
                         <MenuItem value="python">Python 3</MenuItem>
                         <MenuItem value="javascript">Node.js</MenuItem>
                       </Select>
@@ -1639,7 +1727,7 @@ const ToolConfigurationPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <Typography variant="h6">代码编辑器</Typography>
                 <div className="flex items-center space-x-2">
-                  <Chip label={` ${t('plugins.toolConfig.language', '语言')}: ${tool.language || 'python'}`} size="small" />
+                  <Chip label={` ${t('plugins.toolConfig.language', '语言')}: ${tool.language === 'javascript' ? 'JavaScript' : 'Python'}`} size="small" />
                   <Chip label={t('plugins.toolConfig.syntaxHighlight', '语法高亮')} size="small" variant="outlined" />
                   {selectedTemplate && (
                     <Chip label={`${t('plugins.toolConfig.template', '模板')}: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />
@@ -1690,7 +1778,7 @@ const ToolConfigurationPage: React.FC = () => {
                             <Typography variant="body2" className="font-medium">
                               {template.name}
                             </Typography>
-                            <Chip label={codeLanguage === 'javascript' ? 'JS' : 'PY'} size="small" color={codeLanguage === 'javascript' ? 'success' : 'info'} />
+                            <Chip label={(tool?.language || 'python') === 'javascript' ? 'JS' : 'PY'} size="small" color={(tool?.language || 'python') === 'javascript' ? 'success' : 'info'} />
                           </div>
                           <Typography variant="body2" className="text-gray-600 text-sm">
                             {template.description}
@@ -1708,20 +1796,11 @@ const ToolConfigurationPage: React.FC = () => {
                 )}
 
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  {/* Language selector */}
+                  {/* Code editor based on runtime language - no selector here */}
                   <div className="bg-gray-50 border-b border-gray-200 p-3">
-                    <FormControl size="small" className="min-w-32">
-                      <InputLabel>{t('plugins.pluginConfig.programmingLanguage', '编程语言')}</InputLabel>
-                      <Select
-                        value={tool.language || 'python'}
-                        label={t('plugins.pluginConfig.programmingLanguage', '编程语言')}
-                        onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}
-                        disabled={isReadOnly}
-                      >
-                        <MenuItem value="python">Python</MenuItem>
-                        <MenuItem value="javascript">JavaScript</MenuItem>
-                      </Select>
-                    </FormControl>
+                    <Typography variant="body2" className="text-gray-600">
+                      {t('plugins.pluginConfig.programmingLanguage', '编程语言')}: <span className="font-medium">{tool.language === 'javascript' ? 'JavaScript' : 'Python'}</span>
+                    </Typography>
                   </div>
 
                   {/* Code editor based on language */}
@@ -1758,7 +1837,7 @@ const ToolConfigurationPage: React.FC = () => {
                     {t('plugins.pluginConfig.usageTips', '💡 使用提示')}
                   </Typography>
                   <div className="space-y-1 text-sm text-blue-800">
-                    {codeLanguage === 'python' ? (
+                    {(tool.language || 'python') === 'python' ? (
                       <>
                         <div>
                           • {t('plugins.pluginConfig.pythonTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main</code>{' '}
@@ -1819,7 +1898,7 @@ const ToolConfigurationPage: React.FC = () => {
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}: {tool.language === 'javascript' ? 'Node.js' : 'Python 3'}
+                            {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}: {tool.language === 'javascript' ? 'Node.js' : (tool.language === 'python' ? 'Python 3' : 'Python')}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -2148,13 +2227,15 @@ const ToolConfigurationPage: React.FC = () => {
                         const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
                         const paramValue = testParameters[`plugin_${param.name}`] || ''
                         const isRequiredAndEmpty = param.is_required && (!paramValue || paramValue.trim() === '')
+                        const validationError = testParameterErrors[`plugin_${param.name}`] || ''
+                        const hasError = isRequiredAndEmpty || !!validationError
                         return (
                           <div
                             key={`plugin-param-${index}`}
-                            className={`space-y-2 p-3 rounded-lg border ${isRequiredAndEmpty ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}
+                            className={`space-y-2 p-3 rounded-lg border ${hasError ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}
                           >
                             <div className="flex items-center space-x-2">
-                              <Typography variant="subtitle2" className={`font-medium ${isRequiredAndEmpty ? 'text-red-700' : ''}`}>
+                              <Typography variant="subtitle2" className={`font-medium ${hasError ? 'text-red-700' : ''}`}>
                                 {param.name}
                                 {param.is_required && <span className="text-red-500 ml-1">*</span>}
                               </Typography>
@@ -2180,12 +2261,12 @@ const ToolConfigurationPage: React.FC = () => {
                                 fullWidth
                                 size="small"
                                 value={paramValue}
-                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'plugin')}
+                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'plugin', typeString)}
                                 placeholder={`请输入${param.name}...`}
                                 multiline={typeString === 'object'}
                                 rows={typeString === 'object' ? 3 : 1}
-                                error={isRequiredAndEmpty}
-                                helperText={isRequiredAndEmpty ? '此参数为必填项' : ''}
+                                error={hasError}
+                                helperText={validationError || (isRequiredAndEmpty ? '此参数为必填项' : '')}
                               />
                             )}
                           </div>
@@ -2208,13 +2289,15 @@ const ToolConfigurationPage: React.FC = () => {
                       .map(param => {
                         const paramValue = testParameters[`tool_${param.name}`] || ''
                         const isRequiredAndEmpty = param.is_required && (!paramValue || paramValue.trim() === '')
+                        const validationError = testParameterErrors[`tool_${param.name}`] || ''
+                        const hasError = isRequiredAndEmpty || !!validationError
                         return (
                           <div
                             key={param.id}
-                            className={`space-y-2 p-3 rounded-lg border ${isRequiredAndEmpty ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-200'}`}
+                            className={`space-y-2 p-3 rounded-lg border ${hasError ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-200'}`}
                           >
                             <div className="flex items-center space-x-2">
-                              <Typography variant="subtitle2" className={`font-medium ${isRequiredAndEmpty ? 'text-red-700' : ''}`}>
+                              <Typography variant="subtitle2" className={`font-medium ${hasError ? 'text-red-700' : ''}`}>
                                 {param.name}
                                 {param.is_required && <span className="text-red-500 ml-1">*</span>}
                               </Typography>
@@ -2240,12 +2323,12 @@ const ToolConfigurationPage: React.FC = () => {
                                 fullWidth
                                 size="small"
                                 value={paramValue}
-                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'tool')}
+                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'tool', param.type)}
                                 placeholder={`请输入${param.name}...`}
                                 multiline={param.type === 'object'}
                                 rows={param.type === 'object' ? 3 : 1}
-                                error={isRequiredAndEmpty}
-                                helperText={isRequiredAndEmpty ? '此参数为必填项' : ''}
+                                error={hasError}
+                                helperText={validationError || (isRequiredAndEmpty ? '此参数为必填项' : '')}
                               />
                             )}
                           </div>
