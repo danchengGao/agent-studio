@@ -843,11 +843,18 @@ const PromptOptimizeEditPage: React.FC = () => {
                 setOptimizeModelParams(content.modelInfo.headers)
               }
             } else {
+              // 如果找不到匹配的模型，设置为 null（模型可能已被删除）
               console.warn('❌ 未找到匹配的优化模型:', {
                 id: content.modelInfo.id,
                 model_from: content.modelInfo.model_from,
               })
+              setSelectedOptimizeModel(null)
+              setOptimizeModelParams({})
             }
+          } else {
+            // 如果草稿中没有模型信息，设置为 null
+            setSelectedOptimizeModel(null)
+            setOptimizeModelParams({})
           }
 
           // 根据 id + model_from 设置运行模型
@@ -860,11 +867,18 @@ const PromptOptimizeEditPage: React.FC = () => {
                 setRunModelParams(content.assistantInfo.headers)
               }
             } else {
+              // 如果找不到匹配的模型，设置为 null（模型可能已被删除）
               console.warn('❌ 未找到匹配的运行模型:', {
                 id: content.assistantInfo.id,
                 model_from: content.assistantInfo.model_from,
               })
+              setSelectedRunModel(null)
+              setRunModelParams({})
             }
+          } else {
+            // 如果草稿中没有模型信息，设置为 null
+            setSelectedRunModel(null)
+            setRunModelParams({})
           }
         }
       } else if (jobDetailData.progress) {
@@ -883,11 +897,18 @@ const PromptOptimizeEditPage: React.FC = () => {
               setOptimizeModelParams(modelInfo.headers)
             }
           } else {
+            // 如果找不到匹配的模型，设置为 null（模型可能已被删除）
             console.warn('❌ 未找到匹配的优化模型:', {
               id: modelInfo.id,
               model_from: modelInfo.model_from,
             })
+            setSelectedOptimizeModel(null)
+            setOptimizeModelParams({})
           }
+        } else {
+          // 如果任务中没有模型信息，设置为 null
+          setSelectedOptimizeModel(null)
+          setOptimizeModelParams({})
         }
 
         // 根据 id + model_from 设置运行模型
@@ -900,11 +921,18 @@ const PromptOptimizeEditPage: React.FC = () => {
               setRunModelParams(assistantInfo.headers)
             }
           } else {
+            // 如果找不到匹配的模型，设置为 null（模型可能已被删除）
             console.warn('❌ 未找到匹配的运行模型:', {
               id: assistantInfo.id,
               model_from: assistantInfo.model_from,
             })
+            setSelectedRunModel(null)
+            setRunModelParams({})
           }
+        } else {
+          // 如果任务中没有模型信息，设置为 null
+          setSelectedRunModel(null)
+          setRunModelParams({})
         }
       }
     }
@@ -2145,8 +2173,8 @@ const PromptOptimizeEditPage: React.FC = () => {
       if (response.code === 0) {
         setModels(response.models)
 
-        // 设置默认选中的模型
-        if (response.models.length > 0 && !selectedOptimizeModel) {
+        // 设置默认选中的模型（只在新建模式下，且没有选中模型时才自动选择）
+        if (response.models.length > 0 && !isEditMode && !selectedOptimizeModel) {
           const defaultModel = response.models[0]
           setSelectedOptimizeModel(defaultModel)
           setSelectedRunModel(defaultModel)

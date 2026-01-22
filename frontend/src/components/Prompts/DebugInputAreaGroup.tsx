@@ -3,6 +3,7 @@ import { TextField, Button } from '@mui/material'
 import { Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ComparisonGroupData } from '@/types/promptType'
+import { handleInputEnterKey } from '@/utils/prompts/utils'
 
 export interface DebugInputAreaGroupProps {
   comparisonInputMessage: string
@@ -27,12 +28,7 @@ const DebugInputAreaGroup: React.FC<DebugInputAreaGroupProps> = ({ comparisonInp
           placeholder={t('prompts.promptEdit.comparisonMode.comparisonInputPlaceholder')}
           value={comparisonInputMessage}
           onChange={e => onInputChange(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              onSend()
-            }
-          }}
+          onKeyDown={handleInputEnterKey(false, onInputChange, onSend) as React.KeyboardEventHandler<HTMLDivElement>}
           disabled={isProcessing}
           sx={{
             backgroundColor: 'white',

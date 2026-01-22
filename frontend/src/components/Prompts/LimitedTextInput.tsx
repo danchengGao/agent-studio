@@ -15,6 +15,7 @@ export interface LimitedTextInputProps {
   sx?: object
   autoFocus?: boolean
   onKeyPress?: (e: React.KeyboardEvent) => void
+  onKeyDown?: (e: React.KeyboardEvent) => void
   onBlur?: () => void
 }
 
@@ -31,6 +32,7 @@ const LimitedTextInput: React.FC<LimitedTextInputProps> = ({
   sx = {},
   autoFocus = false,
   onKeyPress,
+  onKeyDown,
   onBlur,
 }) => {
   const { t } = useTranslation()
@@ -65,6 +67,7 @@ const LimitedTextInput: React.FC<LimitedTextInputProps> = ({
       label={label}
       autoFocus={autoFocus}
       onKeyPress={onKeyPress}
+      onKeyDown={onKeyDown}
       inputProps={{ maxLength }}
       sx={{
         marginTop: '4px',

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { TextField, Button, IconButton, Tooltip } from '@mui/material'
 import { Layers, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { handleInputEnterKey } from '@/utils/prompts/utils'
 
 export interface DebugInputAreaProps {
   inputMessage: string
@@ -128,15 +129,7 @@ const DebugInputArea: React.FC<DebugInputAreaProps> = ({ inputMessage, onInputCh
               }
               onInputChange(e.target.value)
             }}
-            onKeyDown={e => {
-              if (isReadOnlyMode) {
-                return
-              }
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                onSend()
-              }
-            }}
+            onKeyDown={handleInputEnterKey(isReadOnlyMode, onInputChange, onSend) as React.KeyboardEventHandler<HTMLDivElement>}
             disabled={isProcessing || isReadOnlyMode}
             sx={{
               backgroundColor: 'white',

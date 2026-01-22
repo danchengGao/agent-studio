@@ -1117,7 +1117,7 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                                 return
                               }
 
-                              // 使用防抖更新光标位置（1000ms 防抖）
+                              // 使用防抖更新光标位置（50ms 防抖）
                               if (cursorPositionUpdateTimer.current) {
                                 clearTimeout(cursorPositionUpdateTimer.current)
                               }
@@ -1128,7 +1128,7 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                                 // 调用原始的光标位置处理，传递完整的参数
                                 onCursorPositionChange?.(message.id)?.(position, cursorPos)
                                 cursorPositionUpdateTimer.current = null
-                              }, 1000)
+                              }, 50)
                             }
                           : undefined
                       }

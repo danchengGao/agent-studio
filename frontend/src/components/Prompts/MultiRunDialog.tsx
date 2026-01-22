@@ -3,6 +3,7 @@ import { Dialog, DialogTitle, DialogContent, Button, Typography, TextField, Icon
 import { X, Trash2, Maximize2, Minimize2, Layers, CheckCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import ChatMessageArea, { ChatMessage } from './ChatMessageArea'
+import { handleInputEnterKey } from '@/utils/prompts/utils'
 
 interface MultiRunDialogProps {
   open: boolean
@@ -184,15 +185,6 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
     }, 100)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (isReadOnly) {
-      return
-    }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
 
   const isProcessing = multiRunProcessing.some(processing => processing)
 
@@ -630,7 +622,7 @@ export const MultiRunDialog: React.FC<MultiRunDialogProps> = ({
                   }
                   setInputMessage(e.target.value)
                 }}
-                onKeyDown={handleKeyDown}
+                onKeyDown={handleInputEnterKey(isReadOnly, setInputMessage, handleSendMessage) as React.KeyboardEventHandler<HTMLDivElement>}
                 disabled={isProcessing || isReadOnly}
                 sx={{
                   backgroundColor: 'white',

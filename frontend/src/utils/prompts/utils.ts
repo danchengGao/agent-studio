@@ -427,3 +427,50 @@ export const handleRelationObjNavigate = (relationObj: RelationObj, workspaceId:
     navigate(`/dashboard/${routePath}/${relationObj.obj_id}`)
   }
 }
+
+/**
+ * 处理输入框的 Enter 键事件
+ * - Enter: 发送消息
+ * - Shift+Enter: 换行（使用默认行为）
+ * - Ctrl+Enter: 换行（手动插入换行符）
+ * - Alt+Enter: 换行（手动插入换行符）
+ * @param isReadOnlyMode 是否为只读模式
+ * @param onInputChange 输入内容变化回调函数
+ * @param onSend 发送消息回调函数
+ * @returns 键盘事件处理函数
+ */
+export const handleInputEnterKey = (
+  isReadOnlyMode: boolean,
+  onInputChange: (value: string) => void,
+  onSend: () => void,
+): React.KeyboardEventHandler => {
+  return (e: React.KeyboardEvent) => {
+    if (isReadOnlyMode) {
+      return
+    }
+    if (e.key === 'Enter') {
+      // Shift+Enter 使用默认行为换行
+      if (e.shiftKey) {
+        return
+      }
+      // Ctrl+Enter 或 Alt+Enter 手动插入换行
+      if (e.ctrlKey || e.altKey) {
+        e.preventDefault()
+        const target = e.target as HTMLTextAreaElement
+        const start = target.selectionStart
+        const end = target.selectionEnd
+        const value = target.value
+        const newValue = value.substring(0, start) + '\n' + value.substring(end)
+        onInputChange(newValue)
+        // 设置光标位置到换行符后面
+        setTimeout(() => {
+          target.selectionStart = target.selectionEnd = start + 1
+        }, 0)
+        return
+      }
+      // 单独 Enter 发送消息
+      e.preventDefault()
+      onSend()
+    }
+  }
+}

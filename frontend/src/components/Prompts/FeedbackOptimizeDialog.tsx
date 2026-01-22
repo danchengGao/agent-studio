@@ -3,6 +3,7 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, T
 import { useTranslation } from 'react-i18next'
 import { Zap, Copy, RotateCw, Check, X, Square } from 'lucide-react'
 import LimitedTextInput from './LimitedTextInput'
+import { handleInputEnterKey } from '@/utils/prompts/utils'
 
 // 优化模式定义
 export type OptimizationMode = 'general' | 'insert' | 'select'
@@ -173,14 +174,6 @@ const FeedbackOptimizeDialog: React.FC<FeedbackOptimizeDialogProps> = ({
     }
   }
 
-  // 处理键盘快捷键
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isOptimizing) {
-      e.preventDefault()
-      handleOptimizeRequest()
-    }
-  }
-
   // 停止反馈优化
   const handleStopOptimization = () => {
     console.log('🛑 [FeedbackOptimizeDialog] 用户点击停止反馈优化')
@@ -220,6 +213,13 @@ const FeedbackOptimizeDialog: React.FC<FeedbackOptimizeDialogProps> = ({
     }
     onOptimizeRequest()
   }, [localInput, currentOptimizationType, onOptimizeInputChange, onOptimizeRequest])
+
+  // 处理发送请求（包装函数，用于键盘事件处理）
+  const handleSendRequest = useCallback(() => {
+    if (!isOptimizing) {
+      handleOptimizeRequest()
+    }
+  }, [isOptimizing, handleOptimizeRequest])
 
   return (
     <Dialog
@@ -433,7 +433,7 @@ const FeedbackOptimizeDialog: React.FC<FeedbackOptimizeDialogProps> = ({
               rows={3}
               maxLength={500}
               autoFocus={!optimizedResult}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleInputEnterKey(false, handleInputChange, handleSendRequest) as React.KeyboardEventHandler}
             />
           </div>
         </div>

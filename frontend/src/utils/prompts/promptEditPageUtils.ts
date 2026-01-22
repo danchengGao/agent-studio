@@ -229,7 +229,7 @@ export const findModelByIdAndFrom = (modelId: string, modelFrom?: string, models
  */
 export const checkValidModel = (
   selectedModel: any | null,
-  modelConfig: { model?: string; model_from?: string } | null | undefined,
+  modelConfig: { model?: string | number; model_from?: string } | null | undefined,
   availableModels: any[],
 ): boolean => {
   // 1. 检查是否有选中的模型
@@ -237,16 +237,17 @@ export const checkValidModel = (
     return true
   }
   // 2. 如果没有选中的模型，检查 modelConfig 中是否有模型配置，并且能在 availableModels 中找到
-  if (modelConfig?.model && modelConfig.model.trim() !== '') {
-    const modelFromConfig = findModelByIdAndFrom(modelConfig.model, modelConfig.model_from, availableModels)
-    if (modelFromConfig) {
-      return true
+  if (modelConfig?.model) {
+    // 将 model 转换为字符串，确保能调用 trim 方法
+    const modelId = typeof modelConfig.model === 'string' ? modelConfig.model.trim() : String(modelConfig.model).trim()
+    if (modelId !== '') {
+      const modelFromConfig = findModelByIdAndFrom(modelId, modelConfig.model_from, availableModels)
+      if (modelFromConfig) {
+        return true
+      }
     }
   }
-  // 3. 如果以上都不满足，检查是否有可用的模型列表
-  if (availableModels.length > 0) {
-    return true
-  }
+  // 3. 如果以上都不满足，说明没有有效的模型配置
   return false
 }
 
