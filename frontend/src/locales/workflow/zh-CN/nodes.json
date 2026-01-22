@@ -165,7 +165,7 @@
       "defaultValueIfNotProvided": "参数未提供时的默认值",
       "inputVariableName": "输入变量名",
       "description": "描述",
-      "helpLLMUnderstandProperty": "帮助 M 理解该属性",
+      "helpLLMUnderstandProperty": "帮助 LLM 理解该属性",
       "defaultValue": "默认值"
     }
   },

@@ -53,7 +53,7 @@ export const NodeStatusHeader: React.FC<React.PropsWithChildren<NodeStatusBarPro
           />
         </div>
       </div>
-      {showDetail ? children : null}
+      {showDetail ? <div className={styles['node-status-header-body']}>{children}</div> : null}
     </div>
   )
 }

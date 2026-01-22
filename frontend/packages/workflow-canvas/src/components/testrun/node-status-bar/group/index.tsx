@@ -51,7 +51,11 @@ export const NodeStatusGroup: FC<NodeStatusGroupProps> = ({ title, data, optiona
           </Tag>
         )}
       </div>
-      {hasContent && isExpanded ? <DataStructureViewer data={data} size={size} outputFormat={outputFormat} /> : null}
+      {hasContent && isExpanded ? (
+        <div className={styles['node-status-group-content']}>
+          <DataStructureViewer data={data} size={size} outputFormat={outputFormat} />
+        </div>
+      ) : null}
     </>
   )
 }
