@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import os
+import re
 import uuid
 import time
 import inspect
@@ -75,6 +76,113 @@ from openjiuwen_studio.ops.modules.llm.llm_manager import get_llm_client_by_prot
 
 
 # ==================== GraphRAG 配置和模型管理 ====================
+
+def _extract_full_error_message(error: Exception) -> str:
+    """提取完整的错误信息，包括异常链中的所有错误
+    
+    用于提取 openjiuwen 包抛出的异常信息，因为 openjiuwen 包内部可能捕获异常后
+    使用 cause 参数重新抛出，形成异常链。
+    
+    Args:
+        error: 异常对象
+        
+    Returns:
+        完整的错误信息字符串，包含所有异常链中的错误
+    """
+    error_parts = []
+    current_error = error
+    
+    # 遍历异常链，收集所有错误信息
+    while current_error is not None:
+        error_str = str(current_error)
+        if error_str:
+            error_parts.append(error_str)
+        
+        # 检查是否有 __cause__ (异常链)
+        if hasattr(current_error, '__cause__') and current_error.__cause__:
+            current_error = current_error.__cause__
+        # 检查是否有 __context__ (异常上下文)
+        elif hasattr(current_error, '__context__') and current_error.__context__:
+            current_error = current_error.__context__
+        else:
+            break
+    
+    # 如果只有一个错误，直接返回
+    if len(error_parts) == 1:
+        return error_parts[0]
+    
+    # 如果有多个错误，用 " -> " 连接
+    return " -> ".join(error_parts)
+
+
+def _format_error_message_for_frontend(error_msg: str) -> str:
+    """格式化错误信息供前端显示
+    
+    改写规则：
+    1. 固定错误消息保持不变
+    2. 带前缀的错误：去掉前缀、状态码、箭头（替换为分号）
+    3. 在 "reason" 之前截断（如果存在）
+    4. 确保首字母大写
+    
+    Args:
+        error_msg: 原始错误信息
+        
+    Returns:
+        格式化后的错误信息
+    """
+    if not error_msg:
+        return error_msg
+    
+    # 固定错误消息列表（保持不变）
+    fixed_messages = {
+        "Document not found",
+        "Document status invalid",
+        "File path not found",
+        "Failed to update document status",
+        "Document validation failed",
+        "Processing failed with unknown error",
+        "Failed to update status to INDEXED",
+    }
+    
+    # 如果是固定错误消息，直接返回（首字母已大写）
+    if error_msg in fixed_messages:
+        return error_msg
+    
+    # 需要改写的错误信息
+    result = error_msg
+    
+    # 1. 去掉前缀
+    prefixes = [
+        "File parsing failed: ",
+        "Index building failed: ",
+        "Failed to update status to INDEXING: ",
+    ]
+    for prefix in prefixes:
+        if result.startswith(prefix):
+            result = result[len(prefix):]
+            break
+    
+    # 2. 去掉状态码 [155xxx]
+    result = re.sub(r'\[\d+\]\s*', '', result)
+    
+    # 3. 去掉箭头 -> 和前后空格，用分号替换
+    result = re.sub(r'\s*->\s*', '; ', result)
+    
+    # 4. 在 "reason" 之前截断（如果存在）
+    # 匹配 ", reason:" 或 ",reason:" 或 " reason:" 等变体
+    reason_pattern = r',\s*reason\s*:'
+    match = re.search(reason_pattern, result, re.IGNORECASE)
+    if match:
+        result = result[:match.start()].strip()
+    
+    # 5. 清理多余的空格
+    result = ' '.join(result.split())
+    
+    # 6. 确保首字母大写
+    if result:
+        result = result[0].upper() + result[1:] if len(result) > 1 else result.upper()
+    
+    return result
 
 
 def _create_llm_client_from_db(llm_model_id: str, space_id: str):
@@ -1416,11 +1524,14 @@ async def process_single_document(
                 file_name = Path(file_path).name
             documents = await _parse_file(file_path, parsing_strategy, doc_id, file_name=file_name)
         except Exception as parse_error:
+            # 提取 openjiuwen 包的完整错误信息（可能包含异常链）
+            full_error_msg = _extract_full_error_message(parse_error)
+            error_message = f"File parsing failed: {full_error_msg}"
             logger.error(
-                f"[DOC_PROCESS_BG] File parsing failed - Doc ID: {doc_id}, KB ID: {kb_id}",
+                f"[DOC_PROCESS_BG] File parsing failed - Doc ID: {doc_id}, KB ID: {kb_id}, Error: {error_message}",
                 exc_info=True,
             )
-            raise Exception("File parsing failed") from parse_error
+            raise Exception(error_message) from parse_error
 
         # 2. 索引文档（内部会进行分块和索引构建，并更新状态为INDEXING）
         try:
@@ -1434,11 +1545,14 @@ async def process_single_document(
                 process_info=process_info,
             )
         except Exception as index_error:
+            # 提取 openjiuwen 包的完整错误信息（可能包含异常链）
+            full_error_msg = _extract_full_error_message(index_error)
+            error_message = f"Index building failed: {full_error_msg}"
             logger.error(
-                f"[DOC_PROCESS_BG] Index building failed - Doc ID: {doc_id}, KB ID: {kb_id}",
+                f"[DOC_PROCESS_BG] Index building failed - Doc ID: {doc_id}, KB ID: {kb_id}, Error: {error_message}",
                 exc_info=True,
             )
-            raise Exception("Index building failed") from index_error
+            raise Exception(error_message) from index_error
 
         # 4. 更新文档状态为INDEXED，同时更新索引字段
         final_process_info = {
@@ -1468,7 +1582,9 @@ async def process_single_document(
         )
 
     except Exception as e:
-        # 只记录简化的错误信息（错误位置）
+        # 提取错误信息
+        # 注意：e 是我们新创建的异常，它的消息已经包含了原始错误信息
+        # 不需要遍历异常链，因为我们在创建异常时已经提取了完整的错误信息
         error_message = str(e)
         logger.error(
             f"[DOC_PROCESS_BG] Document processing failed - Doc ID: {doc_id}, "
@@ -1476,7 +1592,7 @@ async def process_single_document(
             exc_info=True,
         )
 
-        # 更新状态为FAILED，记录简化的错误信息
+        # 更新状态为FAILED，记录完整的错误信息
         try:
             knowledge_base_repository.document_update_status(
                 space_id=space_id,
@@ -2208,6 +2324,10 @@ def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) ->
             # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
             if status_value == DocumentStatus.FAILED.value and not error_msg:
                 error_msg = "Processing failed with unknown error"
+            
+            # 格式化错误信息供前端显示
+            if error_msg:
+                error_msg = _format_error_message_for_frontend(error_msg)
 
             status_items.append(
                 DocumentStatusResponse(

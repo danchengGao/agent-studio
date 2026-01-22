@@ -1147,8 +1147,19 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 text-sm">
                               {documentStatuses[doc.id]?.error_msg ? (
-                                <span className="text-red-600" title={documentStatuses[doc.id]?.error_msg}>
-                                  {documentStatuses[doc.id]?.error_msg}
+                                <span 
+                                  className="text-red-600 cursor-help break-words" 
+                                  title={documentStatuses[doc.id]?.error_msg}
+                                  style={{ 
+                                    maxWidth: '400px',
+                                    display: 'inline-block',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word'
+                                  }}
+                                >
+                                  {documentStatuses[doc.id]?.error_msg.length > 100 
+                                    ? `${documentStatuses[doc.id]?.error_msg.substring(0, 100)}...` 
+                                    : documentStatuses[doc.id]?.error_msg}
                                 </span>
                               ) : (
                                 <span className="text-gray-400">-</span>
