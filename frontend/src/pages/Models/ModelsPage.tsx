@@ -816,38 +816,12 @@ const ModelsPage: React.FC = () => {
       
       const errorMessage = parseError(errorDetail)
       
-      // 检查错误信息是否已经包含 "模型已禁用" 或 "inactive"
-      const isModelDisabledError = errorDetail.toLowerCase().includes('inactive') || 
-                                    errorDetail.toLowerCase().includes('disabled') ||
-                                    errorDetail.includes('模型已禁用') ||
-                                    errorDetail.includes('已禁用') ||
-                                    errorDetail.toLowerCase().includes('is not active')
-
-      // 如果模型没有被禁用，测试失败后自动禁用该 Embedding 模型
-      if (!isModelDisabledError) {
-        try {
-          await toggleEmbeddingStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
-          setSnackbar({
-            open: true,
-            message: errorMessage,
-            severity: 'error',
-          })
-        } catch (disableError) {
-          console.error('禁用 Embedding 模型失败:', disableError)
-          setSnackbar({
-            open: true,
-            message: errorMessage,
-            severity: 'error',
-          })
-        }
-      } else {
-        // 如果模型已经被禁用，直接显示错误信息，不尝试禁用
-        setSnackbar({
-          open: true,
-          message: errorMessage,
-          severity: 'error',
-        })
-      }
+      // 测试失败后只显示错误信息，不自动禁用模型
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
     } finally {
       setTestingModelId(null)
     }
