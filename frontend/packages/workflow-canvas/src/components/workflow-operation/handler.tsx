@@ -5,10 +5,12 @@
 
 import React, { useRef } from 'react'
 
-import { useClientContext } from '@flowgram.ai/free-layout-editor'
+import { useClientContext, useService, HistoryService } from '@flowgram.ai/free-layout-editor'
 import { useSaveWorkflow } from '@test-agentstudio/api-client'
-import { Toast } from '@douyinfe/semi-ui'
+import { Toast, Modal } from '@douyinfe/semi-ui'
 import { CheckCircle, XCircle, Info } from 'lucide-react'
+import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import { t } from '../../i18n'
 
 interface WorkflowOperationsHandlerProps {
   workflowId: string | undefined
@@ -20,9 +22,14 @@ interface WorkflowOperationsHandlerProps {
 export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onSaveRef }: WorkflowOperationsHandlerProps) => {
   const context = useClientContext()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const historyService = useService(HistoryService)
 
   // 使用 API 包
   const saveWorkflowMutation = useSaveWorkflow()
+
+  // 从 store 读取只读状态和选中的版本
+  const panelReadonly = useWorkflowStore(s => s.panelReadonly)
+  const selectedVersion = useWorkflowStore(s => s.selectedVersion)
 
   // Toast 显示函数
   const showToast = React.useCallback((message: string, type: 'success' | 'error' | 'info') => {
@@ -99,14 +106,11 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
   // Button handlers with context access
   const handleSaveWorkflowWithHook = async () => {
     try {
-      // Get the current workflow data from the canvas
       const workflowData = context.document.toJSON()
 
       if (workflowId && canvasData) {
-        // 使用正确的space_id，优先级：传递的spaceId > canvasData.space_id > 默认值
         const finalSpaceId = spaceId || canvasData?.space_id || '1'
 
-        // 使用hook保存工作流
         await saveWorkflowMutation.mutateAsync({
           workflow_id: workflowId,
           workflow_version: 'draft',
@@ -114,43 +118,54 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
           schema: JSON.stringify(workflowData),
         })
 
-        showToast('工作流保存成功', 'success')
+        showToast(t('workflowCanvas.ui.saveSuccess'), 'success')
       } else {
-        // 如果没有workflowId，保存到控制台
         console.log('Saving workflow:', workflowData)
-        showToast('工作流保存成功！工作流数据已保存到控制台。', 'success')
+        showToast(t('workflowCanvas.ui.saveSuccessToConsole'), 'success')
       }
     } catch (error) {
       console.error('Save failed:', error)
-      showToast(`保存失败：请重试。错误详情：${error instanceof Error ? error.message : '未知错误'}`, 'error')
+      showToast(t('workflowCanvas.ui.saveError', { error: error instanceof Error ? error.message : 'Unknown' }), 'error')
     }
   }
 
   const handleImportWorkflow = () => {
-    // Trigger file selection using the hidden file input
-    fileInputRef.current?.click()
+    if (panelReadonly) {
+      Toast.warning({
+        content: t('workflowCanvas.ui.importReadonlyWarning'),
+        duration: 3,
+      })
+      return
+    }
+
+    Modal.confirm({
+      title: t('workflowCanvas.ui.importConfirmTitle'),
+      content: t('workflowCanvas.ui.importConfirmMessage'),
+      okText: t('workflowCanvas.ui.importConfirmOk'),
+      cancelText: t('workflowCanvas.ui.importConfirmCancel'),
+      onOk: () => {
+        fileInputRef.current?.click()
+      },
+    })
   }
 
   const handleExportWorkflow = () => {
     try {
-      // Get the current workflow data from the canvas
       const workflowData = context.document.toJSON()
       const dataStr = JSON.stringify(workflowData, null, 2)
       const dataBlob = new Blob([dataStr], { type: 'application/json' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(dataBlob)
-      // 使用工作流名称和时间戳生成文件名
       const workflowName = canvasData?.name || 'workflow'
       link.download = `${workflowName}_${new Date().toISOString().split('T')[0]}.json`
       link.click()
       URL.revokeObjectURL(link.href)
 
-      // Show beautiful success toast
-      showToast('工作流导出成功', 'success')
+      showToast(t('workflowCanvas.ui.exportSuccess'), 'success')
     } catch (error: unknown) {
       console.error('Export failed:', error)
       const errorMessage = error instanceof Error ? error.message : String(error)
-      showToast(`导出失败：请重试。错误详情：${errorMessage}`, 'error')
+      showToast(t('workflowCanvas.ui.exportError', { error: errorMessage }), 'error')
     }
   }
 
@@ -197,20 +212,21 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
             reader.onload = e => {
               try {
                 const importedData = JSON.parse(e.target?.result as string)
-                // Clear current workflow and load imported data
+
+                historyService.stop()
                 context.document.clear()
                 context.document.fromJSON(importedData)
+                historyService.start()
 
-                // Show beautiful success toast
-                showToast('工作流导入成功！导入的数据已加载到画布。', 'success')
+                showToast(t('workflowCanvas.ui.importSuccess'), 'success')
               } catch (error) {
-                console.error('导入失败：文件格式错误', error)
-                showToast('导入失败：文件格式错误。请确保选择的是有效的工作流JSON文件。', 'error')
+                console.error('Import failed:', error)
+                showToast(t('workflowCanvas.ui.importError'), 'error')
+                historyService.start()
               }
             }
             reader.readAsText(file)
           }
-          // Reset file input
           if (fileInputRef.current) {
             fileInputRef.current.value = ''
           }

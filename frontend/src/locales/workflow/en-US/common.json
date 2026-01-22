@@ -67,7 +67,19 @@
   },
   "ui": {
     "draft": "Draft",
-    "switchedToVersion": "Switched to version {{version}}"
+    "switchedToVersion": "Switched to version {{version}}",
+    "importReadonlyWarning": "Cannot import workflow in readonly mode. Please switch to draft version first.",
+    "importConfirmTitle": "Import Workflow",
+    "importConfirmMessage": "Importing a new workflow will clear the current canvas content. This action cannot be undone. Continue?",
+    "importConfirmOk": "Import",
+    "importConfirmCancel": "Cancel",
+    "importSuccess": "Workflow imported successfully! The imported data has been loaded to the canvas.",
+    "importError": "Import failed: Invalid file format. Please ensure you select a valid workflow JSON file.",
+    "saveSuccess": "Workflow saved successfully",
+    "saveSuccessToConsole": "Workflow saved successfully! Workflow data has been saved to console.",
+    "saveError": "Save failed: {{error}}",
+    "exportSuccess": "Workflow exported successfully",
+    "exportError": "Export failed: {{error}}"
   },
   "category": {
     "llmAndWorkflow": "LLM & Workflow",

@@ -67,7 +67,19 @@
   },
   "ui": {
     "draft": "草稿",
-    "switchedToVersion": "已切换到版本 {{version}}"
+    "switchedToVersion": "已切换到版本 {{version}}",
+    "importReadonlyWarning": "当前处于只读模式，无法导入工作流。请切换到草稿版本后再试。",
+    "importConfirmTitle": "导入工作流",
+    "importConfirmMessage": "导入新工作流将清空当前画布内容，此操作不可撤销。是否继续？",
+    "importConfirmOk": "继续导入",
+    "importConfirmCancel": "取消",
+    "importSuccess": "工作流导入成功！导入的数据已加载到画布。",
+    "importError": "导入失败：文件格式错误。请确保选择的是有效的工作流JSON文件。",
+    "saveSuccess": "工作流保存成功",
+    "saveSuccessToConsole": "工作流保存成功！工作流数据已保存到控制台。",
+    "saveError": "保存失败：{{error}}",
+    "exportSuccess": "工作流导出成功",
+    "exportError": "导出失败：{{error}}"
   },
   "category": {
     "llmAndWorkflow": "LLM与工作流",
