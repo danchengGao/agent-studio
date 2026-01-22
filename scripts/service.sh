@@ -11,6 +11,7 @@ source "./template_handler.sh"
 source "./container_handler.sh"
 source "./vars_handler.sh"
 source "./prompt_handler.sh"
+source "./cmd.sh"
 
 # ==== Executes Docker Compose commands (up/down/stop) for enabled modules ====
 exec_service() {
@@ -33,21 +34,32 @@ exec_service() {
             local compose_file=${COMPOSE_FILES["${module}"]}
             case "${module}" in
                 MYSQL)
-                    eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
+                    exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}"
                     if [ "${cmd}" == "up" ]; then
                         wait_for_mysql
                         create_db_if_not_exist
                     fi
                     ;;
                 MILVUS)
+                    local index_manager_type="${RUNTIME_VARS["INDEX_MANAGER_TYPE"]}"
+                    local minio_service=${DEPLOY_VARS["MINIO_SERVICE"]}
+
                     if [ "${cmd}" == "up" ]; then
-                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || warning "${cmd} ${module} service failed: The system's memory functionality is disabled, but the other system features still works"
+                        if [ "${index_manager_type}" == "chroma" ]; then
+                            exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${minio_service}"
+                        else
+                            exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" "false"
+                        fi
                     else
-                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} container" 
+                        if [ "${index_manager_type}" == "chroma" ]; then
+                            exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${minio_service}"
+                        else
+                            exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}"
+                        fi
                     fi
                     ;;
                 JIUWEN|PLUGIN)
-                    eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
+                    exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}"
                     if [ "${cmd}" == "up" ]; then
                         check_containers "${CONTAINERS[${module}]}"
                     fi
@@ -58,12 +70,12 @@ exec_service() {
                     local sandbox_gateway_docker=${DEPLOY_VARS["SANDBOX_GATEWAY_DOCKER"]}
 
                     if [ "${enable_linux_sandbox}" == "true" ]; then
-                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${sandbox_gateway_service}" || error "${cmd} ${sandbox_gateway_service} service failed"
+                        exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args} ${sandbox_gateway_service}"
                         if [ "${cmd}" == "up" ]; then
                             check_containers "${sandbox_gateway_docker}"
                         fi
                     else
-                        eval "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}" || error "${cmd} ${module} service failed"
+                        exec_cmd "${exec_cmd} -f ${compose_file} ${cmd} ${cmd_args}"
                         if [ "${cmd}" == "up" ]; then
                             check_containers "${CONTAINERS[${module}]}"
                         fi

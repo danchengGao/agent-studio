@@ -78,6 +78,13 @@ read_custom_env_file() {
             local key="${line_trimmed%%=*}"
             local value="${line_trimmed#*=}"
 
+            # Remove outer single/double quotes from value
+            if [[ "${value}" =~ ^\"(.*)\"$ ]]; then
+                value="${BASH_REMATCH[1]}"
+            elif [[ "${value}" =~ ^\'(.*)\'$ ]]; then
+                value="${BASH_REMATCH[1]}"
+            fi
+
             if [[ " ${default_deploy_keys[*]} " =~ " ${key} " ]]; then
                 info "Override deploy variable: ${key}=${value}"
                 DEPLOY_VARS["${key}"]="${value}"
@@ -130,6 +137,14 @@ read_env_from_file() {
             # Find first = position, left is key, right is value
             key="${line_trimmed%%=*}"
             value="${line_trimmed#*=}"
+
+            # Remove outer single/double quotes from value
+            if [[ "${value}" =~ ^\"(.*)\"$ ]]; then
+                value="${BASH_REMATCH[1]}"
+            elif [[ "${value}" =~ ^\'(.*)\'$ ]]; then
+                value="${BASH_REMATCH[1]}"
+            fi
+
             target_array["${key}"]="${value}"
         fi
     done < "${env_file}"

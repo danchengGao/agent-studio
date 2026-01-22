@@ -167,7 +167,9 @@ def main():
         "reload": False,
         "log_level": "info",
         "access_log": True,
-        "workers": int(os.getenv("WORKER_NUM", 1)),
+        "workers": int(os.getenv("WORKER_NUM", 1))
+        if (os.getenv("INDEX_MANAGER_TYPE") == "milvus" and os.getenv("DB_TYPE") == "mysql")
+        else 1,
     }
 
     logger.info("🚀 Starting Jiuwen Agent Studio Backend in development mode...")
