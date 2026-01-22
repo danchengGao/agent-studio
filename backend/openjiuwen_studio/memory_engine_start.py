@@ -28,7 +28,13 @@ class MemoryEngineManager:
         current_file_dir = os.path.dirname(os.path.abspath(__file__))
         load_dotenv(os.path.join(current_file_dir, '../.env'))
 
-        data_dir = os.path.join(current_file_dir, 'memory-data')
+        memory_data_path = os.getenv("MEMORY_DATA_PATH", "memory-data")
+
+        if not os.path.isabs(memory_data_path):
+            data_dir = os.path.join(current_file_dir, memory_data_path)
+        else:
+            data_dir = memory_data_path
+
         os.makedirs(data_dir, exist_ok=True)
         kv_db_path = os.path.join(data_dir, 'dbmstore')
 
