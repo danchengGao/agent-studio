@@ -1,9 +1,9 @@
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.database import get_db
 from openjiuwen_studio.core.manager.model_manager.managers.embedding_model_config_manager import \
     EmbeddingModelConfigManager
@@ -21,8 +21,6 @@ from openjiuwen_studio.schemas.embedding_model_config import (
     EmbeddingModelConfigRequest, EmbeddingModelConfigResponse,
     EmbeddingModelConfigUpdate, EmbeddingModelConfigUpdateRequest,
     EmbeddingModelTestRequest, EmbeddingProtocol)
-
-logger = logging.getLogger(__name__)
 
 embedding_models_router = APIRouter(prefix="/embedding-models", tags=["embedding-models"])
 

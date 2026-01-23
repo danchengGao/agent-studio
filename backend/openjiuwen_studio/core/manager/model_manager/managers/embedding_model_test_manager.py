@@ -1,10 +1,10 @@
 from typing import Optional, Dict, Any
 import time
-import logging
 import requests
 
 from sqlalchemy.orm import Session
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.repositories import EmbeddingModelConfigRepository
 from openjiuwen_studio.schemas.embedding_model_config import EmbeddingModelTestRequest
 from openjiuwen_studio.core.manager.model_manager.utils.security_utils import SecurityUtils
@@ -13,8 +13,6 @@ from openjiuwen_studio.core.exceptions import (
     ModelTestError,
     ValidationError
 )
-
-logger = logging.getLogger(__name__)
 
 
 class EmbeddingModelTester:

@@ -3,7 +3,6 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
 import json
-import logging
 import os
 import time
 import hashlib
@@ -49,10 +48,8 @@ from openjiuwen.agent_builder.tune.trainer.base import Callbacks, Progress
 from openjiuwen.agent_builder.prompt_builder.builder.meta_template_builder import MetaTemplateBuilder
 from openjiuwen.agent_builder.prompt_builder.builder.feedback_prompt_builder import FeedbackPromptBuilder
 from openjiuwen.agent_builder.prompt_builder.builder.badcase_prompt_builder import BadCasePromptBuilder
+from openjiuwen.core.common.logging import logger
 from openjiuwen.core.utils.tool.function.function import LocalFunction, Param
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 router = APIRouter(prefix="/api/v1/prompts/tuning", tags=["prompt tuning"])
 

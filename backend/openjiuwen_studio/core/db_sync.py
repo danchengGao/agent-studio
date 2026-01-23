@@ -8,7 +8,6 @@
 """
 
 import importlib
-import logging
 import pkgutil
 import sys
 from typing import Any, Dict, List
@@ -17,11 +16,10 @@ from sqlalchemy import MetaData, create_engine, inspect, text
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import schema
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.database import engine
 from openjiuwen_studio.models import (AgentBaseDB, PluginBaseDB, SpaceDB, UserDB,
                         WorkflowBaseDB)
-
-logger = logging.getLogger(__name__)
 
 
 class DatabaseSync:

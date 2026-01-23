@@ -1,9 +1,9 @@
-import logging
 import time
 from datetime import datetime, timezone
 from typing import Optional
 
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
+from openjiuwen.core.common.logging import logger
 from openjiuwen.core.utils.llm.model_utils.model_factory import ModelFactory
 from sqlalchemy.orm import Session
 
@@ -16,8 +16,6 @@ from openjiuwen_studio.core.exceptions import (
     ValidationError, ModelApiKeyDecryptError
 )
 from openjiuwen_studio.core.common.status_code import StatusCode
-
-logger = logging.getLogger(__name__)
 
 
 class ModelTester:
@@ -92,23 +90,39 @@ class ModelTester:
                     timeout=model.timeout or 60
                 )
 
+                # 从模型配置中获取默认参数
                 temperature = 0.7
                 top_p = 0.9
+                max_tokens = 4096
+
+                # 如果模型配置中有参数，使用模型配置的参数
+                if model.parameters:
+                    if isinstance(model.parameters, dict):
+                        temperature = model.parameters.get('temperature', temperature)
+                        top_p = model.parameters.get('top_p', top_p)
+                        max_tokens = model.parameters.get('max_tokens', max_tokens)
+
+                # 测试请求中的参数优先级最高，覆盖模型配置的参数
                 if test_request.parameters:
                     if hasattr(test_request.parameters, 'temperature'):
                         temperature = test_request.parameters.temperature
                     if hasattr(test_request.parameters, 'top_p'):
                         top_p = test_request.parameters.top_p
+                    if hasattr(test_request.parameters, 'max_tokens'):
+                        max_tokens = test_request.parameters.max_tokens
 
                 messages = [
                     {"role": "user", "content": test_request.prompt}
                 ]
 
+                logger.info(f"Model test params: temperature={temperature}, top_p={top_p}, max_tokens={max_tokens}")
+
                 ai_message = await factory_model.ainvoke(
                     model_name=model.model_type,
                     messages=messages,
                     temperature=temperature,
-                    top_p=top_p
+                    top_p=top_p,
+                    max_tokens=max_tokens
                 )
 
                 inference_result = {

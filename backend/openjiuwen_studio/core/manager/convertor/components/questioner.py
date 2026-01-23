@@ -3,6 +3,7 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 from typing import Dict, List
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.common import dsl
 from openjiuwen_studio.core.manager.convertor.components.common import input_params_convert
 from openjiuwen_studio.core.common.dsl import ComponentType
@@ -86,10 +87,8 @@ def questioner_convert(node: Node, space_id: str) -> dsl.Component:
         model_info.api_base = model_config.base_url
         model_info.timeout = model_config.timeout
         model.model_provider = model_config.provider
-        
+
         # 从模型配置中读取temperature和top_p参数
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info(
             f"[QUESTIONER_CONVERT] Reading model config for "
             f"model_id={model_id}, space_id={space_id}"

@@ -1,9 +1,9 @@
-import logging
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.repositories import EmbeddingModelConfigRepository
 from openjiuwen_studio.models.embedding_model_config import EmbeddingModelConfig
 from openjiuwen_studio.schemas.embedding_model_config import (
@@ -19,9 +19,6 @@ from openjiuwen_studio.core.exceptions import (
     ValidationError,
     EmbeddingModelInUseError
 )
-
-
-logger = logging.getLogger(__name__)
 
 
 class EmbeddingModelConfigManager:

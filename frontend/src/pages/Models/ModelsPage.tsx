@@ -836,9 +836,18 @@ const ModelsPage: React.FC = () => {
     setIsTesting(true)
 
     try {
-      const result = await testModelMutation.mutateAsync({ id: selectedModel.id, prompt: testPrompt, spaceId: user?.spaceId || '' })
+      const result = await testModelMutation.mutateAsync({
+        id: selectedModel.id,
+        prompt: testPrompt,
+        spaceId: user?.spaceId || '',
+        parameters: {
+          temperature: selectedModel.temperature ?? 0.7,
+          top_p: selectedModel.topp ?? 0.9,
+          max_tokens: selectedModel.maxTokens ?? 4096,
+        },
+      })
       setTestResult(
-        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
+        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- top_p: ${selectedModel.topp}\n- max_tokens: ${selectedModel.maxTokens}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
       )
     } catch (error: any) {
       let errorMessage = t('models.testFailed')

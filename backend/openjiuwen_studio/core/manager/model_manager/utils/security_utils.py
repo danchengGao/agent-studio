@@ -1,13 +1,12 @@
 """Security Utils
 
-Provides comprehensive API key security management functionality, 
+Provides comprehensive API key security management functionality,
 including key storage, validation, and format checking.
 """
 import base64
 from typing import Dict, Any
 import os
 
-import logging
 from dotenv import load_dotenv
 
 from Crypto.Protocol.KDF import HKDF
@@ -15,7 +14,7 @@ from Crypto.Hash import SHA256
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-logger = logging.getLogger(__name__)
+from openjiuwen.core.common.logging import logger
 
 project_root = os.path.dirname(os.path.abspath(__file__))
 for _ in range(6):

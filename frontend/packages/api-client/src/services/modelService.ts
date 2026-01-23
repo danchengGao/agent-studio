@@ -205,9 +205,21 @@ export class ModelService {
   }
 
   // 测试模型
-  async testModel(id: string, prompt: string, spaceId: string): Promise<{ success: boolean; response?: string; error?: string; latency: number }> {
+  async testModel(
+    id: string,
+    prompt: string,
+    spaceId: string,
+    parameters?: { temperature?: number; top_p?: number; max_tokens?: number }
+  ): Promise<{ success: boolean; response?: string; error?: string; latency: number }> {
     try {
-      const testRequest: ModelTestRequest = { prompt }
+      const testRequest: ModelTestRequest = {
+        prompt,
+        parameters: parameters ? {
+          temperature: parameters.temperature ?? 0.7,
+          top_p: parameters.top_p ?? 0.9,
+          max_tokens: parameters.max_tokens ?? 4096,
+        } : undefined,
+      }
       const apiClient = getApiClient()
       // 在URL中包含space_id
       const response = await apiClient.post<{ code: number; message: string; data: ModelTestResponse }>(

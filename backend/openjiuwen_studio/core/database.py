@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.common.config import config as jiuwen_config
 from openjiuwen_studio.core.config import settings
 
@@ -64,8 +65,8 @@ milliseconds = get_milliseconds
 def init_log():
     db_logconf = jiuwen_config.db.log.raw_config
     logging.config.dictConfig(db_logconf)
-    logger = logging.getLogger('db_manager')
-    return logger
+    db_logger = logging.getLogger('db_manager')
+    return db_logger
 
 
 jiuwen_db_logger = init_log()
@@ -80,14 +81,14 @@ class LazyMinioClient:
     _instance = None
     _client = None
     _initialized = False
-    _logger = logging.getLogger(__name__)
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(LazyMinioClient, cls).__new__(cls)
         return cls._instance
 
-    def ensure_minio_lifecycle(self, minio_client: Minio, bucket_name: str, days: int = 99):
+    @staticmethod
+    def ensure_minio_lifecycle(minio_client: Minio, bucket_name: str, days: int = 99):
         """
         确保 MinIO bucket 设置了自动过期规则（days 天后删除）
         使URL永久有效（在文件存在期间），但文件会自动过期删除
@@ -96,7 +97,7 @@ class LazyMinioClient:
         try:
             if not minio_client.bucket_exists(bucket_name):
                 minio_client.make_bucket(bucket_name)
-                self._logger.info(f"Bucket '{bucket_name}' created.")
+                logger.info(f"Bucket '{bucket_name}' created.")
             # 构造生命周期规则
             config = LifecycleConfig(
                 [
@@ -122,9 +123,9 @@ class LazyMinioClient:
                 ]
             }
             minio_client.set_bucket_policy(bucket_name, json.dumps(policy))
-            self._logger.info(f"Bucket '{bucket_name}' configured: lifecycle {days} days, public read enabled.")
+            logger.info(f"Bucket '{bucket_name}' configured: lifecycle {days} days, public read enabled.")
         except Exception as e:
-            self._logger.exception(f"Failed to set lifecycle rule for bucket '{bucket_name}': {e}")
+            logger.exception(f"Failed to set lifecycle rule for bucket '{bucket_name}': {e}")
 
     def get_client(self) -> Minio:
         """获取 MinIO 客户端实例，如果尚未初始化或上次初始化失败，则尝试初始化。"""
@@ -138,7 +139,7 @@ class LazyMinioClient:
     def _initialize_client(self):
         """初始化 MinIO 客户端"""
         try:
-            self._logger.debug("Attempting to initialize MinIO client...")
+            logger.debug("Attempting to initialize MinIO client...")
             # 尝试从 settings 中获取配置
             if not all([settings.minio_host, settings.minio_port,
                         settings.minio_access_key, settings.minio_secret_key]):
@@ -157,15 +158,15 @@ class LazyMinioClient:
             self._client = client
             self.ensure_minio_lifecycle(client, settings.minio_bucket)
             self._initialized = True
-            self._logger.info("MinIO client initialized successfully.")
+            logger.info("MinIO client initialized successfully.")
         except (ValueError, S3Error) as e:
             self._client = None
             self._initialized = False # 确保标记为未初始化
-            self._logger.error(f"Failed to initialize MinIO client: {e}. Service will continue without MinIO.")
+            logger.error(f"Failed to initialize MinIO client: {e}. Service will continue without MinIO.")
         except Exception as e:
             self._client = None
             self._initialized = False
-            self._logger.exception(f"Unexpected error during MinIO client initialization: {e}. "
+            logger.exception(f"Unexpected error during MinIO client initialization: {e}. "
                                    f"Service will continue without MinIO.")
 
 
