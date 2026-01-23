@@ -3372,29 +3372,33 @@ async def _agent_import_core(
                         message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(msg=save_res.message)
                     )
             else:
-                # 不覆盖，重新生成ID
+                # 不覆盖，创建副本：生成新的agent_id
                 new_agent_id = str(uuid.uuid4())
                 agent_data["agent_id"] = new_agent_id
-                agent_data["agent_name"] = f"{agent_data.get('agent_name')}_copy"
+                # 更新agent_name，添加_copy后缀
+                agent_data["agent_name"] = f"{agent_data.get('agent_name', 'agent')}_copy"
                 agent_data["space_id"] = space_id
                 agent_data["create_time"] = milliseconds()
                 agent_data["update_time"] = milliseconds()
-                # 清除版本信息，确保是 Draft
+                # 确保没有 agent_version (Draft)
                 agent_data.pop("agent_version", None)
 
-                final_agent_id = new_agent_id
-
+                logger.info(f"[AGENT_IMPORT] Creating agent copy with new ID {new_agent_id} (original: {old_agent_id})")
                 agent_obj = AgentBaseDBPd(**agent_data)
                 create_res = agent_repository.create_agent_db(agent_obj)
+
                 if create_res.code != status.HTTP_200_OK:
+                    # 捕获 IntegrityError: ID已存在但不在当前space下
                     logger.error(
-                        f"[AGENT_IMPORT] Failed to create copy agent: {create_res.message}"
+                        f"[AGENT_IMPORT] Failed to create agent copy: {create_res.message}"
                     )
                     rollback_resources(created_resources)
                     return ResponseModel(
                         code=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.code,
                         message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(msg=create_res.message)
                     )
+
+                final_agent_id = new_agent_id
         else:
             # 直接生成新的agent_id，避免全局冲突
             new_agent_id = str(uuid.uuid4())
