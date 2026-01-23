@@ -1405,7 +1405,7 @@ def _create_plugin_and_tools(
         desc=plugin_tpl.get("desc"),
         space_id=space_id,
         plugin_type=plugin_tpl.get("plugin_type", PluginType.PLUGIN_TYPE_CLOUD_API),
-        url=os.environ.get("VITE_PLUGIN_SERVICE_URL") or plugin_tpl.get("url") or "",
+        url=plugin_tpl.get("url") or "",
         icon_uri=plugin_tpl.get("icon_uri") or "",
     )
 
