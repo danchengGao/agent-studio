@@ -1888,6 +1888,7 @@ const ModelsPage: React.FC = () => {
                 min={0}
                 max={2}
                 step={0.1}
+                valueLabelDisplay="on"
                 marks={[
                   { value: 0, label: '0' },
                   { value: 1, label: '1' },
@@ -1924,6 +1925,7 @@ const ModelsPage: React.FC = () => {
                 min={0}
                 max={1}
                 step={0.1}
+                valueLabelDisplay="on"
                 marks={[
                   { value: 0, label: '0' },
                   { value: 0.5, label: '0.5' },
