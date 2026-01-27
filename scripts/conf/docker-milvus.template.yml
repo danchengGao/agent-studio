@@ -1,7 +1,7 @@
 services:
-  <<ETCD_SERVICE_NAME>>:
-    container_name: <<ETCD_DOCKER_NAME>>
-    image: <<ETCD_DOCKER_IMAGE>>
+  <<ETCD_SERVICE>>:
+    container_name: <<ETCD_DOCKER>>
+    image: <<ETCD_IMAGE>>
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_AUTO_COMPACTION_MODE=revision
@@ -9,7 +9,7 @@ services:
       - ETCD_QUOTA_BACKEND_BYTES=4294967296
       - ETCD_SNAPSHOT_COUNT=50000
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:<<ETCD_HOST_PORT>>
-      - ETCD_ADVERTISE_CLIENT_URLS=http://<<ETCD_SERVICE_NAME>>:<<ETCD_HOST_PORT>>
+      - ETCD_ADVERTISE_CLIENT_URLS=http://<<ETCD_SERVICE>>:<<ETCD_HOST_PORT>>
     volumes:
       - <<ETCD_VOLUME>>:/bitnami/etcd
     networks:
@@ -29,36 +29,42 @@ services:
       retries: 3
       start_period: 20s # 延迟检查，适配启动耗时
 
-  <<MINIO_SERVICE_NAME>>:
-    container_name: <<MINIO_DOCKER_NAME>>
-    image: <<MINIO_DOCKER_IMAGE>>
+  <<MINIO_SERVICE>>:
+    container_name: <<MINIO_DOCKER>>
+    image: <<MINIO_IMAGE>>
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ACCESS_KEY: <<MINIO_ACCESS_KEY>>
+      MINIO_SECRET_KEY: <<MINIO_SECRET_KEY>>
     ports:
-      - "<<MINIO_SERVICE_HOST_PORT>>:9000" # MinIO 服务端口
+      - "<<MINIO_SERVICE_HOST_PORT>>:<<MINIO_PORT>>" # MinIO 服务端口
       - "<<MINIO_CONSOLE_HOST_PORT>>:9001" # MinIO 控制台端口
     volumes:
       - <<MINIO_VOLUME>>:/minio_data
     networks:
       - <<JIUWEN_NETWORK_NAME>>
-    command: minio server /minio_data --console-address ":9001"
+    command: minio server /minio_data --address ":<<MINIO_PORT>>" --console-address ":9001"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:<<MINIO_PORT>>/minio/health/live",
+        ]
       interval: 30s
       timeout: 20s
       retries: 3
 
-  <<MILVUS_SERVICE_NAME>>:
-    container_name: <<MILVUS_DOCKER_NAME>>
-    image: <<MILVUS_DOCKER_IMAGE>>
+  <<MILVUS_SERVICE>>:
+    container_name: <<MILVUS_DOCKER>>
+    image: <<MILVUS_IMAGE>>
     command: ["milvus", "run", "standalone"]
     security_opt:
       - seccomp:unconfined
     environment:
-      ETCD_ENDPOINTS: <<ETCD_SERVICE_NAME>>:<<ETCD_HOST_PORT>>
-      MINIO_ADDRESS: <<MINIO_SERVICE_NAME>>:9000
+      ETCD_ENDPOINTS: <<ETCD_SERVICE>>:<<ETCD_HOST_PORT>>
+      MINIO_ADDRESS: <<MINIO_SERVICE>>:<<MINIO_PORT>>
       MQ_TYPE: woodpecker
     volumes:
       - <<MILVUS_VOLUME>>:/var/lib/milvus
@@ -74,8 +80,8 @@ services:
     ports:
       - "<<MILVUS_HOST_PORT>>:19530" # Milvus gRPC
     depends_on:
-      - "<<ETCD_SERVICE_NAME>>"
-      - "<<MINIO_SERVICE_NAME>>"
+      - "<<ETCD_SERVICE>>"
+      - "<<MINIO_SERVICE>>"
 
 volumes:
   <<ETCD_VOLUME>>:

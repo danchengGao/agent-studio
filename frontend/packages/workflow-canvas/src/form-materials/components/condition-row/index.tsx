@@ -3,48 +3,50 @@
  * SPDX-License-Identifier: MIT
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo } from 'react'
 
-import { JsonSchemaUtils } from '@flowgram.ai/json-schema';
-import { I18n, useScopeAvailable } from '@flowgram.ai/editor';
-import { Button, Input, Select } from '@douyinfe/semi-ui';
-import { IconChevronDownStroked } from '@douyinfe/semi-icons';
+import { JsonSchemaUtils } from '@flowgram.ai/json-schema'
+import { useScopeAvailable } from '@flowgram.ai/editor'
+import { Button, Input, Select } from '@douyinfe/semi-ui'
+import { IconChevronDownStroked } from '@douyinfe/semi-icons'
 
-import { InjectVariableSelector } from '../../';
-import { InjectDynamicValueInput } from '../../';
-import { IConditionRule, ConditionOpConfigs, useCondition } from '../../';
+import { InjectVariableSelector } from '../../'
+import { InjectDynamicValueInput } from '../../'
+import { IConditionRule, ConditionOpConfigs, useCondition } from '../../'
+import { useTranslation } from '../../../i18n'
 
-import { ConditionRowValueType } from './types';
-import './styles.css';
+import { ConditionRowValueType } from './types'
+import './styles.css'
 
 interface PropTypes {
-  value?: ConditionRowValueType;
-  onChange: (value?: ConditionRowValueType) => void;
-  style?: React.CSSProperties;
-  readonly?: boolean;
+  value?: ConditionRowValueType
+  onChange: (value?: ConditionRowValueType) => void
+  style?: React.CSSProperties
+  readonly?: boolean
   /**
    * @deprecated use ConditionContext instead to pass ruleConfig to multiple
    */
   ruleConfig?: {
-    ops?: ConditionOpConfigs;
-    rules?: Record<string, IConditionRule>;
-  };
+    ops?: ConditionOpConfigs
+    rules?: Record<string, IConditionRule>
+  }
 }
 
 export function ConditionRow({ style, value, onChange, readonly, ruleConfig }: PropTypes) {
-  const { left, operator, right } = value || {};
+  const { t } = useTranslation()
+  const { left, operator, right } = value || {}
 
-  const available = useScopeAvailable();
+  const available = useScopeAvailable()
 
   const variable = useMemo(() => {
-    if (!left) return undefined;
-    return available.getByKeyPath(left.content);
-  }, [available, left]);
+    if (!left) return undefined
+    return available.getByKeyPath(left.content)
+  }, [available, left])
 
   const leftSchema = useMemo(() => {
-    if (!variable) return undefined;
-    return JsonSchemaUtils.astToSchema(variable.type, { drilldown: false });
-  }, [variable?.type?.hash]);
+    if (!variable) return undefined
+    return JsonSchemaUtils.astToSchema(variable.type, { drilldown: false })
+  }, [variable?.type?.hash])
 
   const { rule, opConfig, opOptionList, targetSchema } = useCondition({
     leftSchema,
@@ -54,15 +56,15 @@ export function ConditionRow({ style, value, onChange, readonly, ruleConfig }: P
       onChange({
         ...value,
         operator: undefined,
-      });
+      })
     },
     onClearRight() {
       onChange({
         ...value,
         right: undefined,
-      });
+      })
     },
-  });
+  })
 
   const renderOpSelect = () => (
     <Select
@@ -71,11 +73,11 @@ export function ConditionRow({ style, value, onChange, readonly, ruleConfig }: P
       size="small"
       value={operator}
       optionList={opOptionList}
-      onChange={(v) => {
+      onChange={v => {
         onChange({
           ...value,
           operator: v as string,
-        });
+        })
       }}
       triggerRender={({ value }) => (
         <Button size="small" disabled={!rule}>
@@ -83,7 +85,7 @@ export function ConditionRow({ style, value, onChange, readonly, ruleConfig }: P
         </Button>
       )}
     />
-  );
+  )
 
   return (
     <div className="gedit-m-condition-row-container" style={style}>
@@ -94,7 +96,7 @@ export function ConditionRow({ style, value, onChange, readonly, ruleConfig }: P
             readonly={readonly}
             style={{ width: '100%' }}
             value={left?.content}
-            onChange={(v) =>
+            onChange={v =>
               onChange({
                 ...value,
                 left: {
@@ -107,24 +109,14 @@ export function ConditionRow({ style, value, onChange, readonly, ruleConfig }: P
         </div>
         <div className="gedit-m-condition-row-right">
           {targetSchema ? (
-            <InjectDynamicValueInput
-              readonly={readonly || !rule}
-              value={right}
-              schema={targetSchema}
-              onChange={(v) => onChange({ ...value, right: v })}
-            />
+            <InjectDynamicValueInput readonly={readonly || !rule} value={right} schema={targetSchema} onChange={v => onChange({ ...value, right: v })} />
           ) : (
-            <Input
-              size="small"
-              disabled
-              style={{ pointerEvents: 'none' }}
-              value={opConfig?.rightDisplay || I18n.t('Empty')}
-            />
+            <Input size="small" disabled style={{ pointerEvents: 'none' }} value={opConfig?.rightDisplay || t('workflowCanvas.formMaterials.common.empty')} />
           )}
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export { type ConditionRowValueType };
+export { type ConditionRowValueType }

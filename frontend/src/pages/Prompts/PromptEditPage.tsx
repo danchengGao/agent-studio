@@ -50,6 +50,7 @@ import {
   useSubmitVersionDialog,
   useToolEditDialog,
   useVersionHistory,
+  useLoadPrompt,
 } from '@/hooks/prompts'
 import {
   type PromptParameter,
@@ -963,7 +964,7 @@ const PromptEditPage: React.FC = () => {
   // 统一的拖拽处理函数
   const handleGroupDragStart = (e: React.DragEvent, messageId: string, groupId: number) => {
     setComparisonGroupsData(prev => prev.map(g => (g.id === groupId ? { ...g, draggedMessageId: messageId } : g)))
-    e.dataTransfer.setData('text/plain', messageId)
+    e.dataTransfer.setData('application/x-prompt-message-id', messageId)
   }
 
   const handleGroupDragEnd = (groupId: number) => {
@@ -976,7 +977,7 @@ const PromptEditPage: React.FC = () => {
 
   const handleGroupDrop = (e: React.DragEvent, index: number, groupId: number) => {
     e.preventDefault()
-    const draggedMessageId = e.dataTransfer.getData('text/plain')
+    const draggedMessageId = e.dataTransfer.getData('application/x-prompt-message-id')
 
     setComparisonGroupsData(prev =>
       prev.map(group => {
@@ -1245,133 +1246,6 @@ const PromptEditPage: React.FC = () => {
     stopSequences: [],
   })
 
-  // 从draft数据加载到编辑器的通用函数
-  const loadFromDraftData = async (draftData: any) => {
-    // 1. 填充模板类型
-    if (draftData.prompt_template?.template_type) {
-      setTemplateEngine(draftData.prompt_template.template_type as 'normal' | 'jinja2')
-    }
-
-    // 2. 填充提示词内容
-    if (draftData.prompt_template?.messages) {
-      // 转换消息格式，确保每个消息都有id字段
-      const promptMessages = draftData.prompt_template.messages.map((msg: any, index: number) => ({
-        id: msg.id || msg.key || `msg_${Date.now()}_${index}`,
-        role: msg.role as 'system' | 'user' | 'assistant' | 'placeholder',
-        content: msg.content || '',
-        placeholderName: msg.role === 'placeholder' ? msg.content : undefined,
-      }))
-      setPromptMessages(promptMessages)
-
-      // 设置消息输入值
-      const inputValues: { [key: string]: string } = {}
-      promptMessages.forEach((msg: any) => {
-        inputValues[msg.id] = msg.content
-      })
-      setMessageInputValues(inputValues)
-    }
-
-    // 3. 填充变量定义
-    if (draftData.prompt_template?.variable_defs) {
-      const variableParams = draftData.prompt_template.variable_defs
-        .filter((varDef: any) => {
-          if (!isValidVariableName(varDef.key)) {
-            console.warn(`🚫 [VAR-VALIDATION] 跳过草稿数据中的无效变量名: "${varDef.key}"，不符合格式要求`)
-            return false
-          }
-          return true
-        })
-        .map((varDef: any) => ({
-          name: varDef.key,
-          value: '', // 变量值由另外一个API填充
-          description: varDef.desc || '',
-          type: varDef.type === 'placeholder' ? 'placeholder' : 'text',
-          dataType: varDef.type || 'string', // 使用API返回的实际类型
-        }))
-      setParameters(variableParams)
-    }
-
-    // 4. 填充工具设置
-    if (draftData.tools) {
-      const convertedTools = convertApiToolsToFrontendTools(draftData.tools, 0)
-      setTools(convertedTools)
-    }
-
-    // 5. 填充工具调用配置
-    if (draftData.tool_call_config) {
-      const toolChoice = draftData.tool_call_config.tool_choice
-      const isToolsEnabled = toolChoice === 'auto'
-      setToolsEnabled(isToolsEnabled)
-    } else {
-      setToolsEnabled(false)
-    }
-
-    // 6. 填充模型设置
-    if (draftData.prompt_model_config) {
-      const modelConfig = draftData.prompt_model_config
-
-      // 根据models_id从模型列表中找到对应的模型
-      if (modelConfig.models_id) {
-        try {
-          // 如果models列表已经加载，直接从中查找
-          if (availableModels.length > 0) {
-            const targetModel = findModelByIdAndFrom(modelConfig.models_id, modelConfig.model_from, availableModels)
-            if (targetModel) {
-              setSelectedModel(targetModel)
-            } else {
-              // 如果在availableModels中没找到，调用模型详情API
-              const modelResponse = await PromptModelService.getModelDetail(modelConfig.models_id, modelConfig.model_from)
-              if (modelResponse.code === 0 && modelResponse.model) {
-                setSelectedModel(modelResponse.model)
-              }
-            }
-          } else {
-            // 如果模型列表未加载，调用模型详情API
-            const modelResponse = await PromptModelService.getModelDetail(modelConfig.models_id, modelConfig.model_from)
-            if (modelResponse.code === 0 && modelResponse.model) {
-              setSelectedModel(modelResponse.model)
-            }
-          }
-        } catch (error) {
-          console.error('获取模型详情失败:', error)
-        }
-      }
-
-      // 设置模型参数配置 (temperature、max_tokens、top_p等)
-      const newModelConfig: any = {}
-
-      // 处理各个参数，如果实际值为null则使用默认值
-      if (selectedModel?.openModel?.param_config?.param_schemas) {
-        selectedModel.openModel.param_config.param_schemas.forEach((schema: any) => {
-          const paramName = schema.name
-          const actualValue = modelConfig[paramName]
-
-          if (actualValue !== null && actualValue !== undefined) {
-            // 使用实际值
-            newModelConfig[paramName] = actualValue
-          } else {
-            // 使用默认值
-            newModelConfig[paramName] = schema.default_val
-          }
-        })
-      } else {
-        // 如果没有模型schema，直接使用非null的值
-        Object.keys(modelConfig).forEach(key => {
-          if (!['models_id', 'models_name'].includes(key) && modelConfig[key] !== null && modelConfig[key] !== undefined) {
-            newModelConfig[key] = modelConfig[key]
-          }
-        })
-      }
-
-      // 合并模型ID和参数配置
-      setModelConfig(prev => ({
-        ...prev,
-        model: modelConfig.models_id || prev.model,
-        model_from: modelConfig.model_from || prev.model_from,
-        ...newModelConfig,
-      }))
-    }
-  }
 
   // 统一的变量名格式验证函数
   const autoGeneratedParameters = useMemo(() => {
@@ -1496,6 +1370,51 @@ const PromptEditPage: React.FC = () => {
     const group = comparisonGroupsData.find(g => g.id === groupId)
     return group?.isBaseGroup ? { type: 'base' as const, groupId: undefined } : { type: 'control' as const, groupId }
   }
+
+  // 第一次调用 useLoadPrompt，获取基础加载函数（用于 useDraft 和 useVersionHistory）
+  // loadPromptDetail 需要更多参数，会在 useSubmitVersionDialog 之后再次调用获取
+  const { 
+    loadPromptDetailToPage, 
+    loadModels, 
+    loadDebugContext,
+  } = useLoadPrompt({
+    // 基本参数
+    id,
+    isNew,
+    workspaceId,
+    userId,
+    // 基础状态 setters
+    setTemplateEngine,
+    setPromptMessages,
+    setMessageInputValues,
+    setParameters,
+    setTools,
+    setToolsEnabled,
+    setSelectedModel,
+    setModelConfig,
+    setAvailableModels,
+    setModelsLoading,
+    setChatMessages,
+    setCompletedMessages,
+    // 扩展状态 setters（可选，提前传入不影响）
+    setPrompt,
+    setLatestVersion,
+    setIsDraftEdited,
+    setDraftSavedTime,
+    setIsNewPromptScenario,
+    setLoading,
+    setIsLoadingFromAPI,
+    setSnackbar,
+    // 依赖数据
+    availableModels,
+    selectedModel,
+    // Refs
+    loadingRef,
+    optimizedDataApplied,
+    modelsLoadingRef,
+    // 回调函数
+    showSnackbar,
+  })
 
   // 主页面 messageInputValues 更新函数
   const handleMessageInputValuesChange = (newValues: Record<string, string>) => {
@@ -2089,484 +2008,8 @@ const PromptEditPage: React.FC = () => {
     }
   }, [lastSavedTime])
 
-  // 加载模型列表
-  const loadModels = useCallback(async () => {
-    // 防止重复调用
-    if (modelsLoadingRef.current) {
-      return
-    }
 
-    // 检查工作空间ID是否有效
-    if (!workspaceId) {
-      return
-    }
 
-    modelsLoadingRef.current = true
-    setModelsLoading(true)
-    try {
-      const response = await PromptModelService.getModelsList({ workspaceId: workspaceId })
-
-      setAvailableModels(response.models)
-
-      // 如果还没有选中模型，选择第一个模型作为默认值
-      if (!selectedModel && response.models.length > 0) {
-        const firstModel = response.models[0]
-        setSelectedModel(firstModel)
-        // 更新当前模型配置的model字段为新的格式
-        const defaultParams = PromptModelService.getModelDefaultParams(firstModel)
-        setModelConfig(prev => ({
-          ...prev,
-          model: firstModel.openModel.model_id,
-          model_from: firstModel.model_from,
-          ...defaultParams,
-        }))
-
-        // 更新对比组的模型配置（包括基准组）
-        setComparisonGroupsData(prev =>
-          prev.map(group => ({
-            ...group,
-            modelConfig: {
-              ...group.modelConfig,
-              model: firstModel.openModel.model_id,
-              model_from: firstModel.model_from,
-              ...defaultParams,
-            },
-          })),
-        )
-      }
-    } catch (error) {
-      console.error('加载模型列表失败:', error)
-      showSnackbar('加载模型列表失败，请稍后重试', 'error')
-    } finally {
-      setModelsLoading(false)
-      modelsLoadingRef.current = false
-    }
-  }, [workspaceId, showSnackbar, selectedModel])
-
-  // 加载提示词详情数据
-  const loadPromptDetail = useCallback(
-    async (forceLoad = false, mode = 'full') => {
-      // 防止重复调用
-      if (loadingRef.current && !forceLoad) {
-        return
-      }
-
-      // 检查必要的依赖是否准备就绪
-      if (!workspaceId) {
-        return
-      }
-
-      // 如果sessionStorage中有优化数据或覆盖数据，暂时跳过加载以避免覆盖（除非强制加载）
-      if (!forceLoad) {
-        const optimizedData = sessionStorage.getItem('optimizedPromptData')
-        const overrideData = sessionStorage.getItem('promptOverrideData')
-        if (optimizedData || overrideData) {
-          return
-        }
-
-        // 如果优化数据已经应用，也跳过加载以避免覆盖
-        if (optimizedDataApplied.current) {
-          return
-        }
-      }
-
-      // 对于新建提示词，如果没有ID则跳过
-      if (isNew && !id) {
-        return
-      }
-
-      // 对于编辑现有提示词，必须有ID
-      if (!isNew && !id) {
-        return
-      }
-
-      try {
-        loadingRef.current = true // 设置加载标志
-        setLoading(true)
-        setIsLoadingFromAPI(true) // 标记开始从API加载
-
-        // 对于新建提示词，我们使用一个特殊的ID来获取默认配置
-        // 或者我们可以创建一个专门的API，但目前先使用占位符ID
-        const apiId = isNew ? '0' : id // 使用'0'作为获取默认配置的特殊ID
-
-        const response = await PromptService.getPromptDetail(apiId, {
-          withCommit: true,
-          withDraft: true,
-          withDefaultConfig: true,
-          workspaceId: workspaceId,
-        })
-
-        if (response.code !== 0) {
-          setSnackbar({
-            open: true,
-            message: response.msg || '查询提示词详情失败',
-            severity: 'error',
-          })
-          return
-        }
-
-        const promptDetail = response.prompt && response.prompt.length > 0 ? response.prompt[0] : null
-
-        // 保存prompt_commit数据用于版本对比
-        if (promptDetail?.prompt_commit?.detail) {
-          setPromptCommitData(promptDetail.prompt_commit.detail)
-        } else {
-          setPromptCommitData(null)
-        }
-
-        // 保存prompt_draft数据并检查是否有未提交的草稿
-        if (promptDetail?.prompt_draft) {
-          setPromptDraftData(promptDetail.prompt_draft.detail)
-
-          // 检查草稿是否已编辑
-          const isDraftEditedValue = promptDetail.prompt_draft.draft_info?.is_draft_edited || false
-          setIsDraftEdited(isDraftEditedValue)
-
-          // 设置草稿保存时间
-          if (promptDetail.prompt_draft.draft_info?.updated_at) {
-            const draftTime = new Date(promptDetail.prompt_draft.draft_info.updated_at)
-            setDraftSavedTime(draftTime)
-          }
-        } else {
-          setPromptDraftData(null)
-          setIsDraftEdited(false)
-          setDraftSavedTime(null)
-        }
-
-        // 判断使用哪个数据源：
-        // 1. 如果是新建提示词(isNew=true)，使用default_config
-        // 2. 如果来自新创建的提示词页面（检查localStorage），使用default_config
-        // 3. 否则使用prompt_draft
-        const basicInfoStr = localStorage.getItem('newPromptBasicInfo')
-        const isFromNewPrompt = basicInfoStr && JSON.parse(basicInfoStr)?.prompt_id?.toString() === id
-
-        let dataSource: any
-        let isNewPromptScenarioLocal = false
-
-        if (isNew || isFromNewPrompt) {
-          // 新建提示词场景 - 使用default_config
-          dataSource = response.default_config
-          isNewPromptScenarioLocal = true
-          if (isFromNewPrompt) {
-            localStorage.removeItem('newPromptBasicInfo') // 清除标记
-          }
-        } else {
-          // 从提示词管理页面进入的编辑场景
-
-          dataSource = promptDetail?.prompt_draft?.detail
-
-          // 如果prompt_draft不存在，尝试使用prompt_commit
-          if (!dataSource && promptDetail?.prompt_commit?.detail) {
-            dataSource = promptDetail.prompt_commit.detail
-          }
-
-          // 如果都不存在，使用default_config作为后备
-          if (!dataSource && response.default_config) {
-            dataSource = response.default_config
-            isNewPromptScenarioLocal = true
-          }
-        }
-
-        // 设置新建提示词场景状态
-        setIsNewPromptScenario(isNewPromptScenarioLocal)
-
-        if (!dataSource) {
-          console.warn('未找到可用的数据源，API响应:', response)
-          console.warn('尝试的数据源路径:', {
-            'response.default_config': response.default_config,
-            'promptDetail?.prompt_draft?.detail': promptDetail?.prompt_draft?.detail,
-            'promptDetail?.prompt_commit?.detail': promptDetail?.prompt_commit?.detail,
-          })
-          return
-        }
-
-        // 填充基本信息
-        if (promptDetail) {
-          setPrompt(prev => ({
-            ...prev,
-            key: promptDetail.prompt_key,
-            name: promptDetail.prompt_basic.display_name,
-            description: promptDetail.prompt_basic.description,
-          }))
-
-          // 提取最新版本号
-          if (promptDetail.prompt_basic.latest_version) {
-            setLatestVersion(promptDetail.prompt_basic.latest_version)
-          }
-        }
-
-        // 填充提示词内容和消息（basicInfoOnly模式下跳过）
-        if (mode !== 'basicInfoOnly' && dataSource.prompt_template) {
-          const { template_type, messages, variable_defs } = dataSource.prompt_template
-
-          // 设置模板引擎类型
-          setTemplateEngine(template_type as 'normal' | 'jinja2')
-
-          // 转换消息格式
-          const promptMessages = messages.map((msg: any, index: number) => ({
-            id: msg.key || `msg_${index}`,
-            role: msg.role as 'system' | 'user' | 'assistant' | 'placeholder',
-            content: msg.content,
-            placeholderName: msg.role === 'placeholder' ? msg.content : undefined,
-          }))
-
-          setPromptMessages(promptMessages)
-
-          // 设置消息输入值
-          const inputValues: { [key: string]: string } = {}
-          promptMessages.forEach((msg: any) => {
-            inputValues[msg.id] = msg.content
-          })
-          setMessageInputValues(inputValues)
-
-          // 转换变量定义（basicInfoOnly模式下跳过）
-          if (mode !== 'basicInfoOnly') {
-            if (variable_defs && variable_defs.length > 0) {
-              const parameters = variable_defs
-                .filter((varDef: any) => {
-                  if (!isValidVariableName(varDef.key)) {
-                    console.warn(`🚫 [VAR-VALIDATION] 跳过API返回的无效变量名: "${varDef.key}"，不符合格式要求`)
-                    return false
-                  }
-                  return true
-                })
-                .map((varDef: any) => ({
-                  name: varDef.key,
-                  value: varDef.desc || '', // API中desc字段存储的是变量值
-                  description: `变量: ${varDef.key}`,
-                  type: varDef.type === 'placeholder' ? 'placeholder' : 'text',
-                  dataType: varDef.type || 'string', // 使用API返回的实际类型而非固定string
-                }))
-              setParameters(parameters)
-            }
-          }
-        }
-
-        // 填充工具设置（basicInfoOnly模式下跳过）
-        if (dataSource.tools && mode !== 'basicInfoOnly') {
-          const convertedTools = convertApiToolsToFrontendTools(dataSource.tools, 0)
-          setTools(convertedTools)
-        }
-
-        // 填充工具调用配置
-        if (dataSource.tool_call_config) {
-          setToolsEnabled(dataSource.tool_call_config.tool_choice === 'auto')
-        }
-
-        // 填充模型配置（basicInfoOnly模式下跳过）
-        if (mode !== 'basicInfoOnly') {
-          // 如果是新建提示词场景，不使用default_config中的模型配置，而是自动选择第一个模型
-          if (isNewPromptScenarioLocal) {
-            // 如果模型列表已加载，选择第一个模型
-            if (availableModels.length > 0) {
-              const firstModel = availableModels[0]
-              setSelectedModel(firstModel)
-              const defaultParams = PromptModelService.getModelDefaultParams(firstModel)
-              setModelConfig(prev => ({
-                ...prev,
-                model: firstModel.openModel.model_id,
-                model_from: firstModel.model_from,
-                ...defaultParams,
-              }))
-            } else {
-              // 如果模型列表还未加载，loadModels会在后续自动设置默认模型
-            }
-          } else if (dataSource.prompt_model_config) {
-            // 非新建提示词场景，从数据源读取模型配置
-            const modelConfig = dataSource.prompt_model_config
-
-            // 检查models_id字段（API返回的字段名）
-            const modelId = modelConfig.models_id || modelConfig.model_id
-
-            // 设置模型配置参数
-            const updateModelConfig = (selectedModelDetail?: any) => {
-              setModelConfig(prev => {
-                const newModelConfig = {
-                  ...prev,
-                  model: modelId || prev.model,
-                  temperature: modelConfig.temperature ?? prev.temperature,
-                  maxTokens: modelConfig.max_tokens ?? prev.maxTokens,
-                  topP: modelConfig.top_p ?? prev.topP,
-                  frequencyPenalty: modelConfig.frequency_penalty ?? prev.frequencyPenalty,
-                  presencePenalty: modelConfig.presence_penalty ?? prev.presencePenalty,
-                  model_from: modelConfig.model_from ?? prev.model_from,
-                }
-
-                // 如果有选中的模型，填充该模型支持的所有动态参数
-                if (selectedModelDetail?.openModel?.param_config?.param_schemas) {
-                  selectedModelDetail.openModel.param_config.param_schemas.forEach((schema: any) => {
-                    if (modelConfig[schema.name] !== undefined && modelConfig[schema.name] !== null) {
-                      newModelConfig[schema.name] = modelConfig[schema.name]
-                    }
-                  })
-                } else {
-                  // 没有具体模型信息时，直接复制所有字段
-                  Object.keys(modelConfig).forEach(key => {
-                    if (
-                      !['models_id', 'model_id', 'models_name', 'max_tokens', 'top_k', 'top_p', 'presence_penalty', 'frequency_penalty', 'json_mode'].includes(
-                        key,
-                      )
-                    ) {
-                      if (modelConfig[key] !== undefined && modelConfig[key] !== null) {
-                        newModelConfig[key] = modelConfig[key]
-                      }
-                    }
-                  })
-                }
-
-                return newModelConfig
-              })
-            }
-
-            // 如果获取到了模型详情，则基于模型详情设置参数
-            if (modelId) {
-              try {
-                const modelDetail = await PromptModelService.getModelDetail(modelId, modelConfig.model_from)
-                setSelectedModel(modelDetail)
-                updateModelConfig(modelDetail)
-              } catch (error) {
-                console.warn('获取模型详情失败，使用默认配置:', error)
-                updateModelConfig()
-              }
-            } else {
-              // 没有models_id时，直接设置基础参数
-              updateModelConfig()
-            }
-          }
-        }
-      } catch (error) {
-        console.error('加载提示词详情失败:', error)
-        setSnackbar({
-          open: true,
-          message: t('components.prompts.promptEditPage.loadPromptDetailFailed'),
-          severity: 'error',
-        })
-      } finally {
-        setLoading(false)
-        // 延迟清除加载标记，确保所有状态都已设置完成
-        setTimeout(async () => {
-          setIsLoadingFromAPI(false)
-          // 提示词详情加载完成后，立即加载调试上下文
-          await loadDebugContext()
-
-          // 清除加载标志
-          loadingRef.current = false
-        }, 200) // 增加延迟确保状态完全更新
-      }
-    },
-    [id, isNew, workspaceId, userId],
-  )
-
-  // 加载调试上下文的独立函数
-  const loadDebugContext = useCallback(async () => {
-    // 只有在非新建提示词且有ID的情况下才加载
-    if (!isNew && id) {
-      try {
-        const response = await PromptService.getDebugContext(id, userId)
-
-        if (response.code === 0 && response.debug_context) {
-          const { debug_core, debug_config } = response.debug_context
-
-          // 恢复聊天消息
-          if (debug_core.mock_contexts && debug_core.mock_contexts.length > 0) {
-            const chatMessagesFromContext = debug_core.mock_contexts.map((context: MockContext) => ({
-              type: context.role === 'user' ? ('user' as const) : ('ai' as const),
-              content: context.content,
-              timestamp: context.msg_time || new Date().toLocaleString('zh-CN'), // 使用msg_time字段设置消息时间
-              // 保存额外的AI信息用于后续显示
-              ...(context.role === 'assistant' && {
-                reasoningContent: context.reasoning_content,
-                input_tokens: context.input_tokens,
-                output_tokens: context.output_tokens,
-                cost_ms: context.cost_ms,
-                debug_id: context.debug_id,
-                // 处理工具调用信息
-                ...(context.tool_calls &&
-                  Array.isArray(context.tool_calls) && {
-                    toolCalls: context.tool_calls.map((toolCallData: any) => ({
-                      name: toolCallData.tool_call?.function_call?.name || '',
-                      input: toolCallData.tool_call?.function_call?.arguments || '',
-                      output: toolCallData.mock_response || '',
-                      id: toolCallData.tool_call?.id,
-                      index: parseInt(toolCallData.tool_call?.index || '0'),
-                    })),
-                  }),
-              }),
-            }))
-
-            setChatMessages(chatMessagesFromContext)
-
-            // 标记所有恢复的消息为已完成，这样它们会显示控制按钮
-            const completedIndices = new Set<number>()
-            for (let i = 0; i < chatMessagesFromContext.length; i++) {
-              completedIndices.add(i)
-            }
-            setCompletedMessages(completedIndices)
-          }
-
-          // 恢复变量值
-          if (debug_core.mock_variables && debug_core.mock_variables.length > 0) {
-            setTimeout(() => {
-              setParameters(prevParams => {
-                const updatedParams = [...prevParams]
-                debug_core.mock_variables.forEach(variable => {
-                  const paramIndex = updatedParams.findIndex(p => p.name === variable.key)
-                  if (paramIndex !== -1) {
-                    if (variable.type === 'placeholder' && variable.placeholder_messages) {
-                      // placeholder类型变量：恢复placeholder_messages
-                      updatedParams[paramIndex] = {
-                        ...updatedParams[paramIndex],
-                        type: 'placeholder',
-                        messages: variable.placeholder_messages.map(msg => ({
-                          id: msg.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                          role: msg.role,
-                          content: msg.content,
-                        })),
-                      }
-                    } else {
-                      // 普通变量：恢复value
-                      updatedParams[paramIndex] = {
-                        ...updatedParams[paramIndex],
-                        value: variable.value,
-                      }
-                    }
-                  }
-                })
-                return updatedParams
-              })
-            }, 100) // 延迟确保参数已经初始化
-          }
-
-          // 恢复工具配置
-          if (debug_core.mock_tools && debug_core.mock_tools.length > 0) {
-            setTimeout(() => {
-              setTools(prevTools => {
-                const updatedTools = [...prevTools]
-                debug_core.mock_tools.forEach(mockTool => {
-                  const toolIndex = updatedTools.findIndex(t => t.name === mockTool.name)
-                  if (toolIndex !== -1) {
-                    updatedTools[toolIndex] = {
-                      ...updatedTools[toolIndex],
-                      defaultValue: mockTool.mock_response,
-                    }
-                  }
-                })
-                return updatedTools
-              })
-            }, 100) // 延迟确保工具已经初始化
-          }
-
-          // 调试配置已移除，不再恢复
-        } else if (response.code !== 0) {
-          console.warn('⚠️ [DEBUG-CONTEXT] 查询调试上下文失败:', response.msg || '未知错误')
-          // 不显示错误提示，因为可能是首次使用，没有调试上下文数据
-        }
-      } catch (error) {
-        console.error('❌ [DEBUG-CONTEXT] 加载调试上下文失败:', error)
-        // 不显示错误提示，因为调试上下文是可选的
-      }
-    }
-  }, [id, isNew, userId])
 
   // 组件初始化完成后设置标志
   useEffect(() => {
@@ -2575,6 +2018,38 @@ const PromptEditPage: React.FC = () => {
     }, 200) // 等待200ms确保所有依赖都已初始化
     return () => clearTimeout(initTimer)
   }, [])
+
+  // 新建提示词场景：自动选择第一个模型
+  useEffect(() => {
+    // 检查是否是新建场景：isNew 为 true，或者是刚创建的提示词（通过 localStorage 判断）
+    const basicInfoStr = localStorage.getItem('newPromptBasicInfo')
+    const basicInfo = basicInfoStr ? JSON.parse(basicInfoStr) : null
+    const isNewlyCreated = basicInfo && basicInfo.prompt_id && String(basicInfo.prompt_id) === id
+    const isNewScenario = isNew || isNewlyCreated || isNewPromptScenario
+
+    // 只在新建场景下执行
+    if (!isNewScenario) {
+      return
+    }
+
+    // 如果已经有选中的模型，不需要自动选择
+    if (selectedModel) {
+      return
+    }
+
+    // 如果模型列表已加载且没有选中模型，自动选择第一个模型
+    if (availableModels.length > 0 && !selectedModel && !modelsLoading) {
+      const firstModel = availableModels[0]
+      setSelectedModel(firstModel)
+      const defaultParams = PromptModelService.getModelDefaultParams(firstModel)
+      setModelConfig(prev => ({
+        ...prev,
+        model: firstModel.openModel.model_id,
+        model_from: firstModel.model_from,
+        ...defaultParams,
+      }))
+    }
+  }, [isNew, id, isNewPromptScenario, availableModels, selectedModel, modelsLoading])
 
   // 【统一加载逻辑】整合所有进入提示词页面的加载逻辑
   useEffect(() => {
@@ -2859,7 +2334,7 @@ const PromptEditPage: React.FC = () => {
   const handleDragStart = (e: React.DragEvent, messageId: string) => {
     setDraggedMessageId(messageId)
     e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', messageId)
+    e.dataTransfer.setData('application/x-prompt-message-id', messageId)
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -2921,9 +2396,18 @@ const PromptEditPage: React.FC = () => {
   }
 
   const saveEditMessage = (index: number, content: string) => {
-    setChatMessages(prev => prev.map((msg, i) => (i === index ? { ...msg, content } : msg)))
+    // 更新消息内容
+    const updatedMessages = chatMessages.map((msg, i) => (i === index ? { ...msg, content } : msg))
+    setChatMessages(updatedMessages)
     setEditingMessage(null)
     setEditContent('')
+
+    // 非对比模式下，保存调试上下文
+    if (!isComparisonMode) {
+      saveDebugContext(updatedMessages, debugTraceInfo, undefined, undefined, parameters).catch(err => {
+        console.error('保存调试上下文失败:', err)
+      })
+    }
   }
 
   const cancelEditMessage = () => {
@@ -3422,6 +2906,7 @@ const PromptEditPage: React.FC = () => {
     handleClearAllMultiRun,
     handleClearMultiRunInstance,
     handleDeleteMultiRunMessage,
+    handleUpdateMultiRunMessage,
     handleAdoptConversation,
     handleToggleMultiRunToolCallExpanded,
     handleToggleMultiRunReasoningExpanded,
@@ -3496,7 +2981,7 @@ const PromptEditPage: React.FC = () => {
     setCompletedMessages,
     setLastSavedTime,
     setIsDraftEdited,
-    loadFromDraftData,
+    loadPromptDetailToPage,
     loadDebugContext,
   })
 
@@ -3510,6 +2995,7 @@ const PromptEditPage: React.FC = () => {
   }, [setApiVersionList, setVersionHistoryOpen, loadVersionDataToEditor])
 
   // 使用提交版本对话框 hook（在 useVersionHistory 之后调用，以便传递正确的 setVersionHistoryOpen）
+  // 这个 hook 会返回 setPromptCommitData 和 setPromptDraftData，供 loadPromptDetail 使用
   const {
     submitVersionDialogOpen,
     submitVersionStep,
@@ -3544,10 +3030,52 @@ const PromptEditPage: React.FC = () => {
     setVersionHistoryOpen, // 使用 hook 返回的 setVersionHistoryOpen
     setLatestVersion,
     setIsLoadingFromAPI,
-    loadFromDraftData,
+    loadPromptDetailToPage,
     loadDebugContext, // 传递加载调试上下文的函数
     showSnackbar,
     setSnackbar,
+  })
+
+  // 第二次调用 useLoadPrompt，补充传入 setPromptCommitData 和 setPromptDraftData，获取完整的 loadPromptDetail
+  const { loadPromptDetail } = useLoadPrompt({
+    // 基本参数
+    id,
+    isNew,
+    workspaceId,
+    userId,
+    // 基础状态 setters
+    setTemplateEngine,
+    setPromptMessages,
+    setMessageInputValues,
+    setParameters,
+    setTools,
+    setToolsEnabled,
+    setSelectedModel,
+    setModelConfig,
+    setAvailableModels,
+    setModelsLoading,
+    setChatMessages,
+    setCompletedMessages,
+    // 扩展状态 setters（用于 loadPromptDetail，包括来自 useSubmitVersionDialog 的 setters）
+    setPrompt,
+    setLatestVersion,
+    setPromptCommitData, // 来自 useSubmitVersionDialog
+    setPromptDraftData, // 来自 useSubmitVersionDialog
+    setIsDraftEdited,
+    setDraftSavedTime,
+    setIsNewPromptScenario,
+    setLoading,
+    setIsLoadingFromAPI,
+    setSnackbar,
+    // 依赖数据
+    availableModels,
+    selectedModel,
+    // Refs
+    loadingRef,
+    optimizedDataApplied,
+    modelsLoadingRef,
+    // 回调函数
+    showSnackbar,
   })
 
   // 将 promptDraftData 存储到 ref 中，供 useDraft 使用
@@ -5039,6 +4567,7 @@ const PromptEditPage: React.FC = () => {
         onAdoptConversation={handleAdoptConversation}
         onViewTrace={handleViewTrace}
         onDeleteMessage={handleDeleteMultiRunMessage}
+        onUpdateMessage={handleUpdateMultiRunMessage}
         onStopStreaming={handleStopMultiRunStreaming}
         prompt={prompt}
         modelConfig={modelConfig}

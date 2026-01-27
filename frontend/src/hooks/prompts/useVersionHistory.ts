@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PromptService, PromptModelService, type MockContext } from '@test-agentstudio/api-client'
+import { PromptService } from '@test-agentstudio/api-client'
 import { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
-import { isValidVariableName, processToolsFromAPI, findModelByIdAndFrom } from '@/utils/prompts/promptEditPageUtils'
 import { formatDraftDateTime } from '@/utils/prompts/utils'
 import type { PromptParameter, PromptMessage, Model, ModelConfig, ChatMessage } from '@/types/promptType'
 
@@ -64,7 +63,7 @@ interface UseVersionHistoryProps {
   setLastSavedTime: (time: Date) => void
   setIsDraftEdited: (edited: boolean) => void
   // 外部函数
-  loadFromDraftData: (draftData: any) => Promise<void>
+  loadPromptDetailToPage: (promptDetailData: any, isNewPromptScenario?: boolean) => Promise<void>
   loadDebugContext?: () => Promise<void>
 }
 
@@ -112,7 +111,7 @@ export const useVersionHistory = ({
   setCompletedMessages,
   setLastSavedTime,
   setIsDraftEdited,
-  loadFromDraftData,
+  loadPromptDetailToPage,
   loadDebugContext,
 }: UseVersionHistoryProps): UseVersionHistoryReturn => {
   const { t } = useTranslation()
@@ -293,139 +292,21 @@ export const useVersionHistory = ({
           if (commitData) {
             console.log('✅ [LOAD-VERSION-DATA] 成功获取版本详情，开始填充数据')
 
-            // 填充提示词模板类型
-            if (commitData.prompt_template?.template_type) {
-              setTemplateEngine(commitData.prompt_template.template_type as 'normal' | 'jinja2')
-              console.log('✅ [LOAD-VERSION-DATA] 填充模板类型:', commitData.prompt_template.template_type)
-            }
+            // 临时设置加载标志，防止自动变量检测干扰和自动保存
+            setIsLoadingFromAPI(true)
 
-            // 填充提示词内容 (messages)
+            // 使用 loadPromptDetailToPage 填充数据到页面
+            await loadPromptDetailToPage(commitData, false)
+            console.log('✅ [LOAD-VERSION-DATA] 使用 loadPromptDetailToPage 填充数据完成')
+
+            // 同步到prompt.content（不触发自动保存，因为isLoadingFromAPI已设置）
             if (commitData.prompt_template?.messages) {
-              const newPromptMessages = commitData.prompt_template.messages.map((msg: any) => ({
-                id: msg.key || `${Date.now()}-${Math.random()}`,
-                role: msg.role,
-                content: msg.content || '',
-              }))
-
-              // 临时设置加载标志，防止自动变量检测干扰和自动保存
-              setIsLoadingFromAPI(true)
-
-              setPromptMessages(newPromptMessages)
-              console.log('✅ [LOAD-VERSION-DATA] 填充提示词内容:', newPromptMessages)
-
-              // 同步到prompt.content（不触发自动保存，因为isLoadingFromAPI已设置）
-              const combinedContent = newPromptMessages.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n')
+              const messages = commitData.prompt_template.messages
+              const combinedContent = messages.map((m: any) => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n')
               // 直接更新prompt状态，不通过handlePromptChange避免触发自动保存
               setPrompt((prev: any) => ({ ...prev, content: combinedContent }))
               setHasUnsavedChanges(true)
               console.log('✅ [LOAD-VERSION-DATA] 同步到prompt.content（跳过自动保存）')
-
-              // 设置消息输入值
-              const newInputValues: { [key: string]: string } = {}
-              newPromptMessages.forEach(msg => {
-                newInputValues[msg.id] = msg.content
-              })
-              setMessageInputValues(newInputValues)
-              console.log('✅ [LOAD-VERSION-DATA] 设置消息输入值')
-            }
-
-            // 填充变量定义
-            if (commitData.prompt_template?.variable_defs) {
-              const newParameters = commitData.prompt_template.variable_defs
-                .filter((varDef: any) => {
-                  if (!isValidVariableName(varDef.key)) {
-                    console.warn(`🚫 [VAR-VALIDATION] 跳过版本数据中的无效变量名: "${varDef.key}"，不符合格式要求`)
-                    return false
-                  }
-                  return true
-                })
-                .map((varDef: any) => ({
-                  name: varDef.key,
-                  value: '',
-                  description: varDef.desc || `${varDef.type || 'string'}类型变量`,
-                  type: (varDef.type === 'placeholder' ? 'placeholder' : 'text') as 'placeholder' | 'text',
-                  dataType: varDef.type || 'string',
-                }))
-              setParameters(newParameters)
-              console.log('✅ [LOAD-VERSION-DATA] 填充变量定义:', newParameters)
-            }
-
-            // 填充工具设置 (tools)
-            if (commitData.tools && commitData.tools.length > 0) {
-              const processedTools = processToolsFromAPI(commitData.tools)
-              setTools(processedTools)
-              console.log('✅ [LOAD-VERSION-DATA] 填充工具设置:', processedTools)
-            } else {
-              setTools([])
-            }
-
-            // 填充工具调用配置 (tool_call_config)
-            if (commitData.tool_call_config) {
-              const toolChoice = commitData.tool_call_config.tool_choice
-              const isToolsEnabled = toolChoice === 'auto' // auto表示启用，none表示不启用
-              setToolsEnabled(isToolsEnabled)
-              console.log('✅ [LOAD-VERSION-DATA] 填充工具调用配置:', { toolChoice, isToolsEnabled })
-            } else {
-              setToolsEnabled(false)
-            }
-
-            // 填充模型设置 (prompt_model_config)
-            if (commitData.prompt_model_config) {
-              const modelConfig = commitData.prompt_model_config
-              console.log('✅ [LOAD-VERSION-DATA] 模型配置数据:', modelConfig)
-
-              // 根据models_id从模型列表中找到对应的模型
-              if (modelConfig.models_id) {
-                try {
-                  // 如果models列表已经加载，直接从中查找
-                  if (availableModels.length > 0) {
-                    const targetModel = findModelByIdAndFrom(modelConfig.models_id, modelConfig.model_from, availableModels as any[])
-                    if (targetModel) {
-                      setSelectedModel(targetModel as Model)
-                      console.log('✅ [LOAD-VERSION-DATA] 从已加载模型列表中找到模型:', targetModel)
-                    } else {
-                      console.log('⚠️ [LOAD-VERSION-DATA] 在已加载模型列表中未找到models_id:', modelConfig.models_id)
-                    }
-                  } else {
-                    // 如果模型列表未加载，调用模型详情API
-                    const modelResponse = await PromptModelService.getModelDetail(modelConfig.models_id, modelConfig.model_from)
-                    if (modelResponse.code === 0 && modelResponse.data) {
-                      setSelectedModel(modelResponse.data as Model)
-                      console.log('✅ [LOAD-VERSION-DATA] 通过API获取模型详情:', modelResponse.data)
-                    }
-                  }
-                } catch (error) {
-                  console.error('❌ [LOAD-VERSION-DATA] 获取模型详情失败:', error)
-                }
-              }
-
-              // 设置模型参数配置
-              const newModelConfig: any = {}
-              if (selectedModel?.openModel?.param_config?.param_schemas) {
-                selectedModel.openModel.param_config.param_schemas.forEach((schema: any) => {
-                  const paramName = schema.name
-                  const actualValue = modelConfig[paramName]
-                  if (actualValue !== null && actualValue !== undefined) {
-                    newModelConfig[paramName] = actualValue
-                  } else {
-                    newModelConfig[paramName] = schema.default_val
-                  }
-                })
-              } else {
-                Object.keys(modelConfig).forEach(key => {
-                  if (!['models_id', 'models_name'].includes(key) && modelConfig[key] !== null && modelConfig[key] !== undefined) {
-                    newModelConfig[key] = modelConfig[key]
-                  }
-                })
-              }
-
-              setModelConfig((prev: ModelConfig) => ({
-                ...prev,
-                model: modelConfig.models_id || prev.model,
-                model_from: modelConfig.model_from || prev.model_from,
-                ...newModelConfig,
-              }))
-              console.log('✅ [LOAD-VERSION-DATA] 填充模型参数配置:', { model: modelConfig.models_id, ...newModelConfig })
             }
 
             // 设置选中版本
@@ -511,7 +392,7 @@ export const useVersionHistory = ({
             setIsLoadingFromAPI(true)
 
             // 使用 prompt_draft 数据填充编辑器
-            await loadFromDraftData(draftData)
+            await loadPromptDetailToPage(draftData)
 
             // 延迟重置加载标志，确保状态更新完成
             setTimeout(() => {
@@ -519,113 +400,9 @@ export const useVersionHistory = ({
               console.log('✅ [SELECT-VERSION] 草稿数据加载完成，重置加载标志')
             }, 500)
 
-            // 加载调试上下文数据
-            try {
-              console.log('🔍 开始加载当前草稿的调试上下文, promptId:', id)
-
-              const debugResponse = await PromptService.getDebugContext(id!, userId!)
-
-              if (debugResponse.code === 0 && debugResponse.debug_context) {
-                console.log('✅ 查询草稿调试上下文成功:', debugResponse.debug_context)
-
-                const { debug_core } = debugResponse.debug_context
-
-                // 恢复聊天消息
-                if (debug_core.mock_contexts && debug_core.mock_contexts.length > 0) {
-                  const chatMessagesFromContext = debug_core.mock_contexts.map((context: MockContext) => ({
-                    type: context.role === 'user' ? ('user' as const) : ('ai' as const),
-                    content: context.content,
-                    timestamp: context.msg_time || new Date().toLocaleString('zh-CN'), // 使用msg_time字段设置消息时间
-                    // 保存额外的AI信息用于后续显示
-                    ...(context.role === 'assistant' && {
-                      reasoningContent: context.reasoning_content || undefined,
-                      input_tokens: context.input_tokens || undefined,
-                      output_tokens: context.output_tokens || undefined,
-                      cost_ms: context.cost_ms,
-                      debug_id: context.debug_id,
-                      // 处理工具调用信息
-                      ...(context.tool_calls &&
-                        Array.isArray(context.tool_calls) && {
-                          toolCalls: context.tool_calls.map((toolCallData: any) => ({
-                            name: toolCallData.tool_call?.function_call?.name || '',
-                            input: toolCallData.tool_call?.function_call?.arguments || '',
-                            output: toolCallData.mock_response || '',
-                            id: toolCallData.tool_call?.id,
-                            index: parseInt(toolCallData.tool_call?.index || '0'),
-                          })),
-                        }),
-                    }),
-                  }))
-
-                  setChatMessages(chatMessagesFromContext)
-
-                  // 标记所有恢复的消息为已完成
-                  const completedIndices = new Set<number>()
-                  for (let i = 0; i < chatMessagesFromContext.length; i++) {
-                    completedIndices.add(i)
-                  }
-                  setCompletedMessages(completedIndices)
-
-                  console.log('✅ 恢复草稿聊天消息:', chatMessagesFromContext)
-                }
-
-                // 恢复变量值
-                if (debug_core.mock_variables && debug_core.mock_variables.length > 0) {
-                  setTimeout(() => {
-                    setParameters(prevParams => {
-                      const updatedParams = [...prevParams]
-                      debug_core.mock_variables.forEach((variable: any) => {
-                        const paramIndex = updatedParams.findIndex(p => p.name === variable.key)
-                        if (paramIndex !== -1) {
-                          if (variable.type === 'placeholder' && variable.placeholder_messages) {
-                            // placeholder类型变量：恢复placeholder_messages
-                            updatedParams[paramIndex] = {
-                              ...updatedParams[paramIndex],
-                              type: 'placeholder',
-                              messages: variable.placeholder_messages.map((msg: any) => ({
-                                id: msg.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                                role: msg.role,
-                                content: msg.content,
-                              })),
-                            }
-                          } else {
-                            // 普通变量：恢复value
-                            updatedParams[paramIndex] = {
-                              ...updatedParams[paramIndex],
-                              value: variable.value,
-                            }
-                          }
-                        }
-                      })
-                      console.log('✅ 恢复草稿变量值:', updatedParams)
-                      return updatedParams
-                    })
-                  }, 100)
-                }
-
-                // 恢复工具配置
-                if (debug_core.mock_tools && debug_core.mock_tools.length > 0) {
-                  setTimeout(() => {
-                    setTools(prevTools => {
-                      const updatedTools = [...prevTools]
-                      debug_core.mock_tools.forEach((mockTool: any) => {
-                        const toolIndex = updatedTools.findIndex(t => t.name === mockTool.name)
-                        if (toolIndex !== -1) {
-                          updatedTools[toolIndex] = {
-                            ...updatedTools[toolIndex],
-                            defaultValue: mockTool.mock_response,
-                          }
-                        }
-                      })
-                      console.log('✅ 恢复草稿工具配置:', updatedTools)
-                      return updatedTools
-                    })
-                  }, 100)
-                }
-              }
-            } catch (error) {
-              console.error('❌ 加载草稿调试上下文失败:', error)
-              // 不显示错误提示，因为调试上下文是可选的
+            // 加载调试上下文数据（使用统一的 loadDebugContext 函数）
+            if (loadDebugContext) {
+              await loadDebugContext()
             }
 
             setSnackbar({
@@ -653,116 +430,9 @@ export const useVersionHistory = ({
           return
         }
 
-        // 加载调试上下文数据
-        try {
-          console.log('🔍 开始加载版本的调试上下文, promptId:', id)
-
-          const debugResponse = await PromptService.getDebugContext(id!, userId!)
-
-          if (debugResponse.code === 0 && debugResponse.debug_context) {
-            console.log('✅ 查询版本调试上下文成功:', debugResponse.debug_context)
-
-            const { debug_core } = debugResponse.debug_context
-
-            // 恢复聊天消息
-            if (debug_core.mock_contexts && debug_core.mock_contexts.length > 0) {
-              const chatMessagesFromContext = debug_core.mock_contexts.map((context: MockContext) => ({
-                type: context.role === 'user' ? ('user' as const) : ('ai' as const),
-                content: context.content,
-                timestamp: context.msg_time || new Date().toLocaleString('zh-CN'), // 使用msg_time字段设置消息时间
-                // 保存额外的AI信息用于后续显示
-                ...(context.role === 'assistant' && {
-                  reasoningContent: context.reasoning_content || undefined,
-                  input_tokens: context.input_tokens || undefined,
-                  output_tokens: context.output_tokens || undefined,
-                  cost_ms: context.cost_ms,
-                  debug_id: context.debug_id,
-                  // 处理工具调用信息
-                  ...(context.tool_calls &&
-                    Array.isArray(context.tool_calls) && {
-                      toolCalls: context.tool_calls.map((toolCallData: any) => ({
-                        name: toolCallData.tool_call?.function_call?.name || '',
-                        input: toolCallData.tool_call?.function_call?.arguments || '',
-                        output: toolCallData.mock_response || '',
-                        id: toolCallData.tool_call?.id,
-                        index: parseInt(toolCallData.tool_call?.index || '0'),
-                      })),
-                    }),
-                }),
-              }))
-
-              setChatMessages(chatMessagesFromContext)
-
-              // 标记所有恢复的消息为已完成
-              const completedIndices = new Set<number>()
-              for (let i = 0; i < chatMessagesFromContext.length; i++) {
-                completedIndices.add(i)
-              }
-              setCompletedMessages(completedIndices)
-
-              console.log('✅ 恢复版本聊天消息:', chatMessagesFromContext)
-            }
-
-            // 恢复变量值
-            if (debug_core.mock_variables && debug_core.mock_variables.length > 0) {
-              setTimeout(() => {
-                setParameters(prevParams => {
-                  const updatedParams = [...prevParams]
-                  debug_core.mock_variables.forEach((variable: any) => {
-                    const paramIndex = updatedParams.findIndex(p => p.name === variable.key)
-                    if (paramIndex !== -1) {
-                      if (variable.type === 'placeholder' && variable.placeholder_messages) {
-                        // placeholder类型变量：恢复placeholder_messages
-                        updatedParams[paramIndex] = {
-                          ...updatedParams[paramIndex],
-                          type: 'placeholder',
-                          messages: variable.placeholder_messages.map((msg: any) => ({
-                            id: msg.id || Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                            role: msg.role,
-                            content: msg.content,
-                          })),
-                        }
-                      } else {
-                        // 普通变量：恢复value
-                        updatedParams[paramIndex] = {
-                          ...updatedParams[paramIndex],
-                          value: variable.value,
-                        }
-                      }
-                    }
-                  })
-                  console.log('✅ 恢复版本变量值:', updatedParams)
-                  return updatedParams
-                })
-              }, 100) // 延迟确保参数已经初始化
-            }
-
-            // 恢复工具配置
-            if (debug_core.mock_tools && debug_core.mock_tools.length > 0) {
-              setTimeout(() => {
-                setTools(prevTools => {
-                  const updatedTools = [...prevTools]
-                  debug_core.mock_tools.forEach((mockTool: any) => {
-                    const toolIndex = updatedTools.findIndex(t => t.name === mockTool.name)
-                    if (toolIndex !== -1) {
-                      updatedTools[toolIndex] = {
-                        ...updatedTools[toolIndex],
-                        defaultValue: mockTool.mock_response,
-                      }
-                    }
-                  })
-                  console.log('✅ 恢复版本工具配置:', updatedTools)
-                  return updatedTools
-                })
-              }, 100) // 延迟确保工具已经初始化
-            }
-          } else if (debugResponse.code !== 0) {
-            console.warn('⚠️ 查询版本调试上下文失败:', debugResponse.msg || '未知错误')
-            // 不显示错误提示，因为可能是该版本没有调试上下文数据
-          }
-        } catch (error) {
-          console.error('❌ 加载版本调试上下文失败:', error)
-          // 不显示错误提示，因为调试上下文是可选的
+        // 加载调试上下文数据（使用统一的 loadDebugContext 函数）
+        if (loadDebugContext) {
+          await loadDebugContext()
         }
 
         setSnackbar({
@@ -787,7 +457,7 @@ export const useVersionHistory = ({
       getDisplayVersions,
       setSelectedVersion,
       setIsLoadingFromAPI,
-      loadFromDraftData,
+      loadPromptDetailToPage,
       setChatMessages,
       setCompletedMessages,
       setParameters,
@@ -847,7 +517,7 @@ export const useVersionHistory = ({
           setIsLoadingFromAPI(true)
 
           // 使用通用函数加载 prompt_draft 数据到编辑器
-          await loadFromDraftData(draftData)
+          await loadPromptDetailToPage(draftData)
 
           // 加载调试上下文（如果提供了该函数）
           if (loadDebugContext) {
@@ -890,7 +560,7 @@ export const useVersionHistory = ({
     userId,
     workspaceId,
     setIsLoadingFromAPI,
-    loadFromDraftData,
+    loadPromptDetailToPage,
     loadDebugContext,
     setLastSavedTime,
     setHasUnsavedChanges,

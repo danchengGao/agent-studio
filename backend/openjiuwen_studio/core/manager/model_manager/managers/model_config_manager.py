@@ -1,9 +1,9 @@
-import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.repositories import ModelConfigRepository, ModelUsageRepository
 from openjiuwen_studio.models.model_config import ModelConfig
 from openjiuwen_studio.schemas.model_config import (
@@ -18,8 +18,6 @@ from openjiuwen_studio.core.exceptions import (
     ModelConfigNameExistsError,
     ValidationError
 )
-
-logger = logging.getLogger(__name__)
 
 
 class ModelConfigManager:

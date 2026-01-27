@@ -5,7 +5,7 @@ from typing import Any
 
 from openjiuwen_studio.core.common import dsl
 from openjiuwen_studio.core.manager.internal.workflow import InputElem
-from openjiuwen_studio.schemas.node import Node, NodeData
+from openjiuwen_studio.schemas.node import Node, NodeData, BaseValue
 from openjiuwen_studio.core.manager.convertor.components.common import outputs_convert
 from openjiuwen_studio.core.common.dsl import ComponentType
 
@@ -17,13 +17,14 @@ def start_inputs_convert(data: NodeData) -> list[dict[str, Any]]:
 
     inputs_res: list[dict[str, Any]] = []
     for key, value in outputs.properties.items():
+        base_value = BaseValue(**value)
         required = False
         if key in outputs.required:
             required = True
         inputs_res.append(InputElem(
             name=key,
-            type=value.type,
-            description=value.description,
+            type=base_value.type,
+            description=base_value.description,
             required=required,
         ).model_dump())
     return inputs_res

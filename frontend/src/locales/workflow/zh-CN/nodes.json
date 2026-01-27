@@ -1,0 +1,341 @@
+{
+  "nodes": {
+    "llm": {
+      "titlePrefix": "大模型",
+      "description": "调用，使用变量和提示词生成响应。",
+      "outputFormat": {
+        "label": "输出格式",
+        "placeholder": "请选择输出格式",
+        "text": "文本",
+        "markdown": "Markdown",
+        "json": "JSON"
+      }
+    },
+    "code": {
+      "title": "代码",
+      "description": "代码节点，用于运行自定义的 JavaScript 或 Python 代码。",
+      "outputDescription": "代码执行结果"
+    },
+    "plugin": {
+      "description": "工具节点，用于调用具体的插件工具执行特定任务。"
+    },
+    "condition": {
+      "description": "连接多个下游分支。只有满足设定条件的对应分支才会被执行。"
+    },
+    "loop": {
+      "description": "用于通过设置迭代次数和逻辑来重复执行一系列任务。"
+    },
+    "input": {
+      "description": "输入节点，用于在工作流执行过程中暂停并等待用户输入。",
+      "output": "输出"
+    },
+    "output": {
+      "description": "输出节点，用于输出工作流执行过程中的中间结果或最终结果。"
+    },
+    "start": {
+      "description": "工作流的起始节点，用于设置启动工作流所需的信息。"
+    },
+    "end": {
+      "description": "工作流的最终节点，用于返回工作流运行后的结果信息。"
+    },
+    "questioner": {
+      "description": "提问节点，用于向用户提出问题并收集回答。",
+      "maxQuestions": "最大提问次数",
+      "maxQuestionsDescription": "设置最大提问次数，范围 1-10",
+      "userResponseOutput": "用户响应输出变量",
+      "maxResponseRequired": "最大提问次数不能为空",
+      "mustBeInteger": "必须是整数",
+      "mustBePositiveInteger": "必须是大于0且不大于10的整数"
+    },
+    "intent": {
+      "description": "意图识别节点，用于根据用户不同的输入匹配不同的意图。"
+    },
+    "textEditor": {
+      "description": "文本编辑节点，用于在工作流中处理和转换文本内容。"
+    },
+    "variableMerge": {
+      "description": "工作流的变量聚合节点，用于将多个分组的变量进行聚合。",
+      "configCannotBeEmpty": "变量聚合配置不能为空",
+      "atLeastOneGroup": "至少需要添加一个变量分组",
+      "groupNameRequired": "第 {{index}} 个分组的名称不能为空",
+      "groupAtLeastOneVariable": "分组 \"{{name}}\" 至少需要包含一个变量",
+      "output": "输出",
+      "aggregationStrategy": "聚合策略",
+      "firstNonNull": "返回每个分组中第一个非空的值",
+      "tooltipType": "分组的变量类型默认以第一个变量的类型为主",
+      "noVariables": "暂无变量，点击上方按钮添加",
+      "noGroups": "暂无分组，点击下方按钮添加",
+      "addGroup": "添加分组"
+    },
+    "subWorkflow": {
+      "description": "可执行嵌套子工作流"
+    },
+    "continue": {
+      "description": "继续节点，用于在循环中跳过当前迭代并继续下一次迭代。"
+    },
+    "break": {
+      "description": "中断节点，用于在循环中立即退出循环。"
+    },
+    "blockStart": {
+      "description": "块的起始节点。"
+    },
+    "blockEnd": {
+      "description": "块的结束节点。"
+    },
+    "variable": {
+      "description": "用于重置循环变量的值以进行下一次迭代",
+      "title": "变量",
+      "settings": "设置",
+      "notConfigured": "未配置",
+      "assignmentConfigEmpty": "赋值配置不能为空",
+      "atLeastOneAssignment": "至少需要一个赋值操作",
+      "operatorEmpty": "操作符不能为空",
+      "onlyAssignSupported": "仅支持赋值操作",
+      "leftVariableEmpty": "左侧变量不能为空",
+      "leftVariableTypeEmpty": "左侧变量类型不能为空",
+      "leftVariableMustBeRef": "左侧变量必须是引用类型",
+      "leftRefPathEmpty": "左侧变量引用路径不能为空",
+      "leftRefPathMustContain": "左侧变量引用路径必须包含节点和变量名",
+      "leftRefPathNoEmpty": "左侧变量引用路径不能包含空值",
+      "rightValueEmpty": "右侧值不能为空",
+      "rightValueTypeEmpty": "右侧值类型不能为空",
+      "rightValueTypeInvalid": "右侧值类型无效"
+    }
+  },
+  "editorStates": {
+    "loadingWorkflow": "正在加载工作流画布...",
+    "loadFailed": "加载工作流画布失败",
+    "cannotGetWorkflowData": "无法获取工作流数据",
+    "retry": "重新加载",
+    "backToList": "返回工作流列表"
+  },
+  "formMaterials": {
+    "validate": {
+      "variableNameEmpty": "变量名不能为空",
+      "variableNamePattern": "变量名只能包含字母、数字、下划线，且必须以字母开头",
+      "fieldRequired": "字段为必填项",
+      "unknownVariable": "未知变量"
+    },
+    "common": {
+      "selectVariable": "选择变量",
+      "pressAtToSelectVariable": "按 '@' 选择变量",
+      "add": "添加",
+      "empty": "空",
+      "inputKey": "输入键名",
+      "configureViaChildFields": "通过子字段配置"
+    },
+    "fileType": {
+      "default": "默认",
+      "image": "图片",
+      "svg": "SVG",
+      "audio": "音频",
+      "video": "视频",
+      "voice": "语音",
+      "doc": "文档",
+      "ppt": "演示文稿",
+      "excel": "表格",
+      "txt": "文本",
+      "code": "代码",
+      "zip": "压缩包"
+    },
+    "input": {
+      "pleaseInputArray": "请输入数组",
+      "pleaseSelectBoolean": "请选择布尔值",
+      "true": "真",
+      "false": "假",
+      "pleaseInputInteger": "请输入整数",
+      "pleaseInputMap": "请输入映射",
+      "pleaseInputNumber": "请输入数字",
+      "pleaseInputObject": "请输入对象",
+      "pleaseInputString": "请输入字符串",
+      "uploadFile": "上传文件",
+      "uploadMode": "上传",
+      "urlMode": "链接",
+      "enterFileUrl": "请输入文件链接",
+      "dragUploadText": "拖拽文件上传 或 点击上传",
+      "dragUploadSubText": "单个文件大小不得超过 500 MB",
+      "fileUploadError": "请上传文件",
+      "fileUrlError": "请输入文件链接",
+      "uploading": "上传中",
+      "uploadSuccess": "文件上传成功"
+    },
+    "editor": {
+      "noDefaultValue": "无默认值",
+      "defaultValueLocked": "默认值已锁定",
+      "defaultValueIfNotProvided": "参数未提供时的默认值",
+      "inputVariableName": "输入变量名",
+      "description": "描述",
+      "helpLLMUnderstandProperty": "帮助 LLM 理解该属性",
+      "defaultValue": "默认值"
+    },
+    "promptEditor": {
+      "placeholder": "使用 {{变量名}} 引用输入参数"
+    }
+  },
+  "historyPanel": {
+    "title": "历史版本",
+    "subtitle": "查看和管理工作流版本",
+    "createCopyFailed": "创建副本失败:",
+    "versionContentNotFound": "历史版本内容不存在",
+    "restoreVersionFailed": "还原版本失败:",
+    "deleteVersionFailed": "删除版本失败:",
+    "invalidTime": "无效时间",
+    "timeFormatError": "时间格式错误",
+    "noVersionDescription": "无版本描述",
+    "fetchVersionHistoryFailed": "获取版本历史失败",
+    "selectWorkflowPrompt": "请选择工作流以查看版本历史。",
+    "loadFailed": "加载失败",
+    "loading": "加载中...",
+    "noVersionData": "暂无版本数据",
+    "restoreToThisVersion": "还原为此版本",
+    "restoreConfirmMessage": "还原后，将覆盖最新编写的工作流内容",
+    "confirm": "确认",
+    "deleteVersion": "删除版本",
+    "deleteConfirmMessage": "确定要删除版本 {{version}} 吗？删除后无法恢复",
+    "delete": "删除",
+    "switching": "切换中...",
+    "versionDescription": "版本描述",
+    "createCopy": "创建副本",
+    "deleting": "删除中..."
+  },
+  "publishDialog": {
+    "fetchVersionListFailed": "获取版本列表失败:",
+    "enterPublishVersion": "请输入发布版本",
+    "versionFormatIncorrect": "版本号格式不正确，请使用 v1.2.3 格式",
+    "enterPublishDescription": "请输入发布描述",
+    "descriptionMinLength": "发布描述至少需要5个字符",
+    "descriptionMaxLength": "发布描述不能超过200个字符",
+    "workflowInfoNotFound": "工作流信息不存在",
+    "publishSuccess": "工作流发布成功",
+    "publishFailed": "发布失败",
+    "publishWorkflowFailed": "发布工作流失败:",
+    "publishFailedRetry": "发布失败，请稍后重试",
+    "publishWorkflow": "发布工作流",
+    "publishVersion": "发布版本",
+    "versionPlaceholder": "请输入版本号，如: v0.0.1",
+    "publishDescription": "发布描述",
+    "descriptionPlaceholder": "请输入本次发布的描述信息...",
+    "cancel": "取消",
+    "publishing": "发布中...",
+    "confirmPublish": "确认发布"
+  },
+  "testrun": {
+    "saving": "保存中...",
+    "testRun": "试运行"
+  },
+  "testrunPanel": {
+    "fillRequiredFields": "请填写必填字段",
+    "running": "运行中...",
+    "testRunInput": "试运行输入",
+    "completeInputToContinue": "完成以下输入后，继续试运行",
+    "continueRunning": "继续运行",
+    "cancel": "取消",
+    "run": "运行",
+    "testRun": "试运行"
+  },
+  "testdebug": {
+    "testNode": "测试节点"
+  },
+  "testDebugPanel": {
+    "nodeDataNotLoaded": "节点数据未加载",
+    "missingSpaceId": "缺少空间ID，请确保工作空间信息正确",
+    "missingNodeId": "缺少节点ID，请重新选择节点",
+    "unknownError": "执行过程中发生未知错误",
+    "running": "运行中...",
+    "completeInputToContinue": "完成以下输入后，继续试运行",
+    "cancel": "取消",
+    "run": "运行",
+    "testRun": "试运行"
+  },
+  "nodeInputPanel": {
+    "inputParams": "输入参数",
+    "jsonMode": "JSON 模式",
+    "output": "输出",
+    "completeInputToContinue": "完成以下输入后，继续执行"
+  },
+  "debug": {
+    "debug": "调试"
+  },
+  "debugPanel": {
+    "debug": "调试",
+    "noInputOutputData": "该组件没有输入输出数据",
+    "componentInfo": "组件信息",
+    "status": "状态",
+    "executionTime": "执行时间",
+    "model": "模型",
+    "items": "项",
+    "invalidDate": "无效日期",
+    "timeFormatError": "时间格式错误",
+    "loadingDebugData": "正在加载 {{nodeName}} 的调测数据",
+    "missingWorkflowOrSpaceId": "缺少工作流或空间ID",
+    "loadedExecutionLogDetails": "已加载 {{nodeName}} 的执行日志详情",
+    "executionLogDetailsEmpty": "获取到的执行日志详情为空",
+    "unknownError": "未知错误",
+    "loadDebugDataFailed": "加载调测数据失败",
+    "loadFailed": "加载失败",
+    "fetchingData": "获取数据中...",
+    "noExecutionLogs": "暂无执行日志",
+    "executionLogs": "执行日志",
+    "reloadingExecutionLogs": "正在重新加载执行日志列表...",
+    "retry": "重试",
+    "clearedSelection": "已清空选择，请重新选择执行时间",
+    "selectExecutionLog": "请选择执行日志",
+    "fetchingLatestLogs": "正在获取最新的执行日志...",
+    "refreshExecutionLogs": "刷新执行日志",
+    "currentExecutionTime": "当前执行时间",
+    "missingLogSummaryData": "缺少 LogSummary 数据",
+    "missingLogSummaryDescription": "调测树需要 logSummary 数据来显示组件执行信息，但当前没有找到。",
+    "unknownComponent": "未知组件",
+    "name": "名称"
+  },
+  "formModel": {
+    "model": "模型",
+    "loadingModels": "加载模型中...",
+    "loadFailed": "加载模型失败，请重试",
+    "notSelected": "未选择",
+    "modelDisabled": "模型已禁用，请重新选择",
+    "enableHistory": "启用对话历史",
+    "modelNotExists": "模型不存在，请重新选择"
+  },
+  "formInput": {
+    "input": "输入"
+  },
+  "formOutput": {
+    "output": "输出"
+  },
+  "formPrompt": {
+    "userPrompt": "用户提示词",
+    "systemPrompt": "系统提示词"
+  },
+  "formContentEditor": {
+    "outputContent": "输出内容",
+    "streamingOutput": "流式输出"
+  },
+  "pluginSelector": {
+    "selectPluginTools": "选择插件工具",
+    "supportMultipleSelection": "支持同时选择多个插件中的多个工具",
+    "noAvailablePlugins": "暂无可用插件",
+    "plugin": "插件",
+    "noDescription": "暂无描述",
+    "draftVersion": "草稿版本",
+    "version": "版本",
+    "draft": "草稿",
+    "selectVersion": "请选择插件版本",
+    "toolList": "工具列表",
+    "loadingTools": "正在加载工具列表...",
+    "noTools": "暂无工具",
+    "cancel": "取消",
+    "confirm": "确认选择"
+  },
+  "workflowSelector": {
+    "selectWorkflow": "选择已有工作流",
+    "loadingWorkflows": "加载工作流列表中...",
+    "noAvailableWorkflows": "暂无可用工作流",
+    "selected": "已选择",
+    "createdAt": "创建时间",
+    "pagination": "共 {{total}} 个工作流，第 {{current}} / {{total}} 页",
+    "selectedCount": "已选择 {{count}} 个工作流",
+    "cancel": "取消",
+    "confirmAdd": "确认添加"
+  }
+}

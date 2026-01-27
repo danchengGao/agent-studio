@@ -38,6 +38,10 @@ const CallTree: React.FC<CallTreeProps> = ({ execList, onSelect, selectedId, roo
 
   const getNodeLabel = (node: InvokeExecuteInfo, depth: number): string => {
     if (depth === 0 && rootLabel) return rootLabel
+    // 处理知识库检索节点的显示名称
+    if (node.invoke_type === 'retriever' || node.invoke_name === 'knowledge_base_retrieval') {
+      return t('labels.knowledgeBaseRetrieval')
+    }
     return node.invoke_name || node.invoke_type || t('labels.nodeFallback')
   }
 

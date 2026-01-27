@@ -93,6 +93,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
   const [workflowListRefreshToken, setWorkflowListRefreshToken] = useState<number>(0)
 
   const spaceId = getDefaultSpaceId() || ''
+  const maxGreetingLength = 2000
 
   const { validationResults, setValidationResults, validateWorkflows, isValidating, workflowValidationErrorCount } = useWorkflowValidation({
     workflows: workflowObjects,
@@ -577,6 +578,8 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                 setGreeting(e.target.value)
                 updateGreeting(e.target.value)
               }}
+              inputProps={{ maxLength: maxGreetingLength }}
+              helperText={`${greeting.length}/${maxGreetingLength}`}
               fullWidth
               multiline
               rows={4}

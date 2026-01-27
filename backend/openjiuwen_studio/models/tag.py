@@ -3,10 +3,10 @@ from typing import Optional
 from sqlalchemy import (BigInteger, Column, Index, String, Table,
                         UniqueConstraint, Integer)
 from sqlalchemy.orm import (Mapped, declarative_mixin, mapped_column)
-
-from openjiuwen_studio.core.database import Base as meta_base
 from openjiuwen_studio.models.db_fun_base import Base, DBFunBase
 from openjiuwen_studio.ops.config import settings
+from .db_fun_base import Base as meta_base
+
 
 # Workflow-Tag 关联表
 workflow_tag_association = Table(

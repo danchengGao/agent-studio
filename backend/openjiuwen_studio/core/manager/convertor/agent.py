@@ -132,7 +132,7 @@ def agent_plugin_convert(space_id: str, plugin: AgentPlugin) -> dsl.PluginSchema
                 f"get plugin tool info with id {plugin.tool_id} from db failed, error: {get_result.message}")
 
         tool_info = get_result.data
-        input_parameters = tool_info.input_parameters
+        input_parameters = tool_info.input_parameters	 
         output_parameters = tool_info.output_parameters
 
         input_properties = convert_to_properties_format(input_parameters)

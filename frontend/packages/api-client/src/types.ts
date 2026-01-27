@@ -753,7 +753,7 @@ export interface WorkflowUserInputRequest {
 export interface WorkflowCancelRequest {
   space_id: string
   conversation_id: string
-  force?: boolean
+
 }
 
 export interface WorkflowCancelResponse {
@@ -1662,9 +1662,29 @@ export enum ParamSendMethod {
   BODY = 3,
 }
 
+// 插件参数类型枚举
+export enum ParamType {
+  STRING = 1,
+  INT = 2,
+  FLOAT = 3,
+  BOOL = 4,
+  OBJECT = 5,
+  ARRAY_STRING = 6,
+  ARRAY_INT = 7,
+  ARRAY_FLOAT = 8,
+  ARRAY_BOOL = 9,
+}
+
+// 插件参数优先级枚举
+export enum Priority {
+  TOOL = 0,
+  PLUGIN = 1,
+}
+
 export interface PluginCreateRequest {
   name: string
   desc: string
+  desc_mk?: string
   space_id: string
   plugin_type: PluginType | number
   url?: string
@@ -1691,10 +1711,12 @@ export interface PluginInfo {
   plugin_version?: string
   name: string
   desc: string
+  desc_mk?: string
   plugin_type: number
   published: boolean
   url?: string
   icon_uri?: string
+  request_params?: PluginRequestParam[]
 }
 
 export interface PluginGetResponse {
@@ -1723,10 +1745,12 @@ export interface PluginUpdateRequest {
   plugin_version?: string
   name?: string
   desc?: string
+  desc_mk?: string
   plugin_type?: PluginType | number
   published?: boolean
   url?: string
   icon_uri?: string
+  request_params?: PluginRequestParam[]
 }
 
 export interface PluginUpdateResponse {
@@ -1781,12 +1805,25 @@ export interface PluginListApi extends PluginApiBase {
   size?: number
 }
 
+export interface PluginRequestParam {
+  name: string
+  desc?: string
+  type: ParamType | number
+  is_required: boolean
+  value: string
+  is_runtime: boolean
+  priority: Priority | number
+}
+
 export interface PluginApiParam {
   name: string
   desc?: string
-  type: number
+  type: ParamType | number
   is_required?: boolean
   method?: ParamSendMethod
+  is_runtime?: boolean
+  value?: string
+  priority?: Priority | number
 }
 
 export interface PluginApiHeader {
@@ -1799,6 +1836,7 @@ export interface PluginApiInfo extends PluginApiBase {
   request_params?: PluginApiParam[]
   response_params?: PluginApiParam[]
   headers?: PluginApiHeader[]
+  available?: boolean
 }
 
 export interface PluginApiInfoResponse {
@@ -1822,6 +1860,7 @@ export interface PluginCreateApiRequest {
   request_params?: PluginApiParam[]
   response_params?: PluginApiParam[]
   headers?: PluginApiHeader[]
+  available?: boolean
 }
 
 export interface PluginUpdateApiRequest extends PluginApiInfo {}
@@ -1979,6 +2018,7 @@ export interface PluginCodeInfo extends PluginCodeBase {
   tool_id: string
   request_params?: PluginApiParam[]
   response_params?: PluginApiParam[]
+  available?: boolean
 }
 
 export interface PluginCodeInfoResponse {
@@ -2231,5 +2271,35 @@ export interface AgentVersionListResponse {
   data: {
     agent_id: string
     versions: AgentVersionInfo[]
+  }
+}
+
+// 文件上传/下载相关类型
+
+// 获取文件上传URL请求类型
+export interface GetUploadUrlRequest {
+  object_key: string
+}
+
+// 获取文件上传URL响应类型
+export interface GetUploadUrlResponse {
+  code: number
+  message: string
+  data: {
+    upload_url: string
+  }
+}
+
+// 获取文件下载URL请求类型
+export interface GetDownloadUrlRequest {
+  object_key?: string
+}
+
+// 获取文件下载URL响应类型
+export interface GetDownloadUrlResponse {
+  code: number
+  message: string
+  data: {
+    download_url: string
   }
 }

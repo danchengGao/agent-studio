@@ -139,10 +139,10 @@ def extract_component_names(schema_part, name_map, parent_path="", parent_compon
 
 
 async def _fetch_workflow_dl(
-        id: str, version: str, space_id: str, current_user: Dict[str, Any]
+        workflow_id: str, version: str, space_id: str, current_user: Dict[str, Any], skip_validation: bool = False
 ) -> Any:
-    req = {"workflow_id": id, "space_id": space_id, "version": version}
-    res = mgr.workflow_convert(WorkflowId(**req), current_user)
+    req = {"workflow_id": workflow_id, "space_id": space_id, "version": version}
+    res = mgr.workflow_convert(WorkflowId(**req), current_user, skip_validation=skip_validation)
     if res.code != status.HTTP_200_OK:
         if isinstance(res.data, dict) and "error_code" in res.data:
             if "component_id" in res.data and "component_type" in res.data:

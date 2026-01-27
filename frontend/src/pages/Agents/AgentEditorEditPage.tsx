@@ -1,7 +1,7 @@
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { Button, IconButton, Paper, CircularProgress, Divider, Select, MenuItem, SelectChangeEvent } from '@mui/material'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AgentDetailResponse, AgentService, ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client'
+import { AgentDetailResponse, AgentService, ExecutionService, SaveAgentRequest, useModels } from '@test-agentstudio/api-client'
 import i18n, { useScopedTranslation } from '@/i18n'
 import { ChevronLeft, Save, History, Brain, Settings, Eye, Clock, Tag } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -10,11 +10,13 @@ import MultiWorkflowSelector from '@/components/Agent/MultiWorkflowSelector'
 import AgentDebugChat from '@/components/Agent/AgentDebugChat'
 import AgentPublishDialog from '@/components/Agent/AgentPublishDialog'
 import { useAgentStore } from '@/stores/useAgentStore'
+import { useAuthStore } from '@/stores/useAuthStore'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import SystemPromptTab from '@/components/Agent/SystemPromptTab'
 import { ActionSlotTarget } from '@/components/Common/ActionSlot'
 import AgentVersionListPanel from '@/components/Agent/AgentVersionListPanel'
 import AgentSettingsDialog from '@/components/Agent/AgentSettingsDialog'
+import type { ModelDetail } from '@/types/agentTypes'
 
 const MIN_LEFT = 15
 const MIN_MIDDLE = 20
@@ -43,7 +45,16 @@ const AgentEditorEditPage = () => {
   const { saveAgentRequest, setSaveAgentRequest, updateSaveAgentRequest, saveAgent, isSaving, saveError, setReadonly } = useAgentStore()
   const lastAutoSaveTime = useAgentStore(s => s.lastAutoSaveTime)
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
+  const { user } = useAuthStore()
   const [historyAgentDetailResponse, setHistoryAgentDetailResponse] = useState<AgentDetailResponse | null>(null)
+
+  // 获取模型管理API的完整模型列表（最新数据，包含is_active状态）
+  const { data: modelsData } = useModels({
+    spaceId: user?.spaceId || '0',
+    size: 100,
+    sort_by: 'update_time',
+    sort_order: 'desc',
+  })
 
   // Publish dialog state
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
@@ -55,9 +66,6 @@ const AgentEditorEditPage = () => {
 
   // Settings dialog state and fields
   const [settingsOpen, setSettingsOpen] = useState(false)
-
-  // Agent mode selection
-  const [agentMode, setAgentMode] = useState<'single-react-agent' | 'multi-workflow'>('single-react-agent')
 
   // Format agent save request
   const formatSaveAgentRequest = (response: AgentDetailResponse): SaveAgentRequest => {
@@ -108,15 +116,6 @@ const AgentEditorEditPage = () => {
         space_id: getDefaultSpaceId(),
       })
       setAgentDetailResponse(response)
-
-      // Set agent mode based on agent_type
-      const existingAgentType = response.data.agent_info.agent_type
-      if (existingAgentType === 'workflow') {
-        setAgentMode('multi-workflow')
-      } else if (existingAgentType === 'react') {
-        setAgentMode('single-react-agent')
-      }
-
       setSaveAgentRequest(formatSaveAgentRequest(response))
       // Enter page in draft edit mode by default
       setSelectedHistoryVersion(null)
@@ -176,11 +175,23 @@ const AgentEditorEditPage = () => {
     }
   }
 
+  // Reset layout widths to default values
+  const resetLayoutWidths = useCallback(() => {
+    const defaultLeft = 30
+    const defaultRight = 30
+    setLeftPanelWidth(defaultLeft)
+    setRightPanelWidth(defaultRight)
+    leftPanelWidthRef.current = defaultLeft
+    rightPanelWidthRef.current = defaultRight
+    prevWidthsRef.current = { left: defaultLeft, right: defaultRight }
+  }, [])
+
   const handleAgentModeChange = async (e: SelectChangeEvent) => {
     const nextMode = e.target.value as 'single-react-agent' | 'multi-workflow'
-    setAgentMode(nextMode)
     const nextType = nextMode === 'multi-workflow' ? 'workflow' : 'react'
     updateSaveAgentRequest({ agent_type: nextType })
+    // Reset layout when switching agent mode
+    resetLayoutWidths()
     if (agentId && displayedAgentDetailResponse?.data?.agent_info?.agent_version) {
       try {
         await ExecutionService.resetAgentInstance({
@@ -320,6 +331,8 @@ const AgentEditorEditPage = () => {
           setSelectedHistoryVersion(null)
           setHistoryAgentDetailResponse(null)
           useAgentStore.getState().setReadonly(false)
+          // Reset layout when switching to draft
+          resetLayoutWidths()
           if (restoreTargetVersion) {
             showSuccess(t('messages.restoredToVersion', { version: restoreTargetVersion }))
           } else {
@@ -339,6 +352,9 @@ const AgentEditorEditPage = () => {
       // History version details for display only, not written to saveAgentRequest
       setHistoryAgentDetailResponse(response)
       useAgentStore.getState().setReadonly(true)
+
+      // Reset layout when switching to history version
+      resetLayoutWidths()
 
       showSuccess(t('messages.switchedToVersion', { version: versionId }))
       // Keep version list panel open and record currently selected history version
@@ -411,58 +427,40 @@ const AgentEditorEditPage = () => {
   useEffect(() => {
     rightPanelWidthRef.current = rightPanelWidth
   }, [rightPanelWidth])
-  // Calculate middle column width
-  const middleWidth = Math.max(0, 100 - leftPanelWidth - rightPanelWidth)
   const isReadOnly = !!selectedHistoryVersion
   const displayedAgentDetailResponse = historyAgentDetailResponse || agentDetailResponse
+
+  // displayedSaveAgentRequest: 业务数据的统一来源
+  // 历史版本模式：从历史数据转换
+  // 草稿模式：返回实时更新的 saveAgentRequest
+  const displayedSaveAgentRequest = useMemo<SaveAgentRequest>(() => {
+    if (selectedHistoryVersion && historyAgentDetailResponse) {
+      return formatSaveAgentRequest(historyAgentDetailResponse)
+    }
+    return saveAgentRequest
+  }, [selectedHistoryVersion, historyAgentDetailResponse, saveAgentRequest])
+
+  // Calculate agent mode from displayedSaveAgentRequest (reflects real-time edits)
+  const agentMode = useMemo<'single-react-agent' | 'multi-workflow'>(() => {
+    const agentType = displayedSaveAgentRequest?.agent_type
+    return agentType === 'workflow' ? 'multi-workflow' : 'single-react-agent'
+  }, [displayedSaveAgentRequest?.agent_type])
 
   // Calculate whether to show left panel based on agent mode
   const shouldShowSystemPrompt = agentMode !== 'multi-workflow'
 
-  // Recalculate panel widths based on display state
-  const adjustedLeftWidth = shouldShowSystemPrompt ? leftPanelWidth : 0
-
   // Adjust panel widths based on agent mode
-  let adjustedMiddleWidth: number
-  let adjustedRightWidth: number
-
-  if (!shouldShowSystemPrompt) {
-    // Single Agent (multi-workflow mode): orchestration and debug preview each take half
-    adjustedMiddleWidth = 50
-    adjustedRightWidth = 50
-  } else {
+  const { adjustedMiddleWidth, adjustedRightWidth } = useMemo(() => {
+    if (!shouldShowSystemPrompt) {
+      // Multi-workflow mode: orchestration and debug preview each take half
+      return { adjustedMiddleWidth: 50, adjustedRightWidth: 50 }
+    }
     // Other modes: maintain original drag widths
-    adjustedMiddleWidth = Math.max(0, 100 - adjustedLeftWidth - rightPanelWidth)
-    adjustedRightWidth = rightPanelWidth
-  }
-  const displayedSaveAgentRequest = useMemo<SaveAgentRequest>(() => {
-    if (historyAgentDetailResponse?.data?.agent_info) {
-      const { agent_name, ...otherProps } = historyAgentDetailResponse.data.agent_info
-      // Use actual agent_type from response
-      const actualAgentType = otherProps.agent_type || 'react'
-      return {
-        ...otherProps,
-        name: agent_name,
-        agent_type: actualAgentType,
-        configs: otherProps.configs || {},
-        plugins: otherProps.plugins || [],
-        workflows: otherProps.workflows || [],
-        prompt_template_name: otherProps.prompt_template_name || '',
-        prompt_template: otherProps.prompt_template || [],
-        prompt_tuning: otherProps.prompt_tuning || {},
-        triggers: otherProps.triggers || [],
-        knowledge: otherProps.knowledge || [],
-        memory: otherProps.memory || {},
-      } as SaveAgentRequest
-    }
-
-    // For current data, preserve existing saveAgentRequest but ensure correct agent_type
-    const currentAgentType = agentDetailResponse?.data?.agent_info?.agent_type || (agentMode === 'multi-workflow' ? 'workflow' : 'react')
     return {
-      ...saveAgentRequest,
-      agent_type: currentAgentType,
+      adjustedMiddleWidth: Math.max(0, 100 - leftPanelWidth - rightPanelWidth),
+      adjustedRightWidth: rightPanelWidth,
     }
-  }, [historyAgentDetailResponse, saveAgentRequest, agentMode, agentDetailResponse])
+  }, [shouldShowSystemPrompt, leftPanelWidth, rightPanelWidth])
 
   /** 把enableLongTerm提到AgentEditorEditPage，控制记忆弹窗显示长期记忆 */
   const [enableLongTerm, setEnableLongTerm] = useState<boolean | undefined>(undefined)
@@ -474,8 +472,39 @@ const AgentEditorEditPage = () => {
     }
   }, [displayedSaveAgentRequest?.memory?.longterm_memory_config])
 
+  // 将模型管理API的数据转换为ModelDetail格式（获取最新的is_active状态）
+  const modelsList = useMemo<ModelDetail[]>(() => {
+    if (!modelsData?.items) return []
+    return modelsData.items.map(model => ({
+      model_id: parseInt(model.id),
+      model_name: model.name,
+      model_type: model.modelId,
+      model_provider: model.provider,
+      max_tokens: model.maxTokens,
+      temperature: model.temperature,
+      top_p: model.topp,
+      timeout: model.timeout,
+      retry_count: model.retryCount,
+      enable_streaming: model.enableStreaming,
+      enable_function_calling: model.enableFunctionCalling,
+      is_active: model.isActive,
+      api_key: model.apiKey,
+      api_base: model.baseUrl,
+      streaming: model.enableStreaming,
+    }))
+  }, [modelsData])
+
+  // 检查当前选择的模型是否可用
+  const isModelActive = useMemo(() => {
+    const currentModelName = displayedSaveAgentRequest?.model?.model_info?.model_name || ''
+    if (!currentModelName) return false // 如果没有选择模型，认为不可用
+    const matchedModel = modelsList.find(model => model.model_name === currentModelName)
+    // 只有找到模型且is_active为true时才认为可用
+    return matchedModel?.is_active === true
+  }, [modelsList, displayedSaveAgentRequest?.model?.model_info?.model_name])
+
   return (
-    <div className="agent-editor-enhanced-page flex flex-col h-full w-full overflow-x-hidden">
+    <div className="agent-editor-enhanced-page flex flex-col h-full w-full overflow-x-hidden" key={selectedHistoryVersion || 'draft'}>
       {loading ? (
         <div className="flex items-center justify-center h-full w-full">
           <CircularProgress />
@@ -580,7 +609,6 @@ const AgentEditorEditPage = () => {
                     {/* 左侧面板：系统提示词 */}
                     <SystemPromptTab agentDetailResponse={displayedAgentDetailResponse || null} />
                   </div>
-                  {/* 历史版本仅禁用编辑，不使用遮罩以保留拖拽与折叠 */}
                 </Paper>
               )}
               {/* 左侧拖拽分隔线（扩大命中区域，视觉仍为细条）*/}
@@ -610,7 +638,6 @@ const AgentEditorEditPage = () => {
                     />
                   )}
                 </div>
-                {/* 历史版本仅禁用编辑，不使用遮罩以保留拖拽与折叠 */}
               </Paper>
               {/* 右侧拖拽分隔线（扩大命中区域，视觉仍为细条）*/}
               {shouldShowSystemPrompt && (
@@ -635,15 +662,14 @@ const AgentEditorEditPage = () => {
                     <AgentDebugChat
                       key={agentMode}
                       agentId={agentId}
-                      agentVersion={displayedAgentDetailResponse?.data?.agent_info?.agent_version}
                       onDebugInfoChange={handleDebugInfoChange}
                       enableLongTerm={enableLongTerm ?? true}
                       hideMemoryButton={agentMode === 'multi-workflow'}
-                      agentName={displayedAgentDetailResponse?.data?.agent_info?.agent_name}
+                      saveAgentRequest={displayedSaveAgentRequest}
+                      isModelActive={isModelActive}
                     />
                   )}
                 </div>
-                {/* 历史版本仅禁用编辑，不使用遮罩以保留拖拽与折叠与调试 */}
               </Paper>
             </div>
             {/* 版本历史侧边面板（固定宽度，组件内自行获取数据）*/}

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, Float, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from openjiuwen_studio.core.database import Base
+from .db_fun_base import Base
 
 
 class ModelConfig(Base):

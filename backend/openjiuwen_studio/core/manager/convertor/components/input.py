@@ -4,25 +4,23 @@
 from typing import List
 
 from openjiuwen_studio.core.common import dsl
-from openjiuwen_studio.schemas.node import Node, Outputs
+from openjiuwen_studio.schemas.node import Node, Outputs, BaseValue
 from openjiuwen_studio.core.common.dsl import ComponentType
 
 
 def _input_config_convert(outputs: Outputs) -> dsl.UserInputsConfig:
     configs = dsl.UserInputsConfig()
     for key, value in outputs.properties.items():
+        base_value = BaseValue(**value)
         required = False
         if key in outputs.required:
             required = True
-        default = ""
-        if isinstance(value.default, str):
-            default = value.default
         configs.inputs.append(dsl.UserInputElem(
             input_name=key,
-            description=value.description,
-            type=value.type,
+            description=base_value.description,
+            type=base_value.type,
             required=required,
-            default=default,
+            default=base_value.default,
         ))
     return configs
 

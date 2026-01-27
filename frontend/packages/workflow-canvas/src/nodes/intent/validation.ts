@@ -67,7 +67,6 @@ export const validateIntents = ({ value, context }: any) => {
 }
 
 export const validation = {
-  title: validateTitle,
   'inputs.inputParameters.*': validateInputParameters,
   'inputs.llmParam.model': commonValidators.model,
   'inputs.intents': validateIntents,

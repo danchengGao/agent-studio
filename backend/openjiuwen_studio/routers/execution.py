@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from fastapi import APIRouter, HTTPException, Request, status, Depends
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
-from openjiuwen.core.common.logging import logger, set_thread_session
+from openjiuwen.core.common.logging import logger, set_thread_session, get_thread_session
 from openjiuwen.core.runtime.interaction.interactive_input import InteractiveInput
 from pydantic import BaseModel, Field
 from sse_starlette import EventSourceResponse
@@ -69,10 +69,6 @@ class UserInputParas(BaseParas):
     inputs: UserInput = Field(default={}, description="Input parameters")
 
 
-class CancelExecutionParas(BaseParas):
-    force: bool = Field(default=True, description="是否强制停止线程")
-
-
 def get_error_info_in_wf_trace(mgr, chunk):
     code = status.HTTP_200_OK
     message = "Executed successfully"
@@ -105,7 +101,7 @@ async def handler(
         session_id = " ".join(
             [
                 id_val.strip()
-                for id_val in [request_body.space_id, request_body.conversation_id]
+                for id_val in [request_body.space_id, request_body.conversation_id, get_thread_session()]
                 if id_val and id_val.strip()
             ]
         )
@@ -576,14 +572,14 @@ async def reset_agent_instance(
 
 @execution_router.post("/workflow/cancel", response_model=ResponseModel[dict])
 async def cancel_workflow_execution(
-        request_body: CancelExecutionParas,
+        request_body: BaseParas,
         current_user: Dict[str, Any] = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     """
     取消正在执行的工作流
 
     Args:
-        request_body: 包含 conversation_id 和 force 标志的请求体
+        request_body: 包含 conversation_id
         current_user: 当前用户信息
 
     Returns:
@@ -602,8 +598,7 @@ async def cancel_workflow_execution(
 
         # 执行取消操作
         success = await workflow_execution_manager.cancel_execution(
-            conversation_id=request_body.conversation_id,
-            force=request_body.force
+            conversation_id=request_body.conversation_id
         )
 
         if success:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # =============================================================================
 # CORE DATA STRUCTURE
@@ -11,7 +11,8 @@ PROJECT_DIR="${SCRIPT_DIR}/.."
 declare -A CONFIG=(
     ["ENV_DIR"]="${SCRIPT_DIR}/.envs"
     ["ENV_FILE"]="${SCRIPT_DIR}/.env"
-    ["DEFAULT_ENV_FILE"]="${SCRIPT_DIR}/.env.default"
+    ["DEFAULT_DEPLOY_ENV_FILE"]="${SCRIPT_DIR}/.env.deploy.default"
+    ["DEFAULT_RUNTIME_ENV_FILE"]="${SCRIPT_DIR}/.env.runtime.default"
     ["CUSTOM_ENV_FILE"]="${SCRIPT_DIR}/.env.custom"
     ["CONFIG_DIR"]="${SCRIPT_DIR}/conf"
     ["NGINX_TEMPLE_FILE"]="${SCRIPT_DIR}/conf/nginx.template.conf"
@@ -23,33 +24,34 @@ declare -A CONFIG=(
 
 # ===== Prefix-Naming conventions for Docker services/containers/volumes =====
 declare -A NAMES=(
-    ["MYSQL_SERVICE_NAME"]="mysql"
-    ["MYSQL_DOCKER_NAME"]="jiuwen-mysql"
+    ["MYSQL_SERVICE"]="mysql"
+    ["MYSQL_DOCKER"]="jiuwen-mysql"
     ["MYSQL_VOLUME"]="mysql-data"
-    ["ETCD_SERVICE_NAME"]="etcd"
-    ["ETCD_DOCKER_NAME"]="jiuwen-milvus-etcd"
+    ["ETCD_SERVICE"]="etcd"
+    ["ETCD_DOCKER"]="jiuwen-etcd"
     ["ETCD_VOLUME"]="etcd-data"
-    ["MINIO_SERVICE_NAME"]="minio"
-    ["MINIO_DOCKER_NAME"]="jiuwen-milvus-minio"
+    ["MINIO_SERVICE"]="minio"
+    ["MINIO_DOCKER"]="jiuwen-minio"
     ["MINIO_VOLUME"]="minio-data"
-    ["MILVUS_SERVICE_NAME"]="milvus"
-    ["MILVUS_DOCKER_NAME"]="jiuwen-milvus-standalone"
+    ["MILVUS_SERVICE"]="milvus"
+    ["MILVUS_DOCKER"]="jiuwen-milvus-standalone"
     ["MILVUS_VOLUME"]="milvus-data"
-    ["FRONTEND_SERVICE_NAME"]="frontend"
-    ["FRONTEND_DOCKER_NAME"]="jiuwen-frontend"
-    ["BACKEND_SERVICE_NAME"]="backend"
-    ["BACKEND_DOCKER_NAME"]="jiuwen-backend"
+    ["FRONTEND_SERVICE"]="frontend"
+    ["FRONTEND_DOCKER"]="jiuwen-frontend"
+    ["BACKEND_SERVICE"]="backend"
+    ["BACKEND_DOCKER"]="jiuwen-backend"
+    ["SQLITE_VOLUME"]="sqlite-data"
+    ["MEMORY_VOLUME"]="memory-data"
+    ["KNOWLEDGE_VOLUME"]="knowledge-data"
     ["JIUWEN_NETWORK_NAME"]="jiuwen-network"
-    ["NGINX_FILE_NAME"]="nginx.conf"
-    ["SSL_DIR_NAME"]="ssl"
-    ["PLUGIN_SERVER_SERVICE_NAME"]="plugin-server"
-    ["PLUGIN_SERVER_DOCKER_NAME"]="jiuwen-plugin-server"
-    ["SANDBOX_GATEWAY_SERVICE_NAME"]="sandbox-gateway"
-    ["SANDBOX_GATEWAY_DOCKER_NAME"]="jiuwen-sandbox-gateway"
-    ["PYTHON_SERVER_SERVICE_NAME"]="python-server"
-    ["PYTHON_SERVER_DOCKER_NAME"]="jiuwen-python-server"
-    ["JS_SERVER_SERVICE_NAME"]="js-server"
-    ["JS_SERVER_DOCKER_NAME"]="jiuwen-js-server"
+    ["PLUGIN_SERVER_SERVICE"]="plugin-server"
+    ["PLUGIN_SERVER_DOCKER"]="jiuwen-plugin-server"
+    ["SANDBOX_GATEWAY_SERVICE"]="sandbox-gateway"
+    ["SANDBOX_GATEWAY_DOCKER"]="jiuwen-sandbox-gateway"
+    ["PYTHON_SERVER_SERVICE"]="python-server"
+    ["PYTHON_SERVER_DOCKER"]="jiuwen-python-server"
+    ["JS_SERVER_SERVICE"]="js-server"
+    ["JS_SERVER_DOCKER"]="jiuwen-js-server"
 )
 
 # ===== Host port variables to allocate for services (dynamic assignment) =====
@@ -69,36 +71,41 @@ declare -ga PORTS=(
 
 # ===== Container/service name variables for network address resolution =====
 declare -ga CONTAINERS_ADDRS=(
-    MYSQL_SERVICE_NAME
-    MYSQL_DOCKER_NAME
-    ETCD_SERVICE_NAME
-    ETCD_DOCKER_NAME
-    MINIO_SERVICE_NAME
-    MINIO_DOCKER_NAME
-    MILVUS_SERVICE_NAME
-    MILVUS_DOCKER_NAME
-    FRONTEND_SERVICE_NAME
-    FRONTEND_DOCKER_NAME
-    BACKEND_SERVICE_NAME
-    BACKEND_DOCKER_NAME
-    PLUGIN_SERVER_SERVICE_NAME
-    PLUGIN_SERVER_DOCKER_NAME
-    SANDBOX_GATEWAY_SERVICE_NAME
-    SANDBOX_GATEWAY_DOCKER_NAME
-    PYTHON_SERVER_SERVICE_NAME
-    PYTHON_SERVER_DOCKER_NAME
-    JS_SERVER_SERVICE_NAME
-    JS_SERVER_DOCKER_NAME
+    MYSQL_SERVICE
+    MYSQL_DOCKER
+    ETCD_SERVICE
+    ETCD_DOCKER
+    MINIO_SERVICE
+    MINIO_DOCKER
+    MILVUS_SERVICE
+    MILVUS_DOCKER
+    FRONTEND_SERVICE
+    FRONTEND_DOCKER
+    BACKEND_SERVICE
+    BACKEND_DOCKER
+    PLUGIN_SERVER_SERVICE
+    PLUGIN_SERVER_DOCKER
+    SANDBOX_GATEWAY_SERVICE
+    SANDBOX_GATEWAY_DOCKER
+    PYTHON_SERVER_SERVICE
+    PYTHON_SERVER_DOCKER
+    JS_SERVER_SERVICE
+    JS_SERVER_DOCKER
 )
 
-# ==== Global associative array: Stores all variables from .env  ====
+# ==== Global deploy associative array ====
 # ==== (key=variable name, value=variable value) ====
-declare -A ENV_VARS=(
+declare -A DEPLOY_VARS=(
     ["HAS_MYSQL_CONTAINER"]="false"
     ["HAS_MILVUS_CONTAINER"]="false"
     ["HAS_PLUGIN_CONTAINER"]="false"
     ["HAS_SANDBOX_CONTAINER"]="false"
     ["HAS_JIUWEN_CONTAINER"]="false"
+)
+
+# ==== Global runtime associative array  ====
+# ==== (key=variable name, value=variable value) ====
+declare -A RUNTIME_VARS=(
 )
 
 #  ==== List of available ports for service allocation (dynamic generated) ====
@@ -130,11 +137,11 @@ declare -A COMPOSE_FILES=(
 
 # ==== Mapping of modules to their associated Docker container name keys ==== 
 declare -A CONTAINER_KEYS=(
-    ["MYSQL"]="MYSQL_DOCKER_NAME" 
-    ["MILVUS"]="ETCD_DOCKER_NAME MINIO_DOCKER_NAME MILVUS_DOCKER_NAME"
-    ["PLUGIN"]="PLUGIN_SERVER_DOCKER_NAME"
-    ["SANDBOX"]="PYTHON_SERVER_DOCKER_NAME JS_SERVER_DOCKER_NAME SANDBOX_GATEWAY_DOCKER_NAME"
-    ["JIUWEN"]="BACKEND_DOCKER_NAME FRONTEND_DOCKER_NAME"
+    ["MYSQL"]="MYSQL_DOCKER"
+    ["MILVUS"]="ETCD_DOCKER MINIO_DOCKER MILVUS_DOCKER"
+    ["PLUGIN"]="PLUGIN_SERVER_DOCKER"
+    ["SANDBOX"]="PYTHON_SERVER_DOCKER JS_SERVER_DOCKER SANDBOX_GATEWAY_DOCKER"
+    ["JIUWEN"]="BACKEND_DOCKER FRONTEND_DOCKER"
 )
 
 # == Final resolved container names for each module (populated dynamically) ==

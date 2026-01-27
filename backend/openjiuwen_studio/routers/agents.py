@@ -2,8 +2,9 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved
 from typing import Optional
-
-from fastapi import APIRouter, HTTPException, status, Depends
+from urllib.parse import quote
+from starlette.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form, Body, Request
 from pydantic import ValidationError
 
 from openjiuwen.core.common.logging import logger
@@ -15,7 +16,7 @@ import openjiuwen_studio.core.manager.agent as mgr
 from openjiuwen_studio.routers.models import get_model_config_manager
 from openjiuwen_studio.schemas.agent import AgentCreate, AgentGet, AgentDisplayInfo, AgentList, AgentPublish, \
     AgentGetVersion, AgentUpdate, AgentCopy, AgentId, AgentSearchRequest, AgentVersionListRequest, \
-    AgentVersionListResponse
+    AgentVersionListResponse, AgentExportRequest, AgentImportRequest
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.execution_log import ExecutionLogsCreateList, ApiExecutionLogGet, \
     ApiExecutionLogsDebugEnter, AgExecutionLogsFilter, AgExecutionLogIndex
@@ -487,3 +488,98 @@ async def enter_agent_execution_logs_debug(
         return handle_response(res)
     except ValidationError as e:
         raise handle_validation_error(e, "AGENT_EXECUTION_DEBUG", current_user.get('user_id', 'unknown')) from e
+
+
+@agents_router.post("/export")
+async def agent_export(
+        request: dict,
+        current_user: dict = Depends(get_current_user)
+):
+    """
+    导出智能体及其依赖项。
+    """
+    try:
+        req = validate_request(request, AgentExportRequest)
+        res = mgr.agent_export(req, current_user)
+
+        if isinstance(res, tuple) and len(res) == 2:
+            zip_buffer, filename = res
+            filename_encoded = quote(filename)
+            return StreamingResponse(
+                zip_buffer,
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": f"attachment; filename*=UTF-8''{filename_encoded}"
+                }
+            )
+
+        return handle_response(res)
+    except ValidationError as e:
+        raise handle_validation_error(e, "AGENT_EXPORT", current_user.get('user_id', 'unknown')) from e
+
+
+@agents_router.post("/import", response_model=ResponseModel[dict])
+async def agent_import(
+        raw_request: Request,
+        file: Optional[UploadFile] = File(None),
+        request: Optional[dict] = Body(None),
+        space_id: str = Form(None),
+        overwrite: bool = Form(False),
+        current_user: dict = Depends(get_current_user)
+):
+    """
+    导入智能体及其依赖项。
+    支持 JSON 请求体（旧方式）或文件上传（ZIP/JSON）。
+    对于文件上传，必须提供 space_id 参数。
+    """
+    try:
+        # 尝试手动解析 JSON Body，解决 Body 与 File 混用导致 JSON 请求无法解析的问题
+        if not file and not request:
+            content_type = raw_request.headers.get("content-type", "")
+            if content_type and "application/json" in content_type:
+                try:
+                    request = await raw_request.json()
+                    logger.info("[AGENT_IMPORT] Manually parsed JSON body from request")
+                except Exception as e:
+                    logger.warning(f"[AGENT_IMPORT] Failed to parse JSON body: {e}")
+
+        # 1. 如果是文件上传（优先处理）
+        if file:
+            if not space_id:
+                # 尝试从用户数据获取默认空间，但这通常不安全，最好强制前端传参
+                data = current_user.get('data', {})
+                space_id = data.get('space_id') or "default"
+            
+            # 读取文件内容
+            file_content = await file.read()
+            
+            # 构建请求对象
+            # 注意：agent_import_from_file 是异步的
+            res = await mgr.agent_import_from_file(
+                file_content=file_content, 
+                space_id=space_id, 
+                overwrite=overwrite, 
+                current_user=current_user
+            )
+            return handle_response(res)
+            
+        # 2. 如果是 JSON 请求体（兼容旧方式）
+        elif request:
+            req = validate_request(request, AgentImportRequest)
+            res = await mgr.agent_import(req, current_user)
+            return handle_response(res)
+            
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No import data provided"
+            )
+            
+    except ValidationError as e:
+        raise handle_validation_error(e, "AGENT_IMPORT", current_user.get('user_id', 'unknown')) from e
+    except Exception as e:
+        logger.error(f"[AGENT_IMPORT] Unexpected error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Import failed: {str(e)}"
+        ) from e

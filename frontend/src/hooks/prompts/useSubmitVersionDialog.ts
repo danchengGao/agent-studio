@@ -23,7 +23,7 @@ interface UseSubmitVersionDialogProps {
   setVersionHistoryOpen: (open: boolean) => void
   setLatestVersion: (version: string) => void
   setIsLoadingFromAPI: (loading: boolean) => void
-  loadFromDraftData: (draftData: any) => Promise<void>
+  loadPromptDetailToPage: (promptDetailData: any, isNewPromptScenario?: boolean) => Promise<void>
   loadDebugContext?: () => Promise<void> // 加载调试上下文的函数（可选）
   // Snackbar 函数
   showSnackbar: (message: string, severity?: 'success' | 'error' | 'warning' | 'info', duration?: number) => void
@@ -71,7 +71,7 @@ export const useSubmitVersionDialog = ({
   setVersionHistoryOpen,
   setLatestVersion,
   setIsLoadingFromAPI,
-  loadFromDraftData,
+  loadPromptDetailToPage,
   loadDebugContext,
   showSnackbar,
   setSnackbar,
@@ -254,7 +254,7 @@ export const useSubmitVersionDialog = ({
               setIsLoadingFromAPI(true)
 
               // 使用相同的函数填充编辑器数据
-              await loadFromDraftData(draftData)
+              await loadPromptDetailToPage(draftData)
 
               // 延迟重置加载标志，确保状态更新完成
               setTimeout(async () => {
@@ -330,7 +330,7 @@ export const useSubmitVersionDialog = ({
     setVersionHistoryOpen,
     setLatestVersion,
     setIsLoadingFromAPI,
-    loadFromDraftData,
+    loadPromptDetailToPage,
     loadDebugContext,
     resetVersionDialogState,
     t,

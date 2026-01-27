@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Typography, Button, IconButton, CircularProgress, MenuItem, Select, SelectChangeEvent } from '@mui/material'
+import { Typography, Button, IconButton, CircularProgress, MenuItem, Select, SelectChangeEvent, Chip } from '@mui/material'
 import { X } from 'lucide-react'
 import { PluginService, PluginInfo, PluginApiInfo, PluginApiMethod } from '@test-agentstudio/api-client'
 import { getDefaultSpaceId } from '../../../../../src/utils/spaceUtils'
@@ -57,6 +57,12 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
   useEffect(() => {
     if (open) {
       loadPlugins()
+    }
+
+    return () => {
+      // Cleanup: Clear any pending timeouts or intervals
+      setLoadingVersions(new Set())
+      setLoadingTools(new Set())
     }
   }, [open])
 
@@ -128,9 +134,12 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
 
         // 自动加载默认版本的工具列表
         // 确保无论是发布版本还是draft版本，都会调用对应的接口获取工具列表
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           loadPluginTools(pluginId, defaultVersion)
         }, 100) // 添加小延迟确保状态更新完成
+
+        // Store timeout ID for cleanup (simplified approach)
+        return () => clearTimeout(timeoutId)
       }
     } catch (error) {
       console.error(`Failed to load versions for plugin ${pluginId}:`, error)
@@ -149,9 +158,12 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
         setSelectedVersions(prev => new Map(prev).set(pluginId, 'draft'))
 
         // 自动加载draft版本的工具列表
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           loadPluginTools(pluginId, 'draft')
         }, 100) // 添加小延迟确保状态更新完成
+
+        // Store timeout ID for cleanup
+        return () => clearTimeout(timeoutId)
       }
     } finally {
       setLoadingVersions(prev => {
@@ -165,6 +177,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
   // 处理版本选择变化
   const handleVersionChange = (pluginId: string, version: string) => {
     setSelectedVersions(prev => new Map(prev).set(pluginId, version))
+
     // 每次点击具体版本的时候都会调用对应的接口
     // 点插件版本时，都调用一次publish_get，点draft的时候，都调用一次list_api
     loadPluginTools(pluginId, version)
@@ -185,6 +198,23 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
       let tools: PluginApiInfo[] = []
 
       if (version === 'draft') {
+        // 对于draft版本，需要调用get接口获取最新的插件信息
+        try {
+          const response = await PluginService.getPlugin({
+            space_id: spaceId,
+            plugin_id: pluginId,
+          })
+
+          if (response.code === 200 && response.data?.plugin_info) {
+            const freshPluginInfo = response.data.plugin_info
+            // 更新插件列表中的插件信息
+            setPluginList(prev => prev.map(plugin => (plugin.plugin_id === pluginId ? freshPluginInfo : plugin)))
+            console.log(`Updated plugin info for draft version: ${pluginId}`)
+          }
+        } catch (error) {
+          console.warn(`Failed to load plugin info for ${pluginId}, continuing with tools loading:`, error)
+        }
+
         // 对于draft版本，需要根据插件类型选择不同的API
         const plugin = pluginList.find(p => p.plugin_id === pluginId)
 
@@ -210,6 +240,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
               request_params: codeTool.request_params || [],
               response_params: codeTool.response_params || [],
               headers: [],
+              available: codeTool.available,
             }))
             console.log(`Loaded ${tools.length} draft code tools for plugin ${pluginId}`)
           } else {
@@ -239,8 +270,18 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
           plugin_version: version,
         })
 
-        if (response.code === 200 && response.data?.plugin_info?.tools) {
-          tools = response.data.plugin_info.tools
+        if (response.code === 200 && response.data?.plugin_info) {
+          tools = response.data.plugin_info.tools || []
+
+          // IMPORTANT: 保存插件级别的request_params到plugin对象中
+          // 这样publish版本也能像draft版本一样正确显示插件级别参数
+          if (response.data.plugin_info.request_params) {
+            setPluginList(prev =>
+              prev.map(plugin => (plugin.plugin_id === pluginId ? { ...plugin, request_params: response.data.plugin_info.request_params } : plugin)),
+            )
+            console.log(`Updated plugin ${pluginId} with plugin-level request_params from publish version ${version}`)
+          }
+
           console.log(`Loaded ${tools.length} published tools for plugin ${pluginId}, version ${version}`)
         } else {
           console.warn(`No published tools found for plugin ${pluginId}, version ${version}, response:`, response)
@@ -307,6 +348,11 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
   }
 
   const handleToolSelect = (pluginId: string, tool: PluginApiInfo) => {
+    // Prevent selection if tool is disabled
+    if (tool.available === false) {
+      return
+    }
+
     setSelectedTools(prev => {
       const newMap = new Map(prev)
       const currentTools = newMap.get(pluginId) || new Set()
@@ -330,8 +376,8 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" translate="no">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col notranslate">
         <div className="flex justify-between items-center mb-4">
           <div>
             <Typography variant="h6">{t('workflowCanvas.pluginSelector.selectPluginTools')}</Typography>
@@ -376,6 +422,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                   {t('workflowCanvas.pluginSelector.version')}:
                                 </Typography>
                                 <Select
+                                  key={`plugin-select-${plugin.plugin_id}`}
                                   size="small"
                                   value={selectedVersions.get(plugin.plugin_id) || 'draft'}
                                   onChange={(e: SelectChangeEvent) => {
@@ -388,15 +435,52 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                     minWidth: 120,
                                     fontSize: '0.75rem',
                                     height: 24,
+                                    position: 'relative',
+                                    zIndex: 10000,
                                   }}
                                   disabled={loadingVersions.has(plugin.plugin_id)}
+                                  className="notranslate"
+                                  MenuProps={{
+                                    disablePortal: true,
+                                    anchorOrigin: {
+                                      vertical: 'bottom',
+                                      horizontal: 'left',
+                                    },
+                                    transformOrigin: {
+                                      vertical: 'top',
+                                      horizontal: 'left',
+                                    },
+                                    PaperProps: {
+                                      sx: {
+                                        translate: 'no',
+                                        position: 'relative',
+                                        zIndex: 9999,
+                                      },
+                                      className: 'notranslate',
+                                    },
+                                    MenuListProps: {
+                                      className: 'notranslate',
+                                    },
+                                  }}
                                 >
                                   {pluginVersions.get(plugin.plugin_id)?.map(version => (
-                                    <MenuItem key={version.plugin_version} value={version.plugin_version} sx={{ fontSize: '0.75rem' }}>
+                                    <MenuItem
+                                      key={version.plugin_version}
+                                      value={version.plugin_version}
+                                      sx={{ fontSize: '0.75rem' }}
+                                      translate="no"
+                                      className="notranslate"
+                                    >
                                       {version.plugin_version} {version.plugin_version === 'draft' ? `(${t('workflowCanvas.pluginSelector.draft')})` : ''}
                                     </MenuItem>
                                   )) || [
-                                    <MenuItem key="draft" value="draft" sx={{ fontSize: '0.75rem' }}>
+                                    <MenuItem
+                                      key="draft"
+                                      value="draft"
+                                      sx={{ fontSize: '0.75rem' }}
+                                      translate="no"
+                                      className="notranslate"
+                                    >
                                       {t('workflowCanvas.pluginSelector.selectVersion')}
                                     </MenuItem>,
                                   ]}
@@ -423,11 +507,16 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                           <div className="space-y-1">
                                             {tools.map(tool => {
                                               const isSelected = selectedTools.get(plugin.plugin_id)?.has(tool.tool_id)
+                                              const isDisabled = tool.available === false
                                               return (
                                                 <div
                                                   key={tool.tool_id}
-                                                  className={`rounded p-2 text-xs cursor-pointer transition-colors ${
-                                                    isSelected ? 'bg-blue-100 border border-blue-300' : 'bg-gray-50 hover:bg-gray-100'
+                                                  className={`rounded p-2 text-xs transition-colors ${
+                                                    isDisabled
+                                                      ? 'bg-gray-100 opacity-60 cursor-not-allowed'
+                                                      : isSelected
+                                                        ? 'bg-blue-100 border border-blue-300 cursor-pointer'
+                                                        : 'bg-gray-50 hover:bg-gray-100 cursor-pointer'
                                                   }`}
                                                   onClick={e => {
                                                     e.stopPropagation()
@@ -435,15 +524,29 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                                   }}
                                                 >
                                                   <div className="flex items-center justify-between">
-                                                    <Typography variant="caption" className="font-medium">
+                                                    <Typography variant="caption" className={`font-medium ${isDisabled ? 'text-gray-500' : ''}`}>
                                                       {tool.name || tool.tool_id}
                                                     </Typography>
                                                     <div className="flex items-center space-x-1">
+                                                      <Chip
+                                                        label={
+                                                          tool.available === true
+                                                            ? t('plugins.pluginConfig.enabled', '启用')
+                                                            : t('plugins.pluginConfig.disabled', '禁用')
+                                                        }
+                                                        size="small"
+                                                        color={tool.available === true ? 'success' : 'default'}
+                                                        sx={{ height: 18, fontSize: '0.65rem', '& .MuiChip-label': { px: 0.5 } }}
+                                                      />
                                                       {isSelected && <span className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded">✓</span>}
                                                     </div>
                                                   </div>
                                                   {tool.desc && (
-                                                    <Typography variant="caption" color="textSecondary" className="mt-1 block">
+                                                    <Typography
+                                                      variant="caption"
+                                                      color="textSecondary"
+                                                      className={`mt-1 block ${isDisabled ? 'text-gray-400' : ''}`}
+                                                    >
                                                       {tool.desc}
                                                     </Typography>
                                                   )}

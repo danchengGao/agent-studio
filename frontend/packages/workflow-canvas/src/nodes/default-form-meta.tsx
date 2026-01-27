@@ -39,7 +39,6 @@ export const defaultFormMeta: FormMeta<FlowNodeJSON> = {
    * 2: validate as dynamic function: (values,  ctx) => ({ title: () => {}, ... })
    */
   validate: {
-    title: ({ value }) => (value ? undefined : t('workflowCanvas.validation.titleRequired')),
     'inputsValues.*': ({ value, context, formValues, name }) => {
       const valuePropertyKey = name.replace(/^inputsValues\./, '')
       const required = formValues.inputs?.required || []

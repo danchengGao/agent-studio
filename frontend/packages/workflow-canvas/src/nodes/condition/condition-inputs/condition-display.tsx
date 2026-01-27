@@ -34,7 +34,7 @@ export const ConditionDisplay: React.FC = () => {
           ...branch,
           branchId: branch.branchId || `branch_${index}`,
           conditions: Array.isArray(branch.conditions) ? branch.conditions : [],
-          logic: branch.logic || 2,
+          logic: typeof branch.logic === 'number' ? branch.logic : parseInt(branch.logic as string, 10) || 2,
         }))
 
         return (

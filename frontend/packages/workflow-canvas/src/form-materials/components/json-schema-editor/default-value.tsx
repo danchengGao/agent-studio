@@ -6,7 +6,7 @@
 import React from 'react'
 
 import { IJsonSchema } from '@flowgram.ai/json-schema'
-import { I18n } from '@flowgram.ai/editor'
+import { t } from '../../../i18n'
 
 import { ConstantInput } from '../../'
 
@@ -29,9 +29,9 @@ export function DefaultValue(props: {
     return (
       <div className="gedit-m-json-schema-editor-locked-default-value">
         <div className="gedit-m-json-schema-editor-locked-value-display">
-          {value !== undefined && value !== null && value !== '' ? JSON.stringify(value) : I18n.t('No default value')}
+          {value !== undefined && value !== null && value !== '' ? JSON.stringify(value) : t('workflowCanvas.formMaterials.editor.noDefaultValue')}
         </div>
-        <div className="gedit-m-json-schema-editor-locked-hint">{I18n.t('Default value is locked')}</div>
+        <div className="gedit-m-json-schema-editor-locked-hint">{t('workflowCanvas.formMaterials.editor.defaultValueLocked')}</div>
       </div>
     )
   }
@@ -42,7 +42,7 @@ export function DefaultValue(props: {
         value={value}
         onChange={_v => onChange(_v)}
         schema={schema || { type: 'string' }}
-        placeholder={placeholder ?? I18n.t('Default value if parameter is not provided')}
+        placeholder={placeholder ?? t('workflowCanvas.formMaterials.editor.defaultValueIfNotProvided')}
         enableMultiLineStr
       />
     </div>

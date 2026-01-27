@@ -1,4 +1,3 @@
-import logging
 import random
 import secrets
 import string
@@ -6,14 +5,13 @@ import string
 import jwt
 from fastapi import HTTPException, Depends, status
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.core.manager.login_manager.session_auth import hash_password, oauth2_scheme
 from openjiuwen_studio.core.manager.repositories.user_repository import user_repository
 from openjiuwen_studio.schemas.space import SpaceDBPd
 from openjiuwen_studio.schemas.user import UserDBPd, UserResponse, RoleType
-
-logger = logging.getLogger(__name__)
 
 
 def create_user_response(user_db: UserDBPd, include_session_key: bool) -> UserResponse:

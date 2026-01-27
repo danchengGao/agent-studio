@@ -6,7 +6,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
+import { t } from '../../../../i18n'
 
 import { ConditionPresetOp, JsonCodeEditor } from '../../..'
 
@@ -15,7 +15,13 @@ import { type JsonSchemaTypeRegistry } from '../types'
 export const mapRegistry: Partial<JsonSchemaTypeRegistry> = {
   type: 'map',
   ConstantRenderer: props => (
-    <JsonCodeEditor mini value={props.value} onChange={v => props.onChange?.(v)} placeholder={I18n.t('Please Input Map')} readonly={props.readonly} />
+    <JsonCodeEditor
+      mini
+      value={props.value}
+      onChange={v => props.onChange?.(v)}
+      placeholder={t('workflowCanvas.formMaterials.input.pleaseInputMap')}
+      readonly={props.readonly}
+    />
   ),
   conditionRule: {
     [ConditionPresetOp.IS_EMPTY]: null,

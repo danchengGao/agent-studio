@@ -1,0 +1,223 @@
+{
+  "plugin": {
+    "title": "Plugin",
+    "description": "Call plugin tools to execute specific tasks",
+    "noInputParams": "This tool has no input parameters",
+    "noOutputParams": "This tool has no output parameters",
+    "parameterName": "Parameter Name",
+    "type": "Type",
+    "parameterInput": "Parameter Input",
+    "descriptionInfo": "Description",
+    "unnamedTool": "Unnamed Tool",
+    "noDescription": "No description",
+    "stringType": "String",
+    "numberType": "Number",
+    "booleanType": "Boolean",
+    "objectType": "Object",
+    "arrayType": "Array",
+    "inputPlaceholder": "Enter value",
+    "numberPlaceholder": "Enter number",
+    "jsonPlaceholder": "JSON format",
+    "required": "Required"
+  },
+  "node": {
+    "Start": "Start",
+    "End": "End",
+    "LLM": "LLM",
+    "Selector": "Selector",
+    "Loop": "Loop",
+    "Code": "Code",
+    "Input": "Input",
+    "Output": "Output",
+    "Intent": "Intent",
+    "Questioner": "Questioner",
+    "TextEditor": "Text Editor",
+    "Continue": "Continue",
+    "Break": "Break",
+    "Variable": "Variable",
+    "Comment": "Comment",
+    "Node": "Node",
+    "Unknown": "Unknown",
+    "Plugin": "Plugin",
+    "Workflow": "Workflow"
+  },
+  "validators": {
+    "workflowMustContainPath": "Workflow must contain a complete path from start node to end node",
+    "workflow": "Workflow"
+  },
+  "validation": {
+    "titleRequired": "Title is required",
+    "paramRequired": "Parameter {{param}} is required",
+    "paramEmpty": "Parameter {{param}} cannot be empty",
+    "variableUnknown": "Unknown variable",
+    "promptRequired": "Prompt is required",
+    "outputCountMin": "At least {{count}} outputs required",
+    "outputCountDual": "2 outputs required (true and false)",
+    "conditionIncomplete": "Condition is incomplete",
+    "returnContentEmpty": "Return content cannot be empty",
+    "resultRequired": "Result is required",
+    "modelRequired": "Model is required",
+    "streamingTemplateEmpty": "Streaming template cannot be empty",
+    "nodeValidationError": "Node Validation Issues",
+    "error": "Error",
+    "warning": "Warning",
+    "fixAll": "Fix All",
+    "noValidationIssues": "No validation issues found",
+    "configurationError": "Configuration error"
+  },
+  "ui": {
+    "draft": "Draft",
+    "switchedToVersion": "Switched to version {{version}}",
+    "importReadonlyWarning": "Cannot import workflow in readonly mode. Please switch to draft version first.",
+    "importConfirmTitle": "Import Workflow",
+    "importConfirmMessage": "Importing a new workflow will clear the current canvas content. This action cannot be undone. Continue?",
+    "importConfirmOk": "Import",
+    "importConfirmCancel": "Cancel",
+    "importSuccess": "Workflow imported successfully! The imported data has been loaded to the canvas.",
+    "importError": "Import failed: Invalid file format. Please ensure you select a valid workflow JSON file.",
+    "saveSuccess": "Workflow saved successfully",
+    "saveSuccessToConsole": "Workflow saved successfully! Workflow data has been saved to console.",
+    "saveError": "Save failed: {{error}}",
+    "exportSuccess": "Workflow exported successfully",
+    "exportError": "Export failed: {{error}}"
+  },
+  "category": {
+    "llmAndWorkflow": "LLM & Workflow",
+    "businessLogic": "Business Logic",
+    "inputOutput": "Input & Output",
+    "components": "Components"
+  },
+  "nodePanel": {
+    "searchPlaceholder": "Search nodes..."
+  },
+  "workflow": {
+    "name": "Workflow",
+    "unnamed": "Unnamed Workflow",
+    "nameLabel": "Workflow Name",
+    "notFound": "Workflow information not found",
+    "publish": "Publish Version",
+    "versionHistory": "Version History",
+    "historyVersion": "History Version",
+    "save": "Save Workflow",
+    "import": "Import Workflow",
+    "export": "Export Workflow",
+    "backToList": "Back to Workflow List"
+  },
+  "nodeMenu": {
+    "editTitle": "Edit Title",
+    "openDetails": "Open Details",
+    "moveOut": "Move Out",
+    "duplicate": "Duplicate",
+    "autoLayout": "Auto Layout",
+    "delete": "Delete Node"
+  },
+  "tools": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "zoomOut": "Zoom Out",
+    "zoomIn": "Zoom In",
+    "zoomTo": "Zoom to {{percent}}",
+    "fitView": "Fit View",
+    "minimap": "Minimap",
+    "interactiveMode": "Interaction Mode",
+    "mouseMode": "Mouse Friendly",
+    "mouseModeDescription": "Use left mouse button to drag canvas, scroll wheel to zoom.",
+    "touchpadMode": "Touchpad Friendly",
+    "touchpadModeDescription": "Use two fingers moving in same direction to drag, pinch or spread to zoom.",
+    "autoLayout": "Auto Layout",
+    "comment": "Comment",
+    "addNode": "Add Node"
+  },
+  "condition": {
+    "if": "If",
+    "elseIf": "Else If",
+    "else": "Else",
+    "and": "And",
+    "or": "Or",
+    "dragSort": "Drag to Sort",
+    "onlyOneBranch": "Only one branch, cannot drag",
+    "add": "Add"
+  },
+  "intent": {
+    "matching": "Intent Matching",
+    "otherIntent": "Other Intent"
+  },
+  "errorHandler": {
+    "exceptionHandling": "Exception Handling",
+    "timeout": "Timeout",
+    "retryTimes": "Retry Times",
+    "processType": "Process Type",
+    "noRetry": "No Retry",
+    "retry1": "Retry 1 Time",
+    "retry2": "Retry 2 Times",
+    "retry3": "Retry 3 Times",
+    "breakWorkflow": "Break Workflow",
+    "returnContent": "Return Configured Content",
+    "executeExceptionStep": "Execute Exception Step",
+    "returnContentConfig": "Return Content Config"
+  },
+  "splittingSelector": {
+    "comma": "Comma",
+    "semicolon": "Semicolon",
+    "period": "Period",
+    "cancel": "Cancel",
+    "added": "Added"
+  },
+  "draggableList": {
+    "add": "Add",
+    "noData": "No data, click button below to add"
+  },
+  "errorBoundary": {
+    "renderError": "Render Error",
+    "errorMessage": "An error occurred while rendering the debug panel. Please try refreshing the page or selecting a different execution log.",
+    "viewDetails": "View Error Details (Development Mode)",
+    "errorInfo": "Error Info",
+    "componentStack": "Component Stack",
+    "retry": "Retry"
+  },
+  "logSummaryTree": {
+    "noData": "No log summary data available",
+    "clickToViewSample": "Try clicking the \"Mock Data\" button to view sample results",
+    "debugTree": "Debug Tree",
+    "totalDuration": "Total Duration",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All",
+    "noExecutionInfo": "No execution information found",
+    "inputTokens": "Input Tokens",
+    "outputTokens": "Output Tokens",
+    "totalNodes": "Total Nodes"
+  },
+  "block": {
+    "start": "Start",
+    "end": "End"
+  },
+  "nodeStatusBar": {
+    "running": "Running",
+    "success": "Success",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "total": "Total",
+    "inputParams": "Input Parameters",
+    "outputResult": "Output Result",
+    "errorMessage": "Error Message",
+    "branchInfo": "Branch Info",
+    "otherData": "Other Data"
+  },
+  "testrunForm": {
+    "noInputNeeded": "No input required for this test run"
+  },
+  "loop": {
+    "title": "Loop",
+    "nestedLoopNotAllowed": "Nested loops are not supported within loop body",
+    "loopType": "Loop Type",
+    "specifyCount": "Specify Loop Count",
+    "arrayLoop": "Array Loop",
+    "loopCount": "Loop Count",
+    "loopArray": "Loop Array",
+    "intermediateVar": "Intermediate Variable",
+    "loopOutput": "Loop Output",
+    "indexReserved": "Cannot use \"index\" as variable name (reserved word)",
+    "variableExists": "Variable name \"{{key}}\" already exists",
+    "input": "Input"
+  }
+}

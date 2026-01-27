@@ -1,0 +1,223 @@
+{
+  "plugin": {
+    "title": "插件",
+    "description": "调用插件工具执行特定任务",
+    "noInputParams": "当前工具没有输入参数",
+    "noOutputParams": "当前工具没有输出参数",
+    "parameterName": "参数名",
+    "type": "类型",
+    "parameterInput": "参数输入框",
+    "descriptionInfo": "描述信息",
+    "unnamedTool": "未命名工具",
+    "noDescription": "暂无描述",
+    "stringType": "字符串",
+    "numberType": "数字",
+    "booleanType": "布尔",
+    "objectType": "对象",
+    "arrayType": "数组",
+    "inputPlaceholder": "请输入值",
+    "numberPlaceholder": "请输入数字",
+    "jsonPlaceholder": "JSON格式",
+    "required": "必填"
+  },
+  "node": {
+    "Start": "开始",
+    "End": "结束",
+    "LLM": "大语言模型",
+    "Selector": "选择器",
+    "Loop": "循环",
+    "Code": "代码",
+    "Input": "输入",
+    "Output": "输出",
+    "Intent": "意图",
+    "Questioner": "问题提问器",
+    "TextEditor": "文本编辑器",
+    "Continue": "继续",
+    "Break": "中断",
+    "Variable": "变量",
+    "Comment": "注释",
+    "Node": "节点",
+    "Unknown": "未知",
+    "Plugin": "插件",
+    "Workflow": "工作流"
+  },
+  "validators": {
+    "workflowMustContainPath": "工作流必须包含从开始节点到结束节点的完整路径",
+    "workflow": "工作流"
+  },
+  "validation": {
+    "titleRequired": "标题是必需的",
+    "paramRequired": "参数 {{param}} 是必需的",
+    "paramEmpty": "参数 {{param}} 不能为空",
+    "variableUnknown": "未知变量",
+    "promptRequired": "提示词是必需的",
+    "outputCountMin": "至少需要 {{count}} 个输出",
+    "outputCountDual": "需要2个输出（true 和 false）",
+    "conditionIncomplete": "条件不完整",
+    "returnContentEmpty": "返回内容不能为空",
+    "resultRequired": "返回结果是必需的",
+    "modelRequired": "模型是必需的",
+    "streamingTemplateEmpty": "流式输出模板不能为空",
+    "nodeValidationError": "节点校验问题",
+    "error": "错误",
+    "warning": "警告",
+    "fixAll": "修复所有",
+    "noValidationIssues": "没有发现校验问题",
+    "configurationError": "配置有误"
+  },
+  "ui": {
+    "draft": "草稿",
+    "switchedToVersion": "已切换到版本 {{version}}",
+    "importReadonlyWarning": "当前处于只读模式，无法导入工作流。请切换到草稿版本后再试。",
+    "importConfirmTitle": "导入工作流",
+    "importConfirmMessage": "导入新工作流将清空当前画布内容，此操作不可撤销。是否继续？",
+    "importConfirmOk": "继续导入",
+    "importConfirmCancel": "取消",
+    "importSuccess": "工作流导入成功！导入的数据已加载到画布。",
+    "importError": "导入失败：文件格式错误。请确保选择的是有效的工作流JSON文件。",
+    "saveSuccess": "工作流保存成功",
+    "saveSuccessToConsole": "工作流保存成功！工作流数据已保存到控制台。",
+    "saveError": "保存失败：{{error}}",
+    "exportSuccess": "工作流导出成功",
+    "exportError": "导出失败：{{error}}"
+  },
+  "category": {
+    "llmAndWorkflow": "LLM与工作流",
+    "businessLogic": "业务逻辑",
+    "inputOutput": "输入&输出",
+    "components": "组件"
+  },
+  "nodePanel": {
+    "searchPlaceholder": "搜索节点..."
+  },
+  "workflow": {
+    "name": "工作流",
+    "unnamed": "未命名工作流",
+    "nameLabel": "工作流名称",
+    "notFound": "工作流信息不存在",
+    "publish": "提交新版本",
+    "versionHistory": "版本历史",
+    "historyVersion": "历史版本",
+    "save": "保存工作流",
+    "import": "导入工作流",
+    "export": "导出工作流",
+    "backToList": "返回工作流列表"
+  },
+  "nodeMenu": {
+    "editTitle": "编辑标题",
+    "openDetails": "跳转详情",
+    "moveOut": "移出容器",
+    "duplicate": "创建副本",
+    "autoLayout": "自动布局",
+    "delete": "删除节点"
+  },
+  "tools": {
+    "undo": "撤销",
+    "redo": "重做",
+    "zoomOut": "缩小",
+    "zoomIn": "放大",
+    "zoomTo": "缩放到 {{percent}}",
+    "fitView": "适应视图",
+    "minimap": "小地图",
+    "interactiveMode": "交互模式",
+    "mouseMode": "鼠标友好",
+    "mouseModeDescription": "使用左鼠标按钮拖拽画布，使用滚轮缩放。",
+    "touchpadMode": "触控板友好",
+    "touchpadModeDescription": "使用两个手指向同一方向移动进行拖拽，通过捏合或展开两个手指进行缩放。",
+    "autoLayout": "自动布局",
+    "comment": "注释",
+    "addNode": "添加节点"
+  },
+  "condition": {
+    "if": "如果",
+    "elseIf": "否则如果",
+    "else": "否则",
+    "and": "且",
+    "or": "或",
+    "dragSort": "拖拽排序",
+    "onlyOneBranch": "只有一个分支，无法拖拽",
+    "add": "新增"
+  },
+  "intent": {
+    "matching": "意图匹配",
+    "otherIntent": "其他意图"
+  },
+  "errorHandler": {
+    "exceptionHandling": "异常处理",
+    "timeout": "超时时间",
+    "retryTimes": "重试次数",
+    "processType": "异常处理方式",
+    "noRetry": "不重试",
+    "retry1": "重试1次",
+    "retry2": "重试2次",
+    "retry3": "重试3次",
+    "breakWorkflow": "中断流程",
+    "returnContent": "返回设定内容",
+    "executeExceptionStep": "执行异常流程",
+    "returnContentConfig": "返回内容配置"
+  },
+  "splittingSelector": {
+    "comma": "逗号",
+    "semicolon": "分号",
+    "period": "句号",
+    "cancel": "取消",
+    "added": "已添加"
+  },
+  "draggableList": {
+    "add": "添加",
+    "noData": "暂无数据，点击下方按钮添加"
+  },
+  "errorBoundary": {
+    "renderError": "渲染出错",
+    "errorMessage": "调试面板渲染时遇到了错误，请尝试刷新页面或重新选择执行日志。",
+    "viewDetails": "查看错误详情 (开发模式)",
+    "errorInfo": "错误信息",
+    "componentStack": "组件堆栈",
+    "retry": "重试"
+  },
+  "logSummaryTree": {
+    "noData": "暂无日志摘要数据",
+    "clickToViewSample": "请尝试点击\"模拟数据\"按钮查看示例效果",
+    "debugTree": "调试树",
+    "totalDuration": "总耗时",
+    "expandAll": "全部展开",
+    "collapseAll": "全部折叠",
+    "noExecutionInfo": "未找到执行信息",
+    "inputTokens": "输入 Tokens",
+    "outputTokens": "输出 Tokens",
+    "totalNodes": "节点总数"
+  },
+  "block": {
+    "start": "开始",
+    "end": "结束"
+  },
+  "nodeStatusBar": {
+    "running": "正在执行",
+    "success": "执行成功",
+    "failed": "执行失败",
+    "cancelled": "已取消",
+    "total": "总计",
+    "inputParams": "输入参数",
+    "outputResult": "输出结果",
+    "errorMessage": "错误信息",
+    "branchInfo": "分支信息",
+    "otherData": "其他数据"
+  },
+  "testrunForm": {
+    "noInputNeeded": "本次试运行无需输入"
+  },
+  "loop": {
+    "title": "循环",
+    "nestedLoopNotAllowed": "循环体内部不支持嵌套循环",
+    "loopType": "循环类型",
+    "specifyCount": "指定循环次数",
+    "arrayLoop": "数组循环",
+    "loopCount": "循环次数",
+    "loopArray": "循环数组",
+    "intermediateVar": "中间变量",
+    "loopOutput": "循环输出",
+    "indexReserved": "不允许使用 \"index\" 作为变量名（保留字）",
+    "variableExists": "变量名 \"{{key}}\" 已存在",
+    "input": "输入"
+  }
+}

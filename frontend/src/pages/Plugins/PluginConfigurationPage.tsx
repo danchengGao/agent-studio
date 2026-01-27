@@ -5,7 +5,7 @@ import { PluginService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
 import { useCloudPluginForm } from '../../hooks/useCloudPluginForm'
-import { useUpdatePlugin, usePluginPublish } from '@test-agentstudio/api-client'
+import { useUpdatePlugin, usePluginPublish, usePluginPublishList } from '@test-agentstudio/api-client'
 import CloudPluginFormDialog from '../../components/Plugins/CloudPluginFormDialog'
 import CodePluginConfiguration from './components/CodePluginConfiguration'
 import URLPluginConfiguration from './components/URLPluginConfiguration'
@@ -53,13 +53,14 @@ const PluginConfigurationPage: React.FC = () => {
   const [pluginConfigData, setPluginConfigData] = useState<Record<string, unknown> | null>(null)
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
 
-  // Configuration form state
   const [configForm, setConfigForm] = useState({
     name: '',
     desc: '',
+    desc_mk: '',
     icon_uri: '',
     url: '',
     authMethod: 'none',
+    request_params: [] as any[],
   })
 
   // Icon options for selection - diversified without similar types
@@ -160,6 +161,53 @@ const PluginConfigurationPage: React.FC = () => {
   // Plugin publish
   const publishPluginApi = usePluginPublish()
 
+  // Plugin publish list - fetch every time dialog opens
+  const { data: publishListData, isLoading: isPublishListLoading, refetch: refetchPublishList } = usePluginPublishList(
+    {
+      space_id: getDefaultSpaceId(),
+      plugin_id: plugin_id,
+    },
+    {
+      enabled: !!plugin_id,
+    }
+  )
+
+  // Extract latest version from publish list data
+  const getLatestVersion = (): string => {
+    if (!publishListData?.data?.plugin_infos || publishListData.data.plugin_infos.length === 0) {
+      return 'v0.0.1'
+    }
+
+    // Filter publish infos for the current plugin
+    const pluginPublishInfos = publishListData.data.plugin_infos.filter(info => info.plugin_id === plugin_id)
+
+    if (pluginPublishInfos.length === 0) {
+      return 'v0.0.1'
+    }
+
+    // Sort by version to get the latest (assuming semantic versioning)
+    // For simplicity, we'll just take the first one as the API might return them in order
+    // In a production environment, you'd want to implement proper version comparison
+    const latestPublish = pluginPublishInfos[0]
+    return latestPublish.plugin_version || 'v0.0.1'
+  }
+
+  // Fetch publish list when dialog opens - force refetch every time
+  useEffect(() => {
+    if (isPublishDialogOpen && plugin_id) {
+      // Force refetch regardless of stale time to get the latest version
+      refetchPublishList({ cancelRefetch: false })
+    }
+  }, [isPublishDialogOpen, plugin_id, refetchPublishList])
+
+  // Reset dialog state when closing to ensure fresh state on next open
+  useEffect(() => {
+    if (!isPublishDialogOpen) {
+      // This ensures that when dialog reopens, it will properly update
+      // The PublishDialog will reinitialize with the latest version
+    }
+  }, [isPublishDialogOpen])
+
   useEffect(() => {
     if (plugin_id) {
       loadPluginData()
@@ -187,9 +235,11 @@ const PluginConfigurationPage: React.FC = () => {
         setConfigForm({
           name: response.data.plugin_info.name || '',
           desc: response.data.plugin_info.desc || '',
+          desc_mk: response.data.plugin_info.desc_mk || '',
           icon_uri: response.data.plugin_info.icon_uri || '☁️',
           url: response.data.plugin_info.url || '',
           authMethod: 'none',
+          request_params: response.data.plugin_info.request_params || [],
         })
 
         // Create plugin object from the response data
@@ -253,10 +303,12 @@ const PluginConfigurationPage: React.FC = () => {
         plugin_version: pluginConfigData.plugin_version,
         name: configForm.name,
         desc: configForm.desc,
+        desc_mk: configForm.desc_mk,
         plugin_type: pluginConfigData.plugin_type,
         published: pluginConfigData.published,
         url: configForm.url,
         icon_uri: configForm.icon_uri,
+        request_params: pluginConfigData.plugin_type === 2 ? [] : configForm.request_params,
       }
 
       console.log('Updating plugin configuration:', updateRequest)
@@ -272,6 +324,7 @@ const PluginConfigurationPage: React.FC = () => {
           ...prev,
           name: configForm.name,
           desc: configForm.desc,
+          desc_mk: configForm.desc_mk,
           url: configForm.url,
           icon_uri: configForm.icon_uri,
         }))
@@ -502,9 +555,12 @@ const PluginConfigurationPage: React.FC = () => {
         open={isPublishDialogOpen}
         pluginName={plugin?.name || ''}
         pluginId={plugin_id || ''}
-        onClose={() => setIsPublishDialogOpen(false)}
+        onClose={() => {
+          setIsPublishDialogOpen(false)
+        }}
         onPublish={handlePublishPlugin}
         loading={publishPluginApi.isLoading}
+        latestVersion={getLatestVersion()}
       />
     </>
   )

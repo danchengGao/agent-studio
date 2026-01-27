@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # ====== Wait for container to reach Healthy status (infinite wait) ==========
 wait_for_container_healthy() {
@@ -85,11 +85,11 @@ check_containers() {
 # ==== Wait for MySQL container to fully start (can connect + execute SQL)======
 wait_for_mysql() {
     # Parameters: 
-    #   - MySQL container name (from ENV_VARS["MYSQL_DOCKER_NAME"])
-    #   - Root password (from ENV_VARS["DB_ROOT_PASSWORD"])
+    #   - MySQL container name (from DEPLOY_VARS["MYSQL_DOCKER"])
+    #   - Root password (from DEPLOY_VARS["DB_ROOT_PASSWORD"])
     # Behavior: Infinite loop to check MySQL readiness (user can interrupt with Ctrl+C)
-    local mysql_container=${ENV_VARS["MYSQL_DOCKER_NAME"]}
-    local db_password=${ENV_VARS["DB_ROOT_PASSWORD"]}
+    local mysql_container=${DEPLOY_VARS["MYSQL_DOCKER"]}
+    local db_password=${DEPLOY_VARS["DB_ROOT_PASSWORD"]}
     local check_interval=3
 
     # Log startup message (inform user about infinite wait and interrupt method)
@@ -99,7 +99,7 @@ wait_for_mysql() {
     while true; do
         # Core check: Execute test SQL to verify MySQL is ready (connect + run simple query)
         # Use docker exec to run "SELECT 1" - success means MySQL is fully ready
-        if docker exec -i "${mysql_container}" mysql -u root -p"${db_password}" -e "SELECT 1" 2>/dev/null; then
+        if docker exec -i "${mysql_container}" mysql -u root -p"${db_password}" -h 127.0.0.1 -e "SELECT 1" 2>/dev/null; then
             success "MySQL container [${mysql_container}] is fully ready!"
             return 0  # Exit function - MySQL is ready
         fi
@@ -112,14 +112,13 @@ wait_for_mysql() {
 
 # ============= Check and create database ====================
 create_db_if_not_exist() {
-    local agent_db=${ENV_VARS["AGENT_DB_NAME"]}
-    local ops_db=${ENV_VARS["OPS_DB_NAME"]}
-    local mysql_container=${ENV_VARS["MYSQL_DOCKER_NAME"]}
-    local db_password=${ENV_VARS["DB_ROOT_PASSWORD"]}
+    local agent_db=${RUNTIME_VARS["AGENT_DB_NAME"]}
+    local ops_db=${RUNTIME_VARS["OPS_DB_NAME"]}
+    local mysql_container=${DEPLOY_VARS["MYSQL_DOCKER"]}
+    local db_password=${DEPLOY_VARS["DB_ROOT_PASSWORD"]}
 
     info "Checking if database [${agent_db} ${ops_db}] is ready"
-    info "docker exec -i ${mysql_container} mysql -u root -p${db_password}"
-    docker exec -i "${mysql_container}" mysql -u root -p"${db_password}" << EOF
+    docker exec -i "${mysql_container}" mysql -u root -p"${db_password}" -h 127.0.0.1 << EOF
 CREATE DATABASE IF NOT EXISTS ${agent_db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS ${ops_db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 EOF

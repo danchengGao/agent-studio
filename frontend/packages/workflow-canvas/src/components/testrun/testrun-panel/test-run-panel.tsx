@@ -358,6 +358,8 @@ export const TestRunSidePanel: FC<TestRunSidePanelProps> = ({ workflowId, spaceI
         interruptionMessage={t('workflowCanvas.testrunPanel.completeInputToContinue')}
         result={result}
         errors={errors}
+        workflowId={workflowId}
+        spaceId={spaceId}
       />
     </div>
   )

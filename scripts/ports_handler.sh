@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # ================= Count undefined ports ================
 count_undefined_ports() {
@@ -7,11 +7,11 @@ count_undefined_ports() {
 
     # Traverse port list, count undefined (empty/no key) ports
     for port_name in "${PORTS[@]}"; do
-        if [[ -z "${ENV_VARS[$port_name]:-}" ]]; then
+        if [[ -z "${DEPLOY_VARS[$port_name]:-}" ]]; then
             undefined_count=$((undefined_count + 1))
             # info "[$port_name] undefined, requires available port allocation"
         else
-            local port=${ENV_VARS[$port_name]}
+            local port=${DEPLOY_VARS[$port_name]}
             ALLOCATED_PORTS+=("${port}")
             # info "[$port_name] defined, value: ${port}"
 
@@ -132,14 +132,14 @@ assign_ports() {
 
     # Traverse all port names, assign dynamically
     for port_name in "${PORTS[@]}"; do
-        if [[ -n "${ENV_VARS[$port_name]:-}" ]]; then
+        if [[ -n "${DEPLOY_VARS[$port_name]:-}" ]]; then
             # Already defined: keep original value
-            success "[$port_name] already defined, keeping original value: ${ENV_VARS[$port_name]}"
+            success "[$port_name] already defined, keeping original value: ${DEPLOY_VARS[$port_name]}"
         else
             # Undefined: take value from available port list by index
             if [[ $port_index -lt ${#AVAILABLE_PORTS[@]} ]]; then
-                ENV_VARS["$port_name"]=${AVAILABLE_PORTS[$port_index]}
-                success "[$port_name] undefined, assigning available port: ${ENV_VARS[$port_name]}"
+                DEPLOY_VARS["$port_name"]=${AVAILABLE_PORTS[$port_index]}
+                success "[$port_name] undefined, assigning available port: ${DEPLOY_VARS[$port_name]}"
                 port_index=$((port_index + 1))  # Increment index for next undefined port
             else
                 # Extreme case: insufficient available ports (shouldn't happen as alloc_available_ports already validates)

@@ -3,7 +3,6 @@ import { useState } from 'react'
 interface IDEPluginForm {
   name: string
   description: string
-  runtime: 'python3' | 'nodejs'
 }
 
 interface Plugin {
@@ -39,7 +38,6 @@ export const useIDEPluginForm = (initialPlugin?: Plugin | null) => {
   const [form, setForm] = useState<IDEPluginForm>({
     name: initialPlugin?.name || '',
     description: initialPlugin?.description || '',
-    runtime: 'python3',
   })
 
   const handleFormChange = (field: keyof IDEPluginForm, value: string) => {
@@ -50,7 +48,6 @@ export const useIDEPluginForm = (initialPlugin?: Plugin | null) => {
     setForm({
       name: plugin?.name || '',
       description: plugin?.description || '',
-      runtime: 'python3',
     })
   }
 
@@ -62,9 +59,6 @@ export const useIDEPluginForm = (initialPlugin?: Plugin | null) => {
     }
     if (!form.description.trim()) {
       errors.push('请输入插件描述')
-    }
-    if (!form.runtime) {
-      errors.push('请选择IDE运行时')
     }
 
     return {

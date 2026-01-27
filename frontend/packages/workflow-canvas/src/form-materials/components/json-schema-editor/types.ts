@@ -22,4 +22,12 @@ export interface ConfigType {
   defaultValueTitle?: string
   defaultValuePlaceholder?: string
   addButtonText?: string
+  /** Types to exclude from the type selector */
+  excludeTypes?: string[]
+  /** Whether to exclude array type as array item (nested arrays) */
+  excludeNestedArray?: boolean
+  /** Whether to show default value field */
+  showDefaultValue?: boolean
+  /** Max bytes for description field */
+  maxDescBytes?: number
 }

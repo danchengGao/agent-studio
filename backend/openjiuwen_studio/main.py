@@ -21,16 +21,18 @@ from openjiuwen_studio.ops.modules.prompt.infra.database import create_database_
 from openjiuwen_studio.memory_engine_start import MemoryEngineManager
 
 from openjiuwen_studio.routers import register
-from openjiuwen_studio.core.database import engine, Base
+from openjiuwen_studio.core.database import engine
+from openjiuwen_studio.models.db_fun_base import Base
 # Import all models to ensure they are registered with SQLAlchemy
 from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelConfig, AgentBaseDB, AgentPublishDB, \
     PromptRelationDB, TagDB, UserDB, SpaceDB, SpaceUserDB, WorkflowBaseDB, WorkflowPublishDB, PluginBaseDB, \
     PluginPublishDB, ToolBaseDB, \
     WorkflowExecutionDB, WorkflowExecutionDetailsDB, AgentExecutionDB, AgentExecutionDetailsDB, \
-    AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB
+    AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB, ReferenceDB
 # Import database sync tool
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.db_sync import run_database_sync
+from openjiuwen_studio.ops.config import settings as ops_settings
 # Import Trace models
 from openjiuwen_studio.models.trace_detail import TraceDetailDB
 from openjiuwen_studio.models.trace_summary import TraceSummaryDB
@@ -66,6 +68,7 @@ async def lifespan_func(app: FastAPI):
         AgentExecutionDB.__table__,
         AgentExecutionDetailsDB.__table__,
         AgentWorkflowRelationDB.__table__,
+        ReferenceDB.__table__,
         # Trace tables
         TraceDetailDB.__table__,
         TraceSummaryDB.__table__,
@@ -161,7 +164,9 @@ def main():
         "reload": False,
         "log_level": "info",
         "access_log": True,
-        "workers": int(os.getenv("WORKER_NUM", 1)),
+        "workers": int(os.getenv("WORKER_NUM", 1))
+        if (os.getenv("INDEX_MANAGER_TYPE") == "milvus" and os.getenv("DB_TYPE") == "mysql")
+        else 1,
     }
 
     logger.info("🚀 Starting Jiuwen Agent Studio Backend in development mode...")

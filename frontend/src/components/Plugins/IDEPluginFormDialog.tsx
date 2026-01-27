@@ -6,20 +6,16 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Button,
   Tooltip,
   CircularProgress,
 } from '@mui/material'
-import { Info, Code, Terminal } from 'lucide-react'
+import { Info, Code } from 'lucide-react'
 
 interface IDEPluginForm {
   name: string
   description: string
-  runtime: 'python3' | 'nodejs'
+  desc_mk?: string
 }
 
 interface Plugin {
@@ -62,10 +58,6 @@ interface IDEPluginFormDialogProps {
   onCancel: () => void
 }
 
-const runtimeOptions = [
-  { value: 'python3', label: 'Python 3', icon: '🐍', description: '适用于数据分析、机器学习、自动化脚本' },
-  { value: 'nodejs', label: 'Node.js', icon: '🟢', description: '适用于Web API、实时应用、前端构建工具' },
-]
 
 const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
   open,
@@ -123,55 +115,27 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
               multiline
               rows={3}
               placeholder={t('plugins.dialog.idePlugin.descriptionPlaceholder')}
-              helperText={`${t('plugins.dialog.idePlugin.descriptionHelperText')} (${form.description.length}/258)`}
-              inputProps={{ maxLength: 258 }}
+              helperText={`${t('plugins.dialog.idePlugin.descriptionHelperText')} (${form.description.length}/40)`}
+              inputProps={{ maxLength: 40 }}
             />
           </div>
 
-          {/* Runtime Selection */}
+          {/* Plugin Markdown Description */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
-              {t('plugins.dialog.idePlugin.runtime')} <span className="text-red-500 ml-1">*</span>
-              <Tooltip title={t('plugins.dialog.idePlugin.runtimeTooltip')} placement="top">
-                <Info className="w-4 h-4 ml-1 text-gray-400 cursor-help" />
-              </Tooltip>
+              插件详情 <span className="text-gray-400 ml-1">(可选)</span>
             </label>
-            <FormControl fullWidth required>
-              <InputLabel>{t('plugins.dialog.idePlugin.runtimeEnvironment')}</InputLabel>
-              <Select value={form.runtime} onChange={e => onFormChange('runtime', e.target.value)} label={t('plugins.dialog.idePlugin.runtimeEnvironment')}>
-                {runtimeOptions.map(option => (
-                  <MenuItem key={option.value} value={option.value}>
-                    <div className="flex flex-col space-y-1 py-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg">{option.icon}</span>
-                        <span className="font-medium">{option.label}</span>
-                      </div>
-                      <span className="text-xs text-gray-500 ml-8">{option.description}</span>
-                    </div>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <TextField
+              value={form.desc_mk || ''}
+              onChange={e => onFormChange('desc_mk', e.target.value)}
+              fullWidth
+              multiline
+              rows={6}
+              placeholder="支持Markdown格式的详细描述..."
+              helperText={`使用Markdown语法编写富文本描述 (${(form.desc_mk || '').length}字符)`}
+            />
           </div>
 
-          {/* Runtime Information */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <Terminal className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-medium text-blue-900 mb-2">{t('plugins.dialog.idePlugin.runtimeInfoTitle')}</h4>
-                <div className="space-y-2 text-sm text-blue-800">
-                  <div>
-                    <strong>Python 3:</strong> {t('plugins.dialog.idePlugin.python3Desc')}
-                  </div>
-                  <div>
-                    <strong>Node.js:</strong> {t('plugins.dialog.idePlugin.nodejsDesc')}
-                  </div>
-                  <div className="text-blue-600 text-xs mt-2">{t('plugins.dialog.idePlugin.runtimeHint')}</div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </DialogContent>
 
@@ -183,7 +147,7 @@ const IDEPluginFormDialog: React.FC<IDEPluginFormDialogProps> = ({
           onClick={() => onSubmit(isEditing)}
           variant="contained"
           color="primary"
-          disabled={loading || !form.name.trim() || !form.description.trim() || !form.runtime}
+          disabled={loading || !form.name.trim() || !form.description.trim()}
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
         >
           {loading ? (

@@ -512,15 +512,13 @@ export const useExecutePlugin = () => {
       onEvent,
       onError,
       onComplete,
-      timeout,
     }: {
       request: PluginExecuteRequest
       onEvent: PluginExecutionEventHandler
       onError?: (error: Error) => void
       onComplete?: () => void
-      timeout?: number
     }) => {
-      return PluginService.executePlugin(request, onEvent, onError, onComplete, timeout)
+      return PluginService.executePlugin(request, onEvent, onError, onComplete)
     },
     {
       onSuccess: (closeConnection, variables) => {
@@ -612,7 +610,7 @@ export const usePluginPublishGet = (request: PluginPublishGetRequest) => {
 // 获取插件发布列表
 export const usePluginPublishList = (request: PluginPublishListRequest, options?: { enabled?: boolean }) => {
   return useQuery(
-    ['pluginPublishList', request.space_id, request.page, request.size],
+    ['pluginPublishList', request.space_id, request.plugin_id],
     async () => {
       // Add a small delay to ensure API client is initialized
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -631,8 +629,8 @@ export const usePluginPublishList = (request: PluginPublishListRequest, options?
         return errorMessage.includes('Network Error') || errorMessage.includes('timeout')
       },
 
-      // 优化缓存策略
-      staleTime: 30 * 1000, // 30秒内数据视为新鲜
+      // Set staleTime to 0 to ensure refetch always gets fresh data
+      staleTime: 0, // 立即过期，确保每次refetch都获取最新数据
       cacheTime: 5 * 60 * 1000, // 缓存5分钟
 
       // 添加自动刷新机制

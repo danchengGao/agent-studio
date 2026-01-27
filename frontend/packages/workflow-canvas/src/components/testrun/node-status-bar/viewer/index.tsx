@@ -6,13 +6,17 @@
 import React, { useState } from 'react'
 
 import { Toast } from '@douyinfe/semi-ui'
+import MarkdownPreview from '@uiw/react-markdown-preview'
 
 import styles from './index.module.less'
+import { OutputFormat } from '../../../../nodes/llm/type'
 
 interface DataStructureViewerProps {
   data: any
   level?: number
   size?: 'small' | 'large'
+  /** Output format for rendering (text/markdown/json) */
+  outputFormat?: OutputFormat
 }
 
 interface TreeNodeProps {
@@ -21,9 +25,10 @@ interface TreeNodeProps {
   level: number
   size?: 'small' | 'large'
   isLast?: boolean
+  outputFormat?: OutputFormat
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({ label, value, level, size = 'small', isLast = false }) => {
+const TreeNode: React.FC<TreeNodeProps> = ({ label, value, level, size = 'small', isLast = false, outputFormat }) => {
   const [isExpanded, setIsExpanded] = useState(true)
 
   const handleCopy = (text: string) => {
@@ -40,6 +45,18 @@ const TreeNode: React.FC<TreeNodeProps> = ({ label, value, level, size = 'small'
 
     switch (typeof val) {
       case 'string':
+        // Render as Markdown when outputFormat is MARKDOWN
+        if (outputFormat === OutputFormat.MARKDOWN) {
+          return (
+            <span className={`${styles.primitiveValue} ${styles.string}`}>
+              <MarkdownPreview
+                source={val}
+                style={{ backgroundColor: 'transparent', padding: 0 }}
+                className="markdown-preview-light"
+              />
+            </span>
+          )
+        }
         return (
           <span>
             <span className={styles.primitiveValueQuote}>{'"'}</span>
@@ -88,12 +105,12 @@ const TreeNode: React.FC<TreeNodeProps> = ({ label, value, level, size = 'small'
   const renderChildren = () => {
     if (Array.isArray(value)) {
       return value.map((item, index) => (
-        <TreeNode key={index} label={`${index + 1}.`} value={item} level={level + 1} size={size} isLast={index === value.length - 1} />
+        <TreeNode key={index} label={`${index + 1}.`} value={item} level={level + 1} size={size} isLast={index === value.length - 1} outputFormat={outputFormat} />
       ))
     } else {
       const entries = Object.entries(value)
       return entries.map(([key, val], index) => (
-        <TreeNode key={key} label={`${key}:`} value={val} level={level + 1} size={size} isLast={index === entries.length - 1} />
+        <TreeNode key={key} label={`${key}:`} value={val} level={level + 1} size={size} isLast={index === entries.length - 1} outputFormat={outputFormat} />
       ))
     }
   }
@@ -132,11 +149,11 @@ const TreeNode: React.FC<TreeNodeProps> = ({ label, value, level, size = 'small'
   )
 }
 
-export const DataStructureViewer: React.FC<DataStructureViewerProps> = ({ data, level = 0, size = 'small' }) => {
+export const DataStructureViewer: React.FC<DataStructureViewerProps> = ({ data, level = 0, size = 'small', outputFormat }) => {
   if (data === null || data === undefined || typeof data !== 'object') {
     return (
       <div className={styles.dataStructureViewer}>
-        <TreeNode label="value" value={data} level={0} />
+        <TreeNode label="value" value={data} level={0} outputFormat={outputFormat} />
       </div>
     )
   }
@@ -146,7 +163,7 @@ export const DataStructureViewer: React.FC<DataStructureViewerProps> = ({ data, 
   return (
     <div className={`${styles.dataStructureViewer} ${size === 'large' ? styles.dataStructureViewerLarge : ''}`}>
       {entries.map(([key, value], index) => (
-        <TreeNode key={key} label={`${key}:`} value={value} level={0} size={size} isLast={index === entries.length - 1} />
+        <TreeNode key={key} label={`${key}:`} value={value} level={0} size={size} isLast={index === entries.length - 1} outputFormat={outputFormat} />
       ))}
     </div>
   )

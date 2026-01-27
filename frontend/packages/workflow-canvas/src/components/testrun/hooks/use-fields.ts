@@ -4,6 +4,7 @@
  */
 
 import { TestRunFormField, TestRunFormMeta } from '../testrun-form/type'
+import { t } from '../../../i18n'
 
 // Validation functions for different types
 const validateValue = (type: string, value: unknown): { isValid: boolean; error?: string } => {
@@ -85,6 +86,23 @@ const validateValue = (type: string, value: unknown): { isValid: boolean; error?
       }
       return { isValid: true }
     }
+    case 'file': {
+      // File value is { url: string; object_key: string; metadata?: {...} }
+      if (typeof value === 'object' && value !== null) {
+        const fileValue = value as Record<string, unknown>
+        const url = fileValue.url
+        const objectKey = fileValue.object_key
+        if (!url || (typeof url === 'string' && url.trim() === '')) {
+          return { isValid: false, error: t('workflowCanvas.formMaterials.input.fileUrlError') }
+        }
+        if (!objectKey || (typeof objectKey === 'string' && objectKey.trim() === '')) {
+          return { isValid: false, error: t('workflowCanvas.formMaterials.input.fileUrlError') }
+        }
+      } else {
+        return { isValid: false, error: t('workflowCanvas.formMaterials.input.fileUrlError') }
+      }
+      return { isValid: true }
+    }
     case 'string':
     default:
       return { isValid: true }
@@ -100,14 +118,17 @@ export const useFields = (params: {
 
   // Convert each meta item to a form field with value and onChange handler
   const fields: TestRunFormField[] = formMeta.map(meta => {
-    // Handle object type specially - serialize object to JSON string for display
+    // Handle object type specially - ensure value is parsed for JsonCodeEditor
     const getCurrentValue = (): unknown => {
       const rawValue = values[meta.name] ?? meta.defaultValue
-      if ((meta.type === 'object' || meta.type === 'array') && rawValue !== null && typeof rawValue !== 'string') {
+      if (rawValue === null || rawValue === undefined) {
+        return rawValue
+      }
+
+      if ((meta.type === 'object' || meta.type === 'array') && typeof rawValue === 'string') {
         try {
-          return JSON.stringify(rawValue, null, 2)
-        } catch (error) {
-          console.warn('[use-fields] Failed to stringify value:', error)
+          return JSON.parse(rawValue)
+        } catch {
           return rawValue
         }
       }

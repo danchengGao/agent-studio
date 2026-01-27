@@ -52,7 +52,7 @@ function backendToFrontend(backend: ModelConfigResponse): FrontendModelConfig {
     isActive: backend.is_active,
     maxTokens: backend.parameters.max_tokens,
     temperature: backend.parameters.temperature,
-    topp: (backend.parameters as any).top_p || 0.9,
+    topp: backend.parameters.top_p ?? 0.9,
     timeout: backend.timeout,
     retryCount: backend.retry_count,
     enableStreaming: backend.enable_streaming,
@@ -82,9 +82,9 @@ function frontendToBackend(frontend: Partial<FrontendModelConfig>): ModelConfigC
     description: frontend.description,
     tags: frontend.tags || [],
     parameters: {
-      temperature: frontend.temperature || 0.7,
+      temperature: frontend.temperature ?? 0.7,
       max_tokens: frontend.maxTokens || 4000,
-      top_p: frontend.topp || 0.9,
+      top_p: frontend.topp ?? 0.9,
     },
     timeout: frontend.timeout || 3600,
     retry_count: frontend.retryCount || 3,
@@ -205,9 +205,21 @@ export class ModelService {
   }
 
   // 测试模型
-  async testModel(id: string, prompt: string, spaceId: string): Promise<{ success: boolean; response?: string; error?: string; latency: number }> {
+  async testModel(
+    id: string,
+    prompt: string,
+    spaceId: string,
+    parameters?: { temperature?: number; top_p?: number; max_tokens?: number }
+  ): Promise<{ success: boolean; response?: string; error?: string; latency: number }> {
     try {
-      const testRequest: ModelTestRequest = { prompt }
+      const testRequest: ModelTestRequest = {
+        prompt,
+        parameters: parameters ? {
+          temperature: parameters.temperature ?? 0.7,
+          top_p: parameters.top_p ?? 0.9,
+          max_tokens: parameters.max_tokens ?? 4096,
+        } : undefined,
+      }
       const apiClient = getApiClient()
       // 在URL中包含space_id
       const response = await apiClient.post<{ code: number; message: string; data: ModelTestResponse }>(

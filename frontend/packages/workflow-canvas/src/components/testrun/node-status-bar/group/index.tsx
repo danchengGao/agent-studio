@@ -9,6 +9,7 @@ import { Tag } from '@douyinfe/semi-ui'
 import { ChevronDown } from 'lucide-react'
 
 import { DataStructureViewer } from '../viewer'
+import { OutputFormat } from '../../../../nodes/llm/type'
 
 import styles from './index.module.less'
 
@@ -18,11 +19,13 @@ interface NodeStatusGroupProps {
   optional?: boolean
   disableCollapse?: boolean
   size?: 'small' | 'large'
+  /** Output format for rendering (text/markdown/json) */
+  outputFormat?: OutputFormat
 }
 
 const isObjectHasContent = (obj: any = {}): boolean => obj && Object.keys(obj).length > 0
 
-export const NodeStatusGroup: FC<NodeStatusGroupProps> = ({ title, data, optional = false, disableCollapse = false, size = 'small' }) => {
+export const NodeStatusGroup: FC<NodeStatusGroupProps> = ({ title, data, optional = false, disableCollapse = false, size = 'small', outputFormat }) => {
   const hasContent = isObjectHasContent(data)
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -48,7 +51,11 @@ export const NodeStatusGroup: FC<NodeStatusGroupProps> = ({ title, data, optiona
           </Tag>
         )}
       </div>
-      {hasContent && isExpanded ? <DataStructureViewer data={data} size={size} /> : null}
+      {hasContent && isExpanded ? (
+        <div className={styles['node-status-group-content']}>
+          <DataStructureViewer data={data} size={size} outputFormat={outputFormat} />
+        </div>
+      ) : null}
     </>
   )
 }

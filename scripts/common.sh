@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo >/dev/null 2>&1
 
 # ==================== Log functions ====================
 info() { echo -e "\033[36m=== $@ ===\033[0m"; }
@@ -24,6 +24,7 @@ detect_os() {
             error "Unsupported OS: ${os_type}"
             ;;
     esac
+    info "Operating System: ${CONFIG["OS_TYPE"]}"
 }
 
 # ============= Generate 5-character random string =================
@@ -94,6 +95,11 @@ get_public_ip() {
     local os_type=${CONFIG["OS_TYPE"]}
     local cmd=${ARGS["CMD"]}
 
+    if [[ -n "${DEPLOY_VARS["IP"]:-}" ]]; then
+        info "Predefined IP address detected: ${DEPLOY_VARS["IP"]}"
+        return
+    fi
+
     if [ "${cmd}" == "down" ]; then
         return
     fi
@@ -123,15 +129,14 @@ get_public_ip() {
                     \$_.AddressFamily -eq 'IPv4' -and \
                     !\$_.IPAddress.StartsWith('127.') -and \
                     !\$_.IPAddress.StartsWith('169.254.') -and \
-                    !\$_.IPAddress.StartsWith('172.16.') -and !\$_.IPAddress.StartsWith('172.17.') -and !\$_.IPAddress.StartsWith('172.18.') -and !\$_.IPAddress.StartsWith('172.19.') -and !\$_.IPAddress.StartsWith('172.20.') -and !\$_.IPAddress.StartsWith('172.21.') -and !\$_.IPAddress.StartsWith('172.22.') -and !\$_.IPAddress.StartsWith('172.23.') -and !\$_.IPAddress.StartsWith('172.24.') -and !\$_.IPAddress.StartsWith('172.25.') -and !\$_.IPAddress.StartsWith('172.26.') -and !\$_.IPAddress.StartsWith('172.27.') -and !\$_.IPAddress.StartsWith('172.28.') -and !\$_.IPAddress.StartsWith('172.29.') -and !\$_.IPAddress.StartsWith('172.30.') -and !\$_.IPAddress.StartsWith('172.31.') -and \
                     \$_.InterfaceAlias -match 'WLAN|Ethernet' -and \
-                    \$_.InterfaceAlias -notmatch 'Bluetooth|Hyper-V|WSL|Virtual' \
+                    \$_.InterfaceAlias -notmatch 'Bluetooth|Hyper-V|WSL|Virtual|vEthernet' \
                 } | \
                 Select-Object -ExpandProperty IPAddress -First 1
             }" 2>/dev/null)
-            local_ip=$(echo "${local_ip}" | tr -d '\r\n' | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//')
+            local_ip=$(echo "${local_ip}" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -n 1)
             ;;
     esac
 
-    ENV_VARS["IP"]=${local_ip}
+    DEPLOY_VARS["IP"]=${local_ip}
 }

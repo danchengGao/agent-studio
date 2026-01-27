@@ -14,7 +14,7 @@ from openjiuwen_studio.schemas.node import Node
 from openjiuwen_studio.core.manager.convertor.components.common import input_params_convert, exception_config_convert
 from openjiuwen_studio.core.common.dsl import ComponentType
 from openjiuwen_studio.schemas.plugin import PluginApiInfo, PluginApiHeader, PluginToolParam, ParamType, \
-    PluginApiMethod, PluginId, PluginToolId, PluginType, PluginCodeInfo, ParamSendMethod
+    PluginApiMethod, PluginId, PluginToolId, PluginType, PluginCodeInfo, ParamSendMethod, Priority
 from openjiuwen_studio.schemas.plugin import PluginPublishInfo
 
 plugin_type_mapping = {
@@ -37,10 +37,13 @@ api_method_mapping = {
 param_type_mapping = {
     ParamType.PARAM_TYPE_STRING: "string",
     ParamType.PARAM_TYPE_INT: "integer",
-    ParamType.PARAM_TYPE_BOOL: "boolean",
-    ParamType.PARAM_TYPE_LIST: "array",
     ParamType.PARAM_TYPE_FLOAT: "number",
+    ParamType.PARAM_TYPE_BOOL: "boolean",
     ParamType.PARAM_TYPE_OBJECT: "object",
+    ParamType.PARAM_TYPE_ARRAY_STRING: "array",
+    ParamType.PARAM_TYPE_ARRAY_INT: "array",
+    ParamType.PARAM_TYPE_ARRAY_FLOAT: "array",
+    ParamType.PARAM_TYPE_ARRAY_BOOL: "array",
 }
 
 param_send_method_type_mapping = {
@@ -60,6 +63,8 @@ def _plugin_tool_param_convert(params: List[PluginToolParam]) -> List[dsl.Param]
             type=param_type_mapping.get(param.type),
             required=param.is_required,
             method=param_send_method_type_mapping.get(param.method),
+            default_value=param.value,
+            runtime=param.is_runtime,
         )
         converted_params.append(converted_param)
 
@@ -73,15 +78,47 @@ def _plugin_api_header_convert(headers: List[PluginApiHeader]) -> Dict[str, Any]
     return converted_header
 
 
-def plugin_api_tool_convert(url: str, api_info: Dict[str, Any]) -> Dict[str, Any]:
+def _merge_plugin_params(request_params: List[PluginToolParam], plugin_params: List[PluginToolParam]) -> List[
+    PluginToolParam]:
+    """
+    合并两个参数列表，当存在相同name的参数时，根据priority决定使用哪个：
+    """
+    merged_params: Dict[str, PluginToolParam] = {}
+
+    for param in request_params:
+        merged_params[param.name] = param
+
+    # 然后处理 plugin_params，根据priority决定是否覆盖
+    if not plugin_params:
+        return list(merged_params.values())
+
+    for param in plugin_params:
+        if param.name in merged_params:
+            if param.priority == Priority.PRIORITY_PLUGIN:
+                merged_params[param.name] = param
+        else:
+            merged_params[param.name] = param
+
+    return list(merged_params.values())
+
+
+def plugin_api_tool_convert(plugin_info, api_info: Dict[str, Any]) -> Dict[str, Any]:
+    plugin_params: List[PluginToolParam] = []
+    if hasattr(plugin_info, "inputs") and plugin_info.inputs:
+        for i in plugin_info.inputs:
+            plugin_params.append(PluginToolParam(**i))
+    elif hasattr(plugin_info, "request_params") and plugin_info.request_params:
+        for i in plugin_info.request_params:
+            plugin_params.append(i)
     api = PluginApiInfo(**api_info)
+    merged_params = _merge_plugin_params(api.request_params, plugin_params)
     convert_api = dsl.RestfulApiSchema(
         tool_id=api.tool_id,
         name=api.name,
         description=api.desc,
-        path=url + api.path,
+        path=plugin_info.url + api.path,
         method=api_method_mapping.get(api.method),
-        params=_plugin_tool_param_convert(api.request_params),
+        params=_plugin_tool_param_convert(merged_params),
         response=_plugin_tool_param_convert(api.response_params),
         headers=_plugin_api_header_convert(api.headers),
     )
@@ -114,9 +151,9 @@ def plugin_code_tool_convert(code_info: Dict[str, Any]) -> Dict[str, Any]:
     return convert_code.model_dump()
 
 
-def plugin_tool_convert(plugin_info: PluginBaseDBPd, tool: Dict[str, Any]) -> Dict[str, Any]:
+def plugin_tool_convert(plugin_info, tool: Dict[str, Any]) -> Dict[str, Any]:
     if plugin_info.plugin_type == PluginType.PLUGIN_TYPE_CLOUD_API:
-        return plugin_api_tool_convert(plugin_info.url, tool)
+        return plugin_api_tool_convert(plugin_info, tool)
     else:
         return plugin_code_tool_convert(tool)
 
@@ -156,7 +193,8 @@ def _plugin_config_convert(node: Node, space_id: str) -> Dict:
             raise ValueError(f"get plugin publish failed, code: {get_result.code}, error: {get_result.message}")
         if get_result.data is None:
             raise ValueError(f"fetch plugin failed with version: {plugin_param.plugin_version}")
-
+        if get_result.data.get("inputs") and get_result.data.get("inputs"):
+            get_result.data["request_params"] = get_result.data.get("inputs")
         plugin_publish_info = PluginPublishInfo(**get_result.data)
         tools = plugin_publish_info.tools
         tool_info = None
@@ -169,18 +207,9 @@ def _plugin_config_convert(node: Node, space_id: str) -> Dict:
             raise ValueError(
                 f"tool_id {plugin_param.tool_id} not found in plugin publish version {plugin_param.plugin_version}")
 
-        plugin_info = PluginBaseDBPd(
-            plugin_id=plugin_publish_info.plugin_id,
-            plugin_type=plugin_publish_info.plugin_type,
-            name=plugin_publish_info.name,
-            desc=plugin_publish_info.desc,
-            url=plugin_publish_info.url,
-            plugin_version=plugin_publish_info.plugin_version,
-        )
-
         configs = dsl.ToolCompConfig(
-            type=plugin_type_mapping[plugin_info.plugin_type],
-            tool=plugin_tool_convert(plugin_info, tool_info),
+            type=plugin_type_mapping[plugin_publish_info.plugin_type],
+            tool=plugin_tool_convert(plugin_publish_info, tool_info),
             exception_config=exception_conf,
         )
     return configs.model_dump()

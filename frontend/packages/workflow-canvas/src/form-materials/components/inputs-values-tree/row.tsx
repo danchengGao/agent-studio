@@ -5,12 +5,12 @@
 
 import React, { useMemo, useState } from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
 import { IconButton, Input } from '@douyinfe/semi-ui'
 import { IconChevronDown, IconChevronRight, IconDelete } from '@douyinfe/semi-icons'
 
 import { IFlowConstantValue } from '../../'
 import { ConstantInputStrategy, IJsonSchema } from '../../'
+import { t } from '../../../i18n'
 
 import { PropsType } from './types'
 import './styles.css'
@@ -21,7 +21,7 @@ import { IconAddChildren } from './icon'
 
 const AddObjectChildStrategy: ConstantInputStrategy = {
   hit: schema => schema.type === 'object',
-  Renderer: () => <Input size="small" disabled style={{ pointerEvents: 'none' }} value={I18n.t('Configure via child fields')} />,
+  Renderer: () => <Input size="small" disabled style={{ pointerEvents: 'none' }} value={t('workflowCanvas.formMaterials.common.configureViaChildFields')} />,
 }
 
 export function InputValueRow(
@@ -93,7 +93,7 @@ export function InputValueRow(
               size="small"
               value={keyName}
               onChange={v => onUpdateKey?.(v)}
-              placeholder={I18n.t('Input Key')}
+              placeholder={t('workflowCanvas.formMaterials.common.inputKey')}
             />
             <InjectDynamicValueInput
               style={{ flexGrow: 1 }}

@@ -758,25 +758,70 @@ const ModelsPage: React.FC = () => {
         severity: 'success',
       })
     } catch (error: any) {
-      console.error('Embedding 模型测试失败:', error)
-      const errorMessage = error?.response?.data?.detail || error?.response?.data?.message || error?.message || t('models.messages.embeddingModel.testFailed')
-
-      // 测试失败，自动禁用该 Embedding 模型
-      try {
-        await toggleEmbeddingStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
-        setSnackbar({
-          open: true,
-          message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}。${t('models.messages.embeddingModel.modelDisabled')}。`,
-          severity: 'error',
-        })
-      } catch (disableError) {
-        console.error('禁用 Embedding 模型失败:', disableError)
-        setSnackbar({
-          open: true,
-          message: `${t('models.messages.embeddingModel.testFailed')}: ${errorMessage}。${t('models.messages.embeddingModel.disableFailed')}，请手动禁用。`,
-          severity: 'error',
-        })
+      // 提取错误信息
+      const errorDetail = error?.detail || error?.response?.data?.detail || error?.message || ''
+      
+      // 解析后端错误信息并映射到国际化key
+      const parseError = (errorText: string): string => {
+        if (!errorText || typeof errorText !== 'string') {
+          return t('models.messages.embeddingModel.testFailed')
+        }
+        
+        // 提取模型名
+        const modelNameMatch = errorText.match(/Embedding model '([^']+)'/i)
+        const modelName = modelNameMatch ? modelNameMatch[1] : ''
+        
+        // 检查是否是模型未启用
+        if (errorText.toLowerCase().includes('is not active') || errorText.toLowerCase().includes('not active')) {
+          return t('models.messages.embeddingModel.testError.modelNotActive', { modelName })
+        }
+        
+        // 提取错误类型和详情
+        let errorType = 'unknownError'
+        let detail = ''
+        
+        // 提取冒号后的详情部分
+        const colonIndex = errorText.indexOf(':')
+        if (colonIndex > 0) {
+          detail = errorText.substring(colonIndex + 1).trim()
+        }
+        
+        if (errorText.includes('model name') && errorText.includes('is invalid')) {
+          errorType = 'modelNameInvalid'
+        } else if (errorText.includes('API key') && errorText.includes('is invalid')) {
+          errorType = 'apiKeyInvalid'
+        } else if (errorText.includes('API URL') && errorText.includes('is invalid')) {
+          errorType = 'apiUrlInvalid'
+        } else if (errorText.includes('request parameters') && errorText.includes('is invalid')) {
+          errorType = 'requestParamsInvalid'
+        } else if (errorText.includes('API server') && errorText.includes('error')) {
+          errorType = 'apiServerError'
+        } else if (errorText.includes('configuration') && errorText.includes('is invalid')) {
+          errorType = 'configInvalid'
+        } else if (errorText.includes('insufficient quota') && errorText.includes('is invalid')) {
+          errorType = 'insufficientQuota'
+        } else if (errorText.includes('API call failed')) {
+          errorType = 'apiCallFailed'
+        }
+        
+        // 如果没有提取到详情，使用整个错误文本
+        if (!detail) {
+          detail = errorText
+        }
+        
+        // 使用国际化模板
+        const i18nKey = `models.messages.embeddingModel.testError.${errorType}` as const
+        return t(i18nKey, { modelName, detail })
       }
+      
+      const errorMessage = parseError(errorDetail)
+      
+      // 测试失败后只显示错误信息，不自动禁用模型
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error',
+      })
     } finally {
       setTestingModelId(null)
     }
@@ -784,20 +829,26 @@ const ModelsPage: React.FC = () => {
 
   const handleTestModel = async () => {
     if (!testPrompt.trim() || !selectedModel) return
-    if (testPrompt.length > 1000) { 
-      return 
+    if (testPrompt.length > 1000) {
+      return
     }
 
     setIsTesting(true)
 
     try {
-      const result = await testModelMutation.mutateAsync({ id: selectedModel.id, prompt: testPrompt, spaceId: user?.spaceId || '' })
+      const result = await testModelMutation.mutateAsync({
+        id: selectedModel.id,
+        prompt: testPrompt,
+        spaceId: user?.spaceId || '',
+        parameters: {
+          temperature: selectedModel.temperature ?? 0.7,
+          top_p: selectedModel.topp ?? 0.9,
+          max_tokens: selectedModel.maxTokens ?? 4096,
+        },
+      })
       setTestResult(
-        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
+        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- top_p: ${selectedModel.topp}\n- max_tokens: ${selectedModel.maxTokens}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
       )
-
-      // 测试成功后刷新模型列表以更新统计信息
-      refetch()
     } catch (error: any) {
       let errorMessage = t('models.testFailed')
 
@@ -839,6 +890,8 @@ const ModelsPage: React.FC = () => {
       )
     } finally {
       setIsTesting(false)
+      // 无论测试成功还是失败，都刷新模型列表以更新统计信息
+      await Promise.all([refetchLLM(), refetchEmbedding()])
     }
   }
 
@@ -1253,7 +1306,7 @@ const ModelsPage: React.FC = () => {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-gray-600">{t('models.modelList.avgResponse')}:</span>
-                            <span className="font-semibold text-orange-700">{model.usage?.averageResponseTime || 0}s</span>
+                            <span className="font-semibold text-orange-700">{(model.usage?.averageResponseTime || 0).toFixed(3)}s</span>
                           </div>
                         </div>
                       </TableCell>
@@ -1277,14 +1330,16 @@ const ModelsPage: React.FC = () => {
                           </Tooltip>
                         ) : (
                           <Tooltip title={!model.isActive ? t('models.messages.embeddingModel.modelDisabled') : t('models.testModel')}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleTestEmbeddingModel(model.id)}
-                              disabled={testingModelId !== null || !model.isActive}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                            >
-                              {testingModelId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            </IconButton>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleTestEmbeddingModel(model.id)}
+                                disabled={testingModelId !== null || !model.isActive}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                              >
+                                {testingModelId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                              </IconButton>
+                            </span>
                           </Tooltip>
                         )}
                         {/* 编辑按钮 */}
@@ -1578,14 +1633,23 @@ const ModelsPage: React.FC = () => {
                 }}
                 type="password"
                 value={newModel.apiKey}
-                onChange={e => setNewModel({ ...newModel, apiKey: e.target.value })}
+                onChange={e => {
+                  const value = e.target.value
+                  if (value.length <= 500) {
+                    setNewModel({ ...newModel, apiKey: value })
+                  }
+                }}
                 placeholder={editMode ? t('models.messages.apiKeyEmptyHint') : ''}
                 variant="outlined"
-                error={false} // 不显示红色边框，只在下方显示红色提示文本
+                error={(newModel.apiKey || '').length > 500}
                 helperText={
-                  <span style={{ color: '#666' }}>
-                    {editMode ? t('models.messages.apiKeyEditHint') : t('models.modelConfig.parameters.apiKeyHint')}
-                  </span>
+                  (newModel.apiKey || '').length > 500 ? (
+                    <span style={{ color: 'orange' }}>API Key 长度超限，请控制在500字符以内</span>
+                  ) : (
+                    <span style={{ color: '#666' }}>
+                      {editMode ? t('models.messages.apiKeyEditHint') : t('models.modelConfig.parameters.apiKeyHint')}: {newModel.apiKey?.length || 0}/500
+                    </span>
+                  )
                 }
               />
             </Grid>
@@ -1601,21 +1665,26 @@ const ModelsPage: React.FC = () => {
                 }}
                 value={newModel.baseUrl}
                 onChange={e => {
-                  setNewModel({ ...newModel, baseUrl: e.target.value })
-                  validateBaseUrl(e.target.value)
+                  const value = e.target.value
+                  if (value.length <= 100) {
+                    setNewModel({ ...newModel, baseUrl: value })
+                    validateBaseUrl(value)
+                  }
                 }}
                 placeholder=""
                 variant="outlined"
                 disabled={false} // 允许编辑基础URL
-                error={!!baseUrlError} // 只在URL格式错误时显示红色边框
+                error={!!baseUrlError || (newModel.baseUrl || '').length > 100}
                 helperText={
                   baseUrlError ? (
                     <span style={{ color: 'red' }}>{baseUrlError}</span>
+                  ) : (newModel.baseUrl || '').length > 100 ? (
+                    <span style={{ color: 'orange' }}>Base URL 长度超限，请控制在100字符以内</span>
                   ) : (
                     <span style={{ color: '#666' }}>
                       {modelType === 'Embedding'
                         ? t('models.messages.embeddingBaseUrlHint')
-                        : t('models.modelConfig.parameters.baseUrlHint')}
+                        : t('models.modelConfig.parameters.baseUrlHint')}: {newModel.baseUrl?.length || 0}/100
                     </span>
                   )
                 }
@@ -1705,7 +1774,7 @@ const ModelsPage: React.FC = () => {
                   variant="outlined"
                   error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
                   helperText={
-                    (newModel.description || '').length > 450 ? (
+                    (newModel.description || '').length > 500 ? (
                       <span style={{ color: 'orange' }}>描述过长，请控制在500字符以内</span>
                     ) : (
                       <span style={{ color: '#666' }}>

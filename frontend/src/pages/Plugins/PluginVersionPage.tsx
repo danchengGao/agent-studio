@@ -52,13 +52,14 @@ const PluginVersionPage: React.FC = () => {
   const [pluginConfigData, setPluginConfigData] = useState<Record<string, unknown> | null>(null)
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
 
-  // Configuration form state
   const [configForm, setConfigForm] = useState({
     name: '',
     desc: '',
+    desc_mk: '',
     icon_uri: '',
     url: '',
     authMethod: 'none',
+    request_params: [] as any[],
   })
 
   // Read-only display state
@@ -183,9 +184,11 @@ const PluginVersionPage: React.FC = () => {
       setConfigForm({
         name: versionData.plugin_info.name || '',
         desc: versionData.plugin_info.desc || '',
+        desc_mk: versionData.plugin_info.desc_mk || '',
         icon_uri: versionData.plugin_info.icon_uri || '☁️',
         url: versionData.plugin_info.url || '',
         authMethod: 'none',
+        request_params: versionData.plugin_info.request_params || [],
       })
 
       // Create plugin object from the version data
@@ -236,6 +239,7 @@ const PluginVersionPage: React.FC = () => {
         plugin_version: pluginConfigData.plugin_version,
         name: configForm.name,
         desc: configForm.desc,
+        desc_mk: configForm.desc_mk,
         plugin_type: pluginConfigData.plugin_type,
         published: pluginConfigData.published,
         url: configForm.url,
@@ -255,6 +259,7 @@ const PluginVersionPage: React.FC = () => {
           ...prev,
           name: configForm.name,
           desc: configForm.desc,
+          desc_mk: configForm.desc_mk,
           url: configForm.url,
           icon_uri: configForm.icon_uri,
         }))
@@ -289,6 +294,7 @@ const PluginVersionPage: React.FC = () => {
     pluginConfigData,
     configForm.name,
     configForm.desc,
+    configForm.desc_mk,
     configForm.url,
     configForm.icon_uri,
     getDefaultSpaceId,

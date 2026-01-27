@@ -309,7 +309,7 @@ class ExceptRouterConfig(BaseModel):
 
 class ExceptConfig(BaseModel):
     max_retries: Optional[int] = Field(default=0)
-    timeout_seconds: Optional[int] = Field(default=30)
+    timeout_seconds: Optional[int] = Field(default=300)
     except_handling_method: Optional[ExceptHandlingMethod] = Field(default=ExceptHandlingMethod.BREAK)
     return_content: Optional[dict] = Field(default_factory=dict)
     execute_exception_step: Optional[ExceptRouterConfig] = Field(default_factory=ExceptRouterConfig)
@@ -331,6 +331,7 @@ class Param(BaseModel):
     default_value: Optional[str] = Field(default=None)
     visible: Optional[bool] = Field(default=True)
     method: Optional[str] = Field(default="")
+    runtime: Optional[bool] = Field(default=True)
 
 
 class PluginCodeConfig(CodeConfig):
@@ -392,7 +393,7 @@ class UserInputElem(BaseModel):
     description: Optional[str] = Field("")
     type: Optional[str] = Field("")
     required: Optional[bool] = Field(False)
-    default: Optional[str] = Field("")
+    default: Optional[Any] = Field(None)
 
 
 class UserInputsConfig(BaseModel):

@@ -1,9 +1,9 @@
 services:
   # MySQL Database
-  <<MYSQL_SERVICE_NAME>>:
-    image: <<MYSQL_DOCKER_IMAGE>>
+  <<MYSQL_SERVICE>>:
+    image: <<MYSQL_IMAGE>>
     pull_policy: if_not_present
-    container_name: <<MYSQL_DOCKER_NAME>>
+    container_name: <<MYSQL_DOCKER>>
     restart: unless-stopped
     environment:
       # Extract credentials from DATABASE_URL for MySQL container

@@ -17,6 +17,7 @@ export enum ModelProvider {
 export interface ModelParameters {
   temperature: number
   max_tokens: number
+  top_p?: number
 }
 
 // 模型使用统计

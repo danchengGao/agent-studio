@@ -1,19 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useQueryClient } from 'react-query'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
-import { ArrowLeft, Save, Plus, Trash2, Settings, Code, FileText, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Trash2, Settings, Code, FileText, RotateCcw, CheckCircle, XCircle } from 'lucide-react'
 import { validateToolPath, getPathHelpText } from '../../utils/validationUtils'
 import { copyToClipboard } from '../../utils/prompts/utils'
 import {
   Card,
   Typography,
   TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Button,
   IconButton,
   Dialog,
@@ -26,7 +23,14 @@ import {
   Tab,
   Chip,
   CircularProgress,
+  Switch,
+  FormControlLabel,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel,
 } from '@mui/material'
+import { ParameterTypeSelector } from './components/ParameterTypeSelector'
 import { PythonCodeEditor, TypeScriptCodeEditor } from '../../../packages/workflow-canvas/src/form-materials/components/code-editor'
 // Import the base-editor styles for the code editors to work properly
 import '../../../packages/workflow-canvas/src/form-materials/components/base-editor/styles.css'
@@ -38,6 +42,9 @@ import {
   usePluginGetCode,
   usePluginDeleteCode,
   useExecutePlugin,
+  usePlugin,
+  ParamSendMethod,
+  Priority,
 } from '@test-agentstudio/api-client'
 
 interface ToolParameter {
@@ -45,8 +52,11 @@ interface ToolParameter {
   name: string
   description: string
   type: string
-  method: string
+  method: number
   is_required?: boolean
+  is_runtime?: boolean
+  value?: string
+  priority?: numbe
 }
 
 interface HeaderConfig {
@@ -65,6 +75,7 @@ interface Tool {
   input_parameters: ToolParameter[]
   output_parameters: ToolParameter[]
   headers: HeaderConfig[]
+  available?: boolean
 }
 
 type ParameterValue = string | number | boolean | string[] | object | undefined
@@ -147,6 +158,7 @@ const ToolConfigurationPage: React.FC = () => {
   const [testResults, setTestResults] = useState('')
   const [testError, setTestError] = useState('')
   const [testParameters, setTestParameters] = useState<Record<string, string>>({})
+  const [testParameterErrors, setTestParameterErrors] = useState<Record<string, string>>({})
   const [isTestRunning, setIsTestRunning] = useState(false)
   // Code editor state for code tools
   const [codeLanguage, setCodeLanguage] = useState<'javascript' | 'python'>('python')
@@ -162,6 +174,10 @@ const ToolConfigurationPage: React.FC = () => {
   const source = location.state?.source || urlParams.get('source')
   const agentId = location.state?.agentId || urlParams.get('agentId')
   const pluginType = location.state?.pluginType || 'api'
+  const fromPublishVersion = location.state?.fromPublishVersion || false
+  const publishVersion = location.state?.publishVersion || null
+  const toolsData = location.state?.toolsData || null // Tools data from publish info
+  const isReadOnly = fromPublishVersion // Disable editing when from published version
 
   // Parameter dialogs
   const [isInputDialogOpen, setIsInputDialogOpen] = useState(false)
@@ -171,11 +187,14 @@ const ToolConfigurationPage: React.FC = () => {
     name: '',
     description: '',
     type: 'string',
-    method: 0,
+    method: ParamSendMethod.NONE,
     is_required: false,
+    is_runtime: true,
+    value: '',
+    priority: Priority.TOOL,
   })
-
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
 
   // Space ID calculation
   const getDefaultSpaceId = () => {
@@ -198,15 +217,55 @@ const ToolConfigurationPage: React.FC = () => {
         }
       : null
 
-  // Use different API hooks based on plugin type
-  const { data: apiData, isLoading: isLoadingApi, error: apiError } = pluginType === 'code' ? usePluginGetCode(apiRequest!) : usePluginGetApi(apiRequest!)
+  // Create mock API data from toolsData when available (from publish version)
+  // Use useMemo to prevent creating new object on every render
+  const mockApiData = useMemo(() => {
+    if (!toolsData || !Array.isArray(toolsData)) {
+      return null
+    }
+
+    const targetTool = toolsData.find(tool => tool.tool_id === tool_id)
+    if (!targetTool) {
+      return null
+    }
+
+    const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+
+    return {
+      code: 200,
+      data: {
+        [dataKey]: [targetTool],
+        total: 1,
+      },
+    }
+  }, [toolsData, tool_id, pluginType])
+
+  // Use different API hooks based on plugin type, but skip if we have toolsData
+  const shouldFetchApi = !toolsData && !!apiRequest
+  const { data: apiData, isLoading: isLoadingApi, error: apiError } = pluginType === 'code'
+    ? usePluginGetCode(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
+    : usePluginGetApi(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
+
+  // Use mock data if available, otherwise use API data
+  const effectiveApiData = mockApiData || apiData
+
+  // Fetch plugin info to get plugin-level request_params
+  const pluginGetRequest =
+    plugin_id && spaceId
+      ? {
+          space_id: spaceId,
+          plugin_id,
+          plugin_version: undefined,
+        }
+      : null
+  const { data: pluginData } = usePlugin(pluginGetRequest!)
 
   // Transform API data to Tool interface when data is loaded
   useEffect(() => {
     const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
 
-    if (apiData?.code === 200 && apiData?.data?.[dataKey] && Array.isArray(apiData.data[dataKey])) {
-      const infoArray = apiData.data[dataKey]
+    if (effectiveApiData?.code === 200 && effectiveApiData?.data?.[dataKey] && Array.isArray(effectiveApiData.data[dataKey])) {
+      const infoArray = effectiveApiData.data[dataKey]
 
       // Find the specific API info by tool_id from the URL parameters
       const targetApiInfo = infoArray.find(info => info.tool_id === tool_id)
@@ -240,8 +299,11 @@ const ToolConfigurationPage: React.FC = () => {
             name: param.name,
             description: param.desc || '',
             type: mapNumberToString(param.type),
-            method: param.method || 1,
+            method: param.method ?? ParamSendMethod.NONE,
             is_required: param.is_required,
+            is_runtime: param.is_runtime,
+            value: param.value || '',
+            priority: param.priority ?? Priority.TOOL,
           })) || [],
         output_parameters:
           targetApiInfo.response_params?.map(param => ({
@@ -249,14 +311,13 @@ const ToolConfigurationPage: React.FC = () => {
             name: param.name,
             description: param.desc || '',
             type: mapNumberToString(param.type),
-            method: param.method || 1,
-            is_required: param.is_required,
           })) || [],
         headers:
           targetApiInfo.headers?.map(header => ({
             key: header.name,
             value: header.value,
           })) || [],
+        available: targetApiInfo.available,
       }
 
       setTool(transformedTool)
@@ -266,14 +327,14 @@ const ToolConfigurationPage: React.FC = () => {
         setCodeLanguage((transformedTool.language as 'javascript' | 'python') || 'python')
         setCodeContent(transformedTool.code || '')
       }
-    } else if (apiData && apiData?.code !== 200) {
+    } else if (effectiveApiData && effectiveApiData?.code !== 200) {
       // API returned an error
       setSnackbar({
         open: true,
-        message: `${t('plugins.config.loadFailed', '加载工具配置失败：{{message}}')}: ${apiData?.message || t('plugins.errors.unknownError', '未知错误')}`,
+        message: `${t('plugins.config.loadFailed', '加载工具配置失败：{{message}}')}: ${effectiveApiData?.message || t('plugins.errors.unknownError', '未知错误')}`,
         severity: 'error',
       })
-    } else if (apiData && (!apiData?.data?.[dataKey] || !Array.isArray(apiData.data[dataKey]))) {
+    } else if (effectiveApiData && (!effectiveApiData?.data?.[dataKey] || !Array.isArray(effectiveApiData.data[dataKey]))) {
       // API returned success but no valid data
       setSnackbar({
         open: true,
@@ -281,7 +342,8 @@ const ToolConfigurationPage: React.FC = () => {
         severity: 'warning',
       })
     }
-  }, [apiData, tool_id, pluginType])
+  // Use stable dependencies: only re-run when data content actually changes
+  }, [mockApiData !== null ? JSON.stringify(mockApiData) : apiData, tool_id, pluginType, t])
 
   // Handle API errors
   useEffect(() => {
@@ -309,10 +371,17 @@ const ToolConfigurationPage: React.FC = () => {
   const mapTypeToNumber = (type: string): number => {
     const typeMap: Record<string, number> = {
       string: 1,
-      number: 2,
-      boolean: 3,
-      array: 4,
+      int: 2,
+      float: 3,
+      boolean: 4,
       object: 5,
+      array_string: 6,
+      array_int: 7,
+      array_float: 8,
+      array_boolean: 9,
+      // Legacy support for old generic types
+      number: 2, // Default to int for backward compatibility
+      array: 6, // Default to string array for backward compatibility
     }
     return typeMap[type] || 1
   }
@@ -320,10 +389,14 @@ const ToolConfigurationPage: React.FC = () => {
   const mapNumberToString = (typeNumber: number): string => {
     const typeMap: Record<number, string> = {
       1: 'string',
-      2: 'number',
-      3: 'boolean',
-      4: 'array',
+      2: 'int',
+      3: 'float',
+      4: 'boolean',
       5: 'object',
+      6: 'array_string',
+      7: 'array_int',
+      8: 'array_float',
+      9: 'array_boolean',
     }
     return typeMap[typeNumber] || 'string'
   }
@@ -334,13 +407,27 @@ const ToolConfigurationPage: React.FC = () => {
     }
 
     switch (type) {
+      case 'int': {
+        const intValue = parseInt(value, 10)
+        return isNaN(intValue) ? 0 : intValue
+      }
+      case 'float': {
+        const floatValue = parseFloat(value)
+        return isNaN(floatValue) ? 0.0 : floatValue
+      }
       case 'number': {
+        // Legacy support - treat as float
         const numValue = parseFloat(value)
         return isNaN(numValue) ? 0 : numValue
       }
       case 'boolean':
         return value.toLowerCase() === 'true' || value === '1'
-      case 'array':
+      case 'array_string':
+      case 'array_int':
+      case 'array_float':
+      case 'array_boolean':
+      case 'array': {
+        // Legacy 'array' support - treat as string array
         try {
           return JSON.parse(value)
         } catch {
@@ -349,6 +436,7 @@ const ToolConfigurationPage: React.FC = () => {
             .map(item => item.trim())
             .filter(item => item.length > 0)
         }
+      }
       case 'object':
         try {
           return JSON.parse(value)
@@ -362,13 +450,36 @@ const ToolConfigurationPage: React.FC = () => {
   }
 
   const getTypedTestParameters = (): Record<string, ParameterValue> => {
-    if (!tool) return testParameters
-
     const typedParameters: Record<string, ParameterValue> = {}
-    tool.input_parameters.forEach(param => {
-      const stringValue = testParameters[param.name] || ''
-      typedParameters[param.name] = convertParameterToCorrectType(stringValue, param.type)
-    })
+
+    // Get tool parameter names to filter out plugin parameters with the same name
+    const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+
+    // First, add plugin-level parameters with their default values if not provided
+    // Exclude plugin parameters that have the same name as tool parameters
+    if (pluginData?.data?.plugin_info?.request_params) {
+      pluginData.data.plugin_info.request_params.forEach(param => {
+        // Skip this plugin parameter if there's a tool parameter with the same name
+        if (toolParamNames.has(param.name)) {
+          return
+        }
+
+        // 如果是非运行时参数(is_runtime为false)，使用默认值；否则使用用户输入或默认值
+        const stringValue = param.is_runtime === false ? param.value || '' : testParameters[`plugin_${param.name}`] || param.value || ''
+        const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
+        typedParameters[param.name] = convertParameterToCorrectType(stringValue, typeString)
+      })
+    }
+
+    // Then, add tool-level parameters (which will override plugin params with same name if any)
+    if (tool?.input_parameters) {
+      tool.input_parameters.forEach(param => {
+        // 如果是非运行时参数(is_runtime为false)，使用默认值；否则使用用户输入
+        const stringValue = param.is_runtime === false ? param.value || '' : testParameters[`tool_${param.name}`] || ''
+        typedParameters[param.name] = convertParameterToCorrectType(stringValue, param.type)
+      })
+    }
+
     return typedParameters
   }
 
@@ -431,27 +542,27 @@ const ToolConfigurationPage: React.FC = () => {
 
   const formatOutputValue = (value: unknown, paramType: string): string => {
     if (value === null || value === undefined) {
-      return '未设置'
+      return 'undefined'
     }
 
     switch (paramType) {
       case 'string':
         return String(value)
       case 'number':
-        return typeof value === 'number' ? value.toString() : '无效数字'
+        return typeof value === 'number' ? value.toString() : 'invalid number'
       case 'boolean':
-        return value === true ? '是' : value === false ? '否' : '未知'
+        return typeof value === 'boolean' ? value.toString() : 'invalid boolean'
       case 'array':
         try {
           return JSON.stringify(value, null, 2)
         } catch {
-          return t('plugins.toolConfig.arrayParseError', '数组解析错误')
+          return t('plugins.toolConfig.arrayParseError', 'array parse error')
         }
       case 'object':
         try {
           return JSON.stringify(value, null, 2)
         } catch {
-          return t('plugins.toolConfig.objectParseError', '对象解析错误')
+          return t('plugins.toolConfig.objectParseError', 'object parse error')
         }
       default:
         return String(value)
@@ -503,7 +614,10 @@ const ToolConfigurationPage: React.FC = () => {
         desc: param.description,
         type: mapTypeToNumber(param.type),
         is_required: param.is_required ?? false,
-        method: parseInt(param.method) || 0,
+        value: param.value || '',
+        is_runtime: param.is_runtime ?? false,
+        method: parseInt(param.method) || ParamSendMethod.NONE,
+        priority: Priority.TOOL,
       }))
 
     if (pluginType === 'code') {
@@ -544,10 +658,17 @@ const ToolConfigurationPage: React.FC = () => {
   }
 
   const handleParameterFormChange = (field: keyof typeof parameterForm, value: string | boolean) => {
-    setParameterForm(prev => ({
-      ...prev,
-      [field]: value,
-    }))
+    setParameterForm(prev => {
+      const newState = {
+        ...prev,
+        [field]: value,
+      }
+      // When is_runtime is set to true (非运行时参数 unchecked), clear the value
+      if (field === 'is_runtime' && value === true) {
+        newState.value = ''
+      }
+      return newState
+    })
   }
 
   const openParameterDialog = (parameter: ToolParameter | null = null, isInput: boolean) => {
@@ -559,14 +680,20 @@ const ToolConfigurationPage: React.FC = () => {
         type: parameter.type,
         method: parameter.method,
         is_required: isInput ? parameter.is_required || false : false,
+        is_runtime: isInput ? (pluginType === 'code' ? true : parameter.is_runtime || false) : false,
+        value: isInput ? parameter.value || '' : '',
+        priority: parameter.priority ?? Priority.TOOL,
       })
     } else {
       setParameterForm({
         name: '',
         description: '',
         type: 'string',
-        method: 0,
+        method: ParamSendMethod.NONE,
         is_required: false,
+        is_runtime: true,
+        value: '',
+        priority: Priority.TOOL,
       })
     }
     if (isInput) {
@@ -582,6 +709,11 @@ const ToolConfigurationPage: React.FC = () => {
       return
     }
 
+    if (isInput && !parameterForm.is_runtime && !parameterForm.value.trim()) {
+      setSnackbar({ open: true, message: t('plugins.toolConfig.nonRuntimeNeedsDefaultValue', '非运行时参数必须设置默认值'), severity: 'error' })
+      return
+    }
+
     const newParameter: ToolParameter = {
       id: editingParameter?.id || Date.now().toString(),
       name: parameterForm.name.trim(),
@@ -589,6 +721,9 @@ const ToolConfigurationPage: React.FC = () => {
       type: parameterForm.type,
       method: parameterForm.method,
       is_required: parameterForm.is_required,
+      is_runtime: isInput ? (pluginType === 'code' ? true : parameterForm.is_runtime) : undefined,
+      value: isInput ? parameterForm.value : undefined,
+      priority: isInput ? parameterForm.priority : undefined,
     }
 
     if (tool) {
@@ -700,6 +835,16 @@ const ToolConfigurationPage: React.FC = () => {
     setCodeLanguage(language)
     if (tool) {
       const updatedTool = { ...tool, language }
+      setTool(updatedTool)
+    }
+  }
+
+  const handleRuntimeLanguageChange = (language: 'python' | 'javascript' | 'nodejs') => {
+    // Normalize language value: nodejs -> javascript for code editor
+    const normalizedLanguage = language === 'nodejs' ? 'javascript' : language
+    setCodeLanguage(normalizedLanguage as 'javascript' | 'python')
+    if (tool) {
+      const updatedTool = { ...tool, language: normalizedLanguage }
       setTool(updatedTool)
     }
   }
@@ -818,21 +963,152 @@ const ToolConfigurationPage: React.FC = () => {
     setTestResults('')
     setTestError('')
 
-    // 初始化参数值
+    // 初始化参数值 - 只初始化运行时参数(is_runtime: true 或 undefined)
     const initialParams: Record<string, string> = {}
-    if (tool?.input_parameters) {
-      tool.input_parameters.forEach(param => {
-        initialParams[param.name] = ''
+
+    // Get tool parameter names to filter out plugin parameters with the same name
+    const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+
+    // 初始化插件级参数 - 排除与工具参数同名的参数
+    if (pluginData?.data?.plugin_info?.request_params) {
+      pluginData.data.plugin_info.request_params.forEach(param => {
+        // Skip plugin parameters that have the same name as tool parameters
+        if (param.is_runtime !== false && !toolParamNames.has(param.name)) {
+          const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
+          // 布尔类型参数默认为false，其他为空字符串
+          initialParams[`plugin_${param.name}`] = typeString === 'boolean' ? 'false' : ''
+        }
       })
     }
+
+    // 初始化工具级参数
+    if (tool?.input_parameters) {
+      tool.input_parameters.forEach(param => {
+        if (param.is_runtime !== false) {
+          // 布尔类型参数默认为false，其他为空字符串
+          initialParams[`tool_${param.name}`] = param.type === 'boolean' ? 'false' : ''
+        }
+      })
+    }
+
     setTestParameters(initialParams)
   }
 
-  const handleTestParameterChange = (paramName: string, value: string) => {
+  const handleTestParameterChange = (paramName: string, value: string, paramType: 'plugin' | 'tool', fieldType?: string) => {
+    const key = `${paramType}_${paramName}`
     setTestParameters(prev => ({
       ...prev,
-      [paramName]: value,
+      [key]: value,
     }))
+
+    if (fieldType === 'int' || fieldType === 'float' || fieldType === 'object' || fieldType === 'array_int' || fieldType === 'array_float') {
+      const error = validateTestParameterValue(value, fieldType)
+      setTestParameterErrors(prev => ({
+        ...prev,
+        [key]: error,
+      }))
+    } else {
+      setTestParameterErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[key]
+        return newErrors
+      })
+    }
+  }
+
+  const validateTestParameterValue = (value: string, type: string): string => {
+    if (!value || value.trim() === '') return ''
+
+    const trimmedValue = value.trim()
+
+    if (type === 'int') {
+      if (!/^-?\d+$/.test(trimmedValue)) return '请输入有效的整数'
+    } else if (type === 'float') {
+      const num = Number(trimmedValue)
+      if (isNaN(num)) return '请输入有效的数字'
+    } else if (type === 'object') {
+      try {
+        const parsed = JSON.parse(trimmedValue)
+        if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) {
+          return '请输入有效的JSON对象格式，例如: {"key":"value"}'
+        }
+      } catch (e) {
+        return '请输入有效的JSON格式，例如: {"key":"value"}'
+      }
+    } else if (type === 'array_int') {
+      try {
+        const parsed = JSON.parse(trimmedValue)
+        if (!Array.isArray(parsed)) {
+          return '请输入有效的数组格式，例如: [1,2,3]'
+        }
+        if (parsed.length > 0) {
+          const allIntegers = parsed.every((item: unknown) => Number.isInteger(item))
+          if (!allIntegers) {
+            return '数组中的所有元素必须是整数，例如: [1,2,3]'
+          }
+        }
+      } catch (e) {
+        return '请输入有效的JSON数组格式，例如: [1,2,3]'
+      }
+    } else if (type === 'array_float') {
+      try {
+        const parsed = JSON.parse(trimmedValue)
+        if (!Array.isArray(parsed)) {
+          return '请输入有效的数组格式，例如: [1.5,2.3,3.14]'
+        }
+        if (parsed.length > 0) {
+          const allNumbers = parsed.every((item: unknown) => typeof item === 'number' && !isNaN(item))
+          if (!allNumbers) {
+            return '数组中的所有元素必须是数字，例如: [1.5,2.3,3.14]'
+          }
+        }
+      } catch (e) {
+        return '请输入有效的JSON数组格式，例如: [1.5,2.3,3.14]'
+      }
+    }
+
+    return ''
+  }
+
+  const validateRequiredParameters = (): { isValid: boolean; missingParams: string[] } => {
+    const missing: string[] = []
+
+    // Check for validation errors first
+    const hasValidationErrors = Object.values(testParameterErrors).some(error => error !== '')
+    if (hasValidationErrors) {
+      return {
+        isValid: false,
+        missingParams: [],
+      }
+    }
+
+    // Get tool parameter names to filter out plugin parameters with the same name
+    const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+
+    // Check plugin-level required runtime parameters (excluding those with same name as tool parameters)
+    pluginData?.data?.plugin_info?.request_params
+      ?.filter(p => p.is_runtime !== false && p.is_required && !toolParamNames.has(p.name))
+      ?.forEach(param => {
+        const paramValue = testParameters[`plugin_${param.name}`]
+        if (!paramValue || paramValue.trim() === '') {
+          missing.push(`${param.name} (插件参数)`)
+        }
+      })
+
+    // Check tool-level required runtime parameters
+    tool?.input_parameters
+      ?.filter(p => p.is_runtime !== false && p.is_required)
+      ?.forEach(param => {
+        const paramValue = testParameters[`tool_${param.name}`]
+        if (!paramValue || paramValue.trim() === '') {
+          missing.push(`${param.name} (工具参数)`)
+        }
+      })
+
+    return {
+      isValid: missing.length === 0,
+      missingParams: missing,
+    }
   }
 
   const handleExecuteTest = async () => {
@@ -868,8 +1144,8 @@ const ToolConfigurationPage: React.FC = () => {
           )
         },
         onComplete: (buffer: string) => {
-          console.log(t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), buffer)
-          setSnackbar({ open: true, message: t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), severity: 'success' })
+          // console.log(t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), buffer)
+          // setSnackbar({ open: true, message: t('plugins.toolConfig.testConnectionSuccess', '测试执行成功'), severity: 'success' })
 
           try {
             // 解析buffer获取最终结果数据
@@ -892,6 +1168,51 @@ const ToolConfigurationPage: React.FC = () => {
               finalResults.output = bufferData.data.payload?.output || null
               // 根据error_code判断执行是否成功
               finalResults.execution_success = bufferData.data.payload?.error_code === 0
+
+              // 如果执行成功，立即更新工具状态为启用
+              if (bufferData.data.payload?.error_code === 0 && tool) {
+                // 更新本地工具状态
+                setTool(prev => prev ? { ...prev, available: true } : prev)
+
+                // 乐观更新React Query缓存
+                const queryKey = pluginType === 'code' ? ['pluginCodeList', spaceId, plugin_id] : ['pluginApiList', spaceId, plugin_id]
+
+                queryClient.setQueryData(queryKey, (oldData: any) => {
+                  if (!oldData || oldData.code !== 200) return oldData
+
+                  const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+                  const updatedList = oldData.data[dataKey].map((item: any) =>
+                    item.tool_id === tool_id ? { ...item, available: true } : item
+                  )
+
+                  return {
+                    ...oldData,
+                    data: {
+                      ...oldData.data,
+                      [dataKey]: updatedList,
+                    },
+                  }
+                })
+
+                // 也更新单个工具的缓存
+                const singleQueryKey = pluginType === 'code' ? ['pluginCode', spaceId, plugin_id, tool_id] : ['pluginApi', spaceId, plugin_id, tool_id]
+                queryClient.setQueryData(singleQueryKey, (oldData: any) => {
+                  if (!oldData || oldData.code !== 200) return oldData
+
+                  const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+                  return {
+                    ...oldData,
+                    data: {
+                      ...oldData.data,
+                      [dataKey]: oldData.data[dataKey].map((item: any) =>
+                        item.tool_id === tool_id ? { ...item, available: true } : item
+                      ),
+                    },
+                  }
+                })
+
+                console.log('工具状态已更新为启用')
+              }
             } else {
               // 错误响应
               finalResults.execution_success = false
@@ -918,7 +1239,7 @@ const ToolConfigurationPage: React.FC = () => {
             )
           }
         },
-        timeout: 30000, // 30秒超时
+        timeout: undefined, // 移除超时限制
       })
     } catch (error: unknown) {
       console.error('测试执行失败:', error)
@@ -931,10 +1252,10 @@ const ToolConfigurationPage: React.FC = () => {
   }
 
   // Template handling functions
-  const availableTemplates = codeTemplates.filter(template => template.language === codeLanguage)
+  const availableTemplates = codeTemplates.filter(template => template.language === (tool?.language || 'python'))
 
   const handleTemplateSelect = (templateName: string) => {
-    const template = codeTemplates.find(t => t.name === templateName && t.language === codeLanguage)
+    const template = codeTemplates.find(t => t.name === templateName && t.language === (tool?.language || 'python'))
     if (template) {
       setCodeContent(template.template)
       setSelectedTemplate(templateName)
@@ -962,13 +1283,19 @@ const ToolConfigurationPage: React.FC = () => {
       } else {
         navigate('/dashboard/agents')
       }
+    } else if (fromPublishVersion && publishVersion) {
+      // 从插件发布版本页面跳转过来的，返回到插件版本页面
+      navigate(`/dashboard/plugins/${plugin_id}/${publishVersion}`)
     } else {
       // 从插件管理页面跳转过来的，返回到插件配置页面
       navigate(`/dashboard/plugins/${plugin_id}`)
     }
   }
 
-  if (isLoadingApi) {
+  // Don't show loading if we have toolsData (data is already available from publish version)
+  const isLoadingEffective = isLoadingApi && !toolsData
+
+  if (isLoadingEffective) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -1019,6 +1346,12 @@ const ToolConfigurationPage: React.FC = () => {
                 {tool.description}
               </Typography>
               <div className="flex items-center space-x-4 mt-2">
+                <Chip
+                  label={tool.available ? t('plugins.pluginConfig.enabled', '启用') : t('plugins.pluginConfig.disabled', '禁用')}
+                  size="small"
+                  color={tool.available ? 'success' : 'default'}
+                  icon={tool.available ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                />
                 {pluginType === 'code' ? (
                   <>
                     <Chip label={`${t('plugins.toolConfig.language', '语言')}: ${tool.language || 'python'}`} size="small" />
@@ -1051,7 +1384,7 @@ const ToolConfigurationPage: React.FC = () => {
                 color="error"
                 startIcon={<Trash2 className="w-4 h-4" />}
                 onClick={() => setDeleteDialogOpen(true)}
-                disabled={deletePluginApiMutation.isPending}
+                disabled={deletePluginApiMutation.isPending || isReadOnly}
               >
                 {deletePluginApiMutation.isPending ? t('plugins.actions.deleting', '删除中...') : t('plugins.actions.deleteTool', '删除工具')}
               </Button>
@@ -1059,7 +1392,7 @@ const ToolConfigurationPage: React.FC = () => {
                 variant="contained"
                 startIcon={updatePluginApiMutation.isPending ? <CircularProgress size={16} /> : <Save className="w-4 h-4" />}
                 onClick={handleSaveTool}
-                disabled={updatePluginApiMutation.isPending || !tool.name.trim() || !tool.description.trim()}
+                disabled={updatePluginApiMutation.isPending || !tool.name.trim() || !tool.description.trim() || isReadOnly}
               >
                 {updatePluginApiMutation.isPending ? t('plugins.actions.saving', '保存中...') : t('plugins.actions.saveConfig', '保存配置')}
               </Button>
@@ -1093,6 +1426,7 @@ const ToolConfigurationPage: React.FC = () => {
                     placeholder={t('plugins.tools.namePlaceholder', '请输入工具名称...')}
                     helperText={t('plugins.tools.nameHelper', '建议使用简洁明了的名称 ({{count}}/128)', { count: tool.name.length })}
                     inputProps={{ maxLength: 128 }}
+                    disabled={isReadOnly}
                   />
                 </div>
                 {pluginType === 'code' ? (
@@ -1101,7 +1435,7 @@ const ToolConfigurationPage: React.FC = () => {
                       {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}
                     </Typography>
                     <FormControl fullWidth>
-                      <Select value={tool.language || 'python'} onChange={e => setTool({ ...tool, language: e.target.value })}>
+                      <Select value={tool.language || 'python'} onChange={e => handleRuntimeLanguageChange(e.target.value as 'python' | 'javascript' | 'nodejs')} disabled={isReadOnly}>
                         <MenuItem value="python">Python 3</MenuItem>
                         <MenuItem value="javascript">Node.js</MenuItem>
                       </Select>
@@ -1113,7 +1447,7 @@ const ToolConfigurationPage: React.FC = () => {
                       {t('plugins.pluginConfig.method', '请求方法')}
                     </Typography>
                     <FormControl fullWidth>
-                      <Select value={tool.method} onChange={e => setTool({ ...tool, method: e.target.value as number })}>
+                      <Select value={tool.method} onChange={e => setTool({ ...tool, method: e.target.value as number })} disabled={isReadOnly}>
                         <MenuItem value={1}>GET</MenuItem>
                         <MenuItem value={2}>POST</MenuItem>
                       </Select>
@@ -1180,6 +1514,7 @@ const ToolConfigurationPage: React.FC = () => {
                         },
                       },
                     }}
+                    disabled={isReadOnly}
                   />
                 </div>
               )}
@@ -1198,6 +1533,7 @@ const ToolConfigurationPage: React.FC = () => {
                     count: tool.description.length,
                   })}
                   inputProps={{ maxLength: 256 }}
+                  disabled={isReadOnly}
                 />
               </div>
             </div>
@@ -1208,7 +1544,7 @@ const ToolConfigurationPage: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Typography variant="h6">{t('plugins.toolConfig.inputParameters', '输入参数配置')}</Typography>
-                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, true)}>
+                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, true)} disabled={isReadOnly}>
                   {t('plugins.toolConfig.addInputParameter', '添加输入参数')}
                 </Button>
               </div>
@@ -1234,19 +1570,26 @@ const ToolConfigurationPage: React.FC = () => {
                             </Typography>
                             <Chip label={param.type} size="small" />
                             {pluginType === 'api' && <Chip label={getMethodLabel(param.method)} size="small" variant="outlined" />}
+                            {param.is_required && <Chip label="必选" size="small" color="error" variant="outlined" />}
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
                           </Typography>
+                          {param.value && (
+                            <Typography variant="caption" color="text.secondary" className="mt-1">
+                              默认值: {param.value}
+                            </Typography>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
-                          <IconButton size="small" onClick={() => openParameterDialog(param, true)} title={t('plugins.toolConfig.editParameter', '编辑参数')}>
+                          <IconButton size="small" onClick={() => openParameterDialog(param, true)} title={t('plugins.toolConfig.editParameter', '编辑参数')} disabled={isReadOnly}>
                             <Settings className="w-4 h-4" />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteParameter(param.id, true)}
                             title={t('plugins.toolConfig.deleteParameter', '删除参数')}
+                            disabled={isReadOnly}
                           >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
@@ -1264,7 +1607,7 @@ const ToolConfigurationPage: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Typography variant="h6">{t('plugins.toolConfig.outputParameters', '输出参数配置')}</Typography>
-                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, false)}>
+                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => openParameterDialog(null, false)} disabled={isReadOnly}>
                   {t('plugins.toolConfig.addOutputParameter', '添加输出参数')}
                 </Button>
               </div>
@@ -1289,19 +1632,26 @@ const ToolConfigurationPage: React.FC = () => {
                               {param.name}
                             </Typography>
                             <Chip label={param.type} size="small" />
+                            {param.is_required && <Chip label="必选" size="small" color="error" variant="outlined" />}
                           </div>
                           <Typography variant="body2" color="text.secondary" className="mt-1">
                             {param.description}
                           </Typography>
+                          {param.value && (
+                            <Typography variant="caption" color="text.secondary" className="mt-1">
+                              默认值: {param.value}
+                            </Typography>
+                          )}
                         </div>
                         <div className="flex items-center space-x-2">
-                          <IconButton size="small" onClick={() => openParameterDialog(param, false)} title={t('plugins.toolConfig.editParameter', '编辑参数')}>
+                          <IconButton size="small" onClick={() => openParameterDialog(param, false)} title={t('plugins.toolConfig.editParameter', '编辑参数')} disabled={isReadOnly}>
                             <Settings className="w-4 h-4" />
                           </IconButton>
                           <IconButton
                             size="small"
                             onClick={() => handleDeleteParameter(param.id, false)}
                             title={t('plugins.toolConfig.deleteParameter', '删除参数')}
+                            disabled={isReadOnly}
                           >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
@@ -1319,7 +1669,7 @@ const ToolConfigurationPage: React.FC = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <Typography variant="h6">{t('plugins.toolConfig.headers', '请求头配置')}</Typography>
-                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={handleAddHeader}>
+                <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={handleAddHeader} disabled={isReadOnly}>
                   {t('plugins.toolConfig.addHeader', '添加请求头')}
                 </Button>
               </div>
@@ -1341,6 +1691,7 @@ const ToolConfigurationPage: React.FC = () => {
                         size="small"
                         fullWidth
                         placeholder="例如：Authorization"
+                        disabled={isReadOnly}
                       />
                     </div>
                     <div className="col-span-5">
@@ -1350,6 +1701,7 @@ const ToolConfigurationPage: React.FC = () => {
                         size="small"
                         fullWidth
                         placeholder="例如：Bearer token123"
+                        disabled={isReadOnly}
                       />
                     </div>
                     <div className="col-span-2 flex justify-center">
@@ -1358,6 +1710,7 @@ const ToolConfigurationPage: React.FC = () => {
                         onClick={() => handleRemoveHeader(index)}
                         color="error"
                         title={tool.headers.length > 1 ? '删除此行' : '清空内容'}
+                        disabled={isReadOnly}
                       >
                         <Trash2 className="w-4 h-4" />
                       </IconButton>
@@ -1374,7 +1727,7 @@ const ToolConfigurationPage: React.FC = () => {
               <div className="flex items-center justify-between">
                 <Typography variant="h6">代码编辑器</Typography>
                 <div className="flex items-center space-x-2">
-                  <Chip label={` ${t('plugins.toolConfig.language', '语言')}: ${tool.language || 'python'}`} size="small" />
+                  <Chip label={` ${t('plugins.toolConfig.language', '语言')}: ${tool.language === 'javascript' ? 'JavaScript' : 'Python'}`} size="small" />
                   <Chip label={t('plugins.toolConfig.syntaxHighlight', '语法高亮')} size="small" variant="outlined" />
                   {selectedTemplate && (
                     <Chip label={`${t('plugins.toolConfig.template', '模板')}: ${selectedTemplate}`} size="small" variant="outlined" className="text-xs" />
@@ -1392,11 +1745,11 @@ const ToolConfigurationPage: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-3">
                     {availableTemplates.length > 0 && (
-                      <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />}>
+                      <Button variant="outlined" size="small" onClick={() => setShowTemplates(!showTemplates)} startIcon={<FileText className="w-4 h-4" />} disabled={isReadOnly}>
                         {t('plugins.pluginConfig.codeTemplates', '模板')}
                       </Button>
                     )}
-                    <Button variant="outlined" size="small" onClick={handleResetCode} startIcon={<RotateCcw className="w-4 h-4" />}>
+                    <Button variant="outlined" size="small" onClick={handleResetCode} startIcon={<RotateCcw className="w-4 h-4" />} disabled={isReadOnly}>
                       {t('plugins.pluginConfig.resetCode', '重置代码')}
                     </Button>
                   </div>
@@ -1425,7 +1778,7 @@ const ToolConfigurationPage: React.FC = () => {
                             <Typography variant="body2" className="font-medium">
                               {template.name}
                             </Typography>
-                            <Chip label={codeLanguage === 'javascript' ? 'JS' : 'PY'} size="small" color={codeLanguage === 'javascript' ? 'success' : 'info'} />
+                            <Chip label={(tool?.language || 'python') === 'javascript' ? 'JS' : 'PY'} size="small" color={(tool?.language || 'python') === 'javascript' ? 'success' : 'info'} />
                           </div>
                           <Typography variant="body2" className="text-gray-600 text-sm">
                             {template.description}
@@ -1443,19 +1796,11 @@ const ToolConfigurationPage: React.FC = () => {
                 )}
 
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  {/* Language selector */}
+                  {/* Code editor based on runtime language - no selector here */}
                   <div className="bg-gray-50 border-b border-gray-200 p-3">
-                    <FormControl size="small" className="min-w-32">
-                      <InputLabel>{t('plugins.pluginConfig.programmingLanguage', '编程语言')}</InputLabel>
-                      <Select
-                        value={tool.language || 'python'}
-                        label={t('plugins.pluginConfig.programmingLanguage', '编程语言')}
-                        onChange={e => handleCodeLanguageChange(e.target.value as 'python' | 'javascript')}
-                      >
-                        <MenuItem value="python">Python</MenuItem>
-                        <MenuItem value="javascript">JavaScript</MenuItem>
-                      </Select>
-                    </FormControl>
+                    <Typography variant="body2" className="text-gray-600">
+                      {t('plugins.pluginConfig.programmingLanguage', '编程语言')}: <span className="font-medium">{tool.language === 'javascript' ? 'JavaScript' : 'Python'}</span>
+                    </Typography>
                   </div>
 
                   {/* Code editor based on language */}
@@ -1492,7 +1837,7 @@ const ToolConfigurationPage: React.FC = () => {
                     {t('plugins.pluginConfig.usageTips', '💡 使用提示')}
                   </Typography>
                   <div className="space-y-1 text-sm text-blue-800">
-                    {codeLanguage === 'python' ? (
+                    {(tool.language || 'python') === 'python' ? (
                       <>
                         <div>
                           • {t('plugins.pluginConfig.pythonTips1', '确保导出')} <code className="bg-blue-100 px-1 rounded">main</code>{' '}
@@ -1553,7 +1898,7 @@ const ToolConfigurationPage: React.FC = () => {
                         <div className="flex items-center space-x-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                           <Typography variant="body2" color="text.secondary">
-                            {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}: {tool.language === 'javascript' ? 'Node.js' : 'Python 3'}
+                            {t('plugins.pluginConfig.runtimeEnvironment', '运行时环境')}: {tool.language === 'javascript' ? 'Node.js' : (tool.language === 'python' ? 'Python 3' : 'Python')}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -1645,9 +1990,25 @@ const ToolConfigurationPage: React.FC = () => {
         <DialogContent>
           <div className="space-y-4 mt-2">
             <div>
-              <Typography variant="subtitle2" className="mb-2">
-                {t('plugins.toolConfig.parameterName', '参数名称')} <span className="text-red-500 ml-1">*</span>
-              </Typography>
+              <div className="flex items-center justify-between mb-2">
+                <Typography variant="subtitle2">
+                  {t('plugins.toolConfig.parameterName', '参数名称')} <span className="text-red-500 ml-1">*</span>
+                </Typography>
+                {isInputDialogOpen && (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is_required"
+                      checked={parameterForm.is_required}
+                      onChange={e => handleParameterFormChange('is_required', e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="is_required" className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap">
+                      {t('plugins.toolConfig.isRequired', '必选参数')}
+                    </label>
+                  </div>
+                )}
+              </div>
               <TextField
                 fullWidth
                 value={parameterForm.name}
@@ -1673,86 +2034,95 @@ const ToolConfigurationPage: React.FC = () => {
               />
             </div>
             {isInputDialogOpen ? (
-              pluginType === 'api' ? (
-                <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Typography variant="subtitle2" className="mb-2">
+                    {t('plugins.toolConfig.parameterType', '参数类型')}
+                  </Typography>
+                  <ParameterTypeSelector
+                    value={parameterForm.type}
+                    onChange={(value) => handleParameterFormChange('type', value)}
+                  />
+                </div>
+                {pluginType === 'api' && (
                   <div>
                     <Typography variant="subtitle2" className="mb-2">
-                      参数类型
-                    </Typography>
-                    <FormControl fullWidth>
-                      <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                        <MenuItem value="string">字符串</MenuItem>
-                        <MenuItem value="number">数字</MenuItem>
-                        <MenuItem value="boolean">布尔值</MenuItem>
-                        <MenuItem value="array">数组</MenuItem>
-                        <MenuItem value="object">对象</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </div>
-                  <div>
-                    <Typography variant="subtitle2" className="mb-2">
-                      传入方法
+                      {t('plugins.toolConfig.transferMethod', '传入方法')}
                     </Typography>
                     <FormControl fullWidth>
                       <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
-                        <MenuItem value={0}>无</MenuItem>
                         <MenuItem value={1}>Header参数</MenuItem>
                         <MenuItem value={2}>Query参数</MenuItem>
                         {tool.method !== 1 && <MenuItem value={3}>Body参数</MenuItem>}
                       </Select>
                     </FormControl>
                   </div>
-                </div>
-              ) : (
-                <div>
-                  <Typography variant="subtitle2" className="mb-2">
-                    参数类型
-                  </Typography>
-                  <FormControl fullWidth>
-                    <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                      <MenuItem value="string">字符串</MenuItem>
-                      <MenuItem value="number">数字</MenuItem>
-                      <MenuItem value="boolean">布尔值</MenuItem>
-                      <MenuItem value="array">数组</MenuItem>
-                      <MenuItem value="object">对象</MenuItem>
-                    </Select>
-                  </FormControl>
-                </div>
-              )
+                )}
+              </div>
             ) : (
               <div>
                 <Typography variant="subtitle2" className="mb-2">
                   {t('plugins.toolConfig.parameterType', '参数类型')}
                 </Typography>
-                <FormControl fullWidth>
-                  <Select value={parameterForm.type} onChange={e => handleParameterFormChange('type', e.target.value)}>
-                    <MenuItem value="string">{t('plugins.toolConfig.parameterTypeOptions.string', '字符串')}</MenuItem>
-                    <MenuItem value="number">{t('plugins.toolConfig.parameterTypeOptions.number', '数字')}</MenuItem>
-                    <MenuItem value="boolean">{t('plugins.toolConfig.parameterTypeOptions.boolean', '布尔值')}</MenuItem>
-                    <MenuItem value="array">{t('plugins.toolConfig.parameterTypeOptions.array', '数组')}</MenuItem>
-                    <MenuItem value="object">{t('plugins.toolConfig.parameterTypeOptions.object', '对象')}</MenuItem>
-                  </Select>
-                </FormControl>
+                <ParameterTypeSelector
+                  value={parameterForm.type}
+                  onChange={(value) => handleParameterFormChange('type', value)}
+                />
               </div>
             )}
             {isInputDialogOpen && (
-              <div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="is_required"
-                    checked={parameterForm.is_required}
-                    onChange={e => handleParameterFormChange('is_required', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="is_required" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    {t('plugins.toolConfig.isRequired', '必选参数')}
-                  </label>
-                </div>
-                <Typography variant="caption" className="text-gray-500 mt-1 block">
-                  {t('plugins.toolConfig.isRequiredHelper', '勾选后该参数为必填项')}
-                </Typography>
-              </div>
+              <>
+                {pluginType === 'api' && (
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_runtime"
+                        checked={!parameterForm.is_runtime}
+                        onChange={e => handleParameterFormChange('is_runtime', !e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="is_runtime" className="text-sm font-medium text-gray-700 cursor-pointer">
+                        非运行时参数
+                      </label>
+                    </div>
+                    <Typography variant="caption" className="text-gray-500 mt-1 block">
+                      勾选后需要设置参数默认值
+                    </Typography>
+                  </div>
+                )}
+                {!parameterForm.is_runtime && (
+                  <div>
+                    <Typography variant="subtitle2" className="mb-2">
+                      默认值 <span className="text-red-500 ml-1">*</span>
+                    </Typography>
+                    {(() => {
+                      const isBooleanType = String(parameterForm.type) === 'boolean'
+                      return isBooleanType ? (
+                        <div className="flex items-center space-x-2">
+                          <Typography variant="body2" className="text-gray-600">
+                            {parameterForm.value === 'true' || parameterForm.value === true ? 'True' : 'False'}
+                          </Typography>
+                          <Switch
+                            checked={parameterForm.value === 'true' || parameterForm.value === true}
+                            onChange={e => handleParameterFormChange('value', e.target.checked ? 'true' : 'false')}
+                            color="primary"
+                          />
+                        </div>
+                      ) : (
+                        <TextField
+                          fullWidth
+                          value={parameterForm.value}
+                          onChange={e => handleParameterFormChange('value', e.target.value)}
+                          placeholder="请输入默认值..."
+                          helperText="非运行时参数的默认值"
+                          required
+                        />
+                      )
+                    })()}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </DialogContent>
@@ -1814,9 +2184,6 @@ const ToolConfigurationPage: React.FC = () => {
             <span>
               {t('plugins.toolConfig.testTool', '测试工具')}: {tool?.name}
             </span>
-            <IconButton onClick={() => setTestDialogOpen(false)}>
-              <Settings className="w-4 h-4" />
-            </IconButton>
           </div>
         </DialogTitle>
         <DialogContent>
@@ -1830,52 +2197,189 @@ const ToolConfigurationPage: React.FC = () => {
                 </Typography>
               </div>
 
-              {tool?.input_parameters && tool.input_parameters.length > 0 ? (
-                <div className="space-y-4">
-                  {tool.input_parameters.map(param => (
-                    <div key={param.id} className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Typography variant="subtitle2" className="font-medium">
-                          {param.name}
-                        </Typography>
-                        <Chip label={param.type} size="small" variant="outlined" />
-                      </div>
-                      <Typography variant="body2" color="text.secondary" className="text-sm">
-                        {param.description}
+              <div className="space-y-6">
+                {/* Plugin-level Parameters - 只显示运行时参数，且排除与工具参数同名的参数 */}
+                {pluginData?.data?.plugin_info?.request_params && (() => {
+                  const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+                  const visiblePluginParams = pluginData.data.plugin_info.request_params.filter(p =>
+                    p.is_runtime !== false && !toolParamNames.has(p.name)
+                  )
+                  return visiblePluginParams.length > 0
+                })() && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Typography variant="subtitle1" className="font-medium text-blue-600">
+                        {t('plugins.toolConfig.pluginParams', '插件参数')}
                       </Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        value={testParameters[param.name] || ''}
-                        onChange={e => handleTestParameterChange(param.name, e.target.value)}
-                        placeholder={`请输入${param.name}...`}
-                        multiline={param.type === 'object'}
-                        rows={param.type === 'object' ? 3 : 1}
-                      />
+                      <Chip label={`${(() => {
+                        const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+                        return pluginData.data.plugin_info.request_params.filter(p =>
+                          p.is_runtime !== false && !toolParamNames.has(p.name)
+                        ).length
+                      })()}`} size="small" color="primary" />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg p-6 text-center">
-                  <Typography variant="body1" color="text.secondary">
-                    {t('plugins.toolConfig.noInputParams', '该工具没有输入参数')}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {t('plugins.toolConfig.canExecuteTest', '可以直接执行测试')}
-                  </Typography>
-                </div>
-              )}
+                    {pluginData.data.plugin_info.request_params
+                      .filter(p => {
+                        const toolParamNames = new Set(tool?.input_parameters?.map(p => p.name) || [])
+                        return p.is_runtime !== false && !toolParamNames.has(p.name)
+                      })
+                      .map((param, index) => {
+                        const typeString = typeof param.type === 'number' ? mapNumberToString(param.type) : param.type
+                        const paramValue = testParameters[`plugin_${param.name}`] || ''
+                        const isRequiredAndEmpty = param.is_required && (!paramValue || paramValue.trim() === '')
+                        const validationError = testParameterErrors[`plugin_${param.name}`] || ''
+                        const hasError = isRequiredAndEmpty || !!validationError
+                        return (
+                          <div
+                            key={`plugin-param-${index}`}
+                            className={`space-y-2 p-3 rounded-lg border ${hasError ? 'bg-red-50 border-red-300' : 'bg-blue-50 border-blue-200'}`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Typography variant="subtitle2" className={`font-medium ${hasError ? 'text-red-700' : ''}`}>
+                                {param.name}
+                                {param.is_required && <span className="text-red-500 ml-1">*</span>}
+                              </Typography>
+                              <Chip label={typeString} size="small" variant="outlined" color="primary" />
+                              {param.is_required && <Chip label="必填" size="small" color="error" variant="outlined" />}
+                            </div>
+                            <Typography variant="body2" color="text.secondary" className="text-sm">
+                              {param.desc || '暂无描述'}
+                            </Typography>
+                            {typeString === 'boolean' ? (
+                              <FormControlLabel
+                                control={
+                                  <Switch
+                                    checked={paramValue === 'true'}
+                                    onChange={e => handleTestParameterChange(param.name, e.target.checked.toString(), 'plugin')}
+                                    color="primary"
+                                  />
+                                }
+                                label={paramValue === 'true' ? 'TRUE' : 'FALSE'}
+                              />
+                            ) : (
+                              <TextField
+                                fullWidth
+                                size="small"
+                                value={paramValue}
+                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'plugin', typeString)}
+                                placeholder={`请输入${param.name}...`}
+                                multiline={typeString === 'object'}
+                                rows={typeString === 'object' ? 3 : 1}
+                                error={hasError}
+                                helperText={validationError || (isRequiredAndEmpty ? '此参数为必填项' : '')}
+                              />
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                )}
 
-              <div className="pt-4 border-t">
-                <Button
-                  variant="contained"
-                  onClick={handleExecuteTest}
-                  disabled={isTestRunning || executePluginMutation.isPending}
-                  fullWidth
-                  startIcon={isTestRunning || executePluginMutation.isPending ? <CircularProgress size={16} /> : <Settings className="w-4 h-4" />}
-                >
-                  {isTestRunning || executePluginMutation.isPending ? t('common.buttons.executing', '执行中...') : t('common.buttons.executeTest', '执行测试')}
-                </Button>
+                {/* Tool-level Parameters - 只显示运行时参数 */}
+                {tool?.input_parameters && tool.input_parameters.filter(p => p.is_runtime !== false).length > 0 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Typography variant="subtitle1" className="font-medium text-green-600">
+                        {t('plugins.toolConfig.toolParams', '工具参数')}
+                      </Typography>
+                      <Chip label={`${tool.input_parameters.filter(p => p.is_runtime !== false).length}`} size="small" color="success" />
+                    </div>
+                    {tool.input_parameters
+                      .filter(p => p.is_runtime !== false)
+                      .map(param => {
+                        const paramValue = testParameters[`tool_${param.name}`] || ''
+                        const isRequiredAndEmpty = param.is_required && (!paramValue || paramValue.trim() === '')
+                        const validationError = testParameterErrors[`tool_${param.name}`] || ''
+                        const hasError = isRequiredAndEmpty || !!validationError
+                        return (
+                          <div
+                            key={param.id}
+                            className={`space-y-2 p-3 rounded-lg border ${hasError ? 'bg-red-50 border-red-300' : 'bg-green-50 border-green-200'}`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Typography variant="subtitle2" className={`font-medium ${hasError ? 'text-red-700' : ''}`}>
+                                {param.name}
+                                {param.is_required && <span className="text-red-500 ml-1">*</span>}
+                              </Typography>
+                              <Chip label={param.type} size="small" variant="outlined" color="success" />
+                              {param.is_required && <Chip label="必填" size="small" color="error" variant="outlined" />}
+                            </div>
+                            <Typography variant="body2" color="text.secondary" className="text-sm">
+                              {param.description}
+                            </Typography>
+                            {param.type === 'boolean' ? (
+                              <FormControlLabel
+                                control={
+                                  <Switch
+                                    checked={paramValue === 'true'}
+                                    onChange={e => handleTestParameterChange(param.name, e.target.checked.toString(), 'tool')}
+                                    color="primary"
+                                  />
+                                }
+                                label={paramValue === 'true' ? 'TRUE' : 'FALSE'}
+                              />
+                            ) : (
+                              <TextField
+                                fullWidth
+                                size="small"
+                                value={paramValue}
+                                onChange={e => handleTestParameterChange(param.name, e.target.value, 'tool', param.type)}
+                                placeholder={`请输入${param.name}...`}
+                                multiline={param.type === 'object'}
+                                rows={param.type === 'object' ? 3 : 1}
+                                error={hasError}
+                                helperText={validationError || (isRequiredAndEmpty ? '此参数为必填项' : '')}
+                              />
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                )}
+
+                {/* No parameters message */}
+                {(!pluginData?.data?.plugin_info?.request_params || pluginData.data.plugin_info.request_params.length === 0) &&
+                  (!tool?.input_parameters || tool.input_parameters.length === 0) && (
+                    <div className="bg-gray-50 rounded-lg p-6 text-center">
+                      <Typography variant="body1" color="text.secondary">
+                        {t('plugins.toolConfig.noInputParams', '该工具没有输入参数')}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {t('plugins.toolConfig.canExecuteTest', '可以直接执行测试')}
+                      </Typography>
+                    </div>
+                  )}
+              </div>
+
+              <div className="pt-4 border-t space-y-3">
+                {(() => {
+                  const { isValid, missingParams } = validateRequiredParameters()
+                  return (
+                    <>
+                      {!isValid && missingParams.length > 0 && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <Typography variant="body2" color="error" className="font-medium">
+                            {t('plugins.toolConfig.missingRequiredParams', '缺少必填参数')}
+                          </Typography>
+                          <Typography variant="caption" color="error">
+                            {t('plugins.toolConfig.pleaseFillRequiredParams', '请填写以下必填参数')}: {missingParams.join(', ')}
+                          </Typography>
+                        </div>
+                      )}
+                      <Button
+                        variant="contained"
+                        onClick={handleExecuteTest}
+                        disabled={isTestRunning || executePluginMutation.isPending || !isValid}
+                        fullWidth
+                        startIcon={isTestRunning || executePluginMutation.isPending ? <CircularProgress size={16} /> : <Settings className="w-4 h-4" />}
+                      >
+                        {isTestRunning || executePluginMutation.isPending
+                          ? t('common.buttons.executing', '执行中...')
+                          : t('common.buttons.executeTest', '执行测试')}
+                      </Button>
+                    </>
+                  )
+                })()}
               </div>
             </div>
 

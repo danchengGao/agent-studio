@@ -6,9 +6,9 @@
 import { useEffect, useMemo, useRef } from 'react'
 
 import { IJsonSchema } from '@flowgram.ai/json-schema'
-import { I18n } from '@flowgram.ai/editor'
 
 import { useTypeManager } from '../../../'
+import { t } from '../../../../i18n'
 
 import { IConditionRule, ConditionOpConfigs } from '../types'
 import { useConditionContext } from '../context'
@@ -79,7 +79,7 @@ export function useCondition({ leftSchema, operator, onClearOp, onClearRight, ru
         .map(_op => ({
           ...(allOps?.[_op] || {}),
           value: _op,
-          label: I18n.t(allOps?.[_op]?.label || _op),
+          label: t(allOps?.[_op]?.label || _op),
         })),
     [rule, allOps],
   )

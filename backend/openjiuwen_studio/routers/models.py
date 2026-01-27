@@ -1,9 +1,7 @@
-import logging
 from typing import List, Optional
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
-
-logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session

@@ -9,7 +9,6 @@ import { commonValidators, createInputParametersValidator } from '../../utils/va
  * Code 节点的完整校验配置
  */
 export const validation = {
-  title: commonValidators.title,
   'inputs.inputParameters.*': ({ value, context, name, formValues }: any) => {
     const valuePropertyKey = name.replace(/^inputs\.inputParameters\./, '')
     const required = formValues.inputs?.inputParameters?.required || []

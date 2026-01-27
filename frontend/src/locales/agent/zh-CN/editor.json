@@ -303,10 +303,13 @@
         },
         "tips": {
           "modelNotConfiguredTitle": "未配置模型",
-          "modelNotConfiguredDescription": "请先在左侧\"编排配置\"面板中选择一个模型，然后才能开始调试对话。"
+          "modelNotConfiguredDescription": "请先在左侧\"编排配置\"面板中选择一个模型，然后才能开始调试对话。",
+          "modelDisabledTitle": "模型已被禁用",
+          "modelDisabledDescription": "当前关联的模型已被禁用，无法进行调试。请前往模型管理页面启用该模型或选择其他可用模型。"
         },
         "placeholders": {
           "configModelFirst": "请先配置模型后进行调试",
+          "modelDisabled": "模型已被禁用，无法进行调试",
           "addWorkflowFirst": "请先添加工作流后进行调试",
           "waitInputComplex": "等待输入：请在上方卡片中填写并提交",
           "waitInputSimple": "等待输入：请输入反馈",
@@ -358,7 +361,8 @@
             "collapse": "折叠"
           },
           "labels": {
-            "nodeFallback": "节点"
+            "nodeFallback": "节点",
+            "knowledgeBaseRetrieval": "知识库检索"
           }
         },
         "flameGraph": {
@@ -378,7 +382,8 @@
             "input": "输入",
             "output": "输出",
             "none": "无",
-            "nodeFallback": "节点"
+            "nodeFallback": "节点",
+            "knowledgeBaseRetrieval": "知识库检索"
           }
         }
       },

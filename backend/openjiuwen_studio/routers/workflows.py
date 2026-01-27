@@ -5,6 +5,7 @@ from typing import Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
+from minio import Minio
 from openjiuwen.core.common.logging import logger
 
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
@@ -13,6 +14,7 @@ from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.routers.common import handle_response, validate_request
 import openjiuwen_studio.core.manager.workflow as mgr
 from openjiuwen_studio.core.common import dsl
+from openjiuwen_studio.core.database import get_minio_client
 from openjiuwen_studio.schemas.workflow import (
     WorkflowBaseResponse,
     WorkflowUpdate,
@@ -472,4 +474,64 @@ async def enter_workflow_execution_logs_debug(
         logger.error(f"Enter workflow execution logs debug, err: {e.errors()}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed"
+        ) from e
+
+
+@workflows_router.get("/get_upload_url/{object_key}", response_model=ResponseModel[dict])
+async def get_upload_url(
+        object_key: str,
+):
+    """
+    获取文件上传自签名URL
+
+    Args:
+        workflow_id: 工作流ID
+        space_id: 工作空间ID
+        object_key：文件唯一标识
+        current_user: 当前用户信息
+
+    Returns:
+        ResponseModel[dict]: 上传文件URL
+    """
+    try:
+        minio_client = get_minio_client()
+        logger.info(f"Get workflow execution logs create list start.")
+        req = {"object_key": object_key}
+        res = mgr.get_upload_url(req, minio_client)
+        return handle_response(res)
+    except Exception as e:
+        logger.error(f"Failed to generate upload URL: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to generate upload URL"
+        ) from e
+
+
+@workflows_router.get("/get_download_url/{object_key}", response_model=ResponseModel[dict])
+async def get_download_url(
+        object_key: Optional[str] = None,
+):
+    """
+    获取文件下载自签名URL
+
+    Args:
+        workflow_id: 工作流ID
+        space_id: 工作空间ID
+        object_key：文件唯一标识
+        current_user: 当前用户信息
+
+    Returns:
+        ResponseModel[dict]: 下载文件URL
+    """
+    try:
+        minio_client = get_minio_client()
+        logger.info(f"Get workflow execution logs create list start.")
+        req = {"object_key": object_key}
+        res = mgr.get_download_url(req, minio_client)
+        return handle_response(res)
+    except Exception as e:
+        logger.error(f"Failed to generate download URL: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to generate download URL"
         ) from e

@@ -121,11 +121,15 @@ export const useToggleModelStatus = () => {
 
 // 测试模型
 export const useTestModel = () => {
-  return useMutation(({ id, prompt, spaceId }: { id: string; prompt: string; spaceId: string }) => modelService.testModel(id, prompt, spaceId), {
-    onError: error => {
-      console.log('测试模型失败:', error)
+  return useMutation(
+    ({ id, prompt, spaceId, parameters }: { id: string; prompt: string; spaceId: string; parameters?: { temperature?: number; top_p?: number; max_tokens?: number } }) =>
+      modelService.testModel(id, prompt, spaceId, parameters),
+    {
+      onError: error => {
+        console.log('测试模型失败:', error)
+      },
     },
-  })
+  )
 }
 
 // 刷新模型列表

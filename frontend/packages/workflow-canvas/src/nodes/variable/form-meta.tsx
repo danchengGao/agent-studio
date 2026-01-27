@@ -4,14 +4,15 @@
  */
 
 import { FieldArray, FormMeta, ValidateTrigger } from '@flowgram.ai/free-layout-editor'
-import { I18n } from '@flowgram.ai/editor'
 
 import { AssignRows, createInferAssignPlugin, type AssignValueType } from '../../form-materials'
 import { FormHeader, FormContent, FormDisplay, FormItem } from '../../form-components'
 import { defaultFormMeta } from '../default-form-meta'
 import { useIsSidebar } from '../../hooks'
+import { t, useTranslation } from '../../i18n'
 
 export const FormRender = (): JSX.Element => {
+  const { t } = useTranslation()
   const isSidebar = useIsSidebar()
 
   return (
@@ -19,14 +20,13 @@ export const FormRender = (): JSX.Element => {
       <FormHeader />
       <FormContent>
         {isSidebar ? (
-          <FormItem name={I18n.t('Settings')}>
+          <FormItem name={t('workflowCanvas.nodes.variable.settings')}>
             <AssignRows name="assign" enableDeclaration={false} />
           </FormItem>
         ) : (
           <>
             <FieldArray name="assign">
               {({ field }) => {
-                // Extract all variable names from assign array
                 const getVariableNames = () => {
                   const assignData = field.value as AssignValueType[]
                   if (Array.isArray(assignData) && assignData.length > 0) {
@@ -45,13 +45,13 @@ export const FormRender = (): JSX.Element => {
                       }
                     })
 
-                    return variableNames.length > 0 ? variableNames.join(', ') : I18n.t('Not configured')
+                    return variableNames.length > 0 ? variableNames.join(', ') : t('workflowCanvas.nodes.variable.notConfigured')
                   }
 
-                  return I18n.t('Not configured')
+                  return t('workflowCanvas.nodes.variable.notConfigured')
                 }
 
-                return <FormDisplay label={I18n.t('Settings')} content={getVariableNames()} />
+                return <FormDisplay label={t('workflowCanvas.nodes.variable.settings')} content={getVariableNames()} />
               }}
             </FieldArray>
           </>
@@ -74,62 +74,62 @@ export const formMeta: FormMeta = {
   validate: {
     assign: ({ value }) => {
       if (!value || !Array.isArray(value)) {
-        return I18n.t('Assignment config cannot be empty')
+        return t('workflowCanvas.nodes.variable.assignmentConfigEmpty')
       }
       if (value.length === 0) {
-        return I18n.t('At least one assignment operation is required')
+        return t('workflowCanvas.nodes.variable.atLeastOneAssignment')
       }
       return undefined
     },
     'assign.*.operator': ({ value }) => {
       if (!value) {
-        return I18n.t('Operator cannot be empty')
+        return t('workflowCanvas.nodes.variable.operatorEmpty')
       }
       if (value !== 'assign') {
-        return I18n.t('Only assignment operation is supported')
+        return t('workflowCanvas.nodes.variable.onlyAssignSupported')
       }
       return undefined
     },
     'assign.*.left': ({ value }) => {
       if (!value) {
-        return I18n.t('Left variable cannot be empty')
+        return t('workflowCanvas.nodes.variable.leftVariableEmpty')
       }
       return undefined
     },
     'assign.*.left.type': ({ value }) => {
       if (!value) {
-        return I18n.t('Left variable type cannot be empty')
+        return t('workflowCanvas.nodes.variable.leftVariableTypeEmpty')
       }
       if (value !== 'ref') {
-        return I18n.t('Left variable must be a reference type')
+        return t('workflowCanvas.nodes.variable.leftVariableMustBeRef')
       }
       return undefined
     },
     'assign.*.left.content': ({ value }) => {
       if (!value || !Array.isArray(value)) {
-        return I18n.t('Left variable reference path cannot be empty')
+        return t('workflowCanvas.nodes.variable.leftRefPathEmpty')
       }
       if (value.length < 2) {
-        return I18n.t('Left variable reference path must contain node and variable name')
+        return t('workflowCanvas.nodes.variable.leftRefPathMustContain')
       }
       if (value.some(item => !item || typeof item !== 'string')) {
-        return I18n.t('Left variable reference path cannot contain empty values')
+        return t('workflowCanvas.nodes.variable.leftRefPathNoEmpty')
       }
       return undefined
     },
     'assign.*.right': ({ value }) => {
       if (!value) {
-        return I18n.t('Right value cannot be empty')
+        return t('workflowCanvas.nodes.variable.rightValueEmpty')
       }
       return undefined
     },
     'assign.*.right.type': ({ value }) => {
       if (!value) {
-        return I18n.t('Right value type cannot be empty')
+        return t('workflowCanvas.nodes.variable.rightValueTypeEmpty')
       }
       const validTypes = ['constant', 'ref', 'expression', 'template']
       if (!validTypes.includes(value)) {
-        return I18n.t('Right value type is invalid')
+        return t('workflowCanvas.nodes.variable.rightValueTypeInvalid')
       }
       return undefined
     },

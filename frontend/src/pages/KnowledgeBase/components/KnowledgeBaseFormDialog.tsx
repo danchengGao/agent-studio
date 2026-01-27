@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { X, Loader2, ExternalLink } from 'lucide-react'
+import { useQueryClient } from 'react-query'
 import { KnowledgeBase, CreateKnowledgeBaseRequest } from '@/types/knowledgeBase'
 import { useKnowledgeBaseStore } from '@/stores/useKnowledgeBaseStore'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -111,6 +112,7 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
   const { user } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; embedding_model_config_id?: string }>({})
+  const [isRefreshingModels, setIsRefreshingModels] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -124,8 +126,10 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
   const MAX_KNOWLEDGE_BASES = 100
   const isAtLimit = !knowledgeBase && total >= MAX_KNOWLEDGE_BASES
 
+  const queryClient = useQueryClient()
+
   // 获取 Embedding 模型列表
-  const { data: embeddingModelsResponse, isLoading: isLoadingEmbeddingModels } = useEmbeddingModels({
+  const { data: embeddingModelsResponse, isLoading: isLoadingEmbeddingModels, refetch: refetchEmbeddingModels } = useEmbeddingModels({
     spaceId: user?.spaceId,
     page: 1,
     size: 100,
@@ -137,6 +141,27 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
   // 测试和禁用 embedding 模型的 hooks
   const testEmbeddingModelMutation = useTestEmbeddingModel()
   const toggleEmbeddingModelStatusMutation = useToggleEmbeddingModelStatus()
+
+  // 当对话框打开时，强制刷新 Embedding 模型列表，确保获取最新数据
+  useEffect(() => {
+    if (open && user?.spaceId && !knowledgeBase) {
+      // 创建知识库时，强制刷新模型列表
+      setIsRefreshingModels(true)
+      
+      // 先 invalidate queries，然后 refetch
+      queryClient.invalidateQueries(['embeddingModels', 'list'])
+      
+      refetchEmbeddingModels()
+        .then(() => {
+          setIsRefreshingModels(false)
+        })
+        .catch(() => {
+          setIsRefreshingModels(false)
+        })
+    } else {
+      setIsRefreshingModels(false)
+    }
+  }, [open, user?.spaceId, knowledgeBase, queryClient, refetchEmbeddingModels])
 
   // 获取所有知识库名称用于重复检查
   useEffect(() => {
@@ -284,27 +309,25 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
             testRequest: { text: t('knowledgeBases.form.testText') },
           })
         } catch (testError: any) {
-          // 测试失败，禁用该模型
-          console.error('Embedding 模型测试失败，正在禁用模型:', testError)
-          try {
-            await toggleEmbeddingModelStatusMutation.mutateAsync({
-              id: selectedModelId,
-              spaceId: user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID,
-            })
-            // 禁用成功后，设置错误并阻止创建
-            setErrors({
-              embedding_model_config_id: t('knowledgeBases.form.testFailed'),
-            })
-            setIsLoading(false)
-            return
-          } catch (toggleError) {
-            console.error('禁用 Embedding 模型失败:', toggleError)
-            setErrors({
-              embedding_model_config_id: t('knowledgeBases.form.testFailedDisableFailed'),
-            })
-            setIsLoading(false)
-            return
-          }
+          // 测试失败，提取错误信息并阻止创建，但不自动禁用模型
+          console.error('Embedding 模型测试失败:', testError)
+          // 提取错误信息
+          // embeddingModelService.handleError 返回的是 error.response.data，所以 error 对象本身就是响应体
+          // 同时也要兼容原始的 axios error 格式
+          const errorMessage = testError?.detail || 
+                              testError?.message || 
+                              testError?.error ||
+                              testError?.response?.data?.detail || 
+                              testError?.response?.data?.message || 
+                              testError?.response?.data?.error ||
+                              t('knowledgeBases.form.testFailed')
+          
+          // 设置错误信息并阻止创建
+          setErrors({
+            embedding_model_config_id: errorMessage,
+          })
+          setIsLoading(false)
+          return
         }
 
         // 测试通过，继续创建知识库 - 使用V2 API
@@ -394,16 +417,22 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       {t('knowledgeBases.form.embeddingModelRequired')} <span className="text-red-500">*</span>
                     </label>
-                    {isLoadingEmbeddingModels ? (
-                      <div className="text-sm text-gray-500">{t('knowledgeBases.form.loadingModels')}</div>
+                    {(isLoadingEmbeddingModels || isRefreshingModels) ? (
+                      <div className="text-sm text-gray-500 flex items-center">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t('knowledgeBases.form.loadingModels')}
+                      </div>
                     ) : embeddingModels.length === 0 ? (
-                      <div className="text-sm text-red-500">
-                        {t('knowledgeBases.form.noModels')}{' '}
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-red-500">
+                          {t('knowledgeBases.form.noModels')}
+                        </p>
                         <Link
                           to="/dashboard/models"
-                          className="text-blue-600 hover:text-blue-800 underline"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
                           {t('knowledgeBases.form.createModelLink')}
+                          <ExternalLink className="w-4 h-4" />
                         </Link>
                       </div>
                     ) : (

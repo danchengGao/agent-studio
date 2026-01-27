@@ -3,17 +3,14 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved
 """llm service"""
 
-import logging
 from typing import Dict, Any, Tuple
 
+from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.ops.config import ModelConfigManager
 from openjiuwen_studio.ops.modules.llm.model import ModelConfig, ListModelResponse
 from openjiuwen_studio.ops.modules.llm.schema import ListModelRequest
 from openjiuwen_studio.ops.modules.prompt.domain.repositories import AgentRepository
 from openjiuwen_studio.ops.modules.prompt.infra.repositories import orm_repo
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 class LLMService:

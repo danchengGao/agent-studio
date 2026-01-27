@@ -133,6 +133,7 @@ const AgentModelSelector = (props: {
   const [greeting, setGreeting] = useState<string>('')
 
   const spaceId = getDefaultSpaceId() || ''
+  const maxGreetingLength = 2000
 
   const { validationResults, setValidationResults, validateWorkflows, isValidating, workflowValidationErrorCount } = useWorkflowValidation({
     workflows: workflowObjects,
@@ -1147,7 +1148,14 @@ const AgentModelSelector = (props: {
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
               <Tooltip title="刷新工作流信息" arrow>
                 <span>
-                  <IconButton size="small" onClick={handleRefreshWorkflows} disabled={workflowObjects.length === 0} aria-label="刷新">
+                  <IconButton 
+                    component="div"
+                    size="small" 
+                    onClick={handleRefreshWorkflows} 
+                    disabled={workflowObjects.length === 0} 
+                    aria-label="刷新"
+                    sx={{ cursor: workflowObjects.length === 0 ? 'not-allowed' : 'pointer' }}
+                  >
                     <RefreshCcw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
                   </IconButton>
                 </span>
@@ -1286,6 +1294,8 @@ const AgentModelSelector = (props: {
                 setGreeting(e.target.value)
                 updateGreeting(e.target.value)
               }}
+              inputProps={{ maxLength: maxGreetingLength }}
+              helperText={`${greeting.length}/${maxGreetingLength}`}
               fullWidth
               multiline
               rows={4}

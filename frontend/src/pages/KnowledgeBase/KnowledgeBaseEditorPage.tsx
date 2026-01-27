@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square } from 'lucide-react'
+import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square, AlertCircle } from 'lucide-react'
 import {
   KnowledgeBase,
   DocumentItem,
@@ -135,32 +135,36 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           setKnowledgeBase(targetKb)
         } else {
           showError(t('knowledgeBases.settings.notFound'))
+          // 设置 knowledgeBase 为 null，避免无限循环
+          setKnowledgeBase(null)
         }
         setIsLoadingKnowledgeBase(false)
       })
       .catch(error => {
         console.error('Failed to fetch knowledge base:', error)
         showError(t('knowledgeBases.settings.fetchError'))
+        // 设置 knowledgeBase 为 null，避免无限循环
+        setKnowledgeBase(null)
         setIsLoadingKnowledgeBase(false)
       })
   }, [id]) // 只依赖 id，当 id 变化时重新加载
 
   // 用于防止 fetchDocuments 并发执行的锁（按页面索引）
-  const fetchDocumentsLockRef = React.useRef<Map<number, Promise<void>>>(new Map())
+  const fetchDocumentsLockRef = React.useRef<Map<number, Promise<{ items: DocumentItem[]; total: number; page: number } | null>>>(new Map())
 
   // 获取文档列表
-  const fetchDocuments = async (page: number = 1, skipStatusFetch: boolean = false) => {
+  const fetchDocuments = async (page: number = 1, skipStatusFetch: boolean = false): Promise<{ items: DocumentItem[]; total: number; page: number } | null> => {
     if (!knowledgeBase || !knowledgeBase.id) {
-      return
+      return null
     }
 
     if (isDocumentsLoading && currentRequestPage === page) {
-      return
+      return null
     }
 
     const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
     if (!spaceId) {
-      return
+      return null
     }
 
     // 检查是否有相同页面的请求正在进行
@@ -171,7 +175,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       } catch (error) {
         // 忽略错误，让调用方处理
       }
-      return
+      return null
     }
 
     // 创建新的请求并加锁
@@ -205,6 +209,13 @@ const KnowledgeBaseEditorPage: React.FC = () => {
             })
           }
         }
+
+        // 返回响应数据，供调用方使用
+        return {
+          items: response.data.items,
+          total: response.data.total,
+          page: response.data.page,
+        }
       } catch (error) {
         // 不显示错误提示，因为没有文档是正常情况
         throw error // 重新抛出错误，让调用方知道请求失败
@@ -221,9 +232,10 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     fetchDocumentsLockRef.current.set(page, requestPromise)
 
     try {
-      await requestPromise
+      return await requestPromise
     } catch (error) {
       // 错误已经在内部处理，这里只做清理
+      return null
     }
   }
 
@@ -729,8 +741,17 @@ const KnowledgeBaseEditorPage: React.FC = () => {
 
       showSuccess(t('knowledgeBases.editor.deleteSuccess'))
 
+      // 保存删除前的页码
+      const pageBeforeDelete = currentPage
+      
       // 刷新文档列表，确保数据同步
-      await fetchDocuments(currentPage)
+      const result = await fetchDocuments(pageBeforeDelete)
+      
+      // 如果当前页没有文档了，且不是第一页，则跳转到前一页
+      if (result && result.items.length === 0 && pageBeforeDelete > 1) {
+        const previousPage = pageBeforeDelete - 1
+        await fetchDocuments(previousPage)
+      }
     } catch (error) {
       console.error('Failed to delete document:', error)
       showError(t('knowledgeBases.editor.deleteFailed'))
@@ -807,8 +828,17 @@ const KnowledgeBaseEditorPage: React.FC = () => {
 
       showSuccess(t('knowledgeBases.editor.batchDeleteSuccess', { count: deletedCount }))
 
+      // 保存删除前的页码
+      const pageBeforeDelete = currentPage
+      
       // 刷新文档列表，确保数据同步
-      await fetchDocuments(currentPage)
+      const result = await fetchDocuments(pageBeforeDelete)
+      
+      // 如果当前页没有文档了，且不是第一页，则跳转到前一页
+      if (result && result.items.length === 0 && pageBeforeDelete > 1) {
+        const previousPage = pageBeforeDelete - 1
+        await fetchDocuments(previousPage)
+      }
     } catch (error) {
       console.error('Failed to batch delete documents:', error)
       showError(t('knowledgeBases.editor.batchDeleteFailed'))
@@ -849,12 +879,33 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     setProcessingDocIds(processingDocIdsList)
   }, [documentStatuses])
 
-  if (!knowledgeBase || isLoadingKnowledgeBase) {
+  // 处理知识库不存在的情况
+  if (isLoadingKnowledgeBase) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-2 text-gray-600">{t('knowledgeBases.editor.loading')}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 如果知识库不存在，显示错误信息
+  if (!knowledgeBase) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md px-4">
+          <AlertCircle className="mx-auto w-12 h-12 text-red-500 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">{t('knowledgeBases.settings.notFound')}</h2>
+          <p className="text-gray-600 mb-6">{t('knowledgeBases.settings.fetchError')}</p>
+          <button 
+            onClick={() => navigate('/dashboard/knowledge-bases')} 
+            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center mx-auto"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            {t('common.buttons.back')}
+          </button>
         </div>
       </div>
     )
@@ -1096,8 +1147,19 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 text-sm">
                               {documentStatuses[doc.id]?.error_msg ? (
-                                <span className="text-red-600" title={documentStatuses[doc.id]?.error_msg}>
-                                  {documentStatuses[doc.id]?.error_msg}
+                                <span 
+                                  className="text-red-600 cursor-help break-words" 
+                                  title={documentStatuses[doc.id]?.error_msg}
+                                  style={{ 
+                                    maxWidth: '400px',
+                                    display: 'inline-block',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word'
+                                  }}
+                                >
+                                  {documentStatuses[doc.id]?.error_msg.length > 100 
+                                    ? `${documentStatuses[doc.id]?.error_msg.substring(0, 100)}...` 
+                                    : documentStatuses[doc.id]?.error_msg}
                                 </span>
                               ) : (
                                 <span className="text-gray-400">-</span>

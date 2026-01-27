@@ -4,7 +4,7 @@
 from typing import List
 
 from openjiuwen_studio.core.common import dsl
-from openjiuwen_studio.schemas.node import Node
+from openjiuwen_studio.schemas.node import Node, BaseValue
 from openjiuwen_studio.core.manager.convertor.components.common import input_params_convert, exception_config_convert
 from openjiuwen_studio.core.common.dsl import ComponentType
 
@@ -29,9 +29,10 @@ def _output_params_convert(node: Node) -> List[dsl.ParamConfig]:
         raise TypeError("outputs type is not object")
 
     for key, value in outputs.properties.items():
+        base_value = BaseValue(**value)
         param = dsl.ParamConfig(
             name=key,
-            type=output_type_mapping[value.type],
+            type=output_type_mapping[base_value.type],
         )
         params.append(param)
 

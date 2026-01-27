@@ -57,6 +57,9 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
   const finalSpaceId = nodeData?.space_id || spaceId || ''
   const finalVersion = nodeData?.version || ''
 
+  // Extract output_format from node data for Markdown rendering
+  const outputFormat = nodeData?.data?.output_format
+
   const [inputJSONMode, setInputJSONMode] = useState(() => {
     const savedMode = localStorage.getItem('testdebug-input-json-mode')
     return savedMode ? JSON.parse(savedMode) : false
@@ -169,7 +172,10 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
               }
             : undefined
         }
+        outputFormat={outputFormat}
         errors={errors}
+        workflowId={workflowId}
+        spaceId={finalSpaceId}
       />
     </div>
   )

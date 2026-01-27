@@ -3,13 +3,15 @@
  * SPDX-License-Identifier: MIT
  */
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import dayjs from 'dayjs'
 import { History as HistoryIcon, X, FileText, Tag, Loader2, Trash2 } from 'lucide-react'
+import { Toast } from '@douyinfe/semi-ui'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
-import { WorkflowService } from '@test-agentstudio/api-client'
+import { WorkflowService, getErrorMessage } from '@test-agentstudio/api-client'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { useTranslation } from '../../i18n'
+import { usePanelManager } from '@flowgram.ai/panel-manager-plugin'
 
 export interface HistoryPanelProps {
   title?: string
@@ -41,6 +43,14 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
   refreshKey,
 }) => {
   const { t } = useTranslation()
+  const panelManager = usePanelManager()
+
+  // 打开历史面板时，关闭试运行面板和节点详情面板
+  useEffect(() => {
+    panelManager.close('test-run-panel')
+    panelManager.close('node-form-panel')
+  }, [panelManager])
+
   const [versions, setVersions] = React.useState<VersionListItem[]>([])
   const [loading, setLoading] = React.useState<boolean>(false)
   const [switchingVersion, setSwitchingVersion] = React.useState<string | null>(null)
@@ -62,6 +72,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       }
     } catch (e) {
       console.error(t('workflowCanvas.historyPanel.createCopyFailed'), e)
+      Toast.error({ content: getErrorMessage(e) || t('workflowCanvas.historyPanel.createCopyFailed'), showClose: false })
     } finally {
       setSwitchingVersion(null)
     }
@@ -82,6 +93,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       onSelectVersion && onSelectVersion('draft')
     } catch (e) {
       console.error(t('workflowCanvas.historyPanel.restoreVersionFailed'), e)
+      Toast.error({ content: getErrorMessage(e) || t('workflowCanvas.historyPanel.restoreVersionFailed'), showClose: false })
     } finally {
       setRestoreConfirmOpen(false)
       setRestoreTargetVersion(null)
@@ -116,6 +128,7 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
       setDeleteTargetVersion(null)
     } catch (e) {
       console.error(t('workflowCanvas.historyPanel.deleteVersionFailed'), e)
+      Toast.error({ content: getErrorMessage(e) || t('workflowCanvas.historyPanel.deleteVersionFailed'), showClose: false })
     } finally {
       setDeletingVersion(null)
     }

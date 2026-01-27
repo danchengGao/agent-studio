@@ -6,9 +6,8 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
-
 import { ConditionPresetOp, JsonCodeEditor } from '../../..'
+import { t } from '../../../../i18n'
 
 import { type JsonSchemaTypeRegistry } from '../types'
 
@@ -17,9 +16,10 @@ export const arrayRegistry: Partial<JsonSchemaTypeRegistry> = {
   ConstantRenderer: props => (
     <JsonCodeEditor
       mini
+      compact
       value={props.value}
       onChange={v => props.onChange?.(v)}
-      placeholder={I18n.t('Please Input Array')}
+      placeholder={t('workflowCanvas.formMaterials.input.pleaseInputArray')}
       readonly={props.readonly}
       defaultFormat="[]"
       validateArrayElements={!!props.items?.type}

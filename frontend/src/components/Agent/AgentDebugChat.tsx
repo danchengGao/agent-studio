@@ -1,8 +1,7 @@
 import { Paper, Switch } from '@mui/material'
 import { useState, useEffect, useRef, memo } from 'react'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
-import { ExecutionService } from '@test-agentstudio/api-client'
-import { useAgentStore } from '@/stores/useAgentStore'
+import { ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client'
 import { ActionSlotMount } from '@/components/Common/ActionSlot'
 import AgentOperationsBar from './AgentOperationsBar'
 import AgentDebugPanel from './AgentDebugPanel'
@@ -28,23 +27,23 @@ const extractTextFromOutput = (outputRaw: any) => {
 interface AgentDebugChatProps {
   /** 智能体ID */
   agentId: string
-  /** 智能体版本，默认为'latest' */
-  agentVersion?: string
   /** 调试信息面板开关变化回调 */
   onDebugInfoChange?: (open: boolean) => void
   /** 是否显示长期记忆，透传给MemoryButton */
   enableLongTerm?: boolean
   /** 是否隐藏记忆按钮（单Agent多工作流模式下隐藏） */
   hideMemoryButton?: boolean
-  /** 智能体名称（用于调试信息展示） */
-  agentName?: string
+  /** 智能体保存请求（包含所有业务数据和版本信息） */
+  saveAgentRequest: SaveAgentRequest
+  /** 模型是否可用（未被禁用） */
+  isModelActive?: boolean
 }
 
 /**
  * 智能体调试聊天组件
  * 提供与智能体交互的聊天界面，支持调试信息显示
  */
-const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, enableLongTerm, hideMemoryButton, agentName }: AgentDebugChatProps) => {
+const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest, isModelActive = true }: AgentDebugChatProps) => {
   // 提供给MemoryEngine
   const userIdForMem = getDefaultSpaceId()
   const groupIdForMem = agentId
@@ -62,27 +61,26 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
   const cancelStreamRef = useRef<(() => void) | null>(null)
   const userCancelRequestedRef = useRef(false)
 
-  // 订阅开场白内容（来自 useAgentStore.saveAgentRequest.opening_remarks）
-  const openingRemarks = useAgentStore(s => s.saveAgentRequest?.opening_remarks || '')
-  const agentType = useAgentStore(s => s.saveAgentRequest?.agent_type || 'react')
-  const workflowsCount = useAgentStore(s => s.saveAgentRequest?.workflows?.length || 0)
+  // 从 saveAgentRequest 读取所有数据（统一数据源）
+  const openingRemarks = saveAgentRequest.opening_remarks || ''
+  const agentType = saveAgentRequest.agent_type || 'react'
+  const workflowsCount = saveAgentRequest.workflows?.length || 0
+  const model = saveAgentRequest.model
+  const agentName = saveAgentRequest.name
+  // agent_version 为空字符串表示草稿状态，执行 API 使用空字符串或 'draft' 均可
+  const agentVersion = saveAgentRequest.agent_version || 'draft'
 
-  // 获取完整的模型信息
-  const model = useAgentStore(s => s.saveAgentRequest?.model)
   const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
 
-  // 模型未配置的判断：
-  // 1. model 对象本身不存在或为空
+  // 模型未配置的判断
   const modelNotConfigured = !model
-
+  // 模型已被禁用的判断
+  const modelDisabled = !isModelActive
+  // 聊天被阻止：多工作流模式且没有工作流
   const chatBlocked = agentType === 'workflow' && workflowsCount === 0
 
   // 创建聊天容器的引用
   const chatContainerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    console.log(1111111, chatHistory)
-  }, chatHistory)
 
   // 实时同步开场白：作为第一条助手消息展示与更新
   useEffect(() => {
@@ -511,6 +509,7 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
   const handleSendMessage = async () => {
     if (isProcessing) return
     if (modelNotConfigured) return
+    if (modelDisabled) return
     if (chatBlocked) return
     const trimmed = inputMessage.trim()
     if (!trimmed) return
@@ -741,12 +740,33 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
               </div>
             </div>
           )}
+          {/* 模型已被禁用的提示 */}
+          {modelDisabled && !modelNotConfigured && (
+            <div className="mx-4 mt-4 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{t('tips.modelDisabledTitle')}</h3>
+                  <p className="mt-1 text-sm text-red-700">{t('tips.modelDisabledDescription')}</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={chatContainerRef} className="flex-1 bg-white p-4 mb-4 overflow-y-auto overflow-x-hidden">
             <ChatMessageList
               messages={chatHistory}
               onSubmitInteraction={handleInlineInteractionSubmit}
               interactionNodeIds={activeInteractionNodeIds}
               inputFocused={inputFocused}
+              agentName={agentName}
             />
           </div>
 
@@ -756,8 +776,8 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
             onChange={setInputMessage}
             onSend={handleSendMessage}
             onCancel={handleCancel}
-            disabled={!inputMessage.trim() || isProcessing || modelNotConfigured || chatBlocked}
-            inputDisabled={modelNotConfigured || chatBlocked}
+            disabled={!inputMessage.trim() || isProcessing || modelNotConfigured || modelDisabled || chatBlocked}
+            inputDisabled={modelNotConfigured || modelDisabled || chatBlocked}
             onClearChat={async () => {
               // 重置交互状态
               resetInteractionState()
@@ -795,13 +815,15 @@ const AgentDebugChat = ({ agentId, agentVersion = 'latest', onDebugInfoChange, e
             placeholder={
               modelNotConfigured
                 ? t('placeholders.configModelFirst')
-                : chatBlocked
-                  ? t('placeholders.addWorkflowFirst')
-                  : isInterrupted && !isSimpleInteraction
-                    ? t('placeholders.waitInputComplex')
-                    : isInterrupted
-                      ? t('placeholders.waitInputSimple')
-                      : t('placeholders.inputMessage')
+                : modelDisabled
+                  ? t('placeholders.modelDisabled')
+                  : chatBlocked
+                    ? t('placeholders.addWorkflowFirst')
+                    : isInterrupted && !isSimpleInteraction
+                      ? t('placeholders.waitInputComplex')
+                      : isInterrupted
+                        ? t('placeholders.waitInputSimple')
+                        : t('placeholders.inputMessage')
             }
           />
         </div>
@@ -821,11 +843,13 @@ const ChatMessageList = ({
   onSubmitInteraction,
   interactionNodeIds,
   inputFocused,
+  agentName,
 }: {
   messages: ChatMessage[]
   onSubmitInteraction?: (value: string, ts: number) => void
   interactionNodeIds?: string[]
   inputFocused?: boolean
+  agentName?: string
 }) => {
   const activeNodeIds = interactionNodeIds || []
 
@@ -838,6 +862,7 @@ const ChatMessageList = ({
           onSubmitInteraction={onSubmitInteraction}
           isActiveInteraction={message.kind === 'interaction' && !message.detailInfo?.submittedValue && !(message.detailInfo as any)?.isHistorical}
           inputFocused={inputFocused}
+          agentName={agentName}
         />
       ))}
     </div>
@@ -853,11 +878,13 @@ const ChatMessageItem = memo(
     onSubmitInteraction,
     isActiveInteraction,
     inputFocused,
+    agentName,
   }: {
     message: ChatMessage
     onSubmitInteraction?: (value: string, ts: number) => void
     isActiveInteraction?: boolean
     inputFocused?: boolean
+    agentName?: string
   }) => {
     const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
     return (
@@ -868,7 +895,7 @@ const ChatMessageItem = memo(
               <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">AI</span>
               </div>
-              <span className="text-sm text-gray-600 font-medium">{t('messages.assistantLabel')}</span>
+              <span className="text-sm text-gray-600 font-medium">{agentName || t('messages.assistantLabel')}</span>
             </div>
           )}
 

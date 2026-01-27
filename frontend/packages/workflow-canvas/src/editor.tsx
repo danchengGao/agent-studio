@@ -13,6 +13,7 @@ import {
   useClientContext,
   useService,
   WorkflowSelectService,
+  HistoryService,
 } from '@flowgram.ai/free-layout-editor'
 import React, { useEffect, useRef } from 'react'
 import { HistoryPanel } from './components/history-panel'
@@ -101,7 +102,8 @@ export const Editor = () => {
   const version = searchParams.get('version') || undefined
   const nodeIdFromUrl = searchParams.get('node_id') || searchParams.get('nodeId') || undefined
 
-  // 来自 store 的状态 - 必须在useEffect之前声明
+  const historyService = useService(HistoryService)
+
   const showHistoryPanel = useWorkflowStore(s => s.showHistoryPanel)
   const context = useWorkflowStore(s => s.context)
   const selectedVersion = useWorkflowStore(s => s.selectedVersion)
@@ -110,7 +112,6 @@ export const Editor = () => {
   const setSelectedVersion = useWorkflowStore(s => s.setSelectedVersion)
 
   const { canvasData, initialCanvasData, isLoading, error, handleAutoSave } = useWorkflowData(workflowId, spaceId, version)
-  // 编辑器上下文 ref，用于动态加载历史版本数据
   const editorRef = React.useRef<FreeLayoutPluginContext>(null)
 
   // 调试日志
@@ -167,9 +168,10 @@ export const Editor = () => {
         }
         try {
           const parsed = typeof schemaString === 'string' ? JSON.parse(schemaString) : schemaString
-          // 使用 ref 直接清空并导入历史版本
+          historyService.stop()
           editorRef.current?.document.clear()
           editorRef.current?.document.fromJSON(parsed)
+          historyService.start()
           // 加载后触发 fitView，让节点居中展示
           setTimeout(() => {
             try {
@@ -187,6 +189,7 @@ export const Editor = () => {
           Toast.success({ content: t('workflowCanvas.ui.switchedToVersion', { version: versionDisplay }) })
         } catch (e) {
           console.error('历史版本 schema 解析失败或导入失败', e)
+          historyService.start()
         }
       } else {
         console.error('获取历史版本失败', response)

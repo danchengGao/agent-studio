@@ -32,7 +32,8 @@ const AlignedFormDisplayGroupContainer = styled.div`
     color: #333;
     font-size: 12px;
     line-height: 16px;
-    flex: 1;
+    min-width: 0;
+    overflow: hidden;
     white-space: pre-wrap;
     word-wrap: break-word;
     word-break: break-word;
@@ -41,7 +42,6 @@ const AlignedFormDisplayGroupContainer = styled.div`
     /* 只有在内容确实很长且是单行时才截断 */
     &[data-is-long-string='true'] {
       white-space: nowrap;
-      overflow: hidden;
       text-overflow: ellipsis;
       max-height: 20px;
       align-self: center;

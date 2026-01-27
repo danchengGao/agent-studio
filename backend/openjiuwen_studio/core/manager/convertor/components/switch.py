@@ -125,7 +125,9 @@ def _switch_conditions_convert(logic: int, conditions: List[BranchCondition]) ->
                             and condition.right.schema is not None
                             and condition.right.schema.type == "string"
                     ):
-                        right_expression = f"\"{right_expression}\""
+                        # 转义字符串中的双引号，然后添加外层引号
+                        escaped_expression = right_expression.replace('"', '\\"')
+                        right_expression = f'"{escaped_expression}"'
                 expressions.append(_bool_expression_assemble(left_expression, right_expression, operator))
 
             # Join expressions with 'and' if multiple

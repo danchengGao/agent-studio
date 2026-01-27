@@ -5,7 +5,7 @@
 
 import React from 'react'
 
-import { I18n } from '@flowgram.ai/editor'
+import { useTranslation } from '../../../i18n'
 
 // Simple Text interface for our implementation
 interface Text {
@@ -59,9 +59,10 @@ const transformer = transformerCreator((text: Text) => {
 export interface JsonEditorWithVariablesProps extends Omit<BaseEditorProps, 'language'> {}
 
 export function JsonEditorWithVariables(props: JsonEditorWithVariablesProps) {
+  const { t } = useTranslation()
   return (
     <JsonCodeEditor
-      activeLinePlaceholder={I18n.t("Press '@' to Select variable")}
+      activeLinePlaceholder={t('workflowCanvas.formMaterials.common.pressAtToSelectVariable')}
       {...props}
       options={{
         transformer,

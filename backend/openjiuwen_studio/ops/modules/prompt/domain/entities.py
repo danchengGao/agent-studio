@@ -312,6 +312,7 @@ class ListPromptOrderBy(str, Enum):
     CREATED_BY = "created_by_name"
     UPDATED_BY = "updated_by_name"
     LATEST_COMMITTED_TIME = "latest_committed_at"
+    PROMPT_KEY = "prompt_key"
 
 
 class PromptBasicMap(str, Enum):
@@ -323,6 +324,7 @@ class PromptBasicMap(str, Enum):
     created_at = "created_at"
     updated_at = "updated_at"
     latest_committed_at = "latest_commit_time"
+    prompt_key = "prompt_key"
 
 
 class ListPromptRequest(BaseModel):

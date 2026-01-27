@@ -7,6 +7,10 @@ from multiprocessing import Process, Queue
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
+
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env'))
 
 
 # ========== 子进程执行函数 ==========
@@ -60,8 +64,8 @@ def _run_code_in_process(code: str, inputs: dict, result_queue: Queue, timeout: 
 
 # ========== 主执行入口 ==========
 def exec_code(code: str, inputs: dict, timeout: float = 10.0):
-    if timeout <= 0 or timeout > 30:
-        return {"return": None, "error": "Timeout must be between 0 and 30 seconds."}
+    if timeout <= 0 or timeout > 3000:
+        return {"return": None, "error": "Timeout must be between 0 and 3000 seconds."}
 
     result_queue = Queue()
     process = Process(

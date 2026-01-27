@@ -6,7 +6,8 @@ from fastapi import status
 from sqlalchemy import func, literal
 from sqlalchemy.orm import Session
 
-from openjiuwen_studio.core.database import jiuwen_db_logger, milliseconds
+from openjiuwen.core.common.logging import logger
+from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.core.manager.repositories import JiuwenBaseRepository
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import (
     get_db_jw, get_val_from_dict)
@@ -33,8 +34,8 @@ class AgentRepository():
             try:
                 return func(self, *args, **kwargs)
             except Exception as e:
-                jiuwen_db_logger.error("Error: agent db data preprocessing error")
-                jiuwen_db_logger.debug(f"Exception details: {type(e).__name__}", exc_info=True)
+                logger.error("Error: agent db data preprocessing error")
+                logger.debug(f"Exception details: {type(e).__name__}", exc_info=True)
                 return ResponseModel(code=status.HTTP_400_BAD_REQUEST, 
                                      message=f"Error: agent db data preprocessing error: {type(e).__name__}")
         return wrapper
@@ -202,8 +203,7 @@ class AgentRepository():
             # 定义需要返回的字段，包含必要的JSON字段（如model）
             # 基础元数据字段 + 重要的JSON字段
             meta_data_keys = agent.AgentBaseDB.get_meta_data_keys()
-            cols_find = meta_data_keys + ["model", "configs", "plugins", "workflows", "prompt_template",
-                                         "constraint", "prompt_tuning", "triggers", "knowledge", "memory"]
+            cols_find = meta_data_keys + ["model"]
 
             res = agent_db.get_dl_in_sql_with_cols(find_id=find_id, cols_find=cols_find,
                                                    order_cols_desc=order_cols_desc, order_cols_asc=order_cols_asc,
@@ -358,6 +358,19 @@ class AgentRepository():
             json_value = literal(json.dumps(kb_id))
             return func.json_contains(knowledge_col, json_value)
 
+    @staticmethod
+    def _build_tool_query_condition(tool_id: str, plugins_col):
+        """构建查询引用指定工具的agent的条件"""
+        if settings.db_type.lower() == "sqlite":
+            # SQLite: 用 LIKE 模糊匹配
+            return plugins_col.like(f'%"{tool_id}"%')
+        else:
+            # MySQL: 用 JSON_CONTAINS
+            # plugins 存储结构: [{"tool_id": "...", ...}]
+            # 构造包含 tool_id 的局部对象进行匹配
+            json_value = literal(json.dumps({"tool_id": tool_id}))
+            return func.json_contains(plugins_col, json_value)
+
     def _query_agents_referencing_kb(self, db, space_id: str, kb_id: str, cols_find: list, agent_db, knowledge_col):
         """查询引用指定知识库的agent"""
         find_id = {"space_id": space_id}
@@ -447,20 +460,20 @@ class AgentRepository():
 
                             if update_result.code == status.HTTP_200_OK:
                                 updated_count += 1
-                                jiuwen_db_logger.info(
+                                logger.info(
                                     f"[KB_DELETE] Removed KB {kb_id} from agent {agent_id} (draft version)"
                                 )
                             else:
                                 failed_count += 1
                                 error_msg = f"Failed to update agent {agent_id} (draft): {update_result.message}"
                                 errors.append(error_msg)
-                                jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}")
+                                logger.error(f"[KB_DELETE] {error_msg}")
 
                     except Exception as e:
                         failed_count += 1
                         error_msg = f"Error processing agent {agent_data.get('agent_id', 'unknown')} (draft): {str(e)}"
                         errors.append(error_msg)
-                        jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+                        logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
 
             # 查询并更新publish版本的agent
             agent_publish_db = JiuwenBaseRepository(db, agent.AgentPublishDB)
@@ -502,7 +515,7 @@ class AgentRepository():
 
                             if update_result.code == status.HTTP_200_OK:
                                 updated_count += 1
-                                jiuwen_db_logger.info(
+                                logger.info(
                                     f"[KB_DELETE] Removed KB {kb_id} from agent {agent_id} "
                                     f"(publish version: {agent_version})"
                                 )
@@ -513,7 +526,7 @@ class AgentRepository():
                                     f"(publish): {update_result.message}"
                                 )
                                 errors.append(error_msg)
-                                jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}")
+                                logger.error(f"[KB_DELETE] {error_msg}")
 
                     except Exception as e:
                         failed_count += 1
@@ -522,7 +535,7 @@ class AgentRepository():
                             f"(publish): {str(e)}"
                         )
                         errors.append(error_msg)
-                        jiuwen_db_logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+                        logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
 
             return ResponseModel(
                 code=status.HTTP_200_OK,
@@ -574,6 +587,195 @@ class AgentRepository():
                 data={
                     "agent_names": agent_names,
                     "count": len(agent_names)
+                }
+            )
+
+    def _query_agents_referencing_tool(self, space_id: str, tool_id: str, cols_find: list, agent_db, plugins_col):
+        """查询引用指定工具的agent"""
+        find_id = {"space_id": space_id}
+        tool_condition = self._build_tool_query_condition(tool_id, plugins_col)
+
+        result = agent_db.get_dl_in_sql_with_cols(
+            find_id=find_id,
+            cols_find=cols_find,
+            other_sqlalchemy_limitations=[tool_condition],
+            return_first_item=False
+        )
+        return result
+
+    @staticmethod
+    def _build_plugin_query_condition(plugin_id: str, plugins_col):
+        """构建查询引用指定插件的agent的条件"""
+        if settings.db_type.lower() == "sqlite":
+            # SQLite: 用 LIKE 模糊匹配
+            return plugins_col.like(f'%"{plugin_id}"%')
+        else:
+            # MySQL: 用 JSON_CONTAINS
+            # plugins 存储结构: [{"plugin_id": "...", ...}]
+            # 构造包含 plugin_id 的局部对象进行匹配
+            json_value = literal(json.dumps({"plugin_id": plugin_id}))
+            return func.json_contains(plugins_col, json_value)
+
+    def _query_agents_referencing_plugin(self, space_id: str, plugin_id: str, cols_find: list, agent_db, plugins_col):
+        """查询引用指定插件的agent"""
+        find_id = {"space_id": space_id}
+        plugin_condition = self._build_plugin_query_condition(plugin_id, plugins_col)
+
+        result = agent_db.get_dl_in_sql_with_cols(
+            find_id=find_id,
+            cols_find=cols_find,
+            other_sqlalchemy_limitations=[plugin_condition],
+            return_first_item=False
+        )
+        return result
+
+    @with_exception_handling
+    def update_plugin_name_in_agents(
+        self,
+        space_id: str,
+        plugin_id: str,
+        new_plugin_name: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
+        """更新引用了指定插件的agent中的插件名称"""
+        with get_db_jw(db_session) as db:
+            updated_count = 0
+            failed_count = 0
+            errors = []
+
+            cols_find = ["agent_id", "agent_version", "plugins"]
+
+            # 查询并更新draft版本的agent
+            agent_db = JiuwenBaseRepository(db, agent.AgentBaseDB)
+            plugins_col = agent.AgentBaseDB.plugins
+            result = self._query_agents_referencing_plugin(space_id, plugin_id, cols_find, agent_db, plugins_col)
+
+            if result.code == status.HTTP_200_OK and result.data:
+                for agent_data in result.data:
+                    try:
+                        agent_id = agent_data.get("agent_id")
+                        plugins_list = agent_data.get("plugins", [])
+
+                        if not isinstance(plugins_list, list):
+                            continue
+
+                        updated = False
+                        for plugin in plugins_list:
+                            if plugin.get("plugin_id") == plugin_id:
+                                if plugin.get("plugin_name") != new_plugin_name:
+                                    plugin["plugin_name"] = new_plugin_name
+                                    updated = True
+                        
+                        if updated:
+                            # 更新draft版本
+                            find_id = {
+                                "space_id": space_id,
+                                "agent_id": agent_id,
+                                "agent_version": agent.AgentBaseDB.__version_none__
+                            }
+                            update_dl = {
+                                "plugins": plugins_list,
+                                "update_time": milliseconds()
+                            }
+                            update_result = agent_db.update_dl_in_sql(find_id=find_id, update_dl=update_dl)
+
+                            if update_result.code == status.HTTP_200_OK:
+                                updated_count += 1
+                                logger.info(f"[PLUGIN_UPDATE] Updated plugin name for agent {agent_id} (draft)")
+                            else:
+                                failed_count += 1
+                                error_msg = f"Failed to update agent {agent_id} (draft): {update_result.message}"
+                                errors.append(error_msg)
+                                logger.error(f"[PLUGIN_UPDATE] {error_msg}")
+
+                    except Exception as e:
+                        failed_count += 1
+                        error_msg = f"Error processing agent {agent_data.get('agent_id', 'unknown')}: {str(e)}"
+                        errors.append(error_msg)
+                        logger.error(f"[PLUGIN_UPDATE] {error_msg}", exc_info=True)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Updated plugin name in agents: {updated_count} updated, {failed_count} failed",
+                data={
+                    "updated_count": updated_count,
+                    "failed_count": failed_count,
+                    "errors": errors if errors else None
+                }
+            )
+
+    @with_exception_handling
+    def update_tool_name_in_agents(
+        self,
+        space_id: str,
+        tool_id: str,
+        new_tool_name: str,
+        db_session: Session | None = None
+    ) -> ResponseModel[dict]:
+        """更新引用了指定工具的agent中的工具名称"""
+        with get_db_jw(db_session) as db:
+            updated_count = 0
+            failed_count = 0
+            errors = []
+
+            cols_find = ["agent_id", "agent_version", "plugins"]
+
+            # 查询并更新draft版本的agent
+            agent_db = JiuwenBaseRepository(db, agent.AgentBaseDB)
+            plugins_col = agent.AgentBaseDB.plugins
+            result = self._query_agents_referencing_tool(space_id, tool_id, cols_find, agent_db, plugins_col)
+
+            if result.code == status.HTTP_200_OK and result.data:
+                for agent_data in result.data:
+                    try:
+                        agent_id = agent_data.get("agent_id")
+                        plugins_list = agent_data.get("plugins", [])
+
+                        if not isinstance(plugins_list, list):
+                            continue
+
+                        updated = False
+                        for plugin in plugins_list:
+                            if plugin.get("tool_id") == tool_id:
+                                if plugin.get("tool_name") != new_tool_name:
+                                    plugin["tool_name"] = new_tool_name
+                                    updated = True
+                        
+                        if updated:
+                            # 更新draft版本
+                            find_id = {
+                                "space_id": space_id,
+                                "agent_id": agent_id,
+                                "agent_version": agent.AgentBaseDB.__version_none__
+                            }
+                            update_dl = {
+                                "plugins": plugins_list,
+                                "update_time": milliseconds()
+                            }
+                            update_result = agent_db.update_dl_in_sql(find_id=find_id, update_dl=update_dl)
+
+                            if update_result.code == status.HTTP_200_OK:
+                                updated_count += 1
+                                logger.info(f"[TOOL_UPDATE] Updated tool name for agent {agent_id} (draft)")
+                            else:
+                                failed_count += 1
+                                error_msg = f"Failed to update agent {agent_id} (draft): {update_result.message}"
+                                errors.append(error_msg)
+                                logger.error(f"[TOOL_UPDATE] {error_msg}")
+
+                    except Exception as e:
+                        failed_count += 1
+                        error_msg = f"Error processing agent {agent_data.get('agent_id', 'unknown')}: {str(e)}"
+                        errors.append(error_msg)
+                        logger.error(f"[TOOL_UPDATE] {error_msg}", exc_info=True)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Updated tool name in agents: {updated_count} updated, {failed_count} failed",
+                data={
+                    "updated_count": updated_count,
+                    "failed_count": failed_count,
+                    "errors": errors if errors else None
                 }
             )
 

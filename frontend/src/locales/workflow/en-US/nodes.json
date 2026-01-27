@@ -1,0 +1,342 @@
+{
+  "nodes": {
+    "llm": {
+      "titlePrefix": "LLM",
+      "description": "Call and use variables and prompts to generate responses.",
+      "outputFormat": {
+        "label": "Output Format",
+        "placeholder": "Please select output format",
+        "text": "Text",
+        "markdown": "Markdown",
+        "json": "JSON"
+      }
+    },
+    "code": {
+      "title": "Code",
+      "description": "Code node for running custom JavaScript or Python code.",
+      "outputDescription": "Code execution result"
+    },
+    "plugin": {
+      "description": "Tool node for calling specific plugin tools to perform tasks."
+    },
+    "condition": {
+      "description": "Connect multiple downstream branches. Only the branch that meets the set condition will be executed."
+    },
+    "loop": {
+      "description": "Repeat a series of tasks by setting iteration count and logic."
+    },
+    "input": {
+      "description": "Input node for pausing during workflow execution and waiting for user input.",
+      "output": "Output"
+    },
+    "output": {
+      "description": "Output node for outputting intermediate or final results during workflow execution."
+    },
+    "start": {
+      "description": "Starting node of the workflow, used to set the information needed to start the workflow."
+    },
+    "end": {
+      "description": "Final node of the workflow, used to return the result information after the workflow runs."
+    },
+    "questioner": {
+      "description": "Questioner node for asking questions to users and collecting answers.",
+      "maxQuestions": "Max Questions",
+      "maxQuestionsDescription": "Set maximum number of questions, range 1-10",
+      "userResponseOutput": "User response output variable",
+      "maxResponseRequired": "Max response count cannot be empty",
+      "mustBeInteger": "Must be an integer",
+      "mustBePositiveInteger": "Must be an integer greater than 0 and not greater than 10"
+    },
+    "intent": {
+      "description": "Intent recognition node for matching different intents based on different user inputs."
+    },
+    "textEditor": {
+      "description": "Text editor node for processing and transforming text content in workflows."
+    },
+    "variableMerge": {
+      "description": "Workflow variable aggregation node for aggregating variables from multiple groups.",
+      "configCannotBeEmpty": "Variable merge configuration cannot be empty",
+      "atLeastOneGroup": "At least one variable group must be added",
+      "groupNameRequired": "Group {{index}} name cannot be empty",
+      "groupAtLeastOneVariable": "Group \"{{name}}\" must contain at least one variable",
+      "output": "Output",
+      "aggregationStrategy": "Aggregation Strategy",
+      "firstNonNull": "Return the first non-null value from each group",
+      "tooltipType": "Variable type defaults to the first variable's type in the group",
+      "noVariables": "No variables, click the button above to add",
+      "noGroups": "No groups, click the button below to add",
+      "addGroup": "Add Group"
+    },
+    "subWorkflow": {
+      "description": "Execute nested sub-workflows"
+    },
+    "continue": {
+      "description": "Continue node for skipping the current iteration and continuing to the next iteration in a loop."
+    },
+    "break": {
+      "description": "Break node for immediately exiting a loop."
+    },
+    "blockStart": {
+      "description": "Start node of a block."
+    },
+    "blockEnd": {
+      "description": "End node of a block."
+    },
+    "variable": {
+      "description": "Used to reset the value of a loop variable for the next iteration",
+      "title": "Variable",
+      "settings": "Settings",
+      "notConfigured": "Not configured",
+      "assignmentConfigEmpty": "Assignment config cannot be empty",
+      "atLeastOneAssignment": "At least one assignment operation is required",
+      "operatorEmpty": "Operator cannot be empty",
+      "onlyAssignSupported": "Only assignment operation is supported",
+      "leftVariableEmpty": "Left variable cannot be empty",
+      "leftVariableTypeEmpty": "Left variable type cannot be empty",
+      "leftVariableMustBeRef": "Left variable must be a reference type",
+      "leftRefPathEmpty": "Left variable reference path cannot be empty",
+      "leftRefPathMustContain": "Left variable reference path must contain node and variable name",
+      "leftRefPathNoEmpty": "Left variable reference path cannot contain empty values",
+      "rightValueEmpty": "Right value cannot be empty",
+      "rightValueTypeEmpty": "Right value type cannot be empty",
+      "rightValueTypeInvalid": "Right value type is invalid"
+    }
+  },
+  "editorStates": {
+    "loadingWorkflow": "Loading workflow canvas...",
+    "loadFailed": "Failed to load workflow canvas",
+    "cannotGetWorkflowData": "Cannot get workflow data",
+    "retry": "Retry",
+    "backToList": "Back to Workflow List"
+  },
+  "formMaterials": {
+    "validate": {
+      "variableNameEmpty": "Variable name cannot be empty",
+      "variableNamePattern": "Variable name can only contain letters, numbers, underscores, and must start with a letter",
+      "fieldRequired": "Field is required",
+      "unknownVariable": "Unknown Variable"
+    },
+    "common": {
+      "selectVariable": "Select Variable",
+      "pressAtToSelectVariable": "Press '@' to Select variable",
+      "add": "Add",
+      "empty": "Empty",
+      "inputKey": "Input Key",
+      "configureViaChildFields": "Configure via child fields"
+    },
+    "fileType": {
+      "default": "Default",
+      "image": "Image",
+      "svg": "SVG",
+      "audio": "Audio",
+      "video": "Video",
+      "voice": "Voice",
+      "doc": "Document",
+      "ppt": "Presentation",
+      "excel": "Spreadsheet",
+      "txt": "Text",
+      "code": "Code",
+      "zip": "Archive"
+    },
+    "input": {
+      "pleaseInputArray": "Please Input Array",
+      "pleaseSelectBoolean": "Please Select Boolean",
+      "true": "True",
+      "false": "False",
+      "pleaseInputInteger": "Please Input Integer",
+      "pleaseInputMap": "Please Input Map",
+      "pleaseInputNumber": "Please Input Number",
+      "pleaseInputObject": "Please Input Object",
+      "pleaseInputString": "Please Input String",
+      "uploadFile": "Upload File",
+      "uploadMode": "Upload",
+      "urlMode": "URL",
+      "enterFileUrl": "Enter file URL",
+      "dragUploadText": "Drag to upload or click to browse",
+      "dragUploadSubText": "Maximum file size: 500 MB",
+      "fileUploadError": "Please upload a file",
+      "fileUrlError": "Please enter a file URL",
+      "uploading": "Uploading",
+      "uploadSuccess": "File uploaded successfully",
+      "fileWillUploadAtRuntime": "File will be uploaded when workflow runs"
+    },
+    "editor": {
+      "noDefaultValue": "No default value",
+      "defaultValueLocked": "Default value is locked",
+      "defaultValueIfNotProvided": "Default value if parameter is not provided",
+      "inputVariableName": "Input Variable Name",
+      "description": "Description",
+      "helpLLMUnderstandProperty": "Help LLM to understand the property",
+      "defaultValue": "Default Value"
+    },
+    "promptEditor": {
+      "placeholder": "Use {{variable}} to reference input parameters"
+    }
+  },
+  "historyPanel": {
+    "title": "History Versions",
+    "subtitle": "View and manage workflow versions",
+    "createCopyFailed": "Failed to create copy:",
+    "versionContentNotFound": "Version content not found",
+    "restoreVersionFailed": "Failed to restore version:",
+    "deleteVersionFailed": "Failed to delete version:",
+    "invalidTime": "Invalid time",
+    "timeFormatError": "Time format error",
+    "noVersionDescription": "No version description",
+    "fetchVersionHistoryFailed": "Failed to fetch version history",
+    "selectWorkflowPrompt": "Please select a workflow to view version history.",
+    "loadFailed": "Load failed",
+    "loading": "Loading...",
+    "noVersionData": "No version data",
+    "restoreToThisVersion": "Restore to this version",
+    "restoreConfirmMessage": "Restoring will overwrite the latest workflow content",
+    "confirm": "Confirm",
+    "deleteVersion": "Delete Version",
+    "deleteConfirmMessage": "Are you sure you want to delete version {{version}}? This cannot be undone",
+    "delete": "Delete",
+    "switching": "Switching...",
+    "versionDescription": "Version Description",
+    "createCopy": "Create Copy",
+    "deleting": "Deleting..."
+  },
+  "publishDialog": {
+    "fetchVersionListFailed": "Failed to fetch version list:",
+    "enterPublishVersion": "Please enter publish version",
+    "versionFormatIncorrect": "Version format is incorrect, please use v1.2.3 format",
+    "enterPublishDescription": "Please enter publish description",
+    "descriptionMinLength": "Description must be at least 5 characters",
+    "descriptionMaxLength": "Description cannot exceed 200 characters",
+    "workflowInfoNotFound": "Workflow information not found",
+    "publishSuccess": "Workflow published successfully",
+    "publishFailed": "Publish failed",
+    "publishWorkflowFailed": "Failed to publish workflow:",
+    "publishFailedRetry": "Publish failed, please try again later",
+    "publishWorkflow": "Publish Workflow",
+    "publishVersion": "Publish Version",
+    "versionPlaceholder": "Enter version number, e.g.: v0.0.1",
+    "publishDescription": "Publish Description",
+    "descriptionPlaceholder": "Enter description for this publish...",
+    "cancel": "Cancel",
+    "publishing": "Publishing...",
+    "confirmPublish": "Confirm Publish"
+  },
+  "testrun": {
+    "saving": "Saving...",
+    "testRun": "Test Run"
+  },
+  "testrunPanel": {
+    "fillRequiredFields": "Please fill required fields",
+    "running": "Running...",
+    "testRunInput": "Test Run Input",
+    "completeInputToContinue": "Complete the following input to continue test run",
+    "continueRunning": "Continue Running",
+    "cancel": "Cancel",
+    "run": "Run",
+    "testRun": "Test Run"
+  },
+  "testdebug": {
+    "testNode": "Test Node"
+  },
+  "testDebugPanel": {
+    "nodeDataNotLoaded": "Node data not loaded",
+    "missingSpaceId": "Missing space ID, please ensure workspace information is correct",
+    "missingNodeId": "Missing node ID, please select the node again",
+    "unknownError": "Unknown error occurred during execution",
+    "running": "Running...",
+    "completeInputToContinue": "Complete the following input to continue test run",
+    "cancel": "Cancel",
+    "run": "Run",
+    "testRun": "Test Run"
+  },
+  "nodeInputPanel": {
+    "inputParams": "Input Parameters",
+    "jsonMode": "JSON Mode",
+    "output": "Output",
+    "completeInputToContinue": "Complete the following input to continue execution"
+  },
+  "debug": {
+    "debug": "Debug"
+  },
+  "debugPanel": {
+    "debug": "Debug",
+    "noInputOutputData": "This component has no input/output data",
+    "componentInfo": "Component Info",
+    "status": "Status",
+    "executionTime": "Execution Time",
+    "model": "Model",
+    "items": "items",
+    "invalidDate": "Invalid date",
+    "timeFormatError": "Time format error",
+    "loadingDebugData": "Loading debug data for {{nodeName}}...",
+    "missingWorkflowOrSpaceId": "Missing workflow or space ID",
+    "loadedExecutionLogDetails": "Loaded execution log details for {{nodeName}}",
+    "executionLogDetailsEmpty": "Execution log details are empty",
+    "unknownError": "Unknown error",
+    "loadDebugDataFailed": "Failed to load debug data",
+    "loadFailed": "Load failed",
+    "fetchingData": "Fetching data...",
+    "noExecutionLogs": "No execution logs",
+    "executionLogs": "Execution Logs",
+    "reloadingExecutionLogs": "Reloading execution log list...",
+    "retry": "Retry",
+    "clearedSelection": "Selection cleared, please select execution time again",
+    "selectExecutionLog": "Please select execution log",
+    "fetchingLatestLogs": "Fetching latest execution logs...",
+    "refreshExecutionLogs": "Refresh Execution Logs",
+    "currentExecutionTime": "Current execution time",
+    "missingLogSummaryData": "Missing LogSummary Data",
+    "missingLogSummaryDescription": "The debug tree requires logSummary data to display component execution information, but none was found.",
+    "unknownComponent": "Unknown Component",
+    "name": "Name"
+  },
+  "formModel": {
+    "model": "Model",
+    "loadingModels": "Loading models...",
+    "loadFailed": "Failed to load models, please retry",
+    "notSelected": "Not selected",
+    "modelDisabled": "Model disabled, please reselect",
+    "enableHistory": "Enable conversation history",
+    "modelNotExists": "Model does not exist, please reselect"
+  },
+  "formInput": {
+    "input": "Input"
+  },
+  "formOutput": {
+    "output": "Output"
+  },
+  "formPrompt": {
+    "userPrompt": "User Prompt",
+    "systemPrompt": "System Prompt"
+  },
+  "formContentEditor": {
+    "outputContent": "Output Content",
+    "streamingOutput": "Streaming Output"
+  },
+  "pluginSelector": {
+    "selectPluginTools": "Select Plugin Tools",
+    "supportMultipleSelection": "Support selecting multiple tools from multiple plugins",
+    "noAvailablePlugins": "No available plugins",
+    "plugin": "Plugin",
+    "noDescription": "No description",
+    "draftVersion": "Draft version",
+    "version": "Version",
+    "draft": "Draft",
+    "selectVersion": "Please select plugin version",
+    "toolList": "Tool list",
+    "loadingTools": "Loading tool list...",
+    "noTools": "No tools available",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
+  },
+  "workflowSelector": {
+    "selectWorkflow": "Select Existing Workflow",
+    "loadingWorkflows": "Loading workflow list...",
+    "noAvailableWorkflows": "No available workflows",
+    "selected": "Selected",
+    "createdAt": "Created at",
+    "pagination": "Total {{total}} workflows, Page {{current}} / {{total}}",
+    "selectedCount": "Selected {{count}} workflow(s)",
+    "cancel": "Cancel",
+    "confirmAdd": "Confirm Add"
+  }
+}

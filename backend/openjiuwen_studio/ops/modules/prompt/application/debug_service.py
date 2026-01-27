@@ -6,11 +6,12 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, Any, Optional, AsyncGenerator, List
-import logging
 import asyncio
 
 from jinja2 import Environment, BaseLoader, TemplateError, UndefinedError
 from openai import OpenAIError
+
+from openjiuwen.core.common.logging import logger
 
 try:
     from ops_client.decorator import observe
@@ -33,9 +34,6 @@ from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import (
 from openjiuwen_studio.ops.modules.prompt.domain.debug_repository import DebugContextRepository, DebugLogRepository
 
 
-# 配置日志
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 headers = {}
 
 

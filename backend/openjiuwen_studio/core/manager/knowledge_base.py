@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import os
+import re
 import uuid
 import time
 import inspect
@@ -17,6 +18,8 @@ from openjiuwen.core.retrieval.indexing.processor.chunker.chunking import TextCh
 from openjiuwen.core.retrieval.indexing.processor.extractor.triple_extractor import TripleExtractor
 from openjiuwen.core.retrieval.indexing.indexer.milvus_indexer import MilvusIndexer
 from openjiuwen.core.retrieval.vector_store.milvus_store import MilvusVectorStore
+from openjiuwen.core.retrieval.indexing.indexer.chroma_indexer import ChromaIndexer
+from openjiuwen.core.retrieval.vector_store.chroma_store import ChromaVectorStore
 from openjiuwen.core.retrieval.simple_knowledge_base import SimpleKnowledgeBase
 from openjiuwen.core.retrieval.graph_knowledge_base import GraphKnowledgeBase
 from openjiuwen.core.retrieval.common.config import (
@@ -28,7 +31,9 @@ from openjiuwen.core.retrieval.common.document import Document
 from openjiuwen.core.retrieval.embedding.api_embedding import APIEmbedding
 
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
-from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import knowledge_base_repository
+from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
+    knowledge_base_repository,
+)
 from openjiuwen_studio.core.manager.repositories.agent_repository import agent_repository
 from openjiuwen_studio.core.manager.repositories import EmbeddingModelConfigRepository
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
@@ -59,7 +64,7 @@ from openjiuwen_studio.schemas.knowledge_base import (
     DocumentDeleteRequest,
     TaskProgressRequest,
     TaskProgressResponse,
-    TaskProgressItem
+    TaskProgressItem,
 )
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.core.database import milliseconds
@@ -71,6 +76,114 @@ from openjiuwen_studio.ops.modules.llm.llm_manager import get_llm_client_by_prot
 
 
 # ==================== GraphRAG 配置和模型管理 ====================
+
+def _extract_full_error_message(error: Exception) -> str:
+    """提取完整的错误信息，包括异常链中的所有错误
+    
+    用于提取 openjiuwen 包抛出的异常信息，因为 openjiuwen 包内部可能捕获异常后
+    使用 cause 参数重新抛出，形成异常链。
+    
+    Args:
+        error: 异常对象
+        
+    Returns:
+        完整的错误信息字符串，包含所有异常链中的错误
+    """
+    error_parts = []
+    current_error = error
+    
+    # 遍历异常链，收集所有错误信息
+    while current_error is not None:
+        error_str = str(current_error)
+        if error_str:
+            error_parts.append(error_str)
+        
+        # 检查是否有 __cause__ (异常链)
+        if hasattr(current_error, '__cause__') and current_error.__cause__:
+            current_error = current_error.__cause__
+        # 检查是否有 __context__ (异常上下文)
+        elif hasattr(current_error, '__context__') and current_error.__context__:
+            current_error = current_error.__context__
+        else:
+            break
+    
+    # 如果只有一个错误，直接返回
+    if len(error_parts) == 1:
+        return error_parts[0]
+    
+    # 如果有多个错误，用 " -> " 连接
+    return " -> ".join(error_parts)
+
+
+def _format_error_message_for_frontend(error_msg: str) -> str:
+    """格式化错误信息供前端显示
+    
+    改写规则：
+    1. 固定错误消息保持不变
+    2. 带前缀的错误：去掉前缀、状态码、箭头（替换为分号）
+    3. 在 "reason" 之前截断（如果存在）
+    4. 确保首字母大写
+    
+    Args:
+        error_msg: 原始错误信息
+        
+    Returns:
+        格式化后的错误信息
+    """
+    if not error_msg:
+        return error_msg
+    
+    # 固定错误消息列表（保持不变）
+    fixed_messages = {
+        "Document not found",
+        "Document status invalid",
+        "File path not found",
+        "Failed to update document status",
+        "Document validation failed",
+        "Processing failed with unknown error",
+        "Failed to update status to INDEXED",
+    }
+    
+    # 如果是固定错误消息，直接返回（首字母已大写）
+    if error_msg in fixed_messages:
+        return error_msg
+    
+    # 需要改写的错误信息
+    result = error_msg
+    
+    # 1. 去掉前缀
+    prefixes = [
+        "File parsing failed: ",
+        "Index building failed: ",
+        "Failed to update status to INDEXING: ",
+    ]
+    for prefix in prefixes:
+        if result.startswith(prefix):
+            result = result[len(prefix):]
+            break
+    
+    # 2. 去掉状态码 [155xxx]
+    result = re.sub(r'\[\d+\]\s*', '', result)
+    
+    # 3. 去掉箭头 -> 和前后空格，用分号替换
+    result = re.sub(r'\s*->\s*', '; ', result)
+    
+    # 4. 在 "reason" 之前截断（如果存在）
+    # 匹配 ", reason:" 或 ",reason:" 或 " reason:" 等变体
+    reason_pattern = r',\s*reason\s*:'
+    match = re.search(reason_pattern, result, re.IGNORECASE)
+    if match:
+        result = result[:match.start()].strip()
+    
+    # 5. 清理多余的空格
+    result = ' '.join(result.split())
+    
+    # 6. 确保首字母大写
+    if result:
+        result = result[0].upper() + result[1:] if len(result) > 1 else result.upper()
+    
+    return result
+
 
 def _create_llm_client_from_db(llm_model_id: str, space_id: str):
     """从数据库创建 LLM 客户端
@@ -87,7 +200,9 @@ def _create_llm_client_from_db(llm_model_id: str, space_id: str):
     Raises:
         ValueError: 如果数据库查询失败或配置无效
     """
-    logger.info(f"[LLM_CLIENT] Creating LLM client from database - Model ID: {llm_model_id}, Space ID: {space_id}")
+    logger.info(
+        f"[LLM_CLIENT] Creating LLM client from database - Model ID: {llm_model_id}, Space ID: {space_id}"
+    )
 
     # 从数据库获取模型配置
     with get_db_jw() as db:
@@ -101,13 +216,19 @@ def _create_llm_client_from_db(llm_model_id: str, space_id: str):
             try:
                 api_key = security_utils.decrypt_api_key(model_config.api_key)
             except Exception as e:
-                logger.warning(f"[LLM_CLIENT] Failed to decrypt API key for model {llm_model_id}: {str(e)}")
-                raise ValueError(f"Failed to decrypt API key for model {llm_model_id}: {str(e)}") from e
+                logger.warning(
+                    f"[LLM_CLIENT] Failed to decrypt API key for model {llm_model_id}: {str(e)}"
+                )
+                raise ValueError(
+                    f"Failed to decrypt API key for model {llm_model_id}: {str(e)}"
+                ) from e
 
         # 获取 timeout 配置，图增强索引时最小 120s
         timeout = model_config.timeout or 60
         if timeout < 120:
-            logger.warning(f"[LLM_CLIENT] Timeout {timeout}s may be too short for graph indexing, using 120s instead")
+            logger.warning(
+                f"[LLM_CLIENT] Timeout {timeout}s may be too short for graph indexing, using 120s instead"
+            )
             timeout = 120
 
         # 构建 protocol 配置
@@ -115,13 +236,14 @@ def _create_llm_client_from_db(llm_model_id: str, space_id: str):
             "provider": model_config.provider,
             "api_key": api_key or "",
             "base_url": model_config.base_url or "",
-            "timeout": timeout
+            "timeout": timeout,
         }
         # 使用 get_llm_client_by_protocol 创建 LLM 客户端（不需要初始化）
         llm_client = get_llm_client_by_protocol(protocol_config)
         logger.info(
             f"[LLM_CLIENT] LLM client created successfully from database - "
-            f"Model Type: {model_config.model_type}, Timeout: {timeout}s")
+            f"Model Type: {model_config.model_type}, Timeout: {timeout}s"
+        )
 
         return llm_client, model_config.model_type
 
@@ -168,7 +290,9 @@ def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
             raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
 
         if not embed_model_config.is_active:
-            raise ValueError(f"Embedding model config is not active (ID: {embedding_model_config_id})")
+            raise ValueError(
+                f"Embedding model config is not active (ID: {embedding_model_config_id})"
+            )
 
         logger.info(
             f"[EMBED_MODEL] Using embedding model from database - "
@@ -182,7 +306,9 @@ def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
             try:
                 api_key = security_utils.decrypt_api_key(embed_model_config.api_key)
             except Exception as e:
-                raise ValueError(f"Failed to decrypt API key for model {embed_model_config.id}: {str(e)}") from e
+                raise ValueError(
+                    f"Failed to decrypt API key for model {embed_model_config.id}: {str(e)}"
+                ) from e
 
         # 4. 使用数据库配置创建 Embedding 模型
         # 数据库字段：api_base, model_id, api_key, max_batch_size
@@ -208,9 +334,11 @@ def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
 
 # ==================== 异常处理装饰器 ====================
 
+
 def with_exception_handling(func):
     """异常处理装饰器，支持同步和异步函数"""
     if inspect.iscoroutinefunction(func):
+
         async def async_wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
@@ -218,7 +346,7 @@ def with_exception_handling(func):
                 logger.error(f"[KNOWLEDGE_BASE] Error in {func.__name__}: {str(e)}", exc_info=True)
                 return ResponseModel(
                     code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    message=f"Internal server error: {str(e)}"
+                    message=f"Internal server error: {str(e)}",
                 )
 
         return async_wrapper
@@ -230,41 +358,42 @@ def with_exception_handling(func):
             logger.error(f"[KNOWLEDGE_BASE] Error in {func.__name__}: {str(e)}", exc_info=True)
             return ResponseModel(
                 code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message=f"Internal server error: {str(e)}"
+                message=f"Internal server error: {str(e)}",
             )
 
     return wrapper
 
 
 @with_exception_handling
-def knowledge_base_create(
-        req: KnowledgeBaseCreate,
-        current_user: dict
-) -> ResponseModel:
+def knowledge_base_create(req: KnowledgeBaseCreate, current_user: dict) -> ResponseModel:
     """创建新的知识库"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[KB_CREATE] Creating knowledge base - User: {user_id}, Name: {req.name}, "
-        f"Embedding Model Config ID: {req.embedding_model_config_id}")
+        f"Embedding Model Config ID: {req.embedding_model_config_id}"
+    )
 
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
     # 2. 检查知识库名称是否已存在（区分大小写）
     name_exists_result = knowledge_base_repository.knowledge_base_check_name_exists(
-        space_id=req.space_id,
-        name=req.name
+        space_id=req.space_id, name=req.name
     )
     if name_exists_result.code != status.HTTP_200_OK:
-        logger.error(f"[KB_CREATE] Failed to check name existence - Error: {name_exists_result.message}")
+        logger.error(
+            f"[KB_CREATE] Failed to check name existence - Error: {name_exists_result.message}"
+        )
         return ResponseModel(
             code=name_exists_result.code,
             message=name_exists_result.message,
         )
     if name_exists_result.data:
-        logger.warning(f"[KB_CREATE] Knowledge base name already exists - Name: {req.name}, Space: {req.space_id}")
+        logger.warning(
+            f"[KB_CREATE] Knowledge base name already exists - Name: {req.name}, Space: {req.space_id}"
+        )
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
             message=f"知识库名称 '{req.name}' 已存在",
@@ -276,7 +405,9 @@ def knowledge_base_create(
         embedding_repo = EmbeddingModelConfigRepository(db)
         embedding_model = embedding_repo.get_by_id(req.embedding_model_config_id)
         if not embedding_model:
-            logger.error(f"[KB_CREATE] Embedding model config not found - ID: {req.embedding_model_config_id}")
+            logger.error(
+                f"[KB_CREATE] Embedding model config not found - ID: {req.embedding_model_config_id}"
+            )
             return ResponseModel(
                 code=status.HTTP_404_NOT_FOUND,
                 message=f"Embedding model config not found: {req.embedding_model_config_id}",
@@ -284,36 +415,31 @@ def knowledge_base_create(
         if embedding_model.space_id != req.space_id:
             logger.error(
                 f"[KB_CREATE] Embedding model config space mismatch - "
-                f"Config Space: {embedding_model.space_id}, Request Space: {req.space_id}")
+                f"Config Space: {embedding_model.space_id}, Request Space: {req.space_id}"
+            )
             return ResponseModel(
                 code=status.HTTP_403_FORBIDDEN,
                 message="Embedding model config does not belong to this space",
             )
         if not embedding_model.is_active:
-            logger.error(f"[KB_CREATE] Embedding model config is not active - ID: {req.embedding_model_config_id}")
+            logger.error(
+                f"[KB_CREATE] Embedding model config is not active - ID: {req.embedding_model_config_id}"
+            )
             return ResponseModel(
                 code=status.HTTP_400_BAD_REQUEST,
                 message="Embedding model config is not active",
             )
         logger.info(
             f"[KB_CREATE] Embedding model config validated - ID: {req.embedding_model_config_id}, "
-            f"Model: {embedding_model.model_name}")
+            f"Model: {embedding_model.model_name}"
+        )
     finally:
         db.close()
 
-    # 4. 检查 Milvus 连接性
-    logger.info(f"[KB_CREATE] Checking Milvus connection...")
-    milvus_connected, milvus_error = _check_milvus_connection()
-    if not milvus_connected:
-        logger.error(f"[KB_CREATE] Milvus connection check failed - Error: {milvus_error}")
-        return ResponseModel(
-            code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            message=(
-                f"无法连接到 Milvus 服务，请检查 Milvus 配置和连接状态。"
-                f"错误信息: {milvus_error}"
-            ),
-        )
-    logger.info(f"[KB_CREATE] Milvus connection check passed")
+    # 4. Checking index connection
+    index_conn = _check_index_connection()
+    if index_conn is not None:
+        return index_conn
 
     # 5. 生成知识库ID（使用去掉连字符的 UUID，保证仅字母数字，Milvus 索引名合规）
     kb_id = uuid.uuid4().hex
@@ -335,7 +461,9 @@ def knowledge_base_create(
     create_result = knowledge_base_repository.knowledge_base_create(kb_data)
 
     if create_result.code != status.HTTP_200_OK:
-        logger.error(f"[KB_CREATE] Database save failed - ID: {kb_id}, Error: {create_result.message}")
+        logger.error(
+            f"[KB_CREATE] Database save failed - ID: {kb_id}, Error: {create_result.message}"
+        )
         return ResponseModel(
             code=create_result.code,
             message=create_result.message,
@@ -352,31 +480,33 @@ def knowledge_base_create(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="create knowledge base success",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )
 
 
 @with_exception_handling
 def knowledge_base_get_referencing_agents(
-        req: KnowledgeBaseGet,
-        current_user: dict
+    req: KnowledgeBaseGet, current_user: dict
 ) -> ResponseModel:
     """获取引用该知识库的智能体列表"""
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
-    logger.info(f"[KB_GET_REF_AGENTS] Getting agents referencing KB - User: {user_id}, KB ID: {req.kb_id}")
+    logger.info(
+        f"[KB_GET_REF_AGENTS] Getting agents referencing KB - User: {user_id}, KB ID: {req.kb_id}"
+    )
 
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
     # 2. 获取引用该知识库的智能体列表
     result = agent_repository.get_agents_referencing_knowledge_base(
-        space_id=req.space_id,
-        kb_id=req.kb_id
+        space_id=req.space_id, kb_id=req.kb_id
     )
 
     if result.code != status.HTTP_200_OK:
-        logger.error(f"[KB_GET_REF_AGENTS] Failed to get referencing agents - Error: {result.message}")
+        logger.error(
+            f"[KB_GET_REF_AGENTS] Failed to get referencing agents - Error: {result.message}"
+        )
         return result
 
     agent_names = result.data.get("agent_names", []) if result.data else []
@@ -387,21 +517,15 @@ def knowledge_base_get_referencing_agents(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="Get agents referencing knowledge base successfully",
-        data={
-            "agent_names": agent_names,
-            "count": count
-        }
+        data={"agent_names": agent_names, "count": count},
     )
 
 
 @with_exception_handling
-async def knowledge_base_delete(
-        req: KnowledgeBaseGet,
-        current_user: dict
-) -> ResponseModel:
+async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> ResponseModel:
     """删除知识库"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(f"[KB_DELETE] Deleting knowledge base - User: {user_id}, KB ID: {req.kb_id}")
 
@@ -412,14 +536,13 @@ async def knowledge_base_delete(
     get_result = knowledge_base_repository.knowledge_base_get(req)
     if get_result.code == status.HTTP_404_NOT_FOUND:
         logger.warning(f"[KB_DELETE] Knowledge base not found - ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
-        )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 3. 从所有包含该知识库的agent中移除该知识库信息
     try:
-        logger.info(f"[KB_DELETE] Removing KB {req.kb_id} from related agents - Space: {req.space_id}")
+        logger.info(
+            f"[KB_DELETE] Removing KB {req.kb_id} from related agents - Space: {req.space_id}"
+        )
         remove_result = agent_repository.remove_knowledge_base_from_agents(req.space_id, req.kb_id)
 
         if remove_result.code == status.HTTP_200_OK and remove_result.data:
@@ -446,7 +569,7 @@ async def knowledge_base_delete(
         logger.error(
             f"[KB_DELETE] Exception while removing KB {req.kb_id} from agents - "
             f"Error: {str(e)}",
-            exc_info=True
+            exc_info=True,
         )
 
     # 4. 删除知识库
@@ -470,56 +593,58 @@ async def knowledge_base_delete(
         if kb_storage_path.exists():
             # 删除整个知识库目录及其所有内容
             import shutil
+
             shutil.rmtree(kb_storage_path)
-            logger.info(f"[KB_DELETE] Local knowledge base directory deleted - Path: {kb_storage_path}")
+            logger.info(
+                f"[KB_DELETE] Local knowledge base directory deleted - Path: {kb_storage_path}"
+            )
         else:
-            logger.warning(f"[KB_DELETE] Local knowledge base directory not found - Path: {kb_storage_path}")
+            logger.warning(
+                f"[KB_DELETE] Local knowledge base directory not found - Path: {kb_storage_path}"
+            )
     except Exception as e:
         # 知识库记录已删除，但本地文件删除失败，记录错误但返回成功
         logger.error(
             f"[KB_DELETE] Failed to delete local knowledge base directory - Path: {kb_storage_path}, Error: {str(e)}",
-            exc_info=True)
+            exc_info=True,
+        )
 
-    # 6. 删除 Milvus 向量索引（循环删除每个文档的索引）
+    # 6. 删除 Milvus | Chroma 向量索引（循环删除每个文档的索引）
     try:
-        milvus_result = await _delete_kb_indices(req.kb_id, req.space_id)
-        if milvus_result["success_count"] > 0:
+        index_result = await _delete_kb_indices(req.kb_id, req.space_id)
+        if index_result["success_count"] > 0:
             logger.info(
-                f"[KB_DELETE] Milvus indices deleted - KB ID: {req.kb_id}, "
-                f"Success: {milvus_result['success_count']}, Failed: {milvus_result['failed_count']}"
+                f"[KB_DELETE] Indices successfully deleted - KB ID: {req.kb_id}, "
+                f"Success: {index_result['success_count']}, Failed: {index_result['failed_count']}"
             )
-        if milvus_result["errors"]:
+        if index_result["errors"]:
             logger.warning(
-                f"[KB_DELETE] Some Milvus indices failed to delete - KB ID: {req.kb_id}, "
-                f"Errors: {milvus_result['errors']}"
+                f"[KB_DELETE] Some indices failed to delete - KB ID: {req.kb_id}, "
+                f"Errors: {index_result['errors']}"
             )
     except Exception as e:
-        # Milvus 删除失败不影响整体删除结果
+        # Milvus | Chroma 删除失败不影响整体删除结果
         logger.error(
-            f"[KB_DELETE] Failed to delete Milvus indices - KB ID: {req.kb_id}, Error: {str(e)}",
-            exc_info=True
+            f"[KB_DELETE] Failed to delete indices - KB ID: {req.kb_id}, Error: {str(e)}",
+            exc_info=True,
         )
 
     # 7. 返回删除结果
     return ResponseModel(
-        code=status.HTTP_200_OK,
-        message="delete knowledge base success",
-        data=None
+        code=status.HTTP_200_OK, message="delete knowledge base success", data=None
     )
 
 
 @with_exception_handling
-def knowledge_base_update(
-        req: KnowledgeBaseUpdateRequest,
-        current_user: dict
-) -> ResponseModel:
+def knowledge_base_update(req: KnowledgeBaseUpdateRequest, current_user: dict) -> ResponseModel:
     """更新知识库"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[KB_UPDATE] Updating knowledge base - User: {user_id}, KB ID: {req.kb_id}, "
-        f"Name: {req.name}, Desc: {repr(req.desc)}")
+        f"Name: {req.name}, Desc: {repr(req.desc)}"
+    )
 
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
@@ -529,26 +654,25 @@ def knowledge_base_update(
     get_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if get_result.code == status.HTTP_404_NOT_FOUND or not get_result.data:
         logger.warning(f"[KB_UPDATE] Knowledge base not found - ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
-        )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 获取当前知识库的信息
     current_kb = get_result.data
     current_name = current_kb.get("name", "")
     current_desc = current_kb.get("description", "")
-    logger.info(f"[KB_UPDATE] Current description: {repr(current_desc)}, New description: {repr(req.desc)}")
+    logger.info(
+        f"[KB_UPDATE] Current description: {repr(current_desc)}, New description: {repr(req.desc)}"
+    )
 
     # 3. 如果名称改变，检查新名称是否已存在（排除当前知识库，区分大小写）
     if req.name != current_name:
         name_exists_result = knowledge_base_repository.knowledge_base_check_name_exists(
-            space_id=req.space_id,
-            name=req.name,
-            exclude_kb_id=req.kb_id
+            space_id=req.space_id, name=req.name, exclude_kb_id=req.kb_id
         )
         if name_exists_result.code != status.HTTP_200_OK:
-            logger.error(f"[KB_UPDATE] Failed to check name existence - Error: {name_exists_result.message}")
+            logger.error(
+                f"[KB_UPDATE] Failed to check name existence - Error: {name_exists_result.message}"
+            )
             return ResponseModel(
                 code=name_exists_result.code,
                 message=name_exists_result.message,
@@ -556,7 +680,8 @@ def knowledge_base_update(
         if name_exists_result.data:
             logger.warning(
                 f"[KB_UPDATE] Knowledge base name already exists - Name: {req.name}, "
-                f"Space: {req.space_id}, KB ID: {req.kb_id}")
+                f"Space: {req.space_id}, KB ID: {req.kb_id}"
+            )
             return ResponseModel(
                 code=status.HTTP_400_BAD_REQUEST,
                 message=f"知识库名称 '{req.name}' 已存在",
@@ -566,10 +691,7 @@ def knowledge_base_update(
     # 如果 desc 是空字符串，转换为 None 以便正确清空数据库字段
     description_value = req.desc if req.desc else None
     update_result = knowledge_base_repository.knowledge_base_update(
-        space_id=req.space_id,
-        kb_id=req.kb_id,
-        name=req.name,
-        description=description_value
+        space_id=req.space_id, kb_id=req.kb_id, name=req.name, description=description_value
     )
 
     if update_result.code != status.HTTP_200_OK:
@@ -586,9 +708,7 @@ def knowledge_base_update(
 
     # 5. 返回更新结果
     return ResponseModel(
-        code=status.HTTP_200_OK,
-        message="update knowledge base message success",
-        data=None
+        code=status.HTTP_200_OK, message="update knowledge base message success", data=None
     )
 
 
@@ -604,23 +724,23 @@ def _get_storage_path(space_id: str, kb_id: str) -> Path:
 
 def _get_file_type(filename: str) -> str:
     """根据文件名获取文件类型"""
-    return Path(filename).suffix.lower().lstrip('.')
+    return Path(filename).suffix.lower().lstrip(".")
 
 
 def _get_mime_type(file_type: str) -> str:
     """根据文件类型获取 MIME 类型"""
     mime_types = {
-        'pdf': 'application/pdf',
-        'doc': 'application/msword',
-        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'txt': 'text/plain',
-        'md': 'text/markdown',
-        'xls': 'application/vnd.ms-excel',
-        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'ppt': 'application/vnd.ms-powerpoint',
-        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        "pdf": "application/pdf",
+        "doc": "application/msword",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "txt": "text/plain",
+        "md": "text/markdown",
+        "xls": "application/vnd.ms-excel",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "ppt": "application/vnd.ms-powerpoint",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     }
-    return mime_types.get(file_type.lower(), 'application/octet-stream')
+    return mime_types.get(file_type.lower(), "application/octet-stream")
 
 
 def _detect_real_file_type(file_path: str) -> str:
@@ -634,20 +754,20 @@ def _detect_real_file_type(file_path: str) -> str:
         如果无法识别则返回原扩展名
     """
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             header = f.read(8)
 
         # ZIP 格式（包括 .docx, .xlsx, .pptx 等 Office 2007+ 格式）
-        if header[:4] == b'PK\x03\x04':
-            return '.docx'
+        if header[:4] == b"PK\x03\x04":
+            return ".docx"
 
         # 旧版 DOC 格式（OLE Compound Document）
-        if header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
-            return '.doc'
+        if header[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+            return ".doc"
 
         # PDF 格式
-        if header[:4] == b'%PDF':
-            return '.pdf'
+        if header[:4] == b"%PDF":
+            return ".pdf"
 
     except Exception as e:
         logger.warning(f"[PARSE] Failed to detect file type: {file_path}, Error: {e}")
@@ -675,7 +795,7 @@ def _get_corrected_file_path(original_path: str) -> str:
         return original_path
 
     # 特别处理：.doc 文件实际是 .docx 格式
-    if original_ext == '.doc' and real_ext == '.docx':
+    if original_ext == ".doc" and real_ext == ".docx":
         logger.info(
             f"[PARSE] File format mismatch detected - "
             f"Extension: {original_ext}, Real format: {real_ext}, "
@@ -690,6 +810,7 @@ def _get_corrected_file_path(original_path: str) -> str:
         if not corrected_path.exists():
             try:
                 import shutil
+
                 shutil.copy2(original_path, corrected_path)
                 logger.info(
                     f"[PARSE] Created temporary file with correct extension: {corrected_path}"
@@ -706,7 +827,9 @@ def _get_corrected_file_path(original_path: str) -> str:
     return original_path
 
 
-async def _parse_file(doc_path: str, parsing_strategy, doc_id: str, file_name: str = None) -> List[Document]:
+async def _parse_file(
+    doc_path: str, parsing_strategy, doc_id: str, file_name: str = None
+) -> List[Document]:
     """调用新的知识库系统解析文件，返回Document列表"""
     logger.debug(
         f"[PARSE] Parsing file - Path: {doc_path}, "
@@ -731,17 +854,13 @@ async def _parse_file(doc_path: str, parsing_strategy, doc_id: str, file_name: s
         # 使用新的 AutoFileParser 解析文件
         parser = AutoFileParser()
         documents = await parser.parse(
-            doc=corrected_path,
-            doc_id=doc_id,
-            file_name=file_name or Path(corrected_path).name
+            doc=corrected_path, doc_id=doc_id, file_name=file_name or Path(corrected_path).name
         )
 
         if not documents:
             raise ValueError(f"No content parsed from file: {doc_path}")
 
-        logger.debug(
-            f"[PARSE] Parsed file - Path: {doc_path}, Documents: {len(documents)}"
-        )
+        logger.debug(f"[PARSE] Parsed file - Path: {doc_path}, Documents: {len(documents)}")
         return documents
     finally:
         # 清理临时文件
@@ -763,15 +882,21 @@ def _resolve_chunking_config(segmentation_strategy) -> tuple[int, float, Dict[st
     chunk_size = int(cfg.get("max_tokens") or cfg.get("chunk_size") or 512)
     overlap_percent = float(cfg.get("chunk_overlap_percent") or cfg.get("chunk_overlap") or 0)
     preprocess_options = {
-        "normalize_whitespace": bool(cfg.get("remove_extra_spaces") or cfg.get("normalize_whitespace") or False),
-        "remove_url_email": bool(cfg.get("remove_urls_emails") or cfg.get("remove_url_email") or False),
+        "normalize_whitespace": bool(
+            cfg.get("remove_extra_spaces") or cfg.get("normalize_whitespace") or False
+        ),
+        "remove_url_email": bool(
+            cfg.get("remove_urls_emails") or cfg.get("remove_url_email") or False
+        ),
     }
     return chunk_size, overlap_percent, preprocess_options
 
 
 def _create_chunker(segmentation_strategy, embed_model=None) -> TextChunker:
     """创建 Chunker 实例"""
-    chunk_size, overlap_percent, preprocess_options = _resolve_chunking_config(segmentation_strategy)
+    chunk_size, overlap_percent, preprocess_options = _resolve_chunking_config(
+        segmentation_strategy
+    )
 
     # 根据 strategy_type 确定 chunk_unit
     # strategy_type="1" 表示自动分段，使用字符分块
@@ -825,10 +950,7 @@ def _check_milvus_connection() -> Tuple[bool, str]:
 
         # 建立新连接
         connections.connect(
-            alias=alias,
-            host=milvus_host,
-            port=int(milvus_port),
-            token=milvus_token
+            alias=alias, host=milvus_host, port=int(milvus_port), token=milvus_token
         )
 
         # 验证连接是否有效（尝试列出集合）
@@ -839,7 +961,8 @@ def _check_milvus_connection() -> Tuple[bool, str]:
                 connections.disconnect(alias)
             except Exception as disconnect_error:
                 logger.warning(
-                    f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(disconnect_error)}")
+                    f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(disconnect_error)}"
+                )
             return False, f"无法访问 Milvus 服务: {str(e)}"
 
         # 断开测试连接
@@ -864,34 +987,81 @@ def _check_milvus_connection() -> Tuple[bool, str]:
         try:
             alias = "kb_connection_test"
             from pymilvus import connections
+
             if connections.has_connection(alias):
                 connections.disconnect(alias)
         except Exception as disconnect_error:
             logger.warning(
-                f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(disconnect_error)}")
+                f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(disconnect_error)}"
+            )
         return False, f"Milvus 连接失败: {error_msg}"
 
 
-def _create_milvus_index_manager() -> MilvusIndexer:
-    """创建 Milvus 索引管理器
+def _check_index_connection() -> Union[ResponseModel, None]:
+    """
+    Function for wrapping index connection type
+    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+    Returns:
+        _type_: `Union[ResponseModel, None]`
+    """
+    index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+    if index_manager_type == "milvus":
+        logger.info(f"[KB_CREATE] Checking Milvus connection...")
+        milvus_connected, milvus_error = _check_milvus_connection()
+        if not milvus_connected:
+            logger.error(f"[KB_CREATE] Milvus connection check failed - Error: {milvus_error}")
+            return ResponseModel(
+                code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                message=(
+                    f"无法连接到 Milvus 服务，请检查 Milvus 配置和连接状态。"
+                    f"错误信息: {milvus_error}"
+                ),
+            )
+        logger.info(f"[KB_CREATE] Milvus connection check passed")
+        return None
+    else:
+        # No index connection check is required by any other index type afaik.
+        return None
 
-    从环境变量读取 Milvus 配置参数。
+
+def _get_chroma_data_dir() -> Path:
+    """
+    获取 Chroma 数据目录路径并确保目录存在
 
     Returns:
-        MilvusIndexer: Milvus 索引管理器实例
+        Path: Chroma 数据目录路径
     """
-    milvus_host = os.getenv("MILVUS_HOST", "localhost")
-    milvus_port = os.getenv("MILVUS_PORT", "19530")
-    milvus_token = os.getenv("MILVUS_TOKEN", None)
+    backend_dir = Path(
+        __file__
+    ).parent.parent.parent.parent  # 从 knowledge_base.py 回到 backend 目录
+    data_dir = backend_dir / "data" / "knowledge_base"
+    data_dir.mkdir(parents=True, exist_ok=True)  # 确保目录存在
+    return data_dir
 
-    # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
-    # 默认使用 http:// 协议
-    milvus_uri = f"http://{milvus_host}:{milvus_port}"
 
-    return MilvusIndexer(
-        milvus_uri=milvus_uri,
-        milvus_token=milvus_token
-    )
+def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
+    """
+    Creates either a Milvus or Chroma index manager
+    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+    Returns:
+        MilvusIndexer | ChromaIndexer
+    """
+    index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+    if index_manager_type == "chroma":
+        data_dir = _get_chroma_data_dir()
+        return ChromaIndexer(chroma_path=str(data_dir))
+    elif index_manager_type == "milvus":
+        milvus_host = os.getenv("MILVUS_HOST", "localhost")
+        milvus_port = os.getenv("MILVUS_PORT", "19530")
+        milvus_token = os.getenv("MILVUS_TOKEN", None)
+
+        # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
+        # 默认使用 http:// 协议
+        milvus_uri = f"http://{milvus_host}:{milvus_port}"
+
+        return MilvusIndexer(milvus_uri=milvus_uri, milvus_token=milvus_token)
+    else:
+        raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
 
 
 async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
@@ -899,11 +1069,7 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
 
     获取知识库下的所有文档，然后循环删除每个文档的 chunks 和 triples 索引数据
     """
-    result = {
-        "success_count": 0,
-        "failed_count": 0,
-        "errors": []
-    }
+    result = {"success_count": 0, "failed_count": 0, "errors": []}
 
     try:
         # 获取知识库下的所有文档（分页获取，每页最多100条）
@@ -913,10 +1079,7 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
 
         while True:
             doc_list_result = knowledge_base_repository.document_list(
-                space_id=space_id,
-                kb_id=kb_id,
-                page=page,
-                size=page_size
+                space_id=space_id, kb_id=kb_id, page=page, size=page_size
             )
 
             if doc_list_result.code != status.HTTP_200_OK or not doc_list_result.data:
@@ -942,7 +1105,7 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
         logger.info(f"[KB_DELETE] Deleting indices for {len(documents)} documents in KB {kb_id}")
 
         # 创建索引管理器
-        index_manager = _create_milvus_index_manager()
+        index_manager = _create_index_manager()
         chunk_index = f"kb_{kb_id}_chunks"
         triple_index = f"kb_{kb_id}_triples"
 
@@ -959,7 +1122,7 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
                     index_name=chunk_index,
                     doc_id=doc_id,
                     kb_id=kb_id,
-                    index_type="chunks"
+                    index_type="chunks",
                 )
 
                 # 删除 triples 索引（如果有图增强）
@@ -968,7 +1131,7 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
                     index_name=triple_index,
                     doc_id=doc_id,
                     kb_id=kb_id,
-                    index_type="triples"
+                    index_type="triples",
                 )
 
                 result["success_count"] += 1
@@ -990,43 +1153,48 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
     return result
 
 
-def _create_milvus_vector_store(
-        collection_name: str,
-) -> MilvusVectorStore:
-    """创建 Milvus 向量存储
-
-    从环境变量读取 Milvus 配置参数。
+def _create_vector_store(collection_name: str) -> Union[MilvusVectorStore, ChromaVectorStore]:
+    """
+    Creates either a Milvus or Chroma vector store
+    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
 
     Args:
         collection_name: 集合名称
 
     Returns:
-        MilvusVectorStore: Milvus 向量存储实例
+        MilvusVectorStore | ChromaVectorStore
     """
-    milvus_host = os.getenv("MILVUS_HOST", "localhost")
-    milvus_port = os.getenv("MILVUS_PORT", "19530")
-    milvus_token = os.getenv("MILVUS_TOKEN", None)
+    index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
 
-    # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
-    # 默认使用 http:// 协议
-    milvus_uri = f"http://{milvus_host}:{milvus_port}"
+    if index_manager_type == "chroma":
+        data_dir = _get_chroma_data_dir()
+        vector_store_config = VectorStoreConfig(
+            collection_name=collection_name,
+        )
+        return ChromaVectorStore(config=vector_store_config, chroma_path=str(data_dir))
 
-    vector_store_config = VectorStoreConfig(
-        collection_name=collection_name,
-    )
-    return MilvusVectorStore(
-        config=vector_store_config,
-        milvus_uri=milvus_uri,
-        milvus_token=milvus_token
-    )
+    elif index_manager_type == "milvus":
+        milvus_host = os.getenv("MILVUS_HOST", "localhost")
+        milvus_port = os.getenv("MILVUS_PORT", "19530")
+        milvus_token = os.getenv("MILVUS_TOKEN", None)
+
+        # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
+        # 默认使用 http:// 协议
+        milvus_uri = f"http://{milvus_host}:{milvus_port}"
+
+        vector_store_config = VectorStoreConfig(
+            collection_name=collection_name,
+        )
+        return MilvusVectorStore(
+            config=vector_store_config, milvus_uri=milvus_uri, milvus_token=milvus_token
+        )
+
+    else:
+        raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
 
 
 async def create_knowledge_base_for_retrieval(
-        kb_id: str,
-        space_id: str,
-        use_graph: bool,
-        llm_client=None,
-        model_name: str = None
+    kb_id: str, space_id: str, use_graph: bool, llm_client=None, model_name: str = None
 ) -> Union[SimpleKnowledgeBase, GraphKnowledgeBase]:
     """创建知识库实例用于检索
 
@@ -1059,7 +1227,7 @@ async def create_knowledge_base_for_retrieval(
 
     # 4. 创建向量存储
     chunk_index = f"kb_{kb_id}_chunks"
-    vector_store = _create_milvus_vector_store(
+    vector_store = _create_vector_store(
         collection_name=chunk_index,
     )
 
@@ -1067,7 +1235,9 @@ async def create_knowledge_base_for_retrieval(
     extractor = None
     if use_graph:
         if not llm_client:
-            raise ValueError(f"LLM client is required for knowledge base {kb_id} with graph enhancement")
+            raise ValueError(
+                f"LLM client is required for knowledge base {kb_id} with graph enhancement"
+            )
         # 使用传入的 model_name，如果未提供则使用配置中的值或默认值
         extractor = TripleExtractor(
             llm_client=llm_client,
@@ -1109,21 +1279,22 @@ async def create_knowledge_base_for_retrieval(
         )
 
     logger.debug(
-        f"[KB_RETRIEVAL] Created knowledge base instance for retrieval - KB ID: {kb_id}, Has graph: {use_graph}")
+        f"[KB_RETRIEVAL] Created knowledge base instance for retrieval - KB ID: {kb_id}, Has graph: {use_graph}"
+    )
     return knowledge_base
 
 
 async def _delete_document_from_index(
-        index_manager: MilvusIndexer,
-        index_name: str,
-        doc_id: str,
-        kb_id: str,
-        index_type: str = "chunks"
+    index_manager: Union[MilvusIndexer, ChromaIndexer],
+    index_name: str,
+    doc_id: str,
+    kb_id: str,
+    index_type: str = "chunks",
 ) -> bool:
     """从索引中删除指定 doc_id 的数据
 
     Args:
-        index_manager: Milvus 索引管理器
+        index_manager: MilvusIndexer | ChromaIndexer
         index_name: 索引名称
         doc_id: 文档ID
         kb_id: 知识库ID
@@ -1136,19 +1307,22 @@ async def _delete_document_from_index(
         # 检查索引是否存在
         index_exists = await index_manager.index_exists(index_name)
         if not index_exists:
-            logger.debug(f"[DOC_DELETE] {index_type.capitalize()} index does not exist: {index_name}")
+            logger.debug(
+                f"[DOC_DELETE] {index_type.capitalize()} index does not exist: {index_name}"
+            )
             return True
 
-        # 使用 MilvusIndexer 的 delete_index 方法删除数据
-        deleted = await index_manager.delete_index(
-            doc_id=doc_id,
-            index_name=index_name
-        )
+        # Using `delete_index` from the provided `index_manager`
+        deleted = await index_manager.delete_index(doc_id=doc_id, index_name=index_name)
 
         if deleted:
-            logger.info(f"[DOC_DELETE] Deleted {index_type} from index - Index: {index_name}, Doc ID: {doc_id}")
+            logger.info(
+                f"[DOC_DELETE] Deleted {index_type} from index - Index: {index_name}, Doc ID: {doc_id}"
+            )
         else:
-            logger.debug(f"[DOC_DELETE] No {index_type} found for doc_id: {doc_id} in index: {index_name}")
+            logger.debug(
+                f"[DOC_DELETE] No {index_type} found for doc_id: {doc_id} in index: {index_name}"
+            )
 
         return True
 
@@ -1156,7 +1330,9 @@ async def _delete_document_from_index(
         error_msg = str(delete_error)
         # 如果数据不存在，不算错误
         if "not exist" in error_msg.lower() or "not found" in error_msg.lower():
-            logger.debug(f"[DOC_DELETE] No {index_type} found for doc_id: {doc_id} in index: {index_name}")
+            logger.debug(
+                f"[DOC_DELETE] No {index_type} found for doc_id: {doc_id} in index: {index_name}"
+            )
             return True
         else:
             logger.warning(
@@ -1166,26 +1342,22 @@ async def _delete_document_from_index(
 
 
 async def _index_documents(
-        documents: List[Document],
-        indexing_strategy,
-        segmentation_strategy,
-        space_id: str,
-        kb_id: str,
-        doc_id: str,
-        process_info: dict
+    documents: List[Document],
+    indexing_strategy,
+    segmentation_strategy,
+    space_id: str,
+    kb_id: str,
+    doc_id: str,
+    process_info: dict,
 ) -> dict:
-    """使用新的知识库系统将文档写入 Milvus 索引，并更新文档状态为INDEXING"""
+
     # 1. 更新状态为INDEXING
     update_indexing_result = knowledge_base_repository.document_update_status(
         space_id=space_id,
         kb_id=kb_id,
         doc_id=doc_id,
         doc_status=DocumentStatus.INDEXING.value,
-        process_info={
-            **process_info,
-            "parsing_completed": True,
-            "document_count": len(documents)
-        }
+        process_info={**process_info, "parsing_completed": True, "document_count": len(documents)},
     )
 
     if update_indexing_result.code != status.HTTP_200_OK:
@@ -1208,10 +1380,13 @@ async def _index_documents(
     llm_client = None
     model_name = None
     if use_graph:
-        llm_client, model_name = _create_llm_client_from_db(indexing_strategy.llm_model_id, space_id)
+        llm_client, model_name = _create_llm_client_from_db(
+            indexing_strategy.llm_model_id, space_id
+        )
         logger.info(
             f"[INDEX] LLM client created successfully from database - "
-            f"Model ID: {indexing_strategy.llm_model_id}, Model Type: {model_name}")
+            f"Model ID: {indexing_strategy.llm_model_id}, Model Type: {model_name}"
+        )
         if not llm_client:
             raise ValueError("llm_client is required when use_graph=True")
 
@@ -1229,13 +1404,15 @@ async def _index_documents(
     # 5.1 创建分块器（用于 add_documents 内部自动分块）
     strategy_config = segmentation_strategy.strategy_config or {}
     chunk_unit = strategy_config.get("chunk_unit", "char")
-    chunker = _create_chunker(segmentation_strategy, embed_model=embed_model if chunk_unit == "token" else None)
+    chunker = _create_chunker(
+        segmentation_strategy, embed_model=embed_model if chunk_unit == "token" else None
+    )
 
     # 5.2 创建索引管理器
-    index_manager = _create_milvus_index_manager()
+    index_manager = _create_index_manager()
 
     # 5.3 创建向量存储
-    vector_store = _create_milvus_vector_store(
+    vector_store = _create_vector_store(
         collection_name=chunk_index,
     )
 
@@ -1298,7 +1475,8 @@ async def _index_documents(
                 chunk_count = estimated_chunks
                 logger.debug(
                     f"[INDEX] Estimated chunk count: {chunk_count} "
-                    f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})")
+                    f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})"
+                )
         except Exception as e:
             logger.warning(f"[INDEX] Failed to estimate chunk count: {str(e)}")
             # 如果估算失败，使用文档数量作为fallback
@@ -1323,27 +1501,37 @@ async def _index_documents(
             logger.warning(f"[INDEX] Failed to close knowledge base: {str(e)}")
 
 
-async def _process_single_document(
-        space_id: str,
-        kb_id: str,
-        doc_id: str,
-        file_path: str,
-        parsing_strategy,
-        segmentation_strategy,
-        indexing_strategy,
-        process_info: dict
+async def process_single_document(
+    space_id: str,
+    kb_id: str,
+    doc_id: str,
+    file_path: str,
+    parsing_strategy,
+    segmentation_strategy,
+    indexing_strategy,
+    process_info: dict,
+    file_name: str = None,
 ):
     """在后台异步处理单个文档"""
     try:
-        logger.info(f"[DOC_PROCESS_BG] Starting background processing - Doc ID: {doc_id}, KB ID: {kb_id}")
+        logger.info(
+            f"[DOC_PROCESS_BG] Starting background processing - Doc ID: {doc_id}, KB ID: {kb_id}"
+        )
 
         # 1. 解析文件
         try:
-            file_name = Path(file_path).name
+            if not file_name:
+                file_name = Path(file_path).name
             documents = await _parse_file(file_path, parsing_strategy, doc_id, file_name=file_name)
         except Exception as parse_error:
-            logger.error(f"[DOC_PROCESS_BG] File parsing failed - Doc ID: {doc_id}, KB ID: {kb_id}", exc_info=True)
-            raise Exception("File parsing failed") from parse_error
+            # 提取 openjiuwen 包的完整错误信息（可能包含异常链）
+            full_error_msg = _extract_full_error_message(parse_error)
+            error_message = f"File parsing failed: {full_error_msg}"
+            logger.error(
+                f"[DOC_PROCESS_BG] File parsing failed - Doc ID: {doc_id}, KB ID: {kb_id}, Error: {error_message}",
+                exc_info=True,
+            )
+            raise Exception(error_message) from parse_error
 
         # 2. 索引文档（内部会进行分块和索引构建，并更新状态为INDEXING）
         try:
@@ -1354,11 +1542,17 @@ async def _process_single_document(
                 space_id=space_id,
                 kb_id=kb_id,
                 doc_id=doc_id,
-                process_info=process_info
+                process_info=process_info,
             )
         except Exception as index_error:
-            logger.error(f"[DOC_PROCESS_BG] Index building failed - Doc ID: {doc_id}, KB ID: {kb_id}", exc_info=True)
-            raise Exception("Index building failed") from index_error
+            # 提取 openjiuwen 包的完整错误信息（可能包含异常链）
+            full_error_msg = _extract_full_error_message(index_error)
+            error_message = f"Index building failed: {full_error_msg}"
+            logger.error(
+                f"[DOC_PROCESS_BG] Index building failed - Doc ID: {doc_id}, KB ID: {kb_id}, Error: {error_message}",
+                exc_info=True,
+            )
+            raise Exception(error_message) from index_error
 
         # 4. 更新文档状态为INDEXED，同时更新索引字段
         final_process_info = {
@@ -1375,7 +1569,7 @@ async def _process_single_document(
             doc_status=DocumentStatus.INDEXED.value,
             process_info=final_process_info,
             es_index_name=index_result.get("chunk_index"),
-            chunk_count=index_result.get("chunk_count")
+            chunk_count=index_result.get("chunk_count"),
         )
 
         if update_indexed_result.code != status.HTTP_200_OK:
@@ -1388,15 +1582,17 @@ async def _process_single_document(
         )
 
     except Exception as e:
-        # 只记录简化的错误信息（错误位置）
+        # 提取错误信息
+        # 注意：e 是我们新创建的异常，它的消息已经包含了原始错误信息
+        # 不需要遍历异常链，因为我们在创建异常时已经提取了完整的错误信息
         error_message = str(e)
         logger.error(
             f"[DOC_PROCESS_BG] Document processing failed - Doc ID: {doc_id}, "
             f"KB ID: {kb_id}, Error: {error_message}",
-            exc_info=True
+            exc_info=True,
         )
 
-        # 更新状态为FAILED，记录简化的错误信息
+        # 更新状态为FAILED，记录完整的错误信息
         try:
             knowledge_base_repository.document_update_status(
                 space_id=space_id,
@@ -1406,8 +1602,8 @@ async def _process_single_document(
                 process_info={
                     **process_info,
                     "error": error_message,
-                    "failed_time": milliseconds()
-                }
+                    "failed_time": milliseconds(),
+                },
             )
         except Exception as update_error:
             logger.error(
@@ -1417,14 +1613,14 @@ async def _process_single_document(
 
 
 async def _process_documents_sequentially(
-        space_id: str,
-        kb_id: str,
-        documents: list[dict],
-        parsing_strategy,
-        segmentation_strategy,
-        indexing_strategy,
-        task_id: str,
-        process_info_base: dict
+    space_id: str,
+    kb_id: str,
+    documents: list[dict],
+    parsing_strategy,
+    segmentation_strategy,
+    indexing_strategy,
+    task_id: str,
+    process_info_base: dict,
 ):
     """串行处理多个文档（后台任务）"""
     logger.info(
@@ -1435,7 +1631,7 @@ async def _process_documents_sequentially(
     for idx, doc_info in enumerate(documents, 1):
         doc_id = doc_info.get("doc_id")
         file_path = doc_info.get("file_path")
-
+        doc_name = doc_info.get("name")
         try:
             logger.info(
                 f"[DOC_PROCESS_SEQ] Processing document {idx}/{len(documents)} - "
@@ -1447,11 +1643,11 @@ async def _process_documents_sequentially(
                 **process_info_base,
                 "task_id": task_id,
                 "current_index": idx,
-                "total_count": len(documents)
+                "total_count": len(documents),
             }
 
             # 处理单个文档
-            await _process_single_document(
+            await process_single_document(
                 space_id=space_id,
                 kb_id=kb_id,
                 doc_id=doc_id,
@@ -1459,19 +1655,20 @@ async def _process_documents_sequentially(
                 parsing_strategy=parsing_strategy,
                 segmentation_strategy=segmentation_strategy,
                 indexing_strategy=indexing_strategy,
-                process_info=process_info
+                process_info=process_info,
+                file_name=doc_name,
             )
 
             logger.info(
                 f"[DOC_PROCESS_SEQ] Completed document {idx}/{len(documents)} - "
-                f"Doc ID: {doc_id}, Task ID: {task_id}"
+                f"Doc ID: {doc_id}, Name: {doc_name}, Task ID: {task_id}"
             )
 
         except Exception as e:
             logger.error(
                 f"[DOC_PROCESS_SEQ] Failed to process document {idx}/{len(documents)} - "
                 f"Doc ID: {doc_id}, Task ID: {task_id}, Error: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
             continue
 
@@ -1482,20 +1679,22 @@ async def _process_documents_sequentially(
 
 
 async def document_upload(
-        space_id: str,
-        kb_id: str,
-        files: List[UploadFile],
-        metadata: Dict[str, Any] | None,
-        current_user: dict
+    space_id: str,
+    kb_id: str,
+    files: List[UploadFile],
+    metadata: Dict[str, Any] | None,
+    current_user: dict,
 ) -> ResponseModel:
     """上传文档到知识库（支持多文件）
 
     注意：此函数是异步的，异常处理在 Router 层完成
     """
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
-    logger.info(f"[DOC_UPLOAD] Uploading documents - User: {user_id}, KB ID: {kb_id}, Files: {len(files)}")
+    logger.info(
+        f"[DOC_UPLOAD] Uploading documents - User: {user_id}, KB ID: {kb_id}, Files: {len(files)}"
+    )
 
     # 1. 验证用户空间权限
     _ = check_user_space(space_id, current_user)
@@ -1505,16 +1704,13 @@ async def document_upload(
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
         logger.warning(f"[DOC_UPLOAD] Knowledge base not found - KB ID: {kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
-        )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 3. 获取存储路径
     storage_path = _get_storage_path(space_id, kb_id)
 
     # 4. 允许的文件类型
-    ALLOWED_FILE_EXTENSIONS = {'.pdf', '.doc', '.docx', '.txt', '.md'}
+    allowed_file_extensions = {".pdf", ".doc", ".docx", ".txt", ".md"}
 
     # 文件大小限制：20MB
     MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
@@ -1534,7 +1730,7 @@ async def document_upload(
             file_ext = Path(filename).suffix.lower()
 
             # 验证文件类型
-            if file_ext not in ALLOWED_FILE_EXTENSIONS:
+            if file_ext not in allowed_file_extensions:
                 failed_count += 1
                 logger.warning(
                     f"[DOC_UPLOAD] Unsupported file type - File: {filename}, Extension: {file_ext}, "
@@ -1565,7 +1761,7 @@ async def document_upload(
                 )
                 continue
 
-            with open(file_path, 'wb') as f:
+            with open(file_path, "wb") as f:
                 f.write(file_content)
 
             logger.debug(f"[DOC_UPLOAD] File saved - Path: {file_path}, Size: {file_size} bytes")
@@ -1591,12 +1787,14 @@ async def document_upload(
 
             if create_result.code == status.HTTP_200_OK:
                 success_count += 1
-                uploaded_docs.append(DocumentUploadResponse(
-                    id=doc_id,
-                    name=filename,
-                    file_size=file_size,
-                    status=DocumentStatus.UPLOADED.value
-                ))
+                uploaded_docs.append(
+                    DocumentUploadResponse(
+                        id=doc_id,
+                        name=filename,
+                        file_size=file_size,
+                        status=DocumentStatus.UPLOADED.value,
+                    )
+                )
                 logger.info(f"[DOC_UPLOAD] Document created - Doc ID: {doc_id}, Name: {filename}")
             else:
                 failed_count += 1
@@ -1604,23 +1802,24 @@ async def document_upload(
                 if file_path.exists():
                     file_path.unlink()
                 logger.error(
-                    f"[DOC_UPLOAD] Failed to create document record - Doc ID: {doc_id}, Error: {create_result.message}")
+                    f"[DOC_UPLOAD] Failed to create document record - Doc ID: {doc_id}, Error: {create_result.message}"
+                )
 
         except Exception as e:
             failed_count += 1
-            logger.error(f"[DOC_UPLOAD] Error uploading file {file.filename}: {str(e)}", exc_info=True)
+            logger.error(
+                f"[DOC_UPLOAD] Error uploading file {file.filename}: {str(e)}", exc_info=True
+            )
             # 如果文件已保存，尝试删除
             try:
-                if 'file_path' in locals() and file_path.exists():
+                if "file_path" in locals() and file_path.exists():
                     file_path.unlink()
             except Exception:
                 pass
 
     # 5. 准备响应数据
     response_data = DocumentUploadBatchResponse(
-        success_count=success_count,
-        failed_count=failed_count,
-        documents=uploaded_docs
+        success_count=success_count, failed_count=failed_count, documents=uploaded_docs
     )
 
     logger.info(
@@ -1632,7 +1831,7 @@ async def document_upload(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message=f"Upload completed: {success_count} success, {failed_count} failed",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )
 
 
@@ -1646,13 +1845,10 @@ def _timestamp_to_date_str(timestamp: int | None) -> str:
 
 
 @with_exception_handling
-def knowledge_base_search(
-        req: KnowledgeBaseSearchRequest,
-        current_user: dict
-) -> ResponseModel:
+def knowledge_base_search(req: KnowledgeBaseSearchRequest, current_user: dict) -> ResponseModel:
     """查询知识库（支持分页）"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     # 获取分页参数，设置默认值
     page = req.page or 1
@@ -1668,10 +1864,7 @@ def knowledge_base_search(
 
     # 2. 执行查询（带分页）
     search_result = knowledge_base_repository.knowledge_base_search(
-        space_id=req.space_id,
-        query=req.query,
-        page=page,
-        page_size=page_size
+        space_id=req.space_id, query=req.query, page=page, page_size=page_size
     )
 
     if search_result.code != status.HTTP_200_OK:
@@ -1690,8 +1883,7 @@ def knowledge_base_search(
         kb_id = kb.get("kb_id", "")
         # 检查是否有图增强文档
         has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
-            space_id=req.space_id,
-            kb_id=kb_id
+            space_id=req.space_id, kb_id=kb_id
         )
         knowledge_bases.append(
             KnowledgeBaseInfo(
@@ -1703,7 +1895,7 @@ def knowledge_base_search(
                 config=kb.get("config"),
                 create_time=kb.get("create_time"),
                 update_time=kb.get("update_time"),
-                has_graph_enhancement=has_graph_enhancement
+                has_graph_enhancement=has_graph_enhancement,
             )
         )
 
@@ -1712,7 +1904,7 @@ def knowledge_base_search(
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
 
     logger.info(
@@ -1725,22 +1917,22 @@ def knowledge_base_search(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="Search knowledge bases successfully",
-        data=response_data.model_dump(by_alias=True)  # 使用 by_alias=True 以返回 "id" 而不是 "kb_id"
+        data=response_data.model_dump(
+            by_alias=True
+        ),  # 使用 by_alias=True 以返回 "id" 而不是 "kb_id"
     )
 
 
 @with_exception_handling
-def knowledge_base_list(
-        req: KnowledgeBaseListRequest,
-        current_user: dict
-) -> ResponseModel:
+def knowledge_base_list(req: KnowledgeBaseListRequest, current_user: dict) -> ResponseModel:
     """获取知识库列表（支持分页）"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[KB_LIST] Getting knowledge base list - User: {user_id}, Space ID: {req.space_id}, "
-        f"Page: {req.page}, Size: {req.size}")
+        f"Page: {req.page}, Size: {req.size}"
+    )
 
     # 1. 验证用户空间权限（如果 space_id 为空或验证失败，返回空列表）
     if not req.space_id:
@@ -1749,49 +1941,40 @@ def knowledge_base_list(
             code=status.HTTP_200_OK,
             message="get knowledge base list success",
             data=KnowledgeBaseListResponse(
-                items=[],
-                total=0,
-                page=req.page,
-                size=req.size
-            ).model_dump(by_alias=False)
+                items=[], total=0, page=req.page, size=req.size
+            ).model_dump(by_alias=False),
         )
 
     try:
         _ = check_user_space(req.space_id, current_user)
     except Exception as e:
         logger.warning(
-            f"[KB_LIST] Space check failed, returning empty list - Space ID: {req.space_id}, Error: {str(e)}")
+            f"[KB_LIST] Space check failed, returning empty list - Space ID: {req.space_id}, Error: {str(e)}"
+        )
         return ResponseModel(
             code=status.HTTP_200_OK,
             message="get knowledge base list success",
             data=KnowledgeBaseListResponse(
-                items=[],
-                total=0,
-                page=req.page,
-                size=req.size
-            ).model_dump(by_alias=False)
+                items=[], total=0, page=req.page, size=req.size
+            ).model_dump(by_alias=False),
         )
 
     # 2. 从数据库获取知识库列表
     list_result = knowledge_base_repository.knowledge_base_list(
-        space_id=req.space_id,
-        page=req.page,
-        size=req.size
+        space_id=req.space_id, page=req.page, size=req.size
     )
 
     if list_result.code != status.HTTP_200_OK:
         logger.warning(
             f"[KB_LIST] Database query failed, returning empty list - "
-            f"Space ID: {req.space_id}, Error: {list_result.message}")
+            f"Space ID: {req.space_id}, Error: {list_result.message}"
+        )
         return ResponseModel(
             code=status.HTTP_200_OK,
             message="get knowledge base list success",
             data=KnowledgeBaseListResponse(
-                items=[],
-                total=0,
-                page=req.page,
-                size=req.size
-            ).model_dump(by_alias=False)
+                items=[], total=0, page=req.page, size=req.size
+            ).model_dump(by_alias=False),
         )
 
     # 3. 转换数据格式，并检查是否有图增强文档
@@ -1800,30 +1983,28 @@ def knowledge_base_list(
         kb_id = kb_data.get("kb_id", "")
         # 检查是否有图增强文档
         has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
-            space_id=req.space_id,
-            kb_id=kb_id
+            space_id=req.space_id, kb_id=kb_id
         )
 
-        items.append(KnowledgeBaseListItem(
-            name=kb_data.get("name", ""),
-            desc=kb_data.get("description"),
-            id=kb_id,
-            type="text",
-            embedding_model_config_id=kb_data.get("embedding_model_config_id"),
-            created_at=_timestamp_to_date_str(kb_data.get("create_time")),
-            updated_at=_timestamp_to_date_str(kb_data.get("update_time")),
-            has_graph_enhancement=has_graph_enhancement
-        ))
+        items.append(
+            KnowledgeBaseListItem(
+                name=kb_data.get("name", ""),
+                desc=kb_data.get("description"),
+                id=kb_id,
+                type="text",
+                embedding_model_config_id=kb_data.get("embedding_model_config_id"),
+                created_at=_timestamp_to_date_str(kb_data.get("create_time")),
+                updated_at=_timestamp_to_date_str(kb_data.get("update_time")),
+                has_graph_enhancement=has_graph_enhancement,
+            )
+        )
 
     # 4. 获取分页信息
     total = list_result.data.get("total", 0)
 
     # 5. 构建响应数据
     response_data = KnowledgeBaseListResponse(
-        items=items,
-        total=total,
-        page=req.page,
-        size=req.size
+        items=items, total=total, page=req.page, size=req.size
     )
 
     logger.info(
@@ -1836,18 +2017,15 @@ def knowledge_base_list(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get knowledge base list success",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )
 
 
 @with_exception_handling
-def document_list(
-        req: DocumentListRequest,
-        current_user: dict
-) -> ResponseModel:
+def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel:
     """获取知识库文档列表（支持分页）"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[DOC_LIST] Getting document list - User: {user_id}, "
@@ -1862,17 +2040,11 @@ def document_list(
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
         logger.warning(f"[DOC_LIST] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
-        )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 3. 从数据库获取文档列表
     list_result = knowledge_base_repository.document_list(
-        space_id=req.space_id,
-        kb_id=req.kb_id,
-        page=req.page,
-        size=req.size
+        space_id=req.space_id, kb_id=req.kb_id, page=req.page, size=req.size
     )
 
     if list_result.code != status.HTTP_200_OK:
@@ -1883,27 +2055,24 @@ def document_list(
         return ResponseModel(
             code=list_result.code,
             message=list_result.message,
-            data={"items": [], "total": 0, "page": req.page, "size": req.size}
+            data={"items": [], "total": 0, "page": req.page, "size": req.size},
         )
 
     # 4. 转换数据格式
     items = []
     for doc_data in list_result.data.get("items", []):
-        items.append(DocumentListItem(
-            name=doc_data.get("name", ""),
-            id=doc_data.get("doc_id", ""),
-            created_at=_timestamp_to_date_str(doc_data.get("create_time")),
-            updated_at=_timestamp_to_date_str(doc_data.get("update_time"))
-        ))
+        items.append(
+            DocumentListItem(
+                name=doc_data.get("name", ""),
+                id=doc_data.get("doc_id", ""),
+                created_at=_timestamp_to_date_str(doc_data.get("create_time")),
+                updated_at=_timestamp_to_date_str(doc_data.get("update_time")),
+            )
+        )
 
     # 5. 构建响应数据
     total = list_result.data.get("total", 0)
-    response_data = DocumentListResponse(
-        items=items,
-        total=total,
-        page=req.page,
-        size=req.size
-    )
+    response_data = DocumentListResponse(items=items, total=total, page=req.page, size=req.size)
 
     logger.info(
         f"[DOC_LIST] Document list retrieved - Space ID: {req.space_id}, "
@@ -1915,18 +2084,15 @@ def document_list(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get documents success",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )
 
 
 @with_exception_handling
-def document_update(
-        req: DocumentUpdateRequest,
-        current_user: dict
-) -> ResponseModel:
+def document_update(req: DocumentUpdateRequest, current_user: dict) -> ResponseModel:
     """更新文档信息（当前只支持更新文档名称）"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[DOC_UPDATE] Updating document - User: {user_id}, "
@@ -1940,33 +2106,24 @@ def document_update(
     kb_get = KnowledgeBaseGet(space_id=req.space_id, kb_id=req.kb_id)
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_UPDATE] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
+        logger.warning(
+            f"[DOC_UPDATE] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
         )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 3. 验证文档是否存在
     doc_get_result = knowledge_base_repository.document_get(
-        space_id=req.space_id,
-        kb_id=req.kb_id,
-        doc_id=req.document_id
+        space_id=req.space_id, kb_id=req.kb_id, doc_id=req.document_id
     )
     if doc_get_result.code != status.HTTP_200_OK or not doc_get_result.data:
         logger.warning(
             f"[DOC_UPDATE] Document not found - Doc ID: {req.document_id}, KB ID: {req.kb_id}, User: {user_id}"
         )
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Document not found"
-        )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Document not found")
 
     # 4. 更新文档名称
     update_result = knowledge_base_repository.document_update(
-        space_id=req.space_id,
-        kb_id=req.kb_id,
-        doc_id=req.document_id,
-        name=req.document_name
+        space_id=req.space_id, kb_id=req.kb_id, doc_id=req.document_id, name=req.document_name
     )
 
     if update_result.code != status.HTTP_200_OK:
@@ -1986,20 +2143,15 @@ def document_update(
 
     # 5. 返回更新结果
     return ResponseModel(
-        code=status.HTTP_200_OK,
-        message="update document message success",
-        data=None
+        code=status.HTTP_200_OK, message="update document message success", data=None
     )
 
 
 @with_exception_handling
-async def document_delete(
-        req: DocumentDeleteRequest,
-        current_user: dict
-) -> ResponseModel:
+async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> ResponseModel:
     """删除文档（支持批量删除）"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[DOC_DELETE] Deleting documents - User: {user_id}, "
@@ -2013,11 +2165,10 @@ async def document_delete(
     kb_get = KnowledgeBaseGet(space_id=req.space_id, kb_id=req.kb_id)
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_DELETE] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
+        logger.warning(
+            f"[DOC_DELETE] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
         )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 3. 批量删除文档
     success_count = 0
@@ -2027,9 +2178,7 @@ async def document_delete(
     for doc_id in req.document_ids:
         # 验证文档是否存在
         doc_get_result = knowledge_base_repository.document_get(
-            space_id=req.space_id,
-            kb_id=req.kb_id,
-            doc_id=doc_id
+            space_id=req.space_id, kb_id=req.kb_id, doc_id=doc_id
         )
         if doc_get_result.code != status.HTTP_200_OK or not doc_get_result.data:
             logger.warning(
@@ -2044,9 +2193,7 @@ async def document_delete(
 
         # 删除文档
         delete_result = knowledge_base_repository.document_delete(
-            space_id=req.space_id,
-            kb_id=req.kb_id,
-            doc_id=doc_id
+            space_id=req.space_id, kb_id=req.kb_id, doc_id=doc_id
         )
 
         if delete_result.code != status.HTTP_200_OK:
@@ -2069,19 +2216,28 @@ async def document_delete(
                     else:
                         logger.warning(f"[DOC_DELETE] Local file not found - Path: {file_path}")
                 except Exception as e:
-                    logger.warning(f"[DOC_DELETE] Failed to delete local file - Path: {file_path}, Error: {str(e)}")
+                    logger.warning(
+                        f"[DOC_DELETE] Failed to delete local file - Path: {file_path}, Error: {str(e)}"
+                    )
 
             # 同步删除索引中的数据（使用新的知识库系统）
             try:
                 # 获取文档的索引信息，判断是否使用图增强
                 doc_data = doc_get_result.data
                 process_info = doc_data.get("process_info", {})
-                indexing_strategy = process_info.get("indexing_strategy", {}) if isinstance(process_info, dict) else {}
-                use_graph = indexing_strategy.get("enable_graph_enhancement", False) if isinstance(indexing_strategy,
-                                                                                                   dict) else False
+                indexing_strategy = (
+                    process_info.get("indexing_strategy", {})
+                    if isinstance(process_info, dict)
+                    else {}
+                )
+                use_graph = (
+                    indexing_strategy.get("enable_graph_enhancement", False)
+                    if isinstance(indexing_strategy, dict)
+                    else False
+                )
 
                 # 创建索引管理器并删除索引数据
-                index_manager = _create_milvus_index_manager()
+                index_manager = _create_index_manager()
 
                 # 删除chunk索引中的数据
                 chunk_index = f"kb_{req.kb_id}_chunks"
@@ -2090,7 +2246,7 @@ async def document_delete(
                     index_name=chunk_index,
                     doc_id=doc_id,
                     kb_id=req.kb_id,
-                    index_type="chunks"
+                    index_type="chunks",
                 )
 
                 # 如果使用图增强，还需要删除triple索引中的数据
@@ -2101,7 +2257,7 @@ async def document_delete(
                         index_name=triple_index,
                         doc_id=doc_id,
                         kb_id=req.kb_id,
-                        index_type="triples"
+                        index_type="triples",
                     )
             except Exception as e:  # noqa: BLE001
                 logger.warning(
@@ -2116,28 +2272,21 @@ async def document_delete(
 
     # 4. 返回删除结果
     if success_count > 0:
-        return ResponseModel(
-            code=status.HTTP_200_OK,
-            message="delete documents success",
-            data=None
-        )
+        return ResponseModel(code=status.HTTP_200_OK, message="delete documents success", data=None)
     else:
         # 如果所有文档都删除失败，返回错误
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
             message=f"Failed to delete documents: {failed_doc_ids}",
-            data=None
+            data=None,
         )
 
 
 @with_exception_handling
-def document_get_status_batch(
-        req: DocumentStatusRequest,
-        current_user: dict
-) -> ResponseModel:
+def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) -> ResponseModel:
     """批量查询文档状态"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[DOC_STATUS] Getting document status batch - User: {user_id}, "
@@ -2151,9 +2300,7 @@ def document_get_status_batch(
     status_items = []
     for doc_id in req.doc_id_list:
         doc_result = knowledge_base_repository.document_get(
-            space_id=req.space_id,
-            kb_id=req.kb_id,
-            doc_id=doc_id
+            space_id=req.space_id, kb_id=req.kb_id, doc_id=doc_id
         )
 
         if doc_result.code == status.HTTP_200_OK and doc_result.data:
@@ -2170,19 +2317,27 @@ def document_get_status_batch(
                 # 从 indexing_strategy 中提取 enable_graph_enhancement
                 indexing_strategy = process_info.get("indexing_strategy")
                 if isinstance(indexing_strategy, dict):
-                    enable_graph_enhancement = indexing_strategy.get("enable_graph_enhancement", False)
+                    enable_graph_enhancement = indexing_strategy.get(
+                        "enable_graph_enhancement", False
+                    )
 
             # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
             if status_value == DocumentStatus.FAILED.value and not error_msg:
                 error_msg = "Processing failed with unknown error"
+            
+            # 格式化错误信息供前端显示
+            if error_msg:
+                error_msg = _format_error_message_for_frontend(error_msg)
 
-            status_items.append(DocumentStatusResponse(
-                id=doc_id,
-                status=status_value,
-                name=doc_name,
-                error_msg=error_msg,
-                enable_graph_enhancement=enable_graph_enhancement
-            ))
+            status_items.append(
+                DocumentStatusResponse(
+                    id=doc_id,
+                    status=status_value,
+                    name=doc_name,
+                    error_msg=error_msg,
+                    enable_graph_enhancement=enable_graph_enhancement,
+                )
+            )
         else:
             # 文档不存在，仍然返回但状态为空或标记为不存在
             logger.warning(
@@ -2193,9 +2348,7 @@ def document_get_status_batch(
             # 这里选择跳过，只返回存在的文档
 
     # 3. 构建响应数据
-    response_data = DocumentStatusListResponse(
-        items=status_items
-    )
+    response_data = DocumentStatusListResponse(items=status_items)
 
     logger.info(
         f"[DOC_STATUS] Document status batch retrieved - Space ID: {req.space_id}, "
@@ -2208,18 +2361,15 @@ def document_get_status_batch(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get document status success",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )
 
 
 @with_exception_handling
-async def document_process(
-        req: DocumentProcessRequest,
-        current_user: dict
-) -> ResponseModel:
+async def document_process(req: DocumentProcessRequest, current_user: dict) -> ResponseModel:
     """启动文档处理流程，使用 agentcore 的解析/分段/索引能力"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[DOC_PROCESS] Starting document processing - User: {user_id}, "
@@ -2231,11 +2381,10 @@ async def document_process(
     kb_get = KnowledgeBaseGet(space_id=req.space_id, kb_id=req.kb_id)
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_PROCESS] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
+        logger.warning(
+            f"[DOC_PROCESS] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
         )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     processed_count = 0
     failed_count = 0
@@ -2259,9 +2408,7 @@ async def document_process(
     for doc_id in req.doc_id_list:
         try:
             doc_result = knowledge_base_repository.document_get(
-                space_id=req.space_id,
-                kb_id=req.kb_id,
-                doc_id=doc_id
+                space_id=req.space_id, kb_id=req.kb_id, doc_id=doc_id
             )
 
             if doc_result.code != status.HTTP_200_OK or not doc_result.data:
@@ -2278,8 +2425,8 @@ async def document_process(
                         process_info={
                             **process_info_base,
                             "error": "Document not found",
-                            "failed_time": milliseconds()
-                        }
+                            "failed_time": milliseconds(),
+                        },
                     )
                 except Exception:
                     # 如果文档不存在，无法更新状态，这是正常的
@@ -2291,7 +2438,8 @@ async def document_process(
                 failed_count += 1
                 failed_docs.append(doc_id)
                 logger.warning(
-                    f"[DOC_PROCESS] Document status invalid - Doc ID: {doc_id}, Current status: {current_status}")
+                    f"[DOC_PROCESS] Document status invalid - Doc ID: {doc_id}, Current status: {current_status}"
+                )
                 try:
                     knowledge_base_repository.document_update_status(
                         space_id=req.space_id,
@@ -2301,8 +2449,8 @@ async def document_process(
                         process_info={
                             **process_info_base,
                             "error": "Document status invalid",
-                            "failed_time": milliseconds()
-                        }
+                            "failed_time": milliseconds(),
+                        },
                     )
                 except Exception as update_error:
                     logger.error(
@@ -2323,8 +2471,8 @@ async def document_process(
                     process_info={
                         **process_info_base,
                         "error": "File path not found",
-                        "failed_time": milliseconds()
-                    }
+                        "failed_time": milliseconds(),
+                    },
                 )
                 continue
 
@@ -2334,7 +2482,7 @@ async def document_process(
                 kb_id=req.kb_id,
                 doc_id=doc_id,
                 doc_status=DocumentStatus.PROCESSING.value,
-                process_info=process_info_base
+                process_info=process_info_base,
             )
 
             if update_result.code != status.HTTP_200_OK:
@@ -2342,7 +2490,8 @@ async def document_process(
                 failed_docs.append(doc_id)
                 logger.error(
                     f"[DOC_PROCESS] Failed to update document status - "
-                    f"Doc ID: {doc_id}, Error: {update_result.message}")
+                    f"Doc ID: {doc_id}, Error: {update_result.message}"
+                )
                 try:
                     knowledge_base_repository.document_update_status(
                         space_id=req.space_id,
@@ -2352,22 +2501,21 @@ async def document_process(
                         process_info={
                             **process_info_base,
                             "error": "Failed to update document status",
-                            "failed_time": milliseconds()
-                        }
+                            "failed_time": milliseconds(),
+                        },
                     )
                 except Exception as update_error:
                     logger.error(
                         f"[DOC_PROCESS] Failed to update FAILED status - Doc ID: {doc_id}, Error: {str(update_error)}"
                     )
                 continue
-
+            doc_name = doc_result.data.get("name")
             # 收集有效文档信息
-            valid_documents.append({
-                "doc_id": doc_id,
-                "file_path": file_path
-            })
+            valid_documents.append({"doc_id": doc_id, "file_path": file_path, "name": doc_name})
             processed_count += 1
-            logger.info(f"[DOC_PROCESS] Document validated and status updated to PROCESSING - Doc ID: {doc_id}")
+            logger.info(
+                f"[DOC_PROCESS] Document validated and status updated to PROCESSING - Doc ID: {doc_id}"
+            )
 
         except Exception as e:
             failed_count += 1
@@ -2375,7 +2523,7 @@ async def document_process(
             logger.error(
                 f"[DOC_PROCESS] Failed to validate document - Doc ID: {doc_id}, "
                 f"KB ID: {req.kb_id}, Error: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
 
             try:
@@ -2387,13 +2535,13 @@ async def document_process(
                     process_info={
                         **process_info_base,
                         "error": "Document validation failed",
-                        "failed_time": milliseconds()
-                    }
+                        "failed_time": milliseconds(),
+                    },
                 )
             except Exception as update_error:
                 logger.error(
                     f"[DOC_PROCESS] Failed to update FAILED status - Doc ID: {doc_id}, Error: {str(update_error)}",
-                    exc_info=True
+                    exc_info=True,
                 )
 
     # 第二阶段：如果有有效文档，创建后台任务串行处理
@@ -2413,7 +2561,7 @@ async def document_process(
                 segmentation_strategy=req.segmentation_strategy,
                 indexing_strategy=req.indexing_strategy,
                 task_id=task_id,
-                process_info_base=process_info_base
+                process_info_base=process_info_base,
             )
         )
 
@@ -2426,7 +2574,7 @@ async def document_process(
         task_id=task_id,
         processed_count=processed_count,
         failed_count=failed_count,
-        failed_docs=failed_docs
+        failed_docs=failed_docs,
     )
 
     logger.info(
@@ -2439,18 +2587,15 @@ async def document_process(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="Document processing tasks started",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )
 
 
 @with_exception_handling
-def task_progress(
-        req: TaskProgressRequest,
-        current_user: dict
-) -> ResponseModel:
+def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel:
     """查询任务处理进度"""
     start_time = time.time()
-    user_id = current_user.get('user_id', 'unknown')
+    user_id = current_user.get("user_id", "unknown")
 
     logger.info(
         f"[TASK_PROGRESS] Querying task progress - User: {user_id}, "
@@ -2464,18 +2609,14 @@ def task_progress(
     kb_get = KnowledgeBaseGet(space_id=req.space_id, kb_id=req.kb_id)
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[TASK_PROGRESS] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(
-            code=status.HTTP_404_NOT_FOUND,
-            message="Knowledge base not found"
+        logger.warning(
+            f"[TASK_PROGRESS] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
         )
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
 
     # 3. 查询该任务ID下的所有文档
     list_result = knowledge_base_repository.document_list(
-        space_id=req.space_id,
-        kb_id=req.kb_id,
-        page=1,
-        size=1000  # 假设一个任务不会超过1000个文档
+        space_id=req.space_id, kb_id=req.kb_id, page=1, size=1000  # 假设一个任务不会超过1000个文档
     )
 
     if list_result.code != status.HTTP_200_OK:
@@ -2509,20 +2650,20 @@ def task_progress(
             elif doc_status == DocumentStatus.FAILED.value:
                 failed_count += 1
 
-            if doc_status in [DocumentStatus.PROCESSING.value, DocumentStatus.INDEXING.value,
-                              DocumentStatus.INDEXED.value]:
+            if doc_status in [
+                DocumentStatus.PROCESSING.value,
+                DocumentStatus.INDEXING.value,
+                DocumentStatus.INDEXED.value,
+            ]:
                 processed_count += 1
 
             error = None
             if doc_status == DocumentStatus.FAILED.value:
                 error = process_info.get("error", "Unknown error")
 
-            task_items.append(TaskProgressItem(
-                doc_id=doc_id,
-                doc_name=doc_name,
-                status=doc_status,
-                error=error
-            ))
+            task_items.append(
+                TaskProgressItem(doc_id=doc_id, doc_name=doc_name, status=doc_status, error=error)
+            )
 
     # 5. 构建响应数据
     response_data = TaskProgressResponse(
@@ -2531,7 +2672,7 @@ def task_progress(
         processed_count=processed_count,
         success_count=success_count,
         failed_count=failed_count,
-        items=task_items
+        items=task_items,
     )
 
     logger.info(
@@ -2545,5 +2686,5 @@ def task_progress(
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get task progress success",
-        data=response_data.model_dump(by_alias=False)
+        data=response_data.model_dump(by_alias=False),
     )

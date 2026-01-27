@@ -5,7 +5,8 @@ import json
 import os
 import uuid
 from typing import Any, Callable, Dict, List
-
+from enum import Enum
+from pydantic import BaseModel
 from fastapi import status
 from openjiuwen.core.common.logging import logger
 from packaging import version
@@ -14,16 +15,21 @@ from pydantic import ValidationError
 from openjiuwen_studio.core.database import milliseconds
 import openjiuwen_studio.core.manager.convertor.plugin as convert
 from openjiuwen_studio.core.manager.convertor.components.plugin import param_type_mapping
-from openjiuwen_studio.core.manager.internal.workflow import InputElem
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.repositories.plugin_repository import plugin_repository
 from openjiuwen_studio.core.manager.repositories.tool_repository import tool_repository
+from openjiuwen_studio.core.manager.repositories.agent_repository import agent_repository
 from openjiuwen_studio.core.utils.exception import log_exception
 from openjiuwen_studio.models.plugin import PluginBaseDBPd, ToolBaseDB, PluginPublishDBPd
-from openjiuwen_studio.schemas.plugin import PluginCreate, PluginId, PluginInfo, PluginInfoResponse, PluginApiBase, \
-    PluginApiInfo, PluginToolId, PluginApiInfoResponse, PluginListTool, PluginList, PluginListResponse, PluginListPagination, PluginType, \
-    PluginToolParam, ToolId, PluginCodeBase, PluginCodeInfo, PluginCodeInfoResponse, PluginApiInfoDB, PluginCodeInfoDB, \
-    PluginPublish, PluginPublishResponse, PluginPublishInfo, PluginPublishListResponse, PluginPublishInfoResponse
+from openjiuwen_studio.schemas.plugin import (
+    PluginCreate, PluginId, PluginInfo, PluginInfoResponse, PluginApiBase,
+    PluginApiInfo, PluginApiInfoCreate, PluginToolId, PluginApiInfoResponse,
+    PluginListTool, PluginList, PluginListResponse, PluginListPagination,
+    PluginType, PluginToolParam, ToolId, PluginCodeBase, PluginCodeInfo,
+    PluginCodeInfoResponse, PluginApiInfoDB, PluginCodeInfoDB, PluginPublish,
+    PluginPublishResponse, PluginPublishInfo, PluginPublishListResponse,
+    PluginPublishInfoResponse, ParamType
+)
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.core.manager.reference_extractor import check_referenced_dependencies
 from openjiuwen_studio.core.manager.repositories.reference_repository import reference_repository
@@ -61,17 +67,24 @@ def plugin_create(
 
     plugin_id = str(uuid.uuid4())
 
-    plugin = PluginBaseDBPd(
-        plugin_id=plugin_id,
-        name=req.name,
-        desc=req.desc,
-        url=req.url,
-        icon_uri=req.icon_uri,
-        space_id=req.space_id,
-        plugin_type=req.plugin_type,
-        create_time=current_time,
-        update_time=current_time,
-    )
+    plugin_dict = {
+        "plugin_id": plugin_id,
+        "name": req.name,
+        "desc": req.desc,
+        "desc_mk": req.desc_mk if hasattr(req, 'desc_mk') else "",
+        "url": req.url,
+        "icon_uri": req.icon_uri,
+        "space_id": req.space_id,
+        "plugin_type": req.plugin_type,
+        "create_time": current_time,
+        "update_time": current_time,
+    }
+
+    # 将 request_params 映射到数据库字段 inputs
+    if hasattr(req, 'request_params') and req.request_params:
+        plugin_dict["inputs"] = [param.model_dump() for param in req.request_params]
+
+    plugin = PluginBaseDBPd(**plugin_dict)
     logger.info(f"create plugin info: {plugin}")
 
     res = plugin_repository.plugin_create(plugin.model_dump())
@@ -109,10 +122,12 @@ def plugin_get(
             code=canvas_result.code,
             message=canvas_result.message,
         )
+    # 使用字段映射方法将数据库的 inputs 映射为 request_params
+    plugin_info = PluginInfo.from_db_with_mapping(canvas_result.data)
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get plugin success",
-        data=PluginInfoResponse(plugin_info=PluginInfo(**(canvas_result.data.model_dump())))
+        data=PluginInfoResponse(plugin_info=plugin_info)
     )
 
 
@@ -133,11 +148,31 @@ def plugin_update(
             code=get_result.code,
             message=get_result.message,
         )
-    plugin = PluginBaseDBPd(**(get_result.data.model_dump()))
-    plugin.name = req.name
-    plugin.desc = req.desc
-    plugin.url = req.url
-    plugin.icon_uri = req.icon_uri
+    # Handle both dict and Pydantic model types
+    data = get_result.data
+    if hasattr(data, 'model_dump'):
+        data_dict = data.model_dump()
+    elif hasattr(data, 'dict'):
+        data_dict = data.dict()
+    else:
+        data_dict = data
+    plugin = PluginBaseDBPd(**data_dict)
+    update_dict = {
+        "name": req.name,
+        "desc": req.desc,
+        "url": req.url,
+        "icon_uri": req.icon_uri,
+    }
+
+    if hasattr(req, 'desc_mk') and req.desc_mk is not None:
+        update_dict["desc_mk"] = req.desc_mk
+
+    # 将 request_params 映射到数据库字段 inputs
+    if hasattr(req, 'request_params') and req.request_params is not None:
+        update_dict["inputs"] = [param.model_dump() for param in req.request_params]
+
+    for key, value in update_dict.items():
+        setattr(plugin, key, value)
 
     res = plugin_repository.plugin_save(plugin.model_dump())
     result = ResponseModel(**res)
@@ -147,6 +182,17 @@ def plugin_update(
             code=result.code,
             message=result.message,
         )
+
+    # 同步更新引用了该插件的Agent中的插件名称
+    try:
+        if hasattr(req, 'name') and req.name:
+            agent_repository.update_plugin_name_in_agents(
+                space_id=req.space_id,
+                plugin_id=req.plugin_id,
+                new_plugin_name=req.name
+            )
+    except Exception as e:
+        logger.error(f"Failed to sync plugin name to agents: {e}", exc_info=True)
 
     return ResponseModel(
         code=status.HTTP_200_OK,
@@ -232,14 +278,14 @@ def plugin_list(
                 }
             )
         )
-    
+
     # 转换插件信息
     infos: List[PluginInfo] = []
     plugin_data = list_result.data.get("plugin_infos", [])
     for info_dict in plugin_data:
         info = PluginInfo(**info_dict)
         infos.append(info)
-    
+
     # 获取分页信息
     pagination_data = list_result.data.get("pagination", {})
     pagination = PluginListPagination(**pagination_data) if pagination_data else PluginListPagination(
@@ -248,7 +294,7 @@ def plugin_list(
         page=req.page or 1,
         page_size=req.size or 10
     )
-    
+
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get plugin success",
@@ -285,7 +331,7 @@ def plugin_convert(
 
 @with_exception_handling
 def plugin_create_api(
-        req: PluginApiBase,
+        req: PluginApiInfoCreate,
         current_user: dict
 ) -> ResponseModel:
     """创建插件API"""
@@ -302,6 +348,10 @@ def plugin_create_api(
         desc=req.desc,
         path=req.path,
         method=req.method,
+        available=False,
+        request_params=req.request_params if hasattr(req, 'request_params') else [],
+        response_params=req.response_params if hasattr(req, 'response_params') else [],
+        headers=req.headers if hasattr(req, 'headers') else [],
     )
 
     res = tool_repository.tool_create(api_info.model_dump())
@@ -323,16 +373,28 @@ def plugin_create_api(
 def _plugin_input_output_parameters(params: List[PluginToolParam]) -> List[Dict[str, Any]]:
     input_output_params: List[Dict[str, Any]] = []
     for param in params:
-        input = InputElem(
-            name=param.name,
-            type=param_type_mapping.get(param.type),
-            description=param.desc,
-            required=param.is_required,
-            method=param.method
-        )
-        input_output_params.append(input.model_dump())
+        param_dict = param.model_dump()
+        input_output_params.append(param_dict)
 
     return input_output_params
+
+
+def _input_parameters_to_request_params(input_parameters: List[Dict[str, Any]]) -> List[PluginToolParam]:
+    """Convert input_parameters from database to request_params for API response"""
+    if not input_parameters:
+        return []
+
+    request_params = []
+    for param in input_parameters:
+        if isinstance(param.get("type"), str):
+            for key, value in param_type_mapping.items():
+                if value == param.get('type'):
+                    param["type"] = key
+                    break
+        request_param = PluginToolParam(**param)
+        request_params.append(request_param)
+
+    return request_params
 
 
 def _plugin_update_tool(
@@ -348,7 +410,11 @@ def _plugin_update_tool(
         )
 
     tool = get_result.data
-    if tool.plugin_id != plugin_id:
+    # tool is already a dict from database, not a Pydantic model
+    tool_plugin_id = tool.get('plugin_id') if isinstance(tool, dict) else tool.plugin_id
+    tool_version = tool.get('plugin_version') if isinstance(tool, dict) else tool.plugin_version
+
+    if tool_plugin_id != plugin_id:
         return ResponseModel(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="plugin id is not match",
@@ -357,8 +423,51 @@ def _plugin_update_tool(
     # 确保 req 中包含 plugin_version，因为唯一约束是 (tool_id, plugin_version)
     # 从已获取的 tool 对象中获取 plugin_version，确保更新时能正确找到记录
     if 'plugin_version' not in req or not req.get('plugin_version'):
-        req['plugin_version'] = tool.plugin_version if hasattr(
-            tool, 'plugin_version') and tool.plugin_version else ToolBaseDB.__version_none__
+        req['plugin_version'] = tool_version if tool_version else ToolBaseDB.__version_none__
+
+    # 确保req中如果没有修改，则不修改available的状态
+    # 将 tool 转换为 dict
+    if not isinstance(tool, dict):
+        tool_dict = tool.to_dict() if hasattr(tool, 'to_dict') else tool.model_dump()
+    else:
+        tool_dict = tool.copy()
+
+    # 需要对比的字段
+    need_compare_fields = {'name', 'desc', 'input_parameters', 'output_parameters', 'plugin_id', 'plugin_type',
+                           'plugin_version', 'space_id', 'tool_id', 'headers', 'method', 'path', 'request_params',
+                           'response_params'}
+
+    def to_plain(val: Any) -> Any:
+        # IntEnum/Enum -> int/基础值
+        if isinstance(val, Enum):
+            return val.value
+        # Pydantic Model -> dict
+        if isinstance(val, BaseModel):
+            return to_plain(val.model_dump())
+        if isinstance(val, dict):
+            return {k: to_plain(v) for k, v in val.items()}
+        if isinstance(val, list):
+            return [to_plain(v) for v in val]
+        return val
+
+    # 创建用于比较的字典（指定字段）
+    def normalize_for_db_comparison(data: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = {}
+        for key in need_compare_fields:
+            if key in data:
+                normalized[key] = to_plain(data[key])
+        return normalized
+
+    tool_normalized = normalize_for_db_comparison(tool_dict)
+    req_normalized = normalize_for_db_comparison(req)
+
+    # 比较 req 和 tool 的内容
+    if tool_normalized != req_normalized:
+        # 内容不一致，设置 available=False
+        req['available'] = False
+    else:
+        # 内容一致，保持 available 不变（从数据库中获取的值）
+        req['available'] = tool_dict.get('available', False)
 
     res = tool_repository.tool_save(req)
     result = ResponseModel(**res)
@@ -368,6 +477,22 @@ def _plugin_update_tool(
             code=result.code,
             message=result.message,
         )
+
+    # 同步更新引用了该工具的Agent中的工具名称
+    try:
+        if 'name' in req:
+            tool_id = req.get('tool_id')
+            space_id = req.get('space_id')
+            new_name = req.get('name')
+            
+            if tool_id and space_id and new_name:
+                agent_repository.update_tool_name_in_agents(
+                    space_id=space_id,
+                    tool_id=tool_id,
+                    new_tool_name=new_name
+                )
+    except Exception as e:
+        logger.error(f"Failed to sync tool name to agents: {e}", exc_info=True)
 
     return ResponseModel(
         code=status.HTTP_200_OK,
@@ -463,11 +588,21 @@ def plugin_get_api(
             message="plugin id is not match",
         )
 
+    # tool is already a dict from database, not a Pydantic model
+    api_dict = tool if isinstance(tool, dict) else tool.model_dump()
+    if 'available' not in api_dict or api_dict.get('available') is None:
+        api_dict['available'] = True
+
+    # Convert input_parameters to request_params with runtime and value
+    if 'input_parameters' in api_dict and api_dict['input_parameters']:
+        request_params = _input_parameters_to_request_params(api_dict['input_parameters'])
+        api_dict['request_params'] = [param.model_dump() for param in request_params]
+
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get plugin api success",
         data=PluginApiInfoResponse(
-            api_info=[PluginApiInfo(**(tool.model_dump()))],
+            api_info=[PluginApiInfo(**api_dict)],
             total=1,
         )
     )
@@ -493,6 +628,14 @@ def plugin_list_api(
     api_infos: List[PluginApiInfo] = []
     for info_dict in tool_list:
         logger.info(f"tool: {info_dict}")
+        if 'available' not in info_dict or info_dict.get('available') is None:
+            info_dict['available'] = True
+
+        # Convert input_parameters to request_params with runtime and value
+        if 'input_parameters' in info_dict and info_dict['input_parameters']:
+            request_params = _input_parameters_to_request_params(info_dict['input_parameters'])
+            info_dict['request_params'] = [param.model_dump() for param in request_params]
+
         info = PluginApiInfo(**info_dict)
         if info.plugin_id == req.plugin_id:
             api_infos.append(info)
@@ -526,6 +669,7 @@ def plugin_create_code(
         desc=req.desc,
         language=req.language,
         code=req.code,
+        available=False,
     )
 
     res = tool_repository.tool_create(code_info.model_dump())
@@ -577,17 +721,28 @@ def plugin_get_code(
         )
 
     tool = get_result.data
-    if tool.plugin_id != req.plugin_id:
+    # tool is already a dict from database, not a Pydantic model
+    tool_plugin_id = tool.get('plugin_id') if isinstance(tool, dict) else tool.plugin_id
+
+    if tool_plugin_id != req.plugin_id:
         return ResponseModel(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message="plugin id is not match",
         )
 
+    # tool is already a dict from database, not a Pydantic model
+    tool_dict = tool if isinstance(tool, dict) else tool.model_dump()
+
+    # Convert input_parameters to request_params with runtime and value
+    if 'input_parameters' in tool_dict and tool_dict['input_parameters']:
+        request_params = _input_parameters_to_request_params(tool_dict['input_parameters'])
+        tool_dict['request_params'] = [param.model_dump() for param in request_params]
+
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get plugin code success",
         data=PluginCodeInfoResponse(
-            code_info=[PluginCodeInfo(**(tool.model_dump()))],
+            code_info=[PluginCodeInfo(**tool_dict)],
             total=1,
         )
     )
@@ -709,12 +864,14 @@ def plugin_publish(
         "plugin_id": req.plugin_id,
         "name": plugin_info.name,
         "desc": plugin_info.desc,
+        "desc_mk": plugin_info.desc_mk,
         "plugin_version": req.plugin_version,
         "version_desc": req.version_desc,
         "url": plugin_info.url,
         "icon_uri": plugin_info.icon_uri,
         "plugin_type": plugin_info.plugin_type,
         "space_id": req.space_id,
+        "inputs": plugin_info.inputs,
         "tools": tool_list,
         "create_time": milliseconds(),
         "update_time": milliseconds()
@@ -773,7 +930,8 @@ def plugin_publish_list(
     infos: List[PluginPublishInfo] = []
     if list_result.data is not None:
         for info_dict in list_result.data:
-            info = PluginPublishInfo(**info_dict)
+            # 使用 from_db_with_mapping 将 inputs 映射为 request_params
+            info = PluginPublishInfo.from_db_with_mapping(info_dict)
             infos.append(info)
     return ResponseModel(
         code=status.HTTP_200_OK,
@@ -798,10 +956,12 @@ def plugin_publish_get(
             code=canvas_result.code,
             message=canvas_result.message,
         )
+    # 使用 from_db_with_mapping 将 inputs 映射为 request_params
+    plugin_info = PluginPublishInfo.from_db_with_mapping(canvas_result.data)
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get publish plugin success",
-        data=PluginPublishInfoResponse(plugin_info=PluginPublishInfo(**canvas_result.data))
+        data=PluginPublishInfoResponse(plugin_info=plugin_info)
     )
 
 
@@ -831,8 +991,8 @@ def plugin_publish_delete(
 
 @with_exception_handling
 def plugin_read_market_json(
-    req: PluginList,
-    current_user: dict
+        req: PluginList,
+        current_user: dict
 ) -> ResponseModel:
     """
     读取backend目录下的config.json文件内容并以JSON字符串形式返回
@@ -881,4 +1041,62 @@ def plugin_read_market_json(
             code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             message=f"Error reading JSON file: {str(e)}",
             data=""
+        )
+
+
+@with_exception_handling
+def plugin_tool_update_available(
+        tool_id: str,
+        space_id: str,
+        available: bool,
+        plugin_version: str = None
+) -> ResponseModel:
+    """
+    更新工具的可用状态（供运行面调用）
+
+    当工具执行成功时，调用此方法将工具的 available 字段设置为 True
+    当工具执行失败时，调用此方法将工具的 available 字段设置为 False
+
+    Args:
+        tool_id: 工具ID
+        space_id: 空间ID
+        available: 工具是否可用（True=可用，False=不可用）
+        plugin_version: 插件版本（可选，默认使用 __version_none__）
+
+    Returns:
+        ResponseModel: 更新结果
+
+    Example:
+        # 工具执行成功后调用
+        plugin_tool_update_available("tool_123", "space_456", True)
+
+        # 工具执行失败后调用
+        plugin_tool_update_available("tool_123", "space_456", False)
+    """
+    result = tool_repository.tool_update_available(
+        tool_id=tool_id,
+        space_id=space_id,
+        available=available,
+        plugin_version=plugin_version
+    )
+
+    if result.get("code") == status.HTTP_200_OK:
+        logger.info(
+            f"Tool available status updated: tool_id={tool_id}, "
+            f"space_id={space_id}, available={available}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="Tool available status updated successfully",
+            data=result
+        )
+    else:
+        logger.error(
+            f"Failed to update tool available status: tool_id={tool_id}, "
+            f"space_id={space_id}, error={result.get('message')}"
+        )
+        return ResponseModel(
+            code=result.get("code", status.HTTP_500_INTERNAL_SERVER_ERROR),
+            message=result.get("message", "Failed to update tool available status"),
+            data=result
         )

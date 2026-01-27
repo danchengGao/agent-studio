@@ -21,7 +21,8 @@ Agent Runner - Agent执行管理器
 """
 import asyncio
 import json
-from typing import Any, AsyncGenerator, Dict, List, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional, Union
+from datetime import datetime, timezone
 
 from fastapi import status
 from openjiuwen.agent.config.react_config import ReActAgentConfig
@@ -44,7 +45,10 @@ from openjiuwen_studio.core.executor.agent.agent_trace_utils import (
     finalize_trace,
     handle_trace_error,
     initialize_trace_context,
-    process_chunk_trace
+    process_chunk_trace,
+    create_kb_retrieval_span,
+    process_kb_retrieval_spans,
+    KBRetrievalSpanParams
 )
 from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
 from openjiuwen_studio.core.executor.workflow.pregel_graph_adapter import JiuWenGraphException
@@ -58,6 +62,55 @@ from .agent_dl_adapter import AgentDlAdapter
 
 def get_memory_engine():
     return MemoryEngineManager.get_instance()
+
+
+async def _process_kb_retrieval_info(
+    kb_retrieval_info: Dict[str, Any],
+    trace_context: Any,
+    agent_invoke_id: Optional[str] = None
+) -> None:
+    """
+    处理知识库检索信息，创建TraceAgentSpan并添加到追踪上下文
+    
+    Args:
+        kb_retrieval_info: 知识库检索信息字典，包含query、start_time、end_time、results
+        trace_context: 追踪上下文
+        agent_invoke_id: Agent的invoke_id，用于设置知识库检索span的parent_invoke_id
+    """
+    if not kb_retrieval_info or not trace_context.trace_id:
+        return
+    
+    start_time = kb_retrieval_info.get("start_time")
+    end_time = kb_retrieval_info.get("end_time")
+    query = kb_retrieval_info.get("query", "")
+    results = kb_retrieval_info.get("results", [])
+    
+    if not start_time or not end_time:
+        logger.warning("[KB_RETRIEVAL] Missing start_time or end_time for KB retrieval span")
+        return
+    
+    try:
+        # 创建知识库检索的span参数
+        span_params = KBRetrievalSpanParams(
+            trace_id=trace_context.trace_id,
+            query=query,
+            kb_results=results,
+            start_time=start_time,
+            end_time=end_time,
+            parent_invoke_id=agent_invoke_id  # 知识库检索是agent的直接子节点
+        )
+        # 创建知识库检索的span
+        kb_span = await create_kb_retrieval_span(span_params)
+        
+        # 添加到追踪上下文
+        trace_context.kb_retrieval_spans.append(kb_span)
+        
+        # 处理知识库检索的spans
+        await process_kb_retrieval_spans(trace_context, agent_invoke_id=agent_invoke_id)
+        
+        logger.debug(f"[KB_RETRIEVAL] Created and processed KB retrieval span: {kb_span.invoke_id}")
+    except Exception as e:
+        logger.error(f"[KB_RETRIEVAL] Failed to process KB retrieval span: {str(e)}", exc_info=True)
 
 
 async def _fetch_agent_dl(
@@ -457,7 +510,16 @@ class AgentRunner:
 
         # 2.1 使用知识库检索（如果配置了知识库）
         kb_ids, retrieval_config = AgentDlAdapter.get_knowledge_config(agent_dl_json)
+        kb_retrieval_info = None
         if kb_ids:
+            # 初始化知识库检索信息
+            kb_retrieval_info = {
+                "query": inputs.get("query", ""),
+                "kb_ids": kb_ids,
+                "start_time": None,
+                "end_time": None,
+                "results": None,
+            }
             logger.debug(
                 f"[KB_RETRIEVAL] Start to use knowledge retrieval - KB IDs: {kb_ids}, "
                 f"Retrieval config: {retrieval_config}")
@@ -518,12 +580,24 @@ class AgentRunner:
                         logger.debug(
                             f"[KB_RETRIEVAL] Executing multi-KB retrieval - Query: {query}, "
                             f"KB count: {len(kb_instances)}")
+                        
+                        # 记录开始时间
+                        kb_start_time = datetime.now(tz=timezone.utc)
+                        if kb_retrieval_info:
+                            kb_retrieval_info["start_time"] = kb_start_time
+                        
                         kb_results = await retrieve_multi_kb(
                             kbs=kb_instances,
                             query=query,
                             config=openjiuwen_retrieval_config,
                             top_k=retrieval_config.topk or 5
                         )
+                        
+                        # 记录结束时间和结果
+                        kb_end_time = datetime.now(tz=timezone.utc)
+                        if kb_retrieval_info:
+                            kb_retrieval_info["end_time"] = kb_end_time
+                            kb_retrieval_info["results"] = kb_results
 
                         # 将检索结果添加到 agent_config 的 prompt_template
                         if kb_results:
@@ -566,9 +640,25 @@ class AgentRunner:
             inputs["user_id"] = space_id
             inputs["group_id"] = agent_config.id
             trace_context.agent_input = {'inputs': inputs.get('query')}
+            
+            # 6.1 处理知识库检索的spans（在获取trace_id后）
+            # 注意：agent的顶层invoke_id就是agent_id（即id参数），不需要从trace中获取
+            kb_spans_processed = False
+            agent_invoke_id = id  # agent的顶层invoke_id就是agent_id
+            
             async for chunk in invokable_agent.stream(inputs):
                 # 处理单个chunk的追踪信息
                 rsp = await process_chunk_trace(chunk, trace_context)
+                
+                # 在获取到trace_id后，处理知识库检索的spans
+                if not kb_spans_processed and trace_context.trace_id and kb_retrieval_info:
+                    logger.debug(
+                        f"[KB_RETRIEVAL] Processing KB retrieval spans - "
+                        f"trace_id: {trace_context.trace_id}, agent_invoke_id: {agent_invoke_id}"
+                    )
+                    await _process_kb_retrieval_info(kb_retrieval_info, trace_context, agent_invoke_id)
+                    kb_spans_processed = True
+                    logger.debug(f"[KB_RETRIEVAL] KB retrieval spans processed successfully")
 
                 # 返回响应结果
                 if rsp:
