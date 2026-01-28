@@ -95,7 +95,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       <div className="flex-1 overflow-y-auto conversation-scroll px-2 py-3 min-h-0">
         {conversations.length === 0 ? (
           // Empty state
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full">
             <MessageSquare className="w-12 h-12 opacity-30 mb-3" />
             <p className="text-sm">暂无对话历史</p>
           </div>

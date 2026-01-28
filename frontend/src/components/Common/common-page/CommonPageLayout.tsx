@@ -202,7 +202,7 @@ function CommonPageLayoutInner(props: CommonPageLayoutProps) {
   )
 
   return (
-    <div className={`h-full flex flex-col bg-[#F8F9FC] ${className || ''}`}>
+    <div className={`h-full flex flex-col bg-[#F8F9FC] px-6 ${className || ''}`}>
       <PageHeader
         title={title}
         tabs={tabs}

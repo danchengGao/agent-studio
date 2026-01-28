@@ -65,7 +65,6 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
   }
 
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [mainSidebarWidth, setMainSidebarWidth] = useState(260)
 
   // Load collapsed state from localStorage on mount
   useEffect(() => {
@@ -89,35 +88,10 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
     }
   }, [isCollapsed, forceCollapsed])
 
-  // 实时监听主侧边栏的宽度变化
-  useEffect(() => {
-    const mainSidebar = document.querySelector('.lg\\:w-16, .lg\\:w-65') as HTMLElement
-    if (!mainSidebar) return
-
-    const updateWidth = () => {
-      const width = mainSidebar.getBoundingClientRect().width
-      setMainSidebarWidth(width)
-    }
-
-    // 初始宽度
-    updateWidth()
-
-    // 监听窗口大小变化
-    const resizeObserver = new ResizeObserver(updateWidth)
-    resizeObserver.observe(mainSidebar)
-
-    return () => {
-      resizeObserver.disconnect()
-    }
-  }, [])
-
   const handleDeleteConversation = async (conversationId: string) => {
     const { deleteConversation } = useConversationStore.getState()
     await deleteConversation(conversationId)
   }
-
-  // 按钮始终与主侧边栏保持 8px 间距
-  const buttonLeftStyle = { left: mainSidebarWidth + 8 }
 
   // 统一的图标按钮样式
   const iconButtonClass = `
@@ -139,33 +113,22 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
   `
 
   if (isCollapsed) {
-    // 收起状态：中间显示一个 > 按钮用于展开
-    // 按钮位置根据主侧边栏状态动态调整，保持固定间距
     return (
-      <>
-        {/* 收起状态不占用布局空间 */}
-        <div className="w-0 h-full" />
-
-        {/* 展开按钮 - fixed 定位，垂直居中 */}
-        <div
-          className="fixed top-1/2 -translate-y-1/2 z-50 transition-all duration-300"
-          style={buttonLeftStyle}
+      <div className="relative w-0 h-full">
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className={`${collapsedExpandButtonClass} absolute top-1/2 -translate-y-1/2 left-2 z-20`}
+          title="展开对话历史"
         >
-          <button
-            onClick={() => setIsCollapsed(false)}
-            className={collapsedExpandButtonClass}
-            title="展开对话历史"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </>
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
     )
   }
 
   // Expanded state - full sidebar
   return (
-    <div className="flex flex-col bg-gray-50 border-r border-gray-200 w-[260px] h-full min-h-0">
+    <div className="flex flex-col border-r border-gray-200 w-[260px] h-full min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4">
         <div className="flex items-center gap-2">

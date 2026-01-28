@@ -34,7 +34,7 @@ export const MessageList: React.FC = () => {
       <div ref={containerRef}>
         {messageItemsList.length === 0 ? (
           // 空状态
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex items-center justify-center h-full">
             <p>开始对话吧...</p>
           </div>
         ) : (
