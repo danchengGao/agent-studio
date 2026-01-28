@@ -468,7 +468,7 @@
     },
     "navigation": {
       "dashboard": "主页",
-      "apps": "应用空间",
+      "apps": "探索应用",
       "agents": "智能体开发",
       "workflows": "工作流编排",
       "promptManagement": "提示词管理",
@@ -525,7 +525,7 @@
         "description": "管理和安装插件扩展功能"
       },
       "appSpace": {
-        "name": "应用空间",
+        "name": "探索应用",
         "description": "浏览和使用预制智能体应用"
       }
     },

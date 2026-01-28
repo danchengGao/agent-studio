@@ -35,7 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, isCollapsed, onToggl
 
   const navigation: NavigationItem[] = [
     { name: t('layout.navigation.dashboard'), href: '/dashboard', icon: DashboardIcon },
-    // { name: t('layout.navigation.apps'), href: '/dashboard/apps', icon: Layers },
+    { name: t('layout.navigation.apps'), href: '/dashboard/apps', icon: Layers },
     { name: t('layout.navigation.agents'), href: '/dashboard/agents', icon: AgentIcon },
     { name: t('layout.navigation.workflows'), href: '/dashboard/workflows', icon: WorkflowIcon },
     {

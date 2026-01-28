@@ -225,10 +225,27 @@ export { PluginService } from './services/pluginService'
 export { TagService } from './services/tagService'
 export { TraceService, traceService } from './services/traceService'
 export { KnowledgeBaseService } from './services/knowledgeBaseService'
+export { deepsearchTemplateService, fileToBase64 } from './services/deepsearchTemplateService'
+export { webSearchEngineService } from './services/webSearchEngineService'
 export type { FrontendModelConfig } from './services/modelService'
 export type { Space, SpaceResponse } from './services/spaceService'
 export { MemberType } from './services/relatedMemberService'
 export type { RelatedMemberInfo } from './services/relatedMemberService'
+export type {
+  ReportTemplate,
+  TemplateImportRequest,
+  TemplateImportResponse,
+  TemplateListResponse,
+  TemplateDeleteResponse,
+  TemplateContentResponse
+} from './services/deepsearchTemplateService'
+export type {
+  WebSearchEngineConfig,
+  WebSearchEngineCreateRequest,
+  WebSearchEngineCreateResponse,
+  WebSearchEngineListResponse,
+  WebSearchEngineDeleteResponse
+} from './services/webSearchEngineService'
 
 // Hooks
 export * from './hooks/useWorkflow'

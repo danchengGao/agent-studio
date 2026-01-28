@@ -13,6 +13,7 @@ import { LanguageProvider } from './contexts/LanguageContext'
 // 立即加载的核心页面（用户可能立即访问）
 import LoginPage from './pages/Auth/LoginPage'
 import DashboardPage from './pages/Dashboard/DashboardPage'
+import AppsPage from './pages/Apps/AppsPage'
 import AgentsPage from './pages/Agents/AgentsPage'
 import AgentsPageNew from './pages/Agents/AgentsPageNew'
 import WorkflowsPage from './pages/Workflows/WorkflowsPage'
@@ -156,7 +157,7 @@ const App: React.FC = () => {
             }
           >
             <Route index element={<DashboardPage />} />
-
+            <Route path="apps" element={<AppsPage />} />
             <Route path="agents" element={<AgentsPageWrapper />} />
             <Route
               path="agents/new"

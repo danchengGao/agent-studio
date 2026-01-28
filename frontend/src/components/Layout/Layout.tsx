@@ -191,9 +191,9 @@ const Layout: React.FC = () => {
         {!isNew && <Header user={user} onMenuClick={() => setSidebarOpen(true)} />}
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto bg-[#F8F9FC]">
-          <div className={isNew ? "h-full min-w-full" : "py-6 h-full min-w-full"}>
-            <div className="min-w-full h-full px-4 sm:px-6 lg:px-8">
+         <main className={isNew ? "flex-1 overflow-auto bg-[#F8F9FC}" : "flex-1 overflow-auto bg-[#F8F9FC] min-h-0 flex flex-col"}>
+           <div className={isNew ? "h-full min-w-full" : "py-6 min-w-full min-h-0 flex-1 flex flex-col"}>
+             <div className={isNew ? "min-w-full h-full px-4 sm:px-6 lg:px-8" : "min-w-full px-4 sm:px-6 lg:px-8 min-h-0 flex-1 flex flex-col"}>
               <Outlet />
             </div>
           </div>
