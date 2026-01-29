@@ -230,7 +230,7 @@ function CommonPageLayoutInner(props: CommonPageLayoutProps) {
         {effectiveLoading ? (
           <LoadingState />
         ) : viewType === 'grid' && gridView ? (
-          <div className="flex-1 min-h-0 overflow-auto">{gridView}</div>
+          <div className="flex-1 min-h-0 overflow-auto pt-2">{gridView}</div>
         ) : viewType === 'table' && tableView ? (
           <div className="h-full">{tableView}</div>
         ) : null}

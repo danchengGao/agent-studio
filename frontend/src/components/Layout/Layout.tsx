@@ -150,9 +150,9 @@ const Layout: React.FC = () => {
   }
 
   return (
-    <div className={isNew ? "h-full flex overflow-hidden bg-gray-50" : "h-screen flex overflow-hidden bg-gray-50"}>
+    <div className={isNew ? 'h-full flex overflow-hidden bg-gray-50' : 'h-screen flex overflow-hidden bg-gray-50'}>
       {/* Sidebar */}
-      <div ref={sidebarRef} className={isNew ? "h-full flex flex-col overflow-hidden" : "h-screen flex flex-col overflow-hidden"}>
+      <div ref={sidebarRef} className={isNew ? 'h-full flex flex-col overflow-hidden' : 'h-screen flex flex-col overflow-hidden'}>
         {isNew ? (
           <SidebarNew
             isOpen={sidebarOpen}
@@ -191,8 +191,8 @@ const Layout: React.FC = () => {
         {!isNew && <Header user={user} onMenuClick={() => setSidebarOpen(true)} />}
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto bg-[#F8F9FC]">	 
-          <div className={isNew ? "h-full min-w-full" : "py-6 h-full min-w-full"}>	 
+        <main className="flex-1 overflow-auto bg-[#F8F9FC]">
+          <div className={isNew ? 'h-full min-w-full' : 'py-6 h-full min-w-full'}>
             <div className="min-w-full h-full">
               <Outlet />
             </div>
