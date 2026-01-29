@@ -144,7 +144,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
         </div>
 
         {/* 内容区域 */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="flex flex-col items-center gap-3">
