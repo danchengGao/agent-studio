@@ -50,11 +50,13 @@ export class DeepsearchSSEHandler {
   private store: StoreDependencies;
   private streamCache: StreamCache;
   private conversationId: string;
+  private messageFindCache: Map<string, Message | null>; // 新增：消息查找缓存
 
   constructor(store: StoreDependencies, streamCache: StreamCache, conversationId: string) {
     this.store = store;
     this.streamCache = streamCache;
     this.conversationId = conversationId;
+    this.messageFindCache = new Map(); // 初始化缓存
   }
 
   /**
@@ -143,8 +145,10 @@ export class DeepsearchSSEHandler {
       const lastMessageItems = this.store.getCurrentMessageItems();
       if (lastMessageItems && sectionIdx !== undefined && planIdx !== undefined) {
 
-        const sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-          msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+        const sectionTask = this.findTaskInMessages(
+          lastMessageItems.messagesIds,
+          msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+          `section_${sectionIdx}` // 添加缓存key
         );
 
         // 【步骤1】更新上一个 planTask (task_1_x_(n-1))
@@ -204,12 +208,14 @@ export class DeepsearchSSEHandler {
       const lastMessageItems = this.store.getCurrentMessageItems();
       if (!lastMessageItems) return;
 
-      const sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-        msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+      const sectionTask = this.findTaskInMessages(
+        lastMessageItems.messagesIds,
+        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        `section_${sectionIdx}` // 添加缓存key
       );
 
       if (sectionTask) {
-        const subTitle = `sub_reporter: ${sectionTask.title}`;
+        const subTitle = `章节报告: ${sectionTask.title}`;
         const childMessage = this.store.addMessageAsChild(
           lastMessageItems.id,
           sectionTask.id,
@@ -303,8 +309,10 @@ export class DeepsearchSSEHandler {
       const lastMessageItems = this.store.getCurrentMessageItems();
       if (!lastMessageItems) return;
 
-      const sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-        msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+      const sectionTask = this.findTaskInMessages(
+        lastMessageItems.messagesIds,
+        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        `section_${sectionIdx}` // 添加缓存key
       );
 
       if (sectionTask) {
@@ -339,7 +347,11 @@ export class DeepsearchSSEHandler {
     const streamKey = this.generateStreamKey(sseData.agent, sectionIdx, planIdx, stepIdx);
     const lastMessageItems = this.store.getCurrentMessageItems();
 
-    if (!lastMessageItems || getMessageItemsIsUser(lastMessageItems)) return;
+    if (!lastMessageItems || getMessageItemsIsUser(lastMessageItems)) {
+      // 清除缓存
+      this.messageFindCache.clear();
+      return;
+    }
 
     // outline 完成
     if (sseData.agent === 'outline') {
@@ -532,8 +544,10 @@ export class DeepsearchSSEHandler {
     // sub_reporter 完成
     if (sseData.agent === 'sub_reporter' && sectionIdx !== undefined && sectionIdx > 0) {
       const cachedContent = this.getCacheContent(streamKey);
-      const sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-        msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+      const sectionTask = this.findTaskInMessages(
+        lastMessageItems.messagesIds,
+        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        `section_${sectionIdx}` // 添加缓存key
       );
 
       if (sectionTask) {
@@ -599,8 +613,10 @@ export class DeepsearchSSEHandler {
 
         // 检查是否包含最终结果（不是简单的 SECTION END 或 ALL END）
         if (content && typeof content === 'object' && (content.response_content || content.exception_info)) {
-          const outlineTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-            msg.type === MessageType.TASK && msg.sectionIdx === 0
+          const outlineTask = this.findTaskInMessages(
+            lastMessageItems.messagesIds,
+            msg => msg.type === MessageType.TASK && msg.sectionIdx === 0,
+            'outline_root' // 添加缓存key
           );
 
           if (outlineTask) {
@@ -634,6 +650,9 @@ export class DeepsearchSSEHandler {
         isStreaming: false,
       });
     }
+
+    // 处理完成后清除缓存
+    this.messageFindCache.clear();
   }
 
   /**
@@ -648,8 +667,10 @@ export class DeepsearchSSEHandler {
     if (['collector_info_retrieval', 'collector_summary'].includes(sseData.agent) &&
         sectionIdx !== undefined && planIdx !== undefined && stepIdx !== undefined) {
 
-      const sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-        msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+      const sectionTask = this.findTaskInMessages(
+        lastMessageItems.messagesIds,
+        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        `section_${sectionIdx}` // 添加缓存key
       );
 
       if (!sectionTask) {
@@ -835,9 +856,9 @@ export class DeepsearchSSEHandler {
             });
 
             // 3. 更新 task_1 (outline_task): status = COMPLETED
-            updateMessage(lastMessageItems.id, outlineTask.id, {
-              status: TaskStatus.COMPLETED,
-            });
+            // updateMessage(lastMessageItems.id, outlineTask.id, {
+            //   status: TaskStatus.COMPLETED,
+            // });
           }
         }
 
@@ -1068,21 +1089,38 @@ export class DeepsearchSSEHandler {
   }
 
   /**
-   * 在消息列表中递归查找任务
+   * 在消息列表中递归查找任务（带缓存）
    */
-  private findTaskInMessages(messageIds: string[], predicate: (msg: Message) => boolean): Message | null {
+  private findTaskInMessages(messageIds: string[], predicate: (msg: Message) => boolean, cacheKey?: string): Message | null {
+    // 如果有缓存key，先检查缓存
+    if (cacheKey && this.messageFindCache.has(cacheKey)) {
+      return this.messageFindCache.get(cacheKey)!;
+    }
+
+    // 递归查找
     for (const messageId of messageIds) {
       const msg = this.store.getMessageById(messageId);
       if (!msg) continue;
 
       if (predicate(msg)) {
+        // 缓存结果
+        if (cacheKey) {
+          this.messageFindCache.set(cacheKey, msg);
+        }
         return msg;
       }
       if (msg.childMessageIds && msg.childMessageIds.length > 0) {
         const found = this.findTaskInMessages(msg.childMessageIds, predicate);
-        if (found) return found;
+        if (found) {
+          // 缓存结果
+          if (cacheKey) {
+            this.messageFindCache.set(cacheKey, found);
+          }
+          return found;
+        }
       }
     }
+
     return null;
   }
 
@@ -1130,9 +1168,9 @@ export class DeepsearchSSEHandler {
     let count = 0;
 
     const markRecursively = (message: Message) => {
-      // 只标记非 COMPLETED/CANCELLED（用户手动停止）/UNKNOWN 的消息
-      if (message.status !== TaskStatus.COMPLETED && message.status !== TaskStatus.CANCELLED &&
-        (/*markAsCompleted ||*/ message.status !== TaskStatus.UNKNOWN)) {
+      // 只标记非 COMPLETED/CANCELLED（用户手动停止）/UNKNOWN / FAILED 的消息
+      if (message.status !== TaskStatus.COMPLETED && message.status !== TaskStatus.CANCELLED && 
+        message.status !== TaskStatus.FAILED && (/*markAsCompleted ||*/ message.status !== TaskStatus.UNKNOWN)) {
         updateMessage(messageItems.id, message.id, {
           status: targetStatus,
         });

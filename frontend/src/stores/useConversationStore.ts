@@ -828,12 +828,15 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       if (!hasChanges) return state;
 
-      const newMessageItemsMap = new Map(state.messageItemsMap);
-      newMessageItemsMap.set(messageItemsId, {
+      // 创建新的MessageItems对象
+      const updatedMessageItems: MessageItems = {
         ...messageItems,
         ...updates,
         updatedAt: Date.now(),
-      });
+      };
+
+      const newMessageItemsMap = new Map(state.messageItemsMap);
+      newMessageItemsMap.set(messageItemsId, updatedMessageItems);
 
       return {
         messageItemsMap: newMessageItemsMap,
@@ -1050,34 +1053,41 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
   updateMessage: (messageItemsId: string, messageId: string, updates: Partial<Message>) => {
     set((state) => {
-      // 更新 messagesMap
       const existingMessage = state.messagesMap.get(messageId);
       if (!existingMessage) {
         console.warn('[updateMessage] Message not found:', messageId);
         return state;
       }
 
-      const newMessagesMap = new Map(state.messagesMap);
+      // 创建新的Message对象
       const updatedMessage: Message = {
         ...existingMessage,
         ...updates,
         updatedAt: Date.now(),
       };
+
+      const newMessagesMap = new Map(state.messagesMap);
       newMessagesMap.set(messageId, updatedMessage);
 
-      // 更新 messageItemsMap 的时间戳
-      const newMessageItemsMap = new Map(state.messageItemsMap);
-      const messageItems = newMessageItemsMap.get(messageItemsId);
+      // 更新 messageItems 时间戳
+      const messageItems = state.messageItemsMap.get(messageItemsId);
       if (messageItems) {
-        newMessageItemsMap.set(messageItemsId, {
+        const updatedMessageItems: MessageItems = {
           ...messageItems,
           updatedAt: Date.now(),
-        });
+        };
+
+        const newMessageItemsMap = new Map(state.messageItemsMap);
+        newMessageItemsMap.set(messageItemsId, updatedMessageItems);
+
+        return {
+          messagesMap: newMessagesMap,
+          messageItemsMap: newMessageItemsMap,
+        };
       }
 
       return {
         messagesMap: newMessagesMap,
-        messageItemsMap: newMessageItemsMap,
       };
     });
   },
@@ -1088,29 +1098,31 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       if (!messageItems) return state;
 
       const newMessagesMap = new Map(state.messagesMap);
-      const newMessageItemsMap = new Map(state.messageItemsMap);
 
       // 递归删除子消息
       deleteMessageRecursively(messageId, newMessagesMap, state.messagesMap);
 
-      // 从 messageItems 的 messagesIds 中移除
-      const newMessagesIds = messageItems.messagesIds.filter(id => id !== messageId);
-      newMessageItemsMap.set(messageItemsId, {
+      // 更新 messageItems
+      const updatedMessageItems: MessageItems = {
         ...messageItems,
-        messagesIds: newMessagesIds,
+        messagesIds: messageItems.messagesIds.filter(id => id !== messageId),
         updatedAt: Date.now(),
-      });
+      };
+
+      const newMessageItemsMap = new Map(state.messageItemsMap);
+      newMessageItemsMap.set(messageItemsId, updatedMessageItems);
 
       // 从父消息的 childMessageIds 中移除
       const message = state.messagesMap.get(messageId);
       if (message?.parentMessageId) {
         const parentMessage = newMessagesMap.get(message.parentMessageId);
         if (parentMessage?.childMessageIds) {
-          newMessagesMap.set(message.parentMessageId, {
+          const updatedParent: Message = {
             ...parentMessage,
             childMessageIds: parentMessage.childMessageIds.filter(id => id !== messageId),
             updatedAt: Date.now(),
-          });
+          };
+          newMessagesMap.set(message.parentMessageId, updatedParent);
         }
       }
 
@@ -1131,27 +1143,36 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       if (!content || content.length === 0) return state;
 
-      const newMessagesMap = new Map(state.messagesMap);
+      // 创建新的Message对象
       const currentContent = typeof existingMessage.content === 'string' ? existingMessage.content : '';
-      newMessagesMap.set(messageId, {
+      const updatedMessage: Message = {
         ...existingMessage,
         content: currentContent + content,
         updatedAt: Date.now(),
-      });
+      };
+
+      const newMessagesMap = new Map(state.messagesMap);
+      newMessagesMap.set(messageId, updatedMessage);
 
       // 更新 messageItems 时间戳
-      const newMessageItemsMap = new Map(state.messageItemsMap);
-      const messageItems = newMessageItemsMap.get(messageItemsId);
+      const messageItems = state.messageItemsMap.get(messageItemsId);
       if (messageItems) {
-        newMessageItemsMap.set(messageItemsId, {
+        const updatedMessageItems: MessageItems = {
           ...messageItems,
           updatedAt: Date.now(),
-        });
+        };
+
+        const newMessageItemsMap = new Map(state.messageItemsMap);
+        newMessageItemsMap.set(messageItemsId, updatedMessageItems);
+
+        return {
+          messagesMap: newMessagesMap,
+          messageItemsMap: newMessageItemsMap,
+        };
       }
 
       return {
         messagesMap: newMessagesMap,
-        messageItemsMap: newMessageItemsMap,
       };
     });
   },
@@ -1246,75 +1267,93 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     // 标记正在处理队列
     set({ sseProcessingQueue: true });
 
-    // 获取队列中的第一个事件
-    const event = state.sseEventQueue[0];
+    // 使用requestAnimationFrame批量处理
+    const BATCH_SIZE = 10; // 每批处理10个事件
 
-    // 获取当前 MessageItems
-    const getCurrentMessageItems = () => {
-      const currentList = get().getCurrentMessageItems();
-      return currentList[currentList.length - 1];
-    };
+    const processBatch = () => {
+      const currentState = get();
+      const eventsToProcess = currentState.sseEventQueue.slice(0, BATCH_SIZE);
 
-    // 动态导入 deepsearch 处理器
-    import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
-      const handler = new DeepsearchSSEHandler(
-        {
-          getCurrentMessageItems: getCurrentMessageItems,
-          addSystemMessage: get().addSystemMessage,
-          addMessageAsChild: get().addMessageAsChild,
-          updateMessage: get().updateMessage,
-          deleteMessage: get().deleteMessage,
-          updateMessageItems: get().updateMessageItems,
-          appendMessageContent: get().appendMessageContent,
-          getMessageById: get().getMessageById,
-          getMessageTree: get().getMessageTree,
-          getChildMessages: get().getChildMessages,
-          getMessageItemsIsUser: get().getMessageItemsIsUser,
-        },
-        {
-          get: (key: string) => get().sseStreamCache.get(key),
-          set: (key: string, chunks: string[]) => {
-            set((state) => {
-              const newCache = new Map(state.sseStreamCache);
-              newCache.set(key, chunks);
-              return { sseStreamCache: newCache };
-            });
-          },
-          delete: (key: string) => {
-            set((state) => {
-              const newCache = new Map(state.sseStreamCache);
-              newCache.delete(key);
-              return { sseStreamCache: newCache };
-            });
-          },
-        },
-        event.conversationId
-      );
-      // 使用类型断言，因为 useConversationStore 不应该知道具体的 SSE 数据结构
-      handler.handleSSEMessage(event.sseData as any);
-
-      // 从队列中移除已处理的事件
-      set((state) => ({
-        sseEventQueue: state.sseEventQueue.slice(1),
-      }));
-
-      // 继续处理下一个事件
-      get().processSSEQueue();
-    }).catch((error) => {
-      console.error('[processSSEQueue] Failed to load deepsearch handler:', error);
-      // 降级处理：创建简单的文本消息
-      // 使用类型断言访问 SSE 数据属性
-      const sseData = event.sseData as any;
-      if (sseData.event === 'start' || sseData.event === 'message') {
-        get().addSystemMessage(event.conversationId, MessageType.REPORT, sseData.content || '');
+      if (eventsToProcess.length === 0) {
+        set({ sseProcessingQueue: false });
+        return;
       }
 
-      // 从队列中移除失败的事件，继续处理下一个
-      set((state) => ({
-        sseEventQueue: state.sseEventQueue.slice(1),
-      }));
-      get().processSSEQueue();
-    });
+      // 获取当前 MessageItems
+      const getCurrentMessageItems = () => {
+        const currentList = get().getCurrentMessageItems();
+        return currentList[currentList.length - 1];
+      };
+
+      // 动态导入 deepsearch 处理器
+      import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
+        const handler = new DeepsearchSSEHandler(
+          {
+            getCurrentMessageItems: getCurrentMessageItems,
+            addSystemMessage: get().addSystemMessage,
+            addMessageAsChild: get().addMessageAsChild,
+            updateMessage: get().updateMessage,
+            deleteMessage: get().deleteMessage,
+            updateMessageItems: get().updateMessageItems,
+            appendMessageContent: get().appendMessageContent,
+            getMessageById: get().getMessageById,
+            getMessageTree: get().getMessageTree,
+            getChildMessages: get().getChildMessages,
+            getMessageItemsIsUser: get().getMessageItemsIsUser,
+          },
+          {
+            get: (key: string) => get().sseStreamCache.get(key),
+            set: (key: string, chunks: string[]) => {
+              set((state) => {
+                const newCache = new Map(state.sseStreamCache);
+                newCache.set(key, chunks);
+                return { sseStreamCache: newCache };
+              });
+            },
+            delete: (key: string) => {
+              set((state) => {
+                const newCache = new Map(state.sseStreamCache);
+                newCache.delete(key);
+                return { sseStreamCache: newCache };
+              });
+            },
+          },
+          eventsToProcess[0].conversationId
+        );
+
+        // 批量处理事件
+        eventsToProcess.forEach(event => {
+          // 使用类型断言，因为 useConversationStore 不应该知道具体的 SSE 数据结构
+          handler.handleSSEMessage(event.sseData as any);
+        });
+
+        // 从队列中移除已处理的事件
+        set((state) => ({
+          sseEventQueue: state.sseEventQueue.slice(eventsToProcess.length),
+        }));
+
+        // 继续处理下一批
+        requestAnimationFrame(processBatch);
+      }).catch((error) => {
+        console.error('[processSSEQueue] Failed to load deepsearch handler:', error);
+
+        // 降级处理：批量创建简单的文本消息
+        eventsToProcess.forEach(event => {
+          const sseData = event.sseData as any;
+          if (sseData.event === 'start' || sseData.event === 'message') {
+            get().addSystemMessage(event.conversationId, MessageType.REPORT, sseData.content || '');
+          }
+        });
+
+        // 从队列中移除失败的事件，继续处理下一批
+        set((state) => ({
+          sseEventQueue: state.sseEventQueue.slice(eventsToProcess.length),
+        }));
+        requestAnimationFrame(processBatch);
+      });
+    };
+
+    requestAnimationFrame(processBatch);
   },
 
   // ========== 状态管理 ==========
@@ -1565,21 +1604,43 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const state = get();
       const WARNING_THRESHOLD = 50 * 1024 * 1024; // 50MB in bytes
 
-      // 计算 Map 结构的大小
-      const calculateMapSize = <K, V>(map: Map<K, V>): number => {
-        let size = 0;
-        map.forEach((value, key) => {
-          // 使用 JSON.stringify 估算大小，然后用 Blob 转换为字节数
-          const serialized = JSON.stringify({ key, value });
-          size += new Blob([serialized]).size;
-        });
-        return size;
+      // 使用更轻量的估算方法
+      const estimateSize = (obj: any): number => {
+        if (obj === null || obj === undefined) return 0;
+        if (typeof obj === 'string') return obj.length * 2; // UTF-16
+        if (typeof obj === 'number') return 8;
+        if (typeof obj === 'boolean') return 4;
+        if (obj instanceof Date) return 24;
+
+        if (Array.isArray(obj)) {
+          return obj.reduce((sum, item) => sum + estimateSize(item), 0) + 16; // 数组开销
+        }
+
+        if (obj instanceof Map) {
+          let size = 16; // Map开销
+          obj.forEach((value, key) => {
+            size += estimateSize(key) + estimateSize(value) + 16; // entry开销
+          });
+          return size;
+        }
+
+        if (typeof obj === 'object') {
+          let size = 16; // 对象开销
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              size += estimateSize(key) + estimateSize(obj[key]) + 16;
+            }
+          }
+          return size;
+        }
+
+        return 0;
       };
 
       // 计算各个 Map 的大小
-      const conversationsSize = calculateMapSize(state.conversationsMap);
-      const messageItemsSize = calculateMapSize(state.messageItemsMap);
-      const messagesSize = calculateMapSize(state.messagesMap);
+      const conversationsSize = estimateSize(state.conversationsMap);
+      const messageItemsSize = estimateSize(state.messageItemsMap);
+      const messagesSize = estimateSize(state.messagesMap);
 
       const totalSize = conversationsSize + messageItemsSize + messagesSize;
       const totalSizeInMB = totalSize / (1024 * 1024);
@@ -1795,21 +1856,20 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       }
 
       set((state) => {
-        const newMessageItemsMap = new Map(state.messageItemsMap);
-        const newMessagesMap = new Map(state.messagesMap);
-        const newConversationsMap = new Map(state.conversationsMap);
-
         // 恢复 messageItems
+        const newMessageItemsMap = new Map(state.messageItemsMap);
         doc.messageItems.forEach((items) => {
           newMessageItemsMap.set(items.id, items);
         });
 
         // 恢复 messages
+        const newMessagesMap = new Map(state.messagesMap);
         Object.entries(doc.messages).forEach(([msgId, msg]) => {
           newMessagesMap.set(msgId, msg);
         });
 
         // 更新 conversation 的 messageItemsIds
+        const newConversationsMap = new Map(state.conversationsMap);
         const existingConversation = newConversationsMap.get(conversationId);
         if (existingConversation) {
           newConversationsMap.set(conversationId, {
@@ -1819,9 +1879,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         }
 
         return {
-          conversationsMap: newConversationsMap,
           messageItemsMap: newMessageItemsMap,
           messagesMap: newMessagesMap,
+          conversationsMap: newConversationsMap,
         };
       });
     } catch (error) {
@@ -1848,56 +1908,60 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
 
     set((state) => {
-      const newMessageItemsMap = new Map(state.messageItemsMap);
-
       // 删除当前对话的所有 messageItems
+      const newMessageItemsMap = new Map(state.messageItemsMap);
       conversation.messageItemsIds.forEach((itemsId) => {
         newMessageItemsMap.delete(itemsId);
       });
 
-      // 注意：messagesMap 中的消息需要递归删除
-      // 为了简化，我们清空并重新构建只包含非当前对话的消息
-      const newFilteredMessagesMap = new Map<string, Message>();
+      // 删除属于当前对话的所有 messages
+      // 先收集要删除的 messageId，因为不能在遍历Map时删除
+      const messageIdsToDelete: string[] = [];
       state.messagesMap.forEach((msg, msgId) => {
-        // 只保留不属于当前对话的消息
-        if (msg.conversationId !== currentConversationId) {
-          newFilteredMessagesMap.set(msgId, msg);
+        if (msg.conversationId === currentConversationId) {
+          messageIdsToDelete.push(msgId);
         }
+      });
+
+      // 删除收集到的消息
+      const newMessagesMap = new Map(state.messagesMap);
+      messageIdsToDelete.forEach(msgId => {
+        newMessagesMap.delete(msgId);
       });
 
       return {
         messageItemsMap: newMessageItemsMap,
-        messagesMap: newFilteredMessagesMap,
+        messagesMap: newMessagesMap,
       };
     });
   },
 }));
-
 // ===== 监听 IndexDB 删除事件，同步删除内存中的对话 =====
 if (typeof window !== 'undefined') {
   conversationEventEmitter.on('conversation-deleted', async (event: any) => {
-    const { conversationId } = event
+    const { conversationId } = event;
 
     // 从内存中删除对话
     useConversationStore.setState((state) => {
-      const newConversationsMap = new Map(state.conversationsMap)
-      const newConversationsList = state.conversationsList.filter((id: string) => id !== conversationId)
+      // 删除conversationsMap中的条目
+      const newConversationsMap = new Map(state.conversationsMap);
+      newConversationsMap.delete(conversationId);
+
+      // 从conversationsList中移除
+      const newConversationsList = state.conversationsList.filter(id => id !== conversationId);
 
       // 如果删除的是当前对话，清空当前对话ID
       const newCurrentConversationId = state.currentConversationId === conversationId
         ? null
-        : state.currentConversationId
-
-      // 从内存中删除对话基本信息
-      newConversationsMap.delete(conversationId)
+        : state.currentConversationId;
 
       return {
         conversationsMap: newConversationsMap,
         conversationsList: newConversationsList,
         currentConversationId: newCurrentConversationId,
-      }
-    })
-  })
+      };
+    });
+  });
 }
 
 // 开发环境下暴露 store 到 window 对象，方便调试
