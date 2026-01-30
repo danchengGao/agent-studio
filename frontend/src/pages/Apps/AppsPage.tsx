@@ -740,27 +740,6 @@ const AppsPage: React.FC = () => {
     const controller = new AbortController()
     setAbortController(controller)
 
-    // ===== SSE 录制：开始录制（仅开发模式） =====
-    let recordingId: string | undefined
-    if (ENABLE_SSE_DEBUG) {
-      try {
-        // 从 localStorage 读取压缩配置
-        const COMPRESSION_STORAGE_KEY = 'sse_recording_compression_enabled'
-        const enableCompression = localStorage.getItem(COMPRESSION_STORAGE_KEY) !== 'false'
-
-        recordingId = await SSERecorder.startRecording(content, {
-          agentType: 'deepsearch',
-          modelConfigId: selectedModelId,
-          conversationId: conversationId,
-          spaceId: user?.spaceId || getDefaultSpaceId(),
-        }, {
-          enableCompression,
-        })
-      } catch (error) {
-        console.warn('[DeepSearch] Failed to start SSE recording:', error)
-      }
-    }
-
     try {
       // 4. 获取并验证配置
       let config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
@@ -817,6 +796,10 @@ const AppsPage: React.FC = () => {
       const messageItemsList = useConversationStore.getState().getCurrentMessageItems()
       console.log('[HITL Debug] messageItemsList length:', messageItemsList?.length)
 
+      // ===== 判断是否是新的 deepsearch 运行 =====
+      // 用于确定是否需要使用新的 session ID
+      let isNewDeepSearchRun = true  // 默认认为是新的运行
+
       if (messageItemsList && messageItemsList.length > 0) {
         // 从后往前找最后一个系统消息（非用户消息）
         // 因为最后一个是刚添加的用户消息，所以要往前找
@@ -857,6 +840,8 @@ const AppsPage: React.FC = () => {
 
             if (hitlAgent === AgentType.DEEPSEARCH) {
               // Agent 匹配：更新 interrupt 消息状态为 COMPLETED，设置 interrupt_feedback
+              // 这是 HITL 延续，不是新的 deepsearch 运行
+              isNewDeepSearchRun = false
               console.log('[HITL] Before update - status:', lastMessage.status)
               useConversationStore.getState().updateMessage(
                 lastSystemMessageItems.id,
@@ -894,6 +879,44 @@ const AppsPage: React.FC = () => {
         console.log('[HITL Debug] No messageItems found')
       }
 
+      // ===== 计算 DeepSearch 运行 Session ID =====
+      // sessionId = 当前对话中用户消息的数量
+      // 因为已经添加了用户消息，所以用户消息数量就是应该用的 sessionId
+      const userMessageCount = messageItemsList.filter(items =>
+        useConversationStore.getState().getMessageItemsIsUser(items)
+      ).length
+
+      // sessionId 计算逻辑：
+      // - 如果是新的 deepsearch：sessionId = 用户消息数量（新添加的消息被计算在内）
+      // - 如果是 HITL 延续：sessionId = 用户消息数量 - 1（HITL 回复不是新的 deepsearch）
+      const sessionId = isNewDeepSearchRun ? userMessageCount : (userMessageCount - 1)
+      console.log('[DeepSearch] Session ID:', sessionId, '(user message count:', userMessageCount, ', isNewRun:', isNewDeepSearchRun, ')')
+
+      // ===== 生成后端使用的 conversation_id =====
+      const backendConversationId = `${conversationId}.${sessionId}`
+      console.log('[DeepSearch] Backend conversation_id:', backendConversationId, '(original:', conversationId, ')')
+
+      // ===== SSE 录制：开始录制（仅开发模式） =====
+      let recordingId: string | undefined
+      if (ENABLE_SSE_DEBUG) {
+        try {
+          // 从 localStorage 读取压缩配置
+          const COMPRESSION_STORAGE_KEY = 'sse_recording_compression_enabled'
+          const enableCompression = localStorage.getItem(COMPRESSION_STORAGE_KEY) !== 'false'
+
+          recordingId = await SSERecorder.startRecording(content, {
+            agentType: 'deepsearch',
+            modelConfigId: selectedModelId,
+            conversationId: backendConversationId, // 使用带 session 的 conversation_id
+            spaceId: user?.spaceId || getDefaultSpaceId(),
+          }, {
+            enableCompression,
+          })
+        } catch (error) {
+          console.warn('[DeepSearch] Failed to start SSE recording:', error)
+        }
+      }
+
       const response = await fetch('/api/v1/agent/deepsearch/run/', {
         method: 'POST',
         headers: {
@@ -903,7 +926,7 @@ const AppsPage: React.FC = () => {
           space_id: user?.spaceId || getDefaultSpaceId(),
           model_config_id: selectedModelId,
           message: content,
-          conversation_id: conversationId, // 修复：使用本地变量 conversationId 而不是 currentConversationId
+          conversation_id: backendConversationId, // 使用带 session 的 conversation_id
           search_mode: 'research', // DeepSearch 模式固定为 research
           outliner_max_section_num: config.planChapterCount,
           workflow_human_in_the_loop: config.enableHumanInteraction,

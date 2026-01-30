@@ -200,9 +200,10 @@ export class DeepsearchSSEHandler {
       return;
     }
 
-    // sub_reporter: 初始化缓存，创建为 section 的子任务
+    // sub_reporter: 初始化缓存，创建或更新章节报告
     if (sseData.agent === 'sub_reporter' && sectionIdx !== undefined && sectionIdx > 0) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
+      // 重置流缓存
       this.streamCache.set(streamKey, [content]);
 
       const lastMessageItems = this.store.getCurrentMessageItems();
@@ -215,19 +216,33 @@ export class DeepsearchSSEHandler {
       );
 
       if (sectionTask) {
-        const subTitle = `章节报告: ${sectionTask.title}`;
-        const childMessage = this.store.addMessageAsChild(
-          lastMessageItems.id,
-          sectionTask.id,
-          MessageType.REPORT,
-          '',
-          subTitle
-        );
+        // 检查是否已存在章节报告
+        const existingReport = this.findExistingChapterReport(sectionTask);
 
-        updateMessage(lastMessageItems.id, childMessage.id, {
-          status: TaskStatus.IN_PROGRESS,
-          isStreaming: true,
-        });
+        if (existingReport) {
+          // 情况2: 已存在章节报告 - 更新现有消息
+          // 替换 content，设置 isStreaming 和 status
+          updateMessage(lastMessageItems.id, existingReport.id, {
+            content: content,  // 直接替换为新的初始 content
+            isStreaming: true,
+            status: TaskStatus.IN_PROGRESS,
+          });
+        } else {
+          // 情况1: 不存在章节报告 - 创建新消息（原有逻辑）
+          const subTitle = `章节报告: ${sectionTask.title}`;
+          const childMessage = this.store.addMessageAsChild(
+            lastMessageItems.id,
+            sectionTask.id,
+            MessageType.REPORT,
+            '',
+            subTitle
+          );
+
+          updateMessage(lastMessageItems.id, childMessage.id, {
+            status: TaskStatus.IN_PROGRESS,
+            isStreaming: true,
+          });
+        }
 
       }
       return;
@@ -1060,6 +1075,23 @@ export class DeepsearchSSEHandler {
   }
 
   // ===== 辅助方法 =====
+
+  /**
+   * 查找 section 下已存在的章节报告
+   * @param sectionTask 章节 task 消息
+   * @returns 已存在的章节报告消息，如果不存在则返回 null
+   */
+  private findExistingChapterReport(sectionTask: Message): Message | null {
+    const childMessages = this.store.getChildMessages(sectionTask.id);
+
+    // 查找 type=REPORT 且 title 以 "章节报告:" 开头的消息
+    const existingReport = childMessages.find(msg =>
+      msg.type === MessageType.REPORT &&
+      msg.title?.startsWith('章节报告:')
+    );
+
+    return existingReport || null;
+  }
 
   /**
    * 生成流缓存 key
