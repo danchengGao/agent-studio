@@ -32,6 +32,9 @@ def upgrade() -> None:
     with op.batch_alter_table('tool', schema=None) as batch_op:
         batch_op.add_column(sa.Column('available', sa.Boolean(), nullable=False))
 
+    # 设置现有 tool 记录的 available 字段为 True
+    op.execute("UPDATE tool SET available = 1")
+
     with op.batch_alter_table('user', schema=None) as batch_op:
         batch_op.alter_column('session_key',
                existing_type=sa.VARCHAR(length=256),

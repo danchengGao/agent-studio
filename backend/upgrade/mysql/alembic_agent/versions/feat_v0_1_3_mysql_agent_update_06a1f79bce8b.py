@@ -26,6 +26,10 @@ def upgrade() -> None:
     op.add_column('plugin_publish', sa.Column('desc_mk', sa.Text(), nullable=True))
     op.add_column('plugin_publish', sa.Column('inputs', sa.JSON(), nullable=True))
     op.add_column('tool', sa.Column('available', sa.Boolean(), nullable=False))
+
+    # 设置现有 tool 记录的 available 字段为 True
+    op.execute("UPDATE tool SET available = 1")
+
     op.alter_column('user', 'session_key',
                existing_type=mysql.VARCHAR(collation='utf8mb4_unicode_ci', length=256),
                type_=sa.String(length=512),
