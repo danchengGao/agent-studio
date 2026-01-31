@@ -36,7 +36,9 @@ class LazyDeepSearchHttpClient:
                     timeout=3600.0,
                     connect=10.0
                 ),
-                limits=httpx.Limits(max_connections=50)
+                limits=httpx.Limits(max_connections=50),
+                follow_redirects=True,
+                verify=False
             )
 
             try:
