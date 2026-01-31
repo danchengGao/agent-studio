@@ -532,8 +532,8 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                                       <Chip
                                                         label={
                                                           tool.available === true
-                                                            ? t('plugins.pluginConfig.enabled', '启用')
-                                                            : t('plugins.pluginConfig.disabled', '禁用')
+                                                            ? t('plugins.actions.enable', '启用')
+                                                            : t('plugins.actions.disable', '禁用')
                                                         }
                                                         size="small"
                                                         color={tool.available === true ? 'success' : 'default'}
