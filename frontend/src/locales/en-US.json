@@ -630,6 +630,19 @@
         "selectResult": "Please select a result to view detailed information",
         "downloadError": "Failed to download document"
       }
+    },
+    "handler": {
+      "generatingOutline": "Generating outline...",
+      "chapterReport": "Chapter Report",
+      "researchOutline": "Research Outline",
+      "analyzingResearchContent": "Analyzing research content...",
+      "chapter": "Chapter {{index}}",
+      "researchChapter": "Research Chapter {{sectionIdx}}",
+      "finalReport": "Final Report",
+      "informationSummary": "Information Summary",
+      "informationCollection": "Information collection {{index}}",
+      "searchResult": "Search Result",
+      "reportGenerationFailed": "Report generation failed: No final report data received. Possible reasons include: network connection interrupted, server error, or task terminated prematurely."
     }
   },
   "workflows": {

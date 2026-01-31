@@ -133,7 +133,7 @@ export const webSearchEngineService = {
     }
 
     const response = await client.post<WebSearchEngineCreateResponse>(
-      '/agent/deepsearch/web_search/',
+      '/agent/deepsearch/web_search',
       request
     )
 
@@ -207,7 +207,7 @@ export const webSearchEngineService = {
     }
 
     await client.put<WebSearchEngineUpdateResponse>(
-      '/agent/deepsearch/web_search/',
+      '/agent/deepsearch/web_search',
       request
     )
   }

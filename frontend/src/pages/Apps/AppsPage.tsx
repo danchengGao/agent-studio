@@ -4,7 +4,7 @@ import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/Men
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
 import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
-import { useModels } from '@test-agentstudio/api-client'
+import { useModels, getToken } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useUIStore } from '../../stores/useUIStore'
 import { useConversationStore, MessageType, TaskStatus, AgentType, type MessageItems } from '../../stores/useConversationStore'
@@ -917,10 +917,17 @@ const AppsPage: React.FC = () => {
         }
       }
 
-      const response = await fetch('/api/v1/agent/deepsearch/run/', {
+      // 获取认证 token
+      const token = getToken()
+      if (!token) {
+        throw new Error('无法获取认证信息，请重新登录')
+      }
+
+      const response = await fetch('/api/v1/agent/deepsearch/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           space_id: user?.spaceId || getDefaultSpaceId(),

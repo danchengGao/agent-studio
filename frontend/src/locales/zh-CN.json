@@ -611,6 +611,21 @@
       "unknown": "未知"
     }
   },
+  "deepResearch": {
+    "handler": {
+      "generatingOutline": "正在生成大纲...",
+      "chapterReport": "章节报告",
+      "researchOutline": "研究大纲",
+      "analyzingResearchContent": "正在分析研究内容...",
+      "chapter": "章节 {{index}}",
+      "researchChapter": "研究章节 {{sectionIdx}}",
+      "finalReport": "最终报告",
+      "informationSummary": "信息总结",
+      "informationCollection": "信息收集{{index}}",
+      "searchResult": "搜索结果",
+      "reportGenerationFailed": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
+    }
+  },
   "workflows": {
     "title": "工作流编排",
     "subtitle": "设计、管理和监控您的自动化工作流，构建高效的业务流程",

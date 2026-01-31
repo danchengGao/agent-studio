@@ -5,6 +5,7 @@ import {
   MessageItems,
   JSONObject,
 } from '../useConversationStore';
+import i18n from '@/i18n';
 
 /**
  * Deepsearch SSE Handler
@@ -121,7 +122,7 @@ export class DeepsearchSSEHandler {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.streamCache.set(streamKey, [content]);
 
-      addSystemMessage(this.conversationId, MessageType.TASK, '', undefined, '正在生成大纲...', 'deepsearch');
+      addSystemMessage(this.conversationId, MessageType.TASK, '', undefined, i18n.t('deepResearch.handler.generatingOutline'), 'deepsearch');
       const lastMessageItems = this.store.getCurrentMessageItems();
       if (lastMessageItems) {
         const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
@@ -154,7 +155,7 @@ export class DeepsearchSSEHandler {
         // 【步骤1】更新上一个 planTask (task_1_x_(n-1))
         if (planIdx > 1 && sectionTask) {
           const prevPlanTask = this.store.getChildMessages(sectionTask.id).find(task =>
-            task.title?.includes(`信息收集${planIdx - 1}`)
+            task.title?.includes(i18n.t('deepResearch.handler.informationCollection', { index: planIdx - 1 }))
           );
 
           if (prevPlanTask &&
@@ -229,7 +230,7 @@ export class DeepsearchSSEHandler {
           });
         } else {
           // 情况1: 不存在章节报告 - 创建新消息（原有逻辑）
-          const subTitle = `章节报告: ${sectionTask.title}`;
+          const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
           const childMessage = this.store.addMessageAsChild(
             lastMessageItems.id,
             sectionTask.id,
@@ -289,7 +290,7 @@ export class DeepsearchSSEHandler {
         this.streamCache.set(streamKey, [content]);
 
         // 创建占位 TASK 消息
-        addSystemMessage(this.conversationId, MessageType.TASK, '', undefined, '正在生成大纲...', 'deepsearch');
+        addSystemMessage(this.conversationId, MessageType.TASK, '', undefined, i18n.t('deepResearch.handler.generatingOutline'), 'deepsearch');
         const lastMessageItems = this.store.getCurrentMessageItems();
         if (lastMessageItems) {
           const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
@@ -383,8 +384,8 @@ export class DeepsearchSSEHandler {
 
           // 标记大纲任务为已完成，子任务将动态创建
           updateMessage(lastMessageItems.id, lastMessage.id, {
-            title: '研究大纲',
-            content: '正在分析研究内容...',
+            title: i18n.t('deepResearch.handler.researchOutline'),
+            content: i18n.t('deepResearch.handler.analyzingResearchContent'),
             status: TaskStatus.IN_PROGRESS,
             isStreaming: false,
             sectionIdx: 0,
@@ -395,7 +396,7 @@ export class DeepsearchSSEHandler {
         }
 
         const parsedContent = JSON.parse(cachedContent);
-        const title = parsedContent.title || '研究报告';
+        const title = parsedContent.title || i18n.t('deepResearch.handler.researchOutline');
 
         // 更新 outline 任务
         updateMessage(lastMessageItems.id, lastMessage.id, {
@@ -409,7 +410,7 @@ export class DeepsearchSSEHandler {
         // 为每个 section 创建子任务
         if (parsedContent.sections && Array.isArray(parsedContent.sections)) {
           parsedContent.sections.forEach((section: any, index: number) => {
-            const sectionTitle = section.title || `章节 ${index + 1}`;
+            const sectionTitle = section.title || i18n.t('deepResearch.handler.chapter', { index: index + 1 });
             const sectionDescription = section.description || '';
 
             const sectionTask = this.store.addMessageAsChild(
@@ -434,8 +435,8 @@ export class DeepsearchSSEHandler {
         console.error('[DeepsearchSSEHandler] Outline JSON解析失败:', e);
         // ===== 修复：即使解析失败，也要更新任务状态 =====
         updateMessage(lastMessageItems.id, lastMessage.id, {
-          title: '研究大纲',
-          content: '正在分析研究内容...',
+          title: i18n.t('deepResearch.handler.researchOutline'),
+          content: i18n.t('deepResearch.handler.analyzingResearchContent'),
           status: TaskStatus.IN_PROGRESS,
           isStreaming: false,
           sectionIdx: 0,
@@ -640,7 +641,7 @@ export class DeepsearchSSEHandler {
               outlineTask.id,
               MessageType.REPORT,  // 修正：应该是 REPORT 类型
               content || '',
-              '最终报告'
+              i18n.t('deepResearch.handler.finalReport')
             );
             updateMessage(lastMessageItems.id, finalReportTask.id, {
               status: TaskStatus.COMPLETED,
@@ -695,7 +696,7 @@ export class DeepsearchSSEHandler {
 
       const sectionChildren = this.store.getChildMessages(sectionTask.id);
       const planTask = sectionChildren.find(task =>
-        task.title && task.title.includes(`信息收集${planIdx}`)
+        task.title && task.title.includes(i18n.t('deepResearch.handler.informationCollection', { index: planIdx }))
       );
 
       if (!planTask) {
@@ -760,8 +761,8 @@ export class DeepsearchSSEHandler {
           parsedContent = {};
         }
 
-        const contentTitle = (parsedContent?.title as string | undefined) || '搜索结果';
-        const messageTitle = `collector_info_retrieval: ${contentTitle || '搜索结果'}`;
+        const contentTitle = (parsedContent?.title as string | undefined) || i18n.t('deepResearch.handler.searchResult');
+        const messageTitle = `collector_info_retrieval: ${contentTitle || i18n.t('deepResearch.handler.searchResult')}`;
 
         const childMessage = this.store.addMessageAsChild(
           lastMessageItems.id,
@@ -799,7 +800,7 @@ export class DeepsearchSSEHandler {
         stepTask.id,
         MessageType.TEXT,
         summaryContent,
-        '信息总结'
+        i18n.t('deepResearch.handler.informationSummary')
       );
 
       updateMessage(lastMessageItems.id, childMessage.id, {
@@ -862,7 +863,7 @@ export class DeepsearchSSEHandler {
               MessageType.REPORT,
               '',  // 初始 content 为空
               undefined,  // parentId 为 undefined，与 outline_task 同级
-              '最终报告',
+              i18n.t('deepResearch.handler.finalReport'),
               'deepsearch'  // agent 类型
             );
             updateMessage(lastMessageItems.id, finalReportMessage.id, {
@@ -900,7 +901,7 @@ export class DeepsearchSSEHandler {
           .filter(msg =>
             msg.type === MessageType.REPORT &&
             (msg.status === TaskStatus.PENDING || msg.status === TaskStatus.IN_PROGRESS) &&
-            msg.title === '最终报告' &&
+            msg.title === i18n.t('deepResearch.handler.finalReport') &&
             !msg.parentMessageId  // ← 确保是顶级 message
           )
           .pop();  // 取最后一个
@@ -919,7 +920,7 @@ export class DeepsearchSSEHandler {
             MessageType.REPORT,
             endData || '',
             undefined,  // 与 outline_task 同级
-            '最终报告',
+            i18n.t('deepResearch.handler.finalReport'),
             'deepsearch'  // agent 类型
           );
           updateMessage(lastMessageItems.id, finalReportMessage.id, {
@@ -937,7 +938,7 @@ export class DeepsearchSSEHandler {
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            msg.title === '最终报告' &&
+            msg.title === i18n.t('deepResearch.handler.finalReport') &&
             !msg.parentMessageId
           );
 
@@ -972,7 +973,7 @@ export class DeepsearchSSEHandler {
             updateMessage(lastMessageItems.id, finalReportMessage.id, {
               content: {
                 response_content: '',
-                exception_info: '报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。',
+                exception_info: i18n.t('deepResearch.handler.reportGenerationFailed'),
                 citation_messages: null,
               } as JSONObject,
             });
@@ -1046,7 +1047,7 @@ export class DeepsearchSSEHandler {
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            msg.title === '最终报告' &&
+            msg.title === i18n.t('deepResearch.handler.finalReport') &&
             !msg.parentMessageId  // ← 确保是顶级 message
           );
 
@@ -1062,7 +1063,7 @@ export class DeepsearchSSEHandler {
             MessageType.REPORT,
             errorData,
             undefined,
-            '最终报告',
+            i18n.t('deepResearch.handler.finalReport'),
             'deepsearch'  // agent 类型
           );
           updateMessage(lastMessageItems.id, newReport.id, {
@@ -1087,7 +1088,7 @@ export class DeepsearchSSEHandler {
     // 查找 type=REPORT 且 title 以 "章节报告:" 开头的消息
     const existingReport = childMessages.find(msg =>
       msg.type === MessageType.REPORT &&
-      msg.title?.startsWith('章节报告:')
+      msg.title?.startsWith(i18n.t('deepResearch.handler.chapterReport') + ':')
     );
 
     return existingReport || null;
@@ -1163,7 +1164,7 @@ export class DeepsearchSSEHandler {
     const childMessages = this.store.getChildMessages(sectionTask.id);
 
     const existingPlan = childMessages.find(task =>
-      task.title && task.title.includes(`信息收集${targetPlanIdx}`)
+      task.title && task.title.includes(i18n.t('deepResearch.handler.informationCollection', { index: targetPlanIdx }))
     );
 
     if (existingPlan) {
@@ -1171,7 +1172,7 @@ export class DeepsearchSSEHandler {
     }
 
     // const planTitle = `${sectionTask.title}_plan${targetPlanIdx}`;
-    const planTitle = `信息收集${targetPlanIdx}`;
+    const planTitle = i18n.t('deepResearch.handler.informationCollection', { index: targetPlanIdx });
     const planTask = this.store.addMessageAsChild(
       messageItemsId,
       sectionTask.id,
