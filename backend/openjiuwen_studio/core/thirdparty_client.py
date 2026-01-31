@@ -4,6 +4,8 @@ import logging
 from typing import AsyncGenerator, Optional, Dict, Any
 import httpx
 from openjiuwen_studio.core.config import settings
+from openjiuwen_studio.core.common.status_code import StatusCode
+from openjiuwen_studio.core.common.exceptions import DeepSearchClientError
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ class LazyDeepSearchHttpClient:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def _initialize(self) -> bool:
+    async def _initialize(self) -> bool:
         try:
             if not settings.deepsearch_agent_host or not settings.deepsearch_agent_port:
                 raise ValueError("DeepSearch agent host/port not configured")
@@ -36,6 +38,13 @@ class LazyDeepSearchHttpClient:
                 ),
                 limits=httpx.Limits(max_connections=50)
             )
+
+            try:
+                resp = await self._client.get("/", timeout=5.0)
+                resp.raise_for_status()
+            except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as ex:
+                raise RuntimeError(f"DeepSearch service unreachable: {ex}") from ex
+
             self._initialized = True
             logger.info(f"DeepSearch HTTP client ready. Base URL: {base_url}")
             return True
@@ -43,7 +52,10 @@ class LazyDeepSearchHttpClient:
             self._client = None
             self._initialized = False
             logger.error(f"Failed to initialize DeepSearch HTTP client: {e}")
-            return False
+            raise DeepSearchClientError(
+                error_code=StatusCode.TASK_SPACE_THIRDPARTY_CLIENT_ERROR.code,
+                message=StatusCode.TASK_SPACE_THIRDPARTY_CLIENT_ERROR.errmsg.format(msg=str(e))
+            ) from e
 
     async def request(
         self,
@@ -56,8 +68,7 @@ class LazyDeepSearchHttpClient:
     ):
         """通用 HTTP 请求方法"""
         if not self._initialized or self._client is None:
-            if not self._initialize():
-                raise RuntimeError("DeepSearch HTTP client unavailable")
+            await self._initialize()
         try:
             resp = await self._client.request(method, url, json=jsons, params=params, headers=headers)
             resp.raise_for_status()
@@ -74,11 +85,10 @@ class LazyDeepSearchHttpClient:
             self._client = None
             self._initialized = False
 
-    def stream(self, method: str, url: str, **kwargs):
+    async def stream(self, method: str, url: str, **kwargs):
         """用于流式请求，返回异步上下文管理器"""
         if not self._initialized or self._client is None:
-            if not self._initialize():
-                raise RuntimeError("DeepSearch HTTP client unavailable")
+            await self._initialize()
         return self._client.stream(method, url, **kwargs)
 
 
@@ -93,8 +103,7 @@ class DeepSearchAgentClient:
 
     async def run_deepsearch_stream(self, payload: Dict[str, Any]) -> AsyncGenerator[str, None]:
         """流式运行深度搜索"""
-        async with self._http.stream("POST", "/api/v1/agent/deepsearch/run/",
-                                      json=payload) as resp:
+        async with (await self._http.stream("POST", "/api/v1/agent/deepsearch/run/", json=payload)) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 yield line
@@ -155,7 +164,7 @@ class DeepSearchAgentClient:
         """测试模板"""
         resp = await self._http.request("POST",
                                         f"/api/v1/agent/deepsearch/web_search/{space_id}/{web_search_engine_id}",
-                                        json=query)
+                                        jsons=query)
         return resp.json()
 
     async def report_converts(self, payload: Dict[str, Any]) -> list:

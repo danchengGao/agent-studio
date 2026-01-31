@@ -110,7 +110,7 @@ class WebSearchEngineCreateRequestDTO(WebSearchEngineBasicRequestDTO):
     search_api_key: str = Field(..., min_length=1, max_length=255, description="搜索引擎访问api_key")
     search_url: str = Field(..., min_length=1, max_length=255, description="搜索引擎url")
     extension: dict = Field(default_factory=dict, description="搜索引擎扩展配置")
-    is_activate: bool = Field(default=True, description="搜索引擎是否禁用")
+    is_active: bool = Field(default=True, description="搜索引擎是否禁用")
 
 
 class WebSearchEngineGetRequestDTO(WebSearchEngineBasicRequestDTO):
@@ -136,7 +136,7 @@ class WebSearchEngineUpdateRequestDTO(WebSearchEngineBasicRequestDTO):
     search_api_key: str = Field(..., min_length=1, max_length=255, description="搜索引擎访问api_key")
     search_url: str = Field(..., min_length=1, max_length=255, description="搜索引擎url")
     extension: dict = Field(default_factory=dict, description="搜索引擎扩展配置")
-    is_activate: bool = Field(default=True, description="搜索引擎是否禁用")
+    is_active: bool = Field(default=True, description="搜索引擎是否禁用")
 
 
 
@@ -156,7 +156,7 @@ class WebSearchEngineGetRes(BasicResponseDTO):
     search_engine_name: str = Field(..., min_length=1, max_length=255, description="搜索引擎名称")
     search_url: str = Field(..., min_length=1, max_length=255, description="搜索引擎url")
     extension: Optional[dict[str, Any]] = Field(default_factory=dict, description="搜索引擎扩展配置")
-    is_activate: Optional[bool] = Field(default=False, description="搜索引擎是否禁用")
+    is_active: Optional[bool] = Field(default=True, description="搜索引擎是否禁用")
 
 
 class WebSearchEngineDetail(BasicResponseDTO):
@@ -173,7 +173,7 @@ class WebSearchEngineItem(BaseModel):
     web_search_engine_id: int = Field(..., description="搜索引擎id")
     create_time: str = Field(..., min_length=1, max_length=255, description="模板创建时间")
     extension: Optional[dict[str, Any]] = Field(default_factory=dict, description="搜索引擎扩展配置")
-    is_activate: Optional[bool] = Field(default=False, description="搜索引擎是否禁用")
+    is_active: Optional[bool] = Field(default=True, description="搜索引擎是否禁用")
 
 
 class WebSearchEngineListRes(BasicResponseDTO):
@@ -189,6 +189,11 @@ class WebSearchEngineDeleteRes(BasicResponseDTO):
 class WebSearchEngineUpdateRes(BasicResponseDTO):
     '''修改指定搜索引擎'''
     web_search_engine_id: int = Field(default=0, description="搜索引擎id")
+
+
+class WebSearchEngineAccessRequestDTO(BaseModel):
+    '''web搜索引擎基类对象'''
+    query: str = Field(..., description="用户query")
 
 
 class WebSearchEngineAccessRes(BasicResponseDTO):

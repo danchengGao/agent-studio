@@ -3,12 +3,12 @@ from functools import wraps
 from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, status, HTTPException
-from sse_starlette.sse import EventSourceResponse
 from fastapi.responses import StreamingResponse
 from openjiuwen_studio.core.thirdparty_client import DeepSearchAgentClient
 from openjiuwen_studio.core.manager.convertor.components.llm import get_model_config
 from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
+from openjiuwen_studio.core.common.exceptions import DeepSearchClientError
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.deepsearch import (
     DeepSearchRequest,
@@ -29,6 +29,7 @@ from openjiuwen_studio.schemas.deepsearch import (
     WebSearchEngineUpdateRequestDTO,
     WebSearchEngineDeleteRes,
     WebSearchEngineDeleteRequestDTO,
+    WebSearchEngineAccessRequestDTO,
     WebSearchEngineAccessRes,
     ReportConvertReq,
     ReportConvertRes,
@@ -68,17 +69,26 @@ async def run(
     _ = check_user_space(payload["space_id"], current_user)
 
     model_config = get_model_configs(payload["model_config_id"], payload["space_id"])
-    payload["llm_config"] = model_config  # 自行注入
+    payload["llm_config"] = model_config
 
     async def stream():
-        async for line in client.run_deepsearch_stream(payload):
-            if line:
-                yield line + "\n\n"
+        try:
+            async for line in client.run_deepsearch_stream(payload):
+                if line:
+                    yield line + "\n\n"
+        except Exception as e:
+            if isinstance(e, DeepSearchClientError):
+                error = e
+            else:
+                error = DeepSearchClientError(
+                    error_code="CLIENT_INIT_ERROR",
+                    message=str(e)
+                )
+            conversation_id = payload.get("conversation_id", "")
+            for event_str in error.generate_error_stream(conversation_id):
+                yield event_str
 
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 @deepsearch_router.post("/template", response_model=TemplateImportResponse)
@@ -212,12 +222,12 @@ async def update_web_search_engine(
 async def access_web_search_engine(
         space_id: str,
         web_search_engine_id: int,
-        query: str,
+        request: WebSearchEngineAccessRequestDTO,
         client: DeepSearchAgentClient = Depends(get_agent_client),
         current_user: dict = Depends(get_current_user)
 ):
     """test web search"""
-    payload = {"query": query}
+    payload = request.model_dump()
     _ = check_user_space(space_id, current_user)
     res = await client.access_web_search_engines(space_id, web_search_engine_id, payload)
     res["datas"] = [str(doc) for doc in res["datas"]]
