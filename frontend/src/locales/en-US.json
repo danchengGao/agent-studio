@@ -2179,6 +2179,8 @@
         }
       },
       "tagsLimit": "Tag count cannot exceed 10",
+      "tagLengthLimit": "Tag length cannot exceed 100 characters",
+      "tagLength": "Tag length: {{length}}/100",
       "apiKeyEditHint": "Currently showing masked key. Leave empty to keep unchanged, enter new key to update",
       "apiKeyEmptyHint": "Leave empty to keep key unchanged",
       "embeddingBaseUrlHint": "Root address of the model API service (e.g.: https://dashscope.xxxxxxx.com/compatible-mode/v1/embeddings)",

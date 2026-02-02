@@ -2163,6 +2163,8 @@
         }
       },
       "tagsLimit": "标签数量不能超过10个",
+      "tagLengthLimit": "标签长度不能超过100个字符",
+      "tagLength": "标签长度：{{length}}/100",
       "apiKeyEditHint": "当前显示的是脱敏的密钥，留空则不更新，输入新密钥则更新",
       "apiKeyEmptyHint": "留空则不更新密钥",
       "embeddingBaseUrlHint": "模型 API 服务的根地址（如：https://dashscope.xxxxxxx.com/compatible-mode/v1/embeddings）",

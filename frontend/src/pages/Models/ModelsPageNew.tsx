@@ -905,16 +905,26 @@ const ModelsPage: React.FC = () => {
   // Tag management functions
   const handleAddTag = () => {
     const currentTags = newModel.tags || []
-    if (newTag.trim() && !currentTags.includes(newTag.trim())) {
+    const trimmedTag = newTag.trim()
+    if (!trimmedTag) return
+    if (trimmedTag.length > 100) {
+      setSnackbar({
+        open: true,
+        message: t('models.messages.tagLengthLimit'),
+        severity: 'warning',
+      })
+      return
+    }
+    if (!currentTags.includes(trimmedTag)) {
       if (currentTags.length >= 10) {
         setSnackbar({
           open: true,
-          message: '标签数量不能超过10个',
+          message: t('models.messages.tagsLimit'),
           severity: 'warning',
         })
         return
       }
-      setNewModel({ ...newModel, tags: [...currentTags, newTag.trim()] })
+      setNewModel({ ...newModel, tags: [...currentTags, trimmedTag] })
       setNewTag('')
     }
   }
@@ -1294,12 +1304,27 @@ const ModelsPage: React.FC = () => {
                       label={t('models.modelConfig.basicInfo.tags')}
                       placeholder=""
                       value={newTag}
-                      onChange={e => setNewTag(e.target.value)}
+                      onChange={e => {
+                        const value = e.target.value
+                        if (value.length <= 100) {
+                          setNewTag(value)
+                        }
+                      }}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault()
                           const currentTags = newModel.tags || []
-                          if (newTag.trim() && !currentTags.includes(newTag.trim())) {
+                          const trimmedTag = newTag.trim()
+                          if (!trimmedTag) return
+                          if (trimmedTag.length > 100) {
+                            setSnackbar({
+                              open: true,
+                              message: t('models.messages.tagLengthLimit'),
+                              severity: 'warning',
+                            })
+                            return
+                          }
+                          if (!currentTags.includes(trimmedTag)) {
                             if (currentTags.length >= 10) {
                               setSnackbar({
                                 open: true,
@@ -1310,7 +1335,7 @@ const ModelsPage: React.FC = () => {
                             }
                             setNewModel({
                               ...newModel,
-                              tags: [...currentTags, newTag.trim()],
+                              tags: [...currentTags, trimmedTag],
                             })
                             setNewTag('')
                           }
@@ -1319,6 +1344,10 @@ const ModelsPage: React.FC = () => {
                       variant="outlined"
                       className="flex-1 !mr-4"
                       disabled={(newModel.tags || []).length >= 10}
+                      helperText={t('models.messages.tagLength', { length: newTag.length })}
+                      FormHelperTextProps={{
+                        className: newTag.length >= 100 ? 'text-red-600' : 'text-gray-600',
+                      }}
                     />
                     <Button
                       size="small"
