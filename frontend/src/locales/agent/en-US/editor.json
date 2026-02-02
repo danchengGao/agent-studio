@@ -194,6 +194,7 @@
           "disabledModel": "Model disabled ({{name}})"
         },
         "alerts": {
+          "noWorkflow": "No workflows yet. Click the button above to add a workflow.",
           "noModelsInline": "No models configured",
           "modelDisabledAction": "Enable model",
           "modelDisabledMessage": "The associated model \"{{name}}\" is disabled. Please select another available model or go to the model management page to enable it.",
@@ -201,6 +202,48 @@
           "noModelSelectedMessage": "No model selected",
           "noModelsConfiguredAction": "Configure models",
           "noModelsConfiguredMessage": "No models are configured. Please go to the model configuration page to add models."
+        },
+        "workflow": {
+          "refreshTooltip": "Refresh workflow",
+          "validationWarning": "Some workflows have validation errors ({{count}}). Please open the corresponding workflow to fix.",
+          "refreshAriaLabel": "Refresh"
+        },
+        "knowledge": {
+          "sectionTitle": "Knowledge",
+          "accordionTitle": "Knowledge Base",
+          "sectionTitleShort": "Text"
+        },
+        "knowledgeBaseList": {
+          "list": {
+            "empty": "No knowledge bases added yet. Click the button above to add."
+          },
+          "settingsTitle": "Settings",
+          "deleteTitle": "Delete",
+          "removeDialog": {
+            "title": "Remove Knowledge Base",
+            "confirmButtonText": "Confirm",
+            "message": "Are you sure you want to remove this knowledge base? This action cannot be undone."
+          }
+        },
+        "knowledgeSettings": {
+          "title": "Knowledge Base Settings",
+          "graphStrategyLabel": "Document Graph Retrieval Strategy",
+          "graphStrategyTooltip": "Choose how to use document graph enhancement. Only available when the knowledge base has graph-enhanced documents.",
+          "enabled": "Enabled",
+          "disabled": "Disabled",
+          "base": "Base",
+          "agentic": "Agentic",
+          "baseTooltip": "Uses entity and relation graphs for reasoning, good for complex cross-paragraph and cross-document questions with more logical answers.",
+          "agenticTooltip": "Retrieval agent decides and runs multi-step queries automatically, suitable for open-ended or multi-step reasoning with better accuracy and flexibility.",
+          "noGraphDocsMessage": "No graph-enhanced documents in this knowledge base. Document graph retrieval is unavailable.",
+          "maxRecallLabel": "Max Recall Count",
+          "maxRecallTooltip": "Maximum number of passages returned from knowledge to the model. Higher values return more content.",
+          "minScoreLabel": "Min Match Score",
+          "minScoreTooltip": "Only passages with similarity score above this value are returned in vector retrieval.",
+          "minScoreWarning": "A minimum score of 1.0 may exclude all results, as few passages match exactly."
+        },
+        "errors": {
+          "deleteFailed": "Delete failed"
         },
         "memory": {
           "title": "Memory Configuration",
@@ -230,6 +273,10 @@
       "addPlugin": {
         "addExisting": "Add existing plugin",
         "createNew": "Create new plugin"
+      },
+      "addKnowledgeBase": {
+        "addExisting": "Add existing knowledge base",
+        "createNew": "Create new knowledge base"
       },
       "modelSetting": {
         "fields": {
@@ -276,6 +323,24 @@
           "emptyText": "No workflows added yet. Click the button in the upper right to add.",
           "settingsTitle": "Settings",
           "deleteTitle": "Delete"
+        }
+      },
+      "knowledgeBaseSelector": {
+        "title": "Select Knowledge Base",
+        "loading": "Loading...",
+        "empty": "No knowledge bases available",
+        "cancel": "Cancel",
+        "confirm": "Confirm ({{count}})",
+        "selected": "Selected",
+        "embeddingModelLabel": "Embedding model: {{name}} ({{modelId}})",
+        "embeddingModelMismatch": "Embedding model mismatch",
+        "errors": {
+          "fetchFailed": "Failed to fetch knowledge base list",
+          "loadFailed": "Failed to load knowledge base list",
+          "noEmbeddingModel": "Some knowledge bases have no Embedding model configured",
+          "validateFailed": "Unable to verify Embedding model for some knowledge bases",
+          "modelMismatch": "Selected knowledge bases use different Embedding models: {{modelInfo}}. Please select knowledge bases that use the same Embedding model.",
+          "validateError": "Error validating Embedding models"
         }
       },
       "workflowSelector": {

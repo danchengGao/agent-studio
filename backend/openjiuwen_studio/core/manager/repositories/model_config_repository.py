@@ -24,6 +24,17 @@ class ModelConfigRepository(BaseRepository[ModelConfig]):
         """
         super().__init__(db, ModelConfig)
     
+    def get_by_ids(self, model_ids: List[int]) -> List[ModelConfig]:
+        """Batch get model configs by IDs.
+        
+        Args:
+            model_ids: List of Model IDs
+            
+        Returns:
+            List of model configs
+        """
+        return self.query().filter(ModelConfig.id.in_(model_ids)).all()
+
     def get_by_name(self, name: str) -> Optional[ModelConfig]:
         """Get model config by name.
         

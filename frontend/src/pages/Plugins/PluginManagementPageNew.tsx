@@ -614,7 +614,7 @@ const PluginManagementPageNew: React.FC = () => {
                 </div>
                 {selectedPlugin.desc_mk && (
                   <div>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>插件详情</Typography>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('plugins.dialog.pluginDetails.basicInfo')}</Typography>
                     <div className="prose prose-sm max-w-none p-4 bg-gray-50 rounded-lg border border-gray-200">
                       <ReactMarkdown>{selectedPlugin.desc_mk}</ReactMarkdown>
                     </div>
@@ -733,7 +733,7 @@ const PluginManagementPageNew: React.FC = () => {
             disabled={deletePluginMutation.isLoading}
             startIcon={deletePluginMutation.isLoading ? <CircularProgress size={16} /> : null}
           >
-            {deletePluginMutation.isLoading ? t('common.buttons.deleting', '删除中...') : t('common.buttons.delete')}
+            {deletePluginMutation.isLoading ? t('common.buttons.deleting') : t('common.buttons.delete')}
           </Button>
         </DialogActions>
       </Dialog>
