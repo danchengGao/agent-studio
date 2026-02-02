@@ -199,7 +199,7 @@ class WebSearchEngineAccessRequestDTO(BaseModel):
 class WebSearchEngineAccessRes(BasicResponseDTO):
     '''测试指定搜索引擎'''
     search_engine_name: str = Field(..., min_length=1, max_length=255, description="搜索引擎名称")
-    datas: List[str] = Field(default=[], description="搜索引擎返回结果，原结构List[dict[str, Any]]，但key不固定")
+    datas: List[dict[str, Any]] = Field(default=[], description="搜索引擎返回结果，key不固定")
 
 
 class ReportConvertReq(BaseModel):

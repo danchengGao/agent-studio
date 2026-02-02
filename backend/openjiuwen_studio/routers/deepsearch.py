@@ -230,7 +230,6 @@ async def access_web_search_engine(
     payload = request.model_dump()
     _ = check_user_space(space_id, current_user)
     res = await client.access_web_search_engines(space_id, web_search_engine_id, payload)
-    res["datas"] = [str(doc) for doc in res["datas"]]
     return res
 
 
