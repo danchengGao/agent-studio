@@ -3,11 +3,11 @@
  */
 
 import type { MermaidCodeBlockProps } from '../types'
-import { CHART_COLORS, SVG_NS, VIEWBOX_PADDING, CHART_STYLES, COLORS, REGEX, ChartType } from './constants'
+import { CHART_COLORS, SVG_NS, VIEWBOX_PADDING } from './constants'
 import mermaid from 'mermaid'
 
 // 重新导出常量供其他模块使用
-export { CHART_COLORS, SVG_NS, VIEWBOX_PADDING, CHART_STYLES, COLORS, REGEX, ChartType } from './constants'
+export { CHART_COLORS, SVG_NS } from './constants'
 
 // ==================== Mermaid 初始化管理器 ====================
 
@@ -27,14 +27,92 @@ class MermaidManager {
     try {
       mermaid.initialize({
         startOnLoad: false,
-        theme: 'default',
+        theme: 'base',
         securityLevel: 'loose',
         logLevel: 'error',
+        themeVariables: {
+          // ==================== 通用颜色 ====================
+          darkMode: false,
+          background: '#ffffff',
+          fontFamily: 'trebuchet ms, verdana, arial',
+          fontSize: '16px',
+
+          // 主色系
+          primaryColor: CHART_COLORS[0],
+          primaryTextColor: '#1F2937',
+          primaryBorderColor: this.darkenColor(CHART_COLORS[0], 20),
+
+          // 次色系
+          secondaryColor: CHART_COLORS[1],
+          secondaryTextColor: '#1F2937',
+          secondaryBorderColor: this.darkenColor(CHART_COLORS[1], 20),
+
+          // 第三色系
+          tertiaryColor: CHART_COLORS[2],
+          tertiaryTextColor: '#1F2937',
+          tertiaryBorderColor: this.darkenColor(CHART_COLORS[2], 20),
+
+          // 线条和文字颜色
+          lineColor: CHART_COLORS[0],
+          textColor: '#1F2937',
+
+          // 节点背景
+          mainBkg: CHART_COLORS[0],
+
+          // ==================== 流程图变量 ====================
+          nodeBorder: this.darkenColor(CHART_COLORS[0], 20),
+          clusterBkg: CHART_COLORS[2],
+          clusterBorder: this.darkenColor(CHART_COLORS[2], 20),
+          defaultLinkColor: CHART_COLORS[0],
+          titleColor: '#1F2937',
+          edgeLabelBackground: CHART_COLORS[1],
+          nodeTextColor: '#1F2937',
+
+          // ==================== 饼图变量 ====================
+          pie1: CHART_COLORS[0],   // 蓝色
+          pie2: CHART_COLORS[1],   // 绿色
+          pie3: CHART_COLORS[2],   // 橙色
+          pie4: CHART_COLORS[3],   // 红色
+          pie5: CHART_COLORS[4],   // 紫色
+          pie6: CHART_COLORS[5],   // 青色
+          pie7: CHART_COLORS[6],   // 粉色
+          pie8: CHART_COLORS[7],   // 青柠
+          pie9: CHART_COLORS[8],   // 靛蓝
+          pie10: CHART_COLORS[9],  // 蓝绿
+          pie11: CHART_COLORS[10], // 玫瑰
+          pie12: CHART_COLORS[11], // 深紫
+          pieTitleTextSize: '25px',
+          pieTitleTextColor: '#1F2937',
+          pieSectionTextSize: '17px',
+          pieSectionTextColor: '#1F2937',
+          pieLegendTextSize: '17px',
+          pieLegendTextColor: '#1F2937',
+          pieStrokeColor: '#ffffff',
+          pieStrokeWidth: '2px',
+          pieOuterStrokeWidth: '2px',
+          pieOuterStrokeColor: '#ffffff',
+          pieOpacity: '1',
+        },
       })
       this.initialized = true
     } catch (err) {
       console.error('[MermaidChart] Initialization error:', err)
     }
+  }
+
+  /**
+   * 加深颜色（用于边框颜色）
+   * @param color 十六进制颜色
+   * @param percent 加深百分比
+   * @returns 加深后的颜色
+   */
+  private darkenColor(color: string, percent: number): string {
+    const num = parseInt(color.replace('#', ''), 16)
+    const amt = Math.round(2.55 * percent)
+    const R = Math.max((num >> 16) - amt, 0)
+    const G = Math.max((num >> 8 & 0x00FF) - amt, 0)
+    const B = Math.max((num & 0x0000FF) - amt, 0)
+    return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)
   }
 
   /**
@@ -112,98 +190,4 @@ export const createSvgText = (
   textEl.setAttribute('fill', options.fill || '#1F2937')
   textEl.textContent = text
   container.appendChild(textEl)
-}
-
-// ==================== 标题处理 ====================
-
-/**
- * 居中timeline图表标题
- */
-export const centerTimelineTitle = (svgElement: SVGSVGElement): void => {
-  const svgChildren = Array.from(svgElement.children)
-  for (const child of svgChildren) {
-    if (child.tagName === 'text' && !child.getAttribute('class')) {
-      const svgWidth = svgElement.viewBox.baseVal.width
-      child.setAttribute('x', String(svgWidth / 2))
-      child.setAttribute('text-anchor', 'middle')
-      child.setAttribute('y', String(CHART_STYLES.TIMELINE_TITLE_Y))
-      child.setAttribute('font-size', String(CHART_STYLES.TIMELINE_TITLE_FONT_SIZE))
-      child.setAttribute('font-weight', 'bold')
-      break
-    }
-  }
-}
-
-/**
- * 居中饼图标题
- */
-export const centerPieTitle = (svgElement: SVGSVGElement): void => {
-  const pieTitle = svgElement.querySelector('.pieTitleText')
-  if (pieTitle) {
-    pieTitle.setAttribute('text-anchor', 'middle')
-  }
-}
-
-/**
- * 居中xychart-beta标题
- */
-export const centerXyTitle = (svgElement: SVGSVGElement): void => {
-  const xyTitle = svgElement.querySelector('.title')
-  if (xyTitle && xyTitle.tagName === 'text') {
-    const svgWidth = svgElement.viewBox.baseVal.width
-    xyTitle.setAttribute('text-anchor', 'middle')
-    xyTitle.setAttribute('x', String(svgWidth / 2))
-  }
-}
-
-// ==================== 颜色优化 ====================
-
-/**
- * 优化饼图颜色（包括扇区和角标）
- */
-export const optimizePieColors = (svgElement: SVGSVGElement): void => {
-  const pieCharts = svgElement.querySelectorAll('.pieCircle')
-  if (pieCharts.length === 0) return
-
-  // 1. 修改饼图扇区颜色
-  pieCharts.forEach((pie, index) => {
-    pie.setAttribute('fill', getColor(index))
-    pie.setAttribute('stroke', '#fff')
-    pie.setAttribute('stroke-width', '2')
-  })
-
-  // 2. 修改角标（legend）颜色 - 使用 SVG 属性控制
-  const legendGroups = svgElement.querySelectorAll('g.legend')
-  if (legendGroups.length === 0) return
-
-  // 每个 legend group 对应一个颜色，使用外层索引
-  legendGroups.forEach((legendGroup, groupIndex) => {
-    const legendRects = legendGroup.querySelectorAll('rect')
-    legendRects.forEach((rect) => {
-      rect.setAttribute('fill', getColor(groupIndex))
-
-      // 移除可能的 style 属性（避免 CSS 样式覆盖）
-      rect.removeAttribute('style')
-
-      // 移除可能的 class（避免 CSS 类样式）
-      const classList = rect.getAttribute('class') || ''
-      if (classList.includes('pie') || classList.includes('legend')) {
-        rect.removeAttribute('class')
-      }
-    })
-  })
-}
-
-/**
- * 优化timeline图表颜色
- */
-export const optimizeTimelineColors = (svgElement: SVGSVGElement): void => {
-  const timelineSections = svgElement.querySelectorAll('[class*="section-"] rect, [class*="section-"] path')
-  if (timelineSections.length === 0) return
-
-  timelineSections.forEach((section, index) => {
-    if (section.getAttribute('fill')?.includes('hsl')) {
-      section.setAttribute('fill', getColor(index))
-    }
-  })
 }

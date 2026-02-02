@@ -3,13 +3,38 @@
  * 支持多种图表类型，优化颜色和布局
  */
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import mermaid from 'mermaid'
 import type { MermaidCodeBlockProps } from '../types'
-import { initMermaid } from './utils'
-import { adjustViewBox, centerTimelineTitle, centerPieTitle, centerXyTitle, optimizePieColors, optimizeTimelineColors } from './utils'
-import { handleXyChart } from './processors'
+import { initMermaid, adjustViewBox } from './utils'
+import { centerTimelineTitle, optimizeTimelineColors } from './timeline'
+import { centerXyTitle, handleXyChart } from './xyChart'
+
+// ==================== 子组件 ====================
+
+/**
+ * 图表错误显示组件
+ */
+const ChartError: React.FC<{
+  title: string
+  message: string
+  code: string
+  viewCodeLabel: string
+}> = ({ title, message, code, viewCodeLabel }) => (
+  <div className="border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 rounded-lg p-4 my-4">
+    <p className="text-sm font-medium text-red-700 dark:text-red-300">{title}</p>
+    <p className="text-sm text-red-600 dark:text-red-400 mt-1">{message}</p>
+    <details className="mt-2">
+      <summary className="cursor-pointer text-xs text-red-500">{viewCodeLabel}</summary>
+      <pre className="mt-2 text-xs p-2 bg-red-100 dark:bg-red-900/30 rounded overflow-auto max-h-40">
+        {code}
+      </pre>
+    </details>
+  </div>
+)
+
+// ==================== 主组件 ====================
 
 export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
   const { t } = useTranslation()
@@ -17,80 +42,98 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
   const [error, setError] = useState<string | null>(null)
   const uniqueId = useRef(`mermaid-${Math.random().toString(36).substr(2, 9)}-${Date.now()}`)
 
-  // 渲染图表
-  useEffect(() => {
-    const renderDiagram = async () => {
-      if (!ref.current) return
+  /**
+   * 处理图表后处理（根据图表类型应用不同的优化）
+   */
+  const postProcessSvg = useCallback((svgElement: SVGSVGElement, chartType: string | null) => {
+    // 调整viewBox避免内容截断
+    adjustViewBox(svgElement)
 
-      try {
-        initMermaid()
-
-        // 先验证语法，防止 mermaid 将错误插入到 document.body
-        try {
-          await mermaid.parse(code)
-        } catch (parseError) {
-          // 语法验证失败，显示错误而不是让 mermaid 渲染错误SVG
-          const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
-          console.error('[MermaidChart] Parse error:', parseError)
-          console.error('[MermaidChart] Code:', code.substring(0, 200))
-          setError(`${t('apps.chart.syntaxError')}: ${errorMessage}`)
-          return
-        }
-
-        // 语法验证通过，进行渲染
-        const { svg } = await mermaid.render(uniqueId.current, code)
-
-        if (ref.current) {
-          ref.current.innerHTML = svg
-          const svgElement = ref.current.querySelector('svg')
-          if (!svgElement) return
-
-          const chartType = svgElement.getAttribute('aria-roledescription')
-
-          // 调整viewBox避免内容截断
-          adjustViewBox(svgElement)
-
-          // 处理不同类型图表的标题和样式
-          if (chartType === 'timeline') {
-            centerTimelineTitle(svgElement)
-          }
-
-          centerPieTitle(svgElement)
-          centerXyTitle(svgElement)
-
-          // 优化图表颜色
-          optimizePieColors(svgElement)
-          optimizeTimelineColors(svgElement)
-
-          // 处理xychart-beta图表
-          handleXyChart(svgElement, code)
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err)
-        console.error('[MermaidChart] Rendering error:', err)
-        console.error('[MermaidChart] Code:', code.substring(0, 200))
-        setError(`${t('apps.chart.renderFailed')}: ${errorMessage}`)
-      }
+    // 处理不同类型图表的标题
+    if (chartType === 'timeline') {
+      centerTimelineTitle(svgElement)
+    } else if (chartType === 'xyChart-beta') {
+      centerXyTitle(svgElement)
     }
 
-    renderDiagram()
+    // 优化timeline图表颜色
+    optimizeTimelineColors(svgElement)
+
+    // 处理xychart-beta图表
+    handleXyChart(svgElement, code)
   }, [code])
 
+  /**
+   * 验证 mermaid 语法
+   */
+  const validateSyntax = useCallback(async (mermaidCode: string): Promise<boolean> => {
+    try {
+      await mermaid.parse(mermaidCode)
+      return true
+    } catch (parseError) {
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+      console.error('[MermaidChart] Parse error:', parseError)
+      console.error('[MermaidChart] Code:', mermaidCode.substring(0, 200))
+      setError(`${t('apps.chart.syntaxError')}: ${errorMessage}`)
+      return false
+    }
+  }, [t])
+
+  /**
+   * 渲染图表
+   */
+  const renderDiagram = useCallback(async () => {
+    if (!ref.current) return
+
+    // 清除之前的错误
+    setError(null)
+
+    // 验证语法
+    const isValid = await validateSyntax(code)
+    if (!isValid) return
+
+    try {
+      // 渲染 SVG
+      const { svg } = await mermaid.render(uniqueId.current, code)
+
+      if (!ref.current) return
+
+      // 插入 SVG
+      ref.current.innerHTML = svg
+      const svgElement = ref.current.querySelector('svg')
+      if (!svgElement) return
+
+      // 获取图表类型并应用后处理
+      const chartType = svgElement.getAttribute('aria-roledescription')
+      postProcessSvg(svgElement, chartType)
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      console.error('[MermaidChart] Rendering error:', err)
+      console.error('[MermaidChart] Code:', code.substring(0, 200))
+      setError(`${t('apps.chart.renderFailed')}: ${errorMessage}`)
+    }
+  }, [code, validateSyntax, postProcessSvg, t])
+
+  // 当代码变化时重新渲染
+  useEffect(() => {
+    initMermaid()
+    renderDiagram()
+  }, [renderDiagram])
+
+  // 错误状态
   if (error) {
     return (
-      <div className="border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 rounded-lg p-4 my-4">
-        <p className="text-sm font-medium text-red-700 dark:text-red-300">{t('apps.chart.mermaidError')}</p>
-        <p className="text-sm text-red-600 dark:text-red-400 mt-1">{error}</p>
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-red-500">{t('apps.chart.viewCode')}</summary>
-          <pre className="mt-2 text-xs p-2 bg-red-100 dark:bg-red-900/30 rounded overflow-auto max-h-40">
-            {code}
-          </pre>
-        </details>
-      </div>
+      <ChartError
+        title={t('apps.chart.mermaidError')}
+        message={error}
+        code={code}
+        viewCodeLabel={t('apps.chart.viewCode')}
+      />
     )
   }
 
+  // 正常渲染
   return (
     <div
       ref={ref}
