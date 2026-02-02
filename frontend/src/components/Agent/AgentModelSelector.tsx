@@ -831,7 +831,7 @@ const AgentModelSelector = (props: {
     try {
       await api.deleteUserVariable(user_id, group_id, target.name)
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err.message || '删除失败'
+      const msg = err?.response?.data?.detail || err.message || t('orchestrationPage.errors.deleteFailed')
       console.error(msg)
     }
   }
@@ -1138,7 +1138,7 @@ const AgentModelSelector = (props: {
                 {workflowObjects.length}
               </span>
               {workflowValidationErrorCount > 0 && ( 
-                 <Tooltip title={`所选工作流存在校验不通过（${workflowValidationErrorCount} 个），请跳转对应工作流进行修改`} arrow> 
+                 <Tooltip title={t('orchestrationPage.workflow.validationWarning', { count: workflowValidationErrorCount })} arrow> 
                    <span className="inline-flex items-center ml-2"> 
                      <AlertCircle className="w-[20px] h-[20px] text-red-500" /> 
                    </span> 
@@ -1146,14 +1146,14 @@ const AgentModelSelector = (props: {
                )}
             </Typography>
             <div className="action-area" onClick={e => e.stopPropagation()} style={{ marginLeft: '16px', display: 'flex', gap: '8px' }}>
-              <Tooltip title="刷新工作流信息" arrow>
+              <Tooltip title={t('orchestrationPage.workflow.refreshTooltip')} arrow>
                 <span>
                   <IconButton 
                     component="div"
                     size="small" 
                     onClick={handleRefreshWorkflows} 
                     disabled={workflowObjects.length === 0} 
-                    aria-label="刷新"
+                    aria-label={t('orchestrationPage.workflow.refreshAriaLabel')}
                     sx={{ cursor: workflowObjects.length === 0 ? 'not-allowed' : 'pointer' }}
                   >
                     <RefreshCcw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
@@ -1185,11 +1185,11 @@ const AgentModelSelector = (props: {
                refreshToken={workflowListRefreshToken} 
                validationResults={validationResults} 
              />
-             {workflowObjects.length === 0 && ( 
-               <Alert severity="info" sx={{ mt: 2 }}> 
-                 暂无工作流，点击上方按钮添加工作流 
-               </Alert> 
-             )}
+            {workflowObjects.length === 0 && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                {t('orchestrationPage.alerts.noWorkflow')}
+              </Alert>
+            )}
           </AccordionDetails>
         </Accordion>
 
@@ -1231,7 +1231,7 @@ const AgentModelSelector = (props: {
 
       <div className="knowledge-form mb-2 p-2">
         <div className="flex items-center justify-between mb-2">
-          <Typography>知识</Typography>
+          <Typography>{t('orchestrationPage.knowledge.sectionTitle')}</Typography>
           <IconButton
             size="small"
             onClick={e => setKnowledgeSettingsAnchorEl(e.currentTarget)}
@@ -1248,7 +1248,7 @@ const AgentModelSelector = (props: {
         <Accordion>
           <AccordionSummary aria-controls="knowledge-content" id="knowledge-header">
             <Typography component="span" className="flex items-center">
-              文本
+              {t('orchestrationPage.knowledge.accordionTitle')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
                   knowledgeBaseObjects.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
@@ -1259,8 +1259,8 @@ const AgentModelSelector = (props: {
             </Typography>
             <AddButton
               options={[
-                { label: '添加已有知识库', value: 'existing' },
-                { label: '创建新知识库', value: 'new' },
+                { label: t('addKnowledgeBase.addExisting'), value: 'existing' },
+                { label: t('addKnowledgeBase.createNew'), value: 'new' },
               ]}
               onSelect={addType => {
                 if (addType === 'existing') {
@@ -1355,7 +1355,7 @@ const AgentModelSelector = (props: {
         }}
       >
         <Typography variant="h6" sx={{ mb: 2, fontSize: '1rem', fontWeight: 'bold' }}>
-          知识库设置
+          {t('orchestrationPage.knowledgeSettings.title')}
         </Typography>
 
         {/* 文档图检索策略 */}
@@ -1363,9 +1363,9 @@ const AgentModelSelector = (props: {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Typography variant="body2" sx={{ fontWeight: 'medium', color: hasGraphEnhancementDocs ? 'text.primary' : 'text.disabled' }}>
-                文档图检索策略
+                {t('orchestrationPage.knowledgeSettings.graphStrategyLabel')}
               </Typography>
-              <Tooltip title="选择文档图增强检索的方式，仅在知识库中有图增强构建的文档时可用。" arrow placement="top">
+              <Tooltip title={t('orchestrationPage.knowledgeSettings.graphStrategyTooltip')} arrow placement="top">
                 <HelpOutlineIcon sx={{ fontSize: 16, color: hasGraphEnhancementDocs ? 'text.secondary' : 'text.disabled', cursor: 'help' }} />
               </Tooltip>
             </Box>
@@ -1388,7 +1388,7 @@ const AgentModelSelector = (props: {
                   disabled={readonly || !hasGraphEnhancementDocs}
                 />
               }
-              label={enableGraphRetrieval ? '已启用' : '未启用'}
+              label={enableGraphRetrieval ? t('orchestrationPage.knowledgeSettings.enabled') : t('orchestrationPage.knowledgeSettings.disabled')}
               sx={{
                 margin: 0,
                 '& .MuiFormControlLabel-label': {
@@ -1414,26 +1414,26 @@ const AgentModelSelector = (props: {
               pointerEvents: enableGraphRetrieval && hasGraphEnhancementDocs ? 'auto' : 'none'
             }}
           >
-            <Tooltip title="利用知识图谱的实体与关系网络做推理，擅长跨段、跨文档的复杂问题，能给出更有逻辑的回答。" arrow placement="top">
+            <Tooltip title={t('orchestrationPage.knowledgeSettings.baseTooltip')} arrow placement="top">
               <FormControlLabel
                 value="base"
                 control={<Radio size="small" />}
-                label="基础"
+                label={t('orchestrationPage.knowledgeSettings.base')}
                 disabled={readonly || !enableGraphRetrieval || !hasGraphEnhancementDocs}
               />
             </Tooltip>
-            <Tooltip title="由检索智能体自动决策和多步查询，适合开放性或多步推理的问题，兼顾准确度与灵活性，效果更好。" arrow placement="top">
+            <Tooltip title={t('orchestrationPage.knowledgeSettings.agenticTooltip')} arrow placement="top">
               <FormControlLabel
                 value="agentic"
                 control={<Radio size="small" />}
-                label="Agentic"
+                label={t('orchestrationPage.knowledgeSettings.agentic')}
                 disabled={readonly || !enableGraphRetrieval || !hasGraphEnhancementDocs}
               />
             </Tooltip>
           </RadioGroup>
           {!hasGraphEnhancementDocs && (
             <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5, display: 'block' }}>
-              当前知识库中没有图增强构建的文档，文档图检索策略不可用
+              {t('orchestrationPage.knowledgeSettings.noGraphDocsMessage')}
             </Typography>
           )}
         </Box>
@@ -1442,9 +1442,9 @@ const AgentModelSelector = (props: {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-              最大召回数量
+              {t('orchestrationPage.knowledgeSettings.maxRecallLabel')}
             </Typography>
-            <Tooltip title="从知识中返回给大模型的最大段落数，数值越大返回的内容越多。" arrow placement="top">
+            <Tooltip title={t('orchestrationPage.knowledgeSettings.maxRecallTooltip')} arrow placement="top">
               <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
             </Tooltip>
           </Box>
@@ -1524,9 +1524,9 @@ const AgentModelSelector = (props: {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-              最小匹配分数
+              {t('orchestrationPage.knowledgeSettings.minScoreLabel')}
             </Typography>
-            <Tooltip title="向量检索时，只有相似度分数大于此值的段落才会被返回。" arrow placement="top">
+            <Tooltip title={t('orchestrationPage.knowledgeSettings.minScoreTooltip')} arrow placement="top">
               <HelpOutlineIcon sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
             </Tooltip>
           </Box>
@@ -1627,7 +1627,7 @@ const AgentModelSelector = (props: {
             </Box>
             {minMatchScore !== -1 && minMatchScore === 1 && (
               <Typography variant="caption" sx={{ color: 'error.main', mt: 0.5, display: 'block' }}>
-                设置为1可能过滤所有结果
+                {t('orchestrationPage.knowledgeSettings.minScoreWarning')}
               </Typography>
             )}
         </Box>

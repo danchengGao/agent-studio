@@ -441,7 +441,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                   disabled={loadingVersions.has(plugin.plugin_id)}
                                   className="notranslate"
                                   MenuProps={{
-                                    disablePortal: true,
+                                    disablePortal: false,
                                     anchorOrigin: {
                                       vertical: 'bottom',
                                       horizontal: 'left',
@@ -455,6 +455,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                         translate: 'no',
                                         position: 'relative',
                                         zIndex: 9999,
+                                        maxWidth: 250,
                                       },
                                       className: 'notranslate',
                                     },
@@ -531,8 +532,8 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                                       <Chip
                                                         label={
                                                           tool.available === true
-                                                            ? t('plugins.pluginConfig.enabled', '启用')
-                                                            : t('plugins.pluginConfig.disabled', '禁用')
+                                                            ? t('plugins.actions.enable', '启用')
+                                                            : t('plugins.actions.disable', '禁用')
                                                         }
                                                         size="small"
                                                         color={tool.available === true ? 'success' : 'default'}

@@ -33,6 +33,8 @@ class StatusCode(Enum):
                                    "agent校验服务器内部错误: {msg}",
                                    "agent verification internal server error: {msg}")
 
+    AGENT_MODEL_NOT_FOUND = (BASE_CODE + 1014, "未找到指定的模型: {msg}", "model not found: {msg}")
+
     # Agent Import/Export 1020~1049
     AGENT_EXPORT_FAILED = (BASE_CODE + 1020, "智能体导出失败: {msg}", "agent export failed: {msg}")
     AGENT_EXPORT_AGENT_NOT_FOUND = (BASE_CODE + 1021, "导出失败，智能体不存在", "agent not found for export")

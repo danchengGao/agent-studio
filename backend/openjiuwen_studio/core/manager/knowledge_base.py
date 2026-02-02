@@ -216,6 +216,13 @@ def _create_llm_client_from_db(llm_model_id: str, space_id: str):
         manager = ModelConfigManager(db)
         model_config = manager.get_config_by_id(int(llm_model_id), space_id)
 
+        # 检查模型是否激活
+        if not model_config.is_active:
+            raise ValueError(
+                f"LLM model '{model_config.name}' (ID: {llm_model_id}) is not active. "
+                f"Please activate the model before starting document processing."
+            )
+
         # 解密 API key
         security_utils = SecurityUtils()
         api_key = None
@@ -2402,7 +2409,8 @@ def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) ->
             enable_graph_enhancement = None
             process_info = doc_data.get("process_info")
             if isinstance(process_info, dict):
-                error_msg = process_info.get("error")
+                # 优先查找 "error" 字段（文档处理失败时设置），如果没有则查找 "message" 字段（导入时设置）
+                error_msg = process_info.get("error") or process_info.get("message")
                 # 从 indexing_strategy 中提取 enable_graph_enhancement
                 indexing_strategy = process_info.get("indexing_strategy")
                 if isinstance(indexing_strategy, dict):
