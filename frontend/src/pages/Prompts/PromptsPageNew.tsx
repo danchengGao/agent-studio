@@ -617,7 +617,7 @@ const PromptsPageNew: React.FC = () => {
         {prompts.map(prompt => {
           const hasVersion = prompt.version && prompt.version !== '-'
           const tags: ConfigCardTag[] = hasVersion
-            ? [{ label: String(prompt.version) }]
+            ? [{ label: String(prompt.version), color: '#3B82F6' }]
             : [{ label: t('common.status.draft'), variant: 'warning' }]
 
           // 准备操作

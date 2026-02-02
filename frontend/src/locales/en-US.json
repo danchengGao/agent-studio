@@ -453,9 +453,9 @@
       "logout": "Logout",
       "switchUser": "Switch Userspace",
       "language": "Language",
-      "currentLanguage": "EN",
-      "switchToEnglish": "Switch to English",
-      "switchToChinese": "Switch to Chinese",
+      "currentLanguage": "English",
+      "switchToEnglish": "English",
+      "switchToChinese": "中文",
       "switchToNewVersion": "Try New Version",
       "switchToOldVersion": "Back to Old Version",
       "beta": "Beta"
@@ -696,6 +696,22 @@
       "showPerPage": "Show per page",
       "totalRecords": "Total {{total}} records",
       "pageInfo": "Page {{current}} of {{total}}"
+    },
+    "workflowCreation": {
+      "back": "Back",
+      "title": "Create Workflow",
+      "basicInfo": "Basic Information",
+      "workflowNameLabel": "Workflow Name *",
+      "workflowNamePlaceholder": "Enter workflow name (letters, numbers, underscores only, must start with a letter)",
+      "nameRequired": "Name cannot be empty",
+      "nameCharCount": "{{count}}/100",
+      "workflowDescriptionLabel": "Workflow Description *",
+      "workflowDescriptionPlaceholder": "Describe the workflow's purpose and usage...",
+      "descriptionRequired": "Description cannot be empty",
+      "descriptionCharCount": "{{count}}/500",
+      "cancel": "Cancel",
+      "create": "Create Workflow",
+      "creating": "Creating..."
     },
     "workflowEditor": {
       "title": "Workflow Editor",

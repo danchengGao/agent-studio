@@ -462,10 +462,10 @@
       "changePassword": "修改密码",
       "logout": "退出登录",
       "switchUser": "切换用户空间",
-      "language": "语言",
+      "language": "Language",
       "currentLanguage": "中文",
-      "switchToEnglish": "切换到英文",
-      "switchToChinese": "切换到中文",
+      "switchToEnglish": "English",
+      "switchToChinese": "中文",
       "switchToNewVersion": "体验新版",
       "switchToOldVersion": "返回旧版",
       "beta": "Beta"
@@ -675,6 +675,22 @@
       "showPerPage": "每页显示",
       "totalRecords": "共 {{total}} 条记录",
       "pageInfo": "第 {{current}} 页 / 共 {{total}} 页"
+    },
+    "workflowCreation": {
+      "back": "返回",
+      "title": "创建工作流",
+      "basicInfo": "基本信息",
+      "workflowNameLabel": "工作流名称 *",
+      "workflowNamePlaceholder": "输入工作流名称（仅支持字母、数字、下划线，且只能以字母开头）",
+      "nameRequired": "名称不能为空",
+      "nameCharCount": "{{count}}/100",
+      "workflowDescriptionLabel": "工作流描述 *",
+      "workflowDescriptionPlaceholder": "描述工作流的功能和用途...",
+      "descriptionRequired": "描述不能为空",
+      "descriptionCharCount": "{{count}}/500",
+      "cancel": "取消",
+      "create": "创建工作流",
+      "creating": "创建中..."
     },
     "workflowEditor": {
       "title": "工作流编辑器",
