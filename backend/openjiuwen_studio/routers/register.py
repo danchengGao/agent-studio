@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, Request
-from openjiuwen_studio.routers import (auth, models, users, agents, workflows, execution, space,
+from openjiuwen_studio.routers import (auth, models, users, agents, workflows, execution, space, deepsearch,
                                        related_member, plugin, tags, knowledge_base, embedding_models, prompt_router,
                                        prompt_debug_router, prompt_tuning_router, prompt_llm_router)
 from openjiuwen_studio.core.common.language_thread_context import (set_language, clear_language, 
@@ -20,6 +20,7 @@ def router_register(app: FastAPI):
     v1_router.include_router(agents.agents_router, prefix="/agents", tags=["Agents"])
     v1_router.include_router(execution.execution_router, prefix="/execution", tags=["Execution"])
     v1_router.include_router(workflows.workflows_router, prefix="/workflows", tags=["Workflows"])
+    v1_router.include_router(deepsearch.deepsearch_router, prefix="/agent/deepsearch", tags=["deepsearch"])
     v1_router.include_router(related_member.related_router, prefix="/related", tags=["Relation"])
     v1_router.include_router(plugin.plugin_router, prefix="/plugin", tags=["Plugin"])
     v1_router.include_router(tags.tags_router, prefix="/tags", tags=["Tags"])

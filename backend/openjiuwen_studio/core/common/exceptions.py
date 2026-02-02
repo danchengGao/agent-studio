@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
+import time
+import copy
+import json
+import uuid
 from typing import Optional, Any, Dict, List, TypeVar, Union
 from fastapi import status
 from pydantic import BaseModel, Field
@@ -81,3 +85,81 @@ class JiuWenExecuteException(JiuWenBaseException):
                 isinstance(self._connection, type) and issubclass(self._connection, Connection)):
             self._connection = Connection()
         return self._connection
+
+
+class DeepSearchClientError(Exception):
+    def __init__(self, error_code: str, message: str):
+        self.error_code = error_code
+        self.message = message
+        super().__init__(error_code, message)
+
+    def generate_error_stream(self, conversation_id: str = "") -> list[str]:
+        """生成完整的错误事件流（SSE 格式字符串列表）"""
+        event_time = int(time.time() * 1000)
+        message_id_error = str(uuid.uuid4())
+        message_id_summary = str(uuid.uuid4())
+        start_id = str(uuid.uuid4())
+
+        base_event = {
+            "conversation_id": conversation_id,
+            "section_idx": "0",
+            "plan_idx": "0",
+            "step_idx": "0",
+            "message_id": "",
+            "agent": "",
+            "role": "assistant",
+            "content": "",
+            "message_type": "message_chunk",
+            "event": "",
+            "created_time": "",
+        }
+
+        # Start event
+        event_start = copy.deepcopy(base_event)
+        event_start.update({
+            "message_id": start_id,
+            "agent": "entry",
+            "event": "start",
+            "created_time": event_time,
+        })
+
+        # Message event
+        event_message = copy.deepcopy(event_start)
+        event_message["event"] = "message"
+        event_message["created_time"] = event_time
+
+        # Done event
+        event_done = copy.deepcopy(event_message)
+        event_done["event"] = "done"
+        event_done["created_time"] = event_time
+
+        # Error content
+        content_data = {
+            "response_content": "",
+            "citation_messages": {},
+            "infer_messages": [],
+            "exception_info": f"Failed to initialize DeepSearch HTTP client: {self.message}"
+        }
+
+        # Summary response (error payload)
+        error_event = copy.deepcopy(base_event)
+        error_event.update({
+            "message_id": message_id_error,
+            "agent": "end",
+            "event": "summary_response",
+            "content": json.dumps(content_data, ensure_ascii=False),
+            "created_time": event_time,
+        })
+
+        # Final end marker
+        summary_event = copy.deepcopy(base_event)
+        summary_event.update({
+            "message_id": message_id_summary,
+            "agent": "end",
+            "event": "error",
+            "content": "ALL END",
+            "created_time": event_time,
+        })
+
+        events = [event_start, event_message, event_done, error_event, summary_event]
+        return [f"data: {json.dumps(e, ensure_ascii=False)}\n\n" for e in events]

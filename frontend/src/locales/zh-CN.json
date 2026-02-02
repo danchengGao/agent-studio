@@ -355,6 +355,7 @@
       "passwordTooShort": "密码长度至少需要6位",
       "networkError": "网络错误，请稍后重试"
     },
+    "sessionExpired": "登录已过期，请重新登录",
     "changePassword": {
       "title": "修改密码",
       "description": "请输入当前密码和新密码来修改您的账户密码",
@@ -478,7 +479,7 @@
     },
     "navigation": {
       "dashboard": "主页",
-      "apps": "应用空间",
+      "apps": "探索应用",
       "agents": "智能体开发",
       "workflows": "工作流编排",
       "promptManagement": "提示词管理",
@@ -535,7 +536,7 @@
         "description": "管理和安装插件扩展功能"
       },
       "appSpace": {
-        "name": "应用空间",
+        "name": "探索应用",
         "description": "浏览和使用预制智能体应用"
       }
     },
@@ -619,6 +620,417 @@
       "intermediate": "中级",
       "advanced": "高级",
       "unknown": "未知"
+    },
+    "chat": {
+      "welcome": "你好",
+      "welcomeMessage": "选择智能体开始对话，或直接输入你的问题",
+      "replayHistory": "回放历史",
+      "openSSEPanel": "打开 SSE 回放面板",
+      "featureNotImplemented": "该功能还未实现",
+      "configError": "配置错误",
+      "selectKnowledgeBase": "请先在配置中选择本地知识库",
+      "selectSearchEngine": "请先在配置中选择搜索引擎",
+      "localSearch": "本地搜索",
+      "webSearch": "网络搜索",
+      "comprehensiveSearch": "综合搜索",
+      "sendToAgent": "给 {{name}} 发送消息",
+      "typeAtSelectAgent": "输入 @ 选择智能体",
+      "conversationInProgress": "对话进行中，请稍候...",
+      "startNewConversation": "发起新对话",
+      "selectModel": "请先选择模型",
+      "selectAgent": "请先选择智能体",
+      "sendMessage": "发送消息",
+      "yesterday": "昨天",
+      "deleteConversation": "删除对话",
+      "deleteConfirm": "确定要删除对话\"{{title}}\"吗？此操作不可恢复。",
+      "noConversationHistory": "暂无对话历史",
+      "allConversations": "所有对话",
+      "expandHistory": "展开对话历史",
+      "collapseHistory": "收起对话历史",
+      "conversationInProgress": "对话进行中，请稍候...",
+      "newConversation": "发起新对话",
+      "conversationTimeout": "对话已超时，强制中断当前传输",
+      "forceStop": "强制中断",
+      "generating": "正在生成中..."
+    },
+    "picker": {
+      "selectAgent": "选择智能体",
+      "selectResource": "选择资源",
+      "noKnowledgeBase": "暂无知识库",
+      "noKnowledgeBaseConnected": "当前未接入知识库",
+      "uploadLocalFiles": "上传本地文件",
+      "uploadFileDescription": "选择 PDF、Word、TXT 等文档",
+      "deepSearchAgent": "深度搜索智能体"
+    },
+    "model": {
+      "selectModel": "选择模型",
+      "loading": "加载中...",
+      "noModels": "暂无模型"
+    },
+    "agent": {
+      "configAgent": "配置智能体",
+      "deselectAgent": "取消选择"
+    },
+    "clipboard": {
+      "copy": "复制内容",
+      "copied": "已复制！",
+      "copiedToClipboard": "内容已复制到剪贴板",
+      "copyReport": "复制报告内容"
+    },
+    "citation": {
+      "source": "来源",
+      "matchScore": "匹配度",
+      "scoreLow": "低",
+      "scoreMedium": "中",
+      "scoreHigh": "高"
+    },
+    "download": {
+      "downloadReport": "下载报告",
+      "downloading": "下载中...",
+      "downloadingReport": "正在下载报告",
+      "selectFormat": "选择下载格式",
+      "wordDocument": "Word 文档",
+      "pdfDocument": "PDF 文档",
+      "markdown": "Markdown",
+      "html": "HTML",
+      "markdownSuccess": "Markdown 报告下载成功",
+      "formatSuccess": "{{format}} 报告下载成功"
+    },
+    "input": {
+      "placeholder": "请提问... (@ 选择智能体，# 选择资源)",
+      "selectResource": "选择资源"
+    },
+    "inferenceGraph": {
+      "title": "推理图谱",
+      "loading": "加载推理图谱中...",
+      "loadFailed": "加载推理图谱失败",
+      "retryLater": "请稍后重试",
+      "retry": "重试",
+      "reload": "重新加载推理图谱",
+      "cancel": "取消加载",
+      "dragToMove": "拖动",
+      "wheelToZoom": "滚轮缩放",
+      "dragAndZoom": "拖动移动 · 滚轮缩放",
+      "resetView": "重置视图",
+      "reset": "重置",
+      "openInNewTab": "在新标签页打开推理图",
+      "closeModal": "关闭推理图谱 (ESC)",
+      "ariaLabel": "推理图谱可视化展示",
+      "openInNewTabSuccess": "已在新标签页打开推理图",
+      "loadError": "加载推理图失败",
+      "clickToViewDetail": "点击查看详细推理过程",
+      "noGraph": "暂无推理图谱"
+    },
+    "notifications": {
+      "downloadFailed": "下载内容失败，请稍后重试",
+      "copyFailed": "复制失败，请重试",
+      "imageLoadFailed": "图片加载失败"
+    },
+    "interrupt": {
+      "title": "请输入您的反馈",
+      "pendingTip": "请在输入框中输入您的反馈，发送后继续...",
+      "completedTip": "已反馈",
+      "failedTip": "发生错误",
+      "cancelledTip": "已取消",
+      "unknownTip": "状态未知"
+    },
+    "chart": {
+      "mermaidError": "Mermaid 图表错误",
+      "syntaxError": "Mermaid 语法错误",
+      "renderFailed": "图表渲染失败",
+      "viewCode": "查看代码"
+    },
+    "report": {
+      "toolbar": "报告操作工具栏",
+      "closePanel": "关闭面板",
+      "closeReportPanel": "关闭报告面板",
+      "unnamedReport": "未命名报告",
+      "reportLabel": "研究报告",
+      "createdAt": "创建时间",
+      "contentEmpty": "报告内容为空",
+      "loadingTimeout": "加载超时",
+      "timeoutMessage": "报告内容加载时间过长，请稍后重试"
+    },
+    "user": {
+      "defaultUsername": "用户"
+    },
+    "suggestions": {
+      "deepsearch": {
+        "question1": "育儿补贴政策发布是否增加总和生育率",
+        "question2": "请对安徽合肥汽车产业链的情况进行分析"
+      }
+    },
+    "config": {
+      "title": "配置智能体以开始使用",
+      "titleEdit": "确认或修改配置",
+      "subtitle": "请先完成配置",
+      "subtitleEdit": "可修改现有配置",
+      "noConfig": "该智能体暂无可配置项",
+      "cancel": "取消选择",
+      "save": "保存配置",
+      "saved": "已保存",
+      "tabs": {
+        "general": "通用配置",
+        "search": "搜索配置",
+        "template": "模板配置",
+        "generalDesc": "交互、规划等基础设置",
+        "searchDesc": "搜索引擎与结果设置",
+        "templateDesc": "报告模板管理",
+        "needsConfig": "需配置"
+      },
+      "general": {
+        "interactionSettings": "交互设置",
+        "enableHumanInteraction": "启用人机交互",
+        "enableHumanInteractionDesc": "执行时询问确认",
+        "enableTraceability": "启用溯源",
+        "enableTraceabilityDesc": "显示信息来源",
+        "enableSourceTracerInfer": "启用溯源推理",
+        "enableSourceTracerInferDesc": "生成溯源推理图谱",
+        "chapterCount": "章节数量",
+        "chapterCountDesc": "控制报告最大章节数量"
+      },
+      "search": {
+        "mode": "搜索方式",
+        "local": "本地搜索",
+        "localDesc": "仅使用本地知识库",
+        "web": "网络搜索",
+        "webDesc": "使用网络搜索引擎",
+        "all": "综合搜索",
+        "allDesc": "结合本地和网络",
+        "source": "搜索来源",
+        "webEngine": "网络搜索引擎",
+        "configure": "配置",
+        "noEngine": "暂无搜索引擎配置",
+        "clickToConfig": "点击上方\"配置\"按钮添加搜索引擎",
+        "localKB": "本地知识库",
+        "noKB": "暂无知识库配置",
+        "clickToAddKB": "点击上方\"添加知识库\"按钮选择"
+      },
+      "validation": {
+        "chapterCountRange": "规划章节数量必须在 1-10 之间",
+        "allModeRequires": "综合搜索模式下必须配置：{{items}}",
+        "webModeRequires": "网络搜索模式下必须选择一个搜索引擎",
+        "localModeRequires": "本地搜索模式下必须选择至少一个知识库",
+        "webResultCountRange": "网络搜索结果数量必须在 1-10 之间",
+        "localResultCountRange": "本地搜索结果数量必须在 1-10 之间"
+      },
+      "engine": {
+        "select": "选择搜索引擎",
+        "noEngine": "暂无搜索引擎配置",
+        "create": "+ 创建新引擎",
+        "createNew": "创建新引擎",
+        "config": "配置搜索引擎",
+        "edit": "修改搜索引擎",
+        "delete": "删除搜索引擎",
+        "deleteConfirm": "确定要删除搜索引擎\"{{name}}\"吗？此操作无法撤销。",
+        "title": "搜索引擎",
+        "selectType": "请选择一种类型",
+        "type": "引擎类型",
+        "selectPreset": "请从上方选择搜索引擎",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "输入搜索引擎 API Key",
+        "searchUrl": "搜索URL",
+        "searchUrlPlaceholder": "https://api.example.com",
+        "required": "必填",
+        "saving": "保存中...",
+        "cancel": "取消",
+        "confirm": "确认",
+        "error": {
+          "selectType": "请选择一个搜索引擎类型",
+          "invalidName": "引擎名称必须是预设值之一",
+          "fillRequired": "请填写 API Key 和搜索URL"
+        },
+        "presets": {
+          "xunfei": "讯飞搜索",
+          "petal": "花瓣搜索",
+          "tavily": "Tavily",
+          "google": "Google",
+          "custom": "自定义"
+        },
+        "parseError": {
+          "duplicate": {
+            "title": "该名称已被使用",
+            "suggestion": "请尝试其他名称，如添加数字后缀"
+          },
+          "network": {
+            "title": "网络连接失败",
+            "suggestion": "请检查网络连接后重试"
+          },
+          "default": {
+            "title": "配置失败",
+            "suggestion": "请检查输入信息后重试"
+          }
+        }
+      },
+      "knowledge": {
+        "select": "配置知识库",
+        "noKB": "暂无可用知识库",
+        "noKBDesc": "需要先在知识库管理页面创建知识库",
+        "create": "前往创建知识库 →",
+        "loadMore": "加载更多...",
+        "loading": "加载中...",
+        "confirm": "确认 ({{count}})",
+        "cancel": "取消",
+        "error": {
+          "loadFailed": "获取知识库列表失败",
+          "loadError": "加载知识库列表时出错",
+          "noInfo": "无法获取知识库信息",
+          "noConfig": "知识库\"{{name}}\"未配置 Embedding 模型",
+          "validateFailed": "无法验证知识库\"{{name}}\"的 Embedding 模型",
+          "inconsistent": "所选知识库使用了不同的 Embedding 模型：{{models}}",
+          "validateError": "验证 Embedding 模型时出错"
+        }
+      },
+      "template": {
+        "available": "可用模板",
+        "uploadNew": "上传新模板",
+        "importTemplate": "导入新模板",
+        "generationMethod": "模板生成方式",
+        "extractMode": "⚡ 提取生成",
+        "directMode": "📄 直接作为模板",
+        "uploading": "上传中...",
+        "uploadError": "缺少必要的配置信息",
+        "uploadFailed": "上传模板失败",
+        "delete": "删除模板",
+        "deleteConfirm": "确定要删除模板\"{{name}}\"吗？此操作无法撤销。",
+        "confirmDelete": "删除模板",
+        "noDescription": "无描述",
+        "viewTemplate": "查看模板",
+        "deleteTemplate": "删除模板",
+        "details": "模板详情",
+        "preview": "预览",
+        "code": "代码",
+        "split": "分屏",
+        "close": "关闭",
+        "cancel": "取消",
+        "namePlaceholder": "请输入模板名称",
+        "descPlaceholder": "请输入模板描述（可选）",
+        "confirmUpload": "确认上传",
+        "supportFormats": "支持 .md, .html, .doc, .docx, .pdf 格式",
+        "supportMarkdownOnly": "仅支持 .md 格式",
+        "dragDropOrClick": "拖放文件到此处或",
+        "clickToSelect": "点击选择",
+        "templateName": "模板名称",
+        "templateDesc": "模板描述",
+        "emptyTitle": "暂无可用模板",
+        "emptyDescription": "上传模板后即可使用",
+        "uploadButton": "上传模板"
+      }
+    },
+    "time": {
+      "unknown": "未知时间",
+      "justNow": "刚刚",
+      "secondsAgo": "秒前",
+      "minutesAgo": "分钟前",
+      "hoursAgo": "小时前",
+      "daysAgo": "天前",
+      "weeksAgo": "周前",
+      "monthsAgo": "个月前",
+      "yearsAgo": "年前",
+      "yesterday": "昨天"
+    },
+    "errors": {
+      "downloadFailed": "下载文件失败",
+      "copyFailed": "复制失败",
+      "invalidFormat": "无效的格式选项",
+      "reportConvertFailed": "报告转换失败",
+      "unknownError": "未知错误",
+      "unableToGetSpaceId": "无法获取用户空间ID，请重新登录",
+      "unableToGetAuthToken": "无法获取认证信息，请重新登录",
+      "reportRequestFailed": "报告转换请求失败，请稍后重试",
+      "fetchEnginesFailed": "获取搜索引擎列表失败",
+      "createEngineFailed": "创建搜索引擎失败",
+      "deleteEngineFailed": "删除搜索引擎失败",
+      "fetchTemplatesFailed": "获取模板列表失败",
+      "uploadTemplateFailed": "上传模板失败",
+      "deleteTemplateFailed": "删除模板失败",
+      "requestTimeout": "请求超时，请稍后重试",
+      "networkError": "网络连接失败，请检查网络"
+    },
+    "deepSearch": {
+      "informationCollection": "信息收集{{index}}",
+      "informationSummary": "信息总结",
+      "researchOutline": "研究大纲",
+      "generatingOutline": "正在生成大纲...",
+      "analyzingResearchContent": "正在分析研究内容...",
+      "researchReport": "研究报告",
+      "chapter": "章节 {{index}}",
+      "researchChapter": "研究章节 {{index}}",
+      "searchResults": "搜索结果",
+      "finalReport": "最终报告",
+      "link": "链接",
+      "collapse": "收起",
+      "expand": "展开 {{count}} 项",
+      "statusUnknown": "状态未知",
+      "collapseContent": "折叠内容",
+      "expandContent": "展开内容",
+      "status": {
+        "pending": "待开始",
+        "inProgress": "报告生成中",
+        "completed": "报告已生成",
+        "failed": "生成失败",
+        "cancelled": "已手动结束",
+        "unknown": "状态未知",
+        "default": "未知状态"
+      },
+      "loading": "加载中...",
+      "reportCard": "报告",
+      "messageDataError": "消息数据错误",
+      "renderError": "渲染错误",
+      "finalReportStatus": {
+        "generating": "最终报告生成中",
+        "summarizing": "正在汇总分析结果，请稍候...",
+        "failed": "报告生成失败",
+        "unknownError": "未知异常",
+        "bothEmpty": "报告内容和异常信息均为空",
+        "noDataError": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
+      },
+      "playback": {
+        "panelTitle": "SSE 回放控制面板",
+        "playbackSpeed": "回放速度:",
+        "compressionEnabled": "压缩录制:",
+        "status": {
+          "playing": "回放中...",
+          "completed": "✓ 回放完成",
+          "failed": "✗ 回放失败"
+        },
+        "buttons": {
+          "refresh": "刷新",
+          "downloadAll": "下载全部",
+          "downloadAllTooltip": "下载所有录制",
+          "clear": "清空",
+          "download": "下载",
+          "delete": "删除"
+        },
+        "loading": "加载中...",
+        "noRecordings": "暂无录制记录",
+        "noRecordingsDesc": "发送 DeepSearch 消息后，会自动录制 SSE 事件流",
+        "noRecordingsToDownload": "没有可下载的录制",
+        "events": "个事件",
+        "seconds": "秒",
+        "compression": "压缩",
+        "confirmDelete": "确定要删除这条录制吗？",
+        "confirmClearAll": "确定要清空所有录制吗？此操作不可恢复。",
+        "deleteFailed": "删除失败：",
+        "clearFailed": "清空失败：",
+        "downloadFailed": "下载失败：",
+        "tip": "💡 提示：回放时会创建新的对话，速度可在上方调整。压缩比例表示节省的存储空间。"
+      }
+    }
+  },
+  "deepResearch": {
+    "handler": {
+      "generatingOutline": "正在生成大纲...",
+      "chapterReport": "章节报告",
+      "researchOutline": "研究大纲",
+      "analyzingResearchContent": "正在分析研究内容...",
+      "chapter": "章节 {{index}}",
+      "researchChapter": "研究章节 {{sectionIdx}}",
+      "finalReport": "最终报告",
+      "informationSummary": "信息总结",
+      "informationCollection": "信息收集{{index}}",
+      "searchResult": "搜索结果",
+      "reportGenerationFailed": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
     }
   },
   "workflows": {

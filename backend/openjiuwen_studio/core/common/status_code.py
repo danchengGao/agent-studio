@@ -191,6 +191,11 @@ class StatusCode(Enum):
     LLM_COMPONENT_CONFIG_INVALID = (BASE_CODE + 4502, "LLM组件配置错误: {msg}",
                                     "LLM component config invalid: {msg}")
 
+
+    # 任务空间模块 5001~5999
+    TASK_SPACE_THIRDPARTY_CLIENT_ERROR = (BASE_CODE + 5001, "与DeepSearch服务端连接失败: {msg}",
+                                    "Failed to initialize DeepSearch HTTP client: {msg}")
+
     @property
     def code(self):
         return self.value[0]

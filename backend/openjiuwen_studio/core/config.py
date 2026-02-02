@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     minio_secure: bool = False
     minio_bucket: str = ""
 
+    # deepsearch配置
+    deepsearch_agent_host: str = ""
+    deepsearch_agent_port: int = 6000
+
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"
