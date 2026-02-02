@@ -22,7 +22,7 @@ export { downloadApiService, DownloadApiService } from './services/downloadApi'
 
 // ============ 常量 ============
 
-export { FORMAT_OPTIONS } from './constants'
+export { FORMAT_OPTIONS_BASE, getFormatOptions } from './constants'
 
 // ============ 类型 ============
 

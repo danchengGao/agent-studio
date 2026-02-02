@@ -5,6 +5,7 @@
 
 import React, { useMemo, useState } from 'react'
 import { Lightbulb } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@test-agentstudio/base-ui'
 import { InferenceGraphManager } from './InferenceGraphManager'
 import type { InferenceLinkProps } from './types'
@@ -33,6 +34,7 @@ export const InferenceLink: React.FC<InferenceLinkProps> = ({
   children,
   instanceId,
 }) => {
+  const { t } = useTranslation()
   const inferenceIndex = useMemo(() => parseInferenceLink(href), [href])
   const isSourceTracerLink = inferenceIndex !== null
 
@@ -94,8 +96,8 @@ export const InferenceLink: React.FC<InferenceLinkProps> = ({
                   <Lightbulb className="w-5.5 h-5.5 text-purple-600 dark:text-purple-400" />
                 </span>
                 <span>
-                  <span className="block text-sm font-medium text-gray-900 dark:text-gray-100 leading-tight">推理图谱</span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400 leading-tight">点击查看详细推理过程</span>
+                  <span className="block text-sm font-medium text-gray-900 dark:text-gray-100 leading-tight">{t('apps.inferenceGraph.title')}</span>
+                  <span className="block text-xs text-gray-500 dark:text-gray-400 leading-tight">{t('apps.inferenceGraph.clickToViewDetail')}</span>
                 </span>
               </span>
               {/* 箭头 */}

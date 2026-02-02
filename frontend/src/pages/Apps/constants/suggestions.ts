@@ -11,12 +11,12 @@ export interface Suggestion {
 /**
  * 根据智能体 ID 获取建议提示词
  */
-export const getSuggestionsByAgent = (agentId: string): Suggestion[] => {
+export const getSuggestionsByAgent = (agentId: string, t: (key: string) => string): Suggestion[] => {
   switch (agentId) {
     case 'deepsearch':
       return [
-        { id: 1, text: '育儿补贴政策发布是否增加总和生育率', icon: '📊' },
-        { id: 2, text: '请对安徽合肥汽车产业链的情况进行分析', icon: '🏭' },
+        { id: 1, text: t('apps.suggestions.deepsearch.question1'), icon: '📊' },
+        { id: 2, text: t('apps.suggestions.deepsearch.question2'), icon: '🏭' },
       ]
     default:
       return []

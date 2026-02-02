@@ -7,8 +7,9 @@
  */
 
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { DownloadFormat } from '../types'
-import { FORMAT_OPTIONS } from '../constants'
+import { FORMAT_OPTIONS_BASE } from '../constants'
 import { DownloadApiService } from '../services/downloadApi'
 import type { UseDownloadReturn } from '../types'
 import {
@@ -23,6 +24,7 @@ import { showNotification } from '@/utils/notifications'
  * 处理内容下载功能，支持 Markdown、HTML、DOCX 格式
  */
 export function useDownload(content: string, title: string): UseDownloadReturn {
+  const { t } = useTranslation()
   const [downloadFormat, setDownloadFormat] = useState<DownloadFormat>('markdown')
   const [isDownloading, setIsDownloading] = useState(false)
 
@@ -36,9 +38,9 @@ export function useDownload(content: string, title: string): UseDownloadReturn {
       setIsDownloading(true)
       setDownloadFormat(format)
 
-      const formatOption = FORMAT_OPTIONS.find(opt => opt.value === format)
+      const formatOption = FORMAT_OPTIONS_BASE.find(opt => opt.value === format)
       if (!formatOption) {
-        throw new Error('无效的格式选项')
+        throw new Error(t('apps.errors.invalidFormat'))
       }
 
       const filename = generateTimestampedFilename(title, formatOption.extension)
@@ -46,22 +48,23 @@ export function useDownload(content: string, title: string): UseDownloadReturn {
       if (format === 'markdown') {
         // Markdown 格式直接下载
         downloadTextFile(content, filename, formatOption.mimeType)
-        showNotification('Markdown 报告下载成功', 'success')
+        showNotification(t('apps.download.markdownSuccess'), 'success')
       } else {
         // HTML 和 DOCX 需要调用后端转换
-        const convertedContent = await DownloadApiService.convertFormat(content, format)
+        const convertedContent = await DownloadApiService.convertFormat(content, format, t)
         if (convertedContent) {
           downloadBase64File(convertedContent, filename, formatOption.mimeType)
-          showNotification(`${formatOption.label} 报告下载成功`, 'success')
+          const formatLabel = t(`apps.download.${formatOption.labelKey}`)
+          showNotification(t('apps.download.formatSuccess', { format: formatLabel }), 'success')
         }
       }
     } catch (error) {
       console.error('[useDownload] 下载内容失败:', error)
-      showNotification('下载内容失败，请稍后重试', 'error')
+      showNotification(t('apps.notifications.downloadFailed'), 'error')
     } finally {
       setIsDownloading(false)
     }
-  }, [content, isDownloading, title])
+  }, [content, isDownloading, title, t])
 
   return {
     downloadFormat,

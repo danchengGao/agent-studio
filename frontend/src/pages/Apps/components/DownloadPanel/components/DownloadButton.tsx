@@ -12,6 +12,7 @@
 import React from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Download, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { IconButton } from '@test-agentstudio/base-ui'
 import { useDownload } from '../hooks'
 import { FormatMenu } from './FormatMenu'
@@ -44,6 +45,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
   title,
   className = '',
 }) => {
+  const { t } = useTranslation()
   const download = useDownload(content, title)
 
   return (
@@ -59,9 +61,9 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
               <Download className="w-5 h-5" aria-hidden="true" />
             )
           }
-          tooltip={download.isDownloading ? '下载中...' : '下载报告'}
+          tooltip={download.isDownloading ? t('apps.download.downloading') : t('apps.download.downloadReport')}
           disabled={download.isDownloading}
-          aria-label={download.isDownloading ? '正在下载报告' : '下载报告'}
+          aria-label={download.isDownloading ? t('apps.download.downloadingReport') : t('apps.download.downloadReport')}
           aria-busy={download.isDownloading}
           className={className}
         />

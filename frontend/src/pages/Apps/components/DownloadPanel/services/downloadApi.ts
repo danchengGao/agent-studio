@@ -31,18 +31,20 @@ export class DownloadApiService {
    * 转换报告格式
    * @param markdownContent - Markdown 格式的报告内容
    * @param format - 目标格式 ('html' | 'docx')
+   * @param t - 翻译函数
    * @returns 转换后的内容（Base64 编码），失败返回 null
    */
   static async convertFormat(
     markdownContent: string,
-    format: 'html' | 'docx'
+    format: 'html' | 'docx',
+    t: (key: string, params?: Record<string, unknown>) => string
   ): Promise<string | null> {
     try {
       // 获取 spaceId
       const spaceId = getDefaultSpaceId()
       if (!spaceId) {
         console.error('[DownloadApi] 无法获取 spaceId')
-        showNotification('无法获取用户空间ID，请重新登录', 'error')
+        showNotification(t('apps.errors.unableToGetSpaceId'), 'error')
         return null
       }
 
@@ -50,7 +52,7 @@ export class DownloadApiService {
       const token = getAuthToken()
       if (!token) {
         console.error('[DownloadApi] 无法获取认证 token')
-        showNotification('无法获取认证信息，请重新登录', 'error')
+        showNotification(t('apps.errors.unableToGetAuthToken'), 'error')
         return null
       }
 
@@ -77,7 +79,8 @@ export class DownloadApiService {
         return response.data.convert_content
       } else {
         console.error('[DownloadApi] 转换失败:', response.data)
-        showNotification(`报告转换失败：${response.data?.msg || '未知错误'}`, 'error')
+        const errorMsg = response.data?.msg || t('apps.errors.unknownError')
+        showNotification(`${t('apps.errors.reportConvertFailed')}: ${errorMsg}`, 'error')
         return null
       }
     } catch (error: unknown) {
@@ -86,13 +89,13 @@ export class DownloadApiService {
 
       // 细化错误处理
       if (err.response?.status === 401) {
-        showNotification('登录已过期，请重新登录', 'error')
+        showNotification(t('apps.auth.sessionExpired'), 'error')
       } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
-        showNotification('请求超时，请稍后重试', 'warning')
+        showNotification(t('apps.errors.requestTimeout'), 'warning')
       } else if (err.message?.includes('Network') || err.code === 'ERR_NETWORK') {
-        showNotification('网络连接失败，请检查网络', 'error')
+        showNotification(t('apps.errors.networkError'), 'error')
       } else {
-        showNotification('报告转换请求失败，请稍后重试', 'error')
+        showNotification(t('apps.errors.reportRequestFailed'), 'error')
       }
       return null
     }

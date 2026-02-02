@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { Plus, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useConversationStore } from '../../../../stores/useConversationStore'
 import { RADIUS_BUTTON, BUTTON_HOVER_EFFECTS, BUTTON_TRANSITION, RADIUS_CIRCLE } from '../../constants/styles'
 import ConversationList from './ConversationList'
@@ -18,6 +19,8 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
   isStreaming,
   forceCollapsed = false,
 }) => {
+  const { t, i18n } = useTranslation()
+
   // 超时检测状态
   const [showForceStop, setShowForceStop] = useState(false)
   const streamingStartTimeRef = useRef<number | null>(null)
@@ -118,7 +121,7 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
         <button
           onClick={() => setIsCollapsed(false)}
           className={`${collapsedExpandButtonClass} absolute top-1/2 -translate-y-1/2 left-2 z-20`}
-          title="展开对话历史"
+          title={t('apps.chat.expandHistory')}
         >
           <ChevronRight className="w-5 h-5" />
         </button>
@@ -130,10 +133,14 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
   return (
     <div className="flex flex-col border-r border-gray-200 w-[260px] h-full min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-4">
-        <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-gray-500" />
-          <h2 className="text-base font-bold text-gray-700">所有对话</h2>
+      <div className={`flex items-center justify-between ${i18n.language === 'en-US' ? 'px-1.5 py-4' : 'px-4 py-4'}`}>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Clock className="w-5 h-5 text-gray-500 flex-shrink-0" />
+          <h2 className={`font-bold text-gray-700 truncate ${
+            i18n.language === 'en-US' ? 'text-base' : 'text-lg'
+          }`}>
+            {t('apps.chat.allConversations')}
+          </h2>
         </div>
 
         <div className="flex items-center gap-2">
@@ -144,7 +151,7 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
             className={`${iconButtonClass} w-10 h-10 ${
               isStreaming ? 'cursor-not-allowed opacity-50' : ''
             }`}
-            title={isStreaming ? '对话进行中，请稍候...' : '发起新对话'}
+            title={isStreaming ? t('apps.chat.conversationInProgress') : t('apps.chat.newConversation')}
           >
             <Plus className="w-5 h-5" />
           </button>
@@ -153,7 +160,7 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
           <button
             onClick={() => setIsCollapsed(true)}
             className={`${iconButtonClass} w-10 h-10`}
-            title="收起对话历史"
+            title={t('apps.chat.collapseHistory')}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -174,10 +181,10 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
           <button
             onClick={handleForceStop}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors duration-200 text-sm font-medium"
-            title="对话已超时，强制中断当前传输"
+            title={t('apps.chat.conversationTimeout')}
           >
             <AlertCircle className="w-4 h-4" />
-            <span>强制中断</span>
+            <span>{t('apps.chat.forceStop')}</span>
           </button>
         </div>
       )}

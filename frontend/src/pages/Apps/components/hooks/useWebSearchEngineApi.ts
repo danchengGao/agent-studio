@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { webSearchEngineService, WebSearchEngineConfig } from '@test-agentstudio/api-client'
 
 export interface UseWebSearchEngineApiOptions {
@@ -41,6 +42,7 @@ export interface UseWebSearchEngineApiReturn {
 export const useWebSearchEngineApi = (
   options: UseWebSearchEngineApiOptions
 ): UseWebSearchEngineApiReturn => {
+  const { t } = useTranslation()
   const { spaceId, autoLoad = true } = options
 
   const [engines, setEngines] = useState<WebSearchEngineConfig[]>([])
@@ -58,13 +60,13 @@ export const useWebSearchEngineApi = (
       const data = await webSearchEngineService.listEngines(spaceId)
       setEngines(data)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '获取搜索引擎列表失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.errors.fetchEnginesFailed')
       setError(errorMessage)
-      console.error('获取搜索引擎列表失败:', err)
+      console.error('Failed to fetch search engines:', err)
     } finally {
       setLoading(false)
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // 创建搜索引擎
   const createEngine = useCallback(async (
@@ -73,7 +75,7 @@ export const useWebSearchEngineApi = (
     url: string
   ): Promise<number> => {
     if (!spaceId) {
-      throw new Error('未找到空间ID')
+      throw new Error('Space ID not found')
     }
 
     setLoading(true)
@@ -92,13 +94,13 @@ export const useWebSearchEngineApi = (
 
       return engineId
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '创建搜索引擎失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.errors.createEngineFailed')
       setError(errorMessage)
       throw err
     } finally {
       setLoading(false)
     }
-  }, [spaceId, fetchEngines])
+  }, [spaceId, fetchEngines, t])
 
   // 删除搜索引擎
   const deleteEngine = useCallback(async (engineId: number) => {
@@ -113,13 +115,13 @@ export const useWebSearchEngineApi = (
       // 更新本地列表
       setEngines(prev => prev.filter(e => e.web_search_engine_id !== engineId))
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '删除搜索引擎失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.errors.deleteEngineFailed')
       setError(errorMessage)
       throw err
     } finally {
       setLoading(false)
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // 清除错误
   const clearError = useCallback(() => {

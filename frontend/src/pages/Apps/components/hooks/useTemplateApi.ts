@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ReportTemplate } from '../AgentConfigDialog'
 import { deepsearchTemplateService } from '@test-agentstudio/api-client'
 
@@ -43,6 +44,7 @@ export interface UseTemplateApiReturn {
 export const useTemplateApi = (
   options: UseTemplateApiOptions
 ): UseTemplateApiReturn => {
+  const { t } = useTranslation()
   const { spaceId, autoLoad = true } = options
 
   const [templates, setTemplates] = useState<ReportTemplate[]>([])
@@ -60,13 +62,13 @@ export const useTemplateApi = (
       const data = await deepsearchTemplateService.listTemplates(spaceId)
       setTemplates(data)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '获取模板列表失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.errors.fetchTemplatesFailed')
       setError(errorMessage)
-      console.error('获取模板列表失败:', err)
+      console.error('Failed to fetch templates:', err)
     } finally {
       setLoading(false)
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // 上传模板
   const uploadTemplate = useCallback(async (
@@ -76,7 +78,7 @@ export const useTemplateApi = (
     modelConfigId: number
   ): Promise<number> => {
     if (!spaceId) {
-      throw new Error('未找到空间ID')
+      throw new Error('Space ID not found')
     }
 
     setLoading(true)
@@ -96,13 +98,13 @@ export const useTemplateApi = (
 
       return templateId
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '上传模板失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.errors.uploadTemplateFailed')
       setError(errorMessage)
       throw err
     } finally {
       setLoading(false)
     }
-  }, [spaceId, fetchTemplates])
+  }, [spaceId, fetchTemplates, t])
 
   // 删除模板
   const deleteTemplate = useCallback(async (templateId: number) => {
@@ -117,13 +119,13 @@ export const useTemplateApi = (
       // 更新本地列表
       setTemplates(prev => prev.filter(t => t.template_id !== templateId))
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '删除模板失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.errors.deleteTemplateFailed')
       setError(errorMessage)
       throw err
     } finally {
       setLoading(false)
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // 清除错误
   const clearError = useCallback(() => {

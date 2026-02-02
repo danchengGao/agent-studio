@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BlobUrlManager } from './blobUrlManager'
 import { showNotification } from '@/utils/notifications'
 import type { UseGraphModalReturn } from './types'
@@ -12,6 +13,7 @@ import type { UseGraphModalReturn } from './types'
  * 处理推理图谱的显示、隐藏和 Blob URL 生命周期
  */
 export function useGraphModal(): UseGraphModalReturn {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -27,9 +29,9 @@ export function useGraphModal(): UseGraphModalReturn {
       setIsOpen(true)
     } catch (error) {
       console.error('[useGraphModal] 打开推理图失败:', error)
-      showNotification('加载推理图失败', 'error')
+      showNotification(t('apps.inferenceGraph.loadError'), 'error')
     }
-  }, [])
+  }, [t])
 
   /**
    * 关闭推理图谱
@@ -46,9 +48,9 @@ export function useGraphModal(): UseGraphModalReturn {
   const openInNewTab = useCallback(() => {
     if (blobUrl) {
       window.open(blobUrl, '_blank', 'noopener,noreferrer')
-      showNotification('已在新标签页打开推理图', 'success')
+      showNotification(t('apps.inferenceGraph.openInNewTabSuccess'), 'success')
     }
-  }, [blobUrl])
+  }, [blobUrl, t])
 
   /**
    * Escape 键处理

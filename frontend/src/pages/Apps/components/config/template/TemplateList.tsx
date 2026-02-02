@@ -7,6 +7,7 @@
 
 import React from 'react'
 import { FileText, Trash2, Check, Eye } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ReportTemplate } from '../../AgentConfigDialog'
 import { RADIUS_BUTTON } from '../../../constants/styles'
 
@@ -33,11 +34,13 @@ export const TemplateList: React.FC<TemplateListProps> = ({
   onDelete,
   onView
 }) => {
+  const { t } = useTranslation()
+
   if (templates.length === 0) {
     return (
       <div className="text-center py-8">
         <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">暂无模板</p>
+        <p className="text-sm text-gray-500">{t('apps.config.template.available')}</p>
       </div>
     )
   }
@@ -77,7 +80,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                 {template.template_name}
               </div>
               <div className={`text-xs truncate ${isSelected ? 'text-blue-600/70' : 'text-gray-400'}`}>
-                {template.template_desc || '无描述'}
+                {template.template_desc || t('apps.config.template.noDescription')}
               </div>
             </div>
 
@@ -91,7 +94,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                     onView(template.template_id)
                   }}
                   className="p-1.5 text-gray-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="查看模板"
+                  title={t('apps.config.template.viewTemplate')}
                 >
                   <Eye className="w-3.5 h-3.5" />
                 </button>
@@ -109,7 +112,7 @@ export const TemplateList: React.FC<TemplateListProps> = ({
                     onDelete(template.template_id)
                   }}
                   className="p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="删除模板"
+                  title={t('apps.config.template.deleteTemplate')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

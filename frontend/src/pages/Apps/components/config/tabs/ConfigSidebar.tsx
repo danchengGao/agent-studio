@@ -6,8 +6,21 @@
  */
 
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { ConfigTabMeta, ConfigTabId } from '../ConfigRegistry'
 import { RADIUS_BUTTON } from '../../../constants/styles'
+
+/**
+ * 根据 tab ID 获取翻译键
+ */
+function getTabLabelKey(tabId: ConfigTabId): string {
+  const keyMap: Record<ConfigTabId, string> = {
+    general: 'apps.config.tabs.general',
+    search: 'apps.config.tabs.search',
+    template: 'apps.config.tabs.template'
+  }
+  return keyMap[tabId] || tabId
+}
 
 export interface ConfigSidebarProps {
   /** 配置标签列表 */
@@ -32,6 +45,7 @@ export const ConfigSidebar: React.FC<ConfigSidebarProps> = ({
   onTabChange,
   className = ''
 }) => {
+  const { t } = useTranslation()
   return (
     <div className={`
       lg:w-60 lg:min-w-60 lg:border-r lg:border-gray-200 lg:bg-gray-50
@@ -47,6 +61,7 @@ export const ConfigSidebar: React.FC<ConfigSidebarProps> = ({
       `}>
         {tabs.map(tab => {
           const isActive = activeTab === tab.id
+          const label = t(getTabLabelKey(tab.id))
 
           return (
             <button
@@ -73,7 +88,7 @@ export const ConfigSidebar: React.FC<ConfigSidebarProps> = ({
               </div>
 
               {/* 标签文字 */}
-              <span className={`truncate ${isActive ? 'font-semibold' : ''}`}>{tab.label}</span>
+              <span className={`truncate ${isActive ? 'font-semibold' : ''}`}>{label}</span>
 
               {/* 徽章 */}
               {tab.badge && tab.badgeText && (

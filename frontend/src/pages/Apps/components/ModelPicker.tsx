@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Info } from 'lucide-react'
 import ModelIcon from '@/assets/icons/modelManagement.svg?react'
 import { BasePickerContainer, usePickerKeyboard } from './BasePicker'
@@ -31,6 +32,7 @@ const ModelPicker: React.FC<ModelPickerProps> = ({
   position,
   isLoading = false,
 }) => {
+  const { t } = useTranslation()
   const [selectedIndex, setSelectedIndex] = useState(0)
 
   // 找到当前选中的索引
@@ -70,14 +72,14 @@ const ModelPicker: React.FC<ModelPickerProps> = ({
     <BasePickerContainer onClose={onClose} position={position}>
       {/* 标题 */}
       <div className="px-3 py-2 border-b border-gray-100">
-        <span className="text-xs font-medium text-gray-500">选择模型</span>
+        <span className="text-xs font-medium text-gray-500">{t('apps.model.selectModel')}</span>
       </div>
 
       {/* 温馨提示 */}
       <div className="mx-3 mt-2 mb-1 px-2.5 py-1.5 rounded-md border border-amber-200 bg-amber-50 flex items-start gap-2">
         <Info className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
         <span className="text-xs text-amber-800">
-          提示：模型上下文长度低于128K可能影响深度研究报告效果
+          {t('apps.model.contextLengthWarning')}
         </span>
       </div>
 

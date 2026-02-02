@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { X, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { RADIUS_CONTAINER, RADIUS_BUTTON } from '../../../constants/styles'
 import { KnowledgeBaseService, embeddingModelService } from '@test-agentstudio/api-client'
 
@@ -35,6 +36,8 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
   initialSelected = [],
   onConfirm,
 }) => {
+  const { t } = useTranslation()
+
   // 状态管理
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelected)
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseItem[]>([])
@@ -68,11 +71,11 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
         setKnowledgeBases(prev => append ? [...prev, ...newItems] : newItems)
         setHasMore(newItems.length === pageSize)
       } else {
-        setError('获取知识库列表失败')
+        setError(t('apps.config.knowledge.error.loadFailed'))
       }
     } catch (err) {
       console.error('Failed to load knowledge bases:', err)
-      setError('加载知识库列表时出错')
+      setError(t('apps.config.knowledge.error.loadError'))
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -95,7 +98,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
       })
 
       if (!response || response.code !== 200 || !response.data?.items) {
-        setEmbeddingModelError('无法获取知识库信息')
+        setEmbeddingModelError(t('apps.config.knowledge.error.noInfo'))
         return
       }
 
@@ -112,7 +115,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
 
         // 检查是否配置了 embedding_model_config_id
         if (embeddingId === null || embeddingId === undefined) {
-          setEmbeddingModelError(`知识库"${kb.name}"未配置 Embedding 模型`)
+          setEmbeddingModelError(t('apps.config.knowledge.error.noConfig', { name: kb.name }))
           return
         }
 
@@ -126,7 +129,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
           kbModelMap[kb.id] = { name: model.name, modelId: model.modelId }
         } catch (err) {
           console.error(`Failed to fetch embedding model for KB ${kb.id}:`, err)
-          setEmbeddingModelError(`无法验证知识库"${kb.name}"的 Embedding 模型`)
+          setEmbeddingModelError(t('apps.config.knowledge.error.validateFailed', { name: kb.name }))
           return
         }
       }
@@ -136,15 +139,15 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
         const modelInfo = Object.values(kbModelMap)
           .map(m => `${m.name} (${m.modelId})`)
           .join('、')
-        setEmbeddingModelError(`所选知识库使用了不同的 Embedding 模型：${modelInfo}`)
+        setEmbeddingModelError(t('apps.config.knowledge.error.inconsistent', { models: modelInfo }))
       } else {
         setEmbeddingModelError(null)
       }
     } catch (err) {
       console.error('Error validating embedding models:', err)
-      setEmbeddingModelError('验证 Embedding 模型时出错')
+      setEmbeddingModelError(t('apps.config.knowledge.error.validateError'))
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // 初始化加载
   useEffect(() => {
@@ -206,7 +209,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
       <div className={`bg-white ${RADIUS_CONTAINER} shadow-2xl w-full max-w-md mx-4 overflow-hidden`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">配置知识库</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('apps.config.knowledge.title')}</h2>
           <button
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
@@ -243,8 +246,8 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
                 <span className="text-2xl">📚</span>
               </div>
-              <p className="text-sm text-gray-500 mb-3">暂无可用知识库</p>
-              <p className="text-xs text-gray-400 mb-4">需要先在知识库管理页面创建知识库</p>
+              <p className="text-sm text-gray-500 mb-3">{t('apps.config.knowledge.noAvailable')}</p>
+              <p className="text-xs text-gray-400 mb-4">{t('apps.config.knowledge.needCreate')}</p>
               <button
                 onClick={() => {
                   // 打开知识库管理页面（在新标签页中）
@@ -252,7 +255,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
                 }}
                 className="inline-flex items-center gap-1 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
               >
-                前往创建知识库 →
+                {t('apps.config.knowledge.gotoCreate')} →
               </button>
             </div>
           ) : (
@@ -297,10 +300,10 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
                   {loadingMore ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      加载中...
+                      {t('apps.config.knowledge.loading')}
                     </>
                   ) : (
-                    '加载更多...'
+                    t('apps.config.knowledge.loadMore')
                   )}
                 </button>
               )}
@@ -314,7 +317,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
           >
-            取消
+            {t('apps.config.knowledge.cancel')}
           </button>
           <button
             onClick={handleConfirm}
@@ -325,7 +328,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
                 : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
               }`}
           >
-            确认 ({selectedIds.length})
+            {t('apps.config.knowledge.confirm', { count: selectedIds.length })}
           </button>
         </div>
       </div>

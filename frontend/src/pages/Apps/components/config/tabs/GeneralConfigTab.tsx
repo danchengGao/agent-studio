@@ -5,6 +5,7 @@
  */
 
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { ConfigTabProps } from '../ConfigRegistry'
 import { ConfigSection } from '../ConfigSection'
 
@@ -42,16 +43,17 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
   ToggleSwitch,
   RangeSlider
 }) => {
+  const { t } = useTranslation()
   return (
     <div className="space-y-8">
       {/* 交互设置 */}
-      <ConfigSection title="交互设置">
+      <ConfigSection title={t('apps.config.general.interactionSettings')}>
         <div className="space-y-4">
           {/* 启用人机交互 */}
           <div className="flex items-center justify-between py-1">
             <div>
-              <span className="text-sm text-gray-900 font-medium">启用人机交互</span>
-              <p className="text-xs text-gray-500 mt-0.5">执行时询问确认</p>
+              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.enableHumanInteraction')}</span>
+              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.enableHumanInteractionDesc')}</p>
             </div>
             <ToggleSwitch
               checked={config.enableHumanInteraction}
@@ -62,8 +64,8 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
           {/* 启用溯源 */}
           <div className="flex items-center justify-between py-1">
             <div>
-              <span className="text-sm text-gray-900 font-medium">启用溯源</span>
-              <p className="text-xs text-gray-500 mt-0.5">显示信息来源</p>
+              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.enableTraceability')}</span>
+              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.enableTraceabilityDesc')}</p>
             </div>
             <ToggleSwitch
               checked={config.enableTraceability}
@@ -74,8 +76,8 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
           {/* 启用溯源推理 */}
           <div className="flex items-center justify-between py-1">
             <div>
-              <span className="text-sm text-gray-900 font-medium">启用溯源推理</span>
-              <p className="text-xs text-gray-500 mt-0.5">生成溯源推理图谱</p>
+              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.enableSourceTracerInfer')}</span>
+              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.enableSourceTracerInferDesc')}</p>
             </div>
             <ToggleSwitch
               checked={config.enableSourceTracerInfer}
@@ -86,10 +88,10 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
       </ConfigSection>
 
       {/* 规划章节数量 */}
-      <ConfigSection title="章节数量">
+      <ConfigSection title={t('apps.config.general.chapterCount')}>
         <RangeSlider
-          label="章节数量"
-          description="控制报告最大章节数量"
+          label={t('apps.config.general.chapterCount')}
+          description={t('apps.config.general.chapterCountDesc')}
           value={config.planChapterCount}
           min={1}
           max={10}

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReportCard from '@/pages/Apps/components/ReportCard';
 import { buildReportFromDeepSearch } from '@/utils/reportUtils';
 import type { DeepSearchResult } from '@/pages/Apps/types';
@@ -20,6 +21,8 @@ interface DeepSearchReportCardProps {
 const LoadingReportCard: React.FC<{
   depth: number;
 }> = ({ depth }) => {
+  const { t } = useTranslation();
+
   return (
     <div
       style={{ marginLeft: `${depth * 16}px`, marginTop: '12px', marginRight: '16px' }}
@@ -48,12 +51,12 @@ const LoadingReportCard: React.FC<{
           <div className="flex-1 min-w-0">
             {/* 标题 */}
             <div className="text-sm font-semibold truncate text-gray-800">
-              最终报告生成中
+              {t('apps.deepSearch.report.generating')}
             </div>
 
             {/* 提示信息 */}
             <div className="mt-1.5 text-xs text-gray-600">
-              正在汇总分析结果，请稍候...
+              {t('apps.deepSearch.report.summarizing')}
             </div>
           </div>
         </div>
@@ -79,11 +82,13 @@ const ErrorReportCard: React.FC<{
   exceptionInfo?: string;
   depth: number;
 }> = ({ errorType, exceptionInfo, depth }) => {
+  const { t } = useTranslation();
+
   const getErrorMessage = () => {
     if (errorType === 'exception_only') {
-      return exceptionInfo || '未知异常';
+      return exceptionInfo || t('apps.deepSearch.report.unknownError');
     }
-    return '报告内容和异常信息均为空';
+    return t('apps.deepSearch.report.bothEmpty');
   };
 
   return (
@@ -116,7 +121,7 @@ const ErrorReportCard: React.FC<{
           <div className="flex-1 min-w-0">
             {/* 标题 */}
             <div className="text-sm font-semibold truncate text-red-800">
-              报告生成失败
+              {t('apps.deepSearch.report.failed')}
             </div>
 
             {/* 错误信息 */}

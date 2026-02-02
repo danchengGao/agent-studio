@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { MessageSquare } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useConversationStore } from '../../../../stores/useConversationStore'
 import ConversationItem from './ConversationItem'
 import type { ConversationListProps } from './types'
@@ -30,6 +31,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onDeleteConversation,
   isStreaming,
 }) => {
+  const { t } = useTranslation()
+
   // 使用 useState 来缓存计算结果，避免无限循环
   const [conversations, setConversations] = useState<Conversation[]>([])
   const conversationsRef = useRef<Conversation[]>([])
@@ -97,7 +100,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
           // Empty state
           <div className="flex flex-col items-center justify-center h-full">
             <MessageSquare className="w-12 h-12 opacity-30 mb-3" />
-            <p className="text-sm">暂无对话历史</p>
+            <p className="text-sm">{t('apps.chat.noConversationHistory')}</p>
           </div>
         ) : (
           // Conversation list

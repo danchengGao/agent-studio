@@ -6,6 +6,7 @@
 
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { RotateCcw, RefreshCw, MousePointer2, ZoomIn } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { GraphIframeProps } from './types'
 
 // 加载超时时间（毫秒）
@@ -43,6 +44,7 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
   inferFiles,
   className = '',
 }) => {
+  const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
   const [hasTimedOut, setHasTimedOut] = useState(false)
@@ -107,7 +109,7 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
   if (inferFiles.length === 0 || !inferFileUrl) {
     return (
       <div className={`flex items-center justify-center h-full ${className}`}>
-        <div className="text-muted-foreground text-sm">暂无推理图谱</div>
+        <div className="text-muted-foreground text-sm">{t('apps.inferenceGraph.noGraph')}</div>
       </div>
     )
   }
@@ -121,16 +123,16 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
           aria-live="polite"
           className="text-center space-y-3"
         >
-          <p className="text-muted-foreground text-sm">加载推理图谱失败</p>
-          <p className="text-muted-foreground/60 text-xs">请稍后重试</p>
+          <p className="text-muted-foreground text-sm">{t('apps.inferenceGraph.loadFailed')}</p>
+          <p className="text-muted-foreground/60 text-xs">{t('apps.inferenceGraph.retryLater')}</p>
           <button
             onClick={handleRetry}
             className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
             type="button"
-            aria-label="重新加载推理图谱"
+            aria-label={t('apps.inferenceGraph.reload')}
           >
             <RotateCcw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <span className="text-sm text-purple-600 dark:text-purple-400">重试</span>
+            <span className="text-sm text-purple-600 dark:text-purple-400">{t('apps.inferenceGraph.retry')}</span>
           </button>
         </div>
       </div>
@@ -148,21 +150,21 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
           >
             <div className="flex flex-col items-center gap-3">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-t-transparent border-purple-500" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">加载推理图谱中...</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{t('apps.inferenceGraph.loading')}</p>
               {/* 交互提示 */}
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full">
                 <MousePointer2 className="w-3.5 h-3.5" />
-                <span>拖动移动 · 滚轮缩放</span>
+                <span>{t('apps.inferenceGraph.dragAndZoom')}</span>
               </div>
               {hasTimedOut && (
                 <button
                   onClick={handleRetry}
                   className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2 text-sm"
                   type="button"
-                  aria-label="取消加载"
+                  aria-label={t('apps.inferenceGraph.cancel')}
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <span className="text-purple-600 dark:text-purple-400">重试</span>
+                  <span className="text-purple-600 dark:text-purple-400">{t('apps.inferenceGraph.retry')}</span>
                 </button>
               )}
             </div>
@@ -176,9 +178,9 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
           className="h-full w-full border-0"
           onLoad={handleLoad}
           onError={handleError}
-          title="推理图谱"
+          title={t('apps.inferenceGraph.title')}
           role="img"
-          aria-label="推理图谱可视化展示"
+          aria-label={t('apps.inferenceGraph.ariaLabel')}
         />
 
         {/* 底部操作提示栏 */}
@@ -189,12 +191,12 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
               <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                 <div className="flex items-center gap-1">
                   <MousePointer2 className="w-3.5 h-3.5" />
-                  <span>拖动</span>
+                  <span>{t('apps.inferenceGraph.dragToMove')}</span>
                 </div>
                 <span className="text-gray-300 dark:text-gray-600">·</span>
                 <div className="flex items-center gap-1">
                   <ZoomIn className="w-3.5 h-3.5" />
-                  <span>滚轮缩放</span>
+                  <span>{t('apps.inferenceGraph.wheelToZoom')}</span>
                 </div>
               </div>
               {/* 分隔线 */}
@@ -204,11 +206,11 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
                 onClick={handleRetry}
                 className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
                 type="button"
-                aria-label="重置视图"
-                title="重置视图"
+                aria-label={t('apps.inferenceGraph.resetView')}
+                title={t('apps.inferenceGraph.resetView')}
               >
                 <RefreshCw className="w-3.5 h-3.5" />
-                <span>重置</span>
+                <span>{t('apps.inferenceGraph.reset')}</span>
               </button>
             </div>
           </div>

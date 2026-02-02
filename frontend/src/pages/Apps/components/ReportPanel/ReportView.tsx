@@ -10,6 +10,7 @@ import React, { useMemo, useEffect, useState, useRef } from 'react'
 import { ReportMarkdown } from '../Markdown'
 import { InferenceGraph } from '../InferenceGraph'
 import { FileText, AlertCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { Report } from '@/pages/Apps/types'
 
 /**
@@ -35,6 +36,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
   report,
   className = '',
 }) => {
+  const { t } = useTranslation()
   // 检测用户是否偏好减少动画
   const prefersReducedMotion = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -97,7 +99,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
       <div className={`flex-1 overflow-auto ${prefersReducedMotion ? '' : 'scroll-smooth'}`}>
         <article
           className="max-w-5xl mx-auto bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 md:p-8 min-h-[200px]"
-          aria-label={`研究报告：${report.title || '未命名报告'}`}
+          aria-label={`${t('apps.report.reportLabel')}: ${report.title || t('apps.report.unnamedReport')}`}
           aria-busy={loadingState === 'loading'}
           role="article"
         >
@@ -115,14 +117,14 @@ export const ReportView: React.FC<ReportViewProps> = ({
             // 空状态提示
             <div className="flex flex-col items-center justify-center py-16">
               <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
-              <p className="text-gray-500 dark:text-gray-400 text-sm">报告内容为空</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">{t('apps.report.contentEmpty')}</p>
             </div>
           ) : loadingState === 'timeout' ? (
             // 超时错误提示
             <div className="flex flex-col items-center justify-center py-16">
               <AlertCircle className="w-12 h-12 text-amber-500 mb-4" />
-              <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">加载超时</p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm text-center">报告内容加载时间过长，请稍后重试</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">{t('apps.report.loadingTimeout')}</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm text-center">{t('apps.report.timeoutMessage')}</p>
             </div>
           ) : (
             // 正常内容

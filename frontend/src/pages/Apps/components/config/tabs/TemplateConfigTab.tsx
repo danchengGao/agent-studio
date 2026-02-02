@@ -6,6 +6,7 @@
 
 import React from 'react'
 import { Plus } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ConfigTabProps } from '../ConfigRegistry'
 import { ConfigSection } from '../ConfigSection'
 import { TemplateList } from '../template/TemplateList'
@@ -46,10 +47,12 @@ export const TemplateConfigTab: React.FC<TemplateConfigTabProps> = ({
   onShowUploadDialog,
   onViewTemplate
 }) => {
+  const { t } = useTranslation()
+
   return (
     <div className="space-y-6">
       {/* 可用模板 */}
-      <ConfigSection title="可用模板">
+      <ConfigSection title={t('apps.config.template.available')}>
         {templatesLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -82,7 +85,7 @@ export const TemplateConfigTab: React.FC<TemplateConfigTabProps> = ({
             `}
           >
             <Plus className="w-4 h-4" />
-            {uploading ? '上传中...' : '上传新模板'}
+            {uploading ? t('apps.config.template.uploading') : t('apps.config.template.uploadNew')}
           </button>
         </div>
       )}

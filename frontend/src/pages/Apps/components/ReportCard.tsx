@@ -1,5 +1,6 @@
 import React, { memo } from 'react'
 import { FileText, ChevronRight, Clock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { Report } from '../types'
 import { formatReportDate, getRelativeTime } from '../utils/formatDate'
 
@@ -14,12 +15,18 @@ interface ReportCardProps {
  * 显示报告预览信息，支持点击展开查看详情
  */
 const ReportCard: React.FC<ReportCardProps> = memo(({ report, isActive, onClick }) => {
+  const { t, i18n } = useTranslation()
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onClick()
     }
   }
+
+  // Get formatted date strings
+  const relativeTime = getRelativeTime(report.createdAt, t, i18n.language)
+  const formattedDate = formatReportDate(report.createdAt, i18n.language)
 
   return (
     <div
@@ -83,9 +90,9 @@ const ReportCard: React.FC<ReportCardProps> = memo(({ report, isActive, onClick 
             ${isActive ? 'text-blue-100' : 'text-indigo-600/70'}
           `}>
             <Clock className="w-3 h-3" />
-            <span>{getRelativeTime(report.createdAt)}</span>
+            <span>{relativeTime}</span>
             <span className={`text-gray-400 ${isActive ? '!text-blue-200' : ''}`}>·</span>
-            <span className="opacity-80">{formatReportDate(report.createdAt)}</span>
+            <span className="opacity-80">{formattedDate}</span>
           </div>
         </div>
       </div>

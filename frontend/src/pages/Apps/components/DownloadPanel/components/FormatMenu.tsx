@@ -13,7 +13,8 @@
 import React from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Download, Loader2 } from 'lucide-react'
-import { FORMAT_OPTIONS } from '../constants'
+import { useTranslation } from 'react-i18next'
+import { getFormatOptions } from '../constants'
 import type { DownloadFormat } from '../types'
 
 interface FormatMenuProps {
@@ -59,6 +60,9 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
   isDownloading = false,
   disabled = false,
 }) => {
+  const { t } = useTranslation()
+  const formatOptions = getFormatOptions(t)
+
   const handleSelect = async (format: DownloadFormat) => {
     if (!isDownloading) {
       await onSelect(format)
@@ -82,14 +86,14 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
               <Download className="w-4 h-4 text-white" aria-hidden="true" />
             )}
             <span className="text-sm font-bold text-white">
-              {isDownloading ? '正在下载...' : '选择下载格式'}
+              {isDownloading ? t('apps.download.downloading') : t('apps.download.selectFormat')}
             </span>
           </div>
         </div>
 
         {/* 选项列表 */}
         <DropdownMenu.Group className="py-1">
-          {FORMAT_OPTIONS.map((option) => {
+          {formatOptions.map((option) => {
             const isOptionDisabled = isDownloading || disabled
 
             return (

@@ -4,6 +4,7 @@
  */
 
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Send, Loader2, Plus } from 'lucide-react'
 import MessageInput, { MessageInputRef } from './MessageInput'
 import { MentionItem } from './MentionPicker'
@@ -69,6 +70,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
   className = '',
   inputStyle,
 }) => {
+  const { t } = useTranslation()
   return (
     <div className={className}>
       {/* 智能体选择悬浮框 */}
@@ -87,7 +89,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
           ref={inputRef}
           value={inputValue}
           onChange={onInputChange}
-          placeholder={selectedAgent ? "给 " + selectedAgent.name + " 发送消息" : "输入 @ 选择智能体"}
+          placeholder={selectedAgent ? t('apps.chat.sendToAgent', { name: selectedAgent.name }) : t('apps.chat.typeAtSelectAgent')}
           agents={agents}
           resources={resources}
           onAgentSelect={onAgentSelect}
@@ -126,7 +128,7 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
                   ? 'text-gray-400 cursor-not-allowed opacity-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
               }`}
-              title={isStreaming ? '对话进行中，请稍候...' : '发起新对话'}
+              title={isStreaming ? t('apps.chat.conversationInProgress') : t('apps.chat.startNewConversation')}
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -149,12 +151,12 @@ const ChatInputArea: React.FC<ChatInputAreaProps> = ({
             `}
             title={
               isStreaming
-                ? '对话进行中...'
+                ? t('apps.chat.conversationInProgress')
                 : !selectedModel
-                  ? '请先选择模型'
+                  ? t('apps.chat.selectModel')
                   : !selectedAgent
-                    ? '请先选择智能体'
-                    : '发送消息'
+                    ? t('apps.chat.selectAgent')
+                    : t('apps.chat.sendMessage')
             }
           >
             {isStreaming ? (

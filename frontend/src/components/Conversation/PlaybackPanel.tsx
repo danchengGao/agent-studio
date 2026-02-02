@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Play, Trash2, RefreshCw, X, Clock, Activity, Download, DownloadCloud, Zap } from 'lucide-react'
 import SSEPlayer, { type PlaybackStatus } from '../../utils/ssePlayer'
 import { usePlaybackHistory } from '../../hooks/usePlaybackHistory'
@@ -29,6 +30,8 @@ const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
 const COMPRESSION_STORAGE_KEY = 'sse_recording_compression_enabled'
 
 export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPanelProps) {
+  const { t } = useTranslation()
+
   // 压缩开关状态
   const [enableCompression, setEnableCompression] = useState(true)
 
@@ -142,22 +145,22 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
 
   // 处理删除
   const handleDelete = async (id: string) => {
-    if (confirm('确定要删除这条录制吗？')) {
+    if (confirm(t('apps.deepSearch.playback.confirmDelete'))) {
       try {
         await deleteRecording(id)
       } catch (error) {
-        alert('删除失败：' + (error as Error).message)
+        alert(t('apps.deepSearch.playback.deleteFailed') + (error as Error).message)
       }
     }
   }
 
   // 处理清空
   const handleClearAll = async () => {
-    if (confirm('确定要清空所有录制吗？此操作不可恢复。')) {
+    if (confirm(t('apps.deepSearch.playback.confirmClearAll'))) {
       try {
         await clearAll()
       } catch (error) {
-        alert('清空失败：' + (error as Error).message)
+        alert(t('apps.deepSearch.playback.clearFailed') + (error as Error).message)
       }
     }
   }
@@ -210,7 +213,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
       URL.revokeObjectURL(url)
     } catch (error) {
       console.error('[PlaybackPanel] Download failed:', error)
-      alert('下载失败：' + (error as Error).message)
+      alert(t('apps.deepSearch.playback.downloadFailed') + (error as Error).message)
     }
   }
 
@@ -218,7 +221,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
   const handleDownloadAll = async () => {
     try {
       if (recordings.length === 0) {
-        alert('没有可下载的录制')
+        alert(t('apps.deepSearch.playback.noRecordingsToDownload'))
         return
       }
 
@@ -262,14 +265,16 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
       URL.revokeObjectURL(url)
     } catch (error) {
       console.error('[PlaybackPanel] Download all failed:', error)
-      alert('下载失败：' + (error as Error).message)
+      alert(t('apps.deepSearch.playback.downloadFailed') + (error as Error).message)
     }
   }
 
   // 格式化时间
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp)
-    return date.toLocaleString('zh-CN', {
+    // 根据当前语言动态选择locale
+    const locale = t('apps.deepSearch.playback.panelTitle') === 'SSE 回放控制面板' ? 'zh-CN' : 'en-US'
+    return date.toLocaleString(locale, {
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
@@ -289,7 +294,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">SSE 回放控制面板</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t('apps.deepSearch.playback.panelTitle')}</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -303,7 +308,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
           <div className="flex items-center gap-3">
             {/* 速度控制 */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">回放速度:</span>
+              <span className="text-sm font-medium text-gray-700">{t('apps.deepSearch.playback.playbackSpeed')}</span>
               <div className="flex gap-1">
                 {SPEED_OPTIONS.map((option) => (
                   <button
@@ -324,7 +329,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
             {/* 压缩开关 */}
             <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-lg">
               <Zap className={`w-4 h-4 ${enableCompression ? 'text-yellow-500' : 'text-gray-400'}`} />
-              <span className="text-sm font-medium text-gray-700">压缩录制:</span>
+              <span className="text-sm font-medium text-gray-700">{t('apps.deepSearch.playback.compressionEnabled')}</span>
               <button
                 onClick={() => handleCompressionToggle(!enableCompression)}
                 className={`relative w-10 h-5 rounded-full transition-colors ${
@@ -345,16 +350,16 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
                 {playbackStatus === 'playing' && (
                   <>
                     <Activity className="w-4 h-4 text-blue-600 animate-pulse" />
-                    <span className="text-sm font-medium text-blue-700">回放中... {playbackProgress}%</span>
+                    <span className="text-sm font-medium text-blue-700">{t('apps.deepSearch.playback.status.playing')} {playbackProgress}%</span>
                   </>
                 )}
                 {playbackStatus === 'completed' && (
                   <>
-                    <span className="text-sm font-medium text-green-700">✓ 回放完成</span>
+                    <span className="text-sm font-medium text-green-700">{t('apps.deepSearch.playback.status.completed')}</span>
                   </>
                 )}
                 {playbackStatus === 'error' && (
-                  <span className="text-sm font-medium text-red-700">✗ 回放失败</span>
+                  <span className="text-sm font-medium text-red-700">{t('apps.deepSearch.playback.status.failed')}</span>
                 )}
               </div>
             )}
@@ -368,16 +373,16 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
               className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              刷新
+              {t('apps.deepSearch.playback.buttons.refresh')}
             </button>
             {recordings.length > 0 && (
               <button
                 onClick={handleDownloadAll}
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                title="下载所有录制"
+                title={t('apps.deepSearch.playback.buttons.downloadAllTooltip')}
               >
                 <DownloadCloud className="w-4 h-4" />
-                下载全部
+                {t('apps.deepSearch.playback.buttons.downloadAll')}
               </button>
             )}
             {recordings.length > 0 && (
@@ -386,7 +391,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
                 className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
-                清空
+                {t('apps.deepSearch.playback.buttons.clear')}
               </button>
             )}
           </div>
@@ -398,15 +403,15 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-2" />
-                <p className="text-sm text-gray-500">加载中...</p>
+                <p className="text-sm text-gray-500">{t('apps.deepSearch.playback.loading')}</p>
               </div>
             </div>
           ) : recordings.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Clock className="w-16 h-16 text-gray-300 mb-4" />
-              <p className="text-lg font-medium text-gray-600 mb-1">暂无录制记录</p>
+              <p className="text-lg font-medium text-gray-600 mb-1">{t('apps.deepSearch.playback.noRecordings')}</p>
               <p className="text-sm text-gray-500">
-                发送 DeepSearch 消息后，会自动录制 SSE 事件流
+                {t('apps.deepSearch.playback.noRecordingsDesc')}
               </p>
             </div>
           ) : (
@@ -444,14 +449,14 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
                         {formatTime(recording.timestamp)}
                       </span>
                       <span>•</span>
-                      <span>{recording.eventCount} 个事件</span>
+                      <span>{recording.eventCount} {t('apps.deepSearch.playback.events')}</span>
                       <span>•</span>
-                      <span>{recording.duration} 秒</span>
+                      <span>{recording.duration} {t('apps.deepSearch.playback.seconds')}</span>
                       {recording.compressedCount < recording.eventCount && (
                         <>
                           <span>•</span>
                           <span className="text-green-600">
-                            压缩 {getCompressionRatio(recording.eventCount, recording.compressedCount)}
+                            {t('apps.deepSearch.playback.compression')} {getCompressionRatio(recording.eventCount, recording.compressedCount)}
                           </span>
                         </>
                       )}
@@ -464,7 +469,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
                     <button
                       onClick={() => handleDownload(recording.id)}
                       className="flex-shrink-0 p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                      title="下载"
+                      title={t('apps.deepSearch.playback.buttons.download')}
                     >
                       <Download className="w-4 h-4" />
                     </button>
@@ -473,7 +478,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
                     <button
                       onClick={() => handleDelete(recording.id)}
                       className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="删除"
+                      title={t('apps.deepSearch.playback.buttons.delete')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -487,7 +492,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
         {/* 底部信息 */}
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500">
-            💡 提示：回放时会创建新的对话，速度可在上方调整。压缩比例表示节省的存储空间。
+            {t('apps.deepSearch.playback.tip')}
           </p>
         </div>
       </div>

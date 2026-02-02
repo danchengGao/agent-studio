@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback } from 'react'
 import { X, Check, Settings, Search, FileText, Loader2, AlertCircle, Plus, Edit, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { MentionItem } from './MentionPicker'
 import { RADIUS_CONTAINER, RADIUS_BUTTON, RADIUS_CIRCLE } from '../constants/styles'
 import { TemplateUploadDialog } from './config/template/TemplateUploadDialog'
@@ -146,6 +147,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   modelConfigId = -1,
   isFirstConfig = false
 }) => {
+  const { t } = useTranslation()
   const [showSaved, setShowSaved] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -276,38 +278,38 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
     // 规划章节数量验证
     if (config.planChapterCount < 1 || config.planChapterCount > 10) {
-      errors.push('规划章节数量必须在 1-10 之间')
+      errors.push(t('apps.config.validation.chapterCountRange'))
     }
 
     // 综合搜索模式：需要同时配置搜索引擎和知识库
     if (config.searchMode === 'all') {
       const missingConfigs: string[] = []
       if (!config.selectedWebSearchEngineId) {
-        missingConfigs.push('搜索引擎')
+        missingConfigs.push(t('apps.config.engine.title'))
       }
       if (config.selectedKnowledgeBaseIds.length === 0) {
-        missingConfigs.push('本地知识库')
+        missingConfigs.push(t('apps.config.search.localKB'))
       }
       if (missingConfigs.length > 0) {
-        errors.push(`综合搜索模式下必须配置：${missingConfigs.join('、')}`)
+        errors.push(t('apps.config.validation.allModeRequires', { items: missingConfigs.join('、') }))
       }
     } else {
       // 网络搜索模式：需要配置搜索引擎
       if (config.searchMode === 'web' && !config.selectedWebSearchEngineId) {
-        errors.push('网络搜索模式下必须选择一个搜索引擎')
+        errors.push(t('apps.config.validation.webModeRequires'))
       }
       // 本地搜索模式：需要配置知识库
       if (config.searchMode === 'local' && config.selectedKnowledgeBaseIds.length === 0) {
-        errors.push('本地搜索模式下必须选择至少一个知识库')
+        errors.push(t('apps.config.validation.localModeRequires'))
       }
     }
 
     // 搜索结果数量验证
     if (config.webSearchResultCount < 1 || config.webSearchResultCount > 10) {
-      errors.push('网络搜索结果数量必须在 1-10 之间')
+      errors.push(t('apps.config.validation.webResultCountRange'))
     }
     if (config.localSearchResultCount < 1 || config.localSearchResultCount > 10) {
-      errors.push('本地搜索结果数量必须在 1-10 之间')
+      errors.push(t('apps.config.validation.localResultCountRange'))
     }
 
     // Embedding模型一致性验证
@@ -319,7 +321,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
       valid: errors.length === 0,
       errors
     }
-  }, [config, embeddingModelError])
+  }, [config, embeddingModelError, t])
 
   const { valid, errors } = validateConfig()
 
@@ -430,7 +432,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
       for (const kb of kbs) {
         if (!kb.embedding_model_config_id) {
-          setEmbeddingModelError('部分知识库未配置 Embedding 模型')
+          setEmbeddingModelError(t('apps.config.knowledge.error.noConfig', { name: '' }))
           return
         }
 
@@ -445,15 +447,15 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
       const uniqueKeys = Array.from(new Set(modelKeys))
       if (uniqueKeys.length > 1) {
-        setEmbeddingModelError(`所选知识库使用了不同的 Embedding 模型：${modelNames.join('、')}`)
+        setEmbeddingModelError(t('apps.config.knowledge.error.inconsistent', { models: modelNames.join('、') }))
       } else {
         setEmbeddingModelError(null)
       }
     } catch (err) {
       console.error('Failed to validate embedding models:', err)
-      setEmbeddingModelError('验证 Embedding 模型时出错')
+      setEmbeddingModelError(t('apps.config.knowledge.error.validateError'))
     }
-  }, [spaceId])
+  }, [spaceId, t])
 
   // 当对话框打开或知识库 ID 变化时，加载详细信息
   React.useEffect(() => {
@@ -491,7 +493,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   // 上传模板
   const handleUploadTemplate = async (file: File, templateName: string, templateDesc: string, isTemplate: boolean) => {
     if (!spaceId || modelConfigId === -1) {
-      setUploadError('缺少必要的配置信息')
+      setUploadError(t('apps.config.template.uploadError'))
       return
     }
 
@@ -513,7 +515,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
       await fetchTemplates()
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '上传模板失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.config.template.uploadFailed')
       setUploadError(errorMessage)
       throw err
     } finally {
@@ -538,7 +540,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
           }
           setDeleteDialog(prev => ({ ...prev, isOpen: false }))
         } catch (err) {
-          console.error('删除模板失败:', err)
+          console.error('Failed to delete template:', err)
         }
       }
     })
@@ -604,11 +606,11 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   // 更新徽章状态（搜索配置需要配置时）
   React.useEffect(() => {
     if ((config.searchMode === 'web' || config.searchMode === 'all') && !config.selectedWebSearchEngineId) {
-      registry.updateTab('search', { badge: true, badgeText: '需配置' })
+      registry.updateTab('search', { badge: true, badgeText: t('apps.config.tabs.needsConfig') })
     } else {
       registry.updateTab('search', { badge: false })
     }
-  }, [config.searchMode, config.selectedWebSearchEngineId, registry])
+  }, [config.searchMode, config.selectedWebSearchEngineId, registry, t])
 
   if (!open || !agent) return null
 
@@ -624,11 +626,11 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {isFirstConfig ? '配置智能体以开始使用' : '确认或修改配置'}
+                  {isFirstConfig ? t('apps.config.title') : t('apps.config.titleEdit')}
                 </h2>
                 <p className="text-xs text-gray-500">
                   {agent.name}
-                  {isFirstConfig ? ' · 请先完成配置' : ' · 可修改现有配置'}
+                  {isFirstConfig ? ` · ${t('apps.config.subtitle')}` : ` · ${t('apps.config.subtitleEdit')}`}
                 </p>
               </div>
             </div>
@@ -696,7 +698,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
           ) : (
             <div className="flex-1 overflow-y-auto p-6">
               <div className="text-center py-8">
-                <p className="text-sm text-gray-500">该智能体暂无可配置项</p>
+                <p className="text-sm text-gray-500">{t('apps.config.noConfig')}</p>
               </div>
             </div>
           )}
@@ -707,7 +709,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
               onClick={onClose}
               className={`px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 ${RADIUS_BUTTON} transition-all duration-200`}
             >
-              取消选择
+              {t('apps.config.cancel')}
             </button>
             <button
               onClick={handleSave}
@@ -726,10 +728,10 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
               {showSaved ? (
                 <>
                   <Check className="w-4 h-4" />
-                  已保存
+                  {t('apps.config.saved')}
                 </>
               ) : (
-                '保存配置'
+                t('apps.config.save')
               )}
             </button>
           </div>
@@ -828,12 +830,12 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
         onConfirm={deleteDialog.onConfirm}
         itemType={undefined}
         itemName={deleteDialog.itemName}
-        title={deleteDialog.itemType === 'engine' ? '删除搜索引擎' : '删除模板'}
+        title={deleteDialog.itemType === 'engine' ? t('apps.config.engine.delete') : t('apps.config.template.delete')}
         message={deleteDialog.itemType === 'engine'
-          ? `确定要删除搜索引擎"${deleteDialog.itemName}"吗？此操作无法撤销。`
-          : `确定要删除模板"${deleteDialog.itemName}"吗？此操作无法撤销。`
+          ? t('apps.config.engine.deleteConfirm', { name: deleteDialog.itemName })
+          : t('apps.config.template.deleteConfirm', { name: deleteDialog.itemName })
         }
-        confirmButtonText={deleteDialog.itemType === 'engine' ? '删除搜索引擎' : '删除模板'}
+        confirmButtonText={deleteDialog.itemType === 'engine' ? t('apps.config.engine.delete') : t('apps.config.template.confirmDelete')}
       />
 
       {/* 模板查看对话框 */}
@@ -887,6 +889,7 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
   onDeleteEngine,
   onCreateNew,
 }) => {
+  const { t } = useTranslation()
   const [engines, setEngines] = useState<Array<{ id: number; name: string }>>([])
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState<number | undefined>(currentSelectedId)
@@ -933,7 +936,7 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
       <div className={`bg-white ${RADIUS_CONTAINER} shadow-2xl w-full max-w-md mx-4 overflow-hidden`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">选择搜索引擎</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('apps.config.engine.select')}</h2>
           <button
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -950,12 +953,12 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
             </div>
           ) : engines.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-sm text-gray-500 mb-3">暂无搜索引擎配置</p>
+              <p className="text-sm text-gray-500 mb-3">{t('apps.config.engine.noEngine')}</p>
               <button
                 onClick={onCreateNew}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                + 创建新引擎
+                {t('apps.config.engine.create')}
               </button>
             </div>
           ) : (
@@ -1017,7 +1020,7 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
                 className="w-full mt-3 px-3 py-2 text-sm text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
-                创建新引擎
+                {t('apps.config.engine.createNew')}
               </button>
             </>
           )}
@@ -1029,13 +1032,13 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-all duration-200"
           >
-            取消
+            {t('apps.config.engine.cancel')}
           </button>
           <button
             onClick={handleConfirm}
             className="px-6 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm hover:shadow transition-all duration-200"
           >
-            确认
+            {t('apps.config.engine.confirm')}
           </button>
         </div>
       </div>
@@ -1060,6 +1063,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
   onConfigCreated,
   editingEngineId = null
 }) => {
+  const { t } = useTranslation()
   const [engineName, setEngineName] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [searchUrl, setSearchUrl] = useState('')
@@ -1085,7 +1089,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
           console.log('[WebSearchEngineConfigDialog] Form state set successfully')
         } catch (err) {
           console.error('[WebSearchEngineConfigDialog] Load failed:', err)
-          setError('加载搜索引擎数据失败')
+          setError(t('apps.config.engine.parseError.default.title'))
         } finally {
           setLoading(false)
         }
@@ -1108,11 +1112,11 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
 
   // 预设搜索引擎配置
   const presets = [
-    { name: 'xunfei', label: '讯飞搜索', url: 'https://api.xunfei.cn' },
-    { name: 'petal', label: '花瓣搜索', url: 'https://api.petal.dev' },
-    { name: 'tavily', label: 'Tavily', url: 'https://api.tavily.com' },
-    { name: 'google', label: 'Google', url: 'https://www.googleapis.com/customsearch/v1' },
-    { name: 'custom', label: '自定义', url: '' },
+    { name: 'xunfei', labelKey: 'presets.xunfei', url: 'https://api.xunfei.cn' },
+    { name: 'petal', labelKey: 'presets.petal', url: 'https://api.petal.dev' },
+    { name: 'tavily', labelKey: 'presets.tavily', url: 'https://api.tavily.com' },
+    { name: 'google', labelKey: 'presets.google', url: 'https://www.googleapis.com/customsearch/v1' },
+    { name: 'custom', labelKey: 'presets.custom', url: '' },
   ]
 
   const handlePresetSelect = (preset: typeof presets[0]) => {
@@ -1126,35 +1130,35 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
     const lowerErr = err.toLowerCase()
     if (lowerErr.includes('already exists') || lowerErr.includes('已存在') || lowerErr.includes('duplicate')) {
       return {
-        title: '该名称已被使用',
-        suggestion: '请尝试其他名称，如添加数字后缀'
+        title: t('apps.config.engine.parseError.duplicate.title'),
+        suggestion: t('apps.config.engine.parseError.duplicate.suggestion')
       }
     }
     if (lowerErr.includes('network') || lowerErr.includes('网络')) {
       return {
-        title: '网络连接失败',
-        suggestion: '请检查网络连接后重试'
+        title: t('apps.config.engine.parseError.network.title'),
+        suggestion: t('apps.config.engine.parseError.network.suggestion')
       }
     }
     return {
-      title: '配置失败',
-      suggestion: '请检查输入信息后重试'
+      title: t('apps.config.engine.parseError.default.title'),
+      suggestion: t('apps.config.engine.parseError.default.suggestion')
     }
   }
 
   const handleSave = async () => {
     // 验证是否选择了预设引擎
     if (!engineName.trim()) {
-      setError('请选择一个搜索引擎类型')
+      setError(t('apps.config.engine.error.selectType'))
       return
     }
     const isValidEngine = presets.some(p => p.name === engineName)
     if (!isValidEngine) {
-      setError('引擎名称必须是预设值之一')
+      setError(t('apps.config.engine.error.invalidName'))
       return
     }
     if (!apiKey.trim() || !searchUrl.trim()) {
-      setError('请填写 API Key 和搜索URL')
+      setError(t('apps.config.engine.error.fillRequired'))
       return
     }
 
@@ -1195,7 +1199,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
 
       onClose()
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '配置搜索引擎失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.config.engine.parseError.default.title')
       setError(errorMessage)
     } finally {
       setSaving(false)
@@ -1210,7 +1214,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            {editingEngineId ? '修改搜索引擎' : '配置搜索引擎'}
+            {editingEngineId ? t('apps.config.engine.edit') : t('apps.config.engine.config')}
           </h2>
           <button
             onClick={onClose}
@@ -1231,8 +1235,8 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
               {/* 快速选择 */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <label className="block text-sm font-medium text-gray-700">搜索引擎</label>
-                  <span className="text-xs text-gray-400">请选择一种类型</span>
+                  <label className="block text-sm font-medium text-gray-700">{t('apps.config.engine.title')}</label>
+                  <span className="text-xs text-gray-400">{t('apps.config.engine.selectType')}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   {presets.map(preset => (
@@ -1248,7 +1252,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
                         }
                       `}
                     >
-                      {preset.label}
+                      {t(`apps.config.engine.${preset.labelKey}`)}
                     </button>
                   ))}
                 </div>
@@ -1257,13 +1261,13 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
               {/* 表单 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  引擎类型
+                  {t('apps.config.engine.type')}
                 </label>
                 <input
                   type="text"
                   value={engineName}
                   disabled
-                  placeholder="请从上方选择搜索引擎"
+                  placeholder={t('apps.config.engine.selectPreset')}
                   className={`
                     w-full px-3 py-2 ${RADIUS_BUTTON} border text-sm bg-gray-50 text-gray-600
                     border-gray-300
@@ -1280,13 +1284,13 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  API Key <span className="text-red-500">*</span>
+                  {t('apps.config.engine.apiKey')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="password"
                   value={apiKey}
                   onChange={e => setApiKey(e.target.value)}
-                  placeholder="输入搜索引擎 API Key"
+                  placeholder={t('apps.config.engine.apiKeyPlaceholder')}
                   className={`
                     w-full px-3 py-2 ${RADIUS_BUTTON} border border-gray-300
                     text-sm text-gray-900 placeholder-gray-400
@@ -1297,13 +1301,13 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  搜索URL <span className="text-red-500">*</span>
+                  {t('apps.config.engine.searchUrl')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="url"
                   value={searchUrl}
                   onChange={e => setSearchUrl(e.target.value)}
-                  placeholder="https://api.example.com"
+                  placeholder={t('apps.config.engine.searchUrlPlaceholder')}
                   className={`
                     w-full px-3 py-2 ${RADIUS_BUTTON} border border-gray-300
                     text-sm text-gray-900 placeholder-gray-400
@@ -1318,7 +1322,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
                   onClick={onClose}
                   className={`px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 ${RADIUS_BUTTON} transition-all duration-200`}
                 >
-                  取消
+                  {t('apps.config.engine.cancel')}
                 </button>
                 <button
                   onClick={handleSave}
@@ -1334,10 +1338,10 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
                   {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      保存中...
+                      {t('apps.config.engine.saving')}
                     </>
                   ) : (
-                    '保存配置'
+                    t('apps.config.engine.confirm')
                   )}
                 </button>
               </div>

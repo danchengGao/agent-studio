@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { X, Loader2, Eye, Code, Columns } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { RADIUS_CONTAINER, RADIUS_BUTTON } from '../../../constants/styles'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
@@ -40,6 +41,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
   templateContent,
   loading = false
 }) => {
+  const { t } = useTranslation()
   const [viewMode, setViewMode] = useState<ViewMode>('preview')
 
   // 解码内容 - 尝试 Base64（支持 UTF-8 中文），如果失败则直接使用原始内容
@@ -88,7 +90,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div>
-              <h2 className="text-base font-semibold text-gray-900 truncate">{templateName || '模板详情'}</h2>
+              <h2 className="text-base font-semibold text-gray-900 truncate">{templateName || t('apps.config.template.details')}</h2>
               {templateDesc && (
                 <p className="text-xs text-gray-500 truncate mt-0.5">{templateDesc}</p>
               )}
@@ -105,7 +107,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
-                title="预览"
+                title={t('apps.config.template.preview')}
               >
                 <Eye className="w-3.5 h-3.5" />
               </button>
@@ -116,7 +118,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
-                title="代码"
+                title={t('apps.config.template.code')}
               >
                 <Code className="w-3.5 h-3.5" />
               </button>
@@ -127,7 +129,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
-                title="分屏"
+                title={t('apps.config.template.split')}
               >
                 <Columns className="w-3.5 h-3.5" />
               </button>
@@ -136,7 +138,7 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
             <button
               onClick={onClose}
               className={`p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 ${RADIUS_BUTTON} transition-colors`}
-              title="关闭"
+              title={t('apps.config.template.close')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -149,13 +151,13 @@ export const TemplateViewDialog: React.FC<TemplateViewDialogProps> = ({
             <div className="flex items-center justify-center h-64">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-                <p className="text-sm text-gray-500">加载中...</p>
+                <p className="text-sm text-gray-500">{t('apps.model.loading')}</p>
               </div>
             </div>
           ) : isEmpty ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <p className="text-sm text-gray-500">暂无模板内容</p>
+                <p className="text-sm text-gray-500">{t('apps.config.template.available')}</p>
               </div>
             </div>
           ) : (

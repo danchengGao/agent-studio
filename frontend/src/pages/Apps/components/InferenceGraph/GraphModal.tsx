@@ -7,6 +7,7 @@
 
 import React, { useEffect, useRef } from 'react'
 import { X, ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useReducedMotion, useIsMobile } from '@/pages/Apps/components/shared'
 import { GraphIframe } from './GraphIframe'
 import type { GraphModalProps } from './types'
@@ -34,6 +35,7 @@ export const GraphModal: React.FC<GraphModalProps> = ({
   onOpenInNewTab,
   className = '',
 }) => {
+  const { t } = useTranslation()
   const prefersReducedMotion = useReducedMotion()
   const isMobile = useIsMobile()
   const modalRef = useRef<HTMLDivElement>(null)
@@ -114,7 +116,7 @@ export const GraphModal: React.FC<GraphModalProps> = ({
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-label="推理图谱"
+        aria-label={t('apps.inferenceGraph.title')}
         onClick={handleModalClick}
         className={`
           absolute z-50 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden antialiased
@@ -132,8 +134,8 @@ export const GraphModal: React.FC<GraphModalProps> = ({
           <button
             onClick={onOpenInNewTab}
             className="p-3 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 rounded-lg transition-colors duration-200 shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
-            title="在新标签页打开推理图"
-            aria-label="在新标签页打开推理图"
+            title={t('apps.inferenceGraph.openInNewTab')}
+            aria-label={t('apps.inferenceGraph.openInNewTab')}
             type="button"
           >
             <ExternalLink className="w-5 h-5 text-purple-600 dark:text-purple-400" />
@@ -144,8 +146,8 @@ export const GraphModal: React.FC<GraphModalProps> = ({
             ref={closeButtonRef}
             onClick={onClose}
             className="p-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200 shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-gray-500 focus-visible:outline-offset-2"
-            title="关闭推理图谱 (ESC)"
-            aria-label="关闭推理图谱 (ESC)"
+            title={t('apps.inferenceGraph.closeModal')}
+            aria-label={t('apps.inferenceGraph.closeModal')}
             type="button"
           >
             <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />

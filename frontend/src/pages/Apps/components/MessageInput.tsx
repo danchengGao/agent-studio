@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef, useImperativeHandle, forwardRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MentionItem, MentionPicker } from './MentionPicker'
 import { RADIUS_CONTAINER } from '../constants/styles'
 
@@ -35,7 +36,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     {
       value = '',
       onChange,
-      placeholder = '请提问... (@ 选择智能体，# 选择资源)',
+      placeholder,
       disabled = false,
       agents = [],
       resources = [],
@@ -48,7 +49,10 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     },
     ref,
   ) => {
+    const { t } = useTranslation()
     const textareaRef = useRef<HTMLTextAreaElement>(null)
+    // Use translated placeholder if not provided
+    const finalPlaceholder = placeholder || t('apps.input.placeholder')
     const [showPicker, setShowPicker] = useState(false)
     const [pickerState, setPickerState] = useState({
       trigger: '',
@@ -241,7 +245,7 @@ const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={finalPlaceholder}
           disabled={disabled}
           rows={4}
           className={`

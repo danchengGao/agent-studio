@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Message, TaskStatus } from '../../../stores/useConversationStore';
 import { Hand, CheckCircle, XCircle, Ban, AlertCircle } from 'lucide-react';
 
@@ -19,7 +20,7 @@ interface InterruptMessageProps {
  * - CANCELLED: 灰色主题，已取消
  */
 export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) => {
-  const title = '请输入您的反馈'
+  const { t } = useTranslation()
 
   // 根据状态获取样式配置
   const getStatusTheme = () => {
@@ -33,7 +34,8 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
           iconColor: 'text-yellow-600',
           titleColor: 'text-yellow-800',
           tipColor: 'text-yellow-600',
-          tip: '请在输入框中输入您的反馈，发送后继续...',
+          title: t('apps.interrupt.title'),
+          tip: t('apps.interrupt.pendingTip'),
           padding: 'p-3',
         };
       case TaskStatus.COMPLETED:
@@ -44,7 +46,8 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
           iconColor: 'text-green-600',
           titleColor: 'text-green-800',
           tipColor: 'text-green-600',
-          tip: '已反馈',
+          title: t('apps.interrupt.title'),
+          tip: t('apps.interrupt.completedTip'),
           padding: 'p-2',  // 减少卡片高度
         };
       case TaskStatus.FAILED:
@@ -55,7 +58,8 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
           iconColor: 'text-red-600',
           titleColor: 'text-red-800',
           tipColor: 'text-red-600',
-          tip: '发生错误',
+          title: t('apps.interrupt.title'),
+          tip: t('apps.interrupt.failedTip'),
           padding: 'p-3',
         };
       case TaskStatus.CANCELLED:
@@ -66,7 +70,8 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
           iconColor: 'text-gray-500',
           titleColor: 'text-gray-700',
           tipColor: 'text-gray-500',
-          tip: '已取消',
+          title: t('apps.interrupt.title'),
+          tip: t('apps.interrupt.cancelledTip'),
           padding: 'p-3',
         };
       case TaskStatus.UNKNOWN:
@@ -77,7 +82,8 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
           iconColor: 'text-orange-500',
           titleColor: 'text-orange-700',
           tipColor: 'text-orange-500',
-          tip: '状态未知',
+          title: t('apps.interrupt.title'),
+          tip: t('apps.interrupt.unknownTip'),
           padding: 'p-3',
         };
       default:
@@ -88,7 +94,8 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
           iconColor: 'text-yellow-600',
           titleColor: 'text-yellow-800',
           tipColor: 'text-yellow-600',
-          tip: '请在输入框中输入您的反馈，发送后继续...',
+          title: t('apps.interrupt.title'),
+          tip: t('apps.interrupt.pendingTip'),
           padding: 'p-3',
         };
     }
@@ -102,7 +109,7 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
       <div className="flex items-start gap-2">
         <Icon size={18} className={`${theme.iconColor} flex-shrink-0 mt-0.5`} />
         <div className="flex-1">
-          <h4 className={`text-sm font-semibold ${theme.titleColor} mb-1`}>{title}</h4>
+          <h4 className={`text-sm font-semibold ${theme.titleColor} mb-1`}>{theme.title}</h4>
           <div className={`mt-2 text-xs ${theme.tipColor}`}>
             {theme.tip}
           </div>

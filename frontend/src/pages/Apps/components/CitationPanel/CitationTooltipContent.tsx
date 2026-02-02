@@ -4,6 +4,7 @@
  */
 
 import React, { useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { CitationData } from '@/pages/Apps/types'
 
 export interface CitationTooltipContentProps {
@@ -115,19 +116,21 @@ const isValidPublishTime = (publishTime: string): boolean => {
 
 // 可信度评分显示组件
 const CreditScore: React.FC<{ score?: number }> = ({ score }) => {
+  const { t } = useTranslation()
+
   if (score === undefined) return null
 
   const getScoreLabel = (score: number) => {
-    if (score < 0.5) return { label: '低', className: 'text-amber-500 dark:text-amber-400' }
-    if (score < 0.9) return { label: '中', className: 'text-blue-500 dark:text-blue-400' }
-    return { label: '高', className: 'text-green-500 dark:text-green-400' }
+    if (score < 0.5) return { label: t('apps.citation.scoreLow'), className: 'text-amber-500 dark:text-amber-400' }
+    if (score < 0.9) return { label: t('apps.citation.scoreMedium'), className: 'text-blue-500 dark:text-blue-400' }
+    return { label: t('apps.citation.scoreHigh'), className: 'text-green-500 dark:text-green-400' }
   }
 
   const { label, className } = getScoreLabel(score)
 
   return (
     <span className="inline-flex items-center">
-      <span className="text-gray-700 dark:text-gray-300">匹配度：</span>
+      <span className="text-gray-700 dark:text-gray-300">{t('apps.citation.matchScore')}：</span>
       <span className={className}>{label}</span>
     </span>
   )
@@ -143,6 +146,7 @@ const CreditScore: React.FC<{ score?: number }> = ({ score }) => {
  * - 显示匹配度评分
  */
 export const CitationTooltipContent: React.FC<CitationTooltipContentProps> = ({ citationData, href, onScrollRef }) => {
+  const { t } = useTranslation()
   const contentScrollRef = useRef<HTMLDivElement>(null)
 
   // 暴露ref给父组件
@@ -212,7 +216,7 @@ export const CitationTooltipContent: React.FC<CitationTooltipContentProps> = ({ 
            isValidPublishTime(citationData.publish_time) && (
             <span className="mx-1 inline-flex items-center text-gray-500 dark:text-gray-500">|</span>
           )}
-          {citationData.source && <span className="inline-flex items-center text-gray-600 dark:text-gray-400">来源：{citationData.source}</span>}
+          {citationData.source && <span className="inline-flex items-center text-gray-600 dark:text-gray-400">{t('apps.citation.source')}：{citationData.source}</span>}
         </div>
         <div className="flex items-center gap-2">
           <CreditScore score={citationData.score} />

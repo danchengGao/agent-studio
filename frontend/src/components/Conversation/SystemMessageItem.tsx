@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MessageItems, Message, MessageType } from '../../stores/useConversationStore';
 import { useConversationStore } from '../../stores/useConversationStore';
 import { TextMessage } from './messageTypes/TextMessage';
@@ -23,6 +24,7 @@ interface SystemMessageItemProps {
  * 4. 之前的message不会变化
  */
 export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageItems }) => {
+  const { t } = useTranslation();
   const getMessageById = useConversationStore(state => state.getMessageById);
   const getMessageItemsIsUser = useConversationStore(state => state.getMessageItemsIsUser);
   const { messagesIds, status } = messageItems;
@@ -40,7 +42,7 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
 
   if (!messagesIds || !Array.isArray(messagesIds)) {
     console.error('[SystemMessageItem] Invalid messagesIds:', messagesIds);
-    return <div className="text-red-500">消息数据错误</div>;
+    return <div className="text-red-500">{t('apps.deepSearch.messageDataError')}</div>;
   }
 
   try {
@@ -88,7 +90,7 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
             return (
               <div key={message.id} className="mb-3 last:mb-0">
                 {/* 根据消息类型渲染不同的组件 */}
-                <MessageRenderer message={message} isStreaming={isLastStreaming} />
+                <MessageRenderer message={message} isStreaming={isLastStreaming} t={t} />
 
                 {/* 消息分隔线（除了最后一个消息） */}
                 {index < topLevelMessages.length - 1 && (
@@ -107,7 +109,7 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-75"></div>
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-150"></div>
               </div>
-              <span>正在生成中...</span>
+              <span>{t('apps.chat.generating')}</span>
             </div>
           )}
         </div>
@@ -116,16 +118,17 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
     );
   } catch (error) {
     console.error('[SystemMessageItem] Render error:', error, 'messages:', messages);
-    return <div className="text-red-500 p-4 border border-red-500">渲染错误: {error instanceof Error ? error.message : String(error)}</div>;
+    return <div className="text-red-500 p-4 border border-red-500">{t('apps.deepSearch.renderError')}: {error instanceof Error ? error.message : String(error)}</div>;
   }
 };
 
 interface MessageRendererProps {
   message: Message;
   isStreaming?: boolean;
+  t: (key: string, params?: any) => string;
 }
 
-const MessageRenderer: React.FC<MessageRendererProps> = ({ message, isStreaming = false }) => {
+const MessageRenderer: React.FC<MessageRendererProps> = ({ message, isStreaming = false, t }) => {
   const setSelectedResultMessageId = useConversationStore(state => state.setSelectedResultMessageId);
   const selectedResultMessageId = useConversationStore(state => state.selectedResultMessageId);
 
@@ -168,7 +171,7 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ message, isStreaming 
     console.error('MessageRenderer error:', error, message);
     return (
       <div style={{ padding: '16px', border: '1px solid red', borderRadius: '8px', marginBottom: '8px' }}>
-        <div style={{ color: 'red', fontWeight: 'bold' }}>渲染错误</div>
+        <div style={{ color: 'red', fontWeight: 'bold' }}>{t('apps.deepSearch.renderError')}</div>
         <div style={{ fontSize: '12px' }}>
           type: {message.type}, id: {message.id}
         </div>

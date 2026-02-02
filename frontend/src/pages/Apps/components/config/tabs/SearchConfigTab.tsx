@@ -6,6 +6,7 @@
 
 import React from 'react'
 import { Check, Loader2, Plus, Trash2, AlertCircle, Edit } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ConfigTabProps } from '../ConfigRegistry'
 import { ConfigSection } from '../ConfigSection'
 import { RADIUS_BUTTON } from '../../../constants/styles'
@@ -70,20 +71,25 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
   onRemoveKnowledgeBase,
   embeddingModelError,
 }) => {
+  const { t } = useTranslation()
+
   // 根据搜索模式决定显示哪些搜索来源
   const showWebSearch = config.searchMode === 'web' || config.searchMode === 'all'
   const showLocalSearch = config.searchMode === 'local' || config.searchMode === 'all'
 
+  // 搜索模式选项
+  const searchModeOptions = [
+    { value: 'local' as const, label: t('apps.config.search.local'), desc: t('apps.config.search.localDesc') },
+    { value: 'web' as const, label: t('apps.config.search.web'), desc: t('apps.config.search.webDesc') },
+    { value: 'all' as const, label: t('apps.config.search.all'), desc: t('apps.config.search.allDesc') }
+  ]
+
   return (
     <div className="space-y-8">
       {/* 搜索方式 */}
-      <ConfigSection title="搜索方式">
+      <ConfigSection title={t('apps.config.search.mode')}>
         <div className="flex flex-col gap-2">
-          {[
-            { value: 'local' as const, label: '本地搜索', desc: '仅使用本地知识库' },
-            { value: 'web' as const, label: '网络搜索', desc: '使用网络搜索引擎' },
-            { value: 'all' as const, label: '综合搜索', desc: '结合本地和网络' }
-          ].map(option => (
+          {searchModeOptions.map(option => (
             <button
               key={option.value}
               onClick={() => updateConfig('searchMode', option.value)}
@@ -110,21 +116,21 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
       </ConfigSection>
 
       {/* 搜索来源 - 统一区块 */}
-      <ConfigSection title="搜索来源">
+      <ConfigSection title={t('apps.config.search.source')}>
         {/* 网络搜索引擎 */}
         {showWebSearch && (
           <div className={showLocalSearch ? 'mb-4' : ''}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🔍</span>
-                <span className="text-sm font-medium text-gray-900">网络搜索引擎</span>
+                <span className="text-sm font-medium text-gray-900">{t('apps.config.search.webEngine')}</span>
               </div>
               <button
                 onClick={onShowEngineConfig}
                 className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
-                配置
+                {t('apps.config.search.configure')}
               </button>
             </div>
 
@@ -134,8 +140,8 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
               </div>
             ) : !config.selectedWebSearchEngineId ? (
               <div className="p-3 bg-gray-50 rounded-xl text-center">
-                <p className="text-sm text-gray-500 mb-1">暂无搜索引擎配置</p>
-                <p className="text-xs text-gray-400">点击上方"配置"按钮添加搜索引擎</p>
+                <p className="text-sm text-gray-500 mb-1">{t('apps.config.search.noEngine')}</p>
+                <p className="text-xs text-gray-400">{t('apps.config.search.clickToConfig')}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -163,7 +169,7 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
                             onEditEngine(engine.web_search_engine_id)
                           }}
                           className="p-1 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                          title="编辑"
+                          title={t('apps.config.engine.edit')}
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
@@ -186,14 +192,14 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-lg">📚</span>
-                <span className="text-sm font-medium text-gray-900">本地知识库</span>
+                <span className="text-sm font-medium text-gray-900">{t('apps.config.search.localKB')}</span>
               </div>
               <button
                 onClick={onShowKnowledgeBaseSelector}
                 className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
-                配置
+                {t('apps.config.search.configure')}
               </button>
             </div>
 
@@ -208,8 +214,8 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
             {/* 已选知识库列表 */}
             {knowledgeBases.length === 0 ? (
               <div className="p-3 bg-gray-50 rounded-xl text-center">
-                <p className="text-sm text-gray-500 mb-1">暂无知识库配置</p>
-                <p className="text-xs text-gray-400">点击上方"添加知识库"按钮选择</p>
+                <p className="text-sm text-gray-500 mb-1">{t('apps.config.search.noKB')}</p>
+                <p className="text-xs text-gray-400">{t('apps.config.search.clickToAddKB')}</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">

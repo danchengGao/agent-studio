@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Message, TaskStatus, MessageType, LinkContent } from '../../../stores/useConversationStore';
 import { useConversationStore } from '../../../stores/useConversationStore';
 import {
@@ -79,7 +80,8 @@ const truncateText = (text: string, maxLength: number): string => {
 const LinkSet: React.FC<{
   links: Message[];
   onLinkClick: (link: Message) => void;
-}> = ({ links, onLinkClick }) => {
+  t: (key: string, params?: any) => string;
+}> = ({ links, onLinkClick, t }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const maxVisible = 6;
   const showExpandButton = links.length > maxVisible;
@@ -90,7 +92,7 @@ const LinkSet: React.FC<{
       {visibleLinks.map((link) => {
         const linkData = link.content as LinkContent;
         const url = linkData?.url || '';
-        const title = linkData?.title || link.title || '链接';
+        const title = linkData?.title || link.title || t('apps.deepSearch.link');
         const isLocalDataset = url.startsWith('localdataset://result//');
         const faviconUrl = getFaviconUrl(url);
 
@@ -148,7 +150,7 @@ const LinkSet: React.FC<{
           }}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-xs text-blue-700 font-medium transition-colors flex-shrink-0"
         >
-          {isExpanded ? '收起' : `展开 ${links.length - maxVisible} 项`}
+          {isExpanded ? t('apps.deepSearch.collapse') : t('apps.deepSearch.expand', { count: links.length - maxVisible })}
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
       )}
@@ -223,7 +225,26 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
   depth = 0,
   onTaskClick
 }) => {
+  const { t } = useTranslation();
   const getChildMessages = useConversationStore((state) => state.getChildMessages);
+
+  /**
+   * 翻译任务标题
+   * 检测 "信息收集{number}" 模式并翻译，其他标题保持原样
+   */
+  const translateTaskTitle = (title: string | undefined): string => {
+    if (!title) return '';
+
+    // 检测 "信息收集1", "信息收集2" 等模式
+    const match = title.match(/^信息收集(\d+)$/);
+    if (match) {
+      const index = match[1];
+      return t('apps.deepSearch.informationCollection', { index });
+    }
+
+    // 其他标题保持原样
+    return title;
+  };
 
   // 判断是否为根节点
   const isRootNode = !message.parentMessageId;
@@ -389,7 +410,7 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
       case TaskStatus.UNKNOWN:
         // 橙色对勾（轻微提示）
         return (
-          <div className="flex-shrink-0 w-4 h-4 rounded-full bg-orange-400 flex items-center justify-center" title="状态未知">
+          <div className="flex-shrink-0 w-4 h-4 rounded-full bg-orange-400 flex items-center justify-center" title={t('apps.deepSearch.statusUnknown')}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
@@ -502,7 +523,7 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
             }`}
             onClick={handleTitleClick}
           >
-            {message.title || '研究大纲'}
+            {translateTaskTitle(message.title) || t('apps.deepSearch.researchOutline')}
           </span>
 
           {/* 用时模块 */}
@@ -562,7 +583,7 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
                   <button
                     onClick={toggleContentExpand}
                     className="absolute bottom-2 right-2 flex-shrink-0 flex items-center justify-center w-7 h-7 opacity-70 hover:opacity-100 bg-white/90 backdrop-blur-sm rounded-full border border-gray-300 shadow-sm hover:bg-white hover:border-gray-400 transition-all"
-                    title={isContentExpanded ? '折叠内容' : '展开内容'}
+                    title={isContentExpanded ? t('apps.deepSearch.collapseContent') : t('apps.deepSearch.expandContent')}
                   >
                     {isContentExpanded ? (
                       <Minimize2 size={14} className="text-gray-600" />
@@ -594,6 +615,7 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
                   key={`linkset-${index}`}
                   links={linkSet}
                   onLinkClick={(link) => onTaskClick?.(link)}
+                  t={t}
                 />
               ))}
 

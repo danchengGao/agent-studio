@@ -5,6 +5,7 @@
  */
 
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { FileX, Upload } from 'lucide-react'
 import { RADIUS_BUTTON } from '../../../constants/styles'
 
@@ -19,13 +20,14 @@ export interface EmptyTemplateStateProps {
 export const EmptyTemplateState: React.FC<EmptyTemplateStateProps> = ({
   onUpload
 }) => {
+  const { t } = useTranslation()
   return (
     <div className="text-center py-8 px-4">
       <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <FileX className="w-8 h-8 text-gray-400" />
       </div>
-      <h4 className="text-sm font-semibold text-gray-900 mb-2">暂无可用模板</h4>
-      <p className="text-xs text-gray-500 mb-4">上传模板后即可使用</p>
+      <h4 className="text-sm font-semibold text-gray-900 mb-2">{t('apps.config.template.emptyTitle')}</h4>
+      <p className="text-xs text-gray-500 mb-4">{t('apps.config.template.emptyDescription')}</p>
       <button
         onClick={onUpload}
         className={`
@@ -36,7 +38,7 @@ export const EmptyTemplateState: React.FC<EmptyTemplateStateProps> = ({
         `}
       >
         <Upload className="w-4 h-4" />
-        上传模板
+        {t('apps.config.template.uploadButton')}
       </button>
     </div>
   )

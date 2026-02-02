@@ -6,6 +6,7 @@
 
 import React, { useState, useRef } from 'react'
 import { X, Upload, FileText, Loader2, AlertCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { RADIUS_CONTAINER, RADIUS_BUTTON } from '../../../constants/styles'
 
 /** 导入模式类型 */
@@ -31,6 +32,7 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
   onConfirm,
   uploading = false
 }) => {
+  const { t } = useTranslation()
   const [file, setFile] = useState<File | null>(null)
   const [templateName, setTemplateName] = useState('')
   const [templateDesc, setTemplateDesc] = useState('')
@@ -129,7 +131,7 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
       <div className={`bg-white ${RADIUS_CONTAINER} shadow-2xl w-full max-w-md mx-4 overflow-hidden`}>
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">导入新模板</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('apps.config.template.importTemplate')}</h2>
           <button
             onClick={handleClose}
             disabled={uploading}
@@ -144,7 +146,7 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
           {/* 模板生成方式 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              模板生成方式
+              {t('apps.config.template.generationMethod')}
             </label>
             <div className="flex gap-2">
               <button
@@ -161,7 +163,7 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
                 `}
               >
                 <span className="flex items-center justify-center gap-2">
-                  ⚡ 提取生成
+                  {t('apps.config.template.extractMode')}
                 </span>
               </button>
               <button
@@ -178,7 +180,7 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
                 `}
               >
                 <span className="flex items-center justify-center gap-2">
-                  📄 直接作为模板
+                  {t('apps.config.template.directMode')}
                 </span>
               </button>
             </div>
@@ -214,13 +216,13 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
               <>
                 <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">
-                  拖放文件到此处或{' '}
-                  <span className="text-blue-600 font-medium">点击选择</span>
+                  {t('apps.config.template.dragDropOrClick')}{' '}
+                  <span className="text-blue-600 font-medium">{t('apps.config.template.clickToSelect')}</span>
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
                   {importMode === 'extract'
-                    ? '支持 .md, .html, .doc, .docx, .pdf 格式'
-                    : '仅支持 .md 格式'
+                    ? t('apps.config.template.supportFormats')
+                    : t('apps.config.template.supportMarkdownOnly')
                   }
                 </p>
               </>
@@ -230,13 +232,13 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
           {/* 模板名称 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              模板名称 <span className="text-red-500">*</span>
+              {t('apps.config.template.templateName')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="请输入模板名称"
+              placeholder={t('apps.config.template.namePlaceholder')}
               disabled={uploading}
               className={`
                 w-full px-3 py-2 ${RADIUS_BUTTON} border border-gray-300
@@ -250,12 +252,12 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
           {/* 模板描述 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              模板描述
+              {t('apps.config.template.templateDesc')}
             </label>
             <textarea
               value={templateDesc}
               onChange={(e) => setTemplateDesc(e.target.value)}
-              placeholder="请输入模板描述（可选）"
+              placeholder={t('apps.config.template.descPlaceholder')}
               rows={3}
               disabled={uploading}
               className={`
@@ -287,7 +289,7 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
               ${RADIUS_BUTTON} transition-all duration-200 disabled:opacity-50
             `}
           >
-            取消
+            {t('apps.config.template.cancel')}
           </button>
           <button
             onClick={handleConfirm}
@@ -304,10 +306,10 @@ export const TemplateUploadDialog: React.FC<TemplateUploadDialogProps> = ({
             {uploading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                上传中...
+                {t('apps.config.template.uploading')}
               </>
             ) : (
-              '确认上传'
+              t('apps.config.template.confirmUpload')
             )}
           </button>
         </div>

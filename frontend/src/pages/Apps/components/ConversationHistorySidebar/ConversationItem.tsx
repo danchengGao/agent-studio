@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
 import { RADIUS_MEDIUM, BUTTON_HOVER_EFFECTS, BUTTON_TRANSITION } from '../../constants/styles'
 import type { ConversationItemProps } from './types'
@@ -6,10 +7,10 @@ import type { ConversationItemProps } from './types'
 /**
  * Format timestamp to human-readable string
  * - Today: "14:30"
- * - Yesterday: "昨天"
- * - Older: "1月15日"
+ * - Yesterday: "昨天" / "Yesterday"
+ * - Older: "1月15日" / "Jan 15"
  */
-function formatTimestamp(timestamp: number): string {
+function formatTimestamp(timestamp: number, t: (key: string) => string, locale: string): string {
   const now = new Date()
   const date = new Date(timestamp)
   const diffMs = now.getTime() - date.getTime()
@@ -17,13 +18,13 @@ function formatTimestamp(timestamp: number): string {
 
   if (diffDays === 0) {
     // Today - show time
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false })
   } else if (diffDays === 1) {
     // Yesterday
-    return '昨天'
+    return t('apps.chat.yesterday')
   } else {
     // Older - show date
-    return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+    return date.toLocaleDateString(locale, { month: 'numeric', day: 'numeric' })
   }
 }
 
@@ -42,6 +43,8 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   onDelete,
   isStreaming,
 }) => {
+  const { t, i18n } = useTranslation()
+
   const handleClick = () => {
     if (!isStreaming) {
       onClick()
@@ -52,7 +55,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
     e.stopPropagation() // 阻止事件冒泡，避免触发对话选择
     if (!isStreaming) {
       // 二次确认
-      const confirmed = window.confirm(`确定要删除对话"${conversation.title}"吗？此操作不可恢复。`)
+      const confirmed = window.confirm(t('apps.chat.deleteConfirm', { title: conversation.title }))
       if (confirmed) {
         await onDelete(conversation.id)
       }
@@ -71,7 +74,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         }
         ${isStreaming ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
       `}
-      title={isStreaming ? '对话进行中，请稍候...' : conversation.title}
+      title={isStreaming ? t('apps.chat.conversationInProgress') : conversation.title}
     >
       <div className="flex-1 min-w-0">
         {/* Title */}
@@ -80,7 +83,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         </div>
         {/* Timestamp */}
         <div className={`text-xs mt-0.5 ${isActive ? 'text-gray-500' : 'text-gray-400'}`}>
-          {formatTimestamp(conversation.updatedAt)}
+          {formatTimestamp(conversation.updatedAt, t, i18n.language)}
         </div>
       </div>
 
@@ -96,7 +99,7 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
           transition-all duration-200
           ${isStreaming ? 'cursor-not-allowed' : 'cursor-pointer'}
         `}
-        title="删除对话"
+        title={t('apps.chat.deleteConversation')}
       >
         <Trash2 className="w-4 h-4" />
       </button>

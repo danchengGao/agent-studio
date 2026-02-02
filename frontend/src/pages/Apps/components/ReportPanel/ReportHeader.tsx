@@ -12,6 +12,7 @@
 import React from 'react'
 import { IconButton } from '@test-agentstudio/base-ui'
 import { X, FileText, Clock } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { Report } from '@/pages/Apps/types'
 import { formatFullDateTime, getAccessibleRelativeTime } from '@/pages/Apps/utils/formatDate'
 import { ClipboardButton } from '../ClipboardPanel'
@@ -34,8 +35,10 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
   onClose,
   className = '',
 }) => {
+  const { t, i18n } = useTranslation()
   // 获取可访问的时间数据
-  const { displayText, datetime } = getAccessibleRelativeTime(report.createdAt)
+  const { displayText, datetime } = getAccessibleRelativeTime(report.createdAt, t, i18n.language)
+  const fullDateTime = formatFullDateTime(report.createdAt, i18n.language)
 
   return (
     <div className={`flex-shrink-0 flex justify-between items-center border-b border-blue-100/60 bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 dark:border-gray-700 pb-4 mb-4 px-6 pt-5 shadow-sm dark:shadow-none ${className}`}>
@@ -57,14 +60,14 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
               <Clock className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
               <time
                 dateTime={datetime}
-                aria-label={`创建时间：${formatFullDateTime(report.createdAt)}`}
+                aria-label={`${t('apps.report.createdAt')}: ${fullDateTime}`}
                 className="truncate"
               >
                 {displayText}
               </time>
               {/* Tooltip */}
               <div className="absolute -bottom-8 left-0 hidden group-hover:block bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50">
-                {formatFullDateTime(report.createdAt)}
+                {fullDateTime}
               </div>
             </div>
           </div>
@@ -75,12 +78,11 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
       <div
         className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0"
         role="toolbar"
-        aria-label="报告操作工具栏"
+        aria-label={t('apps.report.toolbar')}
       >
         {/* 复制按钮 */}
         <ClipboardButton
           content={report.response_content}
-          successMessage="内容已复制到剪贴板"
         />
 
         {/* 下载按钮 */}
@@ -92,9 +94,9 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
         {/* 关闭按钮 */}
         <IconButton
           icon={<X className="w-5 h-5" />}
-          tooltip="关闭面板"
+          tooltip={t('apps.report.closePanel')}
           onClick={onClose}
-          aria-label="关闭报告面板"
+          aria-label={t('apps.report.closeReportPanel')}
         />
       </div>
     </div>

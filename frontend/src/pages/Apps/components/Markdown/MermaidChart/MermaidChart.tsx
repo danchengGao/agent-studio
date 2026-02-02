@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import mermaid from 'mermaid'
 import type { MermaidCodeBlockProps } from '../types'
 import { initMermaid } from './utils'
@@ -11,6 +12,7 @@ import { adjustViewBox, centerTimelineTitle, centerPieTitle, centerXyTitle, opti
 import { handleXyChart } from './processors'
 
 export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
+  const { t } = useTranslation()
   const ref = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const uniqueId = useRef(`mermaid-${Math.random().toString(36).substr(2, 9)}-${Date.now()}`)
@@ -31,7 +33,7 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
           const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
           console.error('[MermaidChart] Parse error:', parseError)
           console.error('[MermaidChart] Code:', code.substring(0, 200))
-          setError(`Mermaid 语法错误: ${errorMessage}`)
+          setError(`${t('apps.chart.syntaxError')}: ${errorMessage}`)
           return
         }
 
@@ -67,7 +69,7 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
         const errorMessage = err instanceof Error ? err.message : String(err)
         console.error('[MermaidChart] Rendering error:', err)
         console.error('[MermaidChart] Code:', code.substring(0, 200))
-        setError(`图表渲染失败: ${errorMessage}`)
+        setError(`${t('apps.chart.renderFailed')}: ${errorMessage}`)
       }
     }
 
@@ -77,10 +79,10 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
   if (error) {
     return (
       <div className="border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 rounded-lg p-4 my-4">
-        <p className="text-sm font-medium text-red-700 dark:text-red-300">Mermaid 图表错误</p>
+        <p className="text-sm font-medium text-red-700 dark:text-red-300">{t('apps.chart.mermaidError')}</p>
         <p className="text-sm text-red-600 dark:text-red-400 mt-1">{error}</p>
         <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-red-500">查看代码</summary>
+          <summary className="cursor-pointer text-xs text-red-500">{t('apps.chart.viewCode')}</summary>
           <pre className="mt-2 text-xs p-2 bg-red-100 dark:bg-red-900/30 rounded overflow-auto max-h-40">
             {code}
           </pre>

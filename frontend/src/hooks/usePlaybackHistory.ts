@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import i18n from '@/i18n'
 import SSERecorder, { type RecordingSession } from '../utils/sseRecorder'
 
 export interface PlaybackHistoryItem {
@@ -117,7 +118,9 @@ export function usePlaybackHistory(enabled: boolean = true, limit: number = 10) 
 
 function formatRecordingName(recording: RecordingSession): string {
   const date = new Date(recording.startTime)
-  const timeStr = date.toLocaleTimeString('zh-CN', {
+  // 根据当前语言动态选择locale
+  const locale = i18n.language.startsWith('zh') ? 'zh-CN' : 'en-US'
+  const timeStr = date.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
   })

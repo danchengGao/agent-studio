@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Copy, Trash2, RefreshCw, History } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/MentionPicker'
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
 import ChatInputArea from './components/ChatInputArea'
@@ -34,6 +35,7 @@ const ENABLE_SSE_DEBUG = import.meta.env.VITE_ENABLE_SSE_DEBUG === 'true'
 const AppsPage: React.FC = () => {
   const { user } = useAuthStore()
   const isNew = useUIStore(state => state.isNewDashboard)
+  const { t } = useTranslation()
   // Snackbar 支持 - 必须在组件顶层调用以监听全局事件
   const { snackbar, closeSnackbar } = useUnifiedSnackbar()
 
@@ -352,7 +354,7 @@ const AppsPage: React.FC = () => {
 
   // 根据当前选择的智能体获取建议提示词
   const currentSuggestions = selectedAgent
-    ? getSuggestionsByAgent(selectedAgent.id)
+    ? getSuggestionsByAgent(selectedAgent.id, t)
     : []
 
   // 智能体列表（架子数据）
@@ -535,7 +537,7 @@ const AppsPage: React.FC = () => {
     // 模拟重新生成
     const aiMessage: Message = {
       id: Date.now().toString(),
-      content: '该功能还未实现',
+      content: t('apps.chat.featureNotImplemented'),
       isUser: false,
       status: 'sent',
     }
@@ -575,7 +577,7 @@ const AppsPage: React.FC = () => {
       // 添加 AI 回复
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: '该功能还未实现',
+        content: t('apps.chat.featureNotImplemented'),
         isUser: false,
         status: 'sent',
         modelName: selectedModel,
@@ -750,8 +752,8 @@ const AppsPage: React.FC = () => {
         if (!config.selectedKnowledgeBaseIds || config.selectedKnowledgeBaseIds.length === 0) {
           // 显示错误提示
           addSystemMessage(conversationId, MessageType.ERROR, {
-            text: '配置错误：请先在配置中选择本地知识库',
-            searchMode: config.searchMode === 'local' ? '本地搜索' : '综合搜索'
+            text: `${t('apps.chat.configError')}：${t('apps.chat.selectKnowledgeBase')}`,
+            searchMode: config.searchMode === 'local' ? t('apps.chat.localSearch') : t('apps.chat.comprehensiveSearch')
           })
           setIsSending(false)
           setLoading(false)
@@ -764,8 +766,8 @@ const AppsPage: React.FC = () => {
         if (!config.selectedWebSearchEngineId) {
           // 显示错误提示
           addSystemMessage(conversationId, MessageType.ERROR, {
-            text: '配置错误：请先在配置中选择搜索引擎',
-            searchMode: config.searchMode === 'web' ? '网络搜索' : '综合搜索'
+            text: `${t('apps.chat.configError')}：${t('apps.chat.selectSearchEngine')}`,
+            searchMode: config.searchMode === 'web' ? t('apps.chat.webSearch') : t('apps.chat.comprehensiveSearch')
           })
           setIsSending(false)
           setLoading(false)
@@ -1047,10 +1049,10 @@ const AppsPage: React.FC = () => {
         <button
           onClick={() => setShowPlaybackPanel(true)}
           className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
-          title="打开 SSE 回放面板"
+          title={t('apps.chat.openSSEPanel')}
         >
           <History className="w-4 h-4" />
-          <span>回放历史</span>
+          <span>{t('apps.chat.replayHistory')}</span>
         </button>
       )}
 
@@ -1077,11 +1079,11 @@ const AppsPage: React.FC = () => {
                 <div className="text-left mb-8">
                   {/* 第一段话：用户名，你好 */}
                   <p className={`${TEXT_BASE} text-gray-500 mb-1`}>
-                    {user?.username || '用户'}，你好
+                    {user?.username || t('apps.user.defaultUsername')}，{t('apps.chat.welcome')}
                   </p>
                   {/* 第二段话：选择智能体开始对话 */}
                   <h1 className="text-2xl font-semibold text-gray-900 mb-6">
-                    选择智能体开始对话，或直接输入你的问题
+                    {t('apps.chat.welcomeMessage')}
                   </h1>
                 </div>
 

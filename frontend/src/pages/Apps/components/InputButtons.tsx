@@ -4,6 +4,7 @@
  */
 
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import ModelIcon from '@/assets/icons/modelManagement.svg?react'
 import { RADIUS_BUTTON, BUTTON_HOVER_EFFECTS, BUTTON_TRANSITION, FOCUS_RING } from '../constants/styles'
@@ -25,11 +26,13 @@ export const ModelSelectButton: React.FC<ModelSelectButtonProps> = ({
   onClick,
   buttonRef,
 }) => {
+  const { t } = useTranslation()
+
   if (isLoading) {
-    return <div className="text-xs text-gray-400 px-2">加载中...</div>
+    return <div className="text-xs text-gray-400 px-2">{t('apps.model.loading')}</div>
   }
   if (models.length === 0) {
-    return <div className="text-xs text-gray-400 px-2">暂无模型</div>
+    return <div className="text-xs text-gray-400 px-2">{t('apps.model.noModels')}</div>
   }
 
   const hasSelectedModel = !!selectedModel
@@ -47,11 +50,11 @@ export const ModelSelectButton: React.FC<ModelSelectButtonProps> = ({
         ${FOCUS_RING}
         ${BUTTON_TRANSITION}
       `}
-      title={selectedModel || '选择模型'}
+      title={selectedModel || t('apps.model.selectModel')}
     >
       <ModelIcon className="w-3.5 h-3.5" />
       <span className="max-w-[120px] truncate">
-        {selectedModel || '选择模型'}
+        {selectedModel || t('apps.model.selectModel')}
       </span>
       {hasSelectedModel && <ChevronDown className="w-3.5 h-3.5" />}
     </button>
@@ -69,6 +72,8 @@ export const TriggerButtons: React.FC<TriggerButtonsProps> = ({
   onAtClick,
   onHashClick,
 }) => {
+  const { t } = useTranslation()
+
   const buttonClass = `
     px-3 py-1.5 ${RADIUS_BUTTON}
     bg-transparent border-none
@@ -83,7 +88,7 @@ export const TriggerButtons: React.FC<TriggerButtonsProps> = ({
       <button
         onClick={onAtClick}
         className={buttonClass}
-        title="选择智能体"
+        title={t('apps.picker.selectAgent')}
       >
         @
       </button>
@@ -91,7 +96,7 @@ export const TriggerButtons: React.FC<TriggerButtonsProps> = ({
       {/* <button
         onClick={onHashClick}
         className={buttonClass}
-        title="选择资源"
+        title={t('apps.input.selectResource')}
       >
         #
       </button> */}

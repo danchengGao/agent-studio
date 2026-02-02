@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Bot, Database, FileText, Globe, Upload } from 'lucide-react'
 import { BasePickerContainer, usePickerKeyboard } from './BasePicker'
 import { RADIUS_SMALL } from '../constants/styles'
@@ -87,6 +88,7 @@ export const MentionPicker: React.FC<MentionPickerProps> = ({
   position,
   onFileUpload,
 }) => {
+  const { t } = useTranslation()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [filteredItems, setFilteredItems] = useState<MentionItem[]>(items)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -139,7 +141,7 @@ export const MentionPicker: React.FC<MentionPickerProps> = ({
       {/* 标题 */}
       <div className="px-3 py-2 border-b border-gray-100">
         <span className="text-xs font-medium text-gray-500">
-          {trigger === '@' ? '选择智能体' : '选择资源'}
+          {trigger === '@' ? t('apps.picker.selectAgent') : t('apps.picker.selectResource')}
         </span>
       </div>
 
@@ -173,7 +175,9 @@ export const MentionPicker: React.FC<MentionPickerProps> = ({
                   {isSelected && <Check className="w-3 h-3 text-blue-600" />}
                 </div>
                 {item.description && (
-                  <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {item.description.startsWith('apps.') ? t(item.description) : item.description}
+                  </p>
                 )}
               </div>
             </div>
@@ -199,8 +203,8 @@ export const MentionPicker: React.FC<MentionPickerProps> = ({
 
                 {/* 内容 */}
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-400">暂无知识库</span>
-                  <p className="text-xs text-gray-400">当前未接入知识库</p>
+                  <span className="text-sm font-medium text-gray-400">{t('apps.picker.noKnowledgeBase')}</span>
+                  <p className="text-xs text-gray-400">{t('apps.picker.noKnowledgeBaseConnected')}</p>
                 </div>
               </div>
             )}
@@ -219,8 +223,8 @@ export const MentionPicker: React.FC<MentionPickerProps> = ({
 
                 {/* 内容 */}
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-900">上传本地文件</span>
-                  <p className="text-xs text-gray-500">选择 PDF、Word、TXT 等文档</p>
+                  <span className="text-sm font-medium text-gray-900">{t('apps.picker.uploadLocalFiles')}</span>
+                  <p className="text-xs text-gray-500">{t('apps.picker.uploadFileDescription')}</p>
                 </div>
               </div>
             )}
@@ -251,7 +255,7 @@ export const DEFAULT_AGENTS: MentionItem[] = [
     id: 'deepsearch',
     name: 'DeepSearch',
     type: 'agent',
-    description: '深度搜索智能体',
+    description: 'apps.picker.deepSearchAgent',
   },
 ]
 

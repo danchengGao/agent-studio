@@ -9,6 +9,7 @@
 
 import React from 'react'
 import { Copy, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { IconButton } from '@test-agentstudio/base-ui'
 import { useClipboard } from '../hooks'
 
@@ -36,11 +37,15 @@ export interface ClipboardButtonProps {
  */
 export const ClipboardButton: React.FC<ClipboardButtonProps> = ({
   content,
-  successMessage = '内容已复制到剪贴板',
+  successMessage,
   className = '',
   variant = 'auto',
 }) => {
+  const { t } = useTranslation()
   const clipboard = useClipboard()
+
+  // Use translated success message if not provided
+  const finalSuccessMessage = successMessage || t('apps.clipboard.copiedToClipboard')
 
   // 根据状态确定按钮变体
   const buttonVariant = variant === 'auto'
@@ -77,10 +82,10 @@ export const ClipboardButton: React.FC<ClipboardButtonProps> = ({
   return (
     <IconButton
       icon={icon}
-      tooltip={clipboard.copied ? '已复制！' : '复制内容'}
-      onClick={() => clipboard.copy(content, successMessage)}
+      tooltip={clipboard.copied ? t('apps.clipboard.copied') : t('apps.clipboard.copy')}
+      onClick={() => clipboard.copy(content, finalSuccessMessage)}
       variant={buttonVariant}
-      aria-label={clipboard.copied ? '已复制到剪贴板' : '复制报告内容'}
+      aria-label={clipboard.copied ? t('apps.clipboard.copiedToClipboard') : t('apps.clipboard.copyReport')}
       className={className}
     />
   )

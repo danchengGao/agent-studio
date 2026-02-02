@@ -154,8 +154,9 @@ export class DeepsearchSSEHandler {
 
         // 【步骤1】更新上一个 planTask (task_1_x_(n-1))
         if (planIdx > 1 && sectionTask) {
+          const prevPlanTitle = i18n.t('apps.deepSearch.informationCollection', { index: planIdx - 1 });
           const prevPlanTask = this.store.getChildMessages(sectionTask.id).find(task =>
-            task.title?.includes(i18n.t('deepResearch.handler.informationCollection', { index: planIdx - 1 }))
+            task.title?.includes(prevPlanTitle)
           );
 
           if (prevPlanTask &&
@@ -466,8 +467,8 @@ export class DeepsearchSSEHandler {
             lastMessageItems.id,
             rootTask.id,
             MessageType.TASK,
-            `研究章节 ${sectionIdx}`,
-            `章节 ${sectionIdx}`
+            i18n.t('apps.deepSearch.researchChapter', { index: sectionIdx }),
+            i18n.t('apps.deepSearch.chapter', { index: sectionIdx })
           );
 
           updateMessage(lastMessageItems.id, sectionTask.id, {
@@ -695,8 +696,9 @@ export class DeepsearchSSEHandler {
       }
 
       const sectionChildren = this.store.getChildMessages(sectionTask.id);
+      const planTitle = i18n.t('apps.deepSearch.informationCollection', { index: planIdx });
       const planTask = sectionChildren.find(task =>
-        task.title && task.title.includes(i18n.t('deepResearch.handler.informationCollection', { index: planIdx }))
+        task.title && task.title.includes(planTitle)
       );
 
       if (!planTask) {
@@ -934,11 +936,12 @@ export class DeepsearchSSEHandler {
       // "ALL END" 标识 (第8点)
       if (sseData.content === 'ALL END') {
         // 1. 检查最终报告状态
+        const finalReportTitle = i18n.t('apps.deepSearch.finalReport');
         const finalReportMessage = lastMessageItems.messagesIds
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            msg.title === i18n.t('deepResearch.handler.finalReport') &&
+            msg.title === finalReportTitle &&
             !msg.parentMessageId
           );
 
@@ -973,7 +976,7 @@ export class DeepsearchSSEHandler {
             updateMessage(lastMessageItems.id, finalReportMessage.id, {
               content: {
                 response_content: '',
-                exception_info: i18n.t('deepResearch.handler.reportGenerationFailed'),
+                exception_info: i18n.t('apps.deepSearch.report.noDataError'),
                 citation_messages: null,
               } as JSONObject,
             });
@@ -1063,7 +1066,7 @@ export class DeepsearchSSEHandler {
             MessageType.REPORT,
             errorData,
             undefined,
-            i18n.t('deepResearch.handler.finalReport'),
+            i18n.t('apps.deepSearch.finalReport'),
             'deepsearch'  // agent 类型
           );
           updateMessage(lastMessageItems.id, newReport.id, {
@@ -1163,16 +1166,15 @@ export class DeepsearchSSEHandler {
   private findOrCreatePlanTask(sectionTask: Message, targetPlanIdx: number, messageItemsId: string): Message | null {
     const childMessages = this.store.getChildMessages(sectionTask.id);
 
+    const planTitle = i18n.t('apps.deepSearch.informationCollection', { index: targetPlanIdx });
     const existingPlan = childMessages.find(task =>
-      task.title && task.title.includes(i18n.t('deepResearch.handler.informationCollection', { index: targetPlanIdx }))
+      task.title && task.title.includes(planTitle)
     );
 
     if (existingPlan) {
       return existingPlan;
     }
 
-    // const planTitle = `${sectionTask.title}_plan${targetPlanIdx}`;
-    const planTitle = i18n.t('deepResearch.handler.informationCollection', { index: targetPlanIdx });
     const planTask = this.store.addMessageAsChild(
       messageItemsId,
       sectionTask.id,

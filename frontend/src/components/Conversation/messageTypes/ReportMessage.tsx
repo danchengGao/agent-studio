@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Message, TaskStatus, MessageType } from '../../../stores/useConversationStore';
 import { useConversationStore } from '../../../stores/useConversationStore';
 import {
@@ -32,14 +33,15 @@ const ReportCard: React.FC<{
   message: Message;
   onClick: () => void;
   duration: string | null;
-}> = ({ message, onClick, duration }) => {
+  t: (key: string, params?: any) => string;
+}> = ({ message, onClick, duration, t }) => {
   // 根据状态获取配置
   const getStatusConfig = () => {
     switch (message.status) {
       case TaskStatus.PENDING:
         return {
           // 待开始：灰色主题，不可点击
-          statusText: '待开始',
+          statusText: t('apps.deepSearch.status.pending'),
           statusIcon: <Circle size={14} className="text-gray-400" />,
           bgGradient: 'from-gray-50 via-gray-50 to-gray-100',
           borderColor: 'border-gray-200/50',
@@ -55,7 +57,7 @@ const ReportCard: React.FC<{
           // 进行中：灰色主题，旋转小菊花，不可点击
           statusText: (
             <span className="flex items-center gap-0.5">
-              报告生成中
+              {t('apps.deepSearch.status.inProgress')}
               <span className="flex gap-0.5 ml-0.5">
                 <LoadingDotStyles />
                 <span className="loading-dot inline-block w-1 h-1 bg-gray-600 rounded-full"></span>
@@ -84,7 +86,7 @@ const ReportCard: React.FC<{
       case TaskStatus.COMPLETED:
         return {
           // 已完成：蓝色主题，可点击打开右面板
-          statusText: '报告已生成',
+          statusText: t('apps.deepSearch.status.completed'),
           statusIcon: (
             <div className="flex-shrink-0 w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center">
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -105,7 +107,7 @@ const ReportCard: React.FC<{
       case TaskStatus.FAILED:
         return {
           // 失败：红色主题，不可点击
-          statusText: '生成失败',
+          statusText: t('apps.deepSearch.status.failed'),
           statusIcon: <XCircle size={14} className="text-red-500" />,
           bgGradient: 'from-red-50 via-red-50 to-pink-50',
           borderColor: 'border-red-200/50',
@@ -119,7 +121,7 @@ const ReportCard: React.FC<{
       case TaskStatus.CANCELLED:
         return {
           // 手动结束：黄色主题，不可点击
-          statusText: '已手动结束',
+          statusText: t('apps.deepSearch.status.cancelled'),
           statusIcon: <Ban size={14} className="text-yellow-500" />,
           bgGradient: 'from-yellow-50 via-yellow-50 to-amber-50',
           borderColor: 'border-yellow-200/50',
@@ -133,9 +135,9 @@ const ReportCard: React.FC<{
       case TaskStatus.UNKNOWN:
         return {
           // 未知状态：浅橙色主题，可点击打开右面板（轻微提示）
-          statusText: '状态未知',
+          statusText: t('apps.deepSearch.status.unknown'),
           statusIcon: (
-            <div className="flex-shrink-0 w-3.5 h-3.5 rounded-full bg-orange-400 flex items-center justify-center" title="状态未知">
+            <div className="flex-shrink-0 w-3.5 h-3.5 rounded-full bg-orange-400 flex items-center justify-center" title={t('apps.deepSearch.status.unknown')}>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
@@ -153,7 +155,7 @@ const ReportCard: React.FC<{
         };
       default:
         return {
-          statusText: '未知状态',
+          statusText: t('apps.deepSearch.status.default'),
           statusIcon: <Circle size={14} className="text-gray-400" />,
           bgGradient: 'from-gray-50 via-gray-50 to-gray-100',
           borderColor: 'border-gray-200/50',
@@ -194,7 +196,7 @@ const ReportCard: React.FC<{
       {/* 内容 - 显示标题、状态文字和耗时 */}
       <div className="relative flex-1 min-w-0">
         <div className={`text-xs font-semibold truncate ${config.titleColor || config.textColor}`}>
-          {message.title || '报告'}
+          {message.title || t('apps.deepSearch.reportCard')}
         </div>
         <div className="flex items-center gap-1.5">
           <div className={`text-[10px] truncate ${config.textColor} opacity-80`}>
@@ -236,13 +238,14 @@ const ChildTaskRenderer: React.FC<{
   childTask: Message;
   depth: number;
   onTaskClick?: (task: Message) => void;
-}> = ({ childTask, depth, onTaskClick }) => {
+  t: (key: string, params?: any) => string;
+}> = ({ childTask, depth, onTaskClick, t }) => {
   switch (childTask.type) {
     case MessageType.TASK: {
       return (
         <React.Suspense fallback={
           <div className="ml-2 mr-2 py-2 text-xs text-gray-500">
-            加载中...
+            {t('apps.deepSearch.loading')}
           </div>
         }>
           <LazyTaskMessage
@@ -296,10 +299,11 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
   depth = 0,
   onTaskClick
 }) => {
+  const { t } = useTranslation();
   const getChildMessages = useConversationStore((state) => state.getChildMessages);
 
   // 判断是否为最终报告
-  const isFinalReport = message.title === '最终报告';
+  const isFinalReport = message.title === t('apps.deepSearch.finalReport');
 
   // 如果是最终报告，使用DeepSearchReportCard组件
   if (isFinalReport) {
@@ -408,6 +412,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
         message={message}
         onClick={() => onTaskClick?.(message)}
         duration={formattedDuration}
+        t={t}
       />
 
       {/* 展开/折叠子消息 */}
@@ -435,6 +440,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
                     childTask={childTask}
                     depth={depth + 1}
                     onTaskClick={onTaskClick}
+                    t={t}
                   />
                 </div>
               ))}
@@ -446,6 +452,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
                   childTask={childTask}
                   depth={depth}
                   onTaskClick={onTaskClick}
+                  t={t}
                 />
               ))}
 
@@ -456,6 +463,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
                   childTask={childTask}
                   depth={depth}
                   onTaskClick={onTaskClick}
+                  t={t}
                 />
               ))}
             </div>
