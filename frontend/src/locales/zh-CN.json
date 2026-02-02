@@ -1405,6 +1405,7 @@
         "jobCreateFailed": "创建优化任务失败，请稍后重试",
         "testCasesCleared": "用例集已清空",
         "datasetExampleDownloaded": "数据集范例已下载",
+        "datasetExampleDownloadError": "下载数据集样例失败，请稍后重试",
         "variableJsonError": "请修正Variable字段的JSON格式错误",
         "testCasesSaved": "用例保存成功",
         "fileFormatError": "请上传Excel文件(.xlsx或.xls格式)或CSV文件(.csv格式)",
@@ -1505,6 +1506,8 @@
         "export": "导出用例集",
         "saveAsJson": "保存为JSON格式",
         "caseNumber": "用例编号",
+        "number": "编号",
+        "testCase": "用例",
         "role": "Role",
         "content": "Content",
         "variable": "Variable",
@@ -1543,7 +1546,19 @@
         "applyOptimization": "应用优化",
         "noResult": "暂无优化结果",
         "waitingForOptimization": "等待优化任务完成",
-        "completeConfigFirst": "请先完成基本信息和优化配置"
+        "completeConfigFirst": "请先完成基本信息和优化配置",
+        "taskExecutionFailed": "任务执行失败",
+        "failureReason": "失败原因：",
+        "noFailureReason": "暂无失败原因",
+        "loading": "加载中...",
+        "noEvaluationData": "暂无评测数据",
+        "userInput": "用户输入",
+        "modelAnswer": "模型回答",
+        "referenceAnswer": "参照回答",
+        "modelScore": "模型评分",
+        "scoreReason": "评分原因",
+        "averageScore": "平均得分：",
+        "scoreUnit": "分"
       },
       "common": {
         "autoSaving": "自动保存中...",
@@ -1576,7 +1591,61 @@
         "sequenceNumberColumn": "序号",
         "roleColumn": "Role",
         "contentColumn": "Content",
-        "variableColumn": "Variable"
+        "variableColumn": "Variable",
+        "fieldType": "字段类型",
+        "fieldName": "字段名称",
+        "fieldNamePlaceholder": "请输入字段名称",
+        "fieldValue": "字段值",
+        "fieldValuePlaceholder": "请输入字段值"
+      },
+      "sampleData": {
+        "fileName": "数据集范例.xlsx",
+        "noToolCallSheet": "无工具调用示例",
+        "toolCallSheet": "工具调用示例",
+        "noToolCallExamples": [
+          {
+            "inputs_role": "信息提取",
+            "inputs_query": "潘之恒（约1536—1621）字景升，号鸾啸生，冰华生，安徽歙县、岩寺人，侨寓金陵（今江苏南京）",
+            "label_output": "[潘之恒]"
+          },
+          {
+            "inputs_role": "信息提取",
+            "inputs_query": "高祖二十二子：窦皇后生建成（李建成）、太宗皇帝（李世民）、玄霸（李玄霸）、元吉（李元吉），万贵妃生智云（李智云），莫嫔生元景（李元景），孙嫔生元昌（李元昌）",
+            "label_output": "[李建成, 李世民, 李玄霸, 李元吉, 李智云, 李元景, 李元昌]"
+          },
+          {
+            "inputs_role": "信息提取",
+            "inputs_query": "郭造卿（1532—1593），字建初，号海岳，福建福清县化南里人（今福清市人），郭遇卿之弟，郭造卿少年的时候就很有名气，曾游学吴越",
+            "label_output": "[郭造卿, 郭遇卿]"
+          },
+          {
+            "inputs_role": "信息提取",
+            "inputs_query": "沈自邠，字茂仁，号几轩，又号茂秀，浙江秀水长溪（今嘉兴南汇）人",
+            "label_output": "[沈自邠]"
+          }
+        ],
+        "toolCallExamples": [
+          {
+            "inputs_query": "请帮我打开空调",
+            "label_tool_calls": "[{ \"name\": \"ac_open\", \"arguments\": {} }]"
+          },
+          {
+            "inputs_query": "请帮我关闭空调",
+            "label_tool_calls": "[{ \"name\": \"ac_close\", \"arguments\": {} }]"
+          },
+          {
+            "inputs_query": "天气太热了，开一下空调",
+            "label_tool_calls": "[{ \"name\": \"ac_open\", \"arguments\": {} }]"
+          },
+          {
+            "inputs_query": "有点冷，先帮我关窗，再调整到29度",
+            "label_tool_calls": "[{ \"name\": \"ac_control\", \"arguments\": { \"temperature\": 29 } }]"
+          },
+          {
+            "inputs_query": "有点热，先帮我开窗，再调整到21度",
+            "label_tool_calls": "[{ \"name\": \"ac_control\", \"arguments\": { \"temperature\": 21 } }]"
+          }
+        ]
       },
       "clearDialog": {
         "title": "确认清空用例集",

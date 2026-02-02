@@ -92,6 +92,7 @@ import {
 import { Tool } from '@/types/promptType'
 import DiffViewer from '@/components/Prompts/DiffViewer'
 import FieldEditor, { type FieldType } from '@/components/Prompts/FieldEditor'
+import TestCaseEditDrawer, { type TestCaseDetail } from '@/components/Prompts/TestCaseEditDrawer'
 import ConditionalTooltip from '@/components/Prompts/ConditionalTooltip'
 import { FormattedPromptEditor, ModelSelector, ModelParameterEditor } from '@/components/Prompts'
 import ToolSettingsPanel from '@/components/Prompts/ToolSettingsPanel'
@@ -107,13 +108,6 @@ interface TestCase {
   messages: string
 }
 
-interface TestCaseDetail {
-  id: number
-  role: 'inputs' | 'label'
-  content: string
-  variableName?: string
-  contentType?: FieldType
-}
 
 // 用例数量限制常量
 const MAX_TEST_CASES = 300
@@ -1662,79 +1656,109 @@ const PromptOptimizeEditPage: React.FC = () => {
 
   // 处理下载数据集范例
   const handleDownloadSample = () => {
-    // 无工具调用示例数据
-    const noToolCallData = [
-      {
-        inputs_role: '信息提取',
-        inputs_query: '潘之恒（约1536—1621）字景升，号鸾啸生，冰华生，安徽歙县、岩寺人，侨寓金陵（今江苏南京）',
-        label_output: '[潘之恒]',
-      },
-      {
-        inputs_role: '信息提取',
-        inputs_query:
-          '高祖二十二子：窦皇后生建成（李建成）、太宗皇帝（李世民）、玄霸（李玄霸）、元吉（李元吉），万贵妃生智云（李智云），莫嫔生元景（李元景），孙嫔生元昌（李元昌）',
-        label_output: '[李建成, 李世民, 李玄霸, 李元吉, 李智云, 李元景, 李元昌]',
-      },
-      {
-        inputs_role: '信息提取',
-        inputs_query: '郭造卿（1532—1593），字建初，号海岳，福建福清县化南里人（今福清市人），郭遇卿之弟，郭造卿少年的时候就很有名气，曾游学吴越',
-        label_output: '[郭造卿, 郭遇卿]',
-      },
-      {
-        inputs_role: '信息提取',
-        inputs_query: '沈自邠，字茂仁，号几轩，又号茂秀，浙江秀水长溪（今嘉兴南汇）人',
-        label_output: '[沈自邠]',
-      },
-    ]
+    try {
+      // 获取国际化的示例数据，使用fallback确保数据安全
+      const noToolCallDataRaw = t('prompts.optimizeEditPage.sampleData.noToolCallExamples', { returnObjects: true })
+      const toolCallDataRaw = t('prompts.optimizeEditPage.sampleData.toolCallExamples', { returnObjects: true })
+      
+      // 默认数据
+      const defaultNoToolCallData = [
+        {
+          inputs_role: '信息提取',
+          inputs_query: '潘之恒（约1536—1621）字景升，号鸾啸生，冰华生，安徽歙县、岩寺人，侨寓金陵（今江苏南京）',
+          label_output: '[潘之恒]',
+        },
+        {
+          inputs_role: '信息提取',
+          inputs_query: '高祖二十二子：窦皇后生建成（李建成）、太宗皇帝（李世民）、玄霸（李玄霸）、元吉（李元吉），万贵妃生智云（李智云），莫嫔生元景（李元景），孙嫔生元昌（李元昌）',
+          label_output: '[李建成, 李世民, 李玄霸, 李元吉, 李智云, 李元景, 李元昌]',
+        },
+      ]
 
-    // 工具调用示例数据
-    const toolCallData = [
-      {
-        inputs_query: '请帮我打开空调',
-        label_tool_calls: '[{ "name": "ac_open", "arguments": {} }]',
-      },
-      {
-        inputs_query: '请帮我关闭空调',
-        label_tool_calls: '[{ "name": "ac_close", "arguments": {} }]',
-      },
-      {
-        inputs_query: '天气太热了，开一下空调',
-        label_tool_calls: '[{ "name": "ac_open", "arguments": {} }]',
-      },
-      {
-        inputs_query: '有点冷，先帮我关窗，再调整到29度',
-        label_tool_calls: '[{ "name": "ac_control", "arguments": { "temperature": 29 } }]',
-      },
-      {
-        inputs_query: '有点热，先帮我开窗，再调整到21度',
-        label_tool_calls: '[{ "name": "ac_control", "arguments": { "temperature": 21 } }]',
-      },
-    ]
+      const defaultToolCallData = [
+        {
+          inputs_query: '请帮我打开空调',
+          label_tool_calls: '[{ "name": "ac_open", "arguments": {} }]',
+        },
+        {
+          inputs_query: '请帮我关闭空调',
+          label_tool_calls: '[{ "name": "ac_close", "arguments": {} }]',
+        },
+      ]
 
-    // 创建工作簿
-    const workbook = XLSX.utils.book_new()
+      // 验证并处理数据：确保是数组，且数组中的每个元素都是对象
+      const validateAndNormalizeData = (data: any, defaultData: any[]): any[] => {
+        // 如果不是数组，使用默认数据
+        if (!Array.isArray(data)) {
+          return defaultData
+        }
+        
+        // 如果数组为空，使用默认数据
+        if (data.length === 0) {
+          return defaultData
+        }
+        
+        // 验证数组中的每个元素都是对象
+        const isValid = data.every(item => item && typeof item === 'object' && !Array.isArray(item))
+        if (!isValid) {
+          return defaultData
+        }
+        
+        // 确保所有值都是字符串或基本类型（XLSX需要）
+        return data.map(item => {
+          const normalized: any = {}
+          for (const key in item) {
+            if (item.hasOwnProperty(key)) {
+              const value = item[key]
+              // 将值转换为字符串，确保XLSX可以处理
+              normalized[key] = value != null ? String(value) : ''
+            }
+          }
+          return normalized
+        })
+      }
 
-    // 创建无工具调用示例工作表
-    const noToolCallWorksheet = XLSX.utils.json_to_sheet(noToolCallData)
-    noToolCallWorksheet['!cols'] = [
-      { wch: 12 }, // inputs_role
-      { wch: 60 }, // inputs_query
-      { wch: 40 }, // label_output
-    ]
-    XLSX.utils.book_append_sheet(workbook, noToolCallWorksheet, '无工具调用示例')
+      const noToolCallData = validateAndNormalizeData(noToolCallDataRaw, defaultNoToolCallData)
+      const toolCallData = validateAndNormalizeData(toolCallDataRaw, defaultToolCallData)
 
-    // 创建工具调用示例工作表
-    const toolCallWorksheet = XLSX.utils.json_to_sheet(toolCallData)
-    toolCallWorksheet['!cols'] = [
-      { wch: 30 }, // inputs_query
-      { wch: 60 }, // label_tool_calls
-    ]
-    XLSX.utils.book_append_sheet(workbook, toolCallWorksheet, '工具调用示例')
+      // 确保工作表名称不超过31个字符（Excel限制）
+      const truncateSheetName = (name: string, maxLength: number = 31): string => {
+        if (typeof name !== 'string') {
+          return 'Sheet'
+        }
+        return name.length > maxLength ? name.substring(0, maxLength) : name
+      }
 
-    // 生成Excel文件并下载
-    XLSX.writeFile(workbook, '数据集范例.xlsx')
+      // 创建工作簿
+      const workbook = XLSX.utils.book_new()
 
-    showSnackbar(t('prompts.optimizeEditPage.messages.datasetExampleDownloaded'), 'success')
+      // 创建无工具调用示例工作表
+      const noToolCallWorksheet = XLSX.utils.json_to_sheet(noToolCallData)
+      noToolCallWorksheet['!cols'] = [
+        { wch: 12 }, // inputs_role
+        { wch: 60 }, // inputs_query
+        { wch: 40 }, // label_output
+      ]
+      const noToolCallSheetName = truncateSheetName(t('prompts.optimizeEditPage.sampleData.noToolCallSheet'))
+      XLSX.utils.book_append_sheet(workbook, noToolCallWorksheet, noToolCallSheetName)
+
+      // 创建工具调用示例工作表
+      const toolCallWorksheet = XLSX.utils.json_to_sheet(toolCallData)
+      toolCallWorksheet['!cols'] = [
+        { wch: 30 }, // inputs_query
+        { wch: 60 }, // label_tool_calls
+      ]
+      const toolCallSheetName = truncateSheetName(t('prompts.optimizeEditPage.sampleData.toolCallSheet'))
+      XLSX.utils.book_append_sheet(workbook, toolCallWorksheet, toolCallSheetName)
+
+      // 生成Excel文件并下载
+      XLSX.writeFile(workbook, t('prompts.optimizeEditPage.sampleData.fileName'))
+
+      showSnackbar(t('prompts.optimizeEditPage.messages.datasetExampleDownloaded'), 'success')
+    } catch (error) {
+      console.error('下载数据集样例时出错:', error)
+      showSnackbar(t('prompts.optimizeEditPage.messages.datasetExampleDownloadError') || '下载数据集样例失败', 'error')
+    }
   }
 
   const handleEditCase = (testCase: TestCase) => {
@@ -3675,7 +3699,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                             padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
                                           }}
                                         >
-                                          编号
+                                          {t('prompts.optimizeEditPage.testCases.number')}
                                         </TableCell>
                                         <TableCell
                                           className="bg-gray-50 font-medium"
@@ -3685,7 +3709,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                             padding: 'clamp(0.25rem, 0.5vw, 0.5rem)',
                                           }}
                                         >
-                                          用例
+                                          {t('prompts.optimizeEditPage.testCases.testCase')}
                                         </TableCell>
                                         <TableCell
                                           width="80"
@@ -4104,7 +4128,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                       height: 'clamp(0.75rem, 1.5vw, 1.25rem)',
                                     }}
                                   />
-                                  <span>优化参数</span>
+                                  <span>{t('prompts.optimizeEditPage.optimizationConfig.optimizationParameters')}</span>
                                 </Typography>
                                 <div style={{ height: 'clamp(0.25rem, 1vw, 1rem)' }}></div>
                                 <div
@@ -4853,7 +4877,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                     marginBottom: 'clamp(0.125rem, 0.5vw, 0.5rem)',
                                   }}
                                 >
-                                  任务执行失败
+                                  {t('prompts.optimizeEditPage.optimizationResult.taskExecutionFailed')}
                                 </Typography>
                                 <Typography
                                   variant="body2"
@@ -4862,7 +4886,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                     fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
                                   }}
                                 >
-                                  {errorMsg ? `失败原因：${errorMsg}` : '暂无失败原因'}
+                                  {errorMsg ? `${t('prompts.optimizeEditPage.optimizationResult.failureReason')}${errorMsg}` : t('prompts.optimizeEditPage.optimizationResult.noFailureReason')}
                                 </Typography>
                               </div>
                             </div>
@@ -5393,274 +5417,17 @@ const PromptOptimizeEditPage: React.FC = () => {
         </div>
 
         {/* 编辑用例抽屉 */}
-        <Drawer
-          anchor="right"
+        <TestCaseEditDrawer
           open={editDialogOpen}
           onClose={() => setEditDialogOpen(false)}
-          PaperProps={{
-            sx: {
-              width: '800px',
-              maxWidth: '90vw',
-              padding: 0,
-            },
-          }}
-        >
-          <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40">
-            {/* 头部 */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200/60 bg-white/60 backdrop-blur-sm">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl shadow-sm">
-                  <Edit className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <Typography variant="h6" className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                    {isViewMode ? t('prompts.optimizeEditPage.testCaseDialog.view') : t('prompts.optimizeEditPage.testCaseDialog.edit')}
-                  </Typography>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Typography variant="body2" className="text-gray-600">
-                      {t('prompts.optimizeEditPage.testCaseDialog.caseId', { id: currentTestCase?.id })}
-                    </Typography>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <IconButton
-                  size="small"
-                  onClick={() => setEditDialogOpen(false)}
-                  sx={{
-                    color: '#6b7280',
-                    '&:hover': {
-                      color: '#ef4444',
-                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    },
-                  }}
-                >
-                  <X className="w-4 h-4" />
-                </IconButton>
-              </div>
-            </div>
-            {/* 编辑表单 */}
-            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              {testCaseDetails.map((detail, index) => (
-                <div key={detail.id} className="bg-white/60 backdrop-blur-sm border border-gray-200/60 rounded-xl shadow-sm">
-                  <div className="flex items-center justify-between p-4 border-b border-gray-200/60 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-                    <div className="flex items-center space-x-3">
-                      <Typography variant="subtitle1" className="font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                        {t('prompts.optimizeEditPage.testCaseDialog.messageNumber', { number: index + 1 })}
-                      </Typography>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Chip
-                        label={detail.role}
-                        size="small"
-                        sx={{
-                          backgroundColor: detail.role === 'inputs' ? '#dbeafe' : '#f0fdf4',
-                          color: detail.role === 'inputs' ? '#1d4ed8' : '#15803d',
-                          fontWeight: 500,
-                          fontSize: '12px',
-                          borderRadius: '6px',
-                        }}
-                      />
-                      {!isViewMode && (
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteDetailRow(detail.id)}
-                          sx={{
-                            color: '#6b7280',
-                            '&:hover': {
-                              color: '#ef4444',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            },
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </IconButton>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    {/* 字段类型显示 */}
-                    <div>
-                      <Typography variant="body2" className="text-gray-700 mb-2 font-medium">
-                        字段类型
-                      </Typography>
-                      <TextField
-                        value={detail.role}
-                        size="small"
-                        fullWidth
-                        disabled={true}
-                        sx={{
-                          backgroundColor: '#f9fafb',
-                          borderRadius: '8px',
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: '8px',
-                            '& fieldset': {
-                              borderColor: '#e5e7eb',
-                            },
-                            '&.Mui-disabled': {
-                              backgroundColor: '#f9fafb',
-                              '& fieldset': {
-                                borderColor: '#e5e7eb',
-                              },
-                            },
-                          },
-                          '& .MuiInputBase-input.Mui-disabled': {
-                            WebkitTextFillColor: '#6b7280',
-                          },
-                        }}
-                      />
-                    </div>
-
-                    {/* 字段名称输入 */}
-                    <div>
-                      <Typography variant="body2" className="text-gray-700 mb-2 font-medium">
-                        字段名称
-                      </Typography>
-                      {detail.role === 'label' ? (
-                        <Select
-                          value={detail.variableName || ''}
-                          onChange={e => handleUpdateDetail(detail.id, 'variableName', e.target.value)}
-                          size="small"
-                          fullWidth
-                          disabled={isViewMode}
-                          displayEmpty
-                          sx={{
-                            backgroundColor: 'white',
-                            borderRadius: '8px',
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: '#e5e7eb',
-                            },
-                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                              borderColor: isViewMode ? '#e5e7eb' : '#3b82f6',
-                            },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                              borderColor: isViewMode ? '#e5e7eb' : '#3b82f6',
-                            },
-                          }}
-                        >
-                          <MenuItem value="output">output</MenuItem>
-                          <MenuItem value="tool_calls">tool_calls</MenuItem>
-                        </Select>
-                      ) : (
-                        <TextField
-                          value={detail.variableName || ''}
-                          onChange={e => handleUpdateDetail(detail.id, 'variableName', e.target.value)}
-                          size="small"
-                          fullWidth
-                          disabled={true}
-                          placeholder="请输入字段名称"
-                          sx={{
-                            backgroundColor: '#f9fafb',
-                            borderRadius: '8px',
-                            '& .MuiOutlinedInput-root': {
-                              borderRadius: '8px',
-                              '& fieldset': {
-                                borderColor: '#e5e7eb',
-                              },
-                              '&.Mui-disabled': {
-                                backgroundColor: '#f9fafb',
-                                '& fieldset': {
-                                  borderColor: '#e5e7eb',
-                                },
-                              },
-                            },
-                            '& .MuiInputBase-input.Mui-disabled': {
-                              WebkitTextFillColor: '#6b7280',
-                            },
-                          }}
-                        />
-                      )}
-                    </div>
-
-                    {/* 字段值输入 */}
-                    <div>
-                      <FieldEditor
-                        label="字段值"
-                        value={detail.content}
-                        fieldType={detail.contentType || 'PlainText'}
-                        placeholder="请输入字段值"
-                        maxLength={2000}
-                        showCharCount={true}
-                        disabled={isViewMode}
-                        allowedTypes={['PlainText', 'Code', 'JSON', 'Markdown']}
-                        onValueChange={value => handleUpdateDetail(detail.id, 'content', value)}
-                        onTypeChange={type => handleUpdateDetail(detail.id, 'contentType', type)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 底部按钮 */}
-            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200/60 bg-white/60 backdrop-blur-sm">
-              <Button
-                variant="outlined"
-                onClick={() => setEditDialogOpen(false)}
-                sx={{
-                  borderColor: '#e5e7eb',
-                  color: '#6b7280',
-                  '&:hover': {
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
-                    color: '#ef4444',
-                  },
-                  borderRadius: '8px',
-                  textTransform: 'none',
-                  fontWeight: 500,
-                  minWidth: '100px',
-                }}
-              >
-                {isViewMode ? t('prompts.optimizeEditPage.testCaseDialog.close') : t('prompts.optimizeEditPage.testCaseDialog.cancel')}
-              </Button>
-              {isViewMode ? (
-                <Button
-                  variant="contained"
-                  onClick={handleSwitchToEditMode}
-                  startIcon={<Edit className="w-4 h-4" />}
-                  sx={{
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
-                    },
-                    transition: 'all 0.2s ease',
-                    borderRadius: '8px',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
-                    minWidth: '100px',
-                  }}
-                >
-                  {t('prompts.optimizeEditPage.testCaseDialog.editButton')}
-                </Button>
-              ) : (
-                <Button
-                  variant="contained"
-                  onClick={handleSaveEdit}
-                  startIcon={<CheckCircle className="w-4 h-4" />}
-                  sx={{
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 8px 25px rgba(59, 130, 246, 0.3)',
-                    },
-                    transition: 'all 0.2s ease',
-                    borderRadius: '8px',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
-                    minWidth: '100px',
-                  }}
-                >
-                  {t('prompts.optimizeEditPage.testCaseDialog.save')}
-                </Button>
-              )}
-            </div>
-          </div>
-        </Drawer>
+          isViewMode={isViewMode}
+          currentTestCase={currentTestCase}
+          testCaseDetails={testCaseDetails}
+          onUpdateDetail={handleUpdateDetail}
+          onDeleteDetailRow={handleDeleteDetailRow}
+          onSaveEdit={handleSaveEdit}
+          onSwitchToEditMode={handleSwitchToEditMode}
+        />
 
         {/* 查看用例对话框 */}
         <Dialog open={viewDialogOpen} onClose={() => setViewDialogOpen(false)} maxWidth="md" fullWidth>
@@ -5841,7 +5608,7 @@ const PromptOptimizeEditPage: React.FC = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={optimizationHistory.map(item => ({
-                    round: `第${item.round}轮`,
+                    round: t('prompts.optimizeEditPage.optimizationConfig.round', { round: item.round }),
                     score: item.score,
                   }))}
                   margin={{ top: 20, right: 30, left: 20, bottom: 20 }}

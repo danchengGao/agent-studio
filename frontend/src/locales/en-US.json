@@ -1421,6 +1421,7 @@
         "jobCreateFailed": "Failed to create optimization task, please try again later",
         "testCasesCleared": "Test cases cleared",
         "datasetExampleDownloaded": "Dataset example downloaded",
+        "datasetExampleDownloadError": "Failed to download dataset example, please try again later",
         "variableJsonError": "Please correct the JSON format error in Variable field",
         "testCasesSaved": "Test cases saved as JSON format",
         "fileFormatError": "Please upload Excel file (.xlsx or .xls format) or CSV file (.csv format)",
@@ -1521,6 +1522,8 @@
         "export": "Export Test Cases",
         "saveAsJson": "Save as JSON Format",
         "caseNumber": "Case Number",
+        "number": "Number",
+        "testCase": "Test Case",
         "role": "Role",
         "content": "Content",
         "variable": "Variable",
@@ -1559,7 +1562,19 @@
         "applyOptimization": "Apply Optimization",
         "noResult": "No optimization result",
         "waitingForOptimization": "Waiting for optimization task to complete",
-        "completeConfigFirst": "Please complete basic information and optimization configuration first"
+        "completeConfigFirst": "Please complete basic information and optimization configuration first",
+        "taskExecutionFailed": "Task execution failed",
+        "failureReason": "Failure reason: ",
+        "noFailureReason": "No failure reason",
+        "loading": "Loading...",
+        "noEvaluationData": "No evaluation data",
+        "userInput": "User Input",
+        "modelAnswer": "Model Answer",
+        "referenceAnswer": "Reference Answer",
+        "modelScore": "Model Score",
+        "scoreReason": "Score Reason",
+        "averageScore": "Average Score: ",
+        "scoreUnit": "points"
       },
       "common": {
         "autoSaving": "Auto saving...",
@@ -1592,7 +1607,61 @@
         "sequenceNumberColumn": "Sequence",
         "roleColumn": "Role",
         "contentColumn": "Content",
-        "variableColumn": "Variable"
+        "variableColumn": "Variable",
+        "fieldType": "Field Type",
+        "fieldName": "Field Name",
+        "fieldNamePlaceholder": "Please enter field name",
+        "fieldValue": "Field Value",
+        "fieldValuePlaceholder": "Please enter field value"
+      },
+      "sampleData": {
+        "fileName": "Dataset_Examples.xlsx",
+        "noToolCallSheet": "No Tool Call Examples",
+        "toolCallSheet": "Tool Call Examples",
+        "noToolCallExamples": [
+          {
+            "inputs_role": "Information Extraction",
+            "inputs_query": "John Smith (born 1985) is an American software engineer from San Francisco, California, currently residing in New York City.",
+            "label_output": "[John Smith]"
+          },
+          {
+            "inputs_role": "Information Extraction",
+            "inputs_query": "The company was founded by Mark Johnson, Sarah Williams, and David Brown in 2010. Later, they hired Emily Davis as CTO and Michael Wilson as CFO.",
+            "label_output": "[Mark Johnson, Sarah Williams, David Brown, Emily Davis, Michael Wilson]"
+          },
+          {
+            "inputs_role": "Information Extraction",
+            "inputs_query": "Dr. Lisa Anderson (1975-present) is a renowned scientist from Boston, Massachusetts. She works alongside her colleague Dr. Robert Taylor.",
+            "label_output": "[Lisa Anderson, Robert Taylor]"
+          },
+          {
+            "inputs_role": "Information Extraction",
+            "inputs_query": "Professor James Wilson, born in Chicago, Illinois, is known for his research. He collaborated with Dr. Maria Garcia from Stanford University.",
+            "label_output": "[James Wilson, Maria Garcia]"
+          }
+        ],
+        "toolCallExamples": [
+          {
+            "inputs_query": "Please turn on the air conditioner",
+            "label_tool_calls": "[{ \"name\": \"ac_open\", \"arguments\": {} }]"
+          },
+          {
+            "inputs_query": "Please turn off the air conditioner",
+            "label_tool_calls": "[{ \"name\": \"ac_close\", \"arguments\": {} }]"
+          },
+          {
+            "inputs_query": "It's too hot, turn on the AC",
+            "label_tool_calls": "[{ \"name\": \"ac_open\", \"arguments\": {} }]"
+          },
+          {
+            "inputs_query": "It's a bit cold, please close the window and set temperature to 75°F",
+            "label_tool_calls": "[{ \"name\": \"ac_control\", \"arguments\": { \"temperature\": 75 } }]"
+          },
+          {
+            "inputs_query": "It's a bit hot, please open the window and set temperature to 70°F",
+            "label_tool_calls": "[{ \"name\": \"ac_control\", \"arguments\": { \"temperature\": 70 } }]"
+          }
+        ]
       },
       "clearDialog": {
         "title": "Confirm Clear Test Cases",
