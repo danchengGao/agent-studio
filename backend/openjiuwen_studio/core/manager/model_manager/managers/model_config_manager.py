@@ -371,6 +371,24 @@ class ModelConfigManager:
             }
         ]
     
+    def get_configs_by_ids(self, model_ids: List[int]) -> List[ModelConfig]:
+        """Batch get model configurations by IDs.
+        
+        Args:
+            model_ids: List of Model IDs
+            
+        Returns:
+            List of Model configuration objects
+        """
+        if not model_ids:
+            return []
+            
+        try:
+            return self.model_repo.get_by_ids(model_ids)
+        except Exception as e:
+            logger.error(f"Failed to batch get model configs: {str(e)}")
+            raise ValidationError(f"Failed to batch get model configs: {str(e)}") from e
+
     def get_paginated_configs(
         self,
         page: int = 1,
