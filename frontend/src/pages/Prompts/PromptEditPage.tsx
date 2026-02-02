@@ -377,11 +377,11 @@ const PromptEditPage: React.FC = () => {
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else if (window.innerWidth < 2000) {
         // 中等屏幕：平板、14寸笔记本等
-        setVersionHistoryHeight('calc(100vh - 140px)')
+        setVersionHistoryHeight('calc(100vh - 120px)')
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else {
         // 大屏幕：15寸以上笔记本、台式显示器
-        setVersionHistoryHeight('calc(100vh - 200px)')
+        setVersionHistoryHeight('calc(100vh - 120px)')
         setChatMessageMaxHeight('calc(100vh - 500px)')
       }
     }
@@ -3223,7 +3223,7 @@ const PromptEditPage: React.FC = () => {
   )
 
   return (
-    <div className={`bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 px-6 ${isNewDashboard ? 'py-6 h-full' : ''}`} style={{ minHeight: '93vh', minWidth: 'fit-content', width: '100%' }}>
+    <div className={`bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 px-6 ${isNewDashboard ? 'py-6 h-full' : ''}`} style={{ minHeight: '93vh', width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
       {/* Page header */}
       <PromptEditHeader
         isNew={isNew}
@@ -3797,7 +3797,7 @@ const PromptEditPage: React.FC = () => {
         </div>
       ) : (
         /* 正常编辑模式 */
-        <div className={`resizable-columns-container flex min-h-[calc(100vh-200px)] gap-0 ${isNewDashboard ? 'h-[calc(100%-72px)]' : ''}`} style={{ minWidth: 'fit-content', width: '100%' }}>
+        <div className={`resizable-columns-container flex min-h-[calc(100vh-150px)] gap-0 ${isNewDashboard ? 'h-[calc(100%-72px)]' : ''}`} style={{ minWidth: 'fit-content', width: '100%' }}>
           {/* Column 1: 编写提示词 */}
           <div style={{ width: `${visibleModules.actualWidths[0]}%` }}>
             <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>

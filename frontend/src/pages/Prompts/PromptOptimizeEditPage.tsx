@@ -2723,8 +2723,9 @@ const PromptOptimizeEditPage: React.FC = () => {
           style={{
             padding: 'clamp(0.5rem, 0.6vw, 0.875rem)',
             minHeight: 'clamp(3.5rem, 4.5vh, 4rem)',
-            minWidth: 'fit-content',
             width: '100%',
+            maxWidth: '100%',
+            overflow: 'hidden',
           }}
         >
           <IconButton
@@ -2753,15 +2754,28 @@ const PromptOptimizeEditPage: React.FC = () => {
             style={{
               gap: 'clamp(0.375rem, 0.5vw, 0.5rem)',
               marginLeft: 'clamp(0.5rem, 0.8vw, 0.875rem)',
+              maxWidth: 'calc(100% - clamp(12rem, 20vw, 18rem))', // 为右侧按钮区域预留空间
+              overflow: 'hidden',
             }}
           >
-            <div className="min-w-0" style={{ maxWidth: '50%', flex: '0 1 auto' }}>
+            <div 
+              className="min-w-0 flex-shrink" 
+              style={{ 
+                maxWidth: '100%',
+                overflow: 'hidden',
+                flex: '1 1 auto',
+              }}
+            >
               <ConditionalTooltip title={isEditMode ? taskName || t('prompts.optimizeEditPage.common.editTask') : t('prompts.optimizeEditPage.common.newTask')}>
                 <h1
-                  className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent truncate"
+                  className="font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent"
                   style={{
                     fontSize: 'clamp(0.875rem, 0.85vw, 1.125rem)',
                     lineHeight: 1.5,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    width: '100%',
                   }}
                 >
                   {isEditMode ? taskName || t('prompts.optimizeEditPage.common.editTask') : t('prompts.optimizeEditPage.common.newTask')}
@@ -2775,11 +2789,15 @@ const PromptOptimizeEditPage: React.FC = () => {
                 }
               >
                 <p
-                  className="text-gray-600 truncate"
+                  className="text-gray-600"
                   style={{
                     fontSize: 'clamp(0.6875rem, 0.65vw, 0.8125rem)',
                     marginTop: 'clamp(0.125rem, 0.1vh, 0.1875rem)',
                     lineHeight: 1.6,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    width: '100%',
                   }}
                 >
                   {isEditMode
@@ -2791,7 +2809,7 @@ const PromptOptimizeEditPage: React.FC = () => {
           </div>
 
           <div
-            className="flex items-center"
+            className="flex items-center flex-shrink-0"
             style={{
               gap: 'clamp(0.5rem, 1vw, 1rem)',
             }}
