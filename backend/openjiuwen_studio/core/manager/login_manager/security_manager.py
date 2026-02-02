@@ -13,7 +13,7 @@ class SecurityManager:
     _FAIL_COUNT_KEY = "auth:fail:count:{email}"
 
     MAX_LOGIN_ATTEMPTS = 5
-    LOCK_TIME = 18000  # 30分钟锁定
+    LOCK_TIME = 1800  # 30分钟锁定
     CODE_EXPIRE = 600 # 10分钟验证码有效
     LIMIT_EXPIRE = 60 # 60秒发送频率限制
 
