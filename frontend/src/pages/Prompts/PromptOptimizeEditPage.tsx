@@ -2761,7 +2761,7 @@ const PromptOptimizeEditPage: React.FC = () => {
             <div 
               className="min-w-0 flex-shrink" 
               style={{ 
-                maxWidth: '100%',
+                maxWidth: '50%',
                 overflow: 'hidden',
                 flex: '1 1 auto',
               }}

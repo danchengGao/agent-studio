@@ -377,11 +377,11 @@ const PromptEditPage: React.FC = () => {
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else if (window.innerWidth < 2000) {
         // 中等屏幕：平板、14寸笔记本等
-        setVersionHistoryHeight('calc(100vh - 120px)')
+        setVersionHistoryHeight('calc(100vh - 140px)')
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else {
         // 大屏幕：15寸以上笔记本、台式显示器
-        setVersionHistoryHeight('calc(100vh - 120px)')
+        setVersionHistoryHeight('calc(100vh - 200px)')
         setChatMessageMaxHeight('calc(100vh - 500px)')
       }
     }
@@ -3797,7 +3797,7 @@ const PromptEditPage: React.FC = () => {
         </div>
       ) : (
         /* 正常编辑模式 */
-        <div className={`resizable-columns-container flex min-h-[calc(100vh-150px)] gap-0 ${isNewDashboard ? 'h-[calc(100%-72px)]' : ''}`} style={{ minWidth: 'fit-content', width: '100%' }}>
+        <div className={`resizable-columns-container flex min-h-[calc(100vh-200px)] gap-0 ${isNewDashboard ? 'h-[calc(100%-72px)]' : ''}`} style={{ minWidth: 'fit-content', width: '100%' }}>
           {/* Column 1: 编写提示词 */}
           <div style={{ width: `${visibleModules.actualWidths[0]}%` }}>
             <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
