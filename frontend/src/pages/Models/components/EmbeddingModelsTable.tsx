@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import { Chip, Typography, Tooltip, Switch } from '@mui/material'
 import { Play, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { ConfigTable } from '@/components/Common/common-table'
@@ -122,7 +123,7 @@ export const EmbeddingModelsTable: React.FC<EmbeddingModelsTableProps> = ({
         width: 170,
         dateFormatter: (value: unknown) => {
           if (!value) return ''
-          return new Date(value as string | number | Date).toLocaleString('zh-CN')
+          return dayjs(value as string | number | Date).format('YYYY-MM-DD HH:mm:ss')
         },
       },
       {

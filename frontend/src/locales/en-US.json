@@ -2197,6 +2197,7 @@
       "validationErrors": {
         "minLength": "At least 1 character required",
         "maxLength": "Maximum {{max}} characters",
+        "maxLengthFallback": "?",
         "required": "This field is required",
         "invalidUrl": "Please enter a valid URL address",
         "invalidEmail": "Please enter a valid email address",
@@ -2204,6 +2205,33 @@
         "invalidFormat": "Invalid format",
         "incorrectFormat": "Incorrect format",
         "formatError": "Format error"
+      },
+      "cannotDeleteModel": "Cannot delete model",
+      "modelInUseByKnowledgeBases": "This model is being used by the following knowledge bases:",
+      "modelInUseHint": "Please remove or update these knowledge bases' model configuration before deleting this model.",
+      "iKnow": "I understand",
+      "apiKeyMaxLength": "API Key length exceeds limit, please keep within 500 characters",
+      "baseUrlMaxLength": "Base URL length exceeds limit, please keep within 100 characters",
+      "llmTestError": {
+        "modelCallFailedCheckConfig": "Model call failed, please check model configuration",
+        "apiKeyOrModelInvalid": "API Key or model ID invalid, please check model configuration",
+        "serviceUnreachable": "Model service address unreachable, please check base URL or network configuration"
+      },
+      "modelTestError": {
+        "testFailed": "Test failed, please check configuration",
+        "modelCallFailedCheckConfig": "Model call failed, please check model configuration",
+        "apiKeyOrModelInvalid": "API Key or model ID invalid, please check model configuration",
+        "serviceUnreachable": "Model service address unreachable, please check base URL or network configuration",
+        "modelNameInvalid": "Model '{{modelName}}' model name is invalid: {{detail}}",
+        "apiKeyInvalid": "Model '{{modelName}}' API key is invalid: {{detail}}",
+        "apiUrlInvalid": "Model '{{modelName}}' API URL is invalid: {{detail}}",
+        "requestParamsInvalid": "Model '{{modelName}}' request parameters are invalid: {{detail}}",
+        "apiServerError": "Model '{{modelName}}' API server error: {{detail}}",
+        "configInvalid": "Model '{{modelName}}' configuration is invalid: {{detail}}",
+        "apiCallFailed": "Model '{{modelName}}' API call failed: {{detail}}",
+        "insufficientQuota": "Model '{{modelName}}' insufficient quota: {{detail}}",
+        "modelNotActive": "Model '{{modelName}}' is not active",
+        "unknownError": "Model test failed: {{detail}}"
       },
       "embeddingModel": {
         "updateFailed": "Failed to update Embedding model",

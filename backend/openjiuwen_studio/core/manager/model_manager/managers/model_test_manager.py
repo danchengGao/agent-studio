@@ -1,4 +1,4 @@
-import time
+async def delete_collectionimport time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -211,6 +211,7 @@ class ModelTester:
             raise ModelTestError(f"Model test exception: {str(e)}") from e
 
     def _map_inference_error_to_user_msg(self, error_message: str) -> str:
+        """Return English messages so frontend can localize via i18n."""
         msg = error_message.lower()
 
         if "401" in msg or "unauthorized" in msg or "'bad request" in msg:

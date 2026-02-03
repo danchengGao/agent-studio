@@ -2182,6 +2182,7 @@
       "validationErrors": {
         "minLength": "最少需要1个字符",
         "maxLength": "最多{{max}}个字符",
+        "maxLengthFallback": "?",
         "required": "此字段为必填项",
         "invalidUrl": "请输入有效的URL地址",
         "invalidEmail": "请输入有效的邮箱地址",
@@ -2189,6 +2190,33 @@
         "invalidFormat": "格式无效",
         "incorrectFormat": "格式不正确",
         "formatError": "格式错误"
+      },
+      "cannotDeleteModel": "无法删除模型",
+      "modelInUseByKnowledgeBases": "该模型正在被以下知识库使用：",
+      "modelInUseHint": "请先删除或修改这些知识库的模型配置，然后才能删除该模型。",
+      "iKnow": "我知道了",
+      "apiKeyMaxLength": "API Key 长度超限，请控制在500字符以内",
+      "baseUrlMaxLength": "Base URL 长度超限，请控制在100字符以内",
+      "llmTestError": {
+        "modelCallFailedCheckConfig": "模型调用失败，请检查模型相关配置",
+        "apiKeyOrModelInvalid": "API Key 或模型 ID 无效，请检查模型配置",
+        "serviceUnreachable": "模型服务地址不可达，请检查模型基础服务地址或网络配置"
+      },
+      "modelTestError": {
+        "testFailed": "测试失败，请检查配置",
+        "modelCallFailedCheckConfig": "模型调用失败，请检查模型相关配置",
+        "apiKeyOrModelInvalid": "API Key 或模型 ID 无效，请检查模型配置",
+        "serviceUnreachable": "模型服务地址不可达，请检查模型基础服务地址或网络配置",
+        "modelNameInvalid": "模型 '{{modelName}}' 的模型名称无效：{{detail}}",
+        "apiKeyInvalid": "模型 '{{modelName}}' 的 API 密钥无效：{{detail}}",
+        "apiUrlInvalid": "模型 '{{modelName}}' 的 API 地址无效：{{detail}}",
+        "requestParamsInvalid": "模型 '{{modelName}}' 的请求参数无效：{{detail}}",
+        "apiServerError": "模型 '{{modelName}}' 的 API 服务器错误：{{detail}}",
+        "configInvalid": "模型 '{{modelName}}' 的配置无效：{{detail}}",
+        "apiCallFailed": "模型 '{{modelName}}' API 调用失败：{{detail}}",
+        "insufficientQuota": "模型 '{{modelName}}' 配额不足：{{detail}}",
+        "modelNotActive": "模型 '{{modelName}}' 未启用",
+        "unknownError": "模型测试失败：{{detail}}"
       },
       "embeddingModel": {
         "updateFailed": "更新 Embedding 模型失败",

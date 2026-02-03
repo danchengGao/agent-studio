@@ -457,7 +457,7 @@ const ModelsPage: React.FC = () => {
                     friendlyMessage = t('models.messages.validationErrors.minLength')
                   } else if (errorDetail.msg?.includes('at most') && errorDetail.msg?.includes('characters')) {
                     const match = errorDetail.msg.match(/at most (\d+) characters/)
-                    const maxLength = match ? match[1] : '限制'
+                    const maxLength = match ? match[1] : t('models.messages.validationErrors.maxLengthFallback')
                     friendlyMessage = t('models.messages.validationErrors.maxLength', { max: maxLength })
                   } else if (errorDetail.msg?.includes('required') || errorDetail.msg?.includes('field required')) {
                     friendlyMessage = t('models.messages.validationErrors.required')
@@ -576,7 +576,7 @@ const ModelsPage: React.FC = () => {
                   friendlyMessage = t('models.messages.validationErrors.minLength')
                 } else if (errorDetail.msg?.includes('at most') && errorDetail.msg?.includes('characters')) {
                   const match = errorDetail.msg.match(/at most (\d+) characters/)
-                  const maxLength = match ? match[1] : '限制'
+                  const maxLength = match ? match[1] : t('models.messages.validationErrors.maxLengthFallback')
                   friendlyMessage = t('models.messages.validationErrors.maxLength', { max: maxLength })
                 } else if (errorDetail.msg?.includes('required') || errorDetail.msg?.includes('field required')) {
                   friendlyMessage = t('models.messages.validationErrors.required')
@@ -752,74 +752,45 @@ const ModelsPage: React.FC = () => {
 
       setSnackbar({
         open: true,
-        message: `测试成功！模型: ${model}，向量维度: ${dimension}，Token 使用: ${usage.total_tokens || 0}`,
+        message: t('models.messages.embeddingModel.testSuccess', {
+          model,
+          dimension,
+          tokens: usage.total_tokens || 0,
+        }),
         severity: 'success',
       })
     } catch (error: any) {
-      // 提取错误信息
       const errorDetail = error?.detail || error?.response?.data?.detail || error?.message || ''
-
-      // 解析后端错误信息并映射到国际化key
-      const parseError = (errorText: string): string => {
-        if (!errorText || typeof errorText !== 'string') {
-          return t('models.messages.embeddingModel.testFailed')
-        }
-
-        // 提取模型名
-        const modelNameMatch = errorText.match(/Embedding model '([^']+)'/i)
+      const raw = String(errorDetail || '')
+      // 后端统一返回英文，按英文匹配后 replace 为当前语言的 i18n
+      if (!raw) {
+        setSnackbar({ open: true, message: t('models.messages.modelTestError.testFailed'), severity: 'error' })
+      } else {
+        const modelNameMatch = raw.match(/Embedding model '([^']+)'/i)
         const modelName = modelNameMatch ? modelNameMatch[1] : ''
-
-        // 检查是否是模型未启用
-        if (errorText.toLowerCase().includes('is not active') || errorText.toLowerCase().includes('not active')) {
-          return t('models.messages.embeddingModel.testError.modelNotActive', { modelName })
+        if (raw.toLowerCase().includes('is not active') || raw.toLowerCase().includes('not active')) {
+          setSnackbar({ open: true, message: t('models.messages.modelTestError.modelNotActive', { modelName }), severity: 'error' })
+        } else {
+          let detail = ''
+          const colonIndex = raw.indexOf(':')
+          if (colonIndex > 0) detail = raw.substring(colonIndex + 1).trim()
+          if (!detail) detail = raw
+          let errorType = 'unknownError'
+          if (raw.includes('model name') && raw.includes('is invalid')) errorType = 'modelNameInvalid'
+          else if (raw.includes('API key') && raw.includes('is invalid')) errorType = 'apiKeyInvalid'
+          else if (raw.includes('API URL') && raw.includes('is invalid')) errorType = 'apiUrlInvalid'
+          else if (raw.includes('request parameters') && raw.includes('is invalid')) errorType = 'requestParamsInvalid'
+          else if (raw.includes('API server') && raw.includes('error')) errorType = 'apiServerError'
+          else if (raw.includes('configuration') && raw.includes('is invalid')) errorType = 'configInvalid'
+          else if (raw.includes('insufficient quota') && raw.includes('is invalid')) errorType = 'insufficientQuota'
+          else if (raw.includes('API call failed')) errorType = 'apiCallFailed'
+          setSnackbar({
+            open: true,
+            message: t(`models.messages.modelTestError.${errorType}`, { modelName, detail }),
+            severity: 'error',
+          })
         }
-
-        // 提取错误类型和详情
-        let errorType = 'unknownError'
-        let detail = ''
-
-        // 提取冒号后的详情部分
-        const colonIndex = errorText.indexOf(':')
-        if (colonIndex > 0) {
-          detail = errorText.substring(colonIndex + 1).trim()
-        }
-
-        if (errorText.includes('model name') && errorText.includes('is invalid')) {
-          errorType = 'modelNameInvalid'
-        } else if (errorText.includes('API key') && errorText.includes('is invalid')) {
-          errorType = 'apiKeyInvalid'
-        } else if (errorText.includes('API URL') && errorText.includes('is invalid')) {
-          errorType = 'apiUrlInvalid'
-        } else if (errorText.includes('request parameters') && errorText.includes('is invalid')) {
-          errorType = 'requestParamsInvalid'
-        } else if (errorText.includes('API server') && errorText.includes('error')) {
-          errorType = 'apiServerError'
-        } else if (errorText.includes('configuration') && errorText.includes('is invalid')) {
-          errorType = 'configInvalid'
-        } else if (errorText.includes('insufficient quota') && errorText.includes('is invalid')) {
-          errorType = 'insufficientQuota'
-        } else if (errorText.includes('API call failed')) {
-          errorType = 'apiCallFailed'
-        }
-
-        // 如果没有提取到详情，使用整个错误文本
-        if (!detail) {
-          detail = errorText
-        }
-
-        // 使用国际化模板
-        const i18nKey = `models.messages.embeddingModel.testError.${errorType}` as const
-        return t(i18nKey, { modelName, detail })
       }
-
-      const errorMessage = parseError(errorDetail)
-
-      // 测试失败后只显示错误信息，不自动禁用模型（与旧版一致）
-      setSnackbar({
-        open: true,
-        message: errorMessage,
-        severity: 'error',
-      })
     } finally {
       setTestingModelId(null)
     }
@@ -883,8 +854,13 @@ const ModelsPage: React.FC = () => {
         errorMessage = error.message
       }
 
+      // 后端统一返回英文，按英文匹配后 replace 为当前语言的 i18n
+      const localizedError = errorMessage
+        .replace(/Model call failed, please check model configuration/gi, t('models.messages.modelTestError.modelCallFailedCheckConfig'))
+        .replace(/API Key or model ID invalid, please check model configuration/gi, t('models.messages.modelTestError.apiKeyOrModelInvalid'))
+        .replace(/Model service address unreachable, please check base URL or network configuration/gi, t('models.messages.modelTestError.serviceUnreachable'))
       setTestResult(
-        `${t('models.testFailed')}: ${errorMessage}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}`,
+        `${t('models.testFailed')}: ${localizedError}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}`,
       )
     } finally {
       setIsTesting(false)
@@ -1166,7 +1142,7 @@ const ModelsPage: React.FC = () => {
                 error={(newModel.name || '').length > 100}
                 helperText={
                   (newModel.name || '').length > 80 ? (
-                    <span style={{ color: 'orange' }}>模型友好名称过长，请控制在100字符以内</span>
+                    <span style={{ color: 'orange' }}>{t('models.modelConfig.basicInfo.nameError')}</span>
                   ) : (
                     <span style={{ color: '#666' }}>
                       {modelType === 'Embedding' ? t('models.modelConfig.basicInfo.embeddingNameHint') : t('models.modelConfig.basicInfo.nameHint')} |{' '}
@@ -1216,7 +1192,7 @@ const ModelsPage: React.FC = () => {
                 error={(newModel.modelId || '').length > 100}
                 helperText={
                   (newModel.modelId || '').length > 80 ? (
-                    <span style={{ color: 'orange' }}>模型标识符过长，请控制在100字符以内</span>
+                    <span style={{ color: 'orange' }}>{t('models.messages.modelIdMaxLength')}</span>
                   ) : (
                     <span style={{ color: '#666' }}>
                       {modelType === 'Embedding' ? t('models.modelConfig.basicInfo.embeddingTypeHint') : t('models.modelConfig.basicInfo.typeHint')} |{' '}
@@ -1250,7 +1226,7 @@ const ModelsPage: React.FC = () => {
                 error={(newModel.apiKey || '').length > 500}
                 helperText={
                   (newModel.apiKey || '').length > 500 ? (
-                    <span style={{ color: 'orange' }}>API Key 长度超限，请控制在500字符以内</span>
+                    <span style={{ color: 'orange' }}>{t('models.messages.apiKeyMaxLength')}</span>
                   ) : (
                     <span style={{ color: '#666' }}>
                       {editMode ? t('models.messages.apiKeyEditHint') : t('models.modelConfig.parameters.apiKeyHint')}: {newModel.apiKey?.length || 0}/500
@@ -1285,7 +1261,7 @@ const ModelsPage: React.FC = () => {
                   baseUrlError ? (
                     <span style={{ color: 'red' }}>{baseUrlError}</span>
                   ) : (newModel.baseUrl || '').length > 100 ? (
-                    <span style={{ color: 'orange' }}>Base URL 长度超限，请控制在100字符以内</span>
+                    <span style={{ color: 'orange' }}>{t('models.messages.baseUrlMaxLength')}</span>
                   ) : (
                     <span style={{ color: '#666' }}>
                       {modelType === 'Embedding' ? t('models.messages.embeddingBaseUrlHint') : t('models.modelConfig.parameters.baseUrlHint')}:{' '}
@@ -1399,7 +1375,7 @@ const ModelsPage: React.FC = () => {
                   error={(newModel.description || '').length > 500} // 只在长度超限时显示红色边框
                   helperText={
                     (newModel.description || '').length > 500 ? (
-                      <span style={{ color: 'orange' }}>描述过长，请控制在500字符以内</span>
+                      <span style={{ color: 'orange' }}>{t('models.messages.descriptionMaxLength')}</span>
                     ) : (
                       <span style={{ color: '#666' }}>
                         {t('models.modelConfig.basicInfo.descriptionLimit')} {newModel.description?.length || 0}/500
@@ -1764,11 +1740,11 @@ const ModelsPage: React.FC = () => {
         itemName={deleteDialog.modelName}
         isLoading={deleteModelMutation.isLoading || deleteEmbeddingModelMutation.isLoading}
         iconType={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? 'warning' : 'danger'}
-        title={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? '无法删除模型' : undefined}
+        title={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? t('models.messages.cannotDeleteModel') : undefined}
         message={
           deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? (
             <div className="space-y-3 text-base text-left">
-              <p className="text-gray-600">该模型正在被以下知识库使用：</p>
+              <p className="text-gray-600">{t('models.messages.modelInUseByKnowledgeBases')}</p>
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 max-h-60 overflow-y-auto">
                 <ul className="list-disc list-inside space-y-1">
                   {deleteDialog.knowledgeBases.map((kbName: string, index: number) => (
@@ -1778,11 +1754,11 @@ const ModelsPage: React.FC = () => {
                   ))}
                 </ul>
               </div>
-              <p className="text-gray-600">请先删除或修改这些知识库的模型配置，然后才能删除该模型。</p>
+              <p className="text-gray-600">{t('models.messages.modelInUseHint')}</p>
             </div>
           ) : undefined
         }
-        confirmButtonText={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? '我知道了' : undefined}
+        confirmButtonText={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? t('models.messages.iKnow') : undefined}
         cancelButtonText={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? undefined : t('common.cancel')}
       />
 
