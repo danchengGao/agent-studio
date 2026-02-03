@@ -90,6 +90,7 @@
       "loading": "加载中...",
       "noDescription": "暂无描述",
       "clickToAddDescription": "点击添加描述",
+      "doubleClickToEdit": "双击编辑",
       "disabled": "已禁用",
       "moreActions": "更多操作",
       "error": "发生错误",

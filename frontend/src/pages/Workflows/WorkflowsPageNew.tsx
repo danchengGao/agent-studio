@@ -267,11 +267,6 @@ const WorkflowsPage: React.FC = () => {
         onSuccess: result => {
           if (result?.code === 200) {
             showSuccess(t('workflows.workflowList.updateSuccess'))
-            if (shouldUseSearch) {
-              refetchSearch()
-            } else {
-              refetch()
-            }
           } else {
             showError(result?.message || t('workflows.workflowList.updateFailed'))
           }

@@ -221,24 +221,39 @@ export const useDeleteWorkflow = () => {
   })
 }
 
-// 更新工作流
 export const useUpdateWorkflow = () => {
   const queryClient = useQueryClient()
 
   return useMutation((request: UpdateWorkflowRequest) => WorkflowService.updateWorkflow(request), {
-    onSuccess: (response: WorkflowUpdateResponse, variables) => {
+    onSuccess: (response, request) => {
       if (response.code === 200) {
-        // 更新成功后，使工作流列表缓存失效，触发重新获取
-        queryClient.invalidateQueries(['workflows', 'api', 'list'], { predicate: query => query.queryKey[3]?.space_id === variables.space_id })
-        console.log('工作流更新成功')
-        // 可以在这里添加成功提示
-        return { success: true, message: response.message }
+        const updater = (oldData: unknown) => {
+          type CachedData = { data?: { workflow_list?: any[] }, code?: number, message?: string }
+          const cached = oldData as CachedData | undefined
+          
+          if (!cached?.data?.workflow_list) return oldData
+          
+          const updates: any = {}
+          if (request.name !== undefined) updates.name = request.name
+          if (request.desc !== undefined) updates.desc = request.desc
+          
+          return {
+            ...cached,
+            data: {
+              ...cached.data,
+              workflow_list: cached.data.workflow_list.map(workflow =>
+                workflow.workflow_id === request.workflow_id ? { ...workflow, ...updates } : workflow
+              ),
+            },
+          }
+        }
+        
+        queryClient.setQueriesData({ queryKey: ['workflows', 'api', 'list'], exact: false }, updater)
+        queryClient.setQueriesData({ queryKey: ['workflows', 'search'], exact: false }, updater)
       }
     },
     onError: error => {
       console.error('更新工作流失败:', error)
-      // 可以在这里添加失败提示
-      return { success: false, message: '更新工作流失败，请稍后重试' }
     },
   })
 }

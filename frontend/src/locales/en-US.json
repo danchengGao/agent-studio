@@ -90,6 +90,7 @@
       "loading": "Loading...",
       "noDescription": "No description",
       "clickToAddDescription": "Click to add description",
+      "doubleClickToEdit": "Double-click to edit",
       "disabled": "Disabled",
       "moreActions": "More actions",
       "error": "An error occurred",

@@ -296,11 +296,12 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
       <Card
         className={className}
         onClick={() => {
-        if (!isEditingThis && !isMenuOpen) {
+        if (!isMenuOpen) {
           if (clickTimeoutRef.current) {
             clearTimeout(clickTimeoutRef.current)
           }
           clickTimeoutRef.current = setTimeout(() => {
+            if (window.getSelection()?.toString().trim()) return
             onClick?.()
           }, 200)
         }
@@ -325,7 +326,6 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
                       onCancelEdit?.()
                     }
                   }}
-                  onBlur={onSaveEdit}
                   maxLength={nameMaxLength}
                   className="w-full px-2 py-1 pr-16 text-[14px] font-bold text-[#1F2937] leading-[24px] h-[24px] border border-[#3B82F6] rounded-[4px] focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
                   disabled={isUpdating}
@@ -364,13 +364,13 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1 h-[24px]">
-              <h3
-                className="text-[#1F2937] font-bold text-[14px] leading-[24px] truncate cursor-text"
-                onMouseDown={handleFieldMouseDown('name')}
-                onDoubleClick={handleFieldDoubleClick('name')}
-                title={title}
-              >
+            <div
+              className={`flex items-center gap-1 h-[24px] min-w-0 flex-1 ${onEdit ? 'cursor-text' : ''}`}
+              onMouseDown={onEdit ? handleFieldMouseDown('name') : undefined}
+              onDoubleClick={onEdit ? handleFieldDoubleClick('name') : undefined}
+              title={onEdit ? `${t('common.messages.doubleClickToEdit')}` : undefined}
+            >
+              <h3 className="text-[#1F2937] font-bold text-[14px] leading-[24px] truncate min-w-0">
                 {title}
               </h3>
               {titleExtra}
@@ -400,7 +400,6 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
                       onCancelEdit?.()
                     }
                   }}
-                  onBlur={onSaveEdit}
                   maxLength={descriptionMaxLength}
                   className="config-card-scrollbar w-full px-2 py-1 pr-16 text-xs text-[#6B7280] border border-[#3B82F6] rounded-[4px] focus:outline-none focus:ring-1 focus:ring-[#3B82F6] resize-none overflow-y-auto"
                   style={{
@@ -448,10 +447,10 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
             </div>
           ) : (
             <p
-              className="text-[#6B7280] text-xs leading-relaxed line-clamp-2 overflow-hidden h-[39px] cursor-text whitespace-pre-line break-words"
-              onMouseDown={handleFieldMouseDown('description')}
-              onDoubleClick={handleFieldDoubleClick('description')}
-              title={description || t('common.messages.clickToAddDescription')}
+              className={`text-[#6B7280] text-xs leading-relaxed line-clamp-2 overflow-hidden h-[39px] whitespace-pre-line break-words ${onEdit ? 'cursor-text' : ''}`}
+              onMouseDown={onEdit ? handleFieldMouseDown('description') : undefined}
+              onDoubleClick={onEdit ? handleFieldDoubleClick('description') : undefined}
+              title={onEdit ? `${t('common.messages.doubleClickToEdit')}` : undefined}
             >
               {description || t('common.messages.noDescription')}
             </p>
