@@ -29,8 +29,8 @@ export const SVG_NS = 'http://www.w3.org/2000/svg'
 
 /** viewBox padding配置 */
 export const VIEWBOX_PADDING = {
-  top: 25,
-  bottom: 25,
-  left: 10,
-  right: 10,
+  top: 16,
+  bottom: 4,
+  left: 20,
+  right: 20,
 } as const

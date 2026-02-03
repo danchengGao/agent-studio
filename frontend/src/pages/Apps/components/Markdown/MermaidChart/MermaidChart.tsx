@@ -137,7 +137,7 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
   return (
     <div
       ref={ref}
-      className="flex justify-center items-center my-6 overflow-x-auto p-4 rounded-lg bg-white dark:bg-slate-800"
+      className="flex justify-center items-center overflow-x-auto rounded-lg bg-white dark:bg-slate-800"
       style={{ minHeight: '100px' }}
     />
   )

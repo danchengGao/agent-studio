@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
+import rehypeRaw from 'rehype-raw'
 import 'katex/dist/katex.min.css'
 import type { Components } from 'react-markdown'
 import type { MarkdownProps } from './types'
@@ -105,7 +106,11 @@ export const MarkdownRenderer: React.FC<{
   }, [citations, instanceId])
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]} rehypePlugins={[rehypeKatex]} components={defaultComponents}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
+      rehypePlugins={[rehypeRaw, rehypeKatex]}
+      components={defaultComponents}
+    >
       {content}
     </ReactMarkdown>
   )
