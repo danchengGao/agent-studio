@@ -51,12 +51,12 @@ const LoadingReportCard: React.FC<{
           <div className="flex-1 min-w-0">
             {/* 标题 */}
             <div className="text-sm font-semibold truncate text-gray-800">
-              {t('apps.deepSearch.report.generating')}
+              {t('apps.deepSearch.finalReportStatus.generating')}
             </div>
 
             {/* 提示信息 */}
             <div className="mt-1.5 text-xs text-gray-600">
-              {t('apps.deepSearch.report.summarizing')}
+              {t('apps.deepSearch.finalReportStatus.summarizing')}
             </div>
           </div>
         </div>
@@ -84,11 +84,18 @@ const ErrorReportCard: React.FC<{
 }> = ({ errorType, exceptionInfo, depth }) => {
   const { t } = useTranslation();
 
+  // 判断是否为开发模式，开发模式显示详细异常信息
+  const isDevMode = import.meta.env.DEV;
+
   const getErrorMessage = () => {
     if (errorType === 'exception_only') {
-      return exceptionInfo || t('apps.deepSearch.report.unknownError');
+      // 开发模式：显示详细异常信息；生产模式：显示通用错误提示
+      if (isDevMode && exceptionInfo) {
+        return exceptionInfo;
+      }
+      return t('apps.deepSearch.finalReportStatus.unknownError');
     }
-    return t('apps.deepSearch.report.bothEmpty');
+    return t('apps.deepSearch.finalReportStatus.bothEmpty');
   };
 
   return (
@@ -121,7 +128,7 @@ const ErrorReportCard: React.FC<{
           <div className="flex-1 min-w-0">
             {/* 标题 */}
             <div className="text-sm font-semibold truncate text-red-800">
-              {t('apps.deepSearch.report.failed')}
+              {t('apps.deepSearch.finalReportStatus.failed')}
             </div>
 
             {/* 错误信息 */}

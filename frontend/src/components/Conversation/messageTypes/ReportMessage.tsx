@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Message, TaskStatus, MessageType } from '../../../stores/useConversationStore';
+import { Message, TaskStatus, MessageType, isFinalReportMessage } from '../../../stores/useConversationStore';
 import { useConversationStore } from '../../../stores/useConversationStore';
 import {
   ChevronDown,
@@ -303,7 +303,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
   const getChildMessages = useConversationStore((state) => state.getChildMessages);
 
   // 判断是否为最终报告
-  const isFinalReport = message.title === t('apps.deepSearch.finalReport');
+  const isFinalReport = isFinalReportMessage(message.title);
 
   // 如果是最终报告，使用DeepSearchReportCard组件
   if (isFinalReport) {

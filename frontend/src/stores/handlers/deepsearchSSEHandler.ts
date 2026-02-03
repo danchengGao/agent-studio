@@ -4,6 +4,8 @@ import {
   Message,
   MessageItems,
   JSONObject,
+  MESSAGE_TITLES,
+  isFinalReportMessage,
 } from '../useConversationStore';
 import i18n from '@/i18n';
 
@@ -642,7 +644,7 @@ export class DeepsearchSSEHandler {
               outlineTask.id,
               MessageType.REPORT,  // 修正：应该是 REPORT 类型
               content || '',
-              i18n.t('deepResearch.handler.finalReport')
+              MESSAGE_TITLES.FINAL_REPORT
             );
             updateMessage(lastMessageItems.id, finalReportTask.id, {
               status: TaskStatus.COMPLETED,
@@ -865,7 +867,7 @@ export class DeepsearchSSEHandler {
               MessageType.REPORT,
               '',  // 初始 content 为空
               undefined,  // parentId 为 undefined，与 outline_task 同级
-              i18n.t('deepResearch.handler.finalReport'),
+              MESSAGE_TITLES.FINAL_REPORT,
               'deepsearch'  // agent 类型
             );
             updateMessage(lastMessageItems.id, finalReportMessage.id, {
@@ -903,7 +905,7 @@ export class DeepsearchSSEHandler {
           .filter(msg =>
             msg.type === MessageType.REPORT &&
             (msg.status === TaskStatus.PENDING || msg.status === TaskStatus.IN_PROGRESS) &&
-            msg.title === i18n.t('deepResearch.handler.finalReport') &&
+            isFinalReportMessage(msg.title) &&
             !msg.parentMessageId  // ← 确保是顶级 message
           )
           .pop();  // 取最后一个
@@ -922,7 +924,7 @@ export class DeepsearchSSEHandler {
             MessageType.REPORT,
             endData || '',
             undefined,  // 与 outline_task 同级
-            i18n.t('deepResearch.handler.finalReport'),
+            MESSAGE_TITLES.FINAL_REPORT,
             'deepsearch'  // agent 类型
           );
           updateMessage(lastMessageItems.id, finalReportMessage.id, {
@@ -936,12 +938,11 @@ export class DeepsearchSSEHandler {
       // "ALL END" 标识 (第8点)
       if (sseData.content === 'ALL END') {
         // 1. 检查最终报告状态
-        const finalReportTitle = i18n.t('apps.deepSearch.finalReport');
         const finalReportMessage = lastMessageItems.messagesIds
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            msg.title === finalReportTitle &&
+            isFinalReportMessage(msg.title) &&
             !msg.parentMessageId
           );
 
@@ -976,7 +977,7 @@ export class DeepsearchSSEHandler {
             updateMessage(lastMessageItems.id, finalReportMessage.id, {
               content: {
                 response_content: '',
-                exception_info: i18n.t('apps.deepSearch.report.noDataError'),
+                exception_info: i18n.t('apps.deepSearch.finalReportStatus.noDataError'),
                 citation_messages: null,
               } as JSONObject,
             });
@@ -1050,7 +1051,7 @@ export class DeepsearchSSEHandler {
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            msg.title === i18n.t('deepResearch.handler.finalReport') &&
+            isFinalReportMessage(msg.title) &&
             !msg.parentMessageId  // ← 确保是顶级 message
           );
 
@@ -1066,7 +1067,7 @@ export class DeepsearchSSEHandler {
             MessageType.REPORT,
             errorData,
             undefined,
-            i18n.t('apps.deepSearch.finalReport'),
+            MESSAGE_TITLES.FINAL_REPORT,
             'deepsearch'  // agent 类型
           );
           updateMessage(lastMessageItems.id, newReport.id, {

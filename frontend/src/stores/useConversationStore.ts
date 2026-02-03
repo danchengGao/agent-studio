@@ -39,6 +39,31 @@ export enum AgentType {
   DEEPSEARCH = 'deepsearch', // 深度研究
 }
 
+// ===== 消息标题常量 =====
+// 用于程序判断，与语言环境无关
+export const MESSAGE_TITLES = {
+  FINAL_REPORT: 'FINAL_REPORT',
+} as const;
+
+// ===== 兼容性：历史标题 =====
+// 用于识别已生成的旧数据（使用国际化文本作为标题）
+const LEGACY_FINAL_REPORT_TITLES = ['最终报告', 'Final Report'] as const;
+
+/**
+ * 判断消息是否为最终报告
+ * 兼容新旧数据：
+ * - 新数据：使用 MESSAGE_TITLES.FINAL_REPORT（'FINAL_REPORT'）
+ * - 旧数据：使用国际化文本（'最终报告'、'Final Report'）
+ *
+ * @param title - 消息标题
+ * @returns 是否为最终报告
+ */
+export function isFinalReportMessage(title: string | undefined): boolean {
+  if (!title) return false;
+  return title === MESSAGE_TITLES.FINAL_REPORT ||
+         LEGACY_FINAL_REPORT_TITLES.includes(title as any);
+}
+
 
 export interface LinkContent {
   url: string;                 // 链接地址

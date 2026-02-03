@@ -9,7 +9,7 @@ interface TextContentCardProps {
 }
 
 /**
- * TextContentCard组件：显示TEXT类型的message
+ * TextContentCard组件：显示类型为TEXT的Task message
  * 包含title和content两部分
  */
 export const TextContentCard: React.FC<TextContentCardProps> = ({ message, depth }) => {
