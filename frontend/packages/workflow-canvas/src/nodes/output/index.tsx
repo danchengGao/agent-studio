@@ -22,10 +22,10 @@ export const OutputNodeRegistry: FlowNodeRegistry = {
     // 确保节点在面板中可见
     nodePanelVisible: true,
   },
-  info: {
+  info: () => ({
     icon: <Download size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.output.description'),
-  },
+  }),
   formMeta,
   onAdd(context?) {
     const titlePrefix = t('workflowCanvas.nodes.output.titlePrefix')

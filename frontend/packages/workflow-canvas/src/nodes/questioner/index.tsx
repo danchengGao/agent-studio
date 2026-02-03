@@ -14,10 +14,10 @@ import { generateNodeTitle } from '../../utils/workflow-node-utils'
 
 export const QuestionerNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Questioner,
-  info: {
+  info: () => ({
     icon: <HelpCircle size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.questioner.description'),
-  },
+  }),
   meta: {
     defaultPorts: [{ type: 'input' }, { type: 'output' }],
     size: {

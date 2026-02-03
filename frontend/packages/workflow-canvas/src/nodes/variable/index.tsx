@@ -14,10 +14,10 @@ import { t } from '../../i18n'
 
 export const VariableNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Variable,
-  info: {
+  info: () => ({
     icon: <Key size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.variable.description'),
-  },
+  }),
   meta: {
     size: {
       width: 360,

@@ -14,10 +14,10 @@ import { generateNodeTitle } from '../../utils/workflow-node-utils'
 
 export const VariableMergeNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.VariableMerge,
-  info: {
+  info: () => ({
     icon: <Merge size={16} className="text-purple-600" />,
     description: t('workflowCanvas.nodes.variableMerge.description'),
-  },
+  }),
   meta: {
     size: {
       width: 360,

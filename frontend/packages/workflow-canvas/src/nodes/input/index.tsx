@@ -20,10 +20,10 @@ export const InputNodeRegistry: FlowNodeRegistry = {
       height: 211,
     },
   },
-  info: {
+  info: () => ({
     icon: <MousePointerClick size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.input.description'),
-  },
+  }),
   /**
    * Render node via formMeta
    */

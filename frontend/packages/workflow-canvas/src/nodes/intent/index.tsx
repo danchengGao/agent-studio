@@ -23,10 +23,10 @@ export const IntentNodeRegistry: FlowNodeRegistry = {
       height: 280,
     },
   },
-  info: {
+  info: () => ({
     icon: <Target size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.intent.description'),
-  },
+  }),
   /**
    * 通过 formMeta 渲染节点
    */

@@ -23,10 +23,10 @@ export const ContinueNodeRegistry: FlowNodeRegistry = {
     },
     onlyInContainer: WorkflowNodeType.Loop,
   },
-  info: {
+  info: () => ({
     icon: <SkipForward size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.continue.description'),
-  },
+  }),
   /**
    * Render node via formMeta
    */

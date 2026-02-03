@@ -15,10 +15,10 @@ import { generateNodeTitle } from '../../utils/workflow-node-utils'
 
 export const LLMNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.LLM,
-  info: {
+  info: () => ({
     icon: <Sparkles size={16} className="text-purple-600" />,
     description: t('workflowCanvas.nodes.llm.description'),
-  },
+  }),
   meta: {
     size: {
       width: 400, // Increased from 360 to accommodate wider labels

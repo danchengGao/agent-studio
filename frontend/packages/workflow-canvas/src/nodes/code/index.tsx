@@ -14,10 +14,10 @@ import { generateNodeTitle } from '../../utils/workflow-node-utils'
 
 export const CodeNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Code,
-  info: {
+  info: () => ({
     icon: <Code size={16} className="text-emerald-600" />,
     description: t('workflowCanvas.nodes.code.description'),
-  },
+  }),
   meta: {
     defaultPorts: [{ type: 'input' }],
     useDynamicPort: true,

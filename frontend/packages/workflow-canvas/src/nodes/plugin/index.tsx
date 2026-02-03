@@ -237,10 +237,10 @@ export const PluginNodeRegistry: FlowNodeRegistry = {
     singleComponentDebug: true,
   },
   formMeta: pluginFormMeta,
-  info: {
+  info: () => ({
     icon: <Plug size={16} className="text-green-600" />,
     description: t('workflowCanvas.nodes.plugin.description'),
-  },
+  }),
   // 使用异步方法，支持多选插件创建多个节点
   onAdd: async (ctx: FreeLayoutPluginContext) => {
     try {

@@ -23,10 +23,10 @@ export const BreakNodeRegistry: FlowNodeRegistry = {
     },
     onlyInContainer: WorkflowNodeType.Loop,
   },
-  info: {
+  info: () => ({
     icon: <XCircle size={16} className="text-red-600" />,
     description: t('workflowCanvas.nodes.break.description'),
-  },
+  }),
   /**
    * Render node via formMeta
    */

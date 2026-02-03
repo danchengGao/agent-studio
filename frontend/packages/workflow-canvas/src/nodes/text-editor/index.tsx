@@ -21,10 +21,10 @@ export const TextEditorNodeRegistry: FlowNodeRegistry = {
     },
     singleComponentDebug: true,
   },
-  info: {
+  info: () => ({
     icon: <FileText size={16} className="text-green-600" />,
     description: t('workflowCanvas.nodes.textEditor.description'),
-  },
+  }),
   /**
    * Render node via formMeta
    */

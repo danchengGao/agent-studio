@@ -306,10 +306,10 @@ export const WorkflowNodeRegistry: FlowNodeRegistry = {
     },
     singleComponentDebug: true,
   },
-  info: {
+  info: () => ({
     icon: <GitFork size={16} className="text-blue-600" />,
     description: t('workflowCanvas.nodes.subWorkflow.description'),
-  },
+  }),
   formMeta,
   // 使用异步方法，支持多选工作流创建多个节点
   onAdd: async (ctx: FreeLayoutPluginContext) => {

@@ -16,10 +16,10 @@ import { generateNodeTitle } from '../../utils/workflow-node-utils'
 
 export const LoopNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Loop,
-  info: {
+  info: () => ({
     icon: <RotateCcw size={16} className="text-cyan-600" />,
     description: t('workflowCanvas.nodes.loop.description'),
-  },
+  }),
   meta: {
     /**
      * Mark as subcanvas

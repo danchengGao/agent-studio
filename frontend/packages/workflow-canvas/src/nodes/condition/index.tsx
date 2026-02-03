@@ -14,10 +14,10 @@ import { generateNodeTitle } from '../../utils/workflow-node-utils'
 
 export const ConditionNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Condition,
-  info: {
+  info: () => ({
     icon: <GitBranch size={16} className="text-orange-600" />,
     description: t('workflowCanvas.nodes.condition.description'),
-  },
+  }),
   meta: {
     defaultPorts: [{ type: 'input' }],
     useDynamicPort: true,
