@@ -15,16 +15,15 @@ import {
 // 工作流相关的React Query hooks
 
 // 从API获取工作流列表
-export const useWorkflows = (request: WorkflowListRequest) => {
+export const useWorkflows = (request: WorkflowListRequest, options?: { staleTime?: number; refetchOnMount?: boolean | 'always' }) => {
   return useQuery(['workflows', 'api', 'list', request], () => WorkflowService.getWorkflows(request), {
     enabled: !!request.space_id, // 只有当space_id存在时才执行查询
 
-    // 🎯 禁用缓存，确保搜索、排序、过滤时都重新请求
-    staleTime: 0, // 数据立即过期，每次参数改变时都重新请求
+    staleTime: options?.staleTime ?? 0, // 默认数据立即过期，每次参数改变时都重新请求
     cacheTime: 5 * 60 * 1000, // 保留缓存时间用于内存管理（组件卸载后保留5分钟）
 
     // 🎯 添加自动刷新机制
-    refetchOnMount: true, // 组件挂载时重新获取数据
+    refetchOnMount: options?.refetchOnMount ?? true, // 默认组件挂载时重新获取数据，可由调用方覆盖
     refetchOnWindowFocus: false, // 窗口重新聚焦时不重新获取数据
     refetchOnReconnect: true, // 网络重连时重新获取数据
 
@@ -277,12 +276,11 @@ export const useCopyWorkflow = () => {
 }
 
 // 搜索工作流
-export const useSearchWorkflows = (request: WorkflowSearchRequest, options?: { enabled?: boolean }) => {
+export const useSearchWorkflows = (request: WorkflowSearchRequest, options?: { enabled?: boolean; staleTime?: number }) => {
   return useQuery(['workflows', 'search', request], () => WorkflowService.searchWorkflows(request), {
     enabled: options?.enabled !== false && !!request.space_id && request.search_term.trim() !== '', // 只有当enabled为true且space_id存在且有搜索词时才执行查询
 
-    // 🎯 禁用缓存，确保搜索、排序、过滤时都重新请求
-    staleTime: 0, // 数据立即过期，每次参数改变时都重新请求
+    staleTime: options?.staleTime ?? 0, // 默认数据立即过期，每次参数改变时都重新请求
     cacheTime: 3 * 60 * 1000, // 保留缓存时间用于内存管理（组件卸载后保留3分钟）
 
     // 🎯 搜索优化的自动刷新机制

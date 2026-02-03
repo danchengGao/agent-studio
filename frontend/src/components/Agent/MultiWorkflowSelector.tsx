@@ -375,7 +375,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                 {workflowObjects.length}
               </span>
               {workflowValidationErrorCount > 0 && (
-                <Tooltip title={`所选工作流存在校验不通过（${workflowValidationErrorCount} 个），请跳转对应工作流进行修改`} arrow>
+                <Tooltip title={t('workflowValidation.tooltip', { count: workflowValidationErrorCount })} arrow>
                   <span className="inline-flex items-center ml-2">
                     <AlertCircle className="w-[20px] h-[20px] text-red-500" />
                   </span>
@@ -397,9 +397,9 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                   <SettingsIcon fontSize="small" />
                 </IconButton>
               </Tooltip> */}
-              <Tooltip title="刷新工作流信息" arrow>
+              <Tooltip title={t('refreshWorkflows.tooltip')} arrow>
                 <span>
-                  <IconButton size="small" onClick={handleRefreshWorkflows} disabled={workflowObjects.length === 0} aria-label="刷新">
+                  <IconButton size="small" onClick={handleRefreshWorkflows} disabled={workflowObjects.length === 0} aria-label={t('refreshWorkflows.ariaLabel')}>
                     <RefreshCcw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
                   </IconButton>
                 </span>

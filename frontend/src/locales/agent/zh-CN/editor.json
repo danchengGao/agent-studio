@@ -322,7 +322,10 @@
           "versionLabel": "关联版本：",
           "emptyText": "未添加工作流，可点击右上角进行添加",
           "settingsTitle": "设置",
-          "deleteTitle": "删除"
+          "deleteTitle": "删除",
+          "validating": "校验中...",
+          "validationFailedTooltip": "工作流校验失败，请跳转对应的工作流进行修改",
+          "validationFailedAria": "工作流校验失败"
         }
       },
       "knowledgeBaseSelector": {
@@ -386,6 +389,14 @@
         },
         "errors": {
           "executeFailed": "执行失败"
+        },
+        "interactionMessage": {
+          "submitted": "已提交",
+          "expired": "已失效",
+          "fillAndSubmit": "请在此卡片中填写并提交",
+          "inputPlaceholder": "请输入...",
+          "clearInputAria": "清空输入",
+          "submit": "提交"
         }
       },
       "agentDebugPanel": {
@@ -549,6 +560,13 @@
       "title": "对话设置",
       "description": "设置工作流执行时携带的最大消息轮数",
       "maxRoundsLabel": "最大消息轮数"
+    },
+    "workflowValidation": {
+      "tooltip": "所选工作流存在校验不通过（{{count}} 个），请跳转对应工作流进行修改"
+    },
+    "refreshWorkflows": {
+      "tooltip": "刷新工作流信息",
+      "ariaLabel": "刷新"
     }
   }
 }

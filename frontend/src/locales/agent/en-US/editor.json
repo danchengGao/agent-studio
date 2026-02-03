@@ -322,7 +322,10 @@
           "versionLabel": "Version:",
           "emptyText": "No workflows added yet. Click the button in the upper right to add.",
           "settingsTitle": "Settings",
-          "deleteTitle": "Delete"
+          "deleteTitle": "Delete",
+          "validating": "Validating...",
+          "validationFailedTooltip": "Workflow validation failed. Please go to the corresponding workflow to fix it.",
+          "validationFailedAria": "Workflow validation failed"
         }
       },
       "knowledgeBaseSelector": {
@@ -386,6 +389,14 @@
         },
         "errors": {
           "executeFailed": "Execution failed"
+        },
+        "interactionMessage": {
+          "submitted": "Submitted",
+          "expired": "Expired",
+          "fillAndSubmit": "Please fill in and submit in this card",
+          "inputPlaceholder": "Please enter...",
+          "clearInputAria": "Clear input",
+          "submit": "Submit"
         }
       },
       "agentDebugPanel": {
@@ -549,6 +560,13 @@
       "title": "Conversation Settings",
       "description": "Configure the maximum number of message turns carried during workflow execution.",
       "maxRoundsLabel": "Max message turns"
+    },
+    "workflowValidation": {
+      "tooltip": "Some workflows failed validation ({{count}}). Please go to the corresponding workflow(s) to fix."
+    },
+    "refreshWorkflows": {
+      "tooltip": "Refresh workflow info",
+      "ariaLabel": "Refresh"
     }
   }
 }
