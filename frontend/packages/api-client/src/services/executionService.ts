@@ -1,4 +1,4 @@
-import { getApiClient, getToken } from '../utils/apiClientFactory'
+import { getApiClient, getToken, getAcceptLanguage } from '../utils/apiClientFactory'
 import { API_ENDPOINTS } from '../config'
 import {
   WorkflowExecutionRequest,
@@ -157,6 +157,7 @@ export class ExecutionService {
           Accept: 'text/event-stream',
           'Cache-Control': 'no-cache',
           Authorization: `Bearer ${getToken() || ''}`,
+          'Accept-Language': getAcceptLanguage(),
         },
         body: JSON.stringify(request),
         credentials: 'include',

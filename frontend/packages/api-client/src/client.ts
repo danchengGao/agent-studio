@@ -112,7 +112,14 @@ const createApiClient = (
       if (languageProvider) {
         const language = languageProvider()
         if (language) {
-          config.headers['Accept-Language'] = language
+          // 设置语言优先级，选中的语言权重为1.0，其他语言为0.5
+          if (language === 'en-US') {
+            config.headers['Accept-Language'] = 'en-US;q=1.0, zh-CN;q=0.5'
+          } else if (language === 'zh-CN') {
+            config.headers['Accept-Language'] = 'zh-CN;q=1.0, en-US;q=0.5'
+          } else {
+            config.headers['Accept-Language'] = language
+          }
         }
       }
 
@@ -355,17 +362,17 @@ const createApiError = (error: AxiosError<ErrorResponse>, type: string): Error =
 // 获取HTTP状态码文本
 const getHttpStatusText = (status: number): string => {
   const statusTexts: Record<number, string> = {
-    [HTTP_STATUS.BAD_REQUEST]: '请求参数错误',
-    [HTTP_STATUS.UNAUTHORIZED]: '未授权访问',
-    [HTTP_STATUS.FORBIDDEN]: '禁止访问',
-    [HTTP_STATUS.NOT_FOUND]: '资源不存在',
-    [HTTP_STATUS.CONFLICT]: '资源冲突',
-    [HTTP_STATUS.UNPROCESSABLE_ENTITY]: '请求数据验证失败',
-    [HTTP_STATUS.INTERNAL_SERVER_ERROR]: '服务器内部错误',
-    [HTTP_STATUS.BAD_GATEWAY]: '网关错误',
-    [HTTP_STATUS.SERVICE_UNAVAILABLE]: '服务不可用',
+    [HTTP_STATUS.BAD_REQUEST]: 'request parameter error',
+    [HTTP_STATUS.UNAUTHORIZED]: 'unauthorized access',
+    [HTTP_STATUS.FORBIDDEN]: 'forbidden access',
+    [HTTP_STATUS.NOT_FOUND]: 'resource not found',
+    [HTTP_STATUS.CONFLICT]: 'resource conflict',
+    [HTTP_STATUS.UNPROCESSABLE_ENTITY]: 'request data validation failed',
+    [HTTP_STATUS.INTERNAL_SERVER_ERROR]: 'internal server error',
+    [HTTP_STATUS.BAD_GATEWAY]: 'bad gateway',
+    [HTTP_STATUS.SERVICE_UNAVAILABLE]: 'service unavailable',
   }
-  return statusTexts[status] || '未知错误'
+  return statusTexts[status] || 'unknown error'
 }
 
 // 生成请求ID

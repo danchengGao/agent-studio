@@ -37,7 +37,7 @@ export class AgentService {
     } catch (error) {
       // API调用失败时抛出错误，不再返回mock响应
       console.error('获取智能体列表API调用失败:', error)
-      throw new Error(`获取智能体列表失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      throw new Error(`get agent list failed: ${error instanceof Error ? error.message : 'unknown error'}`)
     }
   }
 

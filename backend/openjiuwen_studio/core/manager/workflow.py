@@ -105,28 +105,28 @@ def with_exception_handling(func: Callable) -> Callable:
             log_exception(e)
             if isinstance(e, JiuWenComponentException):
                 type_name_map = {
-                    ComponentType.COMPONENT_TYPE_START: "开始",
-                    ComponentType.COMPONENT_TYPE_LLM: "大模型",
-                    ComponentType.COMPONENT_TYPE_END: "结束",
-                    ComponentType.COMPONENT_TYPE_IF: "选择器",
-                    ComponentType.COMPONENT_TYPE_LOOP: "循环",
-                    ComponentType.COMPONENT_TYPE_INPUT: "输入",
-                    ComponentType.COMPONENT_TYPE_OUTPUT: "输出",
-                    ComponentType.COMPONENT_TYPE_QUESTION: "提问器",
-                    ComponentType.COMPONENT_TYPE_CONTINUE: "继续",
-                    ComponentType.COMPONENT_TYPE_BREAK: "中断",
-                    ComponentType.COMPONENT_TYPE_TEXT_EDITOR: "文本编辑",
-                    ComponentType.COMPONENT_TYPE_INTENT: "意图识别",
-                    ComponentType.COMPONENT_TYPE_SUB_WORKFLOW: "子工作流",
-                    ComponentType.COMPONENT_TYPE_EMPTY_START: "空开始",
-                    ComponentType.COMPONENT_TYPE_EMPTY_END: "空结束",
-                    ComponentType.COMPONENT_TYPE_CODE: "代码",
-                    ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: "变量聚合",
-                    ComponentType.COMPONENT_TYPE_SET_VARIABLE: "设置变量",
-                    ComponentType.COMPONENT_TYPE_PLUGIN: "插件",
+                    ComponentType.COMPONENT_TYPE_START: "START",
+                    ComponentType.COMPONENT_TYPE_LLM: "LLM",
+                    ComponentType.COMPONENT_TYPE_END: "END",
+                    ComponentType.COMPONENT_TYPE_IF: "IF",
+                    ComponentType.COMPONENT_TYPE_LOOP: "LOOP",
+                    ComponentType.COMPONENT_TYPE_INPUT: "INPUT",
+                    ComponentType.COMPONENT_TYPE_OUTPUT: "OUTPUT",
+                    ComponentType.COMPONENT_TYPE_QUESTION: "QUESTION",
+                    ComponentType.COMPONENT_TYPE_CONTINUE: "CONTINUE",
+                    ComponentType.COMPONENT_TYPE_BREAK: "BREAK",
+                    ComponentType.COMPONENT_TYPE_TEXT_EDITOR: "TEXT_EDITOR",
+                    ComponentType.COMPONENT_TYPE_INTENT: "INTENT",
+                    ComponentType.COMPONENT_TYPE_SUB_WORKFLOW: "SUB_WORKFLOW",
+                    ComponentType.COMPONENT_TYPE_EMPTY_START: "EMPTY_START",
+                    ComponentType.COMPONENT_TYPE_EMPTY_END: "EMPTY_END",
+                    ComponentType.COMPONENT_TYPE_CODE: "CODE",
+                    ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: "VARIABLE_MERGE",
+                    ComponentType.COMPONENT_TYPE_SET_VARIABLE: "SET_VARIABLE",
+                    ComponentType.COMPONENT_TYPE_PLUGIN: "PLUGIN",
                 }
                 type_name = type_name_map.get(getattr(e, "component_type", 0), str(getattr(e, "component_type", "")))
-                formatted_message = f"{type_name}组件[{getattr(e, 'component_id', '')}]: {e.message}"
+                formatted_message = f"{type_name} component [{getattr(e, 'component_id', '')}]: {e.message}"
                 return ResponseModel(
                     code=status.HTTP_400_BAD_REQUEST,
                     message=formatted_message,
