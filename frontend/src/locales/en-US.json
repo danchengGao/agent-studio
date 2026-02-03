@@ -4130,6 +4130,41 @@
       "refreshAllFailed": "Failed to refresh all document statuses",
       "autoRefreshError": "Failed to auto-refresh document status"
     },
+    "addDocument": {
+      "title": "Add Document",
+      "uploadDescription": "Upload documents to the knowledge base in various formats",
+      "settingsDescription": "Configure document parsing and indexing parameters",
+      "dragAndDrop": "Drag files here or click to select",
+      "supportedFormats": "Supports PDF, DOCX, TXT, Markdown formats",
+      "selectFiles": "Select Files",
+      "selectedFiles": "Selected Files",
+      "noFilesSelected": "Please select files to upload",
+      "uploadSuccess": "Files uploaded successfully",
+      "uploadFailed": "File upload failed",
+      "allFilesAlreadyUploaded": "All files already uploaded",
+      "noUploadedFiles": "No uploaded files",
+      "settingsSuccess": "Document parameters set successfully",
+      "settingsFailed": "Document parameter setup failed",
+      "steps": {
+        "upload": "Upload",
+        "settings": "Parameters"
+      },
+      "parsingStrategy": "Parsing Strategy",
+      "quickParsing": "Quick",
+      "segmentationStrategy": "Segmentation",
+      "autoSegmentation": "Auto",
+      "customSegmentation": "Custom",
+      "separator": "Separator",
+      "maxTokens": "Max chunk length",
+      "removeExtraSpaces": "Remove extra spaces",
+      "removeUrlsEmails": "Remove URLs and emails",
+      "enableGraphEnhancement": "Document graph construction",
+      "enableGraphEnhancementTooltip": "Building a document graph improves retrieval quality but increases processing time and consumes additional LLM tokens.",
+      "selectLLMModel": "Select LLM model",
+      "selectModelPlaceholder": "Select model",
+      "modelRequired": "Document graph construction requires an LLM model",
+      "loadModelsFailed": "Failed to load model list"
+    },
     "marketplace": {
       "comingSoon": "Coming Soon",
       "description": "Knowledge base marketplace is under development, stay tuned"

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Upload, ArrowLeft, ArrowRight, Check, FileText, HelpCircle, AlertTriangle, Play, Loader2, CheckCircle } from 'lucide-react'
+import { X, Upload, ArrowLeft, ArrowRight, Check, FileText, HelpCircle, AlertTriangle, Play, Loader2, CheckCircle, Info } from 'lucide-react'
 import { Tooltip } from '@mui/material'
 import { KnowledgeBase } from '@/types/knowledgeBase'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -925,6 +925,21 @@ const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({ open, knowledgeBa
                         </label>
                       </div>
                     </div>
+
+                    {/* 勾选文档图构建后自动展示的提示：紧贴该行下方，与小问号悬停提示互不干扰 */}
+                    {formData.enableGraphEnhancement && (
+                      <div
+                        className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                        <span>
+                          {t('knowledgeBases.addDocument.enableGraphEnhancementTooltip') ||
+                            '构建文档图可以获取更好的检索效果，但是会增加耗时以及消耗额外的大模型token。'}
+                        </span>
+                      </div>
+                    )}
 
                     {/* 模型选择器 - 仅在启用图增强时显示 */}
                     {formData.enableGraphEnhancement && (
