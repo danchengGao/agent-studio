@@ -75,6 +75,9 @@ class LazyDeepSearchHttpClient:
             resp = await self._client.request(method, url, json=jsons, params=params, headers=headers)
             resp.raise_for_status()
             return resp
+        except httpx.HTTPStatusError:
+            # Let HTTP errors bubble up so caller can handle them meaningfully
+            raise
         except Exception as e:
             # 可选：重置状态，允许下次重试
             self._client = None
