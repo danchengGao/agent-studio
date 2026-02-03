@@ -45,6 +45,8 @@ const XY_CHART_STYLES = {
 const XY_CHART_REGEX = {
   /** 匹配 xychart-beta 数据 */
   DATA: /(bar|line)\s+\[([\d\s,.-]+)\]/,
+  /** 匹配 horizontal 配置（只匹配 config 中的 horizontal: true） */
+  HORIZONTAL: /horizontal\s*:\s*true/,
   /** 匹配单个 SVG 点坐标 */
   SVG_POINT: /[ML](\d+\.?\d*),(\d+\.?\d*)/,
   /** 匹配所有 SVG 点 */
@@ -83,8 +85,11 @@ const createSvgText = (
 
 /**
  * 处理柱状图
+ * @param svgElement SVG 元素
+ * @param values 数据值数组
+ * @param isHorizontal 是否为水平柱状图
  */
-const handleBarChart = (svgElement: SVGSVGElement, values: number[]): void => {
+const handleBarChart = (svgElement: SVGSVGElement, values: number[], isHorizontal: boolean = false): void => {
   const barPlotGroup = svgElement.querySelector('.bar-plot-0, [class*="bar-plot"]')
   if (!barPlotGroup) return
 
@@ -99,15 +104,31 @@ const handleBarChart = (svgElement: SVGSVGElement, values: number[]): void => {
     const x = parseFloat(rect.getAttribute('x') || '0')
     const y = parseFloat(rect.getAttribute('y') || '0')
     const width = parseFloat(rect.getAttribute('width') || '0')
+    const height = parseFloat(rect.getAttribute('height') || '0')
 
-    createSvgText(barPlotGroup, x + width / 2, y - XY_CHART_STYLES.BAR_LABEL_OFFSET, String(values[index]))
+    if (isHorizontal) {
+      // 水平柱状图：标注在柱子右侧中间
+      createSvgText(
+        barPlotGroup,
+        x + width + XY_CHART_STYLES.BAR_LABEL_OFFSET,
+        y + height / 2,
+        String(values[index]),
+        { textAnchor: 'start' }
+      )
+    } else {
+      // 垂直柱状图：标注在柱顶上方
+      createSvgText(barPlotGroup, x + width / 2, y - XY_CHART_STYLES.BAR_LABEL_OFFSET, String(values[index]))
+    }
   })
 }
 
 /**
  * 处理折线图
+ * @param svgElement SVG 元素
+ * @param values 数据值数组
+ * @param isHorizontal 是否为水平折线图
  */
-const handleLineChart = (svgElement: SVGSVGElement, values: number[]): void => {
+const handleLineChart = (svgElement: SVGSVGElement, values: number[], isHorizontal: boolean = false): void => {
   const linePlotGroup = svgElement.querySelector('.line-plot-0, [class*="line-plot"]')
   if (!linePlotGroup) return
 
@@ -145,8 +166,19 @@ const handleLineChart = (svgElement: SVGSVGElement, values: number[]): void => {
     circle.setAttribute('stroke-width', String(XY_CHART_STYLES.POINT_STROKE_WIDTH))
     linePlotGroup.appendChild(circle)
 
-    // 创建数值标签
-    createSvgText(linePlotGroup, cx, cy - XY_CHART_STYLES.LINE_LABEL_OFFSET, String(values[index]))
+    if (isHorizontal) {
+      // 水平折线图：标注在数据点右侧
+      createSvgText(
+        linePlotGroup,
+        cx + XY_CHART_STYLES.LINE_LABEL_OFFSET,
+        cy,
+        String(values[index]),
+        { textAnchor: 'start' }
+      )
+    } else {
+      // 垂直折线图：标注在数据点上方
+      createSvgText(linePlotGroup, cx, cy - XY_CHART_STYLES.LINE_LABEL_OFFSET, String(values[index]))
+    }
   })
 }
 
@@ -178,9 +210,12 @@ export const handleXyChart = (svgElement: SVGSVGElement, code: string): void => 
   const chartType = match[1] as XyChartType
   const values = match[2].split(',').map(v => parseFloat(v.trim()))
 
+  // 检测是否为水平图表
+  const isHorizontal = XY_CHART_REGEX.HORIZONTAL.test(code)
+
   if (chartType === XyChartType.BAR) {
-    handleBarChart(svgElement, values)
+    handleBarChart(svgElement, values, isHorizontal)
   } else if (chartType === XyChartType.LINE) {
-    handleLineChart(svgElement, values)
+    handleLineChart(svgElement, values, isHorizontal)
   }
 }
