@@ -30,9 +30,9 @@ from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelC
     WorkflowExecutionDB, WorkflowExecutionDetailsDB, AgentExecutionDB, AgentExecutionDetailsDB, \
     AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB, ReferenceDB, SystemEmbeddingModelDB, \
     SystemLLMModelDB
-# Import database sync tool
+# Import alembic version check
 from openjiuwen.core.common.logging import logger
-from openjiuwen_studio.core.db_sync import run_database_sync
+from openjiuwen_studio.core.alembic_version_check import check_alembic_versions
 from openjiuwen_studio.ops.config import settings as ops_settings
 # Import Trace models
 from openjiuwen_studio.models.trace_detail import TraceDetailDB
@@ -107,9 +107,8 @@ async def lifespan_func(app: FastAPI):
     # Create workflow_tag_association table if it doesn't exist
     workflow_tag_association.create(bind=engine, checkfirst=True)
 
-    # 运行数据库字段同步（添加新字段）
-    run_database_sync()
-    logger.info("✅ Database field sync completed")
+    # 检查 Alembic 版本
+    check_alembic_versions()
 
     # ops数据库相关表自动创建
     create_database_tables()

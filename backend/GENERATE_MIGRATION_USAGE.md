@@ -12,10 +12,10 @@
 
 ```bash
 # 为所有数据库自动生成迁移脚本
-python generate_migration.py --autogenerate -m "feat: add user status field"
+python generate_migration.py --autogenerate -m "feat add user status field"
 
 # 为所有数据库手动创建迁移脚本
-python generate_migration.py --manual -m "fix: correct data type issue"
+python generate_migration.py --manual -m "fix correct data type issue"
 ```
 
 ---
@@ -26,7 +26,7 @@ python generate_migration.py --manual -m "fix: correct data type issue"
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
-| `-m, --message` | 迁移描述信息 | `-m "Add user profile"` |
+| `-m, --message` | 迁移描述信息 | `-m "feat add user profile"` |
 
 ### 可选参数
 
@@ -46,7 +46,7 @@ python generate_migration.py --manual -m "fix: correct data type issue"
 
 ```bash
 # 为所有4个数据库自动生成
-python generate_migration.py --autogenerate -m "feat: add user status field"
+python generate_migration.py --autogenerate -m "feat add user status field"
 ```
 
 **输出**：
@@ -71,7 +71,7 @@ python generate_migration.py --autogenerate -m "feat: add user status field"
 
 ```bash
 # 为所有数据库创建空白脚本
-python generate_migration.py --manual -m "feat: custom data migration"
+python generate_migration.py --manual -m "feat custom data migration"
 ```
 
 ---
@@ -82,10 +82,10 @@ python generate_migration.py --manual -m "feat: custom data migration"
 
 ```bash
 # 只为 MySQL Agent 数据库生成
-python generate_migration.py --autogenerate -d mysql_agent -m "feat: update agent schema"
+python generate_migration.py --autogenerate -d mysql_agent -m "feat update agent schema"
 
 # 为多个指定数据库生成
-python generate_migration.py --autogenerate -d mysql_agent -d sqlite_agent -m "fix: update schema"
+python generate_migration.py --autogenerate -d mysql_agent -d sqlite_agent -m "fix update schema"
 ```
 
 ---
@@ -96,17 +96,17 @@ python generate_migration.py --autogenerate -d mysql_agent -d sqlite_agent -m "f
 
 ```bash
 # 需要分别为每个数据库执行命令
-alembic -n alembic_mysql_agent revision --autogenerate -m "feat: add user status"
-alembic -n alembic_mysql_ops revision --autogenerate -m "feat: add user status"
-alembic -n alembic_sqlite_agent revision --autogenerate -m "feat: add user status"
-alembic -n alembic_sqlite_ops revision --autogenerate -m "feat: add user status"
+alembic -n alembic_mysql_agent revision --autogenerate -m "feat add user status"
+alembic -n alembic_mysql_ops revision --autogenerate -m "feat add user status"
+alembic -n alembic_sqlite_agent revision --autogenerate -m "feat add user status"
+alembic -n alembic_sqlite_ops revision --autogenerate -m "feat add user status"
 ```
 
 ### 新方式（简洁）
 
 ```bash
 # 一次命令完成所有数据库
-python generate_migration.py --autogenerate -m "feat: add user status"
+python generate_migration.py --autogenerate -m "feat add user status"
 ```
 
 ---
@@ -205,7 +205,7 @@ backend/
 
 例如：
 ```
-add_user_status_field_4b4dd5bb39b4.py
+feat_add_user_status_field_4b4dd5bb39b4.py
 ```
 
 ---
@@ -216,7 +216,7 @@ add_user_status_field_4b4dd5bb39b4.py
 
 ```bash
 # 1. 生成迁移脚本
-python generate_migration.py --autogenerate -m "feat: add user profile"
+python generate_migration.py --autogenerate -m "feat add user profile"
 
 # 2. 执行迁移
 ./migrate.sh mysql agent upgrade
@@ -229,7 +229,7 @@ python generate_migration.py --autogenerate -m "feat: add user profile"
 
 ```bash
 # 只为 MySQL 数据库生成（SQLite 可能不需要这个变更）
-python generate_migration.py --autogenerate -d mysql_agent -d mysql_ops -m "feat: add MySQL-specific features"
+python generate_migration.py --autogenerate -d mysql_agent -d mysql_ops -m "feat add MySQL-specific features"
 ```
 
 
@@ -296,8 +296,6 @@ pip install alembic
 cd backend
 python generate_migration.py --autogenerate -m "Test"
 
-# 或使用 --backend-dir 参数
-python generate_migration.py --backend-dir /path/to/backend --autogenerate -m "Test"
 ```
 
 ### 错误3：部分数据库生成失败
