@@ -479,7 +479,7 @@
     },
     "navigation": {
       "dashboard": "主页",
-      "apps": "探索应用",
+      "apps": "任务空间",
       "agents": "智能体开发",
       "workflows": "工作流编排",
       "promptManagement": "提示词管理",
@@ -500,8 +500,8 @@
       "pluginMarket": "插件市场",
       "section": {
         "appDevelopment": "应用开发",
-        "promptEngineering": "提示词工程",
-        "modelsAndData": "模型与数据",
+        "promptEngineering": "提示词",
+        "modelsAndData": "资源管理",
         "plugins": "插件"
       }
     }

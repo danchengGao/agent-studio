@@ -469,7 +469,7 @@
     },
     "navigation": {
       "dashboard": "Home",
-      "apps": "Apps",
+      "apps": "Task Space",
       "agents": "Agent Development",
       "workflows": "Workflows",
       "promptManagement": "Prompt Management",
@@ -490,8 +490,8 @@
       "pluginMarket": "Plugin Market",
       "section": {
         "appDevelopment": "App Development",
-        "promptEngineering": "Prompt Engineering",
-        "modelsAndData": "Models & Data",
+        "promptEngineering": "Prompt",
+        "modelsAndData": "Resource Management",
         "plugins": "Plugins"
       }
     }

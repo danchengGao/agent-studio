@@ -302,70 +302,40 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
   const { t } = useTranslation();
   const getChildMessages = useConversationStore((state) => state.getChildMessages);
 
-  // 判断是否为最终报告
-  const isFinalReport = isFinalReportMessage(message.title);
-
-  // 如果是最终报告，使用DeepSearchReportCard组件
-  if (isFinalReport) {
-    return (
-      <DeepSearchReportCard
-        message={message}
-        depth={depth}
-        onTaskClick={onTaskClick}
-      />
-    );
-  }
-
-  // 用于触发实时更新的状态（每秒更新）
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const isRootNode = !message.parentMessageId;
+  const [isExpanded, setIsExpanded] = useState(isRootNode);
 
-  // 对于进行中的报告，每秒更新当前时间（未开始的报告不需要更新，因为不显示耗时）
   useEffect(() => {
     if (message.status !== TaskStatus.IN_PROGRESS) {
-      // 非进行中的报告不需要定时器
       return;
     }
-
     const timer = setInterval(() => {
       setCurrentTime(Date.now());
     }, 1000);
-
     return () => clearInterval(timer);
   }, [message.status]);
 
-  // 计算耗时：根据状态动态计算
   const calculatedDuration = useMemo(() => {
     switch (message.status) {
       case TaskStatus.PENDING:
-        // 未开始：不显示耗时
         return undefined;
       case TaskStatus.IN_PROGRESS:
-        // 进行中：当前时间 - 创建时间，确保不为负数
         return Math.max(0, currentTime - message.createdAt);
       case TaskStatus.COMPLETED:
       case TaskStatus.FAILED:
       case TaskStatus.CANCELLED:
-        // 已完成、失败、手动结束：更新时间 - 创建时间，确保不为负数
         return Math.max(0, message.updatedAt - message.createdAt);
       default:
         return undefined;
     }
   }, [message.status, message.createdAt, message.updatedAt, currentTime]);
 
-  // 格式化duration
   const formattedDuration = useMemo(() => formatDuration(calculatedDuration), [calculatedDuration]);
 
-  // 判断是否为根节点
-  const isRootNode = !message.parentMessageId;
-
-  // 默认展开逻辑：根节点展开，子节点折叠
-  const [isExpanded, setIsExpanded] = useState(isRootNode);
-
-  // 获取子消息
   const childMessages = getChildMessages(message.id);
   const hasChildren = childMessages && childMessages.length > 0;
 
-  // 将子消息分组：task、text、report
   const { taskMessages, textMessages, reportMessages } = useMemo(() => {
     const tasks: Message[] = [];
     const texts: Message[] = [];
@@ -387,6 +357,18 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
       reportMessages: reports
     };
   }, [childMessages]);
+
+  // 判断是否为最终报告（必须在所有 hooks 之后，避免 early return 导致 hook 数量变化）
+  const isFinalReport = message.title === t('apps.deepSearch.finalReport');
+  if (isFinalReport) {
+    return (
+      <DeepSearchReportCard
+        message={message}
+        depth={depth}
+        onTaskClick={onTaskClick}
+      />
+    );
+  }
 
   // 根据深度获取背景色和边框样式（灰色系，层级区分）
   const getDepthStyle = () => {

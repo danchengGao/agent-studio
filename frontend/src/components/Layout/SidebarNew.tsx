@@ -49,9 +49,9 @@ const SidebarNew: React.FC<SidebarProps> = ({
       {
         title: 'layout.navigation.section.appDevelopment',
         items: [
+          { name: t('layout.navigation.apps'), href: `${basePath}/apps`, icon: Layers },
           { name: t('layout.navigation.agents'), href: `${basePath}/agents`, icon: AgentIcon },
           { name: t('layout.navigation.workflows'), href: `${basePath}/workflows`, icon: WorkflowIcon },
-          { name: t('layout.navigation.apps'), href: '/dashboard/apps', icon: Layers },
         ],
       },
       {
