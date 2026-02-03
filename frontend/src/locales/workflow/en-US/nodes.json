@@ -323,6 +323,8 @@
   "pluginSelector": {
     "selectPluginTools": "Select Plugin Tools",
     "supportMultipleSelection": "Support selecting multiple tools from multiple plugins",
+    "searchPlaceholder": "Search plugin name",
+    "noSearchResults": "No matching plugins found",
     "noAvailablePlugins": "No available plugins",
     "plugin": "Plugin",
     "noDescription": "No description",
