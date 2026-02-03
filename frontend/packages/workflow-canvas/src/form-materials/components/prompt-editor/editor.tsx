@@ -7,6 +7,7 @@ import React, { useEffect, useRef, createContext, useContext, useMemo, useCallba
 
 import { BaseEditor, type BaseEditorRef } from '../code-editor'
 import { ExtensionManager } from '../base-editor'
+import { EditorState } from '@codemirror/state'
 
 import { PropsType } from './types'
 import { createCustomLanguageExtension } from './custom-language-support'
@@ -119,12 +120,20 @@ export function PromptEditor(props: PromptEditorPropsType) {
   const stableCustomExtensions = useMemo(() => {
     const extensions = [createCustomLanguageExtension()]
 
+    extensions.push(
+      EditorState.transactionFilter.of((transaction) => {
+        if (transaction.docChanged && transaction.newDoc.length > MAX_PROMPT_LENGTH) {
+          return false
+        }
+        return transaction
+      }),
+    )
+
     // Always add mention extension
     extensions.push(
       mentionExtension({
         triggerCharacters: ['{', '@', '{{'],
         onTrigger: (view, from, to, trigger) => {
-          // Call the callback if provided
           if (onVariableSelect) {
             onVariableSelect(trigger, {
               trigger,
@@ -314,23 +323,13 @@ export function PromptEditor(props: PromptEditorPropsType) {
       return
     }
 
-    // 应用提示词长度限制
+    let finalValue = newValue
     if (newValue.length > MAX_PROMPT_LENGTH) {
-      newValue = newValue.slice(0, MAX_PROMPT_LENGTH)
-
-      // 阻止用户继续输入
-      editorAPIRef.current?.$view.dispatch({
-        changes: {
-          from: newValue.length,
-          to: newValue.length + 1,
-          insert: newValue,
-        },
-        selection: { anchor: newValue.length, head: newValue.length },
-      })
+      finalValue = newValue.slice(0, MAX_PROMPT_LENGTH)
     }
 
-    lastContentRef.current = newValue
-    setCharacterCount(newValue.length)
+    lastContentRef.current = finalValue
+    setCharacterCount(finalValue.length)
 
     // 触发事件监听器
     listenersRef.current.forEach(listener => {
@@ -340,28 +339,11 @@ export function PromptEditor(props: PromptEditorPropsType) {
       })
     })
 
-    onChange?.({ type: 'template', content: newValue })
+    onChange?.({ type: 'template', content: finalValue })
   }
 
   // Handle all editor updates for variable selection functionality
   const handleEditorUpdate = useCallback((update: any) => {
-    // 检查是否达到最大长度限制
-    if (update.state.doc.length > MAX_PROMPT_LENGTH) {
-      // 阻止任何可能导致内容增加的更改
-      if (update.docChanged && update.state.doc.length > lastContentRef.current.length) {
-        // 恢复到之前的状态
-        editorAPIRef.current?.$view.dispatch({
-          changes: {
-            from: 0,
-            to: update.state.doc.length,
-            insert: lastContentRef.current,
-          },
-          selection: update.state.selection,
-        })
-        return
-      }
-    }
-
     // 更新EditorAPI的状态引用
     if (editorAPIRef.current && editorAPIRef.current.$view) {
       editorAPIRef.current.$view.state = update.state
