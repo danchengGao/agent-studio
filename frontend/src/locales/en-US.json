@@ -698,7 +698,7 @@
       "selectModel": "Select Model",
       "loading": "Loading...",
       "noModels": "No models available",
-      "contextLengthWarning": "Note: Model context length below 128K may affect DeepSearch report quality"
+      "contextLengthWarning": "It is recommended to select a model with a context length greater than 128K for better results"
     },
     "agent": {
       "configAgent": "Configure Agent",
@@ -897,9 +897,13 @@
       },
       "knowledge": {
         "select": "Configure Knowledge Base",
+        "title": "Configure Knowledge Base",
         "noKB": "No available knowledge bases",
+        "noAvailable": "No available knowledge bases",
         "noKBDesc": "Please create a knowledge base in the knowledge base management page first",
+        "needCreate": "Please create a knowledge base in the knowledge base management page first",
         "create": "Go to Create Knowledge Base →",
+        "gotoCreate": "Go to Create Knowledge Base",
         "loadMore": "Load More...",
         "loading": "Loading...",
         "confirm": "Confirm ({{count}})",

@@ -707,7 +707,8 @@
     "model": {
       "selectModel": "选择模型",
       "loading": "加载中...",
-      "noModels": "暂无模型"
+      "noModels": "暂无模型",
+      "contextLengthWarning": "建议选择上下文长度大于128K 的模型，效果会更好"
     },
     "agent": {
       "configAgent": "配置智能体",
@@ -906,9 +907,13 @@
       },
       "knowledge": {
         "select": "配置知识库",
+        "title": "配置知识库",
         "noKB": "暂无可用知识库",
+        "noAvailable": "暂无可用知识库",
         "noKBDesc": "需要先在知识库管理页面创建知识库",
+        "needCreate": "需要先在知识库管理页面创建知识库",
         "create": "前往创建知识库 →",
+        "gotoCreate": "前往创建知识库",
         "loadMore": "加载更多...",
         "loading": "加载中...",
         "confirm": "确认 ({{count}})",

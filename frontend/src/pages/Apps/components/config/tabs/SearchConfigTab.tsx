@@ -89,7 +89,10 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
       {/* 搜索方式 */}
       <ConfigSection title={t('apps.config.search.mode')}>
         <div className="flex flex-col gap-2">
-          {searchModeOptions.map(option => (
+          {/* 暂时屏蔽本地搜索和综合搜索选项，只保留网络搜索 */}
+          {searchModeOptions
+            .filter(option => option.value !== 'local' && option.value !== 'all')
+            .map(option => (
             <button
               key={option.value}
               onClick={() => updateConfig('searchMode', option.value)}
