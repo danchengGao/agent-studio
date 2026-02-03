@@ -13,6 +13,7 @@ import { Field } from '@flowgram.ai/free-layout-editor'
 import { Typography } from '@douyinfe/semi-ui'
 import { IFlowTemplateValue } from '../../form-materials'
 import { useIsSidebar } from '../../hooks'
+import { t } from '../../i18n'
 
 export const renderForm = () => {
   const SidebarNote: React.FC<{ show: boolean }> = ({ show }) => {
@@ -31,7 +32,7 @@ export const renderForm = () => {
     <>
       <FormHeader titleEditable={false} menuVisible={false} />
       <FormContent>
-        <FormInput name="输出" />
+        <FormInput name={'workflowCanvas.formOutput.output'} />
         <Field<boolean> name="inputs.streaming">
           {({ field: streamingField }) => (
             <Field<IFlowTemplateValue> name="inputs.content">

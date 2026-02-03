@@ -41,54 +41,81 @@ from openjiuwen_studio.core.manager.model_manager.managers.model_config_manager 
 # 生成随机字符串用于节点ID
 random_id = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_') for _ in range(5))
 
-DEFAULT_WORKFLOW_SCHEMA = {
-    "nodes": [
-        {
-            "id": f"start_{random_id}",
-            "type": "1",
-            "meta": {
-                "position": {
-                    "x": 180,
-                    "y": 36
-                }
-            },
-            "data": {
-                "title": "开始",
-                "outputs": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "default": "你好，请帮我分析一下这个问题。"
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "id": f"end_{random_id}",
-            "type": "2",
-            "meta": {
-                "position": {
-                    "x": 1100,
-                    "y": 36
-                }
-            },
-            "data": {
-                "title": "结束",
-                "inputs": {
-                    "inputParameters": {
-                        "result": {
-                            "type": "ref",
-                        }
+# 国际化文本
+DEFAULT_WORKFLOW_TEXTS_ZH = {
+    "start_title": "开始",
+    "end_title": "结束",
+    "query_default": "你好，请帮我分析一下这个问题。"
+}
+
+DEFAULT_WORKFLOW_TEXTS_EN = {
+    "start_title": "Start",
+    "end_title": "End",
+    "query_default": "Hello, please help me analyze this question."
+}
+
+
+def get_default_workflow_schema():
+    """获取默认工作流schema，根据当前语言返回对应文本"""
+    from openjiuwen_studio.core.common.language_thread_context import get_language
+
+    language = get_language()
+    if language in ("zh-cn", "zh"):
+        texts = DEFAULT_WORKFLOW_TEXTS_ZH
+    else:
+        texts = DEFAULT_WORKFLOW_TEXTS_EN
+
+    return {
+        "nodes": [
+            {
+                "id": f"start_{random_id}",
+                "type": "1",
+                "meta": {
+                    "position": {
+                        "x": 180,
+                        "y": 36
                     }
                 },
-                "streaming": False
+                "data": {
+                    "title": texts["start_title"],
+                    "outputs": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "default": texts["query_default"]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": f"end_{random_id}",
+                "type": "2",
+                "meta": {
+                    "position": {
+                        "x": 1100,
+                        "y": 36
+                    }
+                },
+                "data": {
+                    "title": texts["end_title"],
+                    "inputs": {
+                        "inputParameters": {
+                            "result": {
+                                "type": "ref",
+                            }
+                        }
+                    },
+                    "streaming": False
+                }
             }
-        }
-    ],
-    "edges": []
-}
+        ],
+        "edges": []
+    }
+
+
+DEFAULT_WORKFLOW_SCHEMA = get_default_workflow_schema()
 
 
 def with_exception_handling(func: Callable) -> Callable:

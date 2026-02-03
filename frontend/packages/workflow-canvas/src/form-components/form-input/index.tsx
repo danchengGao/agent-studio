@@ -34,7 +34,10 @@ export function FormInput({
   useFieldSchema = false,
 }: FormInputProps) {
   const { t } = useTranslation()
-  const displayName = name || t('workflowCanvas.formInput.input')
+  var displayName = t('workflowCanvas.formOutput.output')
+  if (name) {
+    displayName = t(name)
+  }
   const isSidebar = useIsSidebar()
 
   if (!isSidebar) {
