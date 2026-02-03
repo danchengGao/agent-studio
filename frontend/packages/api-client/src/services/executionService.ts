@@ -211,7 +211,7 @@ export class ExecutionService {
                   if (sseMessage.code !== 200) {
                     // code 不为 200，表示执行错误，将 code 和 message 拼接成错误消息
                     const originalErrorMessage = sseMessage.message || 'Unknown error'
-                    const errorMessage = `错误 ${sseMessage.code}: ${originalErrorMessage}`
+                    const errorMessage = `error ${sseMessage.code}: ${originalErrorMessage}`
 
                     const messageData = sseMessage.data
                     const errorNodesInfo = messageData?.error_nodes_info

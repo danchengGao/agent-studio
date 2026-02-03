@@ -678,7 +678,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                   {t('common.actions.saving')}
                 </div>
               ) : (
-                t('plugins.config.saveConfig')
+                t('plugins.pluginConfig.saveConfig')
               )}
             </Button>
           </div>

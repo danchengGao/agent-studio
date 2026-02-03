@@ -2641,7 +2641,7 @@
       "descriptionPlaceholder": "请输入插件描述",
       "descriptionHelper": "详细描述插件的功能和行为，帮助用户了解插件的作用",
       "currentSelection": "当前选择",
-      "pluginToolsList": "代码工具列表",
+      "codeToolsList": "代码工具列表",
       "noToolsConfig": "暂无工具配置",
       "addCodeTool": "添加代码工具",
       "codeTool": "代码工具",

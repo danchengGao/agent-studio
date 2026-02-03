@@ -31,7 +31,7 @@ def _get_friendly_error_message(err, operation: str) -> str:
     if (operation == "AGENT_SAVE"
             and err.get("ctx") == {"class_name": "AgentModel"}
             and err.get("msg") == 'Input should be a valid dictionary or instance of AgentModel'):
-        return "智能体自动保存失败，模型配置为空，请为智能体配置模型"
+        return "agent model configuration is empty, please configure the model for the agent"
     # 默认返回原始错误消息
     return err.get('msg', 'Validation error')
 

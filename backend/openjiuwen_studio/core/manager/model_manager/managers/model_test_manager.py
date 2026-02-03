@@ -214,12 +214,13 @@ class ModelTester:
         msg = error_message.lower()
 
         if "401" in msg or "unauthorized" in msg or "'bad request" in msg:
-            return "API Key 或模型 ID 无效，请检查模型配置"
+            return "API Key or model ID is invalid, please check model configuration"
 
         if "resolving ip address failed" in msg or "dns" in msg:
-            return "模型服务地址不可达，请检查模型基础服务地址或网络配置"
+            return "Model service address is unreachable, please check " \
+                   "model base service address or network configuration"
 
-        return "模型调用失败，请检查模型相关配置"
+        return "Model invocation failed, please check model related configuration"
 
     def _log_test_result(
             self,

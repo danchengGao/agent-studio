@@ -2657,7 +2657,7 @@
       "descriptionPlaceholder": "Please enter plugin description",
       "descriptionHelper": "Describe the plugin's functionality and behavior in detail to help users understand its purpose",
       "currentSelection": "Current Selection",
-      "pluginToolsList": "Code Tools List",
+      "codeToolsList": "Code Tools List",
       "noToolsConfig": "No tools configuration",
       "addCodeTool": "Add Code Tool",
       "codeTool": "Code Tool",

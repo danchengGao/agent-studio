@@ -544,7 +544,7 @@ export const apiRequest = {
               if (detailedError) {
                 errorMessage = detailedError
               } else if (errorData.code) {
-                errorMessage = `错误 ${errorData.code}: ${errorData.message || errorData.msg || errorMessage}`
+                errorMessage = `error ${errorData.code}: ${errorData.message || errorData.msg || errorMessage}`
               }
             } catch (e) {
               // 如果不是JSON，使用原始文本（如果不太长）
