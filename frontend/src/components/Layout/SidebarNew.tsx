@@ -158,7 +158,7 @@ const SidebarNew: React.FC<SidebarProps> = ({
               )}
 
               {/* Section items */}
-              <div className="space-y-0.5">
+              <div className="space-y-2">
                 {section.items.map(item => (
                   <Tooltip
                     key={item.name}
@@ -170,8 +170,8 @@ const SidebarNew: React.FC<SidebarProps> = ({
                     <NavLink
                       to={item.href}
                       className={`
-                        group flex items-center font-medium rounded-lg transition-colors duration-200 relative min-h-9 menu-item-hover
-                        ${isCollapsed ? 'justify-center px-2 py-1.5 mx-1' : 'px-2 py-2 mx-1'}
+                        group flex items-center font-medium rounded-lg transition-colors duration-200 relative h-7 menu-item-hover
+                        ${isCollapsed ? 'justify-center px-2 mx-1' : 'px-2 mx-1'}
                         ${isActive(item.href) ? 'menu-item-active' : 'menu-text'}
                       `}
                       onClick={handleNavItemClick}

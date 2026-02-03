@@ -270,7 +270,7 @@ const LoginPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loginMutation.isLoading}
-                  className="w-full btn-primary py-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full btn-login text-base font-medium disabled:cursor-not-allowed"
                 >
                   {loginMutation.isLoading ? (
                     <div className="flex items-center justify-center space-x-2">

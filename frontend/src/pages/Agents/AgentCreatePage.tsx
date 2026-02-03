@@ -703,7 +703,7 @@ const AgentCreatePage: React.FC = () => {
                 {t('actions.cancel')}
               </Button>
               <Button
-                variant="contained"
+                className="btn-primary"
                 startIcon={
                   isLoading ? (
                     <Loader2
@@ -722,16 +722,6 @@ const AgentCreatePage: React.FC = () => {
                   height: 'clamp(1.75rem, 3.5vh, 2.25rem)',
                   fontSize: 'clamp(0.6875rem, 1.1vw, 0.8125rem)',
                   padding: 'clamp(0.1875rem, 0.375vh, 0.3125rem) clamp(0.5rem, 1vw, 0.75rem)',
-                  backgroundColor: '#0a59F7',
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: '#0849d1',
-                  },
-                  '&:disabled': {
-                    backgroundColor: '#0a59F7',
-                    opacity: 0.4,
-                    color: 'white',
-                  },
                 }}
               >
                 {isLoading ? t('actions.creating') : t('actions.create')}

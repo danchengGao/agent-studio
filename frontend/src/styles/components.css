@@ -21,11 +21,15 @@
 
   /* ========== 菜单 ========== */
   .menu-item-active {
-    background-color: color-mix(in srgb, var(--text-blue) 10%, transparent);
-    color: var(--text-blue);
+    background: linear-gradient(104.07deg, rgba(26, 203, 255, 0.1) 0%, rgba(95, 12, 255, 0.1) 100%);
+    color: var(--primary-color);
+  }
+  .menu-item-active:hover {
+    background: linear-gradient(104.07deg, rgba(26, 203, 255, 0.1) 0%, rgba(95, 12, 255, 0.1) 100%);
+    color: var(--primary-color);
   }
 
-  .menu-item-hover:hover {
+  .menu-item-hover:hover:not(.menu-item-active) {
     background-color: var(--menu-hover-bg);
     color: var(--menu-hover-text);
   }
@@ -40,7 +44,30 @@
     @apply font-normal;
   }
 
+  /* ========== 主按钮 ========== */
+  .btn-primary {
+    border-radius: 4px;
+    background: var(--primary-gradient);
+    color: white !important;
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    color: white !important;
+    cursor: not-allowed;
+  }
+
   /* ========== 登录页 ========== */
+  .btn-login {
+    width: 100%;
+    height: 36px;
+    border-radius: 4px;
+    background: linear-gradient(90.12deg, #9628ff 0%, #263eff 50%, #1acbff 100%);
+    color: white;
+  }
+
   .login-card-bg {
     background-color: var(--global-bg-white);
   }

@@ -821,9 +821,9 @@ const UserLoginPage: React.FC = () => {
 
   // 输入框样式
   const inputFieldClass = 'w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-  // 主按钮样式
+  // 主按钮样式（登录/注册/忘记密码提交按钮）
   const btnPrimaryClass =
-    'w-full py-3 text-base font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+    'w-full text-base font-medium btn-login disabled:cursor-not-allowed'
   // 链接样式
   const linkClass = 'text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm'
 
