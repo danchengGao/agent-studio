@@ -707,7 +707,7 @@ def knowledge_base_update(req: KnowledgeBaseUpdateRequest, current_user: dict) -
     # 如果 desc 是空字符串，转换为 None 以便正确清空数据库字段
     description_value = req.desc if req.desc else None
     update_result = knowledge_base_repository.knowledge_base_update(
-        space_id=req.space_id, kb_id=req.kb_id, name=req.name, description=description_value
+        KBDetails(space_id=req.space_id, kb_id=req.kb_id), name=req.name, description=description_value
     )
 
     if update_result.code != status.HTTP_200_OK:

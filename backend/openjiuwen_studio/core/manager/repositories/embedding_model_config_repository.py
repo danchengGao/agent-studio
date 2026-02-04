@@ -27,7 +27,7 @@ class EmbeddingModelConfigRepository(BaseRepository[EmbeddingModelConfig]):
         """获取所有激活的配置"""
         return self.query().filter(
             EmbeddingModelConfig.space_id == space_id,
-            EmbeddingModelConfig.is_active == True
+            EmbeddingModelConfig.is_active
         ).all()
 
     def get_by_space_id_and_system_model_id(self, space_id: str, system_model_id: int) -> Optional[

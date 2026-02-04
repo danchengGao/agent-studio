@@ -36,22 +36,6 @@ def get_security_utils() -> SecurityUtils:
     return SecurityUtils()
 
 
-def get_agent_repository(db: Session = Depends(get_db)) -> AgentRepository:
-    return AgentRepository(db)
-
-
-def get_prompt_relation_repository(db: Session = Depends(get_db)) -> PromptRelationRepository:
-    return PromptRelationRepository(db)
-
-
-def get_workflow_repository(db: Session = Depends(get_db)) -> WorkflowRepository:
-    return WorkflowRepository(db)
-
-
-def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
-    return UserRepository(db)
-
-
 def create_usage_stats_from_model(model: ModelConfig) -> ModelUsageStats:
     """Create usage stats object from model data"""
     return ModelUsageStats(
