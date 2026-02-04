@@ -941,6 +941,7 @@ const AppsPage: React.FC = () => {
           workflow_human_in_the_loop: config.enableHumanInteraction,
           info_collector_search_method: config.searchMode,
           source_tracer_research_trace_source_switch: config.enableTraceability,
+          source_tracer_source_tracer_infer_switch: config.enableSourceTracerInfer,
           web_search_config,  // 可能是undefined
           local_search_config,  // 新增：可能是undefined
           template_id: config.selectedTemplateId ?? -1,

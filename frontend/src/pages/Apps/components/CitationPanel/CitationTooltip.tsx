@@ -46,14 +46,14 @@ function TooltipContent({
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         className={cn(
-          'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[70] max-w-[32rem] origin-(--radix-tooltip-content-transform-origin) rounded-lg shadow-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800 [&_svg]:!bg-white [&_svg]:!fill-white dark:[&_svg]:!bg-gray-800 dark:[&_svg]:!fill-gray-800',
+          'animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-[70] max-w-[32rem] origin-(--radix-tooltip-content-transform-origin) rounded-lg shadow-lg border border-gray-200 bg-white [&_svg]:!bg-white [&_svg]:!fill-white',
           className,
         )}
         side={side}
         sideOffset={sideOffset}
       >
         {children}
-        <TooltipPrimitive.Arrow className="fill-white dark:fill-gray-800" />
+        <TooltipPrimitive.Arrow className="fill-white" />
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )

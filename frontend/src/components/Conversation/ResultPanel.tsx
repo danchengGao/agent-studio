@@ -4,7 +4,7 @@ import { MessageType } from '@/stores/useConversationStore';
 import { ReportMarkdown } from '@/pages/Apps/components/Markdown';
 import { X } from 'lucide-react';
 import { ReportPanel } from '@/pages/Apps/components/ReportPanel';
-import { buildReportFromDeepSearch } from '@/utils/reportUtils';
+import { buildReportFromDeepSearch, cleanReportContent } from '@/utils/reportUtils';
 
 interface ResultPanelProps {
   className?: string;
@@ -107,9 +107,8 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
         ? selectedMessage.content
         : String(selectedMessage.content || '');
 
-      // 清理citation引用标记：删除 [citation:n] 及其内部可能存在的空格
-      // 格式：前导空格 + [ + 空格 + citation + 空格 + : + 空格 + 数字 + 空格 + ] + 后续空格
-      contentString = contentString.replace(/ *\[ *citation *: *\d+ *\] */g, '');
+      // 清理citation引用标记
+      contentString = cleanReportContent(contentString);
 
       return {
         id: selectedMessage.id,

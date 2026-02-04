@@ -127,12 +127,12 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
           <p className="text-muted-foreground/60 text-xs">{t('apps.inferenceGraph.retryLater')}</p>
           <button
             onClick={handleRetry}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
             type="button"
             aria-label={t('apps.inferenceGraph.reload')}
           >
-            <RotateCcw className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <span className="text-sm text-purple-600 dark:text-purple-400">{t('apps.inferenceGraph.retry')}</span>
+            <RotateCcw className="w-4 h-4 text-purple-600" />
+            <span className="text-sm text-purple-600">{t('apps.inferenceGraph.retry')}</span>
           </button>
         </div>
       </div>
@@ -145,26 +145,26 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
         {/* 加载状态 */}
         {isLoading && (
           <div
-            className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
+            className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-sm"
             aria-hidden="true"
           >
             <div className="flex flex-col items-center gap-3">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-t-transparent border-purple-500" />
-              <p className="text-sm text-gray-600 dark:text-gray-400">{t('apps.inferenceGraph.loading')}</p>
+              <p className="text-sm text-gray-600">{t('apps.inferenceGraph.loading')}</p>
               {/* 交互提示 */}
-              <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full">
+              <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
                 <MousePointer2 className="w-3.5 h-3.5" />
                 <span>{t('apps.inferenceGraph.dragAndZoom')}</span>
               </div>
               {hasTimedOut && (
                 <button
                   onClick={handleRetry}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2 text-sm"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2 text-sm"
                   type="button"
                   aria-label={t('apps.inferenceGraph.cancel')}
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <span className="text-purple-600 dark:text-purple-400">{t('apps.inferenceGraph.retry')}</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="text-purple-600">{t('apps.inferenceGraph.retry')}</span>
                 </button>
               )}
             </div>
@@ -186,25 +186,25 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
         {/* 底部操作提示栏 */}
         {!isLoading && !hasError && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-            <div className="flex items-center gap-3 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-full px-4 py-2 shadow-lg">
+            <div className="flex items-center gap-3 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full px-4 py-2 shadow-lg">
               {/* 操作提示 */}
-              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 text-xs text-gray-600">
                 <div className="flex items-center gap-1">
                   <MousePointer2 className="w-3.5 h-3.5" />
                   <span>{t('apps.inferenceGraph.dragToMove')}</span>
                 </div>
-                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <span className="text-gray-300">·</span>
                 <div className="flex items-center gap-1">
                   <ZoomIn className="w-3.5 h-3.5" />
                   <span>{t('apps.inferenceGraph.wheelToZoom')}</span>
                 </div>
               </div>
               {/* 分隔线 */}
-              <div className="w-px h-4 bg-gray-300 dark:bg-gray-600" />
+              <div className="w-px h-4 bg-gray-300" />
               {/* 重置按钮 */}
               <button
                 onClick={handleRetry}
-                className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
+                className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700 transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
                 type="button"
                 aria-label={t('apps.inferenceGraph.resetView')}
                 title={t('apps.inferenceGraph.resetView')}

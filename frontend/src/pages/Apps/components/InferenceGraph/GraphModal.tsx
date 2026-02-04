@@ -119,7 +119,7 @@ export const GraphModal: React.FC<GraphModalProps> = ({
         aria-label={t('apps.inferenceGraph.title')}
         onClick={handleModalClick}
         className={`
-          absolute z-50 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden antialiased
+          absolute z-50 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden antialiased
           ${isMobile
             ? 'inset-4 w-auto h-auto'
             : 'bottom-0 right-5 w-3/5 h-3/5'
@@ -133,24 +133,24 @@ export const GraphModal: React.FC<GraphModalProps> = ({
           {/* 新页签按钮 */}
           <button
             onClick={onOpenInNewTab}
-            className="p-3 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 rounded-lg transition-colors duration-200 shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
+            className="p-3 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors duration-200 shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-purple-500 focus-visible:outline-offset-2"
             title={t('apps.inferenceGraph.openInNewTab')}
             aria-label={t('apps.inferenceGraph.openInNewTab')}
             type="button"
           >
-            <ExternalLink className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <ExternalLink className="w-5 h-5 text-purple-600" />
           </button>
 
           {/* 关闭按钮 */}
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="p-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200 shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-gray-500 focus-visible:outline-offset-2"
+            className="p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 shadow-md cursor-pointer focus-visible:outline-2 focus-visible:outline-gray-500 focus-visible:outline-offset-2"
             title={t('apps.inferenceGraph.closeModal')}
             aria-label={t('apps.inferenceGraph.closeModal')}
             type="button"
           >
-            <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <X className="w-5 h-5 text-gray-600" />
           </button>
         </div>
 

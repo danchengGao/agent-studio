@@ -114,7 +114,7 @@ export const CitationLink: React.FC<CitationLinkProps> = ({
     <span ref={tooltipRef}>
       <CitationTooltip
         open={isTooltipOpen}
-        className="border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800 [&_svg]:!bg-white [&_svg]:!fill-white dark:[&_svg]:!bg-gray-800 dark:[&_svg]:!fill-gray-800"
+        className="border border-gray-200 bg-white shadow-lg [&_svg]:!bg-white [&_svg]:!fill-white"
         title={citationData ? <CitationTooltipContent citationData={citationData} href={href} /> : null}
         side="top"
         sideOffset={2}
@@ -127,8 +127,8 @@ export const CitationLink: React.FC<CitationLinkProps> = ({
           }}
           className={cn(
             'cursor-pointer font-semibold',
-            'text-blue-600 dark:text-blue-400',
-            'hover:text-blue-800 dark:hover:text-blue-300',
+            'text-blue-600',
+            'hover:text-blue-800',
             'hover:underline',
             'transition-colors duration-150',
           )}

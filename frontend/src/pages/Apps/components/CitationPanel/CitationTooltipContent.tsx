@@ -86,7 +86,7 @@ const useScrollToHighlight = (isActive: boolean, _scrollRef: React.RefObject<HTM
 }
 
 // 日历图标组件
-const CalendarIcon: React.FC<{ className?: string }> = ({ className = 'mr-1 text-gray-500 dark:text-gray-400' }) => (
+const CalendarIcon: React.FC<{ className?: string }> = ({ className = 'mr-1 text-gray-500' }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="10"
@@ -121,16 +121,16 @@ const CreditScore: React.FC<{ score?: number }> = ({ score }) => {
   if (score === undefined) return null
 
   const getScoreLabel = (score: number) => {
-    if (score < 0.5) return { label: t('apps.citation.scoreLow'), className: 'text-amber-500 dark:text-amber-400' }
-    if (score < 0.9) return { label: t('apps.citation.scoreMedium'), className: 'text-blue-500 dark:text-blue-400' }
-    return { label: t('apps.citation.scoreHigh'), className: 'text-green-500 dark:text-green-400' }
+    if (score < 0.5) return { label: t('apps.citation.scoreLow'), className: 'text-amber-500' }
+    if (score < 0.9) return { label: t('apps.citation.scoreMedium'), className: 'text-blue-500' }
+    return { label: t('apps.citation.scoreHigh'), className: 'text-green-500' }
   }
 
   const { label, className } = getScoreLabel(score)
 
   return (
     <span className="inline-flex items-center">
-      <span className="text-gray-700 dark:text-gray-300">{t('apps.citation.matchScore')}：</span>
+      <span className="text-gray-700">{t('apps.citation.matchScore')}：</span>
       <span className={className}>{label}</span>
     </span>
   )
@@ -172,11 +172,11 @@ export const CitationTooltipContent: React.FC<CitationTooltipContentProps> = ({ 
               if (href) window.open(href, '_blank')
             }}
             onMouseDown={e => e.stopPropagation()}
-            className="cursor-pointer transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+            className="cursor-pointer transition-colors hover:text-blue-600"
           >
-            <h3 className="mt-2 mb-2 flex items-center text-base font-bold text-gray-900 dark:text-gray-100">
+            <h3 className="mt-2 mb-2 flex items-center text-base font-bold text-gray-900">
               {citationData.from && (
-                <span className="mr-2 flex-shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                <span className="mr-2 flex-shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
                   {citationData.from}
                 </span>
               )}
@@ -189,8 +189,8 @@ export const CitationTooltipContent: React.FC<CitationTooltipContentProps> = ({ 
       {/* 内容部分 */}
       {citationData.content && (
         <div className="mb-4">
-          <div ref={contentScrollRef} style={{ maxHeight: '300px', overflow: 'auto' }} className="w-full rounded-md bg-gray-200/30 p-2 dark:bg-gray-800/10">
-            <div className="text-sm break-words text-gray-700 dark:text-gray-300">
+          <div ref={contentScrollRef} style={{ maxHeight: '300px', overflow: 'auto' }} className="w-full rounded-md bg-gray-200/30 p-2">
+            <div className="text-sm break-words text-gray-700">
               <div dangerouslySetInnerHTML={{ __html: formatContent(citationData.content) }} />
             </div>
           </div>
@@ -204,7 +204,7 @@ export const CitationTooltipContent: React.FC<CitationTooltipContentProps> = ({ 
            citationData.publish_time !== null &&
            citationData.publish_time !== '' &&
            isValidPublishTime(citationData.publish_time) && (
-            <span className="inline-flex items-center text-gray-600 dark:text-gray-400">
+            <span className="inline-flex items-center text-gray-600">
               <CalendarIcon />
               {citationData.publish_time}
             </span>
@@ -214,9 +214,9 @@ export const CitationTooltipContent: React.FC<CitationTooltipContentProps> = ({ 
            citationData.publish_time !== null &&
            citationData.publish_time !== '' &&
            isValidPublishTime(citationData.publish_time) && (
-            <span className="mx-1 inline-flex items-center text-gray-500 dark:text-gray-500">|</span>
+            <span className="mx-1 inline-flex items-center text-gray-500">|</span>
           )}
-          {citationData.source && <span className="inline-flex items-center text-gray-600 dark:text-gray-400">{t('apps.citation.source')}：{citationData.source}</span>}
+          {citationData.source && <span className="inline-flex items-center text-gray-600">{t('apps.citation.source')}：{citationData.source}</span>}
         </div>
         <div className="flex items-center gap-2">
           <CreditScore score={citationData.score} />

@@ -81,8 +81,8 @@ export const InferenceLink: React.FC<InferenceLinkProps> = ({
           onMouseLeave={() => setShowTooltip(false)}
           className={cn(
             'relative cursor-pointer',
-            'text-purple-600 dark:text-purple-400',
-            'hover:text-purple-800 dark:hover:text-purple-300',
+            'text-purple-600',
+            'hover:text-purple-800',
             'font-semibold',
             'hover:underline decoration-purple-500/50 underline-offset-2',
             'transition-all duration-150',
@@ -91,17 +91,17 @@ export const InferenceLink: React.FC<InferenceLinkProps> = ({
           {/* Tooltip */}
           {showTooltip && (
             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50">
-              <span className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 rounded-lg shadow-lg whitespace-nowrap">
-                <span className="p-1 bg-purple-100 dark:bg-purple-900/30 rounded">
-                  <Lightbulb className="w-5.5 h-5.5 text-purple-600 dark:text-purple-400" />
+              <span className="flex items-center gap-2 px-3 py-2 bg-white border border-purple-200 rounded-lg shadow-lg whitespace-nowrap">
+                <span className="p-1 bg-purple-100 rounded">
+                  <Lightbulb className="w-5.5 h-5.5 text-purple-600" />
                 </span>
                 <span>
-                  <span className="block text-sm font-medium text-gray-900 dark:text-gray-100 leading-tight">{t('apps.inferenceGraph.title')}</span>
-                  <span className="block text-xs text-gray-500 dark:text-gray-400 leading-tight">{t('apps.inferenceGraph.clickToViewDetail')}</span>
+                  <span className="block text-sm font-medium text-gray-900 leading-tight">{t('apps.inferenceGraph.title')}</span>
+                  <span className="block text-xs text-gray-500 leading-tight">{t('apps.inferenceGraph.clickToViewDetail')}</span>
                 </span>
               </span>
               {/* 箭头 */}
-              <span className="absolute left-1/2 -translate-x-1/2 top-0 translate-y-1/2 rotate-45 w-2 h-2 bg-white dark:bg-gray-800 border-r border-b border-purple-200 dark:border-purple-800"></span>
+              <span className="absolute left-1/2 -translate-x-1/2 top-0 translate-y-1/2 rotate-45 w-2 h-2 bg-white border-r border-b border-purple-200"></span>
             </span>
           )}
           {children}

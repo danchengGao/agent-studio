@@ -98,7 +98,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
       {/* 内容区域 - 可滚动 */}
       <div className={`flex-1 overflow-auto ${prefersReducedMotion ? '' : 'scroll-smooth'}`}>
         <article
-          className="max-w-5xl mx-auto bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 md:p-8 min-h-[200px]"
+          className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 min-h-[200px]"
           aria-label={`${t('apps.report.reportLabel')}: ${report.title || t('apps.report.unnamedReport')}`}
           aria-busy={loadingState === 'loading'}
           role="article"
@@ -106,25 +106,25 @@ export const ReportView: React.FC<ReportViewProps> = ({
           {loadingState === 'loading' ? (
             // 加载骨架屏
             <div className="animate-pulse space-y-3" aria-hidden="true">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-11/12"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/5"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-11/12"></div>
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-4/5"></div>
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
             </div>
           ) : loadingState === 'empty' ? (
             // 空状态提示
             <div className="flex flex-col items-center justify-center py-16">
-              <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
-              <p className="text-gray-500 dark:text-gray-400 text-sm">{t('apps.report.contentEmpty')}</p>
+              <FileText className="w-12 h-12 text-gray-300 mb-4" />
+              <p className="text-gray-500 text-sm">{t('apps.report.contentEmpty')}</p>
             </div>
           ) : loadingState === 'timeout' ? (
             // 超时错误提示
             <div className="flex flex-col items-center justify-center py-16">
               <AlertCircle className="w-12 h-12 text-amber-500 mb-4" />
-              <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">{t('apps.report.loadingTimeout')}</p>
-              <p className="text-gray-500 dark:text-gray-400 text-sm text-center">{t('apps.report.timeoutMessage')}</p>
+              <p className="text-gray-700 font-medium mb-1">{t('apps.report.loadingTimeout')}</p>
+              <p className="text-gray-500 text-sm text-center">{t('apps.report.timeoutMessage')}</p>
             </div>
           ) : (
             // 正常内容

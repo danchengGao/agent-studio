@@ -5,6 +5,26 @@
 import type { InferMessage, DeepSearchResult, Report } from '@/pages/Apps/types';
 import { MESSAGE_TITLES } from '@/stores/useConversationStore';
 
+// ==================== 内容清理 ====================
+
+/**
+ * 清理报告内容中的引用标记
+ * 删除 [citation:n] 格式的引用标记及其周围的空格
+ *
+ * @param content - 原始内容
+ * @returns 清理后的内容
+ *
+ * @example
+ * cleanReportContent('这是内容[citation:1]需要清理') // '这是内容需要清理'
+ * cleanReportContent('这是内容 [ citation : 1 ] 需要清理') // '这是内容 需要清理'
+ */
+export function cleanReportContent(content: string): string {
+  if (!content) return '';
+  // 清理 citation 引用标记：删除 [citation:n] 及其内部可能存在的空格
+  // 格式：前导空格 + [ + 空格 + citation + 空格 + : + 空格 + 数字 + 空格 + ] + 后续空格
+  return content.replace(/ *\[ *citation *: *\d+ *\] */g, '');
+}
+
 // ==================== 标题提取 ====================
 
 /**
@@ -63,15 +83,18 @@ export function buildReportFromDeepSearch(
   messageCreatedAt: number,
   deepSearchResult: DeepSearchResult
 ): Report {
+  // 清理内容中的引用标记
+  const responseContent = cleanReportContent(deepSearchResult.response_content || '');
+
   // 提取标题，如果没有则使用语言无关的常量标识
-  const extractedTitle = extractTitleFromMarkdown(deepSearchResult.response_content || '');
+  const extractedTitle = extractTitleFromMarkdown(responseContent);
   const title = extractedTitle || MESSAGE_TITLES.FINAL_REPORT;
 
   return {
     id: messageId,
     title,
     createdAt: new Date(messageCreatedAt || Date.now()).toISOString(),
-    response_content: deepSearchResult.response_content || '',
+    response_content: responseContent,
     citation_messages: deepSearchResult.citation_messages || null,
     infer_messages: deepSearchResult.infer_messages || [],
   };

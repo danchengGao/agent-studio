@@ -41,7 +41,7 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
   const fullDateTime = formatFullDateTime(report.createdAt, i18n.language)
 
   return (
-    <div className={`flex-shrink-0 flex justify-between items-center border-b border-blue-100/60 bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 dark:border-gray-700 pb-4 mb-4 px-6 pt-5 shadow-sm dark:shadow-none ${className}`}>
+    <div className={`flex-shrink-0 flex justify-between items-center border-b border-blue-100/60 bg-white/80 backdrop-blur-sm pb-4 mb-4 px-6 pt-5 shadow-sm ${className}`}>
       {/* 左侧：图标和标题 */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* 图标容器 */}
@@ -51,12 +51,12 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
 
         {/* 标题和时间信息 */}
         <div className="min-w-0 flex-1">
-          <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight truncate">
+          <h2 className="text-base sm:text-lg font-bold text-gray-900 leading-tight truncate">
             {report.title}
           </h2>
           <div className="flex items-center gap-2 sm:gap-3 mt-1 text-xs">
             {/* 相对时间 - 使用语义化的 time 元素 */}
-            <div className="group relative flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-medium cursor-help">
+            <div className="group relative flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full font-medium cursor-help">
               <Clock className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
               <time
                 dateTime={datetime}
@@ -66,7 +66,7 @@ export const ReportHeader: React.FC<ReportHeaderProps> = ({
                 {displayText}
               </time>
               {/* Tooltip */}
-              <div className="absolute -bottom-8 left-0 hidden group-hover:block bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50">
+              <div className="absolute -bottom-8 left-0 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50">
                 {fullDateTime}
               </div>
             </div>

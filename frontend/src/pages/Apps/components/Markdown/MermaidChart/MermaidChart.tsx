@@ -22,12 +22,12 @@ const ChartError: React.FC<{
   code: string
   viewCodeLabel: string
 }> = ({ title, message, code, viewCodeLabel }) => (
-  <div className="border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 rounded-lg p-4 my-4">
-    <p className="text-sm font-medium text-red-700 dark:text-red-300">{title}</p>
-    <p className="text-sm text-red-600 dark:text-red-400 mt-1">{message}</p>
+  <div className="border border-red-200 bg-red-50 rounded-lg p-4 my-4">
+    <p className="text-sm font-medium text-red-700">{title}</p>
+    <p className="text-sm text-red-600 mt-1">{message}</p>
     <details className="mt-2">
       <summary className="cursor-pointer text-xs text-red-500">{viewCodeLabel}</summary>
-      <pre className="mt-2 text-xs p-2 bg-red-100 dark:bg-red-900/30 rounded overflow-auto max-h-40">
+      <pre className="mt-2 text-xs p-2 bg-red-100 rounded overflow-auto max-h-40">
         {code}
       </pre>
     </details>
@@ -137,7 +137,7 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
   return (
     <div
       ref={ref}
-      className="flex justify-center items-center overflow-x-auto rounded-lg bg-white dark:bg-slate-800"
+      className="flex justify-center items-center overflow-x-auto rounded-lg bg-white"
       style={{ minHeight: '100px' }}
     />
   )

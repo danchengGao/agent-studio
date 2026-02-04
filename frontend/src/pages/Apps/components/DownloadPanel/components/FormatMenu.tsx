@@ -74,11 +74,11 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
       <DropdownMenu.Content
         align="end"
         sideOffset={8}
-        className="z-[9999] w-48 min-w-[12rem] bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100/50 dark:border-gray-700/50 overflow-hidden"
+        className="z-[9999] w-48 min-w-[12rem] bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-gray-100/50 overflow-hidden"
         side="bottom"
       >
         {/* 标题区域 */}
-        <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 border-b border-blue-600 dark:border-blue-700">
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 border-b border-blue-600">
           <div className="flex items-center gap-2">
             {isDownloading ? (
               <Loader2 className="w-4 h-4 text-white animate-spin" aria-hidden="true" />
@@ -105,11 +105,11 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
                   group relative flex items-center justify-between
                   px-4 py-3 text-sm transition-all duration-200
                   cursor-pointer outline-none
-                  data-[highlighted]:bg-blue-500 data-[highlighted]:dark:bg-blue-600
+                  data-[highlighted]:bg-blue-500
                   data-[highlighted]:text-white
                   ${isOptionDisabled
-                    ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-blue-500 dark:hover:bg-blue-600 hover:text-white'
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-700 hover:bg-blue-500 hover:text-white'
                   }
                 `}
               >
@@ -121,7 +121,7 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
                       ${
                         isOptionDisabled
                           ? 'text-gray-400'
-                          : 'text-blue-500 dark:text-blue-400 group-hover:text-white dark:group-hover:text-white'
+                          : 'text-blue-500 group-hover:text-white'
                       }
                     `}
                     aria-hidden="true"
@@ -139,7 +139,7 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
                     text-xs px-2 py-0.5 rounded-full font-mono transition-colors duration-200
                     ${isOptionDisabled
                       ? 'bg-gray-100 text-gray-400'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover:bg-white/30 dark:group-hover:bg-white/20 group-hover:text-white'
+                      : 'bg-gray-100 text-gray-500 group-hover:bg-white/30 group-hover:text-white'
                     }
                   `}
                   aria-hidden="true"
@@ -152,7 +152,7 @@ export const FormatMenu: React.FC<FormatMenuProps> = ({
         </DropdownMenu.Group>
 
         {/* 箭头 */}
-        <DropdownMenu.Arrow className="fill-white dark:fill-gray-800" />
+        <DropdownMenu.Arrow className="fill-white" />
       </DropdownMenu.Content>
     </DropdownMenu.Portal>
   )
