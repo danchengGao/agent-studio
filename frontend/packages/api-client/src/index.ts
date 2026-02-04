@@ -244,7 +244,12 @@ export type {
   WebSearchEngineCreateRequest,
   WebSearchEngineCreateResponse,
   WebSearchEngineListResponse,
-  WebSearchEngineDeleteResponse
+  WebSearchEngineDeleteResponse,
+  WebSearchEngineUpdateRequest,
+  WebSearchEngineUpdateResponse,
+  WebSearchEngineDetailResponse,
+  WebSearchEngineTestRequest,
+  WebSearchEngineTestResponse
 } from './services/webSearchEngineService'
 
 // Hooks

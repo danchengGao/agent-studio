@@ -90,6 +90,23 @@ export interface WebSearchEngineDetailResponse {
   }
 }
 
+/**
+ * 搜索引擎测试请求
+ */
+export interface WebSearchEngineTestRequest {
+  query: string
+}
+
+/**
+ * 搜索引擎测试响应
+ */
+export interface WebSearchEngineTestResponse {
+  code: number
+  msg: string
+  search_engine_name: string
+  datas: Record<string, any>[]
+}
+
 // ==================== 搜索引擎服务 ====================
 
 /**
@@ -165,7 +182,6 @@ export const webSearchEngineService = {
   async getEngine(spaceId: string, engineId: number): Promise<{
     search_engine_name: string
     search_url: string
-    search_api_key: string
   }> {
     const client = getApiClient()
     const response = await client.get<WebSearchEngineDetailResponse>(
@@ -176,8 +192,7 @@ export const webSearchEngineService = {
     const data = response.data as any
     return {
       search_engine_name: data.search_engine_name || data.data?.search_engine_name || '',
-      search_url: data.search_url || data.data?.search_url || '',
-      search_api_key: data.search_api_key || data.data?.search_api_key || ''
+      search_url: data.search_url || data.data?.search_url || ''
     }
   },
 
@@ -210,5 +225,55 @@ export const webSearchEngineService = {
       '/agent/deepsearch/web_search',
       request
     )
+  },
+
+  /**
+   * 测试搜索引擎
+   * @param spaceId - 用户空间ID
+   * @param engineId - 搜索引擎ID
+   * @param query - 测试查询
+   * @returns 测试结果
+   */
+  async testEngine(
+    spaceId: string,
+    engineId: number,
+    query: string
+  ): Promise<WebSearchEngineTestResponse> {
+    const client = getApiClient()
+
+    const request: WebSearchEngineTestRequest = {
+      query
+    }
+
+    try {
+      const response = await client.post<WebSearchEngineTestResponse>(
+        `/agent/deepsearch/web_search/${spaceId}/${engineId}`,
+        request,
+        {
+          // 关键：让 axios 不将 4xx/5xx 视为错误，这样就不会触发全局拦截器的 Snackbar
+          validateStatus: (status) => status < 600  // 接受所有状态码
+        }
+      )
+
+      // 检查响应状态码 - 接受所有 2xx 状态码为成功
+      if (response.status < 200 || response.status >= 300) {
+        // 业务错误（4xx/5xx），返回错误响应对象
+        const errorData = response.data as any
+        let errorMessage = errorData?.detail || errorData?.msg || errorData?.message || '测试失败'
+
+        return {
+          code: response.status,
+          msg: errorMessage,
+          search_engine_name: '',
+          datas: []
+        }
+      }
+
+      return response.data
+    } catch (error: any) {
+      // 只有真正的网络错误才会进入这里
+      console.error('测试搜索引擎失败:', error)
+      throw error
+    }
   }
 }

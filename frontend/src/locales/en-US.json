@@ -894,6 +894,23 @@
             "title": "Configuration failed",
             "suggestion": "Please check your input and try again"
           }
+        },
+        "test": {
+          "title": "Test Search Engine",
+          "engineLabel": "Test Engine:",
+          "queryLabel": "Test Query",
+          "queryPlaceholder": "Enter content to search",
+          "quickQuestions": {
+            "ai": "Latest AI developments",
+            "react": "React framework tutorial",
+            "programming": "How to learn programming"
+          },
+          "startTest": "Start Test",
+          "testing": "Testing...",
+          "testFailed": "Test Failed",
+          "testResult": "Test Result",
+          "noResults": "Test successful, but no search results found",
+          "networkError": "Network connection failed, please check network settings and try again"
         }
       },
       "knowledge": {

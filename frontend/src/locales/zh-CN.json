@@ -904,6 +904,23 @@
             "title": "配置失败",
             "suggestion": "请检查输入信息后重试"
           }
+        },
+        "test": {
+          "title": "测试搜索引擎",
+          "engineLabel": "测试引擎:",
+          "queryLabel": "测试查询",
+          "queryPlaceholder": "输入要搜索的内容",
+          "quickQuestions": {
+            "ai": "人工智能最新进展",
+            "react": "React框架入门教程",
+            "programming": "如何学习编程"
+          },
+          "startTest": "开始测试",
+          "testing": "测试中...",
+          "testFailed": "测试失败",
+          "testResult": "测试结果",
+          "noResults": "测试成功，但未找到搜索结果",
+          "networkError": "网络连接失败，请检查网络设置后重试"
         }
       },
       "knowledge": {

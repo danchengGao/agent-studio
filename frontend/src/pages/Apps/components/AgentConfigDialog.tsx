@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useCallback } from 'react'
-import { X, Check, Settings, Search, FileText, Loader2, AlertCircle, Plus, Edit, Trash2 } from 'lucide-react'
+import { X, Check, Settings, Search, FileText, Loader2, AlertCircle, Plus, Edit, Trash2, Play } from 'lucide-react'
+import { IconButton, Tooltip } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { MentionItem } from './MentionPicker'
 import { RADIUS_CONTAINER, RADIUS_BUTTON, RADIUS_CIRCLE } from '../constants/styles'
@@ -16,6 +17,7 @@ import { useTemplateApi } from './hooks/useTemplateApi'
 import { useWebSearchEngineApi } from './hooks/useWebSearchEngineApi'
 import { deepsearchTemplateService } from '@test-agentstudio/api-client'
 import DeleteConfirmationDialog from '../../../components/Common/DeleteConfirmationDialog'
+import UnifiedSnackbar, { useUnifiedSnackbar } from '../../../Common/UnifiedSnackbar'
 import { DEFAULT_DEEPSEARCH_CONFIG } from '../utils/deepsearchConstants'
 
 // 导入新的配置标签系统
@@ -148,6 +150,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   isFirstConfig = false
 }) => {
   const { t } = useTranslation()
+  const { snackbar, closeSnackbar } = useUnifiedSnackbar()
   const [showSaved, setShowSaved] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -161,6 +164,45 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     engineId: number
     spaceId: string
   } | null>(null)
+
+  // ===== 新增：搜索引擎测试相关状态 =====
+  const [showTestDialog, setShowTestDialog] = useState(false)
+  const [testEngineName, setTestEngineName] = useState('')
+  const [testEngineId, setTestEngineId] = useState<number | null>(null)
+  const [testQuery, setTestQuery] = useState('')
+  const [testResults, setTestResults] = useState<Record<string, any>[] | null>(null)
+  const [testError, setTestError] = useState<string | null>(null)
+  const [isTesting, setIsTesting] = useState(false)
+
+  // 格式化测试结果（限制字符串长度避免过长）
+  const formatTestResult = (result: Record<string, any>): string => {
+    const maxStringLength = 500  // 限制单个字符串最大长度
+    const maxDepth = 5           // 限制嵌套深度
+
+    const stringify = (obj: any, depth: number = 0): string => {
+      if (depth > maxDepth) return '"..."'
+
+      if (typeof obj === 'string' && obj.length > maxStringLength) {
+        return JSON.stringify(obj.substring(0, maxStringLength) + '... (truncated)')
+      }
+
+      if (typeof obj === 'object' && obj !== null) {
+        if (Array.isArray(obj)) {
+          return '[' + obj.map(item => stringify(item, depth + 1)).join(', ') + ']'
+        } else {
+          const entries = Object.entries(obj).map(([key, value]) => {
+            const strVal = stringify(value, depth + 1)
+            return `"${key}": ${strVal}`
+          })
+          return '{' + entries.join(', ') + '}'
+        }
+      }
+
+      return JSON.stringify(obj)
+    }
+
+    return stringify(result, 0)
+  }
 
   // ===== 新增：知识库相关状态 =====
   const [showKnowledgeBaseSelector, setShowKnowledgeBaseSelector] = useState(false)
@@ -559,6 +601,63 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     })
   }
 
+  // 测试搜索引擎
+  const handleTestEngine = async (engineId: number) => {
+    if (!spaceId) return
+
+    // 获取引擎信息以设置对话框标题
+    const engine = engines.find(e => e.web_search_engine_id === engineId)
+    if (!engine) return
+
+    setTestEngineId(engineId)
+    setTestEngineName(engine.search_engine_name)
+    setShowTestDialog(true)
+    setTestQuery('')
+    setTestResults(null)
+  }
+
+  // 执行测试
+  const handleExecuteTest = async () => {
+    if (!spaceId || testEngineId === null || !testQuery.trim()) return
+
+    setIsTesting(true)
+    setTestResults(null)
+    setTestError(null)  // 重置错误状态
+
+    try {
+      const { webSearchEngineService } = await import('@test-agentstudio/api-client')
+      const response = await webSearchEngineService.testEngine(
+        spaceId,
+        testEngineId,
+        testQuery.trim()
+      )
+
+      if (response.code >= 200 && response.code < 300) {
+        // 测试成功
+        setTestResults(response.datas || [])
+        setTestError(null)
+      } else {
+        // 业务失败（如API Key无效、权限错误等）- 在对话框内显示
+        setTestResults(null)
+        setTestError(response.msg || t('apps.config.engine.test.testFailed'))
+      }
+    } catch (err) {
+      // 只有网络/系统错误才会进入这里
+      console.error('测试搜索引擎失败:', err)
+      setTestResults(null)
+      setTestError(null)
+
+      const errorMessage = err instanceof Error ? err.message : t('apps.config.engine.test.networkError')
+
+      snackbar({
+        message: errorMessage,
+        severity: 'error',
+      })
+    } finally {
+      setIsTesting(false)
+    }
+  }
+
   // 查看模板
   const handleViewTemplate = async (templateId: number) => {
     const template = templates.find(t => t.template_id === templateId)
@@ -794,6 +893,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
             }
           })
         }}
+        onTestEngine={handleTestEngine}
         onCreateNew={() => {
           setShowEngineForm(true)
         }}
@@ -857,6 +957,172 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
         initialSelected={config.selectedKnowledgeBaseIds}
         onConfirm={handleConfirmKnowledgeBases}
       />
+
+      {/* 搜索引擎测试对话框 */}
+      {showTestDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className={`bg-white ${RADIUS_CONTAINER} shadow-2xl w-full max-w-lg mx-4 overflow-hidden`}>
+            {/* 头部 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">{t('apps.config.engine.test.title')}</h2>
+              <button
+                onClick={() => {
+                  setShowTestDialog(false)
+                  setTestQuery('')
+                  setTestResults(null)
+                  setTestError(null)
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 内容 */}
+            <div className="px-6 py-4">
+              <p className="text-sm text-gray-600 mb-4">
+                {t('apps.config.engine.test.engineLabel')} <span className="font-medium text-gray-900">{testEngineName}</span>
+              </p>
+
+              {/* 测试输入 */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('apps.config.engine.test.queryLabel')}
+                </label>
+                <input
+                  type="text"
+                  value={testQuery}
+                  onChange={e => setTestQuery(e.target.value)}
+                  onKeyPress={e => {
+                    if (e.key === 'Enter' && !isTesting && testQuery.trim()) {
+                      handleExecuteTest()
+                    }
+                  }}
+                  placeholder={t('apps.config.engine.test.queryPlaceholder')}
+                  className={`
+                    w-full px-3 py-2 ${RADIUS_BUTTON} border border-gray-300
+                    text-sm text-gray-900 placeholder-gray-400
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                  `}
+                  disabled={isTesting}
+                />
+              </div>
+
+              {/* 快捷测试问题 */}
+              <div className="mb-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setTestQuery(t('apps.config.engine.test.quickQuestions.ai'))}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    disabled={isTesting}
+                  >
+                    {t('apps.config.engine.test.quickQuestions.ai')}
+                  </button>
+                  <button
+                    onClick={() => setTestQuery(t('apps.config.engine.test.quickQuestions.react'))}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    disabled={isTesting}
+                  >
+                    {t('apps.config.engine.test.quickQuestions.react')}
+                  </button>
+                  <button
+                    onClick={() => setTestQuery(t('apps.config.engine.test.quickQuestions.programming'))}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                    disabled={isTesting}
+                  >
+                    {t('apps.config.engine.test.quickQuestions.programming')}
+                  </button>
+                </div>
+              </div>
+
+              {/* 测试按钮 */}
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={handleExecuteTest}
+                  disabled={!testQuery.trim() || isTesting}
+                  className={`
+                    px-4 py-2 text-sm font-medium ${RADIUS_BUTTON} transition-all duration-200 flex items-center gap-2
+                    ${!testQuery.trim() || isTesting
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
+                    }
+                  `}
+                >
+                  {isTesting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {t('apps.config.engine.test.testing')}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4" />
+                      {t('apps.config.engine.test.startTest')}
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTestDialog(false)
+                    setTestQuery('')
+                    setTestResults(null)
+                    setTestError(null)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg transition-all duration-200"
+                  disabled={isTesting}
+                >
+                  {t('common.cancel')}
+                </button>
+              </div>
+
+              {/* 测试结果或错误 */}
+              {(testResults !== null || testError !== null) && (
+                <div className="border-t border-gray-200 pt-4">
+                  {/* 错误显示 */}
+                  {testError && (
+                    <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium mb-1">{t('apps.config.engine.test.testFailed')}</h4>
+                          <p className="text-sm break-words whitespace-normal max-h-32 overflow-y-auto">
+                            {testError}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 结果显示 */}
+                  {testResults !== null && !testError && (
+                    <>
+                      <h3 className="text-sm font-medium text-gray-900 mb-3">
+                        {t('apps.config.engine.test.testResult')} {testResults.length > 0 && `(${testResults.length}条)`}
+                      </h3>
+                      {testResults.length === 0 ? (
+                        <p className="text-sm text-gray-500 text-center py-4">{t('apps.config.engine.test.noResults')}</p>
+                      ) : (
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                          {testResults.map((result, index) => (
+                            <div
+                              key={index}
+                              className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+                            >
+                              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-all font-mono">{formatTestResult(result)}</pre>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 全局通知 */}
+      <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />
     </>
   )
 }
@@ -874,6 +1140,7 @@ interface WebSearchEngineSelectorDialogProps {
   onConfirm: (engineId: number | undefined) => void
   onEditEngine: (engineId: number) => void
   onDeleteEngine: (engineId: number) => void
+  onTestEngine?: (engineId: number) => void  // 新增：测试回调
   onCreateNew: () => void
 }
 
@@ -887,10 +1154,11 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
   onConfirm,
   onEditEngine,
   onDeleteEngine,
+  onTestEngine,
   onCreateNew,
 }) => {
   const { t } = useTranslation()
-  const [engines, setEngines] = useState<Array<{ id: number; name: string }>>([])
+  const [engines, setEngines] = useState<Array<{ id: number; name: string; isActive: boolean }>>([])
   const [loading, setLoading] = useState(false)
   const [selectedId, setSelectedId] = useState<number | undefined>(currentSelectedId)
 
@@ -902,7 +1170,11 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
     try {
       const { webSearchEngineService } = await import('@test-agentstudio/api-client')
       const response = await webSearchEngineService.listEngines(spaceId)
-      setEngines(response.map(e => ({ id: e.web_search_engine_id, name: e.search_engine_name })))
+      setEngines(response.map(e => ({
+        id: e.web_search_engine_id,
+        name: e.search_engine_name,
+        isActive: e.is_active ?? true
+      })))
     } catch (err) {
       console.error('Failed to load engines:', err)
     } finally {
@@ -969,41 +1241,66 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
                   <div
                     key={engine.id}
                     className={`
-                      px-3 py-2 ${RADIUS_BUTTON} border-2 transition-all duration-200 cursor-pointer
+                      px-3 py-2 ${RADIUS_BUTTON} border-2 cursor-pointer transition-all duration-200
                       ${selectedId === engine.id
                         ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       }
                     `}
-                    onClick={() => setSelectedId(engine.id)}
+                    onClick={() => {
+                      // 如果点击的是已选中的引擎，则取消选中；否则选中该引擎
+                      setSelectedId(selectedId === engine.id ? undefined : engine.id)
+                    }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
                           🔍
                         </div>
-                        <p className="text-sm font-medium text-gray-900 truncate">{engine.name}</p>
+                        <p className="text-sm font-medium truncate text-gray-900">
+                          {engine.name}
+                        </p>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onEditEngine(engine.id)
-                          }}
-                          className="p-1 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        {selectedId !== engine.id && (
-                          <button
+                        {onTestEngine && (
+                          <Tooltip title="测试">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onTestEngine(engine.id)
+                              }}
+                              className="text-gray-700 hover:text-blue-600 hover:bg-blue-50"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title="编辑">
+                          <IconButton
+                            size="small"
                             onClick={(e) => {
                               e.stopPropagation()
-                              onDeleteEngine(engine.id)
+                              onEditEngine(engine.id)
                             }}
-                            className="p-1 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                            className="text-gray-700 hover:text-blue-600 hover:bg-blue-50"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                            <Edit className="w-4 h-4" />
+                          </IconButton>
+                        </Tooltip>
+                        {selectedId !== engine.id && (
+                          <Tooltip title="删除">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onDeleteEngine(engine.id)
+                              }}
+                              className="text-gray-700 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </IconButton>
+                          </Tooltip>
                         )}
                         {selectedId === engine.id && (
                           <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
@@ -1084,7 +1381,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
           const engineData = await webSearchEngineService.getEngine(spaceId, editingEngineId)
           console.log('[WebSearchEngineConfigDialog] Data received:', engineData)
           setEngineName(engineData.search_engine_name || '')
-          setApiKey(engineData.search_api_key || '')
+          setApiKey('')
           setSearchUrl(engineData.search_url || '')
           console.log('[WebSearchEngineConfigDialog] Form state set successfully')
         } catch (err) {
