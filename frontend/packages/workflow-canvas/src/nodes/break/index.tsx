@@ -11,7 +11,6 @@ import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
 import { t } from '../../i18n'
 
-const index = 0
 export const BreakNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Break,
   meta: {
@@ -36,7 +35,7 @@ export const BreakNodeRegistry: FlowNodeRegistry = {
       id: `break_${customNanoid(5)}`,
       type: WorkflowNodeType.Break,
       data: {
-        title: `跳出循环`,
+        title: t('workflowCanvas.nodes.break.title'),
       },
     }
   },

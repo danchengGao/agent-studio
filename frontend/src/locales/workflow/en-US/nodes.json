@@ -21,11 +21,52 @@
     },
     "condition": {
       "titlePrefix": "Selector",
-      "description": "Connect multiple downstream branches. Only the branch that meets the set condition will be executed."
+      "description": "Connect multiple downstream branches. Only the branch that meets the set condition will be executed.",
+      "typeMismatch": "Expected {{expectedType}} type, but got {{actualType}} type",
+      "type": {
+        "array": "array",
+        "object": "object",
+        "string": "string",
+        "number": "number",
+        "integer": "integer",
+        "boolean": "boolean"
+      },
+      "invalidDateTimeFormat": "Expected date-time format (ISO 8601), e.g.: 2026-01-09T15:44:53.043Z",
+      "conditionValueCannotBeEmpty": "Condition value cannot be empty",
+      "conditionValueRequired": "Condition value is required",
+      "pleaseSelectVariableToCheck": "Please select a variable to check",
+      "pleaseSelectLeftValue": "Please select left value",
+      "pleaseSelectRightValue": "Please select right value",
+      "ifBranchMustBeConnected": "\"If\" branch must be connected to a node",
+      "elseBranchMustBeConnected": "\"Else\" branch must be connected to a node",
+      "elseIfBranchMustBeConnected": "\"Else If\" branch must be connected to a node",
+      "branchType": {
+        "if": "\"If\"",
+        "else": "\"Else\"",
+        "elseIf": "\"Else If\""
+      },
+      "branchesMustBeConnected": "The following branches must be connected to nodes: {{types}}"
     },
     "loop": {
       "titlePrefix": "Loop",
-      "description": "Repeat a series of tasks by setting iteration count and logic."
+      "description": "Repeat a series of tasks by setting iteration count and logic.",
+      "loopCountCannotBeEmpty": "Loop count cannot be empty",
+      "loopCountVariableNotFound": "Loop count referenced variable not found",
+      "loopCountMustBePositive": "Loop count must be greater than 0",
+      "loopCountExceedsLimit": "Loop count cannot exceed 1000",
+      "loopCountMustBeNumber": "Loop count must be a number",
+      "loopArrayConfigCannotBeEmpty": "Loop array configuration cannot be empty",
+      "atLeastOneArrayVariable": "At least one array variable is required",
+      "arrayVariableNameCannotBeEmpty": "Array variable name cannot be empty",
+      "intermediateVarCannotBeEmpty": "Intermediate variable \"{{field}}\" cannot be empty",
+      "intermediateVarNotFound": "Intermediate variable \"{{field}}\" referenced variable not found",
+      "arrayVariableValueCannotBeEmpty": "Array variable \"{{field}}\" value cannot be empty",
+      "arrayVariableCannotBeEmpty": "Array variable \"{{field}}\" cannot be empty",
+      "arrayVariableNotFound": "Array variable \"{{field}}\" referenced variable not found",
+      "arrayVariableMustBeArray": "Array variable \"{{field}}\" must be an array type",
+      "arrayVariableCannotBeEmptyArray": "Array variable \"{{field}}\" cannot be an empty array",
+      "loopBodyMustContainStartAndEnd": "Loop body must contain start and end nodes",
+      "loopBodyMustHaveCompletePath": "Loop body must have a complete path from start to end"
     },
     "input": {
       "titlePrefix": "Input",
@@ -54,7 +95,13 @@
     },
     "intent": {
       "titlePrefix": "Intent",
-      "description": "Intent recognition node for matching different intents based on different user inputs."
+      "description": "Intent recognition node for matching different intents based on different user inputs.",
+      "atLeastOneIntent": "At least one intent is required",
+      "intentNameCannotBeEmpty": "Intent {{index}} name cannot be empty",
+      "intentNameTooLong": "Intent {{index}} name cannot exceed 50 characters",
+      "intentMustBeConnected": "Intent \"{{name}}\" must be connected to a node",
+      "intentsMustBeConnected": "The following intents must be connected to nodes: {{names}}",
+      "otherIntentMustBeConnected": "Other intent port must be connected to a node"
     },
     "textEditor": {
       "titlePrefix": "Text_Editor",
@@ -79,15 +126,19 @@
       "description": "Execute nested sub-workflows"
     },
     "continue": {
+      "title": "Continue",
       "description": "Continue node for skipping the current iteration and continuing to the next iteration in a loop."
     },
     "break": {
+      "title": "Break",
       "description": "Break node for immediately exiting a loop."
     },
     "blockStart": {
+      "title": "Start",
       "description": "Start node of a block."
     },
     "blockEnd": {
+      "title": "End",
       "description": "End node of a block."
     },
     "variable": {

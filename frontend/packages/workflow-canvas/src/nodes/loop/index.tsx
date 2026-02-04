@@ -124,7 +124,7 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
             },
             moveDisable: false,
           },
-          data: { title: t('workflowCanvas.block.start') },
+          data: { title: t('workflowCanvas.nodes.blockStart.title') },
         },
         {
           id: `block_end_${customNanoid(5)}`,
@@ -137,7 +137,7 @@ export const LoopNodeRegistry: FlowNodeRegistry = {
 
             moveDisable: false,
           },
-          data: { title: t('workflowCanvas.block.end') },
+          data: { title: t('workflowCanvas.nodes.blockEnd.title') },
         },
       ],
     }

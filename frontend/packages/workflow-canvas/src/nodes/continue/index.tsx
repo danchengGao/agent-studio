@@ -36,7 +36,7 @@ export const ContinueNodeRegistry: FlowNodeRegistry = {
       id: `continue_${customNanoid(5)}`,
       type: WorkflowNodeType.Continue,
       data: {
-        title: `继续循环`,
+        title: t('workflowCanvas.nodes.continue.title'),
       },
     }
   },

@@ -21,11 +21,52 @@
     },
     "condition": {
       "titlePrefix": "选择器",
-      "description": "连接多个下游分支。只有满足设定条件的对应分支才会被执行。"
+      "description": "连接多个下游分支。只有满足设定条件的对应分支才会被执行。",
+      "typeMismatch": "期望{{expectedType}}类型，但输入的是{{actualType}}类型",
+      "type": {
+        "array": "数组",
+        "object": "对象",
+        "string": "字符串",
+        "number": "数字",
+        "integer": "整数",
+        "boolean": "布尔值"
+      },
+      "invalidDateTimeFormat": "期望日期时间格式（ISO 8601），例如：2026-01-09T15:44:53.043Z",
+      "conditionValueCannotBeEmpty": "条件值不能为空",
+      "conditionValueRequired": "条件值是必需的",
+      "pleaseSelectVariableToCheck": "请选择要判断的变量",
+      "pleaseSelectLeftValue": "请选择左值",
+      "pleaseSelectRightValue": "请选择右值",
+      "ifBranchMustBeConnected": "\"如果\"分支必须连线到节点",
+      "elseBranchMustBeConnected": "\"否则\"分支必须连线到节点",
+      "elseIfBranchMustBeConnected": "\"否则如果\"分支必须连线到节点",
+      "branchType": {
+        "if": "\"如果\"",
+        "else": "\"否则\"",
+        "elseIf": "\"否则如果\""
+      },
+      "branchesMustBeConnected": "以下分支必须连线到节点: {{types}}"
     },
     "loop": {
       "titlePrefix": "循环",
-      "description": "用于通过设置迭代次数和逻辑来重复执行一系列任务。"
+      "description": "用于通过设置迭代次数和逻辑来重复执行一系列任务。",
+      "loopCountCannotBeEmpty": "循环次数不能为空",
+      "loopCountVariableNotFound": "循环次数引用的变量不存在",
+      "loopCountMustBePositive": "循环次数必须大于0",
+      "loopCountExceedsLimit": "循环次数不能超过1000",
+      "loopCountMustBeNumber": "循环次数必须为数字",
+      "loopArrayConfigCannotBeEmpty": "循环数组配置不能为空",
+      "atLeastOneArrayVariable": "至少需要一个数组变量",
+      "arrayVariableNameCannotBeEmpty": "数组变量名不能为空",
+      "intermediateVarCannotBeEmpty": "中间变量 \"{{field}}\" 不能为空",
+      "intermediateVarNotFound": "中间变量 \"{{field}}\" 引用的变量不存在",
+      "arrayVariableValueCannotBeEmpty": "数组变量 \"{{field}}\" 的值不能为空",
+      "arrayVariableCannotBeEmpty": "数组变量 \"{{field}}\" 不能为空",
+      "arrayVariableNotFound": "数组变量 \"{{field}}\" 引用的变量不存在",
+      "arrayVariableMustBeArray": "数组变量 \"{{field}}\" 必须是数组类型",
+      "arrayVariableCannotBeEmptyArray": "数组变量 \"{{field}}\" 不能为空数组",
+      "loopBodyMustContainStartAndEnd": "循环体必须包含开始和结束节点",
+      "loopBodyMustHaveCompletePath": "循环体必须有从开始到结束的完整路径"
     },
     "input": {
       "titlePrefix": "输入",
@@ -54,7 +95,13 @@
     },
     "intent": {
       "titlePrefix": "意图识别",
-      "description": "意图识别节点，用于根据用户不同的输入匹配不同的意图。"
+      "description": "意图识别节点，用于根据用户不同的输入匹配不同的意图。",
+      "atLeastOneIntent": "至少需要添加一个意图",
+      "intentNameCannotBeEmpty": "意图 {{index}} 的名称不能为空",
+      "intentNameTooLong": "意图 {{index}} 的名称长度不能超过50个字符",
+      "intentMustBeConnected": "意图\"{{name}}\"必须连线到节点",
+      "intentsMustBeConnected": "以下意图必须连线到节点: {{names}}",
+      "otherIntentMustBeConnected": "其他意图端口必须连线到节点"
     },
     "textEditor": {
       "titlePrefix": "文本编辑",
@@ -79,15 +126,19 @@
       "description": "可执行嵌套子工作流"
     },
     "continue": {
+      "title": "继续循环",
       "description": "继续节点，用于在循环中跳过当前迭代并继续下一次迭代。"
     },
     "break": {
+      "title": "跳出循环",
       "description": "中断节点，用于在循环中立即退出循环。"
     },
     "blockStart": {
+      "title": "开始",
       "description": "块的起始节点。"
     },
     "blockEnd": {
+      "title": "结束",
       "description": "块的结束节点。"
     },
     "variable": {
