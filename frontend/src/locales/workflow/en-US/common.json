@@ -163,6 +163,18 @@
     "cancel": "Cancel",
     "added": "Added"
   },
+  "textEditor": {
+    "input": "Input",
+    "concatenateTemplate": "String Concatenation Template",
+    "textProcessingMethod": "Text Processing Method",
+    "stringConcatenation": "String Concatenation",
+    "stringSplitting": "String Splitting",
+    "delimiter": "Delimiter",
+    "enterDelimiterToAdd": "Enter delimiter and press Enter to add",
+    "add": "Add",
+    "addCustomDelimiter": "+ Add Custom Delimiter",
+    "selectDelimiter": "Please select delimiters (multiple allowed)"
+  },
   "draggableList": {
     "add": "Add",
     "noData": "No data, click button below to add"
