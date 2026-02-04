@@ -7,6 +7,8 @@ from typing import List, Any, Optional
 
 from fastapi import status
 from openjiuwen.core.common.logging import logger
+from openjiuwen_studio.core.common.language_thread_context import get_language
+from openjiuwen_studio.core.common.agent_defaults import AgentDefaults
 
 from openjiuwen_studio.core.common import dsl
 from openjiuwen_studio.core.common.dsl import AgentType, ConstrainConfig, ModelConfig, BaseModelInfo, KBRetrievalConfig
@@ -441,8 +443,8 @@ def react_agent_convert(
 
 
 def workflow_agent_convert(
-    space_id: str, 
-    agent_info: AgentBaseDBPd, 
+    space_id: str,
+    agent_info: AgentBaseDBPd,
     model_details: Optional[dict] = None
 ) -> tuple[Optional[dict], Optional[str]]:
     """Convert Workflow type agent to DSL format"""
@@ -532,6 +534,11 @@ def workflow_agent_convert(
                     if 'timeout' in agent_model_config:
                         model_dsl.model_info.timeout = agent_model_config['timeout']
 
+        if agent_info.default_response and agent_info.default_response.strip():
+            default_response = agent_info.default_response
+        else:
+            default_response = AgentDefaults.DEFAULT_RESPONSE.msg
+
         agent_dsl = dsl.WorkflowAgent(
             id=agent_info.agent_id,
             version="",
@@ -541,7 +548,7 @@ def workflow_agent_convert(
             configs={},
             workflows=workflows_dsl,
             model=model_dsl,
-            default_response=agent_info.default_response if agent_info.default_response and agent_info.default_response.strip() else "抱歉，我无法理解您的问题，请换一种方式表达"
+            default_response=default_response
         )
 
         conversion_duration = time.time() - start_time

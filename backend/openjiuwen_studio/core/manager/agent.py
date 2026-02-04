@@ -20,6 +20,7 @@ from openjiuwen.core.common.logging import logger
 from pydantic import BaseModel, ValidationError
 from pymilvus import connections
 import psutil
+from openjiuwen_studio.core.common.agent_defaults import AgentDefaults
 
 import openjiuwen_studio.core.manager.knowledge_base as kb_mgr
 import openjiuwen_studio.core.manager.convertor.agent as convert
@@ -126,17 +127,9 @@ if TYPE_CHECKING:
     # 只为类型检查器服务，运行时不执行
     AgentBaseDBPd: Type[BaseModel]
 
-DEFAULT_OPENING_REMARKS_ZH = "您好！我是您的智能助手，很高兴为您服务。请问有什么可以帮助您的吗？"
-DEFAULT_OPENING_REMARKS_EN = "Hello! I'm your AI assistant. What can I do for you?"
 DEFAULT_PAGE = 1
 
 
-def get_default_opening_remarks() -> str:
-    """Return default opening remarks according to request language (Accept-Language)."""
-    language = get_language()
-    if language in ("zh-cn", "zh"):
-        return DEFAULT_OPENING_REMARKS_ZH
-    return DEFAULT_OPENING_REMARKS_EN
 DEFAULT_PAGE_SIZE = 10
 
 
@@ -321,7 +314,7 @@ def create_agent_react_info(req: AgentCreate) -> AgentBaseDBPd:
         # plugins=plugins,  # 待plugins功能完善后再获取
         # model=req.model,
         constraint=constraint.model_dump(),
-        opening_remarks=get_default_opening_remarks(),
+        opening_remarks=AgentDefaults.OPENING_REMARKS.msg,
         create_time=current_time,
         update_time=current_time,
     )
