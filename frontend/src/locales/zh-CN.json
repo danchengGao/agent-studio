@@ -666,7 +666,7 @@
     },
     "chat": {
       "welcome": "你好",
-      "welcomeMessage": "选择智能体开始对话，或直接输入你的问题",
+      "welcomeMessage": "请先选择智能体以开始对话",
       "replayHistory": "回放历史",
       "openSSEPanel": "打开 SSE 回放面板",
       "featureNotImplemented": "该功能还未实现",

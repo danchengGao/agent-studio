@@ -656,7 +656,7 @@
     },
     "chat": {
       "welcome": "Hello",
-      "welcomeMessage": "Select an agent to start chatting, or type your question directly",
+      "welcomeMessage": "Please select an agent to start chatting",
       "replayHistory": "Replay History",
       "openSSEPanel": "Open SSE Replay Panel",
       "featureNotImplemented": "This feature is not yet implemented",

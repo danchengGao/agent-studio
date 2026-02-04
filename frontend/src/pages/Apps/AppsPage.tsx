@@ -545,7 +545,7 @@ const AppsPage: React.FC = () => {
   }
 
   const handleSendMessage = async () => {
-    if (inputValue.trim() && !isStreaming) {
+    if (inputValue.trim() && !isStreaming && selectedAgent) {
       const messageToSend = inputValue
       setInputValue('')
 
