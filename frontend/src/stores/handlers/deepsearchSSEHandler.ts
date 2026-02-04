@@ -266,6 +266,7 @@ export class DeepsearchSSEHandler {
         if (lastMessage) {
           updateMessage(lastMessageItems.id, lastMessage.id, {
             content: sseData.content || '',
+            isStreaming: true,
           });
         }
       }
@@ -917,20 +918,53 @@ export class DeepsearchSSEHandler {
             status: TaskStatus.COMPLETED,
           });
         } else {
-          console.warn('[DeepsearchSSEHandler] No pending REPORT message found, creating new one');
-          // 如果没找到，创建新的
-          const finalReportMessage = addSystemMessage(
-            this.conversationId,
-            MessageType.REPORT,
-            endData || '',
-            undefined,  // 与 outline_task 同级
-            MESSAGE_TITLES.FINAL_REPORT,
-            'deepsearch'  // agent 类型
-          );
-          updateMessage(lastMessageItems.id, finalReportMessage.id, {
-            status: TaskStatus.COMPLETED,
-            isStreaming: false,
-          });
+          // 只有在存在 outline 任务时才创建最终报告
+          // 如果没有 outline 任务，说明这不是真正的研究请求，不需要创建最终报告
+          if (outlineTask) {
+            console.warn('[DeepsearchSSEHandler] No pending REPORT message found, creating new one');
+            const finalReportMessage = addSystemMessage(
+              this.conversationId,
+              MessageType.REPORT,
+              endData || '',
+              undefined,  // 与 outline_task 同级
+              MESSAGE_TITLES.FINAL_REPORT,
+              'deepsearch'  // agent 类型
+            );
+            updateMessage(lastMessageItems.id, finalReportMessage.id, {
+              status: TaskStatus.COMPLETED,
+              isStreaming: false,
+            });
+          } else {
+            // 非研究请求：将 response_content 作为普通消息显示
+            console.warn('[DeepsearchSSEHandler] No outline task found, treating as normal message');
+            const content = endData?.response_content || sseData.content || '';
+            if (content && content.trim()) {
+              // 查找 entry 创建的消息并更新其内容
+              const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
+              const lastMessage = lastMessageId ? this.store.getMessageById(lastMessageId) : undefined;
+              if (lastMessage && lastMessage.type === MessageType.TEXT && lastMessage.isStreaming) {
+                updateMessage(lastMessageItems.id, lastMessage.id, {
+                  content: content,
+                  status: TaskStatus.COMPLETED,
+                  isStreaming: false,
+                });
+              } else if (!lastMessage || lastMessage.status === TaskStatus.COMPLETED) {
+                // 如果没有找到正在流式传输的消息，创建新的普通消息
+                const normalMessage = addSystemMessage(
+                  this.conversationId,
+                  MessageType.TEXT,
+                  content,
+                  undefined,
+                  undefined,
+                  'deepsearch'
+                );
+                updateMessage(lastMessageItems.id, normalMessage.id, {
+                  status: TaskStatus.COMPLETED,
+                  isStreaming: false,
+                });
+              }
+            }
+          }
         }
         return;
       }
