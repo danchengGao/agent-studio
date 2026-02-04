@@ -233,6 +233,18 @@
       "arrayFormat": "请输入有效的JSON数组格式"
     }
   },
+  "jsonEditor": {
+    "formatError": "JSON格式错误",
+    "type": {
+      "boolean": "布尔值",
+      "integer": "整数",
+      "number": "数字",
+      "string": "字符串",
+      "object": "对象",
+      "array": "数组"
+    },
+    "arrayElementTypeMismatch": "数组第{{index}}个元素类型不匹配，期望{{expectedType}}类型，实际为{{actualType}}类型"
+  },
   "loop": {
     "title": "循环",
     "nestedLoopNotAllowed": "循环体内部不支持嵌套循环",

@@ -233,6 +233,18 @@
       "arrayFormat": "Please enter a valid JSON array format"
     }
   },
+  "jsonEditor": {
+    "formatError": "JSON format error",
+    "type": {
+      "boolean": "boolean",
+      "integer": "integer",
+      "number": "number",
+      "string": "string",
+      "object": "object",
+      "array": "array"
+    },
+    "arrayElementTypeMismatch": "Array element at index {{index}} type mismatch, expected {{expectedType}}, got {{actualType}}"
+  },
   "loop": {
     "title": "Loop",
     "nestedLoopNotAllowed": "Nested loops are not supported within loop body",
