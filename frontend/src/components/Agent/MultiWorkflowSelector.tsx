@@ -94,6 +94,7 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
 
   const spaceId = getDefaultSpaceId() || ''
   const maxGreetingLength = 2000
+  const maxDefaultResponseLength = 2000
 
   const { validationResults, setValidationResults, validateWorkflows, isValidating, workflowValidationErrorCount } = useWorkflowValidation({
     workflows: workflowObjects,
@@ -557,6 +558,8 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
               rows={4}
               placeholder={t('defaultResponse.placeholder')}
               disabled={readonly}
+              inputProps={{ maxLength: maxDefaultResponseLength }}
+              helperText={`${defaultResponse.length}/${maxDefaultResponseLength}`}
               sx={{
                 '& .MuiInputBase-root.Mui-disabled': { cursor: 'not-allowed' },
                 '& .MuiInputBase-input.Mui-disabled': { cursor: 'not-allowed' },
