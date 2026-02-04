@@ -140,7 +140,11 @@
   },
   "intent": {
     "matching": "意图匹配",
-    "otherIntent": "其他意图"
+    "otherIntent": "其他意图",
+    "defaultIntentName": "意图{{index}}",
+    "enterIntentDescription": "请输入用户意图的描述",
+    "option": "选项",
+    "notConfigured": "未配置"
   },
   "errorHandler": {
     "exceptionHandling": "异常处理",

@@ -51,7 +51,7 @@ const nodeTypeI18nKeys: Record<WorkflowNodeType, string> = {
   [WorkflowNodeType.BlockStart]: 'workflowCanvas.node.Start',
   [WorkflowNodeType.BlockEnd]: 'workflowCanvas.node.End',
   [WorkflowNodeType.Comment]: 'workflowCanvas.node.Comment',
-  [WorkflowNodeType.VariableMerge]: 'workflowCanvas.node.Variable',
+  [WorkflowNodeType.VariableMerge]: 'workflowCanvas.node.VariableMerge',
   [WorkflowNodeType.Continue]: 'workflowCanvas.node.Continue',
   [WorkflowNodeType.Break]: 'workflowCanvas.node.Break',
   [WorkflowNodeType.Input]: 'workflowCanvas.node.Input',
@@ -306,7 +306,12 @@ export const NodeList: FC<NodeListProps> = props => {
     <NodesContainer>
       {/* 搜索框 */}
       <SearchContainer>
-        <Input placeholder={t('workflowCanvas.nodePanel.searchPlaceholder')} value={searchQuery} onChange={setSearchQuery} style={{ width: '100%', height: '32px' }} />
+        <Input
+          placeholder={t('workflowCanvas.nodePanel.searchPlaceholder')}
+          value={searchQuery}
+          onChange={setSearchQuery}
+          style={{ width: '100%', height: '32px' }}
+        />
       </SearchContainer>
 
       <CategoriesContainer>

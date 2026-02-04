@@ -35,6 +35,7 @@
     "Continue": "Continue",
     "Break": "Break",
     "Variable": "Variable",
+    "VariableMerge": "Variable Merge",
     "Comment": "Comment",
     "Node": "Node",
     "Unknown": "Unknown",
@@ -140,7 +141,11 @@
   },
   "intent": {
     "matching": "Intent Matching",
-    "otherIntent": "Other Intent"
+    "otherIntent": "Other Intent",
+    "defaultIntentName": "Intent {{index}}",
+    "enterIntentDescription": "Enter user intent description",
+    "option": "Option",
+    "notConfigured": "Not configured"
   },
   "errorHandler": {
     "exceptionHandling": "Exception Handling",
