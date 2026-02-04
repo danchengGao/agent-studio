@@ -80,13 +80,6 @@ const KnowledgeBasePageNew: React.FC = () => {
   const hasCheckedRef = useRef<boolean>(false)
   const prevSearchTermRef = useRef<string>('')
 
-  // 首次进入或从其他模块切回时，将 store 的 pageSize 同步到 20（与 pageSizeOptions 一致）
-  useEffect(() => {
-    if (pageSize === 10 && location.pathname === '/dashboard/knowledge-bases') {
-      setPageSize(20)
-    }
-  }, [location.pathname, pageSize, setPageSize])
-
   // 返场/重置：从其他模块切回时重置分页并重新拉数；从详情返回不重置
   useEffect(() => {
     const currentPath = location.pathname
