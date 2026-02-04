@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useTranslation } from 'react-i18next'
 import { Plus, Settings, Trash2, Play, CheckCircle, Search, XCircle, Loader2, ChevronLeft, ChevronRight, RefreshCw, Package, Bot, FileCode2 } from 'lucide-react'
@@ -211,7 +211,8 @@ const ModelsPage: React.FC = () => {
   const [testPrompt, setTestPrompt] = useState('')
   const [testResult, setTestResult] = useState('')
   const [isTesting, setIsTesting] = useState(false)
-  const [testingModelId, setTestingModelId] = useState<string | null>(null) // 记录正在测试的模型 ID
+  const testingModelIdRef = useRef<string | null>(null) // 使用 ref 持久化跟踪正在测试的模型 ID
+  const testGenerationRef = useRef(0) // 测试代数，用于防止旧测试覆盖新测试状态
 
   // Tag input state
   const [newTag, setNewTag] = useState('')
@@ -350,6 +351,19 @@ const ModelsPage: React.FC = () => {
     setFilteredPage(1)
     setCurrentPage(1)
   }, [searchTerm, filterProvider, filterStatus, activeTab])
+
+  // 监听测试对话框关闭，确保重置测试状态
+  useEffect(() => {
+    if (!showTestDialog) {
+      // 对话框关闭时，增加代数使正在进行的测试失效
+      testGenerationRef.current += 1
+      // 重置所有测试相关状态
+      setIsTesting(false)
+      testingModelIdRef.current = null
+      setTestPrompt('')
+      setTestResult('')
+    }
+  }, [showTestDialog])
 
   // 确定最终显示的模型数据
   const finalModels = hasFilters ? paginatedFilteredModels : paginatedDisplayModels
@@ -739,7 +753,7 @@ const ModelsPage: React.FC = () => {
 
   // 测试 Embedding 模型
   const handleTestEmbeddingModel = async (modelId: string) => {
-    setTestingModelId(modelId)
+    testingModelIdRef.current = modelId
     try {
       const result = await testEmbeddingModelMutation.mutateAsync({
         id: modelId,
@@ -794,7 +808,7 @@ const ModelsPage: React.FC = () => {
         }
       }
     } finally {
-      setTestingModelId(null)
+      testingModelIdRef.current = null
     }
   }
 
@@ -804,11 +818,17 @@ const ModelsPage: React.FC = () => {
       return
     }
 
+    const currentModelId = selectedModel.id
+    // 增加测试代数，使旧测试的失效
+    testGenerationRef.current += 1
+    const currentGeneration = testGenerationRef.current
+
     setIsTesting(true)
+    testingModelIdRef.current = currentModelId
 
     try {
       const result = await testModelMutation.mutateAsync({
-        id: selectedModel.id,
+        id: currentModelId,
         prompt: testPrompt,
         spaceId: user?.spaceId || '',
         parameters: {
@@ -817,9 +837,13 @@ const ModelsPage: React.FC = () => {
           max_tokens: selectedModel.maxTokens ?? 4096,
         },
       })
-      setTestResult(
-        `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- top_p: ${selectedModel.topp}\n- max_tokens: ${selectedModel.maxTokens}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
-      )
+
+      // 只有当代数匹配、对话框仍然打开且模型ID匹配时才设置结果
+      if (currentGeneration === testGenerationRef.current && showTestDialog && testingModelIdRef.current === currentModelId) {
+        setTestResult(
+          `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- top_p: ${selectedModel.topp}\n- max_tokens: ${selectedModel.maxTokens}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
+        )
+      }
     } catch (error: any) {
       let errorMessage = t('models.testFailed')
 
@@ -856,16 +880,26 @@ const ModelsPage: React.FC = () => {
         errorMessage = error.message
       }
 
-      // 后端统一返回英文，按英文匹配后 replace 为当前语言的 i18n
-      const localizedError = errorMessage
-        .replace(/Model call failed, please check model configuration/gi, t('models.messages.modelTestError.modelCallFailedCheckConfig'))
-        .replace(/API Key or model ID invalid, please check model configuration/gi, t('models.messages.modelTestError.apiKeyOrModelInvalid'))
-        .replace(/Model service address unreachable, please check base URL or network configuration/gi, t('models.messages.modelTestError.serviceUnreachable'))
-      setTestResult(
-        `${t('models.testFailed')}: ${localizedError}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}`,
-      )
+      if (currentGeneration === testGenerationRef.current && showTestDialog && testingModelIdRef.current === currentModelId) {
+        // 后端统一返回英文，按英文匹配后 replace 为当前语言的 i18n
+        const localizedError = errorMessage
+          .replace(/Model call failed, please check model configuration/gi, t('models.messages.modelTestError.modelCallFailedCheckConfig'))
+          .replace(/API Key or model ID invalid, please check model configuration/gi, t('models.messages.modelTestError.apiKeyOrModelInvalid'))
+          .replace(/Model service address unreachable, please check base URL or network configuration/gi, t('models.messages.modelTestError.serviceUnreachable'))
+        setTestResult(
+          `${t('models.testFailed')}: ${localizedError}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}`,
+        )
+      }
     } finally {
-      setIsTesting(false)
+      // 只有当正在测试的模型ID仍等于当前模型ID时才重置 isTesting
+      // 这确保不会取消新测试的状态
+      if (testingModelIdRef.current === currentModelId) {
+        setIsTesting(false)
+      }
+      // 只有当代数和模型ID都匹配时才清除 testingModelIdRef
+      if (currentGeneration === testGenerationRef.current && testingModelIdRef.current === currentModelId) {
+        testingModelIdRef.current = null
+      }
       // 无论测试成功还是失败，都刷新模型列表以更新统计信息
       await Promise.all([refetchLLM(), refetchEmbedding()])
     }
@@ -1320,10 +1354,10 @@ const ModelsPage: React.FC = () => {
                               <IconButton
                                 size="small"
                                 onClick={() => handleTestEmbeddingModel(model.id)}
-                                disabled={testingModelId !== null || !model.isActive}
+                                disabled={testingModelIdRef.current !== null || !model.isActive}
                                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 disabled:opacity-50"
                               >
-                                {testingModelId === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                                {testingModelIdRef.current === model.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                               </IconButton>
                             </span>
                           </Tooltip>
@@ -2019,8 +2053,7 @@ const ModelsPage: React.FC = () => {
         open={showTestDialog}
         onClose={() => {
           setShowTestDialog(false)
-          setTestPrompt('')
-          setTestResult('')
+          // useEffect 会处理状态重置
         }}
         maxWidth="md"
         fullWidth
