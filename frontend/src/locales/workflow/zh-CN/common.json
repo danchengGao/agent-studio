@@ -35,6 +35,7 @@
     "Continue": "继续",
     "Break": "中断",
     "Variable": "变量",
+    "VariableMerge": "变量聚合",
     "Comment": "注释",
     "Node": "节点",
     "Unknown": "未知",
