@@ -3540,6 +3540,8 @@
         "optimizationFailed": "优化失败，请重试",
         "noOptimizationResult": "没有优化结果可应用",
         "insertOptimizationNeedsCursor": "插入优化需要光标位置信息",
+        "selectOptimizationNeedsSelectedText": "选中优化需要选中文本",
+        "messageIdNotFound": "未找到消息ID",
         "promptFullyReplaced": "提示词已完全替换",
         "baseGroupPromptFullyReplaced": "基准组提示词已完全替换",
         "cursorPositionNotFound": "未找到光标位置",
@@ -3550,6 +3552,7 @@
         "baseGroupSelectedContentReplaced": "基准组选中内容已替换",
         "optimizePromptFromDebugFailed": "根据调试结果优化提示词失败，请重试",
         "reoptimizeFailed": "重新优化失败，请重试",
+        "badcaseOptimizationFailed": "badcase优化失败，请重试",
         "firstSystemPromptUpdated": "第一个System提示词已更新",
         "systemPromptNotFound": "未找到System类型的提示词",
         "baseGroupFirstSystemPromptUpdated": "基准组的第一个System提示词已更新",
@@ -3559,6 +3562,8 @@
         "noValidModelConfig": "未找到有效的模型配置",
         "quickOptimizeFailedWithError": "快捷优化失败: {{error}}",
         "quickOptimizeRequestFailed": "快捷优化请求失败，请稍后重试",
+        "quickOptimizeTimeout": "快捷优化超时，请稍后重试",
+        "quickOptimizeNoContent": "快捷优化未返回任何内容，请检查模型设置或稍后重试",
         "feedbackOptimizeRequestCancelled": "反馈优化请求已取消",
         "debugOptimizeRequestCancelled": "调试优化请求已取消",
         "baseGroupPromptOptimized": "基准组提示词已优化更新",
@@ -3970,7 +3975,9 @@
         "adopt": "采纳",
         "stopResponse": "停止响应",
         "enterFullscreen": "进入全屏",
-        "exitFullscreen": "退出全屏"
+        "exitFullscreen": "退出全屏",
+        "preparingDiff": "准备差异对比中...",
+        "optimizationFailed": "优化失败，点击\"重新生成\"可重新生成优化建议"
       },
       "toolEditDialog": {
         "editTitle": "编辑工具",

@@ -3555,6 +3555,8 @@
         "optimizationFailed": "Optimization failed, please try again",
         "noOptimizationResult": "No optimization result to apply",
         "insertOptimizationNeedsCursor": "Insert optimization requires cursor position information",
+        "selectOptimizationNeedsSelectedText": "Select optimization requires selected text",
+        "messageIdNotFound": "Message ID not found",
         "promptFullyReplaced": "Prompt has been fully replaced",
         "baseGroupPromptFullyReplaced": "Base group prompt has been fully replaced",
         "cursorPositionNotFound": "Cursor position not found",
@@ -3565,6 +3567,7 @@
         "baseGroupSelectedContentReplaced": "Base group selected content has been replaced",
         "optimizePromptFromDebugFailed": "Failed to optimize prompt from debug results, please try again",
         "reoptimizeFailed": "Re-optimization failed, please try again",
+        "badcaseOptimizationFailed": "Badcase optimization failed, please try again",
         "firstSystemPromptUpdated": "First system prompt has been updated",
         "systemPromptNotFound": "No system-type prompt found",
         "baseGroupFirstSystemPromptUpdated": "Base group's first system prompt has been updated",
@@ -3573,6 +3576,8 @@
         "noValidModelConfig": "No valid model configuration found",
         "quickOptimizeFailedWithError": "Quick optimize failed: {{error}}",
         "quickOptimizeRequestFailed": "Quick optimize request failed, please try again later",
+        "quickOptimizeTimeout": "Quick optimize timeout, please try again later",
+        "quickOptimizeNoContent": "Quick optimize returned no content, please check model settings or try again later",
         "feedbackOptimizeRequestCancelled": "Feedback optimization request cancelled",
         "debugOptimizeRequestCancelled": "Debug optimization request cancelled",
         "baseGroupPromptOptimized": "Base group prompt has been optimized",
@@ -3983,7 +3988,9 @@
         "adopt": "Adopt",
         "stopResponse": "Stop Response",
         "enterFullscreen": "Enter Fullscreen",
-        "exitFullscreen": "Exit Fullscreen"
+        "exitFullscreen": "Exit Fullscreen",
+        "preparingDiff": "Preparing diff comparison...",
+        "optimizationFailed": "Optimization failed. Click \"Regenerate\" to regenerate optimization suggestions"
       },
       "toolEditDialog": {
         "editTitle": "Edit Tool",
