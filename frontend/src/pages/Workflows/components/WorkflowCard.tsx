@@ -69,7 +69,7 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
   const actions: ConfigCardAction[] = [
     {
       key: 'edit',
-      label: '编辑',
+      label: t('common.buttons.edit'),
       icon: <Edit className="w-4 h-4" />,
       onClick: () => {
         window.location.href = `/dashboard/workflows/editor/${workflow.workflow_id}?spaceId=${workflow.space_id || ENV_CONFIG.DEFAULT_SPACE_ID}`
@@ -77,13 +77,13 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
     },
     {
       key: 'copy',
-      label: '复制',
+      label: t('common.buttons.copy'),
       icon: <Copy className="w-4 h-4" />,
       onClick: onCopy,
     },
     {
       key: 'delete',
-      label: '删除',
+      label: t('common.buttons.delete'),
       icon: <Trash2 className="w-4 h-4" />,
       onClick: onDelete,
     },

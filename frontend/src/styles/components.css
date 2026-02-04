@@ -4,12 +4,17 @@
  */
 
 @layer components {
-  /* ========== 卡片阴影 hover ========== */
+  /* ========== 卡片阴影 hover（ConfigCard 等） ========== */
   .shadow-card-hover {
     box-shadow: var(--shadow-card);
-    transition: box-shadow 180ms ease, transform 180ms ease;
+    transition: box-shadow 180ms ease, transform 180ms ease, background 180ms ease;
   }
   .shadow-card-hover:hover {
+    background-color: transparent;
+    background-image: url(/images/card-hover.svg);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     box-shadow: var(--shadow-card-hover);
     transform: translateY(-2px);
   }

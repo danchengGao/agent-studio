@@ -433,16 +433,11 @@ const AgentModelSelector = (props: {
     }
   }, [modelsList, selectedModelName])
 
-  // 当模型列表加载完成后，如果未选择模型或模型列表为空，则自动展开折叠面板
   useEffect(() => {
     if (modelsList.length === 0 || !selectedModelName) {
-      // 模型列表为空或未选择模型时展开
       setModelExpanded(true)
-    } else if (selectedModelName) {
-      // 如果已选择模型且模型列表不为空，可以折叠面板
-      setModelExpanded(false)
     }
-  }, [modelsList.length, selectedModelName]) // 使用 selectedModelName 而不是 selectedModel
+  }, [modelsList.length, selectedModelName])
 
   // 处理模型变化（选择）
   const handleModelChange = (modelName: string) => {
@@ -451,8 +446,8 @@ const AgentModelSelector = (props: {
     const selectedModelObj = modelsList.find(model => model.model_name === modelName)
     if (selectedModelObj) {
       setSelectedModel(selectedModelObj)
-      // 选择模型后，自动折叠折叠面板
-      setModelExpanded(false)
+      // 选择模型后自动展开面板，方便查看/修改参数
+      setModelExpanded(true)
       // 修改store中的数据
       updateModelDetail(selectedModelObj)
     }
