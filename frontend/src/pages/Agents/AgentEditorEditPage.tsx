@@ -585,7 +585,7 @@ const AgentEditorEditPage = () => {
               </Button>
               <Button
                 variant="contained"
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm hover:shadow-sm transition-all duration-200"
+                className="btn-primary"
                 startIcon={<Tag className="w-4 h-4" />}
                 onClick={handleOpenPublishDialog}
                 disabled={isReadOnly}
