@@ -572,7 +572,7 @@ const PromptOptimizeEditPage: React.FC = () => {
   useEffect(() => {
     if (jobDetailError) {
       // 从错误对象中提取错误信息
-      let errorMessage = '获取优化任务详情失败'
+      let errorMessage = t('prompts.optimizeEditPage.messages.jobDetailFailed')
 
       if (jobDetailError instanceof Error) {
         // ApiError 继承自 Error，错误信息在 message 字段
@@ -815,7 +815,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       }
     } else {
       // 处理错误情况：code 不是 200
-      const errorMessage = jobDetailData.msg || '获取优化任务详情失败'
+      const errorMessage = jobDetailData.msg || t('prompts.optimizeEditPage.messages.jobDetailFailed')
       showSnackbar(errorMessage, 'error')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -964,7 +964,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       }
     } else if (jobHistoryData && jobHistoryData.code !== 200 && jobHistoryData.code !== 0) {
       // 如果返回错误，显示错误信息
-      showSnackbar(jobHistoryData.msg || '获取用例历史记录失败', 'error')
+      showSnackbar(jobHistoryData.msg || t('prompts.optimizeEditPage.messages.jobHistoryFailed'), 'error')
       setEvaluateCases([])
     }
   }, [jobHistoryData])
@@ -1451,7 +1451,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       const validation = validateTestCasesWithValues(latestValues)
 
       if (!validation.isValid) {
-        showSnackbar(validation.errorMessage || '用例检查失败', 'error')
+        showSnackbar(validation.errorMessage || t('prompts.optimizeEditPage.messages.caseCheckFailed'), 'error')
         setIsCreatingJob(false)
         return
       }
@@ -1757,7 +1757,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       showSnackbar(t('prompts.optimizeEditPage.messages.datasetExampleDownloaded'), 'success')
     } catch (error) {
       console.error('下载数据集样例时出错:', error)
-      showSnackbar(t('prompts.optimizeEditPage.messages.datasetExampleDownloadError') || '下载数据集样例失败', 'error')
+      showSnackbar(t('prompts.optimizeEditPage.messages.datasetExampleDownloadError'), 'error')
     }
   }
 
@@ -1880,7 +1880,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       // 验证必填字段（只验证字段名称，字段值可以为空）
       const emptyFields = testCaseDetails.filter(d => !d.variableName?.trim())
       if (emptyFields.length > 0) {
-        showSnackbar('请填写所有必填字段', 'error')
+        showSnackbar(t('prompts.optimizeEditPage.messages.fillRequiredFields'), 'error')
         return
       }
 
@@ -1942,14 +1942,14 @@ const PromptOptimizeEditPage: React.FC = () => {
   // 自定义用例检查函数（使用指定值，避免状态延迟）
   const validateTestCasesWithValues = (values: typeof latestValuesRef.current): { isValid: boolean; errorMessage?: string } => {
     if (values.testCases.length === 0) {
-      return { isValid: false, errorMessage: '请至少添加一个测试用例' }
+      return { isValid: false, errorMessage: t('prompts.optimizeEditPage.validation.atLeastOneTestCase') }
     }
 
     // 验证示例个数不能大于用例集总数
     if (values.exampleCount > values.testCases.length) {
       return {
         isValid: false,
-        errorMessage: `示例个数(${values.exampleCount})不能大于用例集总数(${values.testCases.length})`,
+        errorMessage: t('prompts.optimizeEditPage.validation.exampleCountExceedsTestCases', { exampleCount: values.exampleCount, testCaseCount: values.testCases.length }),
       }
     }
 
@@ -1996,7 +1996,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         // 如果不是JSON格式，抛出错误
         return {
           isValid: false,
-          errorMessage: `第${i + 1}个用例格式错误：无法解析JSON格式`,
+          errorMessage: t('prompts.optimizeEditPage.validation.testCaseJsonParseError', { index: i + 1 }),
         }
       }
 
@@ -2008,7 +2008,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         if (inputKeys.length !== promptVariables.length) {
           return {
             isValid: false,
-            errorMessage: `第${i + 1}个用例的inputs变量数量不匹配。提示词中有${promptVariables.length}个变量，但用例中有${inputKeys.length}个inputs变量`,
+            errorMessage: t('prompts.optimizeEditPage.validation.inputsVariableCountMismatch', { index: i + 1, promptVariableCount: promptVariables.length, inputKeyCount: inputKeys.length }),
           }
         }
 
@@ -2016,7 +2016,7 @@ const PromptOptimizeEditPage: React.FC = () => {
           if (!inputKeys.includes(promptVar)) {
             return {
               isValid: false,
-              errorMessage: `第${i + 1}个用例缺少变量"${promptVar}"，该变量在原始提示词中定义`,
+              errorMessage: t('prompts.optimizeEditPage.validation.missingVariable', { index: i + 1, variable: promptVar }),
             }
           }
         }
@@ -2025,7 +2025,7 @@ const PromptOptimizeEditPage: React.FC = () => {
           if (!promptVariables.includes(inputKey)) {
             return {
               isValid: false,
-              errorMessage: `第${i + 1}个用例包含多余的变量"${inputKey}"，该变量不在原始提示词中`,
+              errorMessage: t('prompts.optimizeEditPage.validation.extraVariable', { index: i + 1, variable: inputKey }),
             }
           }
         }
@@ -2034,7 +2034,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         if (inputKeys.length !== 1 || inputKeys[0] !== 'query') {
           return {
             isValid: false,
-            errorMessage: `第${i + 1}个用例的inputs变量不符合要求。当原始提示词没有{{variable}}时，inputs只能有一个变量且命名为"query"`,
+            errorMessage: t('prompts.optimizeEditPage.validation.inputsVariableRequirement', { index: i + 1 }),
           }
         }
       }
@@ -2044,7 +2044,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       if (labelKeys.length !== 1) {
         return {
           isValid: false,
-          errorMessage: `第${i + 1}个用例的label必须只有一个变量`,
+          errorMessage: t('prompts.optimizeEditPage.validation.labelMustHaveOneVariable', { index: i + 1 }),
         }
       }
 
@@ -2052,7 +2052,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       if (labelKey !== 'output' && labelKey !== 'tool_calls') {
         return {
           isValid: false,
-          errorMessage: `第${i + 1}个用例的label变量名必须是"output"或"tool_calls"，当前是"${labelKey}"`,
+          errorMessage: t('prompts.optimizeEditPage.validation.labelVariableNameInvalid', { index: i + 1, labelKey }),
         }
       }
 
@@ -2061,7 +2061,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         if (inputKey.length > 50) {
           return {
             isValid: false,
-            errorMessage: `第${i + 1}个用例的inputs变量名"${inputKey}"长度超过50个字符`,
+            errorMessage: t('prompts.optimizeEditPage.validation.inputsVariableNameTooLong', { index: i + 1, variable: inputKey }),
           }
         }
       }
@@ -2069,7 +2069,7 @@ const PromptOptimizeEditPage: React.FC = () => {
       if (labelKey.length > 50) {
         return {
           isValid: false,
-          errorMessage: `第${i + 1}个用例的label变量名"${labelKey}"长度超过50个字符`,
+          errorMessage: t('prompts.optimizeEditPage.validation.labelVariableNameTooLong', { index: i + 1, variable: labelKey }),
         }
       }
     }
@@ -2311,7 +2311,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     // 使用传入的更新后的工具对象，而不是状态中的editingTool
     // 这样可以确保获取到最新的数据，特别是JSON模式下保存的parametersJsonSchema
     if (!updatedEditingTool || !updatedEditingTool.name.trim()) {
-      showSnackbar('请输入工具名称', 'error')
+      showSnackbar(t('prompts.optimizeEditPage.tools.toolNameRequired'), 'error')
       return
     }
 
@@ -2334,13 +2334,13 @@ const PromptOptimizeEditPage: React.FC = () => {
     if (isNewTool) {
       // 新增工具：检查名称是否已存在
       if (checkToolNameDuplicate(tools, updatedEditingTool.name.trim())) {
-        showSnackbar('工具名称已存在，请重新命名', 'error')
+        showSnackbar(t('prompts.optimizeEditPage.tools.toolNameExists'), 'error')
         return
       }
     } else {
       // 编辑工具：检查名称是否与其他工具重复（排除当前编辑的工具）
       if (checkToolNameDuplicate(tools, updatedEditingTool.name.trim(), updatedEditingTool.id)) {
-        showSnackbar('工具名称已存在，请重新命名', 'error')
+        showSnackbar(t('prompts.optimizeEditPage.tools.toolNameExists'), 'error')
         return
       }
     }
@@ -2365,11 +2365,11 @@ const PromptOptimizeEditPage: React.FC = () => {
     if (updatedEditingTool.id) {
       // 编辑现有工具
       newTools = tools.map(t => (t.id === updatedEditingTool.id ? newTool : t))
-      showSnackbar('工具更新成功', 'success')
+      showSnackbar(t('prompts.optimizeEditPage.tools.toolUpdateSuccess'), 'success')
     } else {
       // 添加新工具
       newTools = [...tools, newTool]
-      showSnackbar('工具添加成功', 'success')
+      showSnackbar(t('prompts.optimizeEditPage.tools.toolAddSuccess'), 'success')
     }
 
     setTools(newTools)
@@ -2397,7 +2397,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     if (!hasInputsColumns || !hasLabelColumns) {
       return {
         isValid: false,
-        errorMessage: '文件格式不正确，需要包含inputs_和label_开头的列，例如：inputs_role, inputs_query, label_output',
+        errorMessage: t('prompts.optimizeEditPage.validation.excelFormatError'),
       }
     }
 
@@ -2411,7 +2411,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         if (row[col] === undefined || row[col] === null || row[col] === '') {
           return {
             isValid: false,
-            errorMessage: `第${i + 1}行的${col}字段不能为空`,
+            errorMessage: t('prompts.optimizeEditPage.validation.excelFieldEmpty', { row: i + 1, column: col }),
           }
         }
       }
@@ -2422,7 +2422,7 @@ const PromptOptimizeEditPage: React.FC = () => {
         if (row[col] === undefined || row[col] === null || row[col] === '') {
           return {
             isValid: false,
-            errorMessage: `第${i + 1}行的${col}字段不能为空`,
+            errorMessage: t('prompts.optimizeEditPage.validation.excelFieldEmpty', { row: i + 1, column: col }),
           }
         }
       }
@@ -2595,13 +2595,13 @@ const PromptOptimizeEditPage: React.FC = () => {
         id: maxId + index + 1,
       }))
       setTestCasesWithAutoSave([...testCases, ...updatedData])
-      showSnackbar(`成功追加${pendingExcelData.length}个用例`, 'success')
+      showSnackbar(t('prompts.optimizeEditPage.testCases.appendSuccess', { count: pendingExcelData.length }), 'success')
     } else {
       // 替换模式：直接替换所有用例
       setTestCasesWithAutoSave(pendingExcelData)
       // 替换用例后跳转到第一页
       setTestCasePage(0)
-      showSnackbar(`成功替换为${pendingExcelData.length}个用例`, 'success')
+      showSnackbar(t('prompts.optimizeEditPage.testCases.replaceSuccess', { count: pendingExcelData.length }), 'success')
     }
 
     setUploadConfirmOpen(false)
@@ -4086,7 +4086,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                         height: 'clamp(1rem, 2vw, 1.5625rem)',
                                         minWidth: 'clamp(1rem, 2vw, 1.5625rem)',
                                       }}
-                                      title="跳转到尾页"
+                                      title={t('prompts.optimizeEditPage.pagination.lastPage')}
                                     >
                                       <ChevronsRight
                                         style={{
@@ -5016,7 +5016,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                     fontSize: 'clamp(0.5rem, 0.9vw, 0.875rem)',
                                   }}
                                 >
-                                  暂无数据
+                                  {t('prompts.optimizeEditPage.optimizationResult.noData')}
                                 </Typography>
                               </Box>
                             )}
@@ -5338,7 +5338,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                               minHeight: 'clamp(1.25rem, 2.5vw, 2rem)',
                                             }}
                                           >
-                                            应用
+                                            {t('prompts.optimizeEditPage.optimizationResult.apply')}
                                           </Button>
                                         )}
                                         <IconButton
