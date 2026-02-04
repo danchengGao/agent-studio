@@ -1506,7 +1506,6 @@
         "fileParseFailed": "File parsing failed, please check if the file format is correct",
         "datasetFormatError": "Dataset format is incorrect: {{error}}, please write the dataset according to the dataset example format",
         "intelligentGenerationDeveloping": "Intelligent generation feature is under development",
-        "copiedToClipboard": "Content copied to clipboard",
         "testCasesLimitExceeded": "Test case limit reached ({{max}} cases), cannot add more",
         "uploadExceedsLimit": "The uploaded file contains {{count}} test cases, exceeding the maximum limit ({{max}} cases)",
         "appendExceedsLimit": "Currently have {{current}} test cases, adding {{adding}} cases would total {{total}}, exceeding the maximum limit ({{max}} cases)",
@@ -4339,6 +4338,51 @@
     "card": {
       "documentType": "Document Knowledge Base",
       "embeddingModel": "Embedding Model"
+    }
+  },
+  "utils": {
+    "prompts": {
+      "utils": {
+        "validateVersionNumber": {
+          "empty": "Version number cannot be empty",
+          "invalidFormat": "Invalid version format. Please use Major.Minor.Patch format (e.g., 1.2.3)"
+        },
+        "formatDateTime": {
+          "invalidTime": "Invalid time",
+          "formatError": "Time format error"
+        },
+        "copyToClipboard": {
+          "defaultSuccess": "Copied to clipboard",
+          "emptyContent": "Copy content is empty",
+          "autoCopyFailed": "Auto copy failed, please copy manually",
+          "copyUnavailable": "Copy function unavailable, please copy manually"
+        },
+        "toolFormatConverter": {
+          "generateJsonSchemaFailed": "Failed to generate JSON Schema from parameters:",
+          "tool": "Tool",
+          "parseStringFailed": "Failed to parse string",
+          "saveJsonSchemaFailed": "Failed to save JSON Schema",
+          "parseFailed": "Parse failed",
+          "parseToolJsonSchemaFailed": "Failed to parse tool JSON Schema, using default conversion:"
+        },
+        "promptEditPageUtils": {
+          "unknownError": "Unknown error",
+          "failKeyword": "失败",
+          "requestFailed": "Request failed",
+          "variableNameFormatError": "Does not meet format requirements",
+          "variableNameTooLong": "Variable name exceeds 50 characters (current length: {{length}})",
+          "variableNameCannotStartWithNumber": "Variable name cannot start with a number",
+          "variableNameInvalidCharacters": "Variable name can only contain letters, numbers, underscores, and hyphens",
+          "variableNameNoSpacesInNormalMode": "Variable name cannot have spaces before or after in Normal mode",
+          "skipInvalidVariableName": "Skipping invalid variable name: \"{{name}}\", {{error}}",
+          "targetMessageNotFound": "Target message not found",
+          "baseGroup": "Base Group",
+          "controlGroup": "Control Group {{id}}",
+          "targetMessageNotFoundInGroup": "Target message not found in {{groupName}}",
+          "existingCallNotFound": "Existing call at index {{index}} does not exist, skipping",
+          "calculateSelectionIndicesFailed": "Failed to calculate selection indices - missing required parameters"
+        }
+      }
     }
   }
 }

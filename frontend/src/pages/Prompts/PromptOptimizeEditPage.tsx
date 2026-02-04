@@ -2613,13 +2613,6 @@ const PromptOptimizeEditPage: React.FC = () => {
     setPendingExcelData([])
   }
 
-  const handleCopyPrompt = async (text: string) => {
-    try {
-      await copyToClipboard(text, setSnackbar, t('prompts.optimizeEditPage.messages.copiedToClipboard'))
-    } catch (error) {
-      console.error('复制失败:', error)
-    }
-  }
 
   const handleShowDetail = (type: 'original' | 'optimized', iterationRound: number = 0) => {
     setDetailDialogType(type)
@@ -5205,7 +5198,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                       >
                                         <IconButton
                                           size="small"
-                                          onClick={() => handleCopyPrompt(originalPrompt)}
+                                          onClick={() => copyToClipboard(originalPrompt, setSnackbar)}
                                           sx={{
                                             color: '#6b7280',
                                             width: 'clamp(1rem, 2vw, 1.5rem)',
@@ -5343,7 +5336,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                                         )}
                                         <IconButton
                                           size="small"
-                                          onClick={() => handleCopyPrompt(currentOptimizedPrompt)}
+                                          onClick={() => copyToClipboard(currentOptimizedPrompt, setSnackbar)}
                                           sx={{
                                             color: '#6b7280',
                                             width: 'clamp(1rem, 2vw, 1.5rem)',
@@ -5731,7 +5724,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                         })()}
                       </div>
                       <Box className="flex gap-1">
-                        <IconButton size="small" onClick={() => handleCopyPrompt(originalPrompt)} sx={{ color: '#6b7280' }}>
+                        <IconButton size="small" onClick={() => copyToClipboard(originalPrompt, setSnackbar)} sx={{ color: '#6b7280' }}>
                           <Copy className="w-3 h-3" />
                         </IconButton>
                         {true && (
@@ -5776,7 +5769,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                         })()}
                       </div>
                       <Box className="flex gap-1">
-                        <IconButton size="small" onClick={() => handleCopyPrompt(currentOptimizedPrompt)} sx={{ color: '#6b7280' }}>
+                        <IconButton size="small" onClick={() => copyToClipboard(currentOptimizedPrompt, setSnackbar)} sx={{ color: '#6b7280' }}>
                           <Copy className="w-3 h-3" />
                         </IconButton>
                         {true && (
