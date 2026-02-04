@@ -1,4 +1,4 @@
-async def delete_collectionimport time
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
