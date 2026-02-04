@@ -85,6 +85,7 @@
       },
       "overwritePromptTemplateDialog": {
         "description": "本操作会覆盖提示词模板的草稿，请选择您希望的处理方式。",
+        "instructionsTitle": "操作说明：",
         "overwriteAndJump": "覆盖跳转：将当前智能体的系统提示词内容覆盖到提示词编辑页面",
         "notOverwriteAndJump": "不覆盖跳转：保持提示词编辑页面的原有内容不变",
         "overwriteAndJumpLabel": "覆盖跳转",

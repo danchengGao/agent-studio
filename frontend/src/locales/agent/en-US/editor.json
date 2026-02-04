@@ -85,6 +85,7 @@
       },
       "overwritePromptTemplateDialog": {
         "description": "This operation will overwrite the prompt template draft. Please choose your preferred handling method.",
+        "instructionsTitle": "Instructions:",
         "overwriteAndJump": "Overwrite: Overwrite the prompt editing page with the current agent's system prompt content",
         "notOverwriteAndJump": "Don't Overwrite: Keep the original content of the prompt editing page unchanged",
         "overwriteAndJumpLabel": "Overwrite",

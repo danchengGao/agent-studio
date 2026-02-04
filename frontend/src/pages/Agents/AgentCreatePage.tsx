@@ -631,7 +631,7 @@ const AgentCreatePage: React.FC = () => {
                   placeholder={t('form.description.placeholder')}
                   error={!!errors.description}
                   helperText={errors.description}
-                  inputProps={{ maxLength: 1000 }}
+                  inputProps={{ maxLength: 500 }}
                   sx={{
                     marginBottom: 0,
                     '& .MuiOutlinedInput-root': {
@@ -663,7 +663,7 @@ const AgentCreatePage: React.FC = () => {
                   }}
                 >
                   <Typography variant="body2" className="text-gray-500" sx={{ fontSize: 'clamp(0.5625rem, 0.9vw, 0.6875rem)' }}>
-                    {agentData.description.length}/1000
+                    {agentData.description.length}/500
                   </Typography>
                 </div>
               </div>
