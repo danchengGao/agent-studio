@@ -221,7 +221,17 @@
     "otherData": "Other Data"
   },
   "testrunForm": {
-    "noInputNeeded": "No input required for this test run"
+    "noInputNeeded": "No input required for this test run",
+    "missingRequiredFields": "Please fill in required fields: {{fields}}",
+    "validation": {
+      "integer": "Please enter an integer",
+      "number": "Please enter a number",
+      "boolean": "Please select a boolean value",
+      "object": "Please enter a valid JSON object",
+      "jsonFormat": "Please enter a valid JSON format",
+      "array": "Please enter a valid JSON array",
+      "arrayFormat": "Please enter a valid JSON array format"
+    }
   },
   "loop": {
     "title": "Loop",

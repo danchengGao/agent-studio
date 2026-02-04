@@ -221,7 +221,17 @@
     "otherData": "其他数据"
   },
   "testrunForm": {
-    "noInputNeeded": "本次试运行无需输入"
+    "noInputNeeded": "本次试运行无需输入",
+    "missingRequiredFields": "请填写必填字段：{{fields}}",
+    "validation": {
+      "integer": "请输入整数",
+      "number": "请输入数字",
+      "boolean": "请选择布尔值",
+      "object": "请输入有效的JSON对象",
+      "jsonFormat": "请输入有效的JSON格式",
+      "array": "请输入有效的JSON数组",
+      "arrayFormat": "请输入有效的JSON数组格式"
+    }
   },
   "loop": {
     "title": "循环",
