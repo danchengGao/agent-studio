@@ -6,10 +6,11 @@
 
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Play, Trash2, RefreshCw, X, Clock, Activity, Download, DownloadCloud, Zap } from 'lucide-react'
+import { Play, Trash2, RefreshCw, X, Clock, Activity, Download, DownloadCloud, Zap, FileText, Eye } from 'lucide-react'
 import SSEPlayer, { type PlaybackStatus } from '../../utils/ssePlayer'
 import { usePlaybackHistory } from '../../hooks/usePlaybackHistory'
 import { useConversationStore } from '../../stores/useConversationStore'
+import { MessageType } from '../../stores/useConversationStore'
 import type { RecordingSession } from '../../utils/sseRecorder'
 
 interface PlaybackPanelProps {
@@ -29,8 +30,19 @@ const SPEED_OPTIONS: { value: PlaybackSpeed; label: string }[] = [
 // localStorage key for compression setting
 const COMPRESSION_STORAGE_KEY = 'sse_recording_compression_enabled'
 
+// 调试报告类型
+interface DebugReport {
+  id: string
+  name: string
+  timestamp: number
+  content: string
+}
+
 export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPanelProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  // 面板切换状态
+  const [activeTab, setActiveTab] = useState<'playback' | 'debug'>('playback')
 
   // 压缩开关状态
   const [enableCompression, setEnableCompression] = useState(true)
@@ -64,6 +76,9 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
     clearAll,
     getRecording,
   } = usePlaybackHistory(true, 10)
+
+  // 调试报告列表
+  const [debugReports, setDebugReports] = useState<DebugReport[]>([])
 
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [playbackSpeed, setPlaybackSpeed] = useState<PlaybackSpeed>(2)
@@ -163,6 +178,75 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
         alert(t('apps.deepSearch.playback.clearFailed') + (error as Error).message)
       }
     }
+  }
+
+  // 处理导入 markdown 报告
+  const handleImportReport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+
+      // 提取标题
+      const titleMatch = text.match(/^#\s+(.+)$/m)
+      const title = titleMatch ? titleMatch[1].trim() : file.name.replace(/\.(md|markdown)$/, '')
+
+      const debugReport: DebugReport = {
+        id: `debug-${Date.now()}`,
+        name: title,
+        timestamp: Date.now(),
+        content: text,
+      }
+
+      setDebugReports(prev => [debugReport, ...prev])
+
+      // 清空 input 允许重复导入
+      event.target.value = ''
+    } catch (error) {
+      console.error('[PlaybackPanel] Failed to import report:', error)
+      alert(t('apps.deepSearch.playback.importFailed') + (error as Error).message)
+    }
+  }
+
+  // 删除调试报告
+  const handleDeleteDebugReport = (id: string) => {
+    setDebugReports(prev => prev.filter(r => r.id !== id))
+  }
+
+  // 查看调试报告（在对话列表中创建一个 REPORT 消息）
+  const handleViewDebugReport = (debugReport: DebugReport) => {
+    const store = useConversationStore.getState()
+
+    // 获取当前对话 ID
+    const currentConversationId = store.currentConversationId
+    if (!currentConversationId) {
+      alert(t('apps.deepSearch.playback.selectConversationFirst'))
+      return
+    }
+
+    // 构造 REPORT 类型的消息内容
+    const reportContent = {
+      response_content: debugReport.content,
+      citation_messages: null,
+      infer_messages: [],
+    }
+
+    // 添加用户消息
+    store.addUserMessage(currentConversationId, debugReport.name)
+
+    // 添加 REPORT 类型系统消息
+    store.addSystemMessage(
+      currentConversationId,
+      MessageType.REPORT,
+      reportContent,
+      undefined,  // parentId
+      t('apps.deepSearch.playback.finalReport'),  // title
+      'debug'      // agentType
+    )
+
+    // 关闭回放面板
+    onClose()
   }
 
   // 下载单个录制
@@ -273,7 +357,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp)
     // 根据当前语言动态选择locale
-    const locale = t('apps.deepSearch.playback.panelTitle') === 'SSE 回放控制面板' ? 'zh-CN' : 'en-US'
+    const locale = i18n.language === 'zh-CN' ? 'zh-CN' : 'en-US'
     return date.toLocaleString(locale, {
       month: 'numeric',
       day: 'numeric',
@@ -292,200 +376,336 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-        {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">{t('apps.deepSearch.playback.panelTitle')}</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+        {/* 头部 + 标签切换 */}
+        <div className="px-6 pt-4 border-b border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">{t('apps.deepSearch.playback.panelTitle')}</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+
+          {/* 标签切换器 */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab('playback')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'playback'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Play className="w-4 h-4" />
+                {t('apps.deepSearch.playback.tabPlayback')}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('debug')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'debug'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                {t('apps.deepSearch.playback.tabDebug')}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* 工具栏 */}
-        <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            {/* 速度控制 */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">{t('apps.deepSearch.playback.playbackSpeed')}</span>
-              <div className="flex gap-1">
-                {SPEED_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setPlaybackSpeed(option.value)}
-                    className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
-                      playbackSpeed === option.value
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+        {activeTab === 'playback' ? (
+          <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              {/* 速度控制 */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">{t('apps.deepSearch.playback.playbackSpeed')}</span>
+                <div className="flex gap-1">
+                  {SPEED_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setPlaybackSpeed(option.value)}
+                      className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+                        playbackSpeed === option.value
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* 压缩开关 */}
-            <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-lg">
-              <Zap className={`w-4 h-4 ${enableCompression ? 'text-yellow-500' : 'text-gray-400'}`} />
-              <span className="text-sm font-medium text-gray-700">{t('apps.deepSearch.playback.compressionEnabled')}</span>
-              <button
-                onClick={() => handleCompressionToggle(!enableCompression)}
-                className={`relative w-10 h-5 rounded-full transition-colors ${
-                  enableCompression ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                    enableCompression ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* 当前状态 */}
-            {playbackStatus !== 'idle' && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
-                {playbackStatus === 'playing' && (
-                  <>
-                    <Activity className="w-4 h-4 text-blue-600 animate-pulse" />
-                    <span className="text-sm font-medium text-blue-700">{t('apps.deepSearch.playback.status.playing')} {playbackProgress}%</span>
-                  </>
-                )}
-                {playbackStatus === 'completed' && (
-                  <>
-                    <span className="text-sm font-medium text-green-700">{t('apps.deepSearch.playback.status.completed')}</span>
-                  </>
-                )}
-                {playbackStatus === 'error' && (
-                  <span className="text-sm font-medium text-red-700">{t('apps.deepSearch.playback.status.failed')}</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 操作按钮 */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadRecordings}
-              disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {t('apps.deepSearch.playback.buttons.refresh')}
-            </button>
-            {recordings.length > 0 && (
-              <button
-                onClick={handleDownloadAll}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                title={t('apps.deepSearch.playback.buttons.downloadAllTooltip')}
-              >
-                <DownloadCloud className="w-4 h-4" />
-                {t('apps.deepSearch.playback.buttons.downloadAll')}
-              </button>
-            )}
-            {recordings.length > 0 && (
-              <button
-                onClick={handleClearAll}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                {t('apps.deepSearch.playback.buttons.clear')}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* 录制列表 */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-2" />
-                <p className="text-sm text-gray-500">{t('apps.deepSearch.playback.loading')}</p>
-              </div>
-            </div>
-          ) : recordings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Clock className="w-16 h-16 text-gray-300 mb-4" />
-              <p className="text-lg font-medium text-gray-600 mb-1">{t('apps.deepSearch.playback.noRecordings')}</p>
-              <p className="text-sm text-gray-500">
-                {t('apps.deepSearch.playback.noRecordingsDesc')}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {recordings.map((recording) => (
-                <div
-                  key={recording.id}
-                  className={`flex items-center gap-4 p-4 bg-gray-50 rounded-xl border-2 transition-all ${
-                    playingId === recording.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-transparent hover:border-gray-300'
+              {/* 压缩开关 */}
+              <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-lg">
+                <Zap className={`w-4 h-4 ${enableCompression ? 'text-yellow-500' : 'text-gray-400'}`} />
+                <span className="text-sm font-medium text-gray-700">{t('apps.deepSearch.playback.compressionEnabled')}</span>
+                <button
+                  onClick={() => handleCompressionToggle(!enableCompression)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                    enableCompression ? 'bg-blue-600' : 'bg-gray-300'
                   }`}
                 >
-                  {/* 播放按钮 */}
-                  <button
-                    onClick={() => handlePlayback(recording.id)}
-                    disabled={playingId !== null}
-                    className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {playingId === recording.id ? (
-                      <Activity className="w-6 h-6 animate-pulse" />
-                    ) : (
-                      <Play className="w-6 h-6" />
-                    )}
-                  </button>
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                      enableCompression ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
 
-                  {/* 信息 */}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 mb-1 truncate">
-                      {recording.name}
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {formatTime(recording.timestamp)}
-                      </span>
-                      <span>•</span>
-                      <span>{recording.eventCount} {t('apps.deepSearch.playback.events')}</span>
-                      <span>•</span>
-                      <span>{recording.duration} {t('apps.deepSearch.playback.seconds')}</span>
-                      {recording.compressedCount < recording.eventCount && (
-                        <>
-                          <span>•</span>
-                          <span className="text-green-600">
-                            {t('apps.deepSearch.playback.compression')} {getCompressionRatio(recording.eventCount, recording.compressedCount)}
-                          </span>
-                        </>
+              {/* 当前状态 */}
+              {playbackStatus !== 'idle' && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
+                  {playbackStatus === 'playing' && (
+                    <>
+                      <Activity className="w-4 h-4 text-blue-600 animate-pulse" />
+                      <span className="text-sm font-medium text-blue-700">{t('apps.deepSearch.playback.status.playing')} {playbackProgress}%</span>
+                    </>
+                  )}
+                  {playbackStatus === 'completed' && (
+                    <>
+                      <span className="text-sm font-medium text-green-700">{t('apps.deepSearch.playback.status.completed')}</span>
+                    </>
+                  )}
+                  {playbackStatus === 'error' && (
+                    <span className="text-sm font-medium text-red-700">{t('apps.deepSearch.playback.status.failed')}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadRecordings}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                {t('apps.deepSearch.playback.buttons.refresh')}
+              </button>
+              {recordings.length > 0 && (
+                <button
+                  onClick={handleDownloadAll}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  title={t('apps.deepSearch.playback.buttons.downloadAllTooltip')}
+                >
+                  <DownloadCloud className="w-4 h-4" />
+                  {t('apps.deepSearch.playback.buttons.downloadAll')}
+                </button>
+              )}
+              {recordings.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {t('apps.deepSearch.playback.buttons.clear')}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between px-6 py-3 bg-purple-50 border-b border-purple-200">
+            <div className="flex items-center gap-2 text-sm text-purple-700">
+              <FileText className="w-4 h-4" />
+              <span>{t('apps.deepSearch.playback.debugReportsCount', { count: debugReports.length })}</span>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex items-center gap-2">
+              {/* 导入报告按钮 */}
+              <label className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-600 hover:bg-purple-100 border border-purple-300 rounded-lg transition-colors cursor-pointer">
+                <FileText className="w-4 h-4" />
+                {t('apps.deepSearch.playback.buttons.importReport')}
+                <input
+                  type="file"
+                  accept=".md,.markdown"
+                  onChange={handleImportReport}
+                  className="hidden"
+                />
+              </label>
+
+              {debugReports.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (confirm(t('apps.deepSearch.playback.confirmClearDebugReports'))) {
+                      setDebugReports([])
+                    }
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100 border border-red-300 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {t('apps.deepSearch.playback.buttons.clear')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 内容区域 */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {activeTab === 'playback' ? (
+            // SSE 回放标签页内容
+            isLoading ? (
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <RefreshCw className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">{t('apps.deepSearch.playback.loading')}</p>
+                </div>
+              </div>
+            ) : recordings.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center">
+                <Clock className="w-16 h-16 text-gray-300 mb-4" />
+                <p className="text-lg font-medium text-gray-600 mb-1">{t('apps.deepSearch.playback.noRecordings')}</p>
+                <p className="text-sm text-gray-500">
+                  {t('apps.deepSearch.playback.noRecordingsDesc')}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recordings.map((recording) => (
+                  <div
+                    key={recording.id}
+                    className={`flex items-center gap-4 p-4 bg-gray-50 rounded-xl border-2 transition-all ${
+                      playingId === recording.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-transparent hover:border-gray-300'
+                    }`}
+                  >
+                    {/* 播放按钮 */}
+                    <button
+                      onClick={() => handlePlayback(recording.id)}
+                      disabled={playingId !== null}
+                      className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {playingId === recording.id ? (
+                        <Activity className="w-6 h-6 animate-pulse" />
+                      ) : (
+                        <Play className="w-6 h-6" />
                       )}
+                    </button>
+
+                    {/* 信息 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 mb-1 truncate">
+                        {recording.name}
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {formatTime(recording.timestamp)}
+                        </span>
+                        <span>•</span>
+                        <span>{recording.eventCount} {t('apps.deepSearch.playback.events')}</span>
+                        <span>•</span>
+                        <span>{recording.duration} {t('apps.deepSearch.playback.seconds')}</span>
+                        {recording.compressedCount < recording.eventCount && (
+                          <>
+                            <span>•</span>
+                            <span className="text-green-600">
+                              {t('apps.deepSearch.playback.compression')} {getCompressionRatio(recording.eventCount, recording.compressedCount)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 操作按钮组 */}
+                    <div className="flex items-center gap-1">
+                      {/* 下载按钮 */}
+                      <button
+                        onClick={() => handleDownload(recording.id)}
+                        className="flex-shrink-0 p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        title={t('apps.deepSearch.playback.buttons.download')}
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+
+                      {/* 删除按钮 */}
+                      <button
+                        onClick={() => handleDelete(recording.id)}
+                        className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title={t('apps.deepSearch.playback.buttons.delete')}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-
-                  {/* 操作按钮组 */}
-                  <div className="flex items-center gap-1">
-                    {/* 下载按钮 */}
+                ))}
+              </div>
+            )
+          ) : (
+            // 报告调试标签页内容
+            debugReports.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center">
+                <FileText className="w-16 h-16 text-purple-200 mb-4" />
+                <p className="text-lg font-medium text-gray-600 mb-1">{t('apps.deepSearch.playback.noDebugReports')}</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  {t('apps.deepSearch.playback.noDebugReportsDesc')}
+                </p>
+                <label className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg cursor-pointer transition-colors">
+                  <FileText className="w-4 h-4" />
+                  {t('apps.deepSearch.playback.buttons.selectMdFile')}
+                  <input
+                    type="file"
+                    accept=".md,.markdown"
+                    onChange={handleImportReport}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {debugReports.map((debugReport) => (
+                  <div
+                    key={debugReport.id}
+                    className="flex items-center gap-4 p-4 bg-purple-50 border-2 border-purple-200 rounded-xl"
+                  >
+                    {/* 查看按钮 */}
                     <button
-                      onClick={() => handleDownload(recording.id)}
-                      className="flex-shrink-0 p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                      title={t('apps.deepSearch.playback.buttons.download')}
+                      onClick={() => handleViewDebugReport(debugReport)}
+                      className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-purple-600 hover:bg-purple-700 text-white rounded-full transition-colors"
+                      title={t('apps.deepSearch.playback.buttons.viewReport')}
                     >
-                      <Download className="w-4 h-4" />
+                      <Eye className="w-6 h-6" />
                     </button>
+
+                    {/* 信息 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 mb-1 truncate">
+                        {debugReport.name}
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          {formatTime(debugReport.timestamp)}
+                        </span>
+                        <span>•</span>
+                        <span className="text-purple-600">{t('apps.deepSearch.playback.debugReport')}</span>
+                      </div>
+                    </div>
 
                     {/* 删除按钮 */}
                     <button
-                      onClick={() => handleDelete(recording.id)}
+                      onClick={() => handleDeleteDebugReport(debugReport.id)}
                       className="flex-shrink-0 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title={t('apps.deepSearch.playback.buttons.delete')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </div>
 

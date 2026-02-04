@@ -1051,7 +1051,9 @@
         "noDataError": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
       },
       "playback": {
-        "panelTitle": "SSE 回放控制面板",
+        "panelTitle": "调试面板",
+        "tabPlayback": "SSE 回放",
+        "tabDebug": "报告调试",
         "playbackSpeed": "回放速度:",
         "compressionEnabled": "压缩录制:",
         "status": {
@@ -1065,7 +1067,10 @@
           "downloadAllTooltip": "下载所有录制",
           "clear": "清空",
           "download": "下载",
-          "delete": "删除"
+          "delete": "删除",
+          "importReport": "导入报告",
+          "selectMdFile": "选择 Markdown 文件",
+          "viewReport": "查看报告"
         },
         "loading": "加载中...",
         "noRecordings": "暂无录制记录",
@@ -1076,9 +1081,17 @@
         "compression": "压缩",
         "confirmDelete": "确定要删除这条录制吗？",
         "confirmClearAll": "确定要清空所有录制吗？此操作不可恢复。",
+        "confirmClearDebugReports": "确定要清空所有调试报告吗？",
         "deleteFailed": "删除失败：",
         "clearFailed": "清空失败：",
         "downloadFailed": "下载失败：",
+        "importFailed": "导入失败：",
+        "selectConversationFirst": "请先选择一个对话",
+        "debugReportsCount": "{{count}} 个报告",
+        "debugReport": "调试报告",
+        "noDebugReports": "暂无调试报告",
+        "noDebugReportsDesc": "导入 markdown 报告文件进行查看",
+        "finalReport": "最终报告",
         "tip": "💡 提示：回放时会创建新的对话，速度可在上方调整。压缩比例表示节省的存储空间。"
       }
     }

@@ -15,6 +15,7 @@ import DeepSearchReportCard from './DeepSearchReportCard';
 import { TextContentCard } from './TextContentCard';
 import { formatDuration } from '../utils/formatDuration';
 import { IosSpinnerSmallStyles, LoadingDotStyles, SpinnerDots } from '../utils/spinnerStyles';
+import { formatReportTitleForDisplay } from '@/utils/reportUtils';
 
 interface ReportMessageProps {
   message: Message;
@@ -196,7 +197,7 @@ const ReportCard: React.FC<{
       {/* 内容 - 显示标题、状态文字和耗时 */}
       <div className="relative flex-1 min-w-0">
         <div className={`text-xs font-semibold truncate ${config.titleColor || config.textColor}`}>
-          {message.title || t('apps.deepSearch.reportCard')}
+          {formatReportTitleForDisplay(message.title, t)}
         </div>
         <div className="flex items-center gap-1.5">
           <div className={`text-[10px] truncate ${config.textColor} opacity-80`}>
@@ -359,7 +360,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
   }, [childMessages]);
 
   // 判断是否为最终报告（必须在所有 hooks 之后，避免 early return 导致 hook 数量变化）
-  const isFinalReport = message.title === t('apps.deepSearch.finalReport');
+  const isFinalReport = isFinalReportMessage(message.title);
   if (isFinalReport) {
     return (
       <DeepSearchReportCard

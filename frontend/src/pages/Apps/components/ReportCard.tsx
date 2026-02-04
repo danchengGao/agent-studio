@@ -3,6 +3,7 @@ import { FileText, ChevronRight, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Report } from '../types'
 import { formatReportDate, getRelativeTime } from '../utils/formatDate'
+import { formatReportTitleForDisplay } from '@/utils/reportUtils'
 
 interface ReportCardProps {
   report: Report
@@ -81,7 +82,7 @@ const ReportCard: React.FC<ReportCardProps> = memo(({ report, isActive, onClick 
             text-sm font-semibold truncate transition-colors duration-300
             ${isActive ? 'text-white' : 'text-gray-800'}
           `}>
-            {report.title}
+            {formatReportTitleForDisplay(report.title, t)}
           </div>
 
           {/* 时间信息 */}

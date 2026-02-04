@@ -1042,7 +1042,9 @@
         "noDataError": "Report generation failed: No final report data received. Possible reasons include: Network connection interrupted, server error, or task was terminated prematurely."
       },
       "playback": {
-        "panelTitle": "SSE Playback Control Panel",
+        "panelTitle": "Debug Panel",
+        "tabPlayback": "SSE Playback",
+        "tabDebug": "Report Debug",
         "playbackSpeed": "Playback Speed:",
         "compressionEnabled": "Compression:",
         "status": {
@@ -1056,7 +1058,10 @@
           "downloadAllTooltip": "Download all recordings",
           "clear": "Clear",
           "download": "Download",
-          "delete": "Delete"
+          "delete": "Delete",
+          "importReport": "Import Report",
+          "selectMdFile": "Select Markdown File",
+          "viewReport": "View Report"
         },
         "loading": "Loading...",
         "noRecordings": "No recordings available",
@@ -1067,9 +1072,17 @@
         "compression": "Compression",
         "confirmDelete": "Are you sure you want to delete this recording?",
         "confirmClearAll": "Are you sure you want to clear all recordings? This action cannot be undone.",
+        "confirmClearDebugReports": "Are you sure you want to clear all debug reports?",
         "deleteFailed": "Delete failed: ",
         "clearFailed": "Clear failed: ",
         "downloadFailed": "Download failed: ",
+        "importFailed": "Import failed: ",
+        "selectConversationFirst": "Please select a conversation first",
+        "debugReportsCount": "{{count}} report(s)",
+        "debugReport": "Debug Report",
+        "noDebugReports": "No debug reports available",
+        "noDebugReportsDesc": "Import markdown report files to view",
+        "finalReport": "Final Report",
         "tip": "💡 Tip: Playback creates a new conversation. Speed can be adjusted above. Compression ratio indicates saved storage space."
       }
     }

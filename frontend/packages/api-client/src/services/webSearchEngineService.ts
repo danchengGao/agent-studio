@@ -259,7 +259,7 @@ export const webSearchEngineService = {
       if (response.status < 200 || response.status >= 300) {
         // 业务错误（4xx/5xx），返回错误响应对象
         const errorData = response.data as any
-        let errorMessage = errorData?.detail || errorData?.msg || errorData?.message || '测试失败'
+        let errorMessage = errorData?.detail || errorData?.msg || errorData?.message || ''
 
         return {
           code: response.status,
