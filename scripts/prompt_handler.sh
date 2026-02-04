@@ -4,38 +4,28 @@ set -euo >/dev/null 2>&1
 # ==== Displays access prompts for openJiuwen Agent Platform ====
 show_jiuwen_deploy_prompt() {
     local frontend_port=${DEPLOY_VARS["FRONTEND_HOST_PORT"]}
-    local ip_addr=${DEPLOY_VARS["IP"]}
     info "openJiuwen Agent Platform:"
     info "\tLocal access: https://localhost:${frontend_port}"
-    if [ -n "${ip_addr}" ]; then
-        info "\tNetwork access: https://${ip_addr}:${frontend_port}"
+    if [ -n "${DEPLOY_VARS["IP"]:-}" ]; then
+        info "\tNetwork access: https://${DEPLOY_VARS["IP"]}:${frontend_port}"
     fi
 }
 
 # ==== Shows deployment prompts for started modules ====
 show_deploy_prompt() {
-    local i=0
-    local cmd=${ARGS["CMD"]}
-    local env_file=${ARGS["ENV_FILE"]}
-    local modules=("${ARGS_MODULES[@]}")
-    local has_jiuwen=${DEPLOY_VARS["HAS_JIUWEN_CONTAINER"]}
-
-    if [ "${cmd}" != "up" ]; then
+    if [ "${ARGS["CMD"]}" != "up" ]; then
         return
     fi
 
-    if [ -z "${env_file}" ]; then
-        local backup_env_file="${CONFIG["ENV_DIR"]}/env.${DEPLOY_VARS["NAME_SUFFIX"]}"
-        info "Backup ENV file: ${backup_env_file}"
-    fi
-    
-
-    if [ "${has_jiuwen}" == "true" ]; then
+    if [ "${DEPLOY_VARS["HAS_JIUWEN"]}" == "true" ]; then
         show_jiuwen_deploy_prompt
         return
     fi
 
-    while [ $i -lt ${#modules[@]} ]; do
+    for module in "${ALL_MODULES[@]}"; do
+        if [ "${DEPLOY_VARS["HAS_${module}"]}" == "false" ]; then
+            continue
+        fi
         case "${modules[$i]}" in
             MYSQL)
                 success "MYSQL Server started" 
@@ -67,6 +57,5 @@ show_deploy_prompt() {
                 info ""
                 ;;
         esac
-        i=$((i + 1))
     done
 }

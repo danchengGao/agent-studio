@@ -80,8 +80,6 @@ check_containers() {
     done
 }
 
-
-
 # ==== Wait for MySQL container to fully start (can connect + execute SQL)======
 wait_for_mysql() {
     # Parameters: 

@@ -5,7 +5,7 @@ set -euo >/dev/null 2>&1
 # CORE DATA STRUCTURE
 # =============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="${SCRIPT_DIR}/.."
+IPV4_REGEX="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
 
 # ===== Core project configuration (paths, ports, commands, OS info) =====
 declare -A CONFIG=(
@@ -15,7 +15,9 @@ declare -A CONFIG=(
     ["DEFAULT_RUNTIME_ENV_FILE"]="${SCRIPT_DIR}/.env.runtime.default"
     ["CUSTOM_ENV_FILE"]="${SCRIPT_DIR}/.env.custom"
     ["CONFIG_DIR"]="${SCRIPT_DIR}/conf"
-    ["NGINX_TEMPLE_FILE"]="${SCRIPT_DIR}/conf/nginx.template.conf"
+    ["PRE_UPGRADE_ENV_DIR"]="${SCRIPT_DIR}/pre_upgrade_envs"
+    ["NGINX_TEMPLATE_FILE"]="${SCRIPT_DIR}/conf/nginx.template.conf"
+    ["MILVUS_BACKUP_TEMPLATE"]="${SCRIPT_DIR}/conf/milvus-backup.template.yml"
     ["DOCKER_COMPOSE_CMD"]=""
     ["START_PORT"]="3000"
     ["END_PORT"]="65535"
@@ -52,6 +54,8 @@ declare -A NAMES=(
     ["PYTHON_SERVER_DOCKER"]="jiuwen-python-server"
     ["JS_SERVER_SERVICE"]="js-server"
     ["JS_SERVER_DOCKER"]="jiuwen-js-server"
+    ["UPGRADE_TOOL_SERVICE"]="upgrade-tool"
+    ["UPGRADE_TOOL_DOCKER"]="jiuwen-upgrade-tool"
 )
 
 # ===== Host port variables to allocate for services (dynamic assignment) =====
@@ -94,18 +98,38 @@ declare -ga CONTAINERS_ADDRS=(
 )
 
 # ==== Global deploy associative array ====
-# ==== (key=variable name, value=variable value) ====
 declare -A DEPLOY_VARS=(
-    ["HAS_MYSQL_CONTAINER"]="false"
-    ["HAS_MILVUS_CONTAINER"]="false"
-    ["HAS_PLUGIN_CONTAINER"]="false"
-    ["HAS_SANDBOX_CONTAINER"]="false"
-    ["HAS_JIUWEN_CONTAINER"]="false"
+    ["HAS_MYSQL"]="false"
+    ["HAS_MILVUS"]="false"
+    ["HAS_PLUGIN"]="false"
+    ["HAS_SANDBOX"]="false"
+    ["HAS_JIUWEN"]="false"
+    ["HAS_UPGRADE"]="false"
+    ["IS_UP_MYSQL"]="false"
+    ["IS_UP_ETCD"]="false"
+    ["IS_UP_MINIO"]="false"
+    ["IS_UP_MILVUS"]="false"
+    ["IS_UP_PLUGIN_SERVER"]="false"
+    ["IS_UP_PYTHON_SERVER"]="false"
+    ["IS_UP_JS_SERVER"]="false"
+    ["IS_UP_SANDBOX_GATEWAY"]="false"
+    ["IS_UP_BACKEND"]="false"
+    ["IS_UP_FRONTEND"]="false"
+    ["IS_UP_UPGRADE_TOOL"]="false"
+    ["IS_UPGRADE_MYSQL"]="false"
+    ["IS_UPGRADE_MILVUS"]="false"
 )
 
-# ==== Global runtime associative array  ====
-# ==== (key=variable name, value=variable value) ====
+# ==== Global runtime associative array ====
 declare -A RUNTIME_VARS=(
+)
+
+# ==== Global associative array to store all environment variables ====
+declare -A ALL_VARS=(
+)
+
+# ==== Global associative array to store pre-upgrade environment variables ====
+declare -A PRE_UPGRADE_VARS=(
 )
 
 #  ==== List of available ports for service allocation (dynamic generated) ====
@@ -114,8 +138,19 @@ declare -ga AVAILABLE_PORTS=()
 # ==== List of ports already allocated to services (dynamic generated)  ==== 
 declare -ga ALLOCATED_PORTS=()
 
-# ==== All available modules ==== 
-declare -ga ALL_MODULES=("MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "JIUWEN")
+# ==== All available modules ====
+declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "JIUWEN")
+
+# ==== components of module ====
+declare -A COMPONENTS=(
+    ["MYSQL"]="MYSQL"
+    ["MILVUS"]="ETCD MINIO MILVUS"
+    ["PLUGIN"]="PLUGIN_SERVER"
+    ["SANDBOX"]="PYTHON_SERVER JS_SERVER SANDBOX_GATEWAY"
+    ["JIUWEN"]="BACKEND FRONTEND"
+    ["UPGRADE"]="UPGRADE_TOOL"
+)
+
 
 # ==== Paths to Docker Compose template files per module ==== 
 declare -A COMPOSE_TEMPLATE_FILES=(
@@ -124,6 +159,7 @@ declare -A COMPOSE_TEMPLATE_FILES=(
     ["PLUGIN"]="${SCRIPT_DIR}/conf/docker-plugin.template.yml"
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.template.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.template.yml"
+    ["UPGRADE"]="${SCRIPT_DIR}/conf/docker-upgrade.template.yml"
 )
 
 # ==== Paths to final generated Docker Compose files per module ==== 
@@ -133,32 +169,31 @@ declare -A COMPOSE_FILES=(
     ["PLUGIN"]="${SCRIPT_DIR}/conf/docker-plugin.yml"
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.yml"
+    ["UPGRADE"]="${SCRIPT_DIR}/conf/docker-upgrade.yml"
 )
 
-# ==== Mapping of modules to their associated Docker container name keys ==== 
-declare -A CONTAINER_KEYS=(
-    ["MYSQL"]="MYSQL_DOCKER"
-    ["MILVUS"]="ETCD_DOCKER MINIO_DOCKER MILVUS_DOCKER"
-    ["PLUGIN"]="PLUGIN_SERVER_DOCKER"
-    ["SANDBOX"]="PYTHON_SERVER_DOCKER JS_SERVER_DOCKER SANDBOX_GATEWAY_DOCKER"
-    ["JIUWEN"]="BACKEND_DOCKER FRONTEND_DOCKER"
-)
-
-# == Final resolved container names for each module (populated dynamically) ==
-declare -A CONTAINERS=(
-    ["MYSQL"]="" 
-    ["MILVUS"]=""
-    ["PLUGIN"]=""
-    ["SANDBOX"]=""
-    ["JIUWEN"]=""
-)
 
 # ==== Parsed command-line arguments (command and custom env file path) ====
 declare -A ARGS=(
     ["CMD"]=""
     ["ENV_FILE"]=""
     ["IS_NEW_SVC"]="false"
+    ["IS_UPGRADE"]="false"
 )
 
 # ==== Modules specified via command-line arguments ====
 declare -ga ARGS_MODULES=()
+
+# ==== Database migration revision IDs ====
+declare -A REVISION_ID=(
+    ["MYSQL_AGENT_0.1.1"]="54351e123cf0"
+    ["MYSQL_AGENT_0.1.2"]="54351e123cf0"
+    ["MYSQL_AGENT_0.1.3"]="06a1f79bce8b"
+    ["MYSQL_OPS_0.1.1"]="80f110f929fc"
+    ["MYSQL_OPS_0.1.2"]="80f110f929fc"
+    ["MYSQL_OPS_0.1.3"]="13377a900fe2"
+    ["SQLITE_AGENT_0.1.2"]="f458c7fb17a5"
+    ["SQLITE_AGENT_0.1.3"]="031b34b4dd30"
+    ["SQLITE_OPS_0.1.2"]="b4f4c6589bc5"
+    ["SQLITE_OPS_0.1.3"]="f6e49cd8c97d"
+)
