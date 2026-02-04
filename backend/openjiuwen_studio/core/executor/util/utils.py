@@ -284,7 +284,8 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                 "output": answer_value,
                 "result_type": "answer",
                 "node_id": "end_0",
-                "node_name": "结束"
+                "node_name": "结束",
+                "index": chunk.index
             }
         elif isinstance(chunk.payload, dict) and "output" in chunk.payload:
             output_value = chunk.payload.get("output", {})
@@ -301,10 +302,13 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                 "output": output_value,
                 "result_type": "answer",
                 "node_id": "end_0",
-                "node_name": "结束"
+                "node_name": "结束",
+                "index": chunk.index
             }
         else:
             transformed_payload = chunk.payload
+            if isinstance(transformed_payload, dict):
+                transformed_payload["index"] = chunk.index
 
         return ExecuteResponse(type=ExecuteResponseType.Workflow, payload=transformed_payload).model_dump(), None, None
 
