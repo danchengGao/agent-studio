@@ -245,6 +245,24 @@
     },
     "arrayElementTypeMismatch": "数组第{{index}}个元素类型不匹配，期望{{expectedType}}类型，实际为{{actualType}}类型"
   },
+  "nodePrompt": {
+    "systemPromptEmpty": "系统提示词为空，无法生成。",
+    "generateFailed": "提示词生成失败: {{error}}",
+    "generateCompleted": "系统提示词自动生成完成，可选择采纳。",
+    "requestFailed": "提示词生成请求失败",
+    "noContentToAdopt": "无可采纳内容。",
+    "adoptedGenerated": "已采纳自动生成的提示词。",
+    "canceled": "已取消自动生成结果，恢复原提示词。",
+    "unnamedPrompt": "未命名提示词",
+    "loadFailed": "预填提示词信息失败，请稍后重试。",
+    "requiredFields": "请填写提示词Key、名称与版本。",
+    "createFailed": "创建提示词失败",
+    "versionFormatError": "提交版本需为 x.x.x，并且大于已存在版本{{current}}",
+    "currentVersion": "(当前：{{version}})",
+    "commitDescription": "工作流节点 {{nodeName}} 保存的版本",
+    "saved": "提示词已保存并提交版本。",
+    "saveFailed": "保存提示词失败，请稍后重试。"
+  },
   "loop": {
     "title": "循环",
     "nestedLoopNotAllowed": "循环体内部不支持嵌套循环",

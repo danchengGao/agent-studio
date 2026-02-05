@@ -227,7 +227,10 @@
       "inputVariableName": "Input Variable Name",
       "description": "Description",
       "helpLLMUnderstandProperty": "Help LLM to understand the property",
-      "defaultValue": "Default Value"
+      "defaultValue": "Default Value",
+      "duplicateParameterName": "Duplicate parameter name",
+      "completeCurrentParameterFirst": "Please complete the current parameter settings before adding a new one",
+      "parameterNameAlreadyExists": "Parameter name \"{{name}}\" already exists, please use a different name"
     },
     "promptEditor": {
       "placeholder": "Use {{variable}} to reference input parameters"
@@ -366,7 +369,10 @@
   },
   "formPrompt": {
     "userPrompt": "User Prompt",
-    "systemPrompt": "System Prompt"
+    "systemPrompt": "System Prompt",
+    "unlink": "Unlink",
+    "unlinkConfirm": "Confirm to unlink prompt \"{{promptName}}-{{version}}\" from workflow node? This action cannot be undone.",
+    "confirm": "Confirm"
   },
   "formContentEditor": {
     "outputContent": "Output Content",
