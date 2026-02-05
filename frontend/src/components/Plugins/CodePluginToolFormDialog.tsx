@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Dialog,
@@ -38,12 +38,26 @@ interface CodeTemplate {
   template: string
 }
 
-const codeTemplates: CodeTemplate[] = [
-  {
-    language: 'python',
-    name: '基础函数',
-    description: '简单的数据处理函数',
-    template: `def add_test(a: int, b: int):
+
+interface CodePluginToolFormDialogProps {
+  open: boolean
+  loading?: boolean
+  form: CodePluginToolForm
+  onFormChange: (_field: keyof CodePluginToolForm, _value: string) => void
+  onSubmit: () => void
+  onCancel: () => void
+}
+
+const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ open, loading = false, form, onFormChange, onSubmit, onCancel }) => {
+  const { t } = useTranslation()
+  const isFormValid = form.name.trim() && form.description.trim() && form.runtime && form.code.trim()
+
+  const codeTemplates: CodeTemplate[] = useMemo(() => [
+    {
+      language: 'python',
+      name: t('plugins.pluginConfig.templateBasicFunction'),
+      description: t('plugins.pluginConfig.templateBasicFunctionDesc'),
+      template: `def add_test(a: int, b: int):
   return a + b
 
 def main(args: Args):
@@ -52,12 +66,12 @@ def main(args: Args):
   c = add_test(a, b)
 
   return {'res': c}`,
-  },
-  {
-    language: 'javascript',
-    name: '基础函数',
-    description: '简单的数据处理函数',
-    template: `function main() {
+    },
+    {
+      language: 'javascript',
+      name: t('plugins.pluginConfig.templateBasicFunction'),
+      description: t('plugins.pluginConfig.templateBasicFunctionDesc'),
+      template: `function main() {
   /**
    * 主要处理函数
    */
@@ -78,21 +92,8 @@ module.exports = { main };
 if (require.main === module) {
   console.log(main());
 }`,
-  },
-]
-
-interface CodePluginToolFormDialogProps {
-  open: boolean
-  loading?: boolean
-  form: CodePluginToolForm
-  onFormChange: (_field: keyof CodePluginToolForm, _value: string) => void
-  onSubmit: () => void
-  onCancel: () => void
-}
-
-const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ open, loading = false, form, onFormChange, onSubmit, onCancel }) => {
-  const { t } = useTranslation()
-  const isFormValid = form.name.trim() && form.description.trim() && form.runtime && form.code.trim()
+    },
+  ], [t])
 
   const runtimeOptions = [
     { value: 'python3', label: 'Python 3', icon: '🐍', description: t('plugins.pluginConfig.pythonDescription', '适用于数据分析、机器学习、自动化脚本') },
@@ -313,7 +314,7 @@ const CodePluginToolFormDialog: React.FC<CodePluginToolFormDialogProps> = ({ ope
 
                   <div className="mt-3 flex justify-end">
                     <Button size="small" onClick={() => setShowTemplates(false)}>
-                      {t('common.actions.close', '关闭')}
+                      {t('common.buttons.close', '关闭')}
                     </Button>
                   </div>
                 </div>

@@ -180,7 +180,8 @@ def validate_streaming_template(node: Node) -> None:
         if content is None or content.content is None or content.content.strip() == "":
             raise JiuWenComponentException(
                 error_code=StatusCode.OUTPUT_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or '组件'}] 开启流式输出时，输出模板不能为空",
+                message=StatusCode.OUTPUT_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title}] output template cannot be empty when streaming is enabled"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -390,7 +391,8 @@ def validate_branch_connection(branch: BranchInfo, all_edges: list[Edge], node_i
     if not branch_connected:
         raise JiuWenComponentException(
             error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node_title or 'Condition 组件'}] 分支 [{branch.branch_id}] 必须连线到节点",
+            message=StatusCode.IF_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node_title}] branch [{branch.branch_id}] must be connected to a node"),
             component_id=node_id,
             component_type=int(ComponentType.COMPONENT_TYPE_IF),
             error_stage="validate"

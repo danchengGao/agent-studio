@@ -2816,6 +2816,8 @@
       "saveConfig": "Save Configuration",
       "pythonDescription": "Suitable for data analysis, machine learning, automation scripts",
       "nodejsDescription": "Suitable for Web API, real-time applications, frontend build tools",
+      "templateBasicFunction": "Basic Function",
+      "templateBasicFunctionDesc": "Simple data processing function",
       "createTool": "Create Tool",
       "toolNameTooltip": "Give the tool a concise and clear name for easy identification and use",
       "toolNameExample": "For example: Get User Info, Query Weather Data",
