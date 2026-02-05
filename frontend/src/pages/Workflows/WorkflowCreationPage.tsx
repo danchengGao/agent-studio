@@ -174,7 +174,7 @@ const WorkflowCreationPage: React.FC = () => {
                 startIcon={createWorkflowMutation.isLoading ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div> : <Plus />}
                 onClick={handleCreate}
                 disabled={!formData.name.trim() || !formData.description.trim() || !!nameValidationError || createWorkflowMutation.isLoading}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-sm hover:shadow-xl transition-all duration-200"
+                className="btn-primary px-8 py-3 shadow-sm hover:shadow-md transition-all duration-200"
               >
                 {createWorkflowMutation.isLoading ? t('workflows.workflowCreation.creating') : t('workflows.workflowCreation.create')}
               </Button>
