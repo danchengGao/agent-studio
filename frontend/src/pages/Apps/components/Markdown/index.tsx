@@ -39,7 +39,7 @@ export const ReportMarkdown: React.FC<MarkdownProps> = ({
 
   return (
     <div
-      className={`markdown-content prose max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:mt-1 prose-a:text-blue-600 ${className}`}
+      className={`markdown-content prose max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-blue-600 ${className}`}
     >
       <MarkdownRenderer
         instanceId={instanceId}

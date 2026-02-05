@@ -87,4 +87,9 @@
     @apply font-bold;
     font-size: 22px;
   }
+
+  /* ========== Apps 报告：仅居中 div 内的 p（如图表标题） ========== */
+  .markdown-content div[style*="text-align: center"] > p {
+    margin-top: 0.25rem;
+  }
 }
