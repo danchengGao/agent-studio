@@ -25,6 +25,14 @@ export type AuthStateUpdater = {
   getRefreshToken?: () => string | null
 }
 
+// 检查是否已经在登录页面，避免重定向循环
+const isOnLoginPage = (): boolean => {
+  if (typeof window === 'undefined') return false
+  const currentPath = window.location.pathname
+  const loginPath = getLoginPagePath()
+  return currentPath === loginPath || currentPath.includes(loginPath)
+}
+
 // 刷新token的函数
 const renewToken = async (authStateUpdater: AuthStateUpdater): Promise<string | null> => {
   try {
@@ -37,8 +45,8 @@ const renewToken = async (authStateUpdater: AuthStateUpdater): Promise<string | 
       console.log('🚪 [Token Renewal] Logging out due to missing refresh token')
       authStateUpdater.logout()
 
-      // 强制跳转到登录页
-      if (typeof window !== 'undefined') {
+      // 只有在非登录页面时才强制跳转，避免刷新循环
+      if (typeof window !== 'undefined' && !isOnLoginPage()) {
         console.log('🔄 [Token Renewal] Redirecting to login page...')
         window.location.href = getLoginPagePath()
       }
@@ -229,15 +237,15 @@ const createApiClient = (
             console.error('❌ Token refresh failed:', refreshError)
             // 刷新失败，清除认证状态并跳转到登录页
             authStateUpdater.logout()
-            // 强制跳转到登录页
-            if (typeof window !== 'undefined') {
+            // 只有在非登录页面时才强制跳转，避免刷新循环
+            if (typeof window !== 'undefined' && !isOnLoginPage()) {
               window.location.href = getLoginPagePath()
             }
             return Promise.reject(createApiError(error, ERROR_TYPES.AUTH))
           }
         } else {
-          // 没有authStateUpdater时，直接跳转到登录页
-          if (typeof window !== 'undefined') {
+          // 没有authStateUpdater时，只有在非登录页面才跳转到登录页
+          if (typeof window !== 'undefined' && !isOnLoginPage()) {
             window.location.href = getLoginPagePath()
           }
         }
@@ -426,8 +434,8 @@ const performTokenRenewal = async (authStateUpdater: AuthStateUpdater) => {
       console.log('🚪 [Token Renewal] Logging out due to token refresh failure')
       authStateUpdater.logout()
 
-      // 强制跳转到登录页
-      if (typeof window !== 'undefined') {
+      // 只有在非登录页面时才强制跳转，避免刷新循环
+      if (typeof window !== 'undefined' && !isOnLoginPage()) {
         console.log('🔄 [Token Renewal] Redirecting to login page...')
         window.location.href = getLoginPagePath()
       }
@@ -439,8 +447,8 @@ const performTokenRenewal = async (authStateUpdater: AuthStateUpdater) => {
     console.log('🚪 [Token Renewal] Logging out due to token refresh failure')
     authStateUpdater.logout()
 
-    // 强制跳转到登录页
-    if (typeof window !== 'undefined') {
+    // 只有在非登录页面时才强制跳转，避免刷新循环
+    if (typeof window !== 'undefined' && !isOnLoginPage()) {
       console.log('🔄 [Token Renewal] Redirecting to login page...')
       window.location.href = getLoginPagePath()
     }

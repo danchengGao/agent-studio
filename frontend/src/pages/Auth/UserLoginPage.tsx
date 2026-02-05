@@ -417,9 +417,20 @@ const UserLoginPage: React.FC = () => {
     localStorage.removeItem('auth-storage')
   }
 
+  // 使用 ref 追踪认证检查状态，避免重复执行导致无限循环
+  const authCheckInProgress = useRef(false)
+
   //
   useEffect(() => {
+    // 防止重复执行认证检查
+    if (authCheckInProgress.current) {
+      return
+    }
+
     const checkAuthentication = async () => {
+      // 标记正在进行认证检查
+      authCheckInProgress.current = true
+
       try {
         // 检查本地存储的token
         const zustandToken = token
@@ -428,12 +439,14 @@ const UserLoginPage: React.FC = () => {
         // 如果没有token，直接显示登录页面
         if (!currentToken) {
           setIsCheckingAuth(false)
+          authCheckInProgress.current = false
           return
         }
         // 如果已经通过Zustand认证，直接跳转到dashboard
         if (isAuthenticated) {
           navigate('/dashboard', { replace: true })
           setIsCheckingAuth(false)
+          authCheckInProgress.current = false
           return
         }
         // 有token但是未认证状态
@@ -461,10 +474,12 @@ const UserLoginPage: React.FC = () => {
       } catch (error) {
         console.error('[LoginPage] Authentication check failed:', error)
         setIsCheckingAuth(false)
+      } finally {
+        authCheckInProgress.current = false
       }
     }
     checkAuthentication()
-  }, [isAuthenticated, token, login, navigate])
+  }, [isAuthenticated, token, navigate])
 
   // 封装通用的登录/注册成功处理函数（抽离出来，避免重复代码）
   const handleAuthSuccess = async (userInfo: any, accessToken: string, refreshToken: string, tokenType: string) => {

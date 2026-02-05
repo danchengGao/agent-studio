@@ -55,10 +55,14 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       logout: () => {
         // 停止 token 刷新
         get().stopTokenRenewal()
-        const oldToken = get().token
-        const oldRefreshToken = get().refreshToken
         console.log('🔑 [AuthStore] Logout - Clearing tokens')
-        console.log('🔑 [AuthStore] Logout - Previous token: [Cleared]')
+        
+        // 同步清除 localStorage，避免页面刷新后状态恢复导致无限循环
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('token_type')
+        localStorage.removeItem('auth-storage')
+        
         set({
           user: null,
           token: null,
