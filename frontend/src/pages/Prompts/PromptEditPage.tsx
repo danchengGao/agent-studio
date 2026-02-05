@@ -76,7 +76,7 @@ import { copyToClipboard } from '@/utils/prompts/utils'
 import { PromptService, PromptModelService, type RelationObj, type MockContext } from '@test-agentstudio/api-client'
 
 const PromptEditPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const isNew = id === 'new'
@@ -260,6 +260,7 @@ const PromptEditPage: React.FC = () => {
   const [isLoadingFromAPI, setIsLoadingFromAPI] = useState(false) // 标记是否正在从API加载数据
   const loadingRef = useRef(false) // 防止重复调用的标志
   const modelsLoadingRef = useRef(false) // 防止模型列表重复调用的标志
+  const pendingModelRestoreRef = useRef<{ modelId: string; modelFrom: string } | null>(null) // 待恢复的模型信息
   const [isInitialized, setIsInitialized] = useState(false) // 组件初始化完成标志
 
   // 对照组数量（不包括基准组）
@@ -2050,6 +2051,39 @@ const PromptEditPage: React.FC = () => {
       }))
     }
   }, [isNew, id, isNewPromptScenario, availableModels, selectedModel, modelsLoading])
+
+  // 监听语言变化，重新加载模型列表以获取对应语言的模型参数信息
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // 如果已经有选中的模型，保存当前模型信息，然后重新加载模型列表
+      if (selectedModel && workspaceId) {
+        pendingModelRestoreRef.current = {
+          modelId: selectedModel.openModel.model_id,
+          modelFrom: selectedModel.model_from,
+        }
+        loadModels()
+      }
+    }
+
+    i18n.on('languageChanged', handleLanguageChange)
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange)
+    }
+  }, [i18n, selectedModel, workspaceId, loadModels])
+
+  // 当模型列表更新后，恢复之前选中的模型（用于语言切换场景）
+  useEffect(() => {
+    if (pendingModelRestoreRef.current && availableModels.length > 0) {
+      const { modelId, modelFrom } = pendingModelRestoreRef.current
+      const restoredModel = findModelByIdAndFrom(modelId, modelFrom, availableModels)
+      if (restoredModel) {
+        setSelectedModel(restoredModel)
+      }
+      // 清除待恢复标记
+      pendingModelRestoreRef.current = null
+    }
+  }, [availableModels, setSelectedModel])
 
   // 【统一加载逻辑】整合所有进入提示词页面的加载逻辑
   useEffect(() => {

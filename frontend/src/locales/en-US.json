@@ -3980,7 +3980,8 @@
         "loading": "Loading models...",
         "noModels": "No available models",
         "providedBy": "Provided by {{vendor}}",
-        "systemBuiltIn": "System Built-in"
+        "systemBuiltIn": "System Built-in",
+        "protocol": "Protocol"
       },
       "quickOptimizeDialog": {
         "title": "Quick Optimize",

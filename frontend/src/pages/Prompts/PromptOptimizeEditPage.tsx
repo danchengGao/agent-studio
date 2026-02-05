@@ -240,7 +240,7 @@ const PromptOptimizeEditPage: React.FC = () => {
 
   // Snackbar状态
   const { snackbar, showSnackbar, closeSnackbar, setSnackbar } = useUnifiedSnackbar()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   // 最优轮数状态
   const [bestIteration, setBestIteration] = useState<number>(-1)
@@ -522,6 +522,8 @@ const PromptOptimizeEditPage: React.FC = () => {
   }, [isDraggingColumn, handleColumnMouseMove, handleColumnMouseUp])
 
   // 使用ref存储最新的状态值，确保自动保存时获取到最新值
+  const pendingOptimizeModelRestoreRef = useRef<{ modelId: string; modelFrom: string } | null>(null) // 待恢复的优化模型信息
+  const pendingRunModelRestoreRef = useRef<{ modelId: string; modelFrom: string } | null>(null) // 待恢复的运行模型信息
   const latestValuesRef = useRef({
     taskName: '',
     description: '',
@@ -1101,6 +1103,66 @@ const PromptOptimizeEditPage: React.FC = () => {
   React.useEffect(() => {
     fetchModels()
   }, [])
+
+  // 监听语言变化，重新加载模型列表以获取对应语言的模型参数信息
+  React.useEffect(() => {
+    const handleLanguageChange = () => {
+      // 如果已经有选中的模型，保存当前模型信息，然后重新加载模型列表
+      if (selectedOptimizeModel && workspaceId) {
+        pendingOptimizeModelRestoreRef.current = {
+          modelId: selectedOptimizeModel.openModel.model_id,
+          modelFrom: selectedOptimizeModel.model_from,
+        }
+      }
+      if (selectedRunModel && workspaceId) {
+        pendingRunModelRestoreRef.current = {
+          modelId: selectedRunModel.openModel.model_id,
+          modelFrom: selectedRunModel.model_from,
+        }
+      }
+      if ((selectedOptimizeModel || selectedRunModel) && workspaceId) {
+        fetchModels()
+      }
+    }
+
+    i18n.on('languageChanged', handleLanguageChange)
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange)
+    }
+  }, [i18n, selectedOptimizeModel, selectedRunModel, workspaceId])
+
+  // 当模型列表更新后，恢复之前选中的模型（用于语言切换场景）
+  React.useEffect(() => {
+    if (models.length > 0) {
+      // 恢复优化模型
+      if (pendingOptimizeModelRestoreRef.current) {
+        const { modelId, modelFrom } = pendingOptimizeModelRestoreRef.current
+        const restoredModel = models.find(
+          m => m.openModel.model_id === modelId && m.model_from === modelFrom
+        )
+        if (restoredModel) {
+          setSelectedOptimizeModel(restoredModel)
+          const defaultParams = PromptModelService.getModelDefaultParams(restoredModel)
+          setOptimizeModelParams(defaultParams)
+        }
+        pendingOptimizeModelRestoreRef.current = null
+      }
+      // 恢复运行模型
+      if (pendingRunModelRestoreRef.current) {
+        const { modelId, modelFrom } = pendingRunModelRestoreRef.current
+        const restoredModel = models.find(
+          m => m.openModel.model_id === modelId && m.model_from === modelFrom
+        )
+        if (restoredModel) {
+          setSelectedRunModel(restoredModel)
+          const defaultParams = PromptModelService.getModelDefaultParams(restoredModel)
+          setRunModelParams(defaultParams)
+        }
+        pendingRunModelRestoreRef.current = null
+      }
+    }
+  }, [models])
 
   // 响应式计算主体内容区域高度
   React.useEffect(() => {

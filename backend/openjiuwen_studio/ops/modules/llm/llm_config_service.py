@@ -243,7 +243,7 @@ def convert_orm_to_model_config(orm_obj, api_key_flag: bool = True) -> ModelConf
         },
         {
             "name": "top_p",
-            "label": "Top-p Sampling",
+            "label": "Top-p",
             "desc": "Top-p (nucleus sampling): Selects the smallest set of tokens whose cumulative "
                     "probability exceeds p, then samples from this set. Dynamically adjusts the number of "
                     "candidate tokens to balance diversity and quality. Recommended range: typically 0.9–0.95. "
