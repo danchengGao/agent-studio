@@ -72,7 +72,6 @@ import {
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from 'react-query'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { useIsNewDashboard } from '@/hooks/useIsNewDashboard'
 import { ENV_CONFIG } from '@/config/environment'
 import {
   useOptimizationJobDetail,
@@ -117,8 +116,6 @@ const PromptOptimizeEditPage: React.FC = () => {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const isEditMode = searchParams.get('mode') === 'edit'
-  const isNewDashboard = useIsNewDashboard()
-
   // 基本信息状态
   const { user } = useAuthStore()
   const workspaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
@@ -1123,7 +1120,7 @@ const PromptOptimizeEditPage: React.FC = () => {
     updateContentHeight()
     window.addEventListener('resize', updateContentHeight)
     return () => window.removeEventListener('resize', updateContentHeight)
-  }, [isNewDashboard])
+  }, [])
 
   // 页面进入时，如果是草稿类型，强制刷新一次（确保获取最新数据）
   // 使用 ref 来跟踪是否已经执行过，确保只在组件挂载时执行一次
@@ -2705,7 +2702,7 @@ const PromptOptimizeEditPage: React.FC = () => {
 
   return (
     <div
-      className={`w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 px-6 ${isNewDashboard ? 'py-6' : ''}`}
+      className="w-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 px-6 py-6"
       style={{ height: '100%', overflowX: 'auto' }}
     >
       {/* 页面容器 */}

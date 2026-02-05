@@ -7,7 +7,6 @@ import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
 import { useModels, getToken } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { useUIStore } from '../../stores/useUIStore'
 import { useConversationStore, MessageType, TaskStatus, AgentType, type MessageItems } from '../../stores/useConversationStore'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import SSERecorder from '../../utils/sseRecorder'
@@ -34,7 +33,6 @@ const ENABLE_SSE_DEBUG = import.meta.env.VITE_ENABLE_SSE_DEBUG === 'true'
 
 const AppsPage: React.FC = () => {
   const { user } = useAuthStore()
-  const isNew = useUIStore(state => state.isNewDashboard)
   const { t } = useTranslation()
   // Snackbar 支持 - 必须在组件顶层调用以监听全局事件
   const { snackbar, closeSnackbar } = useUnifiedSnackbar()
@@ -1044,7 +1042,7 @@ const AppsPage: React.FC = () => {
   }
 
   return (
-    <div className={`${FONT_FAMILY} flex flex-col h-full w-full min-h-0 ${isNew ? '' : '-my-6'}`}>
+    <div className={`${FONT_FAMILY} flex flex-col h-full w-full min-h-0`}>
       {/* SSE 回放浮动按钮（仅开发模式） */}
       {ENABLE_SSE_DEBUG && (
         <button

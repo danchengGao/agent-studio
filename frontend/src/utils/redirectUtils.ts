@@ -3,8 +3,6 @@
  */
 import { getLoginPagePath } from '@/Common/LoginPage.ts'
 
-import { useUIStore } from '@/stores/useUIStore'
-
 // 检查当前是否已经在登录页面
 export const isCurrentLoginPage = (): boolean => {
   if (typeof window === 'undefined') return false
@@ -37,10 +35,9 @@ export const smartRedirectToLogin = (): void => {
 }
 
 
-// 获取 Dashboard 目标路径
+// 获取 Dashboard 目标路径（统一使用新版首页）
 const getDashboardTargetPath = (): string => {
-  const isNew = useUIStore.getState().isNewDashboard
-  return isNew ? '/dashboard/agents' : '/dashboard'
+  return '/dashboard/agents'
 }
 
 // 重定向到 Dashboard（带智能检查）

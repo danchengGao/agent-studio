@@ -451,12 +451,35 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                   value={selectedModelName || ''}
                   onChange={event => handleModelChange(event.target.value as string)}
                   displayEmpty
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        maxHeight: 320,
+                        width: 360,
+                        borderRadius: 2,
+                      },
+                    }
+                  }}
                   renderValue={value => {
                     // 如果选择的模型不在可用列表中，显示提示
                     if (value && !modelsList.find(model => model.model_name === value && model.is_active)) {
                       return <span style={{ color: '#d32f2f' }}>{t('select.disabledModel', { name: value })}</span>
                     }
-                    return value ? value : <span style={{ color: 'rgba(0, 0, 0, 0.38)' }}>{t('select.placeholder')}</span>
+                    return value ? (
+                      <span
+                        title={String(value)}
+                        style={{
+                          display: 'block',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {String(value)}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'rgba(0, 0, 0, 0.38)' }}>{t('select.placeholder')}</span>
+                    )
                   }}
                   sx={{
                     width: 200,
@@ -471,7 +494,9 @@ const MultiWorkflowSelector = (props: { agentDetailResponse: AgentDetailResponse
                     .filter(model => model.is_active)
                     .map(model => (
                       <MenuItem key={model.model_name} value={model.model_name}>
-                        {model.model_name}
+                        <span style={{ display: 'block', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {model.model_name}
+                        </span>
                       </MenuItem>
                     ))}
                 </Select>
