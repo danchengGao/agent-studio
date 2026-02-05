@@ -34,7 +34,7 @@ export function FormInput({
   useFieldSchema = false,
 }: FormInputProps) {
   const { t } = useTranslation()
-  var displayName = t('workflowCanvas.formOutput.output')
+  var displayName = t('workflowCanvas.formInput.input')
   if (name) {
     displayName = t(name)
   }

@@ -41,11 +41,29 @@
       "elseBranchMustBeConnected": "\"否则\"分支必须连线到节点",
       "elseIfBranchMustBeConnected": "\"否则如果\"分支必须连线到节点",
       "branchType": {
-        "if": "\"如果\"",
-        "else": "\"否则\"",
-        "elseIf": "\"否则如果\""
+        "if": "如果",
+        "else": "否则",
+        "elseIf": "否则如果"
       },
-      "branchesMustBeConnected": "以下分支必须连线到节点: {{types}}"
+      "branchesMustBeConnected": "以下分支必须连线到节点: {{types}}",
+      "branchLabel": "条件分支",
+      "operators": {
+        "eq": "等于",
+        "neq": "不等于",
+        "gt": "大于",
+        "gte": "大于等于",
+        "lt": "小于",
+        "lte": "小于等于",
+        "contains": "包含",
+        "notContains": "不包含",
+        "isEmpty": "为空",
+        "isNotEmpty": "不为空"
+      },
+      "unconditional": "无条件",
+      "logic": {
+        "and": "且",
+        "or": "或"
+      }
     },
     "loop": {
       "titlePrefix": "循环",
@@ -124,7 +142,9 @@
       "addGroup": "添加分组"
     },
     "subWorkflow": {
-      "description": "可执行嵌套子工作流"
+      "title": "工作流",
+      "description": "可执行嵌套子工作流",
+      "workflowFallback": "工作流"
     },
     "continue": {
       "title": "继续循环",
@@ -365,6 +385,9 @@
   },
   "formOutput": {
     "output": "输出"
+  },
+  "formVersion": {
+    "version": "版本"
   },
   "formPrompt": {
     "userPrompt": "用户提示词",

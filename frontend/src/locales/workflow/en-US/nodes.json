@@ -41,11 +41,29 @@
       "elseBranchMustBeConnected": "\"Else\" branch must be connected to a node",
       "elseIfBranchMustBeConnected": "\"Else If\" branch must be connected to a node",
       "branchType": {
-        "if": "\"If\"",
-        "else": "\"Else\"",
-        "elseIf": "\"Else If\""
+        "if": "If",
+        "else": "Else",
+        "elseIf": "Else If"
       },
-      "branchesMustBeConnected": "The following branches must be connected to nodes: {{types}}"
+      "branchesMustBeConnected": "The following branches must be connected to nodes: {{types}}",
+      "branchLabel": "Condition Branch",
+      "operators": {
+        "eq": "Equal",
+        "neq": "Not Equal",
+        "gt": "Greater Than",
+        "gte": "Greater Than or Equal",
+        "lt": "Less Than",
+        "lte": "Less Than or Equal",
+        "contains": "Contains",
+        "notContains": "Does Not Contain",
+        "isEmpty": "Is Empty",
+        "isNotEmpty": "Is Not Empty"
+      },
+      "unconditional": "Unconditional",
+      "logic": {
+        "and": "And",
+        "or": "Or"
+      }
     },
     "loop": {
       "titlePrefix": "Loop",
@@ -124,7 +142,9 @@
       "addGroup": "Add Group"
     },
     "subWorkflow": {
-      "description": "Execute nested sub-workflows"
+      "title": "Workflow",
+      "description": "Execute nested sub-workflows",
+      "workflowFallback": "Workflow"
     },
     "continue": {
       "title": "Continue",
@@ -366,6 +386,9 @@
   },
   "formOutput": {
     "output": "Output"
+  },
+  "formVersion": {
+    "version": "Version"
   },
   "formPrompt": {
     "userPrompt": "User Prompt",

@@ -245,7 +245,7 @@ const showWorkflowSelector = (allowMultiple: boolean = true, excludeWorkflowId?:
             // 将每个选中的工作流对象转换为需要的格式
             const workflowInfos = selectedWorkflows.map(workflow => ({
               id: workflow.workflow_id,
-              title: workflow.name || `工作流 ${workflow.workflow_id.slice(-5)}`, // 使用工作流名称或ID的最后5位作为标题
+              title: workflow.name || t('workflowCanvas.nodes.subWorkflow.workflowFallback') + ` ${workflow.workflow_id.slice(-5)}`, // 使用工作流名称或ID的最后5位作为标题
               workflow: workflow, // 保存完整的工作流对象
             }))
 
@@ -297,7 +297,7 @@ const showWorkflowSelector = (allowMultiple: boolean = true, excludeWorkflowId?:
 export const WorkflowNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Workflow,
   meta: {
-    label: '工作流',
+    label: t('workflowCanvas.nodes.subWorkflow.title'),
     nodePanelVisible: true,
     defaultPorts: [{ type: 'output' }, { type: 'input' }],
     size: {

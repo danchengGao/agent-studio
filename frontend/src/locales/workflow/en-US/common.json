@@ -64,7 +64,17 @@
     "warning": "Warning",
     "fixAll": "Fix All",
     "noValidationIssues": "No validation issues found",
-    "configurationError": "Configuration error"
+    "configurationError": "Configuration error",
+    "fieldRequired": "Field is required",
+    "variableReferencedNotFound": "Referenced variable not found"
+  },
+  "editor": {
+    "nodeNotFound": "Node {{nodeId}} does not exist",
+    "openNodePanelFailed": "Failed to open node details panel",
+    "historyVersionSchemaEmpty": "History version schema is empty, cannot load to canvas",
+    "historySchemaParseFailed": "Failed to parse or import history version schema",
+    "fetchHistoryVersionFailed": "Failed to fetch history version",
+    "versionHistory": "Version History"
   },
   "ui": {
     "draft": "Draft",
@@ -160,6 +170,13 @@
     "returnContent": "Return Configured Content",
     "executeExceptionStep": "Execute Exception Step",
     "returnContentConfig": "Return Content Config"
+  },
+  "formCode": {
+    "code": "Code",
+    "switchLanguageTitle": "Switch Programming Language",
+    "switchLanguageMessage": "After switching to {{language}}, the current edited content will be lost. Are you sure you want to switch?",
+    "confirmSwitch": "Confirm Switch",
+    "cancel": "Cancel"
   },
   "splittingSelector": {
     "comma": "Comma",

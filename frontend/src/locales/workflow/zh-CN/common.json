@@ -64,7 +64,17 @@
     "warning": "警告",
     "fixAll": "修复所有",
     "noValidationIssues": "没有发现校验问题",
-    "configurationError": "配置有误"
+    "configurationError": "配置有误",
+    "fieldRequired": "字段是必需的",
+    "variableReferencedNotFound": "引用的变量不存在"
+  },
+  "editor": {
+    "nodeNotFound": "节点 {{nodeId}} 不存在",
+    "openNodePanelFailed": "打开节点详情面板失败",
+    "historyVersionSchemaEmpty": "历史版本 schema 为空，无法加载到画布",
+    "historySchemaParseFailed": "历史版本 schema 解析失败或导入失败",
+    "fetchHistoryVersionFailed": "获取历史版本失败",
+    "versionHistory": "版本历史"
   },
   "ui": {
     "draft": "草稿",
@@ -160,6 +170,13 @@
     "returnContent": "返回设定内容",
     "executeExceptionStep": "执行异常流程",
     "returnContentConfig": "返回内容配置"
+  },
+  "formCode": {
+    "code": "代码",
+    "switchLanguageTitle": "切换编程语言",
+    "switchLanguageMessage": "切换到 {{language}} 后，当前编辑的内容将会丢失，是否确认切换？",
+    "confirmSwitch": "确认切换",
+    "cancel": "取消"
   },
   "splittingSelector": {
     "comma": "逗号",
