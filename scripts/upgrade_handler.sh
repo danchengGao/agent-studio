@@ -154,45 +154,63 @@ valid_upgrade(){
     info "IS_UPGRADE_MILVUS: ${DEPLOY_VARS["IS_UPGRADE_MILVUS"]}"
 }
 
-# Set upgrade-related variables (MySQL/Milvus/MinIO) for pre/post upgrade
-set_upgrade_vars() {
-    if [[ "${DEPLOY_VARS["IS_UPGRADE_MYSQL"]}" == "true" ]]; then
-        set_deploy_vars_if_empty "PRE_UPGRADE_DB_HOST" "${PRE_UPGRADE_VARS["IP"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_DB_PORT" "${PRE_UPGRADE_VARS["MYSQL_HOST_PORT"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_DB_PWD" "${PRE_UPGRADE_VARS["DB_ROOT_PASSWORD"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_AGENT_DB_NAME" "${PRE_UPGRADE_VARS["AGENT_DB_NAME"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_OPS_DB_NAME" "${PRE_UPGRADE_VARS["OPS_DB_NAME"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_DB_HOST" "${RUNTIME_VARS["DB_HOST"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_DB_PORT" "${RUNTIME_VARS["DB_PORT"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_DB_PWD" "${DEPLOY_VARS["DB_ROOT_PASSWORD"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_AGENT_DB_NAME" "${RUNTIME_VARS["AGENT_DB_NAME"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_OPS_DB_NAME" "${RUNTIME_VARS["OPS_DB_NAME"]}"
+# Set upgrade-related variables of MySQL
+set_mysql_vars() {
+    if [[ "${DEPLOY_VARS["IS_UPGRADE_MYSQL"]}" == "false" ]]; then
+        return
     fi
 
-    if [[ "${DEPLOY_VARS["IS_UPGRADE_MILVUS"]}" == "true" ]]; then
-        set_deploy_vars_if_empty "PRE_UPGRADE_MILVUS_HOST" "${PRE_UPGRADE_VARS["IP"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_MILVUS_PORT" "${PRE_UPGRADE_VARS["MILVUS_HOST_PORT"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_MILVUS_TOKEN" "${PRE_UPGRADE_VARS["MILVUS_TOKEN"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_MILVUS_HOST" "${RUNTIME_VARS["MILVUS_HOST"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_MILVUS_PORT" "${RUNTIME_VARS["MILVUS_PORT"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_MILVUS_TOKEN" "${RUNTIME_VARS["MILVUS_TOKEN"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_DB_HOST" "${PRE_UPGRADE_VARS["IP"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_DB_PORT" "${PRE_UPGRADE_VARS["MYSQL_HOST_PORT"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_DB_PWD" "${PRE_UPGRADE_VARS["DB_ROOT_PASSWORD"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_AGENT_DB_NAME" "${PRE_UPGRADE_VARS["AGENT_DB_NAME"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_OPS_DB_NAME" "${PRE_UPGRADE_VARS["OPS_DB_NAME"]}"
+    set_if_empty "DEPLOY_VARS"  "POST_UPGRADE_DB_HOST" "${RUNTIME_VARS["DB_HOST"]}"
+    set_if_empty "DEPLOY_VARS"  "POST_UPGRADE_DB_PORT" "${RUNTIME_VARS["DB_PORT"]}"
+    set_if_empty "DEPLOY_VARS"  "POST_UPGRADE_DB_PWD" "${DEPLOY_VARS["DB_ROOT_PASSWORD"]}"
+    set_if_empty "DEPLOY_VARS"  "POST_UPGRADE_AGENT_DB_NAME" "${RUNTIME_VARS["AGENT_DB_NAME"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_OPS_DB_NAME" "${RUNTIME_VARS["OPS_DB_NAME"]}"
+}
 
-        set_deploy_vars_if_empty "PRE_UPGRADE_MINIO_HOST" "${PRE_UPGRADE_VARS["IP"]}"
-        set_deploy_vars_if_empty "PRE_UPGRADE_MINIO_PORT" "${PRE_UPGRADE_VARS["MINIO_SERVICE_HOST_PORT"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_MINIO_HOST" "${RUNTIME_VARS["MINIO_HOST"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_MINIO_PORT" "${RUNTIME_VARS["MINIO_PORT"]}"
-
-        local pre_version=${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}
-        if [[ "${pre_version}" == "0.1.1" || "${pre_version}" == "0.1.2" ]]; then
-            DEPLOY_VARS["PRE_UPGRADE_MINIO_ACCESS_KEY"]="minioadmin"
-            DEPLOY_VARS["PRE_UPGRADE_MINIO_SECRET_KEY"]="minioadmin"
-        else
-            set_deploy_vars_if_empty "PRE_UPGRADE_MINIO_ACCESS_KEY" "${PRE_UPGRADE_VARS["MINIO_ACCESS_KEY"]}"
-            set_deploy_vars_if_empty "PRE_UPGRADE_MINIO_SECRET_KEY" "${PRE_UPGRADE_VARS["MINIO_SECRET_KEY"]}"
-        fi
-        set_deploy_vars_if_empty "POST_UPGRADE_MINIO_ACCESS_KEY" "${RUNTIME_VARS["MINIO_ACCESS_KEY"]}"
-        set_deploy_vars_if_empty "POST_UPGRADE_MINIO_SECRET_KEY" "${RUNTIME_VARS["MINIO_SECRET_KEY"]}"
+# Set upgrade-related variables of Milvus
+set_milvus_vars() {
+    if [[ "${DEPLOY_VARS["IS_UPGRADE_MILVUS"]}" == "false" ]]; then
+        return
     fi
+
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MILVUS_HOST" "${PRE_UPGRADE_VARS["IP"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MILVUS_PORT" "${PRE_UPGRADE_VARS["MILVUS_HOST_PORT"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MILVUS_TOKEN" "${PRE_UPGRADE_VARS["MILVUS_TOKEN"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MILVUS_HOST" "${RUNTIME_VARS["MILVUS_HOST"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MILVUS_PORT" "${RUNTIME_VARS["MILVUS_PORT"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MILVUS_TOKEN" "${RUNTIME_VARS["MILVUS_TOKEN"]}"
+
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_HOST" "${PRE_UPGRADE_VARS["IP"]}"
+    set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_PORT" "${PRE_UPGRADE_VARS["MINIO_SERVICE_HOST_PORT"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MINIO_HOST" "${RUNTIME_VARS["MINIO_HOST"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MINIO_PORT" "${RUNTIME_VARS["MINIO_PORT"]}"
+
+    case "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" in
+        0.1.1|0.1.2)
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_ACCESS_KEY" "minioadmin"
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_SECRET_KEY" "minioadmin"
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MILVUS_HTTP_HOST_PORT" "9091"
+            ;;
+        0.1.3)
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_ACCESS_KEY" "${PRE_UPGRADE_VARS["MINIO_ACCESS_KEY"]}"
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_SECRET_KEY" "${PRE_UPGRADE_VARS["MINIO_SECRET_KEY"]}"
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MILVUS_HTTP_HOST_PORT" "9091"
+            ;;
+        *)
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_ACCESS_KEY" "${PRE_UPGRADE_VARS["MINIO_ACCESS_KEY"]}"
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MINIO_SECRET_KEY" "${PRE_UPGRADE_VARS["MINIO_SECRET_KEY"]}"
+            set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_MILVUS_HTTP_HOST_PORT" "${PRE_UPGRADE_VARS["MILVUS_HTTP_HOST_PORT"]}"
+            ;;
+    esac
+
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MINIO_ACCESS_KEY" "${RUNTIME_VARS["MINIO_ACCESS_KEY"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MINIO_SECRET_KEY" "${RUNTIME_VARS["MINIO_SECRET_KEY"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_MILVUS_HTTP_HOST_PORT" "${DEPLOY_VARS["MILVUS_HTTP_HOST_PORT"]}"
 }
 
 # Generate Milvus backup/restore config file for pre/post upgrade phase
@@ -210,7 +228,9 @@ gen_milvus_backup_conf() {
         ["MINIO_PORT"]=${DEPLOY_VARS["${upgrade_phase}_MINIO_PORT"]}
         ["MINIO_ACCESS_KEY"]=${DEPLOY_VARS["${upgrade_phase}_MINIO_ACCESS_KEY"]}
         ["MINIO_SECRET_KEY"]=${DEPLOY_VARS["${upgrade_phase}_MINIO_SECRET_KEY"]}
+        ["MILVUS_HTTP_HOST_PORT"]=${DEPLOY_VARS["${upgrade_phase}_MILVUS_HTTP_HOST_PORT"]}
     )
+
     generate_config_file ${template_file} ${file} "milvus_vars"
 }
 
@@ -325,10 +345,7 @@ uprade_mysql() {
 
     local upgrade_container=${DEPLOY_VARS["UPGRADE_TOOL_DOCKER"]}
     local env_file="${CONFIG["ENV_DIR"]}/env.runtime.${DEPLOY_VARS["NAME_SUFFIX"]}"
-    local upgrade_env_file="${CONFIG["ENV_DIR"]}/env.upgrade.${DEPLOY_VARS["NAME_SUFFIX"]}"
-    exec_cmd "cp -f ${env_file} ${upgrade_env_file}"
-    sed -i "s/^DB_HOST=.*/DB_HOST=${DEPLOY_VARS["POST_UPGRADE_DB_HOST"]}/; s/^DB_PORT=.*/DB_PORT=${DEPLOY_VARS["POST_UPGRADE_DB_PORT"]}/;" ${upgrade_env_file}
-    exec_cmd "docker cp ${upgrade_env_file} ${upgrade_container}:/root/.env"
+    exec_cmd "docker cp ${env_file} ${upgrade_container}:/root/.env"
     upgrade_data "mysql"
 }
 
@@ -348,8 +365,7 @@ upgrade_sqlite(){
     local upgrade_container=${DEPLOY_VARS["UPGRADE_TOOL_DOCKER"]}
     local suffix=${DEPLOY_VARS["NAME_SUFFIX"]}
     local env_file="${CONFIG["ENV_DIR"]}/env.runtime.${suffix}"
-    exec_cmd "cp -f ${env_file} .env.post_upgrade"
-    exec_cmd "docker cp .env.post_upgrade ${upgrade_container}:/root/.env"
+    exec_cmd "docker cp ${env_file} ${upgrade_container}:/root/.env"
 
     local pre_upgrade_db_dir=".sqlite-dirs/databases.preupgrade.${suffix}"
     local post_upgrade_db_dir=".sqlite-dirs/databases.postupgrade.${suffix}"
@@ -393,5 +409,6 @@ prepare_upgrade_env() {
     fi
 
     valid_upgrade
-    set_upgrade_vars
+    set_mysql_vars
+    set_milvus_vars
 }

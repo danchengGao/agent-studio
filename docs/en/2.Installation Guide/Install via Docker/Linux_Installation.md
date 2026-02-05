@@ -16,6 +16,8 @@ Make sure your machine meets the following requirements:
 - Software:
   - Docker and Docker Compose: Installation methods are described below
 
+> Note: The default path for Docker's core storage—including images, container runtime data, volumes, and network configurations—is /var/lib/docker/. Most Linux distributions (CentOS, Ubuntu, Debian) do not create a separate partition for /var by default. Instead, /var exists as a regular directory under the root partition (/) and shares space with the system disk (root partition). We recommend that you mount /var to a dedicated, high-capacity partition or separate disk to isolate it from the system disk. This ensures that if /var becomes full, core system operations on the root partition will not be affected.
+
 ### Install Docker and Docker Compose
 
 - Refer to the <a href="https://docs.docker.com/engine/install/" target="_blank" rel="nofollow noopener noreferrer">Docker official installation guide</a> and the <a href="https://docs.docker.com/compose/install/" target="_blank" rel="nofollow noopener noreferrer">Docker Compose official installation guide</a> to complete the setup.
@@ -106,6 +108,8 @@ Make sure your machine meets the following requirements:
     | **EMBED_TIMEOUT** | The maximum wait time for embedding model requests(unit: second), default value `60` |
     | **EMBED_MAX_RETRIES** | The maximum number of retries when an embedding model request fails, default value `3` |
   
+- To modify the port number of the frontend page service, please refer to [here](../../../../scripts/README.md#如何修改前端页面服务的端口号).
+
 - Run the following command to start openJiuwen:
 
   ```bash
@@ -118,7 +122,7 @@ Make sure your machine meets the following requirements:
 
   Local access: *local access address*
 
-  Network access: *network access address*
+> For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
 
 ### 3. Access the system
 

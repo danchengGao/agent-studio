@@ -79,6 +79,7 @@ services:
       retries: 3
     ports:
       - "<<MILVUS_HOST_PORT>>:19530"
+      - "<<MILVUS_HTTP_HOST_PORT>>:9091"
     depends_on:
       - "<<ETCD_SERVICE>>"
       - "<<MINIO_SERVICE>>"

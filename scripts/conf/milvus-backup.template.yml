@@ -39,4 +39,4 @@ backup:
   keepTempFiles: false
   gcPause:
     enable: true
-    address: http://127.0.0.1:9091
+    address: http://<<MILVUS_HOST>>:<<MILVUS_HTTP_HOST_PORT>>

@@ -168,10 +168,12 @@ format_dir_str() {
     echo "${final_str}"
 }
 
-set_deploy_vars_if_empty() {
-    local key=$1
-    local value=$2
-    if [ -z "${DEPLOY_VARS["${key}"]:-}" ]; then
-        DEPLOY_VARS["${key}"]="${value}"
+# Set value for associative array if the key is empty/unset
+set_if_empty() {
+    local -n vars=$1
+    local key=$2
+    local value=$3
+    if [ -z "${vars["${key}"]:-}" ]; then
+        vars["${key}"]="${value}"
     fi 
 }

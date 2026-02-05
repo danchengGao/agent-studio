@@ -9,7 +9,7 @@ generate_final_names() {
     info "Generating name...."
     for key in "${!NAMES[@]}"; do
         # info "Generating name for ${key}"
-        set_deploy_vars_if_empty "${key}" "${NAMES[${key}]}-${name_suffix}"
+        set_if_empty "DEPLOY_VARS" "${key}" "${NAMES[${key}]}-${name_suffix}"
     done
     info "Generating name Done!"
 }

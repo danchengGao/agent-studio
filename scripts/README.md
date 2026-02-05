@@ -11,14 +11,9 @@ scripts/
 ├── .env.deploy.default             # 部署相关默认变量文件（禁止修改）
 ├── .env.runtime.default            # 运行时相关默认变量文件（禁止修改）
 ├── .envs/                          # 多实例服务变量文件归档目录（自动生成）
-│   ├── env.deploy.<实例ID>     # 某实例的部署变量备份文件（记录该实例的部署配置，按五位随机串区分实例）
-│   ├── env.runtime.<实例ID>    # 某实例的运行时变量文件（直接挂载到容器的环境变量文件）
+│   ├── env.deploy.<实例ID>         # 某实例的部署变量备份文件
+│   ├── env.runtime.<实例ID>        # 某实例的运行时变量文件（直接挂载到容器的环境变量文件）
 │   └── ...                         # 其他服务实例的变量文件
-├── .ssl-dirs/                      # 多实例前端服务SSL证书存储目录（自动生成）
-│   ├── ssl-<实例ID>/           # 某前端服务实例的SSL证书目录（自动生成）
-│   │   ├── certificate.crt         # SSL公钥证书（供Nginx配置HTTPS）（自动生成）
-│   │   └── private.key             # SSL私钥文件（禁止泄露）（自动生成）
-│   └── ...                         # 其他前端实例的证书目录
 ├── conf/                           # 服务配置模板与生成后的配置文件目录
 │   ├── config.json                 # Agent Studio配置文件
 │   ├── config.yaml                 # Agent Studio配置文件
@@ -32,12 +27,26 @@ scripts/
 │   ├── docker-sandbox.yml          # 当前实例的Sandbox容器最终配置文件（自动生成）
 │   ├── docker-plugin.template.yml  # Plugin Server插件服务容器模板文件
 │   ├── docker-plugin.yml           # 当前实例的Plugin Server容器最终配置文件（自动生成）
+│   ├── docker-upgrade.template.yml # 升级服务容器模板文件
+│   ├── docker-upgrade.yml          # 当前实例的升级容器最终配置文件（自动生成）
 │   ├── nginx.template.conf         # Nginx通用配置模板
-│   └── .nginx-files/               # 多实例Nginx配置文件目录（自动生成）
-│       ├── nginx.conf-<实例ID> # 某前端实例的Nginx最终配置文件（自动生成）
-│       └── ...                     # 其他实例的Nginx配置文件（自动生成）
+│   ├──  .nginx-files/              # 多实例Nginx配置文件目录（自动生成）
+│   │   ├── nginx.conf-<实例ID>     # 某前端实例的Nginx最终配置文件（自动生成）
+│   │   └── ...                     # 其他实例的Nginx配置文件（自动生成）
+│   ├── .ssl-dirs/                  # 多实例前端服务SSL证书存储目录（自动生成）
+│   │   ├──  ssl-<实例ID>/          # 某前端服务实例的SSL证书目录（自动生成）
+│   │   │   ├── certificate.crt     # SSL公钥证书（供Nginx配置HTTPS）（自动生成）
+│   │   │   └── private.key         # SSL私钥文件（禁止泄露）（自动生成）
+│   └── ...                         # 其他前端实例的证书目录
+├── pre_upgrade_envs/               # 升级前旧实例的变量配置文件目录
 ├── examples/                       # 后端业务示例配置目录
-├── logs/                           # 脚本运行日志与服务日志归档目录（自动生成）
+├── log-dirs/                       # 所有实例的服务日志、升级日志归档目录（自动生成）
+│   ├── logs-<实例ID>/              # 某实例的服务日志、升级日志目录
+│   └── ...
+├── .sqlite-dirs/                   # SQLite数据库升级过程中的临时数据目录（自动生成，升级完成后可清理）
+│   ├── databases.preupgrade.<实例ID>
+│   ├── databases.postupgrade.<实例ID>
+│   └── ...
 ├── readme-service-script.md        # 脚本使用直指导文档
 ├── service.sh                      # 部署脚本核心入口（接收用户指令，调度其他子脚本）
 ├── args_handler.sh                 # 命令行参数解析脚本
@@ -50,12 +59,17 @@ scripts/
 ├── envfile_handler.sh              # 环境文件处理脚本
 ├── ports_handler.sh                # 端口管理脚本
 ├── cmd.sh                          # 命令封装脚本
-└── template_handler.sh             # 模板渲染脚本
+├── template_handler.sh             # 模板渲染脚本
+├── upgrade_handler.sh              # 升级流程核心处理脚本（封装版本检测、数据迁移、容器升级逻辑）
+└── service_handler.sh              # 服务生命周期管理脚本（封装服务启动/停止/重启/状态检查逻辑）
+
 ```
 
 本脚本原生支持多实例隔离部署能力，所有服务实例均通过「实例ID」做唯一标识，不同实例的配置、容器、数据卷、日志完全隔离，互不干扰，可在同一台服务器上部署多套独立的 Agent Studio 服务。所有配置按「实例ID」区分不同服务实例；
 
 脚本运行依赖环境变量配置：`.env.deploy.default` 和`.env.runtime.default` 为默认环境变量文件（内置基础默认值，请勿修改）；如需自定义配置，可在`.env.custom`中配置变量以覆写默认值；
+
+> 注意：Docker 的镜像、容器运行时数据、数据卷、网络配置等核心存储，默认路径是：/var/lib/docker/， 而多数 Linux 发行版（CentOS、Ubuntu、Debian）默认不单独划分 /var 分区，/var 只是根分区 / 下的普通目录，共用 ** 系统盘（根分区）** 的空间。建议客户把 /var 单独挂载到空间充足的独立分区 / 独立数据盘，和系统盘隔离，即便 /var 占满，也不会影响根分区的系统核心运行。
 
 ## 核心功能
 
@@ -241,7 +255,14 @@ $ ./service.sh mysql milvus plugin sandbox down -f .envs/env.deploy.<实例ID>
 
 ## 升级约束说明和配置要求
 
-1. 本升级流程仅支持从低版本向高版本升级，或者同版本的数据迁移，不支持版本回退或降级操作。
+1. 本升级流程仅支持从低版本向高版本升级，或者同版本的数据迁移，不支持版本回退或降级操作。支持的版本迁移路径如下：
+
+| 源版本 | 目标版本 | 支持状态               |
+| :----- | :------- | :--------------------- |
+| 0.1.1  | 0.1.4    | 支持                   |
+| 0.1.2  | 0.1.4    | 支持                   |
+| 0.1.3  | 0.1.4    | 支持                   |
+| 0.1.4  | 0.1.4    | 支持（同版本数据迁移） |
 
 2. 本升级流程仅支持同类型数据库组件的平滑迁移，需确保新旧版本实例的数据库组件类型完全一致：
 
@@ -255,6 +276,10 @@ IP=<实例组件所在服务器的IP地址>
 ```
 
 4. 若升级涉及 SQLITE 组件，请确保新旧版本实例在同一台物理机上。
+
+5. 不支持外挂 MySQL 组件或者外挂 Milvus 组件的数据迁移和升级。
+
+6. 升级过程中需对旧实例的 MySQL 与 Milvus 组件数据进行拷贝，并迁移至新实例。请在升级前核查旧实例上述组件的数据总量，确保磁盘剩余空间不低于该总量的两倍，以满足升级所需空间条件。
 
 ## 执行升级命令
 

@@ -16,6 +16,8 @@
 * 软件
   * Docker 和 Docker Compose：安装方法详见下文
 
+  > 注意：Docker 的镜像、容器运行时数据、数据卷、网络配置等核心存储，默认路径是：/var/lib/docker/， 而多数 Linux 发行版（CentOS、Ubuntu、Debian）默认不单独划分 /var 分区，/var 只是根分区 / 下的普通目录，共用 ** 系统盘（根分区）** 的空间。建议客户把 /var 单独挂载到空间充足的独立分区 / 独立数据盘，和系统盘隔离，即便 /var 占满，也不会影响根分区的系统核心运行。
+
 ### 安装 Docker 和 Docker Compose
 
 * 请参照 <a href="https://docs.docker.com/engine/install/" target="_blank" rel="nofollow noopener noreferrer">Docker 官方安装指南</a> 以及 <a href="https://docs.docker.com/compose/install/" target="_blank" rel="nofollow noopener noreferrer">Docker Compose 官方安装指南</a> 完成配置。
@@ -106,6 +108,8 @@
   | **EMBED_TIMEOUT**                     | 向量模型的最大等待时间（单位秒），默认值`60`          |
   | **EMBED_MAX_RETRIES**                 | 向量模型请求失败时的最大重试次数,默认值`3`           |
 
+  * 如需修改前端页面服务的端口号，请参考[这里](../../../../scripts/README.md#如何修改前端页面服务的端口号)，
+
 * 输入以下命令启动 openJiuwen：
 
   ```bash
@@ -118,7 +122,8 @@
 
   Local access: *本地访问地址*
 
-  Network access: *网络访问地址*
+> 关于容器部署的更多使用细节，可参考[openjiuwen-agent-studio-部署工具使用手册](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册)
+
 
 ### 3. 访问系统
 
