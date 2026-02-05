@@ -718,7 +718,7 @@ const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({ open, knowledgeBa
                   <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <div className="text-sm text-gray-600 mb-2">{t('knowledgeBases.addDocument.dragAndDrop')}</div>
                   <div className="text-xs text-gray-500 mb-2">{t('knowledgeBases.addDocument.supportedFormats')}</div>
-                  <div className="text-xs text-orange-600 mb-4 font-medium">文件大小限制：单个文件不超过 20MB</div>
+                  <div className="text-xs text-orange-600 mb-4 font-medium">{t('knowledgeBases.addDocument.fileSizeLimit')}</div>
                   <input type="file" multiple onChange={handleFileChange} accept=".pdf,.docx,.txt,.md" className="hidden" id="file-upload" />
                   <label
                     htmlFor="file-upload"
@@ -1212,9 +1212,9 @@ const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({ open, knowledgeBa
 
             {/* Content */}
             <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">文件大小超出限制</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('knowledgeBases.addDocument.fileSizeExceeded.title')}</h3>
               <div className="text-left text-gray-600 text-base leading-relaxed space-y-3">
-                <p>以下文件大小超过 <span className="font-semibold text-blue-600">20MB</span> 限制：</p>
+                <p>{t('knowledgeBases.addDocument.fileSizeExceeded.description', { limit: '20MB' })}</p>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <ul className="list-disc list-inside space-y-1">
                     {oversizedFiles.map((fileInfo, index) => {

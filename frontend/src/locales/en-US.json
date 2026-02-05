@@ -4329,7 +4329,12 @@
       "selectLLMModel": "Select LLM model",
       "selectModelPlaceholder": "Select model",
       "modelRequired": "Document graph construction requires an LLM model",
-      "loadModelsFailed": "Failed to load model list"
+      "loadModelsFailed": "Failed to load model list",
+      "fileSizeLimit": "File size limit: Single file must not exceed 20MB",
+      "fileSizeExceeded": {
+        "title": "File size exceeds limit",
+        "description": "The following files exceed the {{limit}} limit:"
+      }
     },
     "marketplace": {
       "comingSoon": "Coming Soon",

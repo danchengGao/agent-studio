@@ -4292,7 +4292,12 @@
       "selectLLMModel": "选择LLM模型",
       "selectModelPlaceholder": "请选择模型",
       "modelRequired": "构建文档图需要选择LLM模型",
-      "loadModelsFailed": "加载模型列表失败"
+      "loadModelsFailed": "加载模型列表失败",
+      "fileSizeLimit": "文件大小限制：单个文件不超过 20MB",
+      "fileSizeExceeded": {
+        "title": "文件大小超出限制",
+        "description": "以下文件大小超过 {{limit}} 限制："
+      }
     },
     "edit": {
       "title": "编辑知识库",
