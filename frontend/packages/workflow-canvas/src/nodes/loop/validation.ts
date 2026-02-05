@@ -173,6 +173,11 @@ export const validateLoopBlocks = ({ value, context }: LoopValidationContext) =>
     return t('workflowCanvas.nodes.loop.loopBodyMustContainStartAndEnd')
   }
 
+  // continue 和 break 也可以作为有效的结束节点
+  const continueNode = blocks.find(block => block.flowNodeType === '12')
+  const breakNode = blocks.find(block => block.flowNodeType === '13')
+  const validEndNodes = [blockEnd, continueNode, breakNode].filter(Boolean) as FlowNodeEntity[]
+
   const buildGraph = (nodes: FlowNodeEntity[], edgeList: any[]) => {
     const graph = new Map<string, string[]>()
 
@@ -212,7 +217,8 @@ export const validateLoopBlocks = ({ value, context }: LoopValidationContext) =>
   }
 
   const graph = buildGraph(blocks, edges)
-  const hasCompletePath = hasPath(graph, blockStart.id, blockEnd.id)
+  // 检查从 blockStart 是否有路径能到达任一有效结束节点
+  const hasCompletePath = validEndNodes.some(endNode => hasPath(graph, blockStart.id, endNode.id))
 
   if (!hasCompletePath) {
     return t('workflowCanvas.nodes.loop.loopBodyMustHaveCompletePath')
