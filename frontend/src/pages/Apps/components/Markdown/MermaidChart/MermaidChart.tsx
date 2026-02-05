@@ -52,15 +52,11 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
     // 处理不同类型图表的标题
     if (chartType === 'timeline') {
       centerTimelineTitle(svgElement)
-    } else if (chartType === 'xyChart-beta') {
+      optimizeTimelineColors(svgElement)
+    } else if (chartType === 'xychart') {
       centerXyTitle(svgElement)
+      handleXyChart(svgElement, code)
     }
-
-    // 优化timeline图表颜色
-    optimizeTimelineColors(svgElement)
-
-    // 处理xychart-beta图表
-    handleXyChart(svgElement, code)
   }, [code])
 
   /**
