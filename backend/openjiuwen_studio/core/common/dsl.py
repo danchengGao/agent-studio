@@ -80,7 +80,7 @@ class ModelRequestConfig(BaseModel):
 
 class ModelConfig(BaseModel):
     model_id: str = Field("")
-    model_client_config: ModelClientConfig = Field(default=None)
+    model_client_config: Optional[ModelClientConfig] = Field(default=None)
     request_config: Optional[ModelRequestConfig] = Field(default=None)
 
 

@@ -90,27 +90,29 @@ class AgentDlAdapter:
         agent_config.workflows = _workflow_schema_adapter(agent_dl.workflows)
 
         # 模型配置
-        model_info = BaseModelInfo(
-            api_key=agent_dl.model.model_client_config.api_key,
-            api_base=agent_dl.model.model_client_config.api_base,
-            model=agent_dl.model.request_config.model_name,
-            temperature=agent_dl.model.request_config.temperature,
-            top_p=agent_dl.model.request_config.top_p,
-            stream=agent_dl.model.request_config.stream,
-            timeout=agent_dl.model.model_client_config.timeout
-        )
+        if agent_dl.model and agent_dl.model.model_client_config:
+            request_config = agent_dl.model.request_config
+            model_info = BaseModelInfo(
+                api_key=agent_dl.model.model_client_config.api_key,
+                api_base=agent_dl.model.model_client_config.api_base,
+                model=request_config.model_name if request_config else "",
+                temperature=request_config.temperature if request_config else 0.7,
+                top_p=request_config.top_p if request_config else 0.9,
+                stream=request_config.stream if request_config else False,
+                timeout=agent_dl.model.model_client_config.timeout
+            )
 
-        model_provider = agent_dl.model.model_client_config.client_provider
-        # Normalize provider casing
-        if model_provider.lower() == 'openai':
-            model_provider = 'OpenAI'
-        elif model_provider.lower() == 'siliconflow':
-            model_provider = 'SiliconFlow'
+            model_provider = agent_dl.model.model_client_config.client_provider
+            # Normalize provider casing
+            if model_provider.lower() == 'openai':
+                model_provider = 'OpenAI'
+            elif model_provider.lower() == 'siliconflow':
+                model_provider = 'SiliconFlow'
 
-        agent_config.model = ModelConfig(
-            model_provider=model_provider,
-            model_info=model_info
-        )
+            agent_config.model = ModelConfig(
+                model_provider=model_provider,
+                model_info=model_info
+            )
 
         return agent_config
 
