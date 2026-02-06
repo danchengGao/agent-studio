@@ -103,9 +103,7 @@ def convert_to_properties_format(input_list):
             properties[property_name] = {
                 'type': item.get('type'),
                 'description': item.get('description'),
-                'required': item.get('required')
             }
-
             if item.get('required') and item.get('required') == True:
                 requires.append(property_name)
         return properties, requires
