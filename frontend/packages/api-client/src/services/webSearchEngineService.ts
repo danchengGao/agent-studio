@@ -15,7 +15,8 @@ export interface WebSearchEngineConfig {
   search_engine_name: string
   search_url: string
   create_time: string
-  update_time: string
+  extension?: Record<string, any>
+  is_active?: boolean
 }
 
 /**
@@ -35,6 +36,8 @@ export interface WebSearchEngineCreateRequest {
   search_engine_name: string
   search_api_key: string
   search_url: string
+  extension?: Record<string, any>
+  is_active?: boolean
 }
 
 /**
@@ -63,6 +66,8 @@ export interface WebSearchEngineUpdateRequest {
   search_engine_name: string
   search_api_key: string
   search_url: string
+  extension?: Record<string, any>
+  is_active?: boolean
 }
 
 /**
@@ -77,17 +82,13 @@ export interface WebSearchEngineUpdateResponse {
 /**
  * 搜索引擎详情响应
  */
-export interface WebSearchEngineDetailResponse {
+export interface WebSearchEngineGetResponse {
   code: number
   msg: string
-  data: {
-    web_search_engine_id: number
-    search_engine_name: string
-    search_url: string
-    search_api_key: string
-    create_time: string
-    update_time: string
-  }
+  search_engine_name: string
+  search_url: string
+  extension?: Record<string, any>
+  is_active?: boolean
 }
 
 /**
@@ -179,21 +180,13 @@ export const webSearchEngineService = {
    * @param engineId - 搜索引擎ID
    * @returns 搜索引擎详情
    */
-  async getEngine(spaceId: string, engineId: number): Promise<{
-    search_engine_name: string
-    search_url: string
-  }> {
+  async getEngine(spaceId: string, engineId: number): Promise<WebSearchEngineGetResponse> {
     const client = getApiClient()
-    const response = await client.get<WebSearchEngineDetailResponse>(
+    const response = await client.get<WebSearchEngineGetResponse>(
       `/agent/deepsearch/web_search/${spaceId}/${engineId}`
     )
-    // 后端返回的数据结构：{code, msg, search_engine_name, search_url}
-    // 字段直接在 response.data 中，不在 response.data.data 中
-    const data = response.data as any
-    return {
-      search_engine_name: data.search_engine_name || data.data?.search_engine_name || '',
-      search_url: data.search_url || data.data?.search_url || ''
-    }
+    // 后端返回的数据结构
+    return response.data
   },
 
   /**
@@ -219,6 +212,31 @@ export const webSearchEngineService = {
       search_engine_name: engineName,
       search_api_key: apiKey,
       search_url: url
+    }
+
+    await client.put<WebSearchEngineUpdateResponse>(
+      '/agent/deepsearch/web_search',
+      request
+    )
+  },
+
+  /**
+   * 切换搜索引擎启用/禁用状态
+   * @param spaceId - 用户空间ID
+   * @param engineId - 搜索引擎ID
+   * @param isActive - 是否启用
+   */
+  async toggleEngineStatus(
+    spaceId: string,
+    engineId: number,
+    isActive: boolean
+  ): Promise<void> {
+    const client = getApiClient()
+
+    const request: WebSearchEngineUpdateRequest = {
+      space_id: spaceId,
+      web_search_engine_id: engineId,
+      is_active: isActive
     }
 
     await client.put<WebSearchEngineUpdateResponse>(

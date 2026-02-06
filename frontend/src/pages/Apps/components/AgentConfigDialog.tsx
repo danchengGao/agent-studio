@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useCallback } from 'react'
-import { X, Check, Settings, Search, FileText, Loader2, AlertCircle, Plus, Edit, Trash2, Play } from 'lucide-react'
+import { X, Check, Settings, Search, FileText, Loader2, AlertCircle, Plus, Edit, Trash2, XCircle, CheckCircle, Play } from 'lucide-react'
 import { IconButton, Tooltip } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { MentionItem } from './MentionPicker'
@@ -400,6 +400,17 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     })
   }, [])
 
+  // 自动清理无效的引擎选择：当选中的引擎被禁用时，自动清空选择
+  React.useEffect(() => {
+    if (config.selectedWebSearchEngineId && engines.length > 0) {
+      const selectedEngine = engines.find(e => e.web_search_engine_id === config.selectedWebSearchEngineId)
+      // 如果选中的引擎不存在或已禁用，清空选择
+      if (!selectedEngine || selectedEngine.is_active === false) {
+        updateConfig('selectedWebSearchEngineId', undefined)
+      }
+    }
+  }, [engines, config.selectedWebSearchEngineId, updateConfig])
+
   // 选择搜索引擎（单选）
   const handleSelectEngine = useCallback((engineId: number | undefined) => {
     updateConfig('selectedWebSearchEngineId', engineId)
@@ -600,6 +611,38 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
       spaceId
     })
   }
+
+    // 切换搜索引擎启用/禁用状态
+  const handleToggleEngineStatus = async (engineId: number, currentStatus: boolean) => {
+    if (!spaceId) return
+
+    try {
+      const { webSearchEngineService } = await import('@test-agentstudio/api-client')
+      // 使用专门的 toggleEngineStatus 方法，只传递状态字段
+      await webSearchEngineService.toggleEngineStatus(
+        spaceId,
+        engineId,
+        !currentStatus
+      )
+      // 如果禁用的是当前选中的引擎，取消选择
+      if (currentStatus && config.selectedWebSearchEngineId === engineId) {
+        updateConfig('selectedWebSearchEngineId', undefined)
+      }
+      // 刷新主界面的引擎列表
+      await fetchEngines()
+      // 触发选择对话框刷新
+      setEngineListRefreshTrigger(prev => prev + 1)
+    } catch (err) {
+      console.error('切换搜索引擎状态失败:', err)
+      const errorMessage = err instanceof Error ? err.message : '切换状态失败'
+      // 使用 UnifiedSnackbar 替代 alert
+      const event = new CustomEvent('global-snackbar', {
+        detail: { message: errorMessage, severity: 'error' as const }
+      })
+      window.dispatchEvent(event)
+    }
+  }
+
 
   // 测试搜索引擎
   const handleTestEngine = async (engineId: number) => {
@@ -893,6 +936,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
             }
           })
         }}
+        onToggleEngineStatus={handleToggleEngineStatus}
         onTestEngine={handleTestEngine}
         onCreateNew={() => {
           setShowEngineForm(true)
@@ -1140,6 +1184,7 @@ interface WebSearchEngineSelectorDialogProps {
   onConfirm: (engineId: number | undefined) => void
   onEditEngine: (engineId: number) => void
   onDeleteEngine: (engineId: number) => void
+  onToggleEngineStatus?: (engineId: number, currentStatus: boolean) => void  // 新增：切换状态回调
   onTestEngine?: (engineId: number) => void  // 新增：测试回调
   onCreateNew: () => void
 }
@@ -1154,6 +1199,7 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
   onConfirm,
   onEditEngine,
   onDeleteEngine,
+  onToggleEngineStatus,
   onTestEngine,
   onCreateNew,
 }) => {
@@ -1237,78 +1283,113 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
             <>
               {/* 已有引擎列表 */}
               <div className="space-y-2">
-                {engines.map(engine => (
-                  <div
-                    key={engine.id}
-                    className={`
-                      px-3 py-2 ${RADIUS_BUTTON} border-2 cursor-pointer transition-all duration-200
-                      ${selectedId === engine.id
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      }
-                    `}
-                    onClick={() => {
-                      // 如果点击的是已选中的引擎，则取消选中；否则选中该引擎
-                      setSelectedId(selectedId === engine.id ? undefined : engine.id)
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
-                          🔍
+                {engines.map(engine => {
+                  const isDisabled = !engine.isActive
+                  return (
+                    <div
+                      key={engine.id}
+                      className={`
+                        px-3 py-2 ${RADIUS_BUTTON} border-2 transition-all duration-200
+                        ${isDisabled
+                          ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                          : 'cursor-pointer'
+                        }
+                        ${selectedId === engine.id && !isDisabled
+                          ? 'border-blue-400 bg-blue-50'
+                          : ''
+                        }
+                      `}
+                      onClick={() => {
+                        if (!isDisabled) {
+                          // 如果点击的是已选中的引擎，则取消选中；否则选中该引擎
+                          setSelectedId(selectedId === engine.id ? undefined : engine.id)
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className={`flex items-center gap-2 flex-1 min-w-0 ${isDisabled ? 'opacity-60' : ''}`}>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
+                            🔍
+                          </div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className={`text-sm font-medium truncate ${isDisabled ? 'text-gray-500' : 'text-gray-900'}`}>
+                              {engine.name}
+                            </p>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 ${
+                              engine.isActive
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-200 text-gray-600'
+                            }`}>
+                              {engine.isActive ? '启用' : '禁用'}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-sm font-medium truncate text-gray-900">
-                          {engine.name}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {onTestEngine && (
-                          <Tooltip title="测试">
+                        <div className="flex items-center gap-1">
+                          {onTestEngine && (
+                            <Tooltip title="测试">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onTestEngine(engine.id)
+                                }}
+                                className={`text-gray-700 hover:text-blue-600 hover:bg-blue-50 ${isDisabled ? 'opacity-60' : ''}`}
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="编辑">
                             <IconButton
                               size="small"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                onTestEngine(engine.id)
+                                onEditEngine(engine.id)
                               }}
-                              className="text-gray-700 hover:text-blue-600 hover:bg-blue-50"
+                              className={`text-gray-700 hover:text-blue-600 hover:bg-blue-50 ${isDisabled ? 'opacity-60' : ''}`}
                             >
-                              <Play className="w-3.5 h-3.5" />
+                              <Edit className="w-4 h-4" />
                             </IconButton>
                           </Tooltip>
-                        )}
-                        <Tooltip title="编辑">
-                          <IconButton
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onEditEngine(engine.id)
-                            }}
-                            className="text-gray-700 hover:text-blue-600 hover:bg-blue-50"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </IconButton>
-                        </Tooltip>
-                        {selectedId !== engine.id && (
-                          <Tooltip title="删除">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onDeleteEngine(engine.id)
-                              }}
-                              className="text-gray-700 hover:text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {selectedId === engine.id && (
-                          <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                        )}
+                          {onToggleEngineStatus && (
+                            <Tooltip title={engine.isActive ? '禁用' : '启用'}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onToggleEngineStatus(engine.id, engine.isActive)
+                                }}
+                                className={engine.isActive
+                                  ? 'text-gray-700 hover:text-red-600 hover:bg-red-50'
+                                  : 'text-gray-700 hover:text-green-600 hover:bg-green-50'
+                                }
+                              >
+                                {engine.isActive ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {selectedId !== engine.id && (
+                            <Tooltip title="删除">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDeleteEngine(engine.id)
+                                }}
+                                className={`text-gray-700 hover:text-red-600 hover:bg-red-50 ${isDisabled ? 'opacity-60' : ''}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {selectedId === engine.id && (
+                            <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* 创建新引擎按钮 */}
