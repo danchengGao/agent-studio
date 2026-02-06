@@ -9,6 +9,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { XCircle } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { generateNodeTitle } from '../../utils/workflow-node-utils'
 import { t } from '../../i18n'
 
 export const BreakNodeRegistry: FlowNodeRegistry = {
@@ -30,12 +31,15 @@ export const BreakNodeRegistry: FlowNodeRegistry = {
    * Render node via formMeta
    */
   formMeta,
-  onAdd() {
+  onAdd(context?) {
+    const titlePrefix = t('workflowCanvas.nodes.break.titlePrefix')
+    const title = generateNodeTitle(WorkflowNodeType.Break, context, titlePrefix)
+
     return {
       id: `break_${customNanoid(5)}`,
       type: WorkflowNodeType.Break,
       data: {
-        title: t('workflowCanvas.nodes.break.title'),
+        title: title,
       },
     }
   },

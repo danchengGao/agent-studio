@@ -9,9 +9,9 @@ import { FlowNodeRegistry } from '../../typings'
 import { SkipForward } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { WorkflowNodeType } from '../constants'
+import { generateNodeTitle } from '../../utils/workflow-node-utils'
 import { t } from '../../i18n'
 
-const index = 0
 export const ContinueNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.Continue,
   meta: {
@@ -31,12 +31,15 @@ export const ContinueNodeRegistry: FlowNodeRegistry = {
    * Render node via formMeta
    */
   formMeta,
-  onAdd() {
+  onAdd(context?) {
+    const titlePrefix = t('workflowCanvas.nodes.continue.titlePrefix')
+    const title = generateNodeTitle(WorkflowNodeType.Continue, context, titlePrefix)
+
     return {
       id: `continue_${customNanoid(5)}`,
       type: WorkflowNodeType.Continue,
       data: {
-        title: t('workflowCanvas.nodes.continue.title'),
+        title: title,
       },
     }
   },

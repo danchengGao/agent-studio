@@ -147,10 +147,12 @@
       "workflowFallback": "工作流"
     },
     "continue": {
+      "titlePrefix": "继续循环",
       "title": "继续循环",
       "description": "继续节点，用于在循环中跳过当前迭代并继续下一次迭代。"
     },
     "break": {
+      "titlePrefix": "跳出循环",
       "title": "跳出循环",
       "description": "中断节点，用于在循环中立即退出循环。"
     },
@@ -163,6 +165,7 @@
       "description": "块的结束节点。"
     },
     "variable": {
+      "titlePrefix": "变量",
       "description": "用于重置循环变量的值以进行下一次迭代",
       "title": "变量",
       "settings": "设置",

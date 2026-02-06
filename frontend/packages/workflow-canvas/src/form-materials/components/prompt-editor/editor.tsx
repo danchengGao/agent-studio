@@ -11,16 +11,14 @@ import { EditorState } from '@codemirror/state'
 
 import { PropsType } from './types'
 import { createCustomLanguageExtension } from './custom-language-support'
-import { mentionExtension, type MentionOptions } from './extensions/mention'
+import { mentionExtension } from './extensions/mention'
 import { useTranslation } from '../../../i18n'
 
 import './styles.css'
 
-// 获取提示词最大长度限制
 const envValue = import.meta.env.VITE_API_PROMPT_LENGTH
 const MAX_PROMPT_LENGTH = parseInt(envValue || '8000', 10)
 
-// 调试信息：在控制台显示读取的环境变量值
 if (typeof window !== 'undefined') {
   console.log('📝 Prompt length limit DEBUG:', {
     rawEnvValue: envValue,
@@ -31,20 +29,16 @@ if (typeof window !== 'undefined') {
   })
 }
 
-// EditorContext for stable editor instance management
 const EditorContext = createContext<EditorAPI | null>(null)
 
-// Event system for editor changes
 const EditorEventContext = createContext<{
   listeners: Set<(update: any) => void>
 }>({ listeners: new Set() })
 
-// useEditor hook
 function useEditor(): EditorAPI | null {
   return useContext(EditorContext)
 }
 
-// useEditorEvent hook - 监听编辑器变化事件
 function useEditorEvent(callback: (update: any) => void) {
   const { listeners } = useContext(EditorEventContext)
 
@@ -56,7 +50,6 @@ function useEditorEvent(callback: (update: any) => void) {
   }, [listeners])
 }
 
-// EditorAPI compatible interface for BaseEditor
 export interface EditorAPI {
   getValue: () => string
   setValue: (value: string) => void
@@ -93,7 +86,6 @@ export type PromptEditorPropsType = PropsType & {
   onVariableSelect?: (trigger: string, info: MentionInfo) => void
 }
 
-// Export hooks for other components
 export { useEditor, useEditorEvent }
 
 export function PromptEditor(props: PromptEditorPropsType) {
@@ -111,12 +103,10 @@ export function PromptEditor(props: PromptEditorPropsType) {
   const listenersRef = useRef<Set<(update: any) => void>>(new Set())
   const [characterCount, setCharacterCount] = useState(0)
 
-  // 初始化字符计数
   useEffect(() => {
     setCharacterCount(editorValue.length)
   }, [value?.content])
 
-  // Stable custom extensions to prevent editor recreation
   const stableCustomExtensions = useMemo(() => {
     const extensions = [createCustomLanguageExtension()]
 
@@ -129,7 +119,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
       }),
     )
 
-    // Always add mention extension
     extensions.push(
       mentionExtension({
         triggerCharacters: ['{', '@', '{{'],
@@ -153,7 +142,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
     return extensions
   }, [onVariableSelect])
 
-  // Stable objects to prevent editor recreation
   const stableExtensions = useMemo(
     () => ({
       jinja: stableCustomExtensions,
@@ -169,16 +157,13 @@ export function PromptEditor(props: PromptEditorPropsType) {
     [options, readonly],
   )
 
-  // Stable boolean props to prevent unnecessary recreation
   const enableExtensionsValue = !disableMarkdownHighlight
 
-  // 只有当内容真正改变时才更新，避免不必要的重新渲染
   const hasContentChanged = lastContentRef.current !== editorValue
   if (hasContentChanged) {
     lastContentRef.current = editorValue
   }
 
-  // Create stable EditorAPI
   const editorAPI = React.useMemo(() => {
     const editor = {
       getValue: () => editorRef.current?.getValue() || '',
@@ -204,12 +189,10 @@ export function PromptEditor(props: PromptEditorPropsType) {
         const currentPos = position ?? state.selection.main.head
         const text = state.doc.toString()
 
-        // Look backward from the current position to find the trigger character
         let triggerStart = -1
         let triggerEnd = -1
 
         if (trigger === '{{') {
-          // Find {{ position
           const beforePos = text.slice(0, currentPos)
           const match = beforePos.lastIndexOf('{{')
           if (match !== -1) {
@@ -217,7 +200,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
             triggerEnd = match + 2
           }
         } else if (trigger === '{' || trigger === '@') {
-          // Find { or @ position
           const beforePos = text.slice(0, currentPos)
           const match = beforePos.lastIndexOf(trigger)
           if (match !== -1) {
@@ -228,31 +210,24 @@ export function PromptEditor(props: PromptEditorPropsType) {
 
         if (triggerStart === -1) return
 
-        // Check what's immediately after the trigger
         const textAfterTrigger = text.slice(triggerEnd)
 
-        // Determine how much to replace
         let replacementEnd = triggerEnd
         let needClosingBracket = true
 
-        // Check if there's a }} pattern right after the trigger
         if (textAfterTrigger.startsWith('}}') && trigger === '{{') {
-          // Found {{}} - replace the entire }}
           replacementEnd = triggerEnd + 2
-          needClosingBracket = false // Already have closing brackets
+          needClosingBracket = false
         } else if (textAfterTrigger.startsWith('}') && (trigger === '{' || trigger === '@')) {
-          // Found {} - replace the }
           replacementEnd = triggerEnd + 1
-          needClosingBracket = false // Already have closing bracket
+          needClosingBracket = false
         }
 
-        // Construct the final text
         let finalText = variable
         if (needClosingBracket) {
           finalText = variable + '}'
         }
 
-        // Replace trigger and any auto-completed brackets with the variable
         currentView.dispatch({
           changes: {
             from: triggerStart,
@@ -279,7 +254,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
       getView: () => editorRef.current?.getView() || null,
     }
 
-    // Update $view.state when editor changes
     const updateViewState = () => {
       const view = editorRef.current?.getView()
       if (view && editor.$view) {
@@ -305,9 +279,8 @@ export function PromptEditor(props: PromptEditorPropsType) {
     // Store reference and set up update mechanism
     editorAPIRef.current = editor
     return editor
-  }, []) // Empty dependency array ensures object reference stability
+  }, [])
 
-  // Update editor state when editor mounts
   useEffect(() => {
     if (editorAPIRef.current && editorRef.current) {
       const view = editorRef.current.getView()
@@ -331,7 +304,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
     lastContentRef.current = finalValue
     setCharacterCount(finalValue.length)
 
-    // 触发事件监听器
     listenersRef.current.forEach(listener => {
       listener({
         docChanged: true,
@@ -342,14 +314,11 @@ export function PromptEditor(props: PromptEditorPropsType) {
     onChange?.({ type: 'template', content: finalValue })
   }
 
-  // Handle all editor updates for variable selection functionality
   const handleEditorUpdate = useCallback((update: any) => {
-    // 更新EditorAPI的状态引用
     if (editorAPIRef.current && editorAPIRef.current.$view) {
       editorAPIRef.current.$view.state = update.state
     }
 
-    // 触发所有事件监听器，包括光标移动
     listenersRef.current.forEach(listener => {
       listener({
         docChanged: update.docChanged,
@@ -358,7 +327,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
     })
   }, [])
 
-  // Cleanup function for event listeners
   useEffect(() => {
     return () => {
       if (editorRef.current) {
@@ -371,7 +339,6 @@ export function PromptEditor(props: PromptEditorPropsType) {
     editorRef.current = editorRefInstance
     extensionManagerRef.current = editorRefInstance.getExtensionManager() || null
 
-    // Register update listener for variable selection functionality
     editorRefInstance.on('update', handleEditorUpdate)
   }
 
@@ -382,7 +349,7 @@ export function PromptEditor(props: PromptEditorPropsType) {
           <BaseEditor
             value={editorValue}
             onChange={handleEditorChange}
-            language="markdown" // Use markdown for prompt editing
+            language="markdown"
             theme="light"
             placeholder={finalPlaceholder}
             readonly={readonly}
@@ -392,7 +359,7 @@ export function PromptEditor(props: PromptEditorPropsType) {
             enableCloseBrackets={true}
             enableBracketMatching={true}
             enableAutocompletion={false}
-            enableWordWrap={true}
+            enableWordWrap={false}
             ref={ref => {
               if (ref) {
                 handleEditorMount(ref)

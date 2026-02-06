@@ -147,10 +147,12 @@
       "workflowFallback": "Workflow"
     },
     "continue": {
+      "titlePrefix": "Continue",
       "title": "Continue",
       "description": "Continue node for skipping the current iteration and continuing to the next iteration in a loop."
     },
     "break": {
+      "titlePrefix": "Break",
       "title": "Break",
       "description": "Break node for immediately exiting a loop."
     },
@@ -163,6 +165,7 @@
       "description": "End node of a block."
     },
     "variable": {
+      "titlePrefix": "Variable",
       "description": "Used to reset the value of a loop variable for the next iteration",
       "title": "Variable",
       "settings": "Settings",

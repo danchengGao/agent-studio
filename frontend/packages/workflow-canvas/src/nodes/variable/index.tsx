@@ -10,6 +10,7 @@ import { FlowNodeRegistry } from '../../typings'
 import { Key } from 'lucide-react'
 import { formMeta } from './form-meta'
 import { customNanoid } from '../../utils/nanoid-custom'
+import { generateNodeTitle } from '../../utils/workflow-node-utils'
 import { t } from '../../i18n'
 
 export const VariableNodeRegistry: FlowNodeRegistry = {
@@ -25,12 +26,15 @@ export const VariableNodeRegistry: FlowNodeRegistry = {
     },
     onlyInContainer: WorkflowNodeType.Loop,
   },
-  onAdd() {
+  onAdd(context?) {
+    const titlePrefix = t('workflowCanvas.nodes.variable.titlePrefix')
+    const title = generateNodeTitle(WorkflowNodeType.Variable, context, titlePrefix)
+
     return {
       id: `variable__${customNanoid(5)}`,
       type: WorkflowNodeType.Variable,
       data: {
-        title: t('workflowCanvas.nodes.variable.title'),
+        title: title,
         assign: [
           {
             operator: 'assign',
