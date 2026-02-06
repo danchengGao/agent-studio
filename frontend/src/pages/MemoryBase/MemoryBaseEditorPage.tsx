@@ -68,9 +68,9 @@ interface MemInfo {
 }
 
 // 记忆类型枚举
-type MemoryType = 'longterm' | 'variable' | 'summary' | 'profile' | 'scenario' | 'semantic';
+type MemoryType = 'longterm' | 'variable' | 'summary' | 'user_profile' | 'scenario' | 'semantic';
 
-const MEMORY_TYPES = ['longterm', 'variable', 'summary', 'profile', 'scenario', 'semantic'] as const;
+const MEMORY_TYPES = ['longterm', 'variable', 'summary', 'user_profile', 'scenario', 'semantic'] as const;
 
 function isMemoryType(value: string): value is MemoryType {
   return (MEMORY_TYPES as readonly string[]).includes(value);
@@ -225,7 +225,7 @@ const MemoryBaseEditorPage: React.FC = () => {
   const [memoryStatuses, setMemoryStatuses] = useState<Record<string, MemoryStatusItem>>({});
   const [refreshingStatuses, setRefreshingStatuses] = useState<Set<string>>(new Set());
   const [isRefreshingAllStatuses, setIsRefreshingAllStatuses] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   // 删除确认对话框状态
   const [deleteDialog, setDeleteDialog] = useState({
@@ -707,7 +707,7 @@ const MemoryBaseEditorPage: React.FC = () => {
         return <Hash className="w-4 h-4 text-purple-600" />;
       case 'summary':
         return <MessageSquare className="w-4 h-4 text-blue-600" />;
-      case 'profile':
+      case 'user_profile':
         return <User className="w-4 h-4 text-green-600" />;
       case 'scenario':
         return <Target className="w-4 h-4 text-yellow-600" />;
@@ -725,7 +725,7 @@ const MemoryBaseEditorPage: React.FC = () => {
         return t('memoryBases.memoryType.variable');
       case 'summary':
         return t('memoryBases.memoryType.summary');
-      case 'profile':
+      case 'user_profile':
         return t('memoryBases.memoryType.profile');
       case 'scenario':
         return t('memoryBases.memoryType.scenario');

@@ -324,6 +324,23 @@ export const API_ENDPOINTS = {
     SHARE: '/knowledge-bases/:id/share',
     UNSHARE: '/knowledge-bases/:id/share/:userId',
   },
+  // 记忆库管理
+  MEMORY_BASES: {
+    CREATE: '/memory/repo/create',
+    LIST: '/memory/repo/list',
+    DETAIL: '/memory-bases/:id/detail',
+    UPDATE: '/memory/repo/update',
+    DELETE: '/memory/repo/delete',
+    UPLOAD: '/memory-bases/upload',
+    GET_REFERENCING_AGENTS: '/memory-bases/referencing-agents',
+    BATCH_ADD: '/memory-bases/memories/batch-add',
+    MEMORIES_LIST: '/memory-bases/memories/list',
+    PROCESS: '/memory-bases/memories/process',
+    STATUS: '/memory-bases/memories/status',
+    SEARCH: '/memory/repo/search',
+    SETTINGS: '/memory-base/settings',
+    CLEAN_EXPIRED: '/memory-bases/memories/clean-expired'
+  }
 }
 
 // HTTP状态码常量

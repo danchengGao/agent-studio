@@ -11,11 +11,16 @@ import { LanguageProvider } from './contexts/LanguageContext'
 
 // 立即加载的核心页面（用户可能立即访问）- 统一使用新版
 import LoginPage from './pages/Auth/LoginPage'
+import DashboardPage from './pages/Dashboard/DashboardPage'
 import AppsPage from './pages/Apps/AppsPage'
+import AgentsPage from './pages/Agents/AgentsPage'
 import AgentsPageNew from './pages/Agents/AgentsPageNew'
+import WorkflowsPage from './pages/Workflows/WorkflowsPage'
 import WorkflowsPageNew from './pages/Workflows/WorkflowsPageNew'
+import PromptsPage from './pages/Prompts/PromptsPage'
 import PromptsPageNew from './pages/Prompts/PromptsPageNew'
 import KnowledgeBasePageNew from './pages/KnowledgeBase/KnowledgeBasePageNew'
+import MemoryBasePageNew from './pages/MemoryBase/MemoryBasePageNew'
 import UserLoginPage from '@/pages/Auth/UserLoginPage.tsx'
 import { ENV_CONFIG } from '@/config/environment.ts'
 import { getLoginPagePath } from '@/Common/LoginPage.ts'
@@ -29,6 +34,7 @@ const PromptOptimizePageNew = React.lazy(() => import('./pages/Prompts/PromptOpt
 const PromptOptimizeEditPage = React.lazy(() => import('./pages/Prompts/PromptOptimizeEditPage'))
 const ModelsPageNew = React.lazy(() => import('./pages/Models/ModelsPageNew'))
 const KnowledgeBaseSettingsPage = React.lazy(() => import('./pages/KnowledgeBase/KnowledgeBaseEditorPage'))
+const MemoryBaseSettingsPage = React.lazy(() => import('./pages/MemoryBase/MemoryBaseEditorPage'))
 const PluginManagementPageNew = React.lazy(() => import('./pages/Plugins/PluginManagementPageNew'))
 const PluginMarketPageNew = React.lazy(() => import('./pages/Plugins/PluginMarketPageNew'))
 const PluginConfigurationPage = React.lazy(() => import('./pages/Plugins/PluginConfigurationPage'))
@@ -199,6 +205,22 @@ const App: React.FC = () => {
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <KnowledgeBasePageNew />
+                </Suspense>
+              }
+            />
+            <Route
+              path="memory-bases/:id/edit"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <MemoryBaseSettingsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="memory-bases"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <MemoryBasePageNew />
                 </Suspense>
               }
             />

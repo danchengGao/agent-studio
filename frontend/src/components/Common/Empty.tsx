@@ -88,7 +88,7 @@ const resourceConfig = {
   },
   memoryBases: {
     icon: <Brain className="w-12 h-12 text-[#6b7280]" />,
-    createPath: null, // 知识库通过对话框创建
+    createPath: null, // 记忆库通过对话框创建
     i18nKeys: {
       noDataTitle: 'memoryBases.empty.title',
       noResultsTitle: 'memoryBases.search.noResults',

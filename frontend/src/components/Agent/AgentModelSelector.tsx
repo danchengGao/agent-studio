@@ -4,7 +4,7 @@ import MuiAccordion, { AccordionProps } from '@mui/material/Accordion'
 import MuiAccordionSummary, { AccordionSummaryProps, accordionSummaryClasses } from '@mui/material/AccordionSummary'
 import MuiAccordionDetails from '@mui/material/AccordionDetails'
 import Typography from '@mui/material/Typography'
-import { AgentDetailResponse, AgentPlugin, SaveAgentRequest, useModels, KnowledgeBaseService, type PluginApiInfo } from '@test-agentstudio/api-client'
+import { AgentDetailResponse, AgentPlugin, SaveAgentRequest, useModels, KnowledgeBaseService, type PluginApiInfo, MemoryBaseService } from '@test-agentstudio/api-client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { AlertCircle, RefreshCcw, Trash2, Settings } from 'lucide-react'
 import { ModelDetail, WorkflowDetail, WorkflowSelectDetail } from '../../types/agentTypes'
@@ -20,6 +20,7 @@ import WorkflowList from './WorkflowList'
 import PluginList from './PluginList'
 import KnowledgeBaseSelector from './KnowledgeBaseSelector'
 import KnowledgeBaseList from './KnowledgeBaseList'
+import MemoryBaseSelector from './MemoryBaseSelector'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { useAuthStore } from '../../stores/useAuthStore'
 import axios from 'axios'
@@ -37,9 +38,9 @@ const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters
   },
   backgroundColor: '#f9fafb',
   '&.Mui-expanded': {
-    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', // 添加阴影效果
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
   },
-})) // theme is used in border property
+}))
 
 const AccordionSummary = styled((props: AccordionSummaryProps) => {
   // 提取children和其他props
@@ -82,6 +83,16 @@ interface MemoryVariable {
   name: string
   description?: string
   enabled?: boolean // 新增：是否启用，默认 true
+}
+
+// 记忆库项类型定义
+interface MemoryBaseItem {
+  mdb_id: string;
+  name: string;
+  status: string;
+  description?: string;
+  embedding_model_config_id?: number;
+  llm_model_config_id?: number;
 }
 
 const api = {
@@ -131,6 +142,10 @@ const AgentModelSelector = (props: {
   const [showKnowledgeBaseSelector, setShowKnowledgeBaseSelector] = useState(false)
   const [knowledgeSettingsAnchorEl, setKnowledgeSettingsAnchorEl] = useState<HTMLElement | null>(null)
   const [greeting, setGreeting] = useState<string>('')
+
+  // 记忆库相关状态
+  const [memoryBaseObject, setMemoryBaseObject] = useState<MemoryBaseItem | null>(null)
+  const [showMemoryBaseSelector, setShowMemoryBaseSelector] = useState(false)
 
   const spaceId = getDefaultSpaceId() || ''
   const maxGreetingLength = 2000
@@ -196,7 +211,7 @@ const AgentModelSelector = (props: {
         retry_count: model.retryCount,
         enable_streaming: model.enableStreaming,
         enable_function_calling: model.enableFunctionCalling,
-        is_active: model.isActive, // 使用转换后的 isActive 字段
+        is_active: model.isActive,
         api_key: model.apiKey,
         api_base: model.baseUrl,
         streaming: model.enableStreaming,
@@ -420,8 +435,63 @@ const AgentModelSelector = (props: {
     }
   }, [agentDetailResponse, saveAgentRequest?.knowledge])
 
-  // 当模型列表更新时，如果当前选择的模型在列表中，更新为最新数据
-  // 注意：只在初始化时同步，避免覆盖用户的修改
+  // 初始化记忆库列表
+  useEffect(() => {
+    if (!agentDetailResponse || !agentDetailResponse.data) {
+      return
+    }
+    const initMemoryBase = saveAgentRequest?.memory?.memory_base;
+    const initMemoryBaseId = initMemoryBase ? initMemoryBase.mdb_id : null;
+
+    if (initMemoryBaseId) {
+      const fetchMemoryBaseInfo = async () => {
+        try {
+          const spaceId = getDefaultSpaceId();
+          if (!spaceId) {
+            setMemoryBaseObject({ mdb_id: initMemoryBaseId, name: initMemoryBaseId, description: undefined, status: "active" });
+            return;
+          }
+
+          const response = await MemoryBaseService.getMemoryBases({
+            space_id: spaceId,
+            page: 1,
+            page_size: 100,
+          });
+
+          if (response.code === 200 && response.data?.items) {
+            const mbMap = new Map<string, MemoryBaseItem>();
+            response.data.items.forEach((item: MemoryBaseItem) => {
+              mbMap.set(item.mdb_id, item);
+            });
+
+            const mbInfo = mbMap.get(initMemoryBaseId);
+            if (mbInfo) {
+              setMemoryBaseObject(mbInfo);
+            } else {
+              setMemoryBaseObject(null);
+              if (saveAgentRequest?.memory) {
+                updateMemoryConfig({
+                  max_tokens: 1000,
+                  variable_config: memoryVariables,
+                  longterm_memory_config: longTermMemoryEnabled,
+                  memory_base: undefined, // ✅ 清空
+                });
+              }
+            }
+          } else {
+            setMemoryBaseObject({ mdb_id: initMemoryBaseId, name: initMemoryBaseId, description: undefined, status: "active" });
+          }
+        } catch (error) {
+          console.error('获取记忆库列表失败:', error);
+          setMemoryBaseObject({ mdb_id: initMemoryBaseId, name: initMemoryBaseId, description: undefined, status: "active" });
+        }
+      };
+      fetchMemoryBaseInfo();
+    } else {
+      setMemoryBaseObject(null); // ✅ 初始为空
+    }
+  }, [agentDetailResponse, saveAgentRequest?.memory?.memory_bases]);
+
   useEffect(() => {
     if (selectedModelName && modelsList.length > 0 && !selectedModel) {
       // 只在 selectedModel 不存在时（初始化阶段）才从 modelsList 中获取
@@ -433,9 +503,14 @@ const AgentModelSelector = (props: {
     }
   }, [modelsList, selectedModelName])
 
+  // 当模型列表加载完成后，如果未选择模型或模型列表为空，则自动展开折叠面板
   useEffect(() => {
     if (modelsList.length === 0 || !selectedModelName) {
+      // 模型列表为空或未选择模型时展开
       setModelExpanded(true)
+    } else if (selectedModelName) {
+      // 如果已选择模型且模型列表不为空，可以折叠面板
+      setModelExpanded(false)
     }
   }, [modelsList.length, selectedModelName])
 
@@ -446,8 +521,8 @@ const AgentModelSelector = (props: {
     const selectedModelObj = modelsList.find(model => model.model_name === modelName)
     if (selectedModelObj) {
       setSelectedModel(selectedModelObj)
-      // 选择模型后自动展开面板，方便查看/修改参数
-      setModelExpanded(true)
+      // 选择模型后，自动折叠折叠面板
+      setModelExpanded(false)
       // 修改store中的数据
       updateModelDetail(selectedModelObj)
     }
@@ -469,13 +544,10 @@ const AgentModelSelector = (props: {
   // 处理最大迭代次数变化
   const handleMaxIterationChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(event.target.value, 10)
-    // 允许空值以便用户修改，但在 blur 时应该有默认值或保留旧值
-    // 但为了限制范围，如果超出范围则截断
     if (!isNaN(val)) {
       let finalVal = val
       if (val > 50) finalVal = 50
       
-      // 当输入值有效（>=1）时更新 store，否则只更新本地状态
       if (finalVal >= 1) {
         setMaxIteration(finalVal)
         updateSaveAgentRequest({
@@ -486,12 +558,9 @@ const AgentModelSelector = (props: {
           },
         })
       } else {
-        // 如果输入了 0 或负数（虽然 input type=number 可能限制了部分），暂时更新本地状态
-        // 这样用户可以删除或修改，onBlur 会修正
         setMaxIteration(finalVal)
       }
     } else if (event.target.value === '') {
-       // 允许清空，暂时不更新 store，设为 -1 标记为空
        setMaxIteration(-1)
     }
   }
@@ -499,15 +568,14 @@ const AgentModelSelector = (props: {
   // 处理最大迭代次数失去焦点
   const handleMaxIterationBlur = () => {
     if (maxIteration === -1 || maxIteration < 1) {
-      // 默认值为 5，最小值为 1。如果为空，恢复默认值 5；小于 1 时设为 1
       const finalVal = maxIteration === -1 ? 5 : 1
       setMaxIteration(finalVal)
       updateSaveAgentRequest({
         constraint: {
-          ...(saveAgentRequest?.constraint || {}),
-          max_iteration: finalVal,
-          reserved_max_chat_rounds: maxMessageRounds,
-        },
+            ...(saveAgentRequest?.constraint || {}),
+            max_iteration: finalVal,
+            reserved_max_chat_rounds: maxMessageRounds,
+          },
       })
     }
   }
@@ -539,7 +607,6 @@ const AgentModelSelector = (props: {
   // 处理最大对话轮数失去焦点
   const handleMaxMessageRoundsBlur = () => {
     if (maxMessageRounds === -1 || maxMessageRounds < 1) {
-      // 默认值为 10，最小值为 1。如果为空，恢复默认值 10；小于 1 时设为 1
       const finalVal = maxMessageRounds === -1 ? 10 : 1
       setMaxMessageRounds(finalVal)
       updateSaveAgentRequest({
@@ -731,6 +798,82 @@ const AgentModelSelector = (props: {
     }
   }
 
+  // 处理记忆库选择确认
+const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ 新的单选回调
+    if (selectedId === null) {
+      // 用户取消了选择或清除了选择
+      setMemoryBaseObject(null);
+      if (saveAgentRequest?.memory) {
+        // 清空 agent 的记忆库绑定
+        updateMemoryConfig({
+          max_tokens: 1000,
+          variable_config: memoryVariables,
+          longterm_memory_config: longTermMemoryEnabled,
+          memory_base: undefined, // ✅ 清空
+        });
+      }
+      setShowMemoryBaseSelector(false);
+      return;
+    }
+
+    // 用户选择了一个新的记忆库
+    let newMemoryBase: MemoryBaseItem | null = null;
+    try {
+      const spaceId = getDefaultSpaceId();
+      if (spaceId) {
+        const response = await MemoryBaseService.getMemoryBases({
+          space_id: spaceId,
+          page: 1,
+          page_size: 100,
+        });
+        if (response.code === 200 && response.data?.items) {
+          const mbMap = new Map<string, MemoryBaseItem>();
+          response.data.items.forEach((item: MemoryBaseItem) => {
+            mbMap.set(item.mdb_id, item);
+          });
+          newMemoryBase = mbMap.get(selectedId) ?? { mdb_id: selectedId, name: selectedId, description: undefined, status: "active" };
+        } else {
+          newMemoryBase = { mdb_id: selectedId, name: selectedId, description: undefined, status: "active" };
+        }
+      } else {
+        newMemoryBase = { mdb_id: selectedId, name: selectedId, description: undefined, status: "active" };
+      }
+    } catch (error) {
+      console.error('获取记忆库列表失败:', error);
+      newMemoryBase = { mdb_id: selectedId, name: selectedId, description: undefined, status: "active" };
+    }
+
+    // 更新状态和 store
+    setMemoryBaseObject(newMemoryBase);
+    if (saveAgentRequest?.memory) {
+      updateMemoryConfig({
+        max_tokens: 1000,
+        variable_config: memoryVariables,
+        longterm_memory_config: longTermMemoryEnabled,
+        memory_base: newMemoryBase, // ✅ 绑定单个对象
+      });
+    }
+    setShowMemoryBaseSelector(false);
+  };
+
+
+  // 处理记忆库操作（删除/设置）
+  const handleMemoryBaseOperation = (operate: 'delete' | 'setting', memoryBaseId: string) => {
+    if (operate === 'delete') {
+      setMemoryBaseObject(null); // ✅ 删除即清空
+      if (saveAgentRequest?.memory) {
+        updateMemoryConfig({
+          max_tokens: 1000,
+          variable_config: memoryVariables,
+          longterm_memory_config: longTermMemoryEnabled,
+          memory_base: undefined, // ✅ 清空
+        });
+      }
+    } else if (operate === 'setting') {
+      window.open(`/dashboard/memory-bases/${memoryBaseId}/edit`, '_blank');
+    }
+  };
+
   // 保存知识库设置到 store
   const saveRetrievalConfig = useCallback(() => {
     if (!agentDetailResponse || readonly || !isRetrievalConfigInitializedRef.current) return
@@ -793,6 +936,7 @@ const AgentModelSelector = (props: {
         max_tokens: 1000,
         variable_config: updatedVariables,
         longterm_memory_config: longTermMemoryEnabled,
+        memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
       }
 
       try {
@@ -815,6 +959,7 @@ const AgentModelSelector = (props: {
       max_tokens: 1000,
       variable_config: updatedVariables,
       longterm_memory_config: longTermMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
     }
     try {
       await updateMemoryConfig(req)
@@ -841,6 +986,7 @@ const AgentModelSelector = (props: {
       max_tokens: 1000,
       variable_config: updatedVariables,
       longterm_memory_config: longTermMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
     }
 
     try {
@@ -862,6 +1008,7 @@ const AgentModelSelector = (props: {
       max_tokens: 1000,
       variable_config: memoryVariables,
       longterm_memory_config: !longTermMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
     }
 
     try {
@@ -871,6 +1018,9 @@ const AgentModelSelector = (props: {
       console.error(error.response?.data?.detail || error.message)
     }
   }
+
+  // 检查是否有绑定记忆库
+  const hasMemoryBases = memoryBaseObject !== null;
 
   return (
     <div className="h-full overflow-auto">
@@ -1040,27 +1190,124 @@ const AgentModelSelector = (props: {
         </Accordion>
       </div>
 
-      <div className="workflow-form mb-2 p-2">
-        <Typography sx={{ mb: 2 }}>{t('orchestrationPage.sections.skillsTitle')}</Typography>
+      {/* 记忆配置部分 - 独立于技能部分 */}
+      <div className="memory-form mb-2 p-2">
+        <div className="flex items-center justify-between mb-2">
+          <Typography>{t('orchestrationPage.sections.memoryTitle')}</Typography>
+        </div>
 
+        {/* 绑定记忆库部分 */}
         <Accordion>
-          <AccordionSummary aria-controls="memory-content" id="memory-header">
+          <AccordionSummary aria-controls="memory-bases-content" id="memory-bases-header">
             <Typography component="span" className="flex items-center">
-              {t('orchestrationPage.memory.title')}
+              记忆库
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
-                  memoryVariables.length > 0 || longTermMemoryEnabled ? 'bg-blue-500' : 'bg-gray-400'
+                  memoryBaseObject ? 'bg-blue-500' : 'bg-gray-400'
                 }`}
               >
-                {memoryVariables.length + (longTermMemoryEnabled ? 1 : 0)}
+                {memoryBaseObject ? 1 : 0}
+              </span>
+            </Typography>
+            <AddButton
+              options={[
+                { label: '添加已有记忆库', value: 'existing' },
+                { label: '创建新记忆库', value: 'new' },
+              ]}
+              onSelect={addType => {
+                if (addType === 'existing') {
+                  // 打开记忆库选择器
+                  setShowMemoryBaseSelector(true)
+                } else if (addType === 'new') {
+                  // 导航到记忆库管理页面
+                  window.open('/dashboard/memory-bases', '_blank')
+                }
+              }}
+              disabled={readonly}
+            />
+          </AccordionSummary>
+          <AccordionDetails>
+            {/* 记忆库列表组件 */}
+            <div className="space-y-3">
+              {memoryBaseObject && ( (
+                <div
+                  key={memoryBaseObject.mdb_id}
+                  className="flex items-start justify-between py-2 px-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200"
+                >
+                  <div className="flex items-start space-x-3 flex-1 min-w-0">
+                    <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-lg flex items-center justify-center border border-purple-200 mt-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-purple-600">
+                        <path d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.25a.75.75 0 0 0 1 .707A8.237 8.237 0 0 1 6 18.75c1.995 0 3.823.707 5.25 1.886V4.533ZM12.75 20.636A8.214 8.214 0 0 1 18 18.75c.966 0 1.89.166 2.75.47a.75.75 0 0 0 1-.708V4.262a.75.75 0 0 0-.5-.707A9.735 9.735 0 0 0 18 3a9.707 9.707 0 0 0-5.25 1.533v16.103Z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <Typography sx={{ fontWeight: 'bold', fontSize: '1rem' }}>{memoryBaseObject.name}</Typography>
+                      {memoryBaseObject.description && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            fontSize: '0.875rem',
+                            lineHeight: 1.4,
+                            mt: 0.5,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {memoryBaseObject.description}
+                        </Typography>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex space-x-4 pt-1">
+                    <button
+                      title="设置"
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleMemoryBaseOperation('setting', memoryBaseObject.mdb_id);
+                      }}
+                    >
+                      <Settings className="w-4 h-4 text-gray-600" />
+                    </button>
+                    <button
+                      title="删除"
+                      onClick={e => {
+                        e.stopPropagation();
+                        if (!readonly) {
+                          handleMemoryBaseOperation('delete', memoryBaseObject.mdb_id);
+                        }
+                      }}
+                      disabled={readonly}
+                      className={`${readonly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-gray-600" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {!memoryBaseObject && <div className="text-center py-6 text-gray-500">未添加记忆库，记忆配置不生效，可点击右上角进行添加</div>}
+            </div>
+          </AccordionDetails>
+        </Accordion>
+
+        {/* 记忆变量部分 - 仅当绑定了记忆库时启用 */}
+        <Accordion>
+          <AccordionSummary aria-controls="memory-variables-content" id="memory-variables-header">
+            <Typography component="span" className="flex items-center">
+              {t('orchestrationPage.memory.variablesTitle')}
+              <span
+                className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
+                  memoryVariables.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
+                }`}
+              >
+                {memoryVariables.length}
               </span>
             </Typography>
           </AccordionSummary>
           <AccordionDetails>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>
-              {t('orchestrationPage.memory.variablesTitle')}
-            </Typography>
-
             {/* 添加新变量表单 */}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: 1 }}>
               <Box sx={{ display: 'flex', gap: 2 }}>
@@ -1068,7 +1315,7 @@ const AgentModelSelector = (props: {
                   label={t('orchestrationPage.memory.fields.nameLabel')}
                   value={newVariableName}
                   onChange={e => setNewVariableName(e.target.value)}
-                  disabled={readonly}
+                  disabled={readonly || !hasMemoryBases}
                   size="small"
                   sx={{ flex: 1 }}
                   error={!!duplicateVariableWarning}
@@ -1077,14 +1324,14 @@ const AgentModelSelector = (props: {
                   label={t('orchestrationPage.memory.fields.descLabel')}
                   value={newVariableDescription}
                   onChange={e => setNewVariableDescription(e.target.value)}
-                  disabled={readonly}
+                  disabled={readonly || !hasMemoryBases}
                   size="small"
                   sx={{ flex: 2 }}
                 />
                 <Button
                   variant="outlined"
                   onClick={handleAddMemoryVariable}
-                  disabled={readonly || !newVariableName.trim() || !newVariableDescription.trim() || !!duplicateVariableWarning}
+                  disabled={readonly || !newVariableName.trim() || !newVariableDescription.trim() || !!duplicateVariableWarning || !hasMemoryBases}
                   size="small"
                   sx={{ alignSelf: 'flex-end', height: '40px' }}
                 >
@@ -1099,6 +1346,11 @@ const AgentModelSelector = (props: {
                     {duplicateVariableWarning}
                   </Typography>
                 )}
+                {!hasMemoryBases && (
+                  <Typography variant="caption" color="warning.main">
+                    请先绑定记忆库以启用记忆变量功能
+                  </Typography>
+                )}
               </Box>
             </Box>
 
@@ -1110,7 +1362,7 @@ const AgentModelSelector = (props: {
                     key={variable.id}
                     secondaryAction={
                       <>
-                        {!readonly && (
+                        {!readonly && hasMemoryBases && (
                           <FormControlLabel
                             control={<Switch size="small" checked={variable.enabled !== false} onChange={() => handleToggleVariableEnabled(variable.id)} />}
                             label={
@@ -1120,34 +1372,68 @@ const AgentModelSelector = (props: {
                             sx={{ mr: 1 }}
                           />
                         )}
-                        {!readonly && (
+                        {!readonly && hasMemoryBases && (
                           <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteMemoryVariable(variable.id)}>
                             <Trash2 className="w-4 h-4 text-gray-600" />
                           </IconButton>
                         )}
+                        {!hasMemoryBases && (
+                          <Typography variant="caption" color="text.disabled">
+                            需绑定记忆库
+                          </Typography>
+                        )}
                       </>
                     }
                   >
-                    <ListItemText primary={variable.name} secondary={<>{variable.description || t('orchestrationPage.memory.list.noDescription')}</>} />
+                    <ListItemText 
+                      primary={variable.name} 
+                      secondary={
+                        <>{variable.description || t('orchestrationPage.memory.list.noDescription')}</>
+                      }
+                    />
                   </ListItem>
                 ))}
               </List>
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                {t('orchestrationPage.memory.list.empty')}
+                  {t('orchestrationPage.memory.list.empty') }
               </Typography>
             )}
+          </AccordionDetails>
+        </Accordion>
+
+        {/* 长期记忆部分 - 仅当绑定了记忆库时启用 */}
+        <Accordion>
+          <AccordionSummary aria-controls="long-term-memory-content" id="long-term-memory-header">
+            <Typography component="span">{t('orchestrationPage.memory.longTermTitle')}</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
             <Box sx={{ mb: 2, mt: 1 }}>
               <FormControlLabel
-                control={<Switch checked={longTermMemoryEnabled} onChange={handleLongTermMemoryToggle} disabled={readonly} />}
+                control={
+                  <Switch 
+                    checked={longTermMemoryEnabled} 
+                    onChange={handleLongTermMemoryToggle} 
+                    disabled={readonly || !hasMemoryBases} 
+                  />
+                }
                 label={t('orchestrationPage.memory.longTermToggleLabel')}
               />
               <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
                 {t('orchestrationPage.memory.longTermDescription')}
               </Typography>
+              {!hasMemoryBases && (
+                <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
+                  请先绑定记忆库以启用长期记忆功能
+                </Typography>
+              )}
             </Box>
           </AccordionDetails>
         </Accordion>
+      </div>
+
+      <div className="skills-form mb-2 p-2">
+        <Typography sx={{ mb: 2 }}>{t('orchestrationPage.sections.skillsTitle')}</Typography>
 
         <Accordion>
           <AccordionSummary aria-controls="workflow-content" id="workflow-header">
@@ -1353,6 +1639,14 @@ const AgentModelSelector = (props: {
           onClose={() => setShowKnowledgeBaseSelector(false)}
           onConfirm={handleKnowledgeBaseConfirm}
           initialSelected={knowledgeBaseObjects.map(kb => kb.id)}
+        />
+      )}
+      {showMemoryBaseSelector && !readonly && (
+        <MemoryBaseSelector
+          open={showMemoryBaseSelector}
+          onClose={() => setShowMemoryBaseSelector(false)}
+          onConfirm={handleMemoryBaseConfirm}
+          initialSelected={memoryBaseObject?.mdb_id ?? null}
         />
       )}
 

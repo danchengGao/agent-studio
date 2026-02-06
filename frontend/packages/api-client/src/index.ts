@@ -225,6 +225,7 @@ export { PluginService } from './services/pluginService'
 export { TagService } from './services/tagService'
 export { TraceService, traceService } from './services/traceService'
 export { KnowledgeBaseService } from './services/knowledgeBaseService'
+export { MemoryBaseService } from './services/memoryBaseService'
 export { deepsearchTemplateService, fileToBase64 } from './services/deepsearchTemplateService'
 export { webSearchEngineService } from './services/webSearchEngineService'
 export type { FrontendModelConfig } from './services/modelService'
@@ -345,3 +346,21 @@ export type {
   SearchKnowledgeBaseResponse,
   SearchKnowledgeBaseItem,
 } from './types/knowledgeBase'
+
+export type {
+  CreateMemoryBaseRequest,
+  CreateMemoryBaseResponse,
+  GetMemoryBasesRequest,
+  GetMemoryBasesResponse,
+  MemoryBaseItem,
+  MemoryBase,
+  UpdateMemoryBaseRequest,
+  UpdateMemoryBaseResponse,
+  DeleteMemoryBaseRequest,
+  DeleteMemoryBaseResponse,
+  GetMemoryBaseDetailRequest,
+  GetMemoryBaseDetailResponse,
+  SearchMemoryBaseRequest,
+  SearchMemoryBaseResponse,
+  SearchMemoryBaseItem,
+} from './types/memoryBase'
