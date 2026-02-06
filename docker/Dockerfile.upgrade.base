@@ -1,4 +1,6 @@
-FROM ubuntu:22.04
+
+ARG ARCH_IMAGE
+FROM ${ARCH_IMAGE}
 
 SHELL ["/bin/bash", "-c"]
 
@@ -10,13 +12,15 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends \
     ca-certificates \
     mydumper
 
-RUN wget -q https://github.com/zilliztech/milvus-backup/releases/download/v0.5.9/milvus-backup_0.5.9_Linux_x86_64.tar.gz -O milvus-backup.tar.gz \
+ARG MILVUS_ARCH
+RUN wget -q https://github.com/zilliztech/milvus-backup/releases/download/v0.5.9/milvus-backup_0.5.9_Linux_${MILVUS_ARCH}.tar.gz -O milvus-backup.tar.gz \
     && tar -zxf milvus-backup.tar.gz \
     && mv milvus-backup /usr/local/bin/ \
     && chmod +x /usr/local/bin/milvus-backup \
     && rm -rf milvus-backup.tar.gz LICENSE README.md
 
-RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda3.sh \
+ARG CONDA_ARCH
+RUN wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${CONDA_ARCH}.sh -O miniconda3.sh \
     && bash miniconda3.sh -b -p /usr/local/miniconda3 \
     && source /usr/local/miniconda3/etc/profile.d/conda.sh \
     && conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main \
