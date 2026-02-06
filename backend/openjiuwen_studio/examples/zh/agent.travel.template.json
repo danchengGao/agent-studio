@@ -1,6 +1,7 @@
 {
   "agent_name": "出游助手",
   "description": "使用天气查询，路线规划等工具，对出游行程进行规划。",
+  "opening_remarks": "您好！我是您的智能旅游助手，很高兴为您服务。请问有什么可以帮助您的吗？",
   "agent_type": "react",
   "icon": "🤖",
   "model": {},

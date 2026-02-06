@@ -26,7 +26,7 @@ def create_user_response(user_db: UserDBPd, include_session_key: bool) -> UserRe
     return user_response
 
 
-def create_user_db(email: str, password: str, role_type: RoleType) -> UserDBPd:
+def create_user_db(email: str, password: str, role_type: RoleType, locale: str = "zh-CN") -> UserDBPd:
     user_id = ''.join(secrets.choice(string.digits) for _ in range(8))
     name = email.split('@')[0]
     user_unique_name = email
@@ -39,7 +39,7 @@ def create_user_db(email: str, password: str, role_type: RoleType) -> UserDBPd:
         "description": "",
         "avata_url": "",
         "role_type": role_type,
-        "locale": "zh-CN",
+        "locale": locale,
         "password": hash_password(password),
         "user_create_time": user_create_time,
         "user_update_time": user_create_time,

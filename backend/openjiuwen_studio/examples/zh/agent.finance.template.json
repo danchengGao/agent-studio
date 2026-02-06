@@ -1,6 +1,7 @@
 {
   "agent_name": "金融客服助手",
   "description": "面向金融场景的客服助手，可以进行余额查询和转账服务。",
+  "opening_remarks": "您好！我是您的智能金融客服助手，很高兴为您服务。请问有什么可以帮助您的吗？",
   "agent_type": "workflow",
   "icon": "💼",
   "model": {},

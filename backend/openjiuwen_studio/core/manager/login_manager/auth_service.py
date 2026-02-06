@@ -38,7 +38,7 @@ class AuthService:
         return SecurityManager.generate_and_save_code(email, action_type="reg")
 
     @staticmethod
-    async def register_user(req):
+    async def register_user(req, language: str = "zh"):
         """用户正式注册流程"""
         email = req.email
         if not SecurityManager.verify_code(email, req.code, action_type="reg"):
@@ -48,7 +48,7 @@ class AuthService:
             raise HTTPException(status_code=400, detail="该邮箱已注册")
 
         try:
-            user_db = create_user_db(email, req.password, RoleType.COMMON_USER)
+            user_db = create_user_db(email, req.password, RoleType.COMMON_USER, locale=language)
 
             access_token = session_auth.create_access_token(
                 data={"sub": user_db.email},
@@ -75,7 +75,7 @@ class AuthService:
             if ret["code"] != status.HTTP_200_OK:
                 raise HTTPException(status_code=500, detail="Failed to sign up")
 
-            pre_install(space_pd.space_id)
+            pre_install(space_pd.space_id, language)
 
             return {
                 "access_token": access_token,

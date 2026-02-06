@@ -17,10 +17,13 @@ from openjiuwen_studio.models.agent import AgentBaseDBPd
 from openjiuwen_studio.models.workflow import WorkflowBaseDBPd
 
 
-def pre_install(space_id: str):
+def pre_install(space_id: str, language: str = None):
+    if language is None:
+        language = os.getenv("LANGUAGE", "zh")
+    logger.info(f"[Template] Pre-installing templates for space: {space_id}, language: {language}")
     db = SessionLocal()
     try:
-        create_examples(space_id, db)
+        create_examples(space_id, db, language)
         db.commit()
     except Exception as e:
         db.rollback()
@@ -31,21 +34,41 @@ def pre_install(space_id: str):
 
 def _read_json(path: str) -> dict:
     try:
+        logger.info(f"[Template] Reading template file: {path}")
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            content = json.load(f)
+            logger.info(f"[Template] Successfully read template file: {path}, name: {content.get('name', 'N/A')}")
+            return content
     except Exception as e:
         logger.error(f"[Template] Error reading template file: {str(e)}, path: {path}")
         return {}
 
 
-def create_examples(space_id: str, db: Session):
+def get_template_path(base_dir: str, filename: str, language: str) -> str:
+    subdir = "zh"
+    if language and language.lower().startswith("en"):
+        subdir = "en"
+
+    path = os.path.join(base_dir, subdir, filename)
+    logger.info(f"[Template] Looking for template: {path}, language: {language}")
+    if os.path.exists(path):
+        logger.info(f"[Template] Found template: {path}")
+        return path
+
+    fallback_path = os.path.join(base_dir, filename)
+    logger.info(f"[Template] Fallback to: {fallback_path}")
+    return fallback_path
+
+
+def create_examples(space_id: str, db: Session, language: str = "zh"):
     base_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "../../../examples")
     )
     current_time = milliseconds()
 
     def _create_workflow_from_template(filename: str) -> dict | None:
-        tpl = _read_json(os.path.join(base_dir, filename))
+        tpl_path = get_template_path(base_dir, filename, language)
+        tpl = _read_json(tpl_path)
         if not tpl:
             return None
 
@@ -146,7 +169,8 @@ def create_examples(space_id: str, db: Session):
     travel_wfs = [w for w in [wf_check_weather, wf_plan_route] if w]
 
     # Create Travel Agent
-    ag_tpl = _read_json(os.path.join(base_dir, "agent.travel.template.json"))
+    ag_tpl_path = get_template_path(base_dir, "agent.travel.template.json", language)
+    ag_tpl = _read_json(ag_tpl_path)
     agent_id = str(uuid.uuid4())
     _ag_configs = ag_tpl.get("configs") or {}
     _ag_pt = ag_tpl.get("prompt_template") or []
@@ -175,7 +199,7 @@ def create_examples(space_id: str, db: Session):
         triggers=ag_tpl.get("triggers") or [],
         knowledge=ag_tpl.get("knowledge") or [],
         constraint={"reserved_max_chat_rounds": 10, "max_iteration": 5},
-        opening_remarks="您好！我是您的智能旅游助手，很高兴为您服务。请问有什么可以帮助您的吗？",
+        opening_remarks=ag_tpl.get("opening_remarks") or "您好！我是您的智能旅游助手，很高兴为您服务。请问有什么可以帮助您的吗？",
         memory=ag_tpl.get("memory") or None,
         create_time=current_time,
         update_time=current_time,
@@ -183,7 +207,8 @@ def create_examples(space_id: str, db: Session):
     agent_repository.create_agent_db(travel_agent)
 
     # Create Finance Agent
-    finance_tpl = _read_json(os.path.join(base_dir, "agent.finance.template.json"))
+    finance_tpl_path = get_template_path(base_dir, "agent.finance.template.json", language)
+    finance_tpl = _read_json(finance_tpl_path)
     finance_agent_id = str(uuid.uuid4())
     _fi_configs = finance_tpl.get("configs") or {}
     _fi_pt = finance_tpl.get("prompt_template") or []
@@ -212,7 +237,7 @@ def create_examples(space_id: str, db: Session):
         triggers=finance_tpl.get("triggers") or [],
         knowledge=finance_tpl.get("knowledge") or [],
         constraint={"reserved_max_chat_rounds": 10, "max_iteration": 5},
-        opening_remarks="您好！我是您的智能金融客服助手，很高兴为您服务。请问有什么可以帮助您的吗？",
+        opening_remarks=finance_tpl.get("opening_remarks") or "您好！我是您的智能金融客服助手，很高兴为您服务。请问有什么可以帮助您的吗？",
         memory=finance_tpl.get("memory")
         or {
             "max_tokens": 1000,

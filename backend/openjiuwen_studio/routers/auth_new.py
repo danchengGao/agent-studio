@@ -4,6 +4,7 @@ from openjiuwen_studio.core.manager.email_manager.email_utils import EmailUtils
 from openjiuwen_studio.core.manager.login_manager.auth_service import AuthService
 from openjiuwen_studio.core.manager.login_manager.session_auth import oauth2_scheme
 from openjiuwen_studio.schemas.common import ResponseModel
+from openjiuwen_studio.core.common.language_thread_context import get_highest_priority_language
 from openjiuwen_studio.schemas.user import (
     SendCodeRequest,
     RegisterRequest,
@@ -12,17 +13,7 @@ from openjiuwen_studio.schemas.user import (
 )
 
 
-from fastapi import APIRouter, Depends, status, BackgroundTasks
-from fastapi.security.oauth2 import OAuth2PasswordRequestForm
-from openjiuwen_studio.core.manager.email_manager.email_utils import EmailUtils
-from openjiuwen_studio.core.manager.login_manager.auth_service import AuthService
-from openjiuwen_studio.schemas.common import ResponseModel
-from openjiuwen_studio.schemas.user import (
-    SendCodeRequest,
-    RegisterRequest,
-    ResetPasswordRequest,
-    RefreshTokenRequest
-)
+
 
 auth_router = APIRouter()
 
@@ -37,9 +28,21 @@ async def send_code(req: SendCodeRequest, background_tasks: BackgroundTasks):
 
 
 @auth_router.post("/register", response_model=ResponseModel[dict])
-async def register(req: RegisterRequest):
+async def register(req: RegisterRequest, request: Request):
     """用户注册"""
-    result = await AuthService.register_user(req)
+    accept_language = request.headers.get("accept-language", "")
+    language = "zh"
+    
+    langs = get_highest_priority_language(accept_language)
+    if langs:
+        primary = langs[0]
+        if primary.startswith("en"):
+            language = "en"
+        elif primary.startswith("zh"):
+            language = "zh"
+        else:
+            language = "zh"
+    result = await AuthService.register_user(req, language)
 
     return ResponseModel(
         code=status.HTTP_200_OK,
