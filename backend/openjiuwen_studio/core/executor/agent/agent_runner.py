@@ -505,8 +505,6 @@ class AgentRunner:
         # 2. 获取Agent配置
         agent_dl_json = await _fetch_agent_dl(id, version, space_id, current_user)
         agent_config = AgentDlAdapter.convert_to_agent_config(agent_dl_json)
-        memory_engine = get_memory_engine()
-        memory_engine.set_group_llm_config(agent_config.id, agent_config.model)
 
         # 2.1 使用知识库检索（如果配置了知识库）
         kb_ids, retrieval_config = AgentDlAdapter.get_knowledge_config(agent_dl_json)

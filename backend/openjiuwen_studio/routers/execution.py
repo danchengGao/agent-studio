@@ -22,10 +22,12 @@ from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.schemas.trace_summary import (TraceSummaryListRequest, TraceSummaryByTraceIdRequest,
                                        TraceSummaryLatestRequest, TraceSummaryBrief)
 from openjiuwen_studio.schemas.execution_log import ExecutionLogSummary
-from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, UpdateLongtermMem, UpdateVariable, GetUserVar, \
-    SearchLongtermMem
+from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, UpdateLongtermMem, UpdateVariable, \
+    GetUserVar, \
+    SearchLongtermMem, DeleteScopeLongtermMem
 from openjiuwen_studio.core.manager.memory import delete_user_variable, delete_longterm_mem, update_user_variable, \
-    update_longterm_mem, get_longterm_mem, get_user_variable
+    update_longterm_mem, get_longterm_mem, get_user_variable, delete_longterm_mem_by_scope_id
+
 from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, WorkflowErrorData, ErrorNodeInfo
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponse, ExecuteResponseType
@@ -479,6 +481,26 @@ async def delete_longterm_memory(
     req = DeleteLongtermMem(**request)
     try:
         data = await delete_longterm_mem(req)
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="delete long term memory success",
+            data=data
+        )
+    except Exception as e:
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to delete long-term memory: {str(e)}",
+            data=None
+        )
+
+
+@execution_router.post("/memory/delete_longterm_mem_by_scope", response_model=ResponseModel[dict])
+async def delete_longterm_mem_by_scope(
+    request: dict,
+) -> ResponseModel[Dict[str, Any]]:
+    req = DeleteScopeLongtermMem(**request)
+    try:
+        data = await delete_longterm_mem_by_scope_id(req)
         return ResponseModel(
             code=status.HTTP_200_OK,
             message="delete long term memory success",

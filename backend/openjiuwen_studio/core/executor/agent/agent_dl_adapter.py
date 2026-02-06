@@ -12,8 +12,8 @@ from openjiuwen.agent.config.workflow_config import WorkflowAgentConfig, Default
 from openjiuwen.core.component.common.configs.model_config import ModelConfig
 from openjiuwen.core.utils.llm.base import BaseModelInfo
 from openjiuwen.agent.common.schema import WorkflowSchema, PluginSchema
-from openjiuwen.core.memory.config.config import MemoryConfig
-
+from openjiuwen.core.memory.config.config import AgentMemoryConfig
+from openjiuwen.core.common import Param
 
 VARIABLE_PROMPT_SYS = """
 以下列出的是用户历史保存的记忆变量\n{{sys_memory_variables}}
@@ -107,7 +107,7 @@ class AgentDlAdapter:
         )
 
         return agent_config
-    
+
     @staticmethod
     def _parse_memory_config_to_react_agent_config(react_agent_config: ReActAgentConfig, react_agent_dl: ReactAgentDL):
         # 1.获取记忆的配置
@@ -116,19 +116,29 @@ class AgentDlAdapter:
             variable_list = variable_config
         else:
             variable_list = []
-        react_agent_config.memory_config = MemoryConfig(
-            mem_variables={
-                var["name"]: var["description"] for var in variable_list if var.get("enabled", False)
-            },
+        react_agent_config.agent_memory_config = AgentMemoryConfig(
+            mem_variables=[
+                Param.string(var["name"], description=var["description"], required=False)
+                for var in variable_list if var.get("enabled", False)
+            ],
             enable_long_term_mem=react_agent_dl.configs.get("longterm_memory_config", False)
         )
 
-        # 2.拼接prompt
+        # 2.获取记忆库的id和对应的配置
+        memory_base_dict = react_agent_dl.configs.get("memory_base")
+        if not isinstance(memory_base_dict, dict):
+            memory_base_dict = {}
+        mdb_id = memory_base_dict.get("mdb_id", "")
+        # 如果绑定了记忆库
+        if mdb_id:
+            react_agent_config.memory_scope_id = mdb_id
+
+        # 3.拼接prompt
         if not react_agent_config.prompt_template:
             system_content = ""
-            if react_agent_config.memory_config.mem_variables:
+            if react_agent_config.agent_memory_config.mem_variables:
                 system_content += VARIABLE_PROMPT_SYS
-            if react_agent_config.memory_config.enable_long_term_mem:
+            if react_agent_config.agent_memory_config.enable_long_term_mem:
                 system_content += LONG_TERM_PROMPT
             if system_content != "":
                 react_agent_config.prompt_template.append({
@@ -136,9 +146,9 @@ class AgentDlAdapter:
                     "content": system_content
                 })
         else:
-            if react_agent_config.memory_config.mem_variables:
+            if react_agent_config.agent_memory_config.mem_variables:
                 react_agent_config.prompt_template[0]["content"] += VARIABLE_PROMPT_SYS
-            if react_agent_config.memory_config.enable_long_term_mem:
+            if react_agent_config.agent_memory_config.enable_long_term_mem:
                 react_agent_config.prompt_template[0]["content"] += LONG_TERM_PROMPT
 
     @staticmethod
@@ -241,3 +251,12 @@ class AgentDlAdapter:
             for kb in agent_dl.knowledges:
                 kb_ids.append(kb.id)
         return kb_ids, agent_dl.kb_retrieval
+
+    @staticmethod
+    def get_memory_base_id(agent_dl_json: str):
+        agent_dl = AgentDL.model_validate_json(agent_dl_json)
+        memory_base_dict = agent_dl.configs.get("memory_base")
+        if not isinstance(memory_base_dict, dict):
+            memory_base_dict = {}
+        mdb_id = memory_base_dict.get("mdb_id", "")
+        return mdb_id
