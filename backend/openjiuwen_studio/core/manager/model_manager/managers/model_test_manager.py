@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from openjiuwen.core.common.exception.exception import JiuWenBaseException
+from openjiuwen_studio.core.common.exceptions import BaseError
 from openjiuwen.core.common.logging import logger
 from openjiuwen.core.foundation.llm import Model, ModelClientConfig, ModelRequestConfig
 from sqlalchemy.orm import Session
@@ -207,8 +207,8 @@ class ModelTester:
 
                 logger.error(f"Model inference failed: {model.name} (ID: {model_id}), error: {error_message}")
 
-                raise JiuWenBaseException(
-                    error_code=StatusCode.AGENT_TEST_FAILED.code,
+                raise BaseError(
+                    code=StatusCode.AGENT_TEST_FAILED.code,
                     message=StatusCode.AGENT_TEST_FAILED.errmsg.format(msg=user_error_msg)
                 ) from inference_error
 

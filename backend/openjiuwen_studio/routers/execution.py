@@ -2,7 +2,7 @@ from typing import Any, Optional, Dict, AsyncGenerator, Union
 from pydantic import ValidationError
 
 from fastapi import APIRouter, HTTPException, Request, status, Depends
-from openjiuwen.core.common.exception.exception import JiuWenBaseException
+from openjiuwen_studio.core.common.exceptions import BaseError
 from openjiuwen.core.common.logging import logger, set_session_id, get_session_id
 from openjiuwen.core.session.interaction.interactive_input import InteractiveInput
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ from openjiuwen_studio.core.manager.memory import delete_user_variable, delete_l
 
 from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, WorkflowErrorData, ErrorNodeInfo
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
-from openjiuwen_studio.core.common.message import ExecuteResponse, ExecuteResponseType
+from openjiuwen_studio.core.common.message import ExecuteResponseType
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
 from openjiuwen_studio.core.executor.component.component_execution_manager import component_execution_manager
 execution_router = APIRouter()
@@ -123,21 +123,21 @@ async def handler(
             ).model_dump_json()
     except JiuWenExecuteException as e:
         log_exception(e)
-        error_node_info = ErrorNodeInfo(error_code=e.error_code, error_message=e.message,
+        error_node_info = ErrorNodeInfo(error_code=e.code, error_message=e.message,
                                         node_id=e.node_id, connection=e.connection)
         data = WorkflowErrorData(workflow_id=e.workflow_id, error_nodes_info=[error_node_info])
-        yield WorkflowFailedResponse(data=data, code=e.error_code, message=e.message).model_dump_json()
+        yield WorkflowFailedResponse(data=data, code=e.code, message=e.message).model_dump_json()
     except JiuWenGraphException as e:
         log_exception(e)
         yield ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data=None
         ).model_dump_json()
     except JiuWenComponentException as e:
         log_exception(e)
         yield ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data={
                 "component_id": e.component_id,
@@ -145,10 +145,10 @@ async def handler(
                 "error_stage": e.error_stage
             }
         ).model_dump_json()
-    except JiuWenBaseException as e:
+    except BaseError as e:
         log_exception(e)
         yield ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data=None
         ).model_dump_json()
@@ -240,16 +240,27 @@ async def execute_component(
                                          request_body.space_id, current_user, request_body.loop_id,
                                          request_body.conversation_id)
         logger.info(f"Received result: {result}")
-        return ResponseModel(code=status.HTTP_200_OK, message="Component Executed successfully", data=result)
+        return ResponseModel(
+            code=status.HTTP_200_OK, message="Component Executed successfully", data=result
+        )
     except JiuWenComponentException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except JiuWenGraphException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
-    except JiuWenBaseException as e:
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
+    except BaseError as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -271,14 +282,14 @@ async def validate_workflow(
     except JiuWenGraphException as e:
         logger.info(f"JiuWenGraphException: {repr(e)}")
         return ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data={}
         )
     except JiuWenComponentException as e:
         logger.info(f"JiuWenComponentException: {repr(e)}")
         return ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data={
                 "component_id": e.component_id,
@@ -311,13 +322,22 @@ async def execute_plugin(
         return ResponseModel(code=status.HTTP_200_OK, message="Executed successfully", data=chunk)
     except JiuWenComponentException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except JiuWenGraphException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
-    except JiuWenBaseException as e:
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
+    except BaseError as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -357,7 +377,9 @@ async def test_plugin(
             inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
         else:
             inputs = request_body.inputs
-        chunk = await plugin_mgr.run(request_body.plugin_id, request_body.tool_id, inputs, request_body.space_id, "draft", None)
+        chunk = await plugin_mgr.run(
+            request_body.plugin_id, request_body.tool_id, inputs, request_body.space_id, "draft", None
+        )
         logger.warning(f"Received chunk: {chunk}, type: {type(chunk)}")
         return ResponseModel(code=status.HTTP_200_OK, message="Executed successfully", data=chunk)
     except HTTPException:

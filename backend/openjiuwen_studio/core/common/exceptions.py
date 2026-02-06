@@ -9,13 +9,31 @@ from fastapi import status
 from pydantic import BaseModel, Field
 
 from openjiuwen_studio.core.common.dsl import Connection
-from openjiuwen.core.common.exception.exception import JiuWenBaseException
+from openjiuwen.core.common.exception.errors import BaseError as FrameworkBaseError
+from openjiuwen.core.common.exception.codes import StatusCode as FrameworkStatusCode
 
 
-class JiuWenComponentException(JiuWenBaseException):
-    def __init__(self, error_code: int, message: str, component_id: str, component_type: int,
+class BaseError(FrameworkBaseError):
+    def __init__(self, code: int = None, message: str = None, error_status=None, **kwargs):
+        if error_status is None:
+            # Fallback to generic error from framework to satisfy type hints/structure
+            error_status = FrameworkStatusCode.ERROR
+        
+        # Framework BaseError expects status object with .code and .errmsg
+        super().__init__(error_status, msg=message, **kwargs)
+
+        # Explicitly override code if provided, as super().__init__ sets it from status.code
+        if code is not None:
+            self.code = code
+        # Explicitly override message if provided, ensuring it takes precedence
+        if message is not None:
+            self.message = message
+
+
+class JiuWenComponentException(BaseError):
+    def __init__(self, code: int, message: str, component_id: str, component_type: int,
                  error_stage: str = "convert") -> None:
-        super().__init__(error_code, message)
+        super().__init__(code=code, message=message)
         self._component_id = component_id
         self._component_type = component_type
         self._error_stage = error_stage
@@ -51,11 +69,11 @@ class WorkflowFailedResponse(BaseModel):
     message: str = Field(default="工作流运行失败")
 
 
-class JiuWenExecuteException(JiuWenBaseException):
+class JiuWenExecuteException(BaseError):
     """workflow图异常"""
 
-    def __init__(self, error_code: int, message: str, workflow_id="", node_id="", connection=None):
-        super().__init__(error_code, message)
+    def __init__(self, code: int, message: str, workflow_id="", node_id="", connection=None):
+        super().__init__(code=code, message=message)
         self._workflow_id = workflow_id
         self._node_id = node_id
         self._connection = connection

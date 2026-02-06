@@ -310,7 +310,11 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
             if isinstance(transformed_payload, dict):
                 transformed_payload["index"] = chunk.index
 
-        return ExecuteResponse(type=ExecuteResponseType.Workflow, payload=transformed_payload).model_dump(), None, None
+        response_type = ExecuteResponseType.Workflow
+        if business_type == "AGENT":
+            response_type = ExecuteResponseType.Agent
+
+        return ExecuteResponse(type=response_type, payload=transformed_payload).model_dump(), None, None
 
     # Agent workflow run result
     # not processing workflow_final type
@@ -333,6 +337,19 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                     answer_value = "\n".join(formatted_items)
                 else:
                     answer_value = str(output_data)
+            # 处理 response 情况
+            elif chunk.payload.get("response"):
+                response_data = chunk.payload.get("response")
+                if isinstance(response_data, dict):
+                    formatted_items = []
+                    for key, value in response_data.items():
+                        if not isinstance(value, str):
+                            value = str(value)
+                        formatted_items.append(f"{key}: {value}")
+                    answer_value = "\n".join(formatted_items)
+                else:
+                    answer_value = str(response_data)
+
             if answer_value:
                 agent_payload = {"output": answer_value, "result_type": "answer"}
                 return ExecuteResponse(type=ExecuteResponseType.Agent, payload=agent_payload).model_dump(), None, None

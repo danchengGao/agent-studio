@@ -75,6 +75,7 @@ class ModelRequestConfig(BaseModel):
     model_name: str = Field("")
     temperature: float = Field(0.1)
     top_p: float = Field(0.1)
+    stream: bool = Field(False)
 
 
 class ModelConfig(BaseModel):

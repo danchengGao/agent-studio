@@ -144,7 +144,7 @@ def workflow_convert(workflow_info: WorkflowBase, skip_validation: bool = False)
             if component_type == dsl.ComponentType.COMPONENT_TYPE_LLM:
                 code = StatusCode.LLM_COMPONENT_CONFIG_INVALID.code
             raise JiuWenComponentException(
-                error_code=code,
+                code=code,
                 message=StatusCode.COMPONENT_CONFIG_INVALID.errmsg.format(msg=hint),
                 component_id=component_id,
                 component_type=component_type,

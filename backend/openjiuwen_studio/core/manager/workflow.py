@@ -34,7 +34,7 @@ from openjiuwen_studio.schemas.space import SpaceAWPQuery
 from openjiuwen_studio.core.manager.reference_extractor import extract_workflow_references, \
     check_referenced_dependencies
 from openjiuwen_studio.core.manager.repositories.reference_repository import reference_repository
-from openjiuwen.core.common.exception.exception import JiuWenBaseException
+from openjiuwen_studio.core.common.exceptions import BaseError
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.manager.model_manager.managers.model_config_manager import ModelConfigManager
 
@@ -128,7 +128,7 @@ def with_exception_handling(func: Callable) -> Callable:
                 code=status.HTTP_400_BAD_REQUEST,
                 message=str(e)
             )
-        except JiuWenBaseException as e:
+        except BaseError as e:
             log_exception(e)
             if isinstance(e, JiuWenComponentException):
                 type_name_map = {
@@ -158,7 +158,7 @@ def with_exception_handling(func: Callable) -> Callable:
                     code=status.HTTP_400_BAD_REQUEST,
                     message=formatted_message,
                     data={
-                        "error_code": getattr(e, "error_code", -1),
+                        "error_code": getattr(e, "code", -1),
                         "component_id": e.component_id,
                         "component_type": e.component_type,
                         "error_stage": e.error_stage,
@@ -168,7 +168,7 @@ def with_exception_handling(func: Callable) -> Callable:
                 return ResponseModel(
                     code=status.HTTP_400_BAD_REQUEST,
                     message=e.message,
-                    data={"error_code": getattr(e, "error_code", -1)}
+                    data={"error_code": getattr(e, "code", -1)}
                 )
         except Exception as e:
             log_exception(e)

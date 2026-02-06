@@ -5,15 +5,14 @@ from typing import List, Union
 
 from openjiuwen_studio.core.common.dsl import Agent as AgentDL, AgentType, ReactAgent as ReactAgentDL, \
     WorkflowAgent as WorkflowAgentDL, PluginSchema as PluginSchemaDL, WorkflowSchema as WorkflowSchemaDL
-from openjiuwen.agent.common.enum import ControllerType
-from openjiuwen.agent.config.base import AgentConfig
-from openjiuwen.agent.config.react_config import ReActAgentConfig, ConstrainConfig
-from openjiuwen.agent.config.workflow_config import WorkflowAgentConfig, DefaultResponse
-from openjiuwen.core.component.common.configs.model_config import ModelConfig
-from openjiuwen.core.utils.llm.base import BaseModelInfo
-from openjiuwen.agent.common.schema import WorkflowSchema, PluginSchema
+from openjiuwen.core.common.constants.enums import ControllerType
+from openjiuwen.core.application.llm_agent import ReActAgentConfig, ConstrainConfig
+from openjiuwen.core.single_agent.legacy import WorkflowAgentConfig, DefaultResponse, WorkflowSchema, PluginSchema
+from openjiuwen.core.foundation.llm import BaseModelInfo, ModelConfig
 from openjiuwen.core.memory.config.config import AgentMemoryConfig
 from openjiuwen.core.common import Param
+from openjiuwen.core.workflow import WorkflowCard
+
 
 VARIABLE_PROMPT_SYS = """
 以下列出的是用户历史保存的记忆变量\n{{sys_memory_variables}}
@@ -45,18 +44,18 @@ def _plugin_schema_adapter(plugin_dls: List[PluginSchemaDL]) -> List[PluginSchem
     return plugin_schemas
 
 
-def _workflow_schema_adapter(workflow_dls: List[WorkflowSchemaDL]) -> List[WorkflowSchema]:
-    workflow_schemas = []
+def _workflow_schema_adapter(workflow_dls: List[WorkflowSchemaDL]) -> List[WorkflowCard]:
+    workflow_cards = []
     for workflow_dl in workflow_dls:
-        workflow_schema = WorkflowSchema(
+        workflow_card = WorkflowCard(
             id=workflow_dl.id,
             version=workflow_dl.version,
             name=workflow_dl.name,
             description=workflow_dl.description,
-            inputs=workflow_dl.inputs,
+            input_params=workflow_dl.inputs,
         )
-        workflow_schemas.append(workflow_schema)
-    return workflow_schemas
+        workflow_cards.append(workflow_card)
+    return workflow_cards
 
 
 class AgentDlAdapter:
@@ -92,17 +91,24 @@ class AgentDlAdapter:
 
         # 模型配置
         model_info = BaseModelInfo(
-            api_key=agent_dl.model.model_info.api_key,
-            api_base=agent_dl.model.model_info.api_base,
-            model=agent_dl.model.model_info.model_name,
-            temperature=agent_dl.model.model_info.temperature,
-            top_p=agent_dl.model.model_info.top_p,
-            stream=agent_dl.model.model_info.streaming,
-            timeout=agent_dl.model.model_info.timeout
+            api_key=agent_dl.model.model_client_config.api_key,
+            api_base=agent_dl.model.model_client_config.api_base,
+            model=agent_dl.model.request_config.model_name,
+            temperature=agent_dl.model.request_config.temperature,
+            top_p=agent_dl.model.request_config.top_p,
+            stream=agent_dl.model.request_config.stream,
+            timeout=agent_dl.model.model_client_config.timeout
         )
 
+        model_provider = agent_dl.model.model_client_config.client_provider
+        # Normalize provider casing
+        if model_provider.lower() == 'openai':
+            model_provider = 'OpenAI'
+        elif model_provider.lower() == 'siliconflow':
+            model_provider = 'SiliconFlow'
+
         agent_config.model = ModelConfig(
-            model_provider=agent_dl.model.model_provider,
+            model_provider=model_provider,
             model_info=model_info
         )
 
