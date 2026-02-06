@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from 'react'
 import { EditorView, keymap, placeholder as codemirrorPlaceholder, lineNumbers, GutterMarker } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { defaultKeymap, history } from '@codemirror/commands'
+import { defaultKeymap, history, indentWithTab } from '@codemirror/commands'
 import { foldGutter, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { gutter } from '@codemirror/gutter'
 import { autocompletion, closeBrackets } from '@codemirror/autocomplete'
@@ -241,7 +241,7 @@ export const BaseEditor = forwardRef<BaseEditorRef, BaseEditorProps>(
 
       const finalExtensions = [
         history(),
-        keymap.of(defaultKeymap),
+        keymap.of([indentWithTab, ...defaultKeymap]),
         ...languageExtension, // Language extension must come first
         syntaxHighlighting(STABLE_HIGHLIGHT_STYLE),
         ...(showLineNumbers ? [lineNumbers()] : []),
