@@ -132,12 +132,11 @@ class WebSearchEngineUpdateRequestDTO(WebSearchEngineBasicRequestDTO):
     '''更新指定web搜索引擎对象'''
     space_id: str = Field(..., min_length=1, max_length=255, description="用户空间id")
     web_search_engine_id: int = Field(..., description="搜素引擎id")
-    search_engine_name: str = Field(..., min_length=1, max_length=255, description="搜索引擎名称")
-    search_api_key: str = Field(..., min_length=1, max_length=255, description="搜索引擎访问api_key")
-    search_url: str = Field(..., min_length=1, max_length=255, description="搜索引擎url")
-    extension: dict = Field(default_factory=dict, description="搜索引擎扩展配置")
-    is_active: bool = Field(default=True, description="搜索引擎是否禁用")
-
+    search_engine_name: Optional[str] = Field(None, min_length=1, max_length=255, description="搜索引擎名称")
+    search_api_key: Optional[str] = Field(None, min_length=1, max_length=255, description="搜索引擎访问api_key")
+    search_url: Optional[str] = Field(None, min_length=1, max_length=255, description="搜索引擎url")
+    extension: Optional[dict] = Field(default_factory=dict, description="搜索引擎扩展配置")
+    is_active: Optional[bool] = Field(default=True, description="搜索引擎是否禁用")
 
 
 class BasicResponseDTO(BaseModel):
