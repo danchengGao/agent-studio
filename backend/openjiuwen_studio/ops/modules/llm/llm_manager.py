@@ -1,9 +1,8 @@
 #!/usr/bin/python3.10
 # -*- coding: utf-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
-import os
 from __future__ import annotations
-
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import List, Dict, Any, Literal, Optional

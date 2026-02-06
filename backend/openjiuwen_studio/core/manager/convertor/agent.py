@@ -344,16 +344,19 @@ def react_agent_convert(
                         f"[AGENT_CONVERT] Unexpected error decrypting API key: {str(e)}"
                     )
 
+            provider = info.get("provider")
             model_dsl = ModelConfig(
-                model_provider=info.get("provider"),
-                model_info=BaseModelInfo(
+                model_client_config=ModelClientConfig(
+                    client_provider=provider,
                     api_key=api_key,
                     api_base=model_info_dict.get("api_base"),
-                    model_name=model_info_dict.get("model_type"),  # DSL usually expects type here
+                    timeout=model_info_dict.get("timeout", 60)
+                ),
+                request_config=ModelRequestConfig(
+                    model_name=model_info_dict.get("model_type"),
                     temperature=model_info_dict.get("temperature", 0.7),
                     top_p=model_info_dict.get("top_p", 0.9),
-                    streaming=model_info_dict.get("streaming", False),
-                    timeout=model_info_dict.get("timeout", 60)
+                    stream=model_info_dict.get("streaming", False),
                 )
             )
         elif hasattr(agent_info, 'model_id') and agent_info.model_id:
@@ -371,15 +374,17 @@ def react_agent_convert(
                 parameters = model_config.parameters or {}
 
                 model_dsl = ModelConfig(
-                    model_provider=model_config.provider,
-                    model_info=BaseModelInfo(
+                    model_client_config=ModelClientConfig(
+                        client_provider=model_config.provider,
                         api_key=SecurityUtils().decrypt_api_key(model_config.api_key) if model_config.api_key else '',
                         api_base=model_config.base_url,
+                        timeout=model_config.timeout
+                    ),
+                    request_config=ModelRequestConfig(
                         model_name=model_config.model_type,
                         temperature=parameters.get('temperature', 0.7),
                         top_p=parameters.get('top_p', 0.9),
-                        streaming=model_config.enable_streaming,
-                        timeout=model_config.timeout
+                        stream=model_config.enable_streaming,
                     )
                 )
 
