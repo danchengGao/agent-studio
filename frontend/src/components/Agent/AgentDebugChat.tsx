@@ -5,7 +5,7 @@ import { ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client
 import { ActionSlotMount } from '@/components/Common/ActionSlot'
 import AgentOperationsBar from './AgentOperationsBar'
 import AgentDebugPanel from './AgentDebugPanel'
-import MemoryButton from '@/pages/Memory/MemoryButton'
+import MemoryButton from '@/pages/MemoryBase/MemoryButton'
 import { MessageRenderer } from './messages/MessageRenderer'
 import { useScopedTranslation } from '@/i18n'
 
