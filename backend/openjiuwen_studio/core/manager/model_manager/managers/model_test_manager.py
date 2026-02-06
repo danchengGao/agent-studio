@@ -131,7 +131,7 @@ class ModelTester:
                     model_config=model_config
                 )
 
-                ai_message = await model_inference.ainvoke(messages)
+                ai_message = await model_inference.invoke(messages)
 
                 inference_result = {
                     'response': str(ai_message.content),

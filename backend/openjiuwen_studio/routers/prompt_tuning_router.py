@@ -467,6 +467,7 @@ class OptimizationTaskExecutor:
 
         llm_call_config = LLMCallConfig(
             model=model_config,
+            model_client=model_client_config,
             system_prompt=[{"role": "system", "content": prompt}],
             user_prompt=[{"role": "user", "content": "{{query}}"}]
         )
@@ -484,7 +485,6 @@ class OptimizationTaskExecutor:
     @staticmethod
     def _create_trainer(llm_config: Dict[str, Any], optimize_config: Dict[str, Any]):
         """创建训练器"""
-        # 构建模型配置
         model_client_config = ModelClientConfig(
             client_provider=compatible_provider(llm_config.get("provider")),
             api_base=llm_config.get("base_url"),

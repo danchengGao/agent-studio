@@ -129,7 +129,7 @@ async def register_internal(username: str, language: str = "zh"):
         # 检查用户是否已存在（双重检查）
         ret = user_repository.find_user_tbl(email=username)
         if ret["code"] == status.HTTP_500_INTERNAL_SERVER_ERROR:
-            raise HTTPException(status_code=ret["code"], detail="DB ERROR When find user")
+            raise HTTPException(status_code=ret["code"], detail="DB ERROR：failed to find user")
         if ret["code"] == status.HTTP_200_OK:
             # 用户已存在，直接登录
             user_data = ret["data"]
