@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, Request
-from openjiuwen.core.common.logging import set_thread_session, logger
+from openjiuwen.core.common.logging import set_session_id, logger
 
 from openjiuwen_studio.core.common.language_thread_context import (set_language, clear_language,
                                                                    get_highest_priority_language)
@@ -80,7 +80,7 @@ def router_register(app: FastAPI):
     async def process_header_request_id(request: Request, call_next):
         request_id = request.headers.get("x-request-id")
         if request_id:
-            set_thread_session(request_id)
+            set_session_id(request_id)
         try:
             response = await call_next(request)
             return response

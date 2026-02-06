@@ -4,7 +4,7 @@ from typing import Optional
 
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.utils.llm.model_utils.model_factory import ModelFactory
+from openjiuwen.core.foundation.llm import Model
 from sqlalchemy.orm import Session
 
 from openjiuwen_studio.core.manager.repositories import ModelConfigRepository, ModelUsageRepository
@@ -34,7 +34,7 @@ class ModelTester:
         self.model_repo = ModelConfigRepository(db)
         self.usage_repo = ModelUsageRepository(db)
         self.security_utils = SecurityUtils()
-        self.model_factory = ModelFactory()
+        self.model_factory = Model()
 
     async def test_model_config(
             self,

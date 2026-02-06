@@ -60,7 +60,6 @@ class StatusCode(Enum):
                                    "There are circles in workflow graph: {msg}")
     WORKFLOW_GRAPH_BRANCH_REDUCE_ERROR = (BASE_CODE + 2003,
                                           "不同源的分支在同一节点汇合",
-
                                           "These edges have different branch ancestors and cannot be reduced")
     WORKFLOW_GRAPH_LOOP_CONTROL_NODE_REDUCE_ERROR = (BASE_CODE + 2004,
                                                      "循环控制节点:{msg}存在未汇合的非switch类型的分支祖先",

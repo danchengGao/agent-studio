@@ -11,7 +11,8 @@ from openjiuwen_studio.core.common.language_thread_context import get_language
 from openjiuwen_studio.core.common.agent_defaults import AgentDefaults
 
 from openjiuwen_studio.core.common import dsl
-from openjiuwen_studio.core.common.dsl import AgentType, ConstrainConfig, ModelConfig, BaseModelInfo, KBRetrievalConfig
+from openjiuwen_studio.core.common.dsl import AgentType, ConstrainConfig, ModelConfig, ModelClientConfig, \
+    ModelRequestConfig, KBRetrievalConfig
 from openjiuwen_studio.core.manager.internal.agent import AgentWorkflowListNodeBase
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 from openjiuwen_studio.core.manager.repositories.tool_repository import tool_repository
@@ -46,13 +47,14 @@ def workflow_convert(space_id: str, workflow: AgentWorkflowListNodeBase):
         input_parameters = workflow_info.input_parameters
         output_parameters = workflow_info.output_parameters
 
-        input_properties = convert_to_properties_format(input_parameters)
+        input_properties, input_requires = convert_to_properties_format(input_parameters)
         inputs = {
             "type": "object",
-            "properties": input_properties
+            "properties": input_properties,
+            "required": input_requires
         }
 
-        output_properties = convert_to_properties_format(output_parameters)
+        output_properties, output_requires = convert_to_properties_format(output_parameters)
 
         return inputs, output_properties
 
@@ -134,16 +136,17 @@ def agent_plugin_convert(space_id: str, plugin: AgentPlugin) -> dsl.PluginSchema
                 f"get plugin tool info with id {plugin.tool_id} from db failed, error: {get_result.message}")
 
         tool_info = get_result.data
-        input_parameters = tool_info.input_parameters	 
+        input_parameters = tool_info.input_parameters
         output_parameters = tool_info.output_parameters
 
-        input_properties = convert_to_properties_format(input_parameters)
+        input_properties, input_requires = convert_to_properties_format(input_parameters)
         inputs = {
             "type": "object",
-            "properties": input_properties
+            "properties": input_properties,
+            "required": input_requires
         }
 
-        output_properties = convert_to_properties_format(output_parameters)
+        output_properties, output_requires = convert_to_properties_format(output_parameters)
 
         plugin_schema = dsl.PluginSchema(
             id=plugin.tool_id,
@@ -272,7 +275,7 @@ def knowledges_retrieval_config_convert(configs: dict[str, Any]):
     # 从配置中获取 use_agent 和 use_sync（前端直接传递）
     use_agent = retrieval_config.get("use_agent", False)
     use_sync = retrieval_config.get("use_sync", False)
-    
+
     # 如果 use_agent 或 use_sync 中有一个为 True，则设置 use_graph 和 graph_expansion 为 True
     if use_agent or use_sync:
         use_graph = True
@@ -283,21 +286,21 @@ def knowledges_retrieval_config_convert(configs: dict[str, Any]):
 
     kb_retrieval_config = KBRetrievalConfig(
         retrieval_type=retrieval_config["retrieval_type"],
-                                            use_graph=use_graph,
+        use_graph=use_graph,
         source=retrieval_config.get("source", 1),
-                                            topk=retrieval_config["topk"],
-                                            score_threshold=retrieval_config["score_threshold"],
-                                            graph_expansion=graph_expansion,
-                                            use_agent=use_agent,
+        topk=retrieval_config["topk"],
+        score_threshold=retrieval_config["score_threshold"],
+        graph_expansion=graph_expansion,
+        use_agent=use_agent,
         use_sync=use_sync
     )
     return kb_retrieval_config
 
 
 def react_agent_convert(
-    space_id: str, 
-    agent_info: AgentBaseDBPd, 
-    model_details: Optional[dict] = None
+        space_id: str,
+        agent_info: AgentBaseDBPd,
+        model_details: Optional[dict] = None
 ) -> tuple[Optional[dict], Optional[str]]:
     """Convert ReAct type agent to DSL format"""
     start_time = time.time()
@@ -325,7 +328,7 @@ def react_agent_convert(
             # Add parameters if present in model_details
             if info.get("parameters"):
                 model_info_dict.update(info.get("parameters"))
-            
+
             # Create ModelConfig DSL
             # Need to decrypt api_key if needed, but here we assume raw or handled
             api_key = model_info_dict.get("api_key")
@@ -346,7 +349,7 @@ def react_agent_convert(
                 model_info=BaseModelInfo(
                     api_key=api_key,
                     api_base=model_info_dict.get("api_base"),
-                    model_name=model_info_dict.get("model_type"), # DSL usually expects type here
+                    model_name=model_info_dict.get("model_type"),  # DSL usually expects type here
                     temperature=model_info_dict.get("temperature", 0.7),
                     top_p=model_info_dict.get("top_p", 0.9),
                     streaming=model_info_dict.get("streaming", False),
@@ -357,16 +360,16 @@ def react_agent_convert(
             # Get model config by model_id
             from openjiuwen_studio.core.manager.repositories.model_config_repository import ModelConfigRepository
             from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
-            
+
             with get_db_jw() as db:
                 model_repo = ModelConfigRepository(db)
                 model_config = model_repo.get_by_id(agent_info.model_id)
-            
+
             if model_config:
                 # Create model_dsl from model_config
                 # Get parameters from JSON field
                 parameters = model_config.parameters or {}
-                
+
                 model_dsl = ModelConfig(
                     model_provider=model_config.provider,
                     model_info=BaseModelInfo(
@@ -379,7 +382,7 @@ def react_agent_convert(
                         timeout=model_config.timeout
                     )
                 )
-                
+
                 # Apply agent_model_config overrides if available
                 if hasattr(agent_info, 'agent_model_config') and agent_info.agent_model_config:
                     agent_model_config = agent_info.agent_model_config
@@ -443,9 +446,9 @@ def react_agent_convert(
 
 
 def workflow_agent_convert(
-    space_id: str,
-    agent_info: AgentBaseDBPd,
-    model_details: Optional[dict] = None
+        space_id: str,
+        agent_info: AgentBaseDBPd,
+        model_details: Optional[dict] = None
 ) -> tuple[Optional[dict], Optional[str]]:
     """Convert Workflow type agent to DSL format"""
     start_time = time.time()
@@ -501,16 +504,16 @@ def workflow_agent_convert(
             # Get model config by model_id
             from openjiuwen_studio.core.manager.repositories.model_config_repository import ModelConfigRepository
             from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
-            
+
             with get_db_jw() as db:
                 model_repo = ModelConfigRepository(db)
                 model_config = model_repo.get_by_id(agent_info.model_id)
-            
+
             if model_config:
                 # Create model_dsl from model_config
                 # Get parameters from JSON field
                 parameters = model_config.parameters or {}
-                
+
                 model_dsl = ModelConfig(
                     model_provider=model_config.provider,
                     model_info=BaseModelInfo(
@@ -523,7 +526,7 @@ def workflow_agent_convert(
                         timeout=model_config.timeout
                     )
                 )
-                
+
                 # Apply agent_model_config overrides if available
                 if hasattr(agent_info, 'agent_model_config') and agent_info.agent_model_config:
                     agent_model_config = agent_info.agent_model_config
@@ -575,9 +578,9 @@ def workflow_agent_convert(
 
 
 def agent_convert(
-    space_id: str, 
-    agent_info: AgentBaseDBPd, 
-    model_details: Optional[dict] = None
+        space_id: str,
+        agent_info: AgentBaseDBPd,
+        model_details: Optional[dict] = None
 ) -> tuple[Optional[dict], Optional[str]]:
     """Select appropriate conversion method based on agent type"""
     start_time = time.time()

@@ -1200,11 +1200,11 @@ const ToolConfigurationPage: React.FC = () => {
               finalResults.error_code = bufferData.data.payload?.error_code ?? null
               finalResults.error_message = bufferData.data.payload?.error_message || null
               finalResults.output = bufferData.data.payload?.output || null
-              // 根据error_code判断执行是否成功
-              finalResults.execution_success = bufferData.data.payload?.error_code === 0
+              // 根据error_message判断执行是否成功
+ 	          finalResults.execution_success = bufferData.data.payload?.error_message === 'success'
 
               // 如果执行成功，立即更新工具状态为启用
-              if (bufferData.data.payload?.error_code === 0 && tool) {
+              if (bufferData.data.payload?.error_message === 'success' && tool) {
                 // 更新本地工具状态
                 setTool(prev => prev ? { ...prev, available: true } : prev)
 
@@ -2474,8 +2474,8 @@ const ToolConfigurationPage: React.FC = () => {
                               <Chip
                                 label={`${t('plugins.toolConfig.errorCode', '错误码')}: ${results.error_code}`}
                                 size="small"
-                                variant={results.error_code === 0 ? 'outlined' : 'filled'}
-                                color={results.error_code === 0 ? 'success' : 'error'}
+                                variant={results.error_message === 'success' ? 'outlined' : 'filled'}
+                                color={results.error_message === 'success' ? 'success' : 'error'}
                               />
                             )}
                           </div>

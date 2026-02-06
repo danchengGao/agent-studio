@@ -3,8 +3,8 @@ from pydantic import ValidationError
 
 from fastapi import APIRouter, HTTPException, Request, status, Depends
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
-from openjiuwen.core.common.logging import logger, set_thread_session, get_thread_session
-from openjiuwen.core.runtime.interaction.interactive_input import InteractiveInput
+from openjiuwen.core.common.logging import logger, set_session_id, get_session_id
+from openjiuwen.core.session.interaction.interactive_input import InteractiveInput
 from pydantic import BaseModel, Field
 from sse_starlette import EventSourceResponse
 
@@ -101,12 +101,12 @@ async def handler(
         session_id = " ".join(
             [
                 id_val.strip()
-                for id_val in [request_body.space_id, request_body.conversation_id, get_thread_session()]
+                for id_val in [request_body.space_id, request_body.conversation_id, get_session_id()]
                 if id_val and id_val.strip()
             ]
         )
         if session_id:
-            set_thread_session(session_id)
+            set_session_id(session_id)
 
         async for chunk in mgr.run(request_body.id, request_body.version, inputs,
                                    request_body.conversation_id, request_body.space_id, current_user):
@@ -586,6 +586,7 @@ async def cancel_workflow_execution(
         ResponseModel: 取消操作的结果
     """
     try:
+        logger.info(f"Start to cancel workflow execution")
         _ = check_user_space(request_body.space_id, current_user)
         # 获取执行信息以验证权限
         execution_info = workflow_execution_manager.get_execution(request_body.conversation_id)

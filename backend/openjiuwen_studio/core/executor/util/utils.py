@@ -5,9 +5,9 @@ import json
 import time
 from typing import Any, Dict, Optional, List
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.stream.writer import TraceSchema, OutputSchema
-from openjiuwen.core.tracer.span import TraceWorkflowSpan, TraceAgentSpan
-from openjiuwen.core.runtime.interaction.interaction import InteractionOutput
+from openjiuwen.core.session.stream import TraceSchema, OutputSchema
+from openjiuwen.core.session.tracer.span import TraceAgentSpan, TraceWorkflowSpan
+from openjiuwen.core.session.interaction.interaction import InteractionOutput
 from openjiuwen_studio.core.manager.repositories.workflow_execution_repository import workflow_execution_repository
 from openjiuwen_studio.core.manager.repositories.agent_execution_repository import agent_execution_repository
 from openjiuwen_studio.core.manager.repositories.trace_detail_repository import trace_detail_repository
@@ -102,14 +102,14 @@ def get_trace_workflow_output(data):
             if isinstance(item, dict) and 'output' in item:
                 text_parts.append(str(item['output']))
 
-            # 第二种格式: {'type': 'end node stream', 'index': 0, 'payload': {'answer': 'value'}}
+            # 第二种格式: {'type': 'end node stream', 'index': 0, 'payload': {'response': 'value'}}
             # 第三种格式: {'type': 'output', 'index': 0, 'payload': {'output': '111', 'result_type': 'answer'}}
             elif isinstance(item, dict) and 'payload' in item:
                 payload = item.get('payload', {})
                 if isinstance(payload, dict):
-                    # 检查 payload 中是否有 answer 字段
-                    if 'answer' in payload:
-                        text_parts.append(str(payload['answer']))
+                    # 检查 payload 中是否有 response 字段
+                    if 'response' in payload:
+                        text_parts.append(str(payload['response']))
                         output_key = "responseContent"
                     if 'output' in payload:
                         text_parts.append(str(payload['output']))
@@ -270,9 +270,9 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
 
     # Streaming output
     if isinstance(chunk, OutputSchema) and chunk.type == "end node stream":
-        # 将原有payload={"answer": "你好"} 转换成 payload={"output": "你好", "result_type": "answer"}格式
-        if isinstance(chunk.payload, dict) and "answer" in chunk.payload:
-            answer_value = chunk.payload.get("answer", "")
+        # 将原有payload={"response": "你好"} 转换成 payload={"output": "你好", "result_type": "answer"}格式
+        if isinstance(chunk.payload, dict) and "response" in chunk.payload:
+            answer_value = chunk.payload.get("response", "")
             # 确保answer是字符串类型，如果不是则序列化为JSON字符串
             if not isinstance(answer_value, str):
                 try:
