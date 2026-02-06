@@ -1,10 +1,11 @@
+import os
 import time
 from datetime import datetime, timezone
 from typing import Optional
 
 from openjiuwen.core.common.exception.exception import JiuWenBaseException
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.foundation.llm import Model
+from openjiuwen.core.foundation.llm import Model, ModelClientConfig, ModelRequestConfig
 from sqlalchemy.orm import Session
 
 from openjiuwen_studio.core.manager.repositories import ModelConfigRepository, ModelUsageRepository
@@ -16,6 +17,7 @@ from openjiuwen_studio.core.exceptions import (
     ValidationError, ModelApiKeyDecryptError
 )
 from openjiuwen_studio.core.common.status_code import StatusCode
+from openjiuwen_studio.core.utils.compatible_field import compatible_provider
 
 
 class ModelTester:
@@ -34,7 +36,6 @@ class ModelTester:
         self.model_repo = ModelConfigRepository(db)
         self.usage_repo = ModelUsageRepository(db)
         self.security_utils = SecurityUtils()
-        self.model_factory = Model()
 
     async def test_model_config(
             self,
@@ -82,12 +83,13 @@ class ModelTester:
 
             # Execute model inference using ModelFactory
             try:
-                factory_model = self.model_factory.get_model(
-                    model_provider=model.provider,
+                model_client_config = ModelClientConfig(
+                    client_provider=compatible_provider(model.provider),
                     api_key=api_key,
                     api_base=model.base_url,
                     max_retries=3,
-                    timeout=model.timeout or 60
+                    timeout=model.timeout or 60,
+                    verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
                 )
 
                 # 从模型配置中获取默认参数
@@ -117,13 +119,19 @@ class ModelTester:
 
                 logger.info(f"Model test params: temperature={temperature}, top_p={top_p}, max_tokens={max_tokens}")
 
-                ai_message = await factory_model.ainvoke(
-                    model_name=model.model_type,
-                    messages=messages,
-                    temperature=temperature,
+                model_config = ModelRequestConfig(
+                    model=model.model_type,
                     top_p=top_p,
-                    max_tokens=max_tokens
+                    temperature=temperature,
+                    max_tokens=max_tokens,
                 )
+
+                model_inference = Model(
+                    model_client_config=model_client_config,
+                    model_config=model_config
+                )
+
+                ai_message = await model_inference.ainvoke(messages)
 
                 inference_result = {
                     'response': str(ai_message.content),
