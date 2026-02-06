@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Button, Tooltip, CircularProgress, Alert } from '@mui/material'
-import { Shell, Settings, X, Variable, Database, Trash } from 'lucide-react'
+import { Shell, Settings, X, Variable, Brain, Trash } from 'lucide-react'
 import axios from 'axios'
 import { useScopedTranslation } from '@/i18n'
 
@@ -136,10 +136,9 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         const arr = lRes.data.longterm_mem_data || []
         const lList = arr.map((r: any, idx: number) => ({
           id: idx + 1,
-          field: r.profile_type || t('menus.longterm'),
-          value: r.mem,
-          time: formatLocalDate(r.time || r.timestamp) || new Date().toLocaleString('zh-CN'),
-          _id: r.id,
+          field: r.type || t('menus.longterm'),
+          value: r.content,
+          _id: r.mem_id,
         }))
         setLongList(lList)
         // 长期记忆数据按修改时间排序
@@ -179,7 +178,7 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         const list = arr.map((r: any, idx: number) => ({
           id: idx + 1,
           field: r.profile_type || t('menus.longterm'),
-          value: r.mem,
+          value: r.content,
           time: formatLocalDate(r.time || r.timestamp) || new Date().toLocaleString('zh-CN'),
           _id: r.id,
         }))
@@ -241,7 +240,7 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         const freshList = arr.map((r: any, idx: number) => ({
           id: idx + 1,
           field: r.profile_type || t('menus.longterm'),
-          value: r.mem,
+          value: r.content,
           time: formatLocalDate(r.time || r.timestamp) || new Date().toLocaleString('zh-CN'),
           _id: r.id,
         }))
@@ -313,7 +312,7 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
   const menus = useMemo(() => {
     const base = [
       { key: 'variables' as MenuKey, label: t('menus.variables'), icon: Variable },
-      { key: 'longterm' as MenuKey, label: t('menus.longterm'), icon: Database },
+      { key: 'longterm' as MenuKey, label: t('menus.longterm'), icon: Brain },
     ]
     return enableLongTerm ? base : base.filter(m => m.key !== 'longterm')
   }, [enableLongTerm, t])

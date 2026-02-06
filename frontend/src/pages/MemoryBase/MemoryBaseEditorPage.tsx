@@ -345,7 +345,7 @@ const MemoryBaseEditorPage: React.FC = () => {
       const variableMemories: ExtendedMemoryItem[] = response_var.map(([key, value]) => ({
         id: key, // 使用key作为ID
         mb_id: memoryBase.mdb_id,
-        content: typeof value === 'string' ? value : JSON.stringify(value),
+        content: typeof value === 'string' ? `{${key} : ${value}}` : `{${key}:${JSON.stringify(value)}}`,
         type: 'variable',
       }));
       
@@ -393,7 +393,7 @@ const MemoryBaseEditorPage: React.FC = () => {
       const variableMemories: ExtendedMemoryItem[] = response_var.map(([key, value]) => ({
         id: key,
         mb_id: memoryBase.mdb_id,
-        content: typeof value === 'string' ? value : JSON.stringify(value),
+        content: typeof value === 'string' ? `{${key} : ${value}}` : `{${key}:${JSON.stringify(value)}}`,
         type: 'variable',
       }));
       

@@ -662,6 +662,7 @@ const AgentEditorEditPage = () => {
                     <AgentDebugChat
                       key={agentMode}
                       agentId={agentId}
+                      mdbId={saveAgentRequest.memory.memory_base?.mdb_id}
                       onDebugInfoChange={handleDebugInfoChange}
                       enableLongTerm={enableLongTerm ?? true}
                       hideMemoryButton={agentMode === 'multi-workflow'}

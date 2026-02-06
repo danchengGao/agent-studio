@@ -27,6 +27,8 @@ const extractTextFromOutput = (outputRaw: any) => {
 interface AgentDebugChatProps {
   /** 智能体ID */
   agentId: string
+  /** 此智能体的记忆库ID */
+  mdbId?: string
   /** 调试信息面板开关变化回调 */
   onDebugInfoChange?: (open: boolean) => void
   /** 是否显示长期记忆，透传给MemoryButton */
@@ -43,10 +45,10 @@ interface AgentDebugChatProps {
  * 智能体调试聊天组件
  * 提供与智能体交互的聊天界面，支持调试信息显示
  */
-const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest, isModelActive = true }: AgentDebugChatProps) => {
+const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest, isModelActive = true }: AgentDebugChatProps) => {
   // 提供给MemoryEngine
   const userIdForMem = getDefaultSpaceId()
-  const groupIdForMem = agentId
+  const groupIdForMem = mdbId || agentId
   // 状态管理
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
