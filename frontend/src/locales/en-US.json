@@ -186,6 +186,7 @@
         "model": "Delete Model",
         "plugin": "Delete Plugin",
         "knowledgeBase": "Delete Knowledge Base",
+        "memorygeBase": "Delete Memory Base",
         "default": "Delete Confirmation"
       },
       "messages": {
@@ -194,6 +195,7 @@
         "model": "Are you sure you want to delete model \"{{name}}\"? This action cannot be undone.",
         "plugin": "Are you sure you want to delete plugin \"{{name}}\"? This action cannot be undone.",
         "knowledgeBase": "Are you sure you want to delete knowledge base \"{{name}}\"? This action cannot be undone.",
+        "memorygeBase": "Are you sure you want to delete memory base \"{{name}}\"? This action cannot be undone.",
         "default": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone."
       },
       "buttons": {
@@ -528,6 +530,7 @@
       "automationTasks": "Automation Tasks",
       "models": "Models",
       "knowledgeBases": "Knowledge Bases",
+      "memoryBase": "Memory Bases",
       "plugins": "Plugins",
       "pluginManagement": "Plugin Management",
       "pluginMarket": "Plugin Market",
@@ -656,7 +659,7 @@
     },
     "chat": {
       "welcome": "Hello",
-      "welcomeMessage": "Please select an agent to start chatting",
+      "welcomeMessage": "Select an agent to start chatting, or type your question directly",
       "replayHistory": "Replay History",
       "openSSEPanel": "Open SSE Replay Panel",
       "featureNotImplemented": "This feature is not yet implemented",
@@ -1506,6 +1509,7 @@
         "fileParseFailed": "File parsing failed, please check if the file format is correct",
         "datasetFormatError": "Dataset format is incorrect: {{error}}, please write the dataset according to the dataset example format",
         "intelligentGenerationDeveloping": "Intelligent generation feature is under development",
+        "copiedToClipboard": "Content copied to clipboard",
         "testCasesLimitExceeded": "Test case limit reached ({{max}} cases), cannot add more",
         "uploadExceedsLimit": "The uploaded file contains {{count}} test cases, exceeding the maximum limit ({{max}} cases)",
         "appendExceedsLimit": "Currently have {{current}} test cases, adding {{adding}} cases would total {{total}}, exceeding the maximum limit ({{max}} cases)",
@@ -2203,7 +2207,7 @@
         "topp": "Top P",
         "toppDesc": "Top-p Sampling: Select the smallest set of words whose cumulative probability reaches p for sampling. Dynamically adjusts the number of candidate words to balance output diversity and quality. Typically set to 0.9-0.95. When used with temperature sampling, it is recommended to adjust only one of them.",
         "timeout": "Timeout(s)",
-        "timeoutDesc": "Timeout range: 1-3600 seconds (out-of-range values will be automatically adjusted)"
+        "timeoutDesc": "Timeout range: 1-300 seconds (out-of-range values will be automatically adjusted)"
       },
       "actions": {
         "save": "Save",
@@ -2239,7 +2243,7 @@
       "nameMaxLength": "Model name cannot exceed 100 characters",
       "modelIdMaxLength": "Model ID cannot exceed 100 characters",
       "descriptionMaxLength": "Description cannot exceed 500 characters",
-      "timeoutRange": "Timeout must be between 1-3600 seconds",
+      "timeoutRange": "Timeout must be between 1-300 seconds",
       "fillRequiredFields": "Please fill in all required fields",
       "systemModelNoEdit": "Pre-built models are not editable",
       "systemModelNoDelete": "Pre-built models cannot be deleted",
@@ -2816,8 +2820,6 @@
       "saveConfig": "Save Configuration",
       "pythonDescription": "Suitable for data analysis, machine learning, automation scripts",
       "nodejsDescription": "Suitable for Web API, real-time applications, frontend build tools",
-      "templateBasicFunction": "Basic Function",
-      "templateBasicFunctionDesc": "Simple data processing function",
       "createTool": "Create Tool",
       "toolNameTooltip": "Give the tool a concise and clear name for easy identification and use",
       "toolNameExample": "For example: Get User Info, Query Weather Data",
@@ -3980,8 +3982,7 @@
         "loading": "Loading models...",
         "noModels": "No available models",
         "providedBy": "Provided by {{vendor}}",
-        "systemBuiltIn": "System Built-in",
-        "protocol": "Protocol"
+        "systemBuiltIn": "System Built-in"
       },
       "quickOptimizeDialog": {
         "title": "Quick Optimize",
@@ -4330,12 +4331,7 @@
       "selectLLMModel": "Select LLM model",
       "selectModelPlaceholder": "Select model",
       "modelRequired": "Document graph construction requires an LLM model",
-      "loadModelsFailed": "Failed to load model list",
-      "fileSizeLimit": "File size limit: Single file must not exceed 20MB",
-      "fileSizeExceeded": {
-        "title": "File size exceeds limit",
-        "description": "The following files exceed the {{limit}} limit:"
-      }
+      "loadModelsFailed": "Failed to load model list"
     },
     "marketplace": {
       "comingSoon": "Coming Soon",
@@ -4348,49 +4344,244 @@
       "embeddingModel": "Embedding Model"
     }
   },
-  "utils": {
-    "prompts": {
-      "utils": {
-        "validateVersionNumber": {
-          "empty": "Version number cannot be empty",
-          "invalidFormat": "Invalid version format. Please use Major.Minor.Patch format (e.g., 1.2.3)"
-        },
-        "formatDateTime": {
-          "invalidTime": "Invalid time",
-          "formatError": "Time format error"
-        },
-        "copyToClipboard": {
-          "defaultSuccess": "Copied to clipboard",
-          "emptyContent": "Copy content is empty",
-          "autoCopyFailed": "Auto copy failed, please copy manually",
-          "copyUnavailable": "Copy function unavailable, please copy manually"
-        },
-        "toolFormatConverter": {
-          "generateJsonSchemaFailed": "Failed to generate JSON Schema from parameters:",
-          "tool": "Tool",
-          "parseStringFailed": "Failed to parse string",
-          "saveJsonSchemaFailed": "Failed to save JSON Schema",
-          "parseFailed": "Parse failed",
-          "parseToolJsonSchemaFailed": "Failed to parse tool JSON Schema, using default conversion:"
-        },
-        "promptEditPageUtils": {
-          "unknownError": "Unknown error",
-          "failKeyword": "失败",
-          "requestFailed": "Request failed",
-          "variableNameFormatError": "Does not meet format requirements",
-          "variableNameTooLong": "Variable name exceeds 50 characters (current length: {{length}})",
-          "variableNameCannotStartWithNumber": "Variable name cannot start with a number",
-          "variableNameInvalidCharacters": "Variable name can only contain letters, numbers, underscores, and hyphens",
-          "variableNameNoSpacesInNormalMode": "Variable name cannot have spaces before or after in Normal mode",
-          "skipInvalidVariableName": "Skipping invalid variable name: \"{{name}}\", {{error}}",
-          "targetMessageNotFound": "Target message not found",
-          "baseGroup": "Base Group",
-          "controlGroup": "Control Group {{id}}",
-          "targetMessageNotFoundInGroup": "Target message not found in {{groupName}}",
-          "existingCallNotFound": "Existing call at index {{index}} does not exist, skipping",
-          "calculateSelectionIndicesFailed": "Failed to calculate selection indices - missing required parameters"
-        }
-      }
+  "memoryBases": {
+    "title": "Memory Base Management",
+    "description": "Configure and manage your memory bases",
+    "tabs": {
+      "myMemoryBases": "My Memory Bases",
+      "marketplace": "Memory Base Marketplace",
+      "basic": "Basic Information",
+      "advanced": "Advanced Settings"
+    },
+    "searchPlaceholder": "Search by memory base name or description...",
+    "createButton": "Create Memory Base",
+    "memoryType": {
+      "all": "All Type",
+      "longterm": "Long Term Memory",
+      "variable": "Variable Memory",
+      "summary": "History Summary",
+      "profile": "User Profile",
+      "scenario": "Scenario Memory",
+      "semantic": "Semantic Memory"
+    },
+    "search": {
+      "searching": "Searching...",
+      "loading": "Loading...",
+      "noResults": "No matching knowledge bases found",
+      "tryOtherKeywords": "Please try other search keywords",
+      "results": "Search Results"
+    },
+    "list": {
+      "name": "Memory Base",
+      "updatedAt": "Updated At",
+      "createdAt": "Created At",
+      "actions": "Actions"
+    },
+    "form": {
+      "name": "Memory Base Name",
+      "namePlaceholder": "Enter memory base name",
+      "nameRequired": "Memory base name is required",
+      "nameExists": "Memory base name already exists",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter memory base description",
+      "createTitle": "Create Memory Base",
+      "uploadFiles": "Upload Files",
+      "dragAndDrop": "Drag files here or click to select files",
+      "selectFiles": "Select Files",
+      "supportedFormats": "Supported formats: PDF, DOCX, TXT, Markdown",
+      "selectedFiles": "Selected Files",
+      "embeddingModel": "Embedding Model",
+      "llmModel": "LLM Model",
+      "embeddingModelRequired": "Embedding model is required",
+      "embeddingModelDesc": "Used for relevance filtering of long-term memory",
+      "llmModelDesc": "Used for extraction and processing of long-term memory",
+      "llmModelRequired": "LLM model is required",
+      "createLlmModelLink": "Please create an LLM model first",
+      "selectLlmModel": "Please select an LLM model",
+      "selectEmbeddingModel": "Please select an Embedding model",
+      "loadingModels": "Loading models...",
+      "noLlmModels": "No LLM models available",
+      "noModels": "No Embedding models available",
+      "createModelLink": "Please create an Embedding model first",
+      "selectModel": "Please select an Embedding model",
+      "noModelsError": "Please create an Embedding model first",
+      "selectLlmModelError": "Please select an LLM model",
+      "selectModelError": "Please select an Embedding model",
+      "modelUnavailable": "Selected model is unavailable",
+      "testText": "Hello, world!",
+      "testFailed": "Test failed",
+      "testFailedDisableFailed": "The selected Embedding model test failed, and disabling it also failed. Please manually disable the model in Model Management.",
+      "saveError": "Failed to save memory base",
+      "limitReached": "Maximum number of memory bases reached",
+      "chunkSize": "Chunk Size",
+      "chunkOverlap": "Chunk Overlap",
+      "maxTokens": "Max Tokens",
+      "configInfo": {
+        "title": "Configuration Guide",
+        "chunkSize": "Chunk size controls the length of text segments when splitting documents",
+        "chunkOverlap": "Chunk overlap ensures contextual continuity",
+        "maxTokens": "Max tokens affect retrieval efficiency and accuracy"
+      },
+      "modelTestSuccess": "Model test succeeded",
+      "modelTestError": "Model test failed",
+      "selectLLMModelError": "Please select an LLM model",
+      "selectLLMModel": "Please select an LLM model",
+      "testingModel": "Testing...",
+      "testModel": "Test Model",
+      "modelTestPassed": "Model test passed",
+      "parsingStrategy": "Parsing Strategy",
+      "fastParsing": "Fast Parsing",
+      "accurateParsing": "Accurate Parsing",
+      "segmentationStrategy": "Segmentation Strategy",
+      "autoSegmentation": "Auto Segmentation & Cleaning",
+      "customSegmentation": "Custom Segmentation",
+      "maxTokensHint": "Recommended value: 128–2048; affects segment length and retrieval performance",
+      "chunkOverlapHint": "Recommended value: 0–50%; maintains contextual coherence",
+      "enableGraphEnhancement": "Enable Graph Enhancement",
+      "graphEnhancementHint": "Building a document knowledge graph can improve retrieval performance but increases processing time and LLM token consumption."
+    },
+    "create": {
+      "title": "Create Memory Base",
+      "description": "Create a new memory base",
+      "success": "Memory base created successfully"
+    },
+    "settings": {
+      "title": "Memory Base Settings",
+      "addDocument": "Add Document",
+      "name": "Memory Base Name",
+      "description": "description",
+      "basicInfo": "Basic Info",
+      "status": "Status",
+      "errorInfo": "Error Info",
+      "createdAt": "Created At",
+      "documentAdded": "Document processing task submitted",
+      "notFound": "Memory base not found",
+      "fetchError": "Failed to fetch memory base info",
+      "addMemory": "Add Memory",
+      "memoryAdded": "Memory added successfully"
+    },
+    "editor": {
+      "loading": "Loading memory base info...",
+      "documentList": "Memory List",
+      "autoRefresh": "Auto-refreshing memory status",
+      "stopAutoRefresh": "Stop auto-refreshing memory status",
+      "startAutoRefresh": "Start auto-refreshing memory status",
+      "noAutoRefreshHint": "No memories are being processed; auto-refresh not needed",
+      "refreshing": "Refreshing...",
+      "refreshStatus": "Refresh Status",
+      "processing": "{{count}} memory(s) being processed",
+      "loadingDocuments": "Loading memory list...",
+      "noDocuments": "No memories yet",
+      "addDocument": "Add Memory",
+      "documentName": "Memory Name",
+      "createdAt": "Created At",
+      "actions": "Actions",
+      "refreshDocumentStatus": "Refresh Memory Status",
+      "title": "Edit Memory Base",
+      "memoryList": "Memory List",
+      "memoryName": "Memory Name",
+      "memoryType": "Memory Type",
+      "memoryContent": "Memory Content",
+
+      "noMemories": "No memories yet",
+      "addMemory": "Add Memory",
+      "loadingMemories": "Loading memory list...",
+
+      "refreshMemoryStatus": "Refresh Memory Status",
+
+      "nameMaxLength": "Memory name cannot exceed {{max}} characters",
+      "contentMaxLength": "Memory content cannot exceed {{max}} characters",
+
+      "updateSuccess": "Memory updated successfully",
+      "updateFailed": "Failed to update memory",
+
+      "deleteTitle": "Delete Memory",
+      "deleteMessage": "Are you sure you want to delete memory? This action cannot be undone.",
+      "deleteMemory": "Delete Memory",
+      "status": {
+        "uploading": "Uploading",
+        "uploaded": "Uploaded",
+        "processing": "Processing",
+        "indexing": "Indexing",
+        "indexed": "Used",
+        "failed": "Failed",
+        "deleted": "Deleted"
+      },
+      "graphEnhancement": "Graph Enhancement",
+      "maxLengthReached": "Maximum length reached",
+      "deleteDocument": "Delete Memory",
+      "deleteSuccess": "Memory deleted successfully",
+      "deleteFailed": "Failed to delete Memory",
+      "batchDeleteTitle": "Batch Delete Documents",
+      "batchDeleteMessage": "Are you sure you want to delete the selected {{count}} Memory(s)? This action cannot be undone.",
+      "batchDeleteButton": "Delete {{count}} Memory(s)",
+      "batchDeleteSuccess": "Successfully deleted {{count}} Memory(s)",
+      "batchDeleteFailed": "Failed to batch delete memories",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "deleteSelected": "Delete Selected ({{count}})",
+      "refreshSuccess": "Memory status refreshed successfully",
+      "refreshFailed": "Failed to refresh Memory status",
+      "refreshAllSuccess": "All Memory statuses refreshed successfully",
+      "refreshAllFailed": "Failed to refresh all Memory statuses",
+      "autoRefreshError": "Auto-refresh of Memory status failed"
+    },
+    "addDocument": {
+      "title": "Add Document",
+      "uploadPrompt": "Drag files here or click to select files",
+      "supportedTypes": "Supported Formats",
+      "maxSize": "Maximum File Size",
+      "selectFiles": "Select Files",
+      "selectedFiles": "Selected Files",
+      "step": "Step",
+      "of": "of",
+      "step_over": "steps",
+      "invalidFilesTitle": "Unsupported File Types",
+      "invalidFilesDesc": "The following file types are not supported. Please upload PDF, DOCX, TXT, or Markdown files."
+    },
+    "document": {
+      "process": "Process Document",
+      "processSuccess": "Document processing task submitted",
+      "processError": "Document processing failed"
+    },
+    "edit": {
+      "title": "Edit Memory Base",
+      "description": "Modify memory base information and configuration",
+      "namePlaceholder": "Enter memory base name",
+      "descriptionPlaceholder": "Enter memory base description",
+      "nameRequired": "Memory base name cannot be empty"
+    },
+    "update": {
+      "success": "Memory base updated successfully",
+      "error": "Failed to update memory base. Please try again."
+    },
+    "delete": {
+      "title": "Delete Memory Base",
+      "message": "Are you sure you want to delete memory base “{{name}}”? This action cannot be undone.",
+      "success": "Memory base deleted successfully",
+      "error": "Failed to delete memory base. Please try again.",
+      "referencedByAgents": "This memory base is referenced by the following agents:",
+      "deleteWarning": "After deletion, these agents will no longer be able to use this memory base.",
+      "confirmDelete": "Are you sure you want to delete it?",
+      "confirmMessage": "Are you sure you want to delete memory base",
+      "cannotUndo": "? This action cannot be undone."
+    },
+    "empty": {
+      "title": "No Memory Bases Yet",
+      "description": "Create your first memory base to start building an intelligent memory system"
+    },
+    "card": {
+      "noDescription": "No description",
+      "unknownEmbeddingModel": "Unknown Embedding Model",
+      "unknownLlmModel": "Unknown LLM Model",
+      "memoryCount": "{{count}} memories",
+      "memories": "{{count}} memories"
+    },
+    "status": {
+      "active": "Active",
+      "processing": "Processing",
+      "error": "Error",
+      "inactive": "Inactive"
     }
   }
 }

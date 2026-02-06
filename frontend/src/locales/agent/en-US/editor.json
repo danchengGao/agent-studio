@@ -179,6 +179,7 @@
           "constraintTitle": "Constraint",
           "skillsTitle": "Skills",
           "conversationTitle": "Conversation Settings",
+          "memoryTitle": "Memory",
           "greetingTitle": "Greeting",
           "workflowTitle": "Workflows",
           "pluginTitle": "Plugins"
@@ -247,7 +248,7 @@
           "deleteFailed": "Delete failed"
         },
         "memory": {
-          "title": "Memory Configuration",
+          "memoryTitle": "Memory",
           "variablesTitle": "Variable Configuration",
           "fields": {
             "nameLabel": "Variable Name",
@@ -263,6 +264,7 @@
             "enabledLabel": "Enabled",
             "disabledLabel": "Disabled"
           },
+          "longTermTitle": "Long-Term Memory",
           "longTermToggleLabel": "Enable Long-Term Memory",
           "longTermDescription": "When enabled, the agent can remember user personal information and preferences from the conversation history."
         }

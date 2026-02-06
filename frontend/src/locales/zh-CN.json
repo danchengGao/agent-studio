@@ -186,6 +186,7 @@
         "model": "删除模型",
         "plugin": "删除插件",
         "knowledgeBase": "删除知识库",
+        "memoryBase": "删除记忆库",
         "default": "删除确认"
       },
       "messages": {
@@ -194,6 +195,7 @@
         "model": "确定要删除模型\"{{name}}\"吗？此操作无法撤销。",
         "plugin": "确定要删除插件\"{{name}}\"吗？此操作无法撤销。",
         "knowledgeBase": "确定要删除知识库\"{{name}}\"吗？此操作无法撤销。",
+        "memoryBase": "确定要删除记忆库库\"{{name}}\"吗？此操作无法撤销。",
         "default": "确定要删除\"{{name}}\"吗？此操作无法撤销。"
       },
       "buttons": {
@@ -538,6 +540,7 @@
       "automationTasks": "自动化任务",
       "models": "模型管理",
       "knowledgeBases": "知识库管理",
+      "memoryBase": "记忆库管理",
       "plugins": "插件管理",
       "pluginManagement": "插件管理",
       "pluginMarket": "插件市场",
@@ -666,7 +669,7 @@
     },
     "chat": {
       "welcome": "你好",
-      "welcomeMessage": "请先选择智能体以开始对话",
+      "welcomeMessage": "选择智能体开始对话，或直接输入你的问题",
       "replayHistory": "回放历史",
       "openSSEPanel": "打开 SSE 回放面板",
       "featureNotImplemented": "该功能还未实现",
@@ -1491,6 +1494,7 @@
         "fileParseFailed": "文件解析失败，请检查文件格式是否正确",
         "datasetFormatError": "数据集格式不正确：{{error}}，请按照数据集范例格式编写数据集",
         "intelligentGenerationDeveloping": "智能生成功能开发中",
+        "copiedToClipboard": "内容已复制到剪贴板",
         "testCasesLimitExceeded": "用例数量已达到上限（{{max}}条），无法继续添加",
         "uploadExceedsLimit": "上传的文件包含{{count}}个用例，超过了最大限制（{{max}}条）",
         "appendExceedsLimit": "当前有{{current}}个用例，追加{{adding}}个用例后总数为{{total}}，超过了最大限制（{{max}}条）",
@@ -2188,7 +2192,7 @@
         "topp": "核采样",
         "toppDesc": "Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。",
         "timeout": "超时时间(s)",
-        "timeoutDesc": "超时时间范围：1-3600秒（输入超出范围将自动调整）"
+        "timeoutDesc": "超时时间范围：1-300秒（输入超出范围将自动调整）"
       },
       "actions": {
         "save": "保存",
@@ -2224,7 +2228,7 @@
       "nameMaxLength": "模型名称不能超过100个字符",
       "modelIdMaxLength": "模型ID不能超过100个字符",
       "descriptionMaxLength": "描述不能超过500个字符",
-      "timeoutRange": "超时时间必须在1-3600秒之间",
+      "timeoutRange": "超时时间必须在1-300秒之间",
       "fillRequiredFields": "请填写所有必填字段",
       "systemModelNoEdit": "预置模型不支持编辑",
       "systemModelNoDelete": "预置模型不支持删除",
@@ -2801,8 +2805,6 @@
       "saveConfig": "保存配置",
       "pythonDescription": "适用于数据分析、机器学习、自动化脚本",
       "nodejsDescription": "适用于Web API、实时应用、前端构建工具",
-      "templateBasicFunction": "基础函数",
-      "templateBasicFunctionDesc": "简单的数据处理函数",
       "createTool": "创建工具",
       "toolNameTooltip": "为工具起一个简洁明了的名称，便于识别和使用",
       "toolNameExample": "例如：获取用户信息、查询天气数据",
@@ -3967,8 +3969,7 @@
         "loading": "加载模型中...",
         "noModels": "暂无可用模型",
         "providedBy": "由{{vendor}}提供",
-        "systemBuiltIn": "系统内置",
-        "protocol": "协议"
+        "systemBuiltIn": "系统内置"
       },
       "quickOptimizeDialog": {
         "title": "快捷优化",
@@ -4120,6 +4121,247 @@
           "json": "JSON格式"
         }
       }
+    }
+  },
+  "memoryBases": {
+    "title": "记忆库管理",
+    "description": "配置和管理您的记忆库",
+    "tabs": {
+      "myMemoryBases": "我的记忆库",
+      "marketplace": "记忆库市场",
+      "basic": "基本信息",
+      "advanced": "高级设置"
+    },
+    "list": {
+      "name": "记忆库",
+      "updatedAt": "更新时间",
+      "createdAt": "创建时间",
+      "actions": "操作"
+    },
+    "searchPlaceholder": "搜索记忆库名称或描述...",
+    "searchMemory": "搜索记忆名称",
+    "createButton": "创建记忆库",
+    "memoryType": {
+      "all": "全部",
+      "longterm": "长期记忆",
+      "variable": "变量记忆",
+      "summary": "历史摘要",
+      "profile": "用户画像",
+      "scenario": "场景记忆",
+      "semantic": "语义记忆"
+    },
+    "form": {
+      "name": "记忆库名称",
+      "namePlaceholder": "输入记忆库名称",
+      "nameRequired": "记忆库名称为必填项",
+      "nameExists": "记忆库名称已存在",
+      "description": "描述",
+      "descriptionPlaceholder": "输入记忆库描述",
+      "createTitle": "创建记忆库",
+      "uploadFiles": "上传文件",
+      "dragAndDrop": "拖拽文件到这里或点击选择文件",
+      "selectFiles": "选择文件",
+      "supportedFormats": "支持 PDF、DOCX、TXT、Markdown 格式",
+      "selectedFiles": "已选择的文件",
+      "embeddingModel": "Embedding 模型",
+      "llmModel": "LLM 模型",
+      "embeddingModelRequired": "Embedding 模型",
+      "embeddingModelDesc": "用于长期记忆相关性筛选",
+      "llmModelDesc": "用于长期记忆的提取和加工",
+      "llmModelRequired": "LLM 模型",
+      "createLlmModelLink": "请先创建 LLM 模型",
+      "selectLlmModel": "请选择 LLM 模型",
+      "selectEmbeddingModel": "请选择 Embedding 模型",
+      "loadingModels": "加载模型中...",
+      "noLlmModels": "没有可用的 LLM 模型",
+      "noModels": "没有可用的 Embedding 模型",
+      "createModelLink": "请先创建 Embedding 模型",
+      "selectModel": "请选择 Embedding 模型",
+      "noModelsError": "请先创建 Embedding 模型",
+      "selectLlmModelError": "请选择 LLM 模型",
+      "selectModelError": "请选择 Embedding 模型",
+      "modelUnavailable": "所选模型不可用",
+      "testText": "你好，世界！",
+      "testFailed": "测试失败",
+      "testFailedDisableFailed": "选中的 Embedding 模型测试失败，且禁用操作失败。请手动在模型管理中禁用该模型。",
+      "saveError": "保存记忆库失败",
+      "limitReached": "记忆库数量已达上限",
+      "chunkSize": "分段大小",
+      "chunkOverlap": "分段重叠",
+      "maxTokens": "最大令牌数",
+      "configInfo": {
+        "title": "配置说明",
+        "chunkSize": "分段大小控制文档切分的文本长度",
+        "chunkOverlap": "分段重叠确保上下文连续性",
+        "maxTokens": "最大令牌数影响检索效率和准确性"
+      },
+      "modelTestSuccess": "模型测试成功",
+      "modelTestError": "模型测试失败",
+      "selectLLMModelError": "请选择 LLM 模型",
+      "selectLLMModel": "请选择 LLM 模型",
+      "testingModel": "测试中...",
+      "testModel": "测试模型",
+      "modelTestPassed": "模型测试通过",
+      "parsingStrategy": "解析策略",
+      "fastParsing": "快速解析",
+      "accurateParsing": "精准解析",
+      "segmentationStrategy": "分段策略",
+      "autoSegmentation": "自动分段与清洗",
+      "customSegmentation": "自定义分段",
+      "maxTokensHint": "建议值：128–2048，影响分段长度和检索效果",
+      "chunkOverlapHint": "建议值：0–50%，用于保持上下文连贯性",
+      "enableGraphEnhancement": "启用图增强",
+      "graphEnhancementHint": "构建文档知识图谱可提升检索效果，但会增加处理时间和 LLM Token 消耗。"
+    },
+    "create": {
+      "title": "创建记忆库",
+      "description": "创建新的记忆库",
+      "success": "记忆库创建成功"
+    },
+    "settings": {
+      "title": "记忆库设置",
+      "name": "记忆库名称",
+      "description": "描述",
+      "addDocument": "添加文档",
+      "basicInfo": "基本信息",
+      "status": "状态",
+      "errorInfo": "错误信息",
+      "createdAt": "创建时间",
+      "documentAdded": "文档处理任务已提交",
+      "notFound": "记忆库不存在",
+      "fetchError": "获取记忆库信息失败",
+      "addMemory": "添加记忆",
+      "memoryAdded": "记忆添加成功"
+    },
+    "editor": {
+      "loading": "加载记忆库信息...",
+      "documentList": "记忆列表",
+      "autoRefresh": "自动刷新记忆状态中",
+      "stopAutoRefresh": "停止自动刷新记忆状态",
+      "startAutoRefresh": "开启自动刷新记忆状态",
+      "noAutoRefreshHint": "没有处理中的记忆，无需自动刷新",
+      "refreshing": "刷新中...",
+      "refreshStatus": "刷新状态",
+      "processing": "记忆处理中 ({{count}} 个记忆)",
+      "loadingDocuments": "加载记忆列表...",
+      "noDocuments": "暂无记忆",
+      "addDocument": "添加记忆",
+      "documentName": "记忆名称",
+      "createdAt": "创建时间",
+      "actions": "操作",
+      "refreshDocumentStatus": "刷新记忆状态",
+      "title": "编辑记忆库",
+      "memoryList": "记忆列表",
+      "memoryName": "记忆名称",
+      "memoryType": "记忆类型",
+      "memoryContent": "记忆内容",
+
+      "noMemories": "暂无记忆",
+      "addMemory": "添加记忆",
+      "loadingMemories": "加载记忆列表...",
+
+      "refreshMemoryStatus": "刷新记忆状态",
+
+      "nameMaxLength": "记忆名称不能超过 {{max}} 个字符",
+      "contentMaxLength": "记忆内容不能超过 {{max}} 个字符",
+
+      "updateSuccess": "记忆更新成功",
+      "updateFailed": "更新记忆失败",
+
+      "deleteTitle": "删除记忆",
+      "deleteMessage": "确定要删除记忆吗？此操作不可恢复。",
+      "deleteMemory": "删除记忆",
+      "status": {
+        "uploading": "上传中",
+        "uploaded": "已上传",
+        "processing": "处理中",
+        "indexing": "索引中",
+        "indexed": "已使用",
+        "failed": "失败",
+        "deleted": "已删除"
+      },
+      "graphEnhancement": "图增强",
+      "maxLengthReached": "已达到最大长度",
+      "deleteDocument": "删除记忆",
+      "deleteSuccess": "记忆删除成功",
+      "deleteFailed": "删除记忆失败",
+      "batchDeleteTitle": "批量删除记忆",
+      "batchDeleteMessage": "确定要删除选中的 {{count}} 个记忆吗？此操作不可恢复。",
+      "batchDeleteButton": "删除 {{count}} 个记忆",
+      "batchDeleteSuccess": "成功删除 {{count}} 个记忆",
+      "batchDeleteFailed": "批量删除记忆失败",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "deleteSelected": "删除选中 ({{count}})",
+      "refreshSuccess": "记忆状态刷新成功",
+      "refreshFailed": "刷新记忆状态失败",
+      "refreshAllSuccess": "所有记忆状态刷新成功",
+      "refreshAllFailed": "刷新所有记忆状态失败",
+      "autoRefreshError": "自动刷新记忆状态失败"
+    },
+    "addDocument": {
+      "title": "添加文档",
+      "uploadPrompt": "拖拽文件到这里或点击选择文件",
+      "supportedTypes": "支持格式",
+      "maxSize": "最大文件大小",
+      "selectFiles": "选择文件",
+      "selectedFiles": "已选择的文件",
+      "step": "第",
+      "of": "步，共",
+      "step_over": "步",
+      "invalidFilesTitle": "不支持的文件类型",
+      "invalidFilesDesc": "以下文件类型不受支持。请上传 PDF、DOCX、TXT 或 Markdown 文件。"
+    },
+    "document": {
+      "process": "处理文档",
+      "processSuccess": "文档处理任务已提交",
+      "processError": "文档处理失败"
+    },
+    "edit": {
+      "title": "编辑记忆库",
+      "description": "修改记忆库信息和配置",
+      "namePlaceholder": "输入记忆库名称",
+      "descriptionPlaceholder": "输入记忆库描述",
+      "nameRequired": "记忆库名称不能为空"
+    },
+    "update": {
+      "success": "记忆库更新成功",
+      "error": "更新记忆库失败，请重试"
+    },
+    "delete": {
+      "title": "删除记忆库",
+      "message": "确定要删除记忆库「{{name}}」吗？此操作无法撤销。",
+      "success": "记忆库删除成功",
+      "error": "删除记忆库失败，请重试",
+      "referencedByAgents": "该记忆库被以下智能体引用：",
+      "deleteWarning": "删除后，这些智能体将无法使用该记忆库。",
+      "confirmDelete": "确定要删除吗？",
+      "confirmMessage": "确定要删除记忆库",
+      "cannotUndo": "吗？此操作无法撤销。"
+    },
+    "empty": {
+      "title": "暂无记忆库",
+      "description": "创建您的第一个记忆库，开始构建智能记忆系统"
+    },
+    "search": {
+      "searching": "搜索中...",
+      "loading": "加载中...",
+      "noResults": "未找到匹配的知识库",
+      "tryOtherKeywords": "请尝试其他搜索关键词",
+      "results": "搜索结果"
+    },
+    "card": {
+      "noDescription": "暂无描述",
+      "unknownEmbeddingModel": "未知 Embedding 模型",
+      "unknownLlmModel": "未知 LLM 模型",
+      "memoryCount": "共 {{count}} 条记忆",
+      "memories": "共 {{count}} 条记忆"
+    },
+    "status": {
+      "active": "活跃",
+      "processing": "处理中",
+      "error": "错误",
+      "inactive": "未激活"
     }
   },
   "knowledgeBases": {
@@ -4293,12 +4535,7 @@
       "selectLLMModel": "选择LLM模型",
       "selectModelPlaceholder": "请选择模型",
       "modelRequired": "构建文档图需要选择LLM模型",
-      "loadModelsFailed": "加载模型列表失败",
-      "fileSizeLimit": "文件大小限制：单个文件不超过 20MB",
-      "fileSizeExceeded": {
-        "title": "文件大小超出限制",
-        "description": "以下文件大小超过 {{limit}} 限制："
-      }
+      "loadModelsFailed": "加载模型列表失败"
     },
     "edit": {
       "title": "编辑知识库",
@@ -4345,51 +4582,6 @@
     "card": {
       "documentType": "文档知识库",
       "embeddingModel": "Embedding 模型"
-    }
-  },
-  "utils": {
-    "prompts": {
-      "utils": {
-        "validateVersionNumber": {
-          "empty": "版本号不能为空",
-          "invalidFormat": "版本号格式错误，请使用 主版本.次版本.修订版本 格式（如：1.2.3）"
-        },
-        "formatDateTime": {
-          "invalidTime": "无效时间",
-          "formatError": "时间格式错误"
-        },
-        "copyToClipboard": {
-          "defaultSuccess": "已复制到剪贴板",
-          "emptyContent": "复制内容为空",
-          "autoCopyFailed": "自动复制失败，请手动复制内容",
-          "copyUnavailable": "复制功能不可用，请手动复制内容"
-        },
-        "toolFormatConverter": {
-          "generateJsonSchemaFailed": "从parameters生成JSON Schema失败:",
-          "tool": "工具",
-          "parseStringFailed": "解析字符串失败",
-          "saveJsonSchemaFailed": "保存JSON Schema失败",
-          "parseFailed": "解析失败",
-          "parseToolJsonSchemaFailed": "解析工具JSON Schema失败，使用默认转换:"
-        },
-        "promptEditPageUtils": {
-          "unknownError": "未知错误",
-          "failKeyword": "失败",
-          "requestFailed": "请求失败",
-          "variableNameFormatError": "不符合格式要求",
-          "variableNameTooLong": "变量名长度超过50个字符（当前长度：{{length}}）",
-          "variableNameCannotStartWithNumber": "变量名不能以数字开头",
-          "variableNameInvalidCharacters": "变量名只能包含字母、数字、下划线和连字符",
-          "variableNameNoSpacesInNormalMode": "Normal模式下变量名前后不能有空格",
-          "skipInvalidVariableName": "跳过提取的无效变量名: \"{{name}}\"，{{error}}",
-          "targetMessageNotFound": "未找到目标消息",
-          "baseGroup": "基准组",
-          "controlGroup": "对照组{{id}}",
-          "targetMessageNotFoundInGroup": "{{groupName}}中未找到目标消息",
-          "existingCallNotFound": "索引 {{index}} 的现有调用不存在，跳过处理",
-          "calculateSelectionIndicesFailed": "计算选中位置失败 - 缺少必要参数"
-        }
-      }
     }
   }
 }

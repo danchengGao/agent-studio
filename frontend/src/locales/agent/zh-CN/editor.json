@@ -179,6 +179,7 @@
           "constraintTitle": "规格",
           "skillsTitle": "技能",
           "conversationTitle": "对话设置",
+          "memoryTitle": "记忆",
           "greetingTitle": "开场白",
           "workflowTitle": "工作流",
           "pluginTitle": "插件"
@@ -247,7 +248,7 @@
           "deleteFailed": "删除失败"
         },
         "memory": {
-          "title": "记忆配置",
+          "memoryTitle": "记忆",
           "variablesTitle": "变量配置",
           "fields": {
             "nameLabel": "变量名称",
@@ -263,6 +264,7 @@
             "enabledLabel": "启用",
             "disabledLabel": "禁用"
           },
+          "longTermTitle": "长期记忆",
           "longTermToggleLabel": "启用长期记忆",
           "longTermDescription": "启用后，智能体将能够记住与用户的对话过程中的用户个人信息和偏好数据"
         }
