@@ -4,11 +4,11 @@ set -euo >/dev/null 2>&1
 # Perform post-start setup operations for specific service modules
 post_start_setup(){
     local module="$1"
-    if [ "${module}" == "milvus" ]; then
+    if [ "${module}" == "MILVUS" ]; then
         return
     fi
 
-    if [ "${module}" == "mysql" ]; then
+    if [ "${module}" == "MYSQL" ]; then
         wait_for_mysql
         if [ "${ARGS["IS_UPGRADE"]}" == "false" ]; then
             create_db_if_not_exist
@@ -20,14 +20,34 @@ post_start_setup(){
     wait_for_container_healthy "${container}"
 }
 
+# Check if the specified module exists in the ARGS_MODULES
+is_module_in_args() {
+    local target_module="$1"
+
+    if [ ${#ARGS_MODULES[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    for item in "${ARGS_MODULES[@]}"; do
+        if [ "$item" == "$target_module" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 # Process a single service of a specified module (handle start/stop/etc. via docker compose)
 process_service() {
     local module="$1"
     local component="$2"
-    if [ "${DEPLOY_VARS["HAS_${module}"]}" == "false" ]; then
+
+    if [[ "${DEPLOY_VARS["HAS_${module}"]}" == "false" ||
+         "${DEPLOY_VARS["IS_UP_${component}"]}" == "false" ]]; then
         return
     fi
-    if [ "${DEPLOY_VARS["IS_UP_${component}"]}" == "false" ]; then
+
+    if ! is_module_in_args "${module}"; then
         return
     fi
 
@@ -70,6 +90,7 @@ process_all_services() {
     upgrade_milvus
     process_services "PLUGIN"
     process_services "SANDBOX"
+    process_services "DEEPSEARCH"
     process_service "JIUWEN" "BACKEND"
     upgrade_sqlite
     process_service "JIUWEN" "FRONTEND"

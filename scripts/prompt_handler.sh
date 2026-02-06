@@ -26,7 +26,7 @@ show_deploy_prompt() {
         if [ "${DEPLOY_VARS["HAS_${module}"]}" == "false" ]; then
             continue
         fi
-        case "${modules[$i]}" in
+        case "${module}" in
             MYSQL)
                 success "MYSQL Server started" 
                 info "To use it, please set the following value in .env:"
@@ -54,6 +54,13 @@ show_deploy_prompt() {
                 success "Sandbox Server started"
                 info "To use it, please set the following value in .env:"
                 echo "CODE_SANDBOX_URL=http://localhost:${DEPLOY_VARS["SANDBOX_GATEWAY_HOST_PORT"]}/run"
+                info ""
+                ;;
+            DEEPSEARCH)
+                success "Deepsearch Server started"
+                info "To use it, please set the following value in .env:"
+                echo "DEEPSEARCH_AGENT_HOST=localhost"
+                echo "DEEPSEARCH_AGENT_PORT=${DEPLOY_VARS["DEEPSEARCH_HOST_PORT"]}"
                 info ""
                 ;;
         esac

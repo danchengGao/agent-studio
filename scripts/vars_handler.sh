@@ -52,15 +52,22 @@ valid_env_vars() {
     else
         RUNTIME_VARS["MEMORY_DATA_PATH"]="/app/${RUNTIME_VARS["MEMORY_DATA_PATH"]}"
     fi
+
+    if [[ "${DEPLOY_VARS["HAS_JIUWEN"]}" == "true" ||
+          "${DEPLOY_VARS["HAS_DEEPSEARCH"]}" == "true" ]]; then
+        if [ -z "${RUNTIME_VARS["DB_HOST"]:-}" ]; then
+            error "Validation failed: DB_HOST is a mandatory configuration item that must be defined in .env.custom!"
+        fi
+    fi
 }
 
 # === env variable setup (ports, names, proxy, module config, nginx timeout) ===
 process_env_vars() {
-    valid_env_vars
     process_ports
     generate_final_names
     setup_no_proxy_vars
     configure_module_env
+    valid_env_vars
 
     local tms=${RUNTIME_VARS["VITE_API_PROXY_TIMEOUT"]}
     if ! [[ "${tms}" =~ ^[0-9]+$ ]]; then
@@ -78,6 +85,11 @@ configure_module_env() {
             continue
         fi
         case "${module}" in
+            UPGRADE)
+                if [ ${DEPLOY_VARS["HAS_UPGRADE"]}=="true" ]; then
+                    DEPLOY_VARS["IS_UP_UPGRADE_TOOL"]="true"
+                fi
+                ;;
             MYSQL)
                 if [ "${RUNTIME_VARS["DB_TYPE"]:-}" != "mysql" ]; then
                     DEPLOY_VARS["HAS_MYSQL"]="false"
@@ -90,6 +102,7 @@ configure_module_env() {
                 DEPLOY_VARS["HAS_MYSQL"]="true"
                 DEPLOY_VARS["IS_UP_MYSQL"]="true"
                 RUNTIME_VARS["DB_HOST"]=${DEPLOY_VARS["MYSQL_SERVICE"]}
+                RUNTIME_VARS["DB_PORT"]="3306"
                 ;;
             MILVUS)
                 if [[ -n "${RUNTIME_VARS["MILVUS_HOST"]:-}" ||
@@ -103,6 +116,7 @@ configure_module_env() {
                     DEPLOY_VARS["IS_UP_ETCD"]="true"
                     DEPLOY_VARS["IS_UP_MILVUS"]="true"
                     RUNTIME_VARS["MILVUS_HOST"]=${DEPLOY_VARS["MILVUS_SERVICE"]}
+                    RUNTIME_VARS["MILVUS_PORT"]="19530"
                 fi
                 DEPLOY_VARS["IS_UP_MINIO"]="true"
                 RUNTIME_VARS["MINIO_HOST"]=${DEPLOY_VARS["MINIO_SERVICE"]}
@@ -148,10 +162,15 @@ configure_module_env() {
                 DEPLOY_VARS["IS_UP_FRONTEND"]="true"
                 RUNTIME_VARS["VITE_API_PROXY_TARGET"]="http://${backend_service}:${backend_port}/"
                 ;;
-            UPGRADE)
-                if [ ${DEPLOY_VARS["HAS_UPGRADE"]}=="true" ]; then
-                    DEPLOY_VARS["IS_UP_UPGRADE_TOOL"]="true"
+            DEEPSEARCH)
+                if [ -n "${RUNTIME_VARS["DEEPSEARCH_AGENT_HOST"]:-}" ]; then
+                    DEPLOY_VARS["HAS_DEEPSEARCH"]="false"
+                    continue
                 fi
+                DEPLOY_VARS["HAS_DEEPSEARCH"]="true"
+                DEPLOY_VARS["IS_UP_DEEPSEARCH"]="true"
+                RUNTIME_VARS["DEEPSEARCH_AGENT_HOST"]=${DEPLOY_VARS["DEEPSEARCH_SERVICE"]}
+                RUNTIME_VARS["DEEPSEARCH_AGENT_PORT"]="8000"
         esac
     done
 }

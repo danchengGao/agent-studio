@@ -72,7 +72,7 @@ find_available_ports() {
     local allocated_ports=("${ALLOCATED_PORTS[@]:-}")
 
     if [ "$need_port_num" -eq 0 ]; then
-        return 0
+        return
     fi
     
     info "Current allocated port list: ${allocated_ports[*]:-empty}"

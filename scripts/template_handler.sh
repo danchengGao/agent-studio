@@ -60,6 +60,39 @@ generate_config_file() {
     success "Final file: ${destfile}"
 }
 
+
+# ==== Generate nginx file ===
+generate_nginx_file() {
+    local nginx_template_file=${CONFIG["NGINX_TEMPLATE_FILE"]}
+    local nginx_dir="${CONFIG["CONFIG_DIR"]}/.nginx-files"
+    local nginx_file="${nginx_dir}/nginx.conf.${DEPLOY_VARS["NAME_SUFFIX"]}"
+
+    mkdir -p ${nginx_dir}
+    generate_config_file ${nginx_template_file} ${nginx_file} "ALL_VARS"
+}
+
+generate_deepsearch_env_file() {
+    local db_type="${RUNTIME_VARS["DB_TYPE"]}"
+    DEEPSERACH_ENV_VARS["DB_TYPE"]="${db_type}"
+
+    case "${db_type}" in
+        mysql)
+            DEEPSERACH_ENV_VARS["DB_HOST"]="${RUNTIME_VARS["DB_HOST"]}"
+            DEEPSERACH_ENV_VARS["DB_PORT"]="${RUNTIME_VARS["DB_PORT"]}"
+            DEEPSERACH_ENV_VARS["DB_USER"]="${RUNTIME_VARS["DB_USER"]}"
+            DEEPSERACH_ENV_VARS["DB_PASSWORD"]="${RUNTIME_VARS["DB_PASSWORD"]}"
+            DEEPSERACH_ENV_VARS["DEEPSEARCH_DB_NAME"]="${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
+            ;;
+        sqlite)
+            DEEPSERACH_ENV_VARS["SQLITE_DB_PATH"]="${RUNTIME_VARS["SQLITE_DB_PATH"]}"
+            DEEPSERACH_ENV_VARS["DEEPSEARCH_SQLITE_DB"]="${DEPLOY_VARS["DEEPSEARCH_SQLITE_DB"]}"
+            ;;
+    esac
+
+    local env_file="${CONFIG["ENV_DIR"]}/env.deepsearch.${DEPLOY_VARS["NAME_SUFFIX"]}"
+    write_env_to_file "${env_file}" "DEEPSERACH_ENV_VARS"
+}
+
 # ==== Generates all project config files by their template file ===
 generate_config_files() {
     for key in "${!DEPLOY_VARS[@]}"; do
@@ -77,24 +110,10 @@ generate_config_files() {
         fi
         case "${module}" in
             JIUWEN)
-                # generate nginx file
-                local nginx_template_file=${CONFIG["NGINX_TEMPLATE_FILE"]}
-                local nginx_dir="${CONFIG["CONFIG_DIR"]}/.nginx-files"
-                local nginx_file="${nginx_dir}/nginx.conf.${DEPLOY_VARS["NAME_SUFFIX"]}"
-                mkdir -p ${nginx_dir}
-                generate_config_file ${nginx_template_file} ${nginx_file} "ALL_VARS"
+                generate_nginx_file
                 ;;
-            SANDBOX)
-                if [ "${DEPLOY_VARS["ENABLE_LINUX_SANDBOX"],,}" == "true" ]; then
-                    ALL_VARS["PRIVILEGED_SECURITY_OPTS"]=$(cat <<'EOF'
-cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp=unconfined
-      - apparmor=unconfined
-EOF
-                    )
-                fi
+            DEEPSEARCH)
+                generate_deepsearch_env_file
                 ;;
         esac
 

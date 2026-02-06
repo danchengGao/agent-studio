@@ -26,6 +26,9 @@ declare -A CONFIG=(
 
 # ===== Prefix-Naming conventions for Docker services/containers/volumes =====
 declare -A NAMES=(
+    ["JIUWEN_NETWORK_NAME"]="jiuwen-network"
+    ["UPGRADE_TOOL_SERVICE"]="upgrade-tool"
+    ["UPGRADE_TOOL_DOCKER"]="jiuwen-upgrade-tool"
     ["MYSQL_SERVICE"]="mysql"
     ["MYSQL_DOCKER"]="jiuwen-mysql"
     ["MYSQL_VOLUME"]="mysql-data"
@@ -38,14 +41,15 @@ declare -A NAMES=(
     ["MILVUS_SERVICE"]="milvus"
     ["MILVUS_DOCKER"]="jiuwen-milvus-standalone"
     ["MILVUS_VOLUME"]="milvus-data"
-    ["FRONTEND_SERVICE"]="frontend"
-    ["FRONTEND_DOCKER"]="jiuwen-frontend"
+    ["DEEPSEARCH_SERVICE"]="deepsearch"
+    ["DEEPSEARCH_DOCKER"]="jiuwen-deepsearch"
     ["BACKEND_SERVICE"]="backend"
     ["BACKEND_DOCKER"]="jiuwen-backend"
     ["SQLITE_VOLUME"]="sqlite-data"
     ["MEMORY_VOLUME"]="memory-data"
     ["KNOWLEDGE_VOLUME"]="knowledge-data"
-    ["JIUWEN_NETWORK_NAME"]="jiuwen-network"
+    ["FRONTEND_SERVICE"]="frontend"
+    ["FRONTEND_DOCKER"]="jiuwen-frontend"
     ["PLUGIN_SERVER_SERVICE"]="plugin-server"
     ["PLUGIN_SERVER_DOCKER"]="jiuwen-plugin-server"
     ["SANDBOX_GATEWAY_SERVICE"]="sandbox-gateway"
@@ -54,8 +58,6 @@ declare -A NAMES=(
     ["PYTHON_SERVER_DOCKER"]="jiuwen-python-server"
     ["JS_SERVER_SERVICE"]="js-server"
     ["JS_SERVER_DOCKER"]="jiuwen-js-server"
-    ["UPGRADE_TOOL_SERVICE"]="upgrade-tool"
-    ["UPGRADE_TOOL_DOCKER"]="jiuwen-upgrade-tool"
 )
 
 # ===== Host port variables to allocate for services (dynamic assignment) =====
@@ -72,6 +74,7 @@ declare -ga PORTS=(
     SANDBOX_GATEWAY_HOST_PORT
     PYTHON_SERVER_HOST_PORT
     JS_SERVER_HOST_PORT
+    DEEPSEARCH_HOST_PORT
 )
 
 # ===== Container/service name variables for network address resolution =====
@@ -96,6 +99,8 @@ declare -ga CONTAINERS_ADDRS=(
     PYTHON_SERVER_DOCKER
     JS_SERVER_SERVICE
     JS_SERVER_DOCKER
+    DEEPSEARCH_SERVICE
+    DEEPSEARCH_DOCKER
 )
 
 # ==== Global deploy associative array ====
@@ -104,6 +109,7 @@ declare -A DEPLOY_VARS=(
     ["HAS_MILVUS"]="false"
     ["HAS_PLUGIN"]="false"
     ["HAS_SANDBOX"]="false"
+    ["HAS_DEEPSEARCH"]="false"
     ["HAS_JIUWEN"]="false"
     ["HAS_UPGRADE"]="false"
     ["IS_UP_MYSQL"]="false"
@@ -114,15 +120,20 @@ declare -A DEPLOY_VARS=(
     ["IS_UP_PYTHON_SERVER"]="false"
     ["IS_UP_JS_SERVER"]="false"
     ["IS_UP_SANDBOX_GATEWAY"]="false"
+    ["IS_UP_DEEPSEARCH"]="false"
     ["IS_UP_BACKEND"]="false"
     ["IS_UP_FRONTEND"]="false"
     ["IS_UP_UPGRADE_TOOL"]="false"
     ["IS_UPGRADE_MYSQL"]="false"
     ["IS_UPGRADE_MILVUS"]="false"
+
 )
 
 # ==== Global runtime associative array ====
 declare -A RUNTIME_VARS=(
+)
+
+declare -A DEEPSERACH_ENV_VARS=(
 )
 
 # ==== Global associative array to store all environment variables ====
@@ -140,37 +151,40 @@ declare -ga AVAILABLE_PORTS=()
 declare -ga ALLOCATED_PORTS=()
 
 # ==== All available modules ====
-declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "JIUWEN")
+declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN")
 
 # ==== components of module ====
 declare -A COMPONENTS=(
+    ["UPGRADE"]="UPGRADE_TOOL"
     ["MYSQL"]="MYSQL"
     ["MILVUS"]="ETCD MINIO MILVUS"
     ["PLUGIN"]="PLUGIN_SERVER"
     ["SANDBOX"]="PYTHON_SERVER JS_SERVER SANDBOX_GATEWAY"
+    ["DEEPSEARCH"]="DEEPSEARCH"
     ["JIUWEN"]="BACKEND FRONTEND"
-    ["UPGRADE"]="UPGRADE_TOOL"
 )
 
 
 # ==== Paths to Docker Compose template files per module ==== 
 declare -A COMPOSE_TEMPLATE_FILES=(
+    ["UPGRADE"]="${SCRIPT_DIR}/conf/docker-upgrade.template.yml"
     ["MYSQL"]="${SCRIPT_DIR}/conf/docker-mysql.template.yml"
     ["MILVUS"]="${SCRIPT_DIR}/conf/docker-milvus.template.yml"
     ["PLUGIN"]="${SCRIPT_DIR}/conf/docker-plugin.template.yml"
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.template.yml"
+    ["DEEPSEARCH"]="${SCRIPT_DIR}/conf/docker-deepsearch.template.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.template.yml"
-    ["UPGRADE"]="${SCRIPT_DIR}/conf/docker-upgrade.template.yml"
 )
 
 # ==== Paths to final generated Docker Compose files per module ==== 
 declare -A COMPOSE_FILES=(
+    ["UPGRADE"]="${SCRIPT_DIR}/conf/docker-upgrade.yml"
     ["MYSQL"]="${SCRIPT_DIR}/conf/docker-mysql.yml"
     ["MILVUS"]="${SCRIPT_DIR}/conf/docker-milvus.yml"
     ["PLUGIN"]="${SCRIPT_DIR}/conf/docker-plugin.yml"
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.yml"
+    ["DEEPSEARCH"]="${SCRIPT_DIR}/conf/docker-deepsearch.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.yml"
-    ["UPGRADE"]="${SCRIPT_DIR}/conf/docker-upgrade.yml"
 )
 
 

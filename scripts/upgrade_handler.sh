@@ -7,7 +7,6 @@ valid_pre_upgrade_env_dir(){
     info "Validate Pre-Upgrade-Env-Dir: ${pre_upgrade_env_dir} ..." 
     if [ ! -d "${pre_upgrade_env_dir}" ]; then
         error "Directory not found - ${pre_upgrade_env_dir}"
-        return 1
     fi
 
     local -a env_files=()
@@ -326,7 +325,6 @@ upgrade_data() {
     local module="$1"
     local cmds="$(gen_cmds ${module})"
     local docker_exec_prefix=""
-    local suffix=${DEPLOY_VARS["NAME_SUFFIX"]}
 
     info "Start migration ${module} data ..."
     if [ "${DEPLOY_VARS["OS_TYPE"]}" == "windows" ]; then

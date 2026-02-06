@@ -29,6 +29,8 @@ scripts/
 │   ├── docker-plugin.yml           # 当前实例的Plugin Server容器最终配置文件（自动生成）
 │   ├── docker-upgrade.template.yml # 升级服务容器模板文件
 │   ├── docker-upgrade.yml          # 当前实例的升级容器最终配置文件（自动生成）
+│   ├── docker-deepsearch.template.yml  # deepsearch服务容器模板文件
+│   ├── docker-deepsearch.yml           # 当前实例的deepsearch容器最终配置文件（自动生成）
 │   ├── nginx.template.conf         # Nginx通用配置模板
 │   ├──  .nginx-files/              # 多实例Nginx配置文件目录（自动生成）
 │   │   ├── nginx.conf-<实例ID>     # 某前端实例的Nginx最终配置文件（自动生成）
@@ -109,12 +111,14 @@ $ ./service.sh --help
   -n,--new   强制启动全新的服务实例（忽略已存在的.env文件,自动生成全新配置）
   --upgrade  启动由低版本服务升级而来的全新服务实例。
 
-模块（适用于 service.sh/cluster.sh，可选参数）:
-  milvus    部署 Milvus 模块
-  jiuwen    部署 Jiuwen 模块
-  mysql     部署 MySQL 模块
-  plugin    部署插件模块
-  sandbox   部署沙箱模块
+模块（可选参数）:
+  milvus        部署 Milvus 模块
+  jiuwen        部署 Jiuwen 模块
+  mysql         部署 MySQL 模块
+  plugin        部署插件模块
+  sandbox       部署沙箱模块
+  deepsearch    部署deepsearch模块
+
 注意: 未指定任何模块时，默认部署所有模块
 ```
 
@@ -159,7 +163,7 @@ $ ./service.sh down -f .envs/env.deploy.<实例ID>
 ```
 
 ✔️ **指定组件 独立运维指令**
-支持对单个组件进行精准启停 / 卸载，也支持同时对任意数量的组件进行批量运维，组件名称固定支持：mysql、milvus、jiuwen、plugin、sandbox，指令格式统一、灵活易用，单点 / 集群完全通用。
+支持对单个组件进行精准启停 / 卸载，也支持同时对任意数量的组件进行批量运维，组件名称固定支持：mysql、milvus、jiuwen、plugin、sandbox、deepsearch，指令格式统一、灵活易用，单点 / 集群完全通用。
 
 1. 独立启动指定组件（全新实例 / 已有实例）
 
@@ -170,6 +174,7 @@ $ ./service.sh milvus up -n
 $ ./service.sh jiuwen up -n
 $ ./service.sh plugin up -n
 $ ./service.sh sandbox up -n
+$ ./service.sh deepsearch up -n
 
 # 重启指定的已有组件实例
 $ ./service.sh mysql up -f .envs/env.deploy.<实例ID>

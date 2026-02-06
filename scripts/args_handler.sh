@@ -37,7 +37,7 @@ parse_args() {
                 cmd="${args[$i]}"
                 i=$((i+1))
                 ;;
-            milvus|jiuwen|mysql|plugin|sandbox|upgrade)
+            upgrade|mysql|milvus|plugin|sandbox|deepsearch|jiuwen)
                 # treat as modules
                 local module="${args[$i]^^}"
                 DEPLOY_VARS["HAS_${module}"]="true"
@@ -105,7 +105,7 @@ process_module_args(){
     info "ARGS_MODULES: ${ARGS_MODULES[*]}"
 
     if [ ${#ARGS_MODULES[@]} -eq 0 ]; then
-        for module in "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "JIUWEN"
+        for module in "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN"
         do
             DEPLOY_VARS["HAS_${module}"]="true"
         done
@@ -128,12 +128,13 @@ Options:
   -n,--new  Force to start a BRAND NEW service (ignore existing .env file).
   --upgrade Start a new set of services upgraded from a lower version deployment.
 
-Modules (for service.sh/cluster.sh, optional):
-  milvus    Deploy milvus module
-  jiuwen    Deploy jiuwen module
-  mysql     Deploy mysql module
-  plugin    Deploy plugin module
-  sandbox   Deploy sandbox module
+Modules (optional):
+  milvus        Deploy milvus module
+  jiuwen        Deploy jiuwen module
+  mysql         Deploy mysql module
+  plugin        Deploy plugin module
+  sandbox       Deploy sandbox module
+  deepsearch    Deploy deepsearch module
 Note: No module specified means deploy ALL modules.
 
 Examples:

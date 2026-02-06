@@ -67,13 +67,11 @@ check_docker() {
     info "Checking Docker..."
     
     command -v docker >/dev/null 2>&1 || {
-        log_error "Docker is not installed. Please install it first."
-        return 1
+        error "Docker is not installed. Please install it first."
     }
     
     docker info >/dev/null 2>&1 || {
         error "Docker daemon is not running. Please start it first."
-        return 1
     }
     
     # Detect Docker Compose command
@@ -83,7 +81,6 @@ check_docker() {
         CONFIG["DOCKER_COMPOSE_CMD"]="docker-compose"
     else
         error "Docker Compose is not installed. Please install it first."
-        return 1
     fi
     
     success "Docker is ready"
@@ -150,7 +147,7 @@ print_array() {
     
     if [[ ! "$(declare -p ${array_name})" =~ "declare -a" && ! "$(declare -p ${array_name})" =~ "declare -A" ]]; then
         echo -e "\033[31m[ERROR] ${array_name} is not a bash array variable!\033[0m"
-        return 1
+        return
     fi
 
     for key in "${!arr_ref[@]}"; do
