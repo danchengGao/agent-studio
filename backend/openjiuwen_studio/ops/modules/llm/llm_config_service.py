@@ -220,10 +220,10 @@ def convert_orm_to_model_config(orm_obj, api_key_flag: bool = True) -> ModelConf
         {
             "name": "timeout",
             "label": "超时时间",
-            "desc": "timeout:大模型返回等待时间，超过这个时间即终止等待并报错：API call timeout。取值范围为[1-300]，默认值60秒。",
+            "desc": "timeout:大模型返回等待时间，超过这个时间即终止等待并报错：API call timeout。取值范围为[1-3600]，默认值60秒。",
             "type": "int",
             "min": "1",
-            "max": "300",
+            "max": "3600",
             "default_val": str(orm_obj.timeout or 60)
         }
     ]

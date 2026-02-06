@@ -237,7 +237,7 @@ const ModelsPage: React.FC = () => {
       const descriptionLengthValid = (newModel.description?.length || 0) <= 500
       const baseValid = nameValid && modelIdValid && apiKeyValid && baseUrlValid && descriptionLengthValid && tagsValid
       const timeout = newModel.timeout
-      return baseValid && timeout !== undefined && timeout >= 1 && timeout <= 300 // 超时时间范围验证
+      return baseValid && timeout !== undefined && timeout >= 1 && timeout <= 3600 // 超时时间范围验证
     }
   }
 
@@ -392,7 +392,7 @@ const ModelsPage: React.FC = () => {
     // LLM 模型需要验证超时时间范围
     if (modelType === 'LLM') {
       const timeout = newModel.timeout
-      if (timeout === undefined || timeout < 1 || timeout > 300) {
+      if (timeout === undefined || timeout < 1 || timeout > 3600) {
         setSnackbar({ open: true, message: t('models.messages.timeoutRange'), severity: 'error' })
         return
       }
@@ -1443,7 +1443,7 @@ const ModelsPage: React.FC = () => {
                     type="number"
                     placeholder=""
                     value={newModel.timeout || ''}
-                    error={!(newModel.timeout && newModel.timeout >= 1 && newModel.timeout <= 300)} // 只在URL格式错误时显示红色边框
+                    error={!(newModel.timeout && newModel.timeout >= 1 && newModel.timeout <= 3600)} // 只在URL格式错误时显示红色边框
                     onChange={e => {
                       const value = e.target.value
                       if (value === '') {
@@ -1456,8 +1456,8 @@ const ModelsPage: React.FC = () => {
                         // 自动将值限制在有效范围内
                         if (numValue < 1) {
                           numValue = 1
-                        } else if (numValue > 300) {
-                          numValue = 300
+                        } else if (numValue > 3600) {
+                          numValue = 3600
                         }
                         setNewModel({ ...newModel, timeout: numValue })
                       }
