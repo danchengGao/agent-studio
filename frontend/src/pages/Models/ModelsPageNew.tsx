@@ -56,6 +56,7 @@ interface UnifiedModelListItem {
   description: string
   createdAt: string
   updatedAt: string
+  isSystemModel: boolean // 是否系统预置模型
   modelType: ModelType // 添加模型类型字段
   // LLM 特有属性
   usage?: {
