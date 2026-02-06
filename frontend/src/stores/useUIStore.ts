@@ -15,6 +15,7 @@ interface UIState {
   promptsViewMode: 'grid' | 'list'
   // 知识库管理页面显示模式
   knowledgeBaseViewMode: 'grid' | 'list'
+  memoryBaseViewMode: 'grid' | 'list'
 
   // 是否使用新版 Dashboard UI
   isNewDashboard: boolean
@@ -39,9 +40,11 @@ interface UIActions {
   setPromptsViewMode: (mode: 'grid' | 'list') => void
   // 知识库显示模式操作
   setKnowledgeBaseViewMode: (mode: 'grid' | 'list') => void
-
-  // Dashboard 版本（仅保留状态，默认新版，不再提供切换）
+  // 知识库显示模式操作
+  setMemoryBaseViewMode: (mode: 'grid' | 'list') => void
+  // Dashboard 版本切换
   setIsNewDashboard: (isNew: boolean) => void
+  toggleDashboardVersion: () => void
 
   // 主题相关操作
   setTheme: (theme: 'light' | 'dark' | 'auto') => void
@@ -64,7 +67,8 @@ const initialState: UIState = {
   workflowViewMode: 'grid', // 默认为网格模式
   promptsViewMode: 'grid', // 默认为网格模式
   knowledgeBaseViewMode: 'grid', // 默认为网格模式
-  isNewDashboard: true, // 默认使用新版 Dashboard
+  memoryBaseViewMode: 'grid',
+  isNewDashboard: false, // 默认使用旧版 Dashboard
   theme: 'light',
   sidebarCollapsed: false,
   mainLayoutSize: 100,
@@ -72,7 +76,7 @@ const initialState: UIState = {
 
 export const useUIStore = create<UIState & UIActions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
 
       // 设置插件显示模式（旧版页面）
@@ -117,10 +121,24 @@ export const useUIStore = create<UIState & UIActions>()(
         set({ knowledgeBaseViewMode: mode })
       },
 
+      // 设置记忆库显示模式
+      setMemoryBaseViewMode: (mode: 'grid' | 'list') => {
+        console.log(`🎨 [UIStore] Memory base view mode changed to: ${mode}`)
+        set({ memoryBaseViewMode: mode })
+      },
+
       // 设置 Dashboard 版本
       setIsNewDashboard: (isNew: boolean) => {
         console.log(`🎨 [UIStore] Dashboard version changed to: ${isNew ? 'new' : 'old'}`)
         set({ isNewDashboard: isNew })
+      },
+
+      // 切换 Dashboard 版本
+      toggleDashboardVersion: () => {
+        const current = get().isNewDashboard
+        const next = !current
+        console.log(`🎨 [UIStore] Toggling dashboard version from ${current ? 'new' : 'old'} to ${next ? 'new' : 'old'}`)
+        set({ isNewDashboard: next })
       },
 
       // 设置主题
@@ -150,7 +168,7 @@ export const useUIStore = create<UIState & UIActions>()(
     {
       name: 'ui-storage', // 在localStorage中的键名
       partialize: state => ({
-        // 只持久化需要保存的状态（不再持久化 isNewDashboard，始终使用新版）
+        // 只持久化需要保存的状态
         pluginViewMode: state.pluginViewMode,
         pluginManagementViewMode: state.pluginManagementViewMode,
         pluginMarketViewMode: state.pluginMarketViewMode,
@@ -158,15 +176,12 @@ export const useUIStore = create<UIState & UIActions>()(
         workflowViewMode: state.workflowViewMode,
         promptsViewMode: state.promptsViewMode,
         knowledgeBaseViewMode: state.knowledgeBaseViewMode,
+        isNewDashboard: state.isNewDashboard,
         theme: state.theme,
         sidebarCollapsed: state.sidebarCollapsed,
         mainLayoutSize: state.mainLayoutSize,
       }),
-      version: 2, // 版本号，迁移后固定使用新版 Dashboard
-      migrate: (persistedState: any) => {
-        // 迁移时强制 isNewDashboard 为 true，不再使用旧版
-        return persistedState ? { ...persistedState, isNewDashboard: true } : persistedState
-      },
+      version: 1, // 版本号，用于状态迁移
       onRehydrateStorage: () => state => {
         console.log('🎨 [UIStore] UI state rehydrated from storage:', state)
       },
