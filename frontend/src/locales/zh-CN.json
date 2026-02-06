@@ -2285,7 +2285,7 @@
         "updateSuccess": "Embedding 模型更新成功",
         "createSuccess": "Embedding 模型创建成功",
         "testFailed": "测试失败，请检查配置",
-        "testSuccess": "测试成功！模型: {{model}}，向量维度: {{dimension}}，Token 使用: {{tokens}}",
+        "testSuccess": "测试成功！模型: {{model}}，向量维度: {{dimension}}",
         "disableFailed": "禁用 Embedding 模型失败",
         "modelDisabled": "模型已禁用",
         "testError": {
@@ -4535,7 +4535,10 @@
       "selectLLMModel": "选择LLM模型",
       "selectModelPlaceholder": "请选择模型",
       "modelRequired": "构建文档图需要选择LLM模型",
-      "loadModelsFailed": "加载模型列表失败"
+      "loadModelsFailed": "加载模型列表失败",
+      "fileSizeLimit": "文件大小限制：单个文件不超过 {{size}}",
+      "filesExceedLimit": "以下文件大小超过 {{size}} 限制：",
+      "oversizedTitle": "文件大小超出限制"
     },
     "edit": {
       "title": "编辑知识库",

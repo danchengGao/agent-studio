@@ -29,7 +29,7 @@ from openjiuwen.core.retrieval.common.config import (
     VectorStoreConfig,
 )
 from openjiuwen.core.retrieval.common.document import Document
-from openjiuwen.core.retrieval.embedding.api_embedding import APIEmbedding
+from openjiuwen.core.retrieval.embedding.openai_embedding import OpenAIEmbedding
 
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
@@ -245,24 +245,25 @@ def _create_llm_client_from_db(llm_model_id: str, space_id: str):
             )
             timeout = 120
 
-        # 构建 protocol 配置
-        protocol_config = {
+        protocol = {
             "provider": model_config.provider,
             "api_key": api_key or "",
             "base_url": model_config.base_url or "",
             "timeout": timeout,
         }
-        # 使用 get_llm_client_by_protocol 创建 LLM 客户端（不需要初始化）
-        llm_client = get_llm_client_by_protocol(protocol_config)
+        llm_client = get_llm_client_by_protocol(protocol)
+        # TripleExtractor 调用 invoke 时不传 model，依赖 client 的 model_config.model_name
+        if getattr(llm_client, "model_config", None) and model_config.model_type:
+            llm_client.model_config.model_name = model_config.model_type
         logger.info(
-            f"[LLM_CLIENT] LLM client created successfully from database - "
+            f"[LLM_CLIENT] LLM client created from database - "
             f"Model Type: {model_config.model_type}, Timeout: {timeout}s"
         )
 
         return llm_client, model_config.model_type
 
 
-def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
+def _create_embed_model(kb_id: str, space_id: str) -> OpenAIEmbedding:
     """创建 Embedding 模型
 
     从数据库读取知识库关联的 embedding 模型配置。
@@ -272,7 +273,7 @@ def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
         space_id: 空间ID，用于从数据库查询知识库和 embedding 模型配置（必填）
 
     Returns:
-        APIEmbedding 实例
+        OpenAIEmbedding 实例
 
     Raises:
         ValueError: 如果数据库查询失败或配置无效
@@ -327,14 +328,14 @@ def _create_embed_model(kb_id: str, space_id: str) -> APIEmbedding:
 
         # 4. 使用数据库配置创建 Embedding 模型
         # 数据库字段：api_base, model_id, api_key, max_batch_size
-        # APIEmbedding 需要：config (EmbeddingConfig), timeout, max_retries, max_batch_size
+        # OpenAIEmbedding 需要：config (EmbeddingConfig), timeout, max_retries, max_batch_size
         # timeout 和 max_retries 使用默认值（60 和 3）
         embed_config = EmbeddingConfig(
             model_name=embed_model_config.model_id,  # 使用 model_id 作为模型名称
             api_key=api_key,
             base_url=embed_model_config.api_base,
         )
-        embed_model = APIEmbedding(
+        embed_model = OpenAIEmbedding(
             config=embed_config,
             timeout=default_timeout,  # 使用默认值
             max_retries=default_max_retries,  # 使用默认值
@@ -1055,6 +1056,24 @@ def _get_chroma_data_dir() -> Path:
     return data_dir
 
 
+def _default_index_config() -> VectorStoreConfig:
+    """Default VectorStoreConfig for index manager."""
+    return VectorStoreConfig(collection_name="default", database_name="")
+
+
+def _create_milvus_index_manager() -> MilvusIndexer:
+    """Create Milvus index manager (used by _check_milvus_connection and _create_index_manager)."""
+    milvus_host = os.getenv("MILVUS_HOST", "localhost")
+    milvus_port = os.getenv("MILVUS_PORT", "19530")
+    milvus_token = os.getenv("MILVUS_TOKEN", None)
+    milvus_uri = f"http://{milvus_host}:{milvus_port}"
+    return MilvusIndexer(
+        config=_default_index_config(),
+        milvus_uri=milvus_uri,
+        milvus_token=milvus_token,
+    )
+
+
 def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
     """
     Creates either a Milvus or Chroma index manager
@@ -1065,17 +1084,12 @@ def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
     index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
     if index_manager_type == "chroma":
         data_dir = _get_chroma_data_dir()
-        return ChromaIndexer(chroma_path=str(data_dir))
+        return ChromaIndexer(
+            config=_default_index_config(),
+            chroma_path=str(data_dir),
+        )
     elif index_manager_type == "milvus":
-        milvus_host = os.getenv("MILVUS_HOST", "localhost")
-        milvus_port = os.getenv("MILVUS_PORT", "19530")
-        milvus_token = os.getenv("MILVUS_TOKEN", None)
-
-        # 组合 Milvus URI (格式: http://host:port 或 tcp://host:port)
-        # 默认使用 http:// 协议
-        milvus_uri = f"http://{milvus_host}:{milvus_port}"
-
-        return MilvusIndexer(milvus_uri=milvus_uri, milvus_token=milvus_token)
+        return _create_milvus_index_manager()
     else:
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
 
@@ -1261,10 +1275,20 @@ async def create_knowledge_base_for_retrieval(
             raise ValueError(
                 f"LLM client is required for knowledge base {kb_id} with graph enhancement"
             )
-        # 使用传入的 model_name，如果未提供则使用配置中的值或默认值
+        # 使用传入的 model_name；未提供时从 llm_client 的 model_info 取配置值，再否则用默认空字符串
+        resolved_model_name = model_name
+        if resolved_model_name is None and llm_client is not None:
+            model_info = getattr(llm_client, "model_info", None)
+            if model_info is not None:
+                resolved_model_name = getattr(model_info, "model_name", None)
+            if resolved_model_name is None:
+                model_config = getattr(llm_client, "model_config", None)
+                resolved_model_name = getattr(model_config, "model_name", None) if model_config else None
+        if resolved_model_name is None:
+            resolved_model_name = ""
         extractor = TripleExtractor(
             llm_client=llm_client,
-            model_name=model_name,
+            model_name=resolved_model_name,
         )
 
     # 6. 创建知识库配置
@@ -1288,7 +1312,7 @@ async def create_knowledge_base_for_retrieval(
             extractor=extractor,
             index_manager=None,
             llm_client=llm_client,
-            llm_model_name=model_name,
+            llm_model_name=resolved_model_name,
         )
     else:
         knowledge_base = SimpleKnowledgeBase(
@@ -1445,11 +1469,12 @@ async def _index_documents(
     )
 
     # 5.4 创建三元组提取器（如果使用图索引）
+    # model_name 来自配置（_create_llm_client_from_db 返回的 model_config.model_type）；若未提供则用默认空字符串
     extractor = None
     if use_graph and llm_client:
         extractor = TripleExtractor(
             llm_client=llm_client,
-            model_name=model_name,
+            model_name=model_name or "",
         )
 
     # 6. 创建知识库配置
@@ -1778,8 +1803,8 @@ async def document_upload(
     # 4. 允许的文件类型
     allowed_file_extensions = {".pdf", ".doc", ".docx", ".txt", ".md"}
 
-    # 文件大小限制：20MB
-    MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
+    # 文件大小限制：50MB
+    max_file_size = 50 * 1024 * 1024  # 50MB in bytes
 
     # 5. 处理每个文件
     uploaded_docs = []
@@ -1817,10 +1842,10 @@ async def document_upload(
             file_size = len(file_content)
 
             # 验证文件大小
-            if file_size > MAX_FILE_SIZE:
+            if file_size > max_file_size:
                 failed_count += 1
                 file_size_mb = file_size / (1024 * 1024)
-                max_size_mb = MAX_FILE_SIZE / (1024 * 1024)
+                max_size_mb = max_file_size / (1024 * 1024)
                 logger.warning(
                     f"[DOC_UPLOAD] File size exceeds limit - File: {filename}, Size: {file_size_mb:.2f}MB, "
                     f"Limit: {max_size_mb}MB, User: {user_id}, KB ID: {kb_id}"

@@ -2300,7 +2300,7 @@
         "updateSuccess": "Embedding model updated successfully",
         "createSuccess": "Embedding model created successfully",
         "testFailed": "Test failed, please check configuration",
-        "testSuccess": "Test successful! Model: {{model}}, Vector dimension: {{dimension}}, Tokens used: {{tokens}}",
+        "testSuccess": "Test successful! Model: {{model}}, Vector dimension: {{dimension}}",
         "disableFailed": "Failed to disable Embedding model",
         "modelDisabled": "Model disabled",
         "testError": {
@@ -4211,6 +4211,11 @@
       "title": "Create Knowledge Base",
       "description": "Create new knowledge base and upload documents",
       "success": "Knowledge base created successfully"
+    },
+    "addDocument": {
+      "fileSizeLimit": "File size limit: each file must not exceed {{size}}",
+      "filesExceedLimit": "The following files exceed the {{size}} limit:",
+      "oversizedTitle": "File size exceeds limit"
     },
     "edit": {
       "title": "Edit Knowledge Base",

@@ -29,6 +29,7 @@ from openjiuwen.core.single_agent.legacy import WorkflowAgentConfig, WorkflowFac
 from openjiuwen.core.application.llm_agent import LLMAgent
 from openjiuwen.core.application.workflow_agent import WorkflowAgent
 from openjiuwen.core.single_agent.base import BaseAgent as InvokableAgent
+from openjiuwen.core.single_agent.legacy.agent import workflow_provider
 from openjiuwen.core.foundation.tool import Tool
 from openjiuwen.core.common.logging import logger
 

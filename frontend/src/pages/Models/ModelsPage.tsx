@@ -760,10 +760,9 @@ const ModelsPage: React.FC = () => {
         testRequest: { text: t('models.messages.testText') },
       })
 
-      // 格式化测试结果（result 是 EmbeddingModelTestResponse，包含 data, model, usage 等字段）
+      // 格式化测试结果（result 含 data, model, response_time；后端不再返回 usage/tokens）
       const embeddingData = result.data?.[0]
       const dimension = embeddingData?.embedding?.length || 0
-      const usage = result.usage || {}
       const model = result.model || 'unknown'
 
       setSnackbar({
@@ -771,7 +770,6 @@ const ModelsPage: React.FC = () => {
         message: t('models.messages.embeddingModel.testSuccess', {
           model,
           dimension,
-          tokens: usage.total_tokens || 0,
         }),
         severity: 'success',
       })

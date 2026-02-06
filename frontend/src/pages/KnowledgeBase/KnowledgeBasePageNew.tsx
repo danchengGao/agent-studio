@@ -49,7 +49,11 @@ const KnowledgeBasePageNew: React.FC = () => {
   } = useKnowledgeBaseStore()
 
   const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
-  const { data: embeddingModelsResponse, isLoading: embeddingModelsLoading } = useEmbeddingModels({ spaceId })
+  const { data: embeddingModelsResponse, isLoading: embeddingModelsLoading } = useEmbeddingModels({
+    spaceId,
+    page: 1,
+    size: 100,
+  })
   const embeddingModelMap = useMemo(() => {
     const items = embeddingModelsResponse?.items || []
     return items.reduce((acc, m) => {

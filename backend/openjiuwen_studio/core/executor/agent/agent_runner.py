@@ -273,7 +273,7 @@ class AgentRunner:
         # 配置已变更或首次创建，重新编译Agent
         invokable_agent = await self.create_new_agent(agent_config, space_id, current_user)
         if catch_instance:
-            invokable_agent._context_engine._context_accessor = catch_instance._context_engine._context_accessor
+            invokable_agent._context_engine._context_pool = catch_instance._context_engine._context_pool
 
         # 更新缓存
         self._agent_instances[user_id][agent_key] = (agent_config, invokable_agent)
