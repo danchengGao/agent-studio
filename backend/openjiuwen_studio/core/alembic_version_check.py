@@ -337,10 +337,10 @@ class AlembicVersionChecker:
         if not table_exists:
             # 数据库没有 alembic_version 表，需要 stamp
             logger.info("状态: 数据库未初始化 Alembic 版本控制")
-            logger.info("操作: 需要标记当前数据库版本")
+            logger.info("操作: 需要标记当前数据库版本，请检查数据库对应的版本id")
             logger.info("")
             logger.info("请执行以下命令:")
-            logger.info("  alembic -n alembic_%s_%s stamp %s", db_type, db_name, latest)
+            logger.info("  alembic -n alembic_%s_%s stamp your_db_revision_id", db_type, db_name)
             logger.info("")
             logger.info("说明: 此命令将数据库标记为指定版本，不会执行任何迁移操作")
 
@@ -349,11 +349,6 @@ class AlembicVersionChecker:
             logger.info("状态: 数据库版本需要更新")
             logger.info("当前版本: %s", current)
             logger.info("最新版本: %s", latest)
-            logger.info("")
-            logger.info("请执行以下命令:")
-            logger.info("  alembic -n alembic_%s_%s upgrade head", db_type, db_name)
-            logger.info("")
-            logger.info("说明: 此命令将数据库升级到最新版本")
 
 
 def check_alembic_versions() -> bool:
