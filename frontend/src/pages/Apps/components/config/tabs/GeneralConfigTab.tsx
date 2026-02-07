@@ -72,18 +72,6 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
               onChange={checked => updateConfig('enableTraceability', checked)}
             />
           </div>
-
-          {/* 启用溯源推理 */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.enableSourceTracerInfer')}</span>
-              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.enableSourceTracerInferDesc')}</p>
-            </div>
-            <ToggleSwitch
-              checked={config.enableSourceTracerInfer}
-              onChange={checked => updateConfig('enableSourceTracerInfer', checked)}
-            />
-          </div>
         </div>
       </ConfigSection>
 
