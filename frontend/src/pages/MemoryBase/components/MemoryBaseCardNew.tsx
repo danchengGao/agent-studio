@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Brain, Edit, Trash2, Clock } from 'lucide-react';
 import { ConfigCard, ConfigCardAction, EditingState } from '@/components/Common/common-grid';
 import { CardFooterRow } from '@/components/Common/common-grid';
-import { useEmbeddingModel, useModels } from '@test-agentstudio/api-client';
+import { useEmbeddingModel, useModels, MemoryBaseService } from '@test-agentstudio/api-client';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useMemoryBaseStore } from '@/stores/useMemoryBaseStore';
+import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar';
+import { validateMemoryBaseName } from '../utils/validation';
 import type { MemoryBase } from '@/types/memoryBase';
 
 interface ModelDetail {
@@ -57,8 +60,7 @@ export interface MemoryBaseCardNewProps {
 }
 
 /**
- * 基于 ConfigCard 的记忆库网格卡片，用于 CommonPageLayout 下的网格视图。
- * 本迭代不做卡片内联编辑，编辑即跳转编辑页。
+ * 基于 ConfigCard 的记忆库网格卡片，支持卡片内联编辑名称与描述（双击编辑）。
  */
 export const MemoryBaseCardNew: React.FC<MemoryBaseCardNewProps> = ({
   memoryBase,
@@ -67,13 +69,15 @@ export const MemoryBaseCardNew: React.FC<MemoryBaseCardNewProps> = ({
 }) => {
   const { t } = useTranslation();
   const { user } = useAuthStore();
+  const { updateMemoryBase } = useMemoryBaseStore();
+  const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar();
 
   const { data: embeddingModel, isLoading: embeddingLoading } = useEmbeddingModel(
     memoryBase.embedding_model_config_id?.toString() || '',
     memoryBase.space_id || user?.spaceId || '',
   );
 
-  const { data: modelsData, isLoading: modelsLoading } = useModels({
+  const { data: modelsData } = useModels({
     spaceId: user?.spaceId || '0',
     size: 100,
     sort_by: 'update_time',
@@ -106,6 +110,116 @@ export const MemoryBaseCardNew: React.FC<MemoryBaseCardNewProps> = ({
       setModelsList(convertedModels);
     }
   }, [modelsData]);
+
+  const [editingState, setEditingState] = useState<EditingState>(EMPTY_EDITING_STATE);
+  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [nameError, setNameError] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (editingState.id === memoryBase.mdb_id && editingState.field === 'name' && user?.spaceId) {
+      const fetchNames = async () => {
+        try {
+          const allNames: string[] = [];
+          let page = 1;
+          const pageSize = 100;
+          let hasMore = true;
+          while (hasMore) {
+            const response = await MemoryBaseService.getMemoryBases({
+              space_id: user.spaceId,
+              page,
+              page_size: pageSize,
+            });
+            if (response?.data?.items) {
+              const names = response.data.items
+                .map((item: { name?: string }) => item.name)
+                .filter((n): n is string => Boolean(n) && n !== memoryBase.name);
+              allNames.push(...names);
+              const total = response.data.total || 0;
+              hasMore = page * pageSize < total;
+              page += 1;
+            } else {
+              hasMore = false;
+            }
+          }
+          setExistingNames(allNames);
+        } catch (err) {
+          console.error('Failed to fetch memory base names:', err);
+        }
+      };
+      fetchNames();
+    }
+  }, [editingState.id, editingState.field, user?.spaceId, memoryBase.name]);
+
+  const handleStartEdit = useCallback(
+    (field: 'name' | 'description') => {
+      setEditingState({
+        id: memoryBase.mdb_id,
+        field,
+        value: field === 'name' ? memoryBase.name : memoryBase.description || '',
+        isEditing: true,
+      });
+      setNameError('');
+    },
+    [memoryBase.mdb_id, memoryBase.name, memoryBase.description],
+  );
+
+  const handleUpdateValue = useCallback((value: string) => {
+    setEditingState(prev => (prev.isEditing ? { ...prev, value } : prev));
+    setNameError('');
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingState.isEditing || editingState.id !== memoryBase.mdb_id || !user?.spaceId) return;
+    const { field, value } = editingState;
+    const trimmed = value.trim();
+
+    if (field === 'name') {
+      const err = validateMemoryBaseName(trimmed, t, 'memoryBases.edit.nameRequired');
+      if (err) {
+        setNameError(err);
+        return;
+      }
+      if (existingNames.some(n => n === trimmed)) {
+        setNameError(t('memoryBases.form.nameExists'));
+        return;
+      }
+    }
+
+    try {
+      setIsSaving(true);
+      await updateMemoryBase({
+        space_id: user.spaceId,
+        mdb_id: memoryBase.mdb_id,
+        name: field === 'name' ? trimmed : memoryBase.name,
+        description: field === 'description' ? trimmed : memoryBase.description ?? '',
+      });
+      showSuccess(t('memoryBases.update.success'));
+      setEditingState(EMPTY_EDITING_STATE);
+      setNameError('');
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || t('memoryBases.update.error');
+      showError(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    editingState,
+    memoryBase.mdb_id,
+    memoryBase.name,
+    memoryBase.description,
+    user?.spaceId,
+    existingNames,
+    t,
+    updateMemoryBase,
+    showSuccess,
+    showError,
+  ]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingState(EMPTY_EDITING_STATE);
+    setNameError('');
+  }, []);
 
   const llmModel = modelsList.find(model => model.model_id === memoryBase.llm_model_config_id);
 
@@ -167,28 +281,45 @@ export const MemoryBaseCardNew: React.FC<MemoryBaseCardNewProps> = ({
   }
 
   return (
-    <ConfigCard
-      id={memoryBase.mdb_id}
-      icon={icon}
-      iconBgColor="bg-gradient-to-br from-purple-50 to-indigo-50"
-      iconTextColor="text-purple-600"
-      title={memoryBase.name}
-      description={memoryBase.description}
-      tags={tags}
-      editingState={EMPTY_EDITING_STATE}
-      actions={actions}
-      onClick={() => onEdit(memoryBase)}
-      footer={
-        <CardFooterRow className="flex flex-col gap-1">
-          <div className="flex items-center text-[11px] text-[#9CA3AF]">
-            <Clock className="w-3 h-3 mr-1" />
-            <span>
-              {t('common.card.editedAgo')} {timeDisplay}
-            </span>
-          </div>
-        </CardFooterRow>
-      }
-    />
+    <>
+      <ConfigCard
+        id={memoryBase.mdb_id}
+        icon={icon}
+        iconBgColor="bg-gradient-to-br from-purple-50 to-indigo-50"
+        iconTextColor="text-purple-600"
+        title={memoryBase.name}
+        description={memoryBase.description}
+        tags={tags}
+        editingState={editingState}
+        isUpdating={isSaving}
+        actions={actions}
+        onClick={() => onEdit(memoryBase)}
+        onEdit={handleStartEdit}
+        onUpdateValue={handleUpdateValue}
+        onSaveEdit={handleSaveEdit}
+        onCancelEdit={handleCancelEdit}
+        nameMaxLength={100}
+        descriptionMaxLength={2000}
+        inlineError={
+          editingState.id === memoryBase.mdb_id && editingState.isEditing
+            ? editingState.field === 'name'
+              ? nameError
+              : undefined
+            : undefined
+        }
+        footer={
+          <CardFooterRow className="flex flex-col gap-1">
+            <div className="flex items-center text-[11px] text-[#9CA3AF]">
+              <Clock className="w-3 h-3 mr-1" />
+              <span>
+                {t('common.card.editedAgo')} {timeDisplay}
+              </span>
+            </div>
+          </CardFooterRow>
+        }
+      />
+      <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />
+    </>
   );
 };
 

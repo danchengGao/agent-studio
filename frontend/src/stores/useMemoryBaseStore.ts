@@ -58,7 +58,7 @@ const initialState: MemoryBaseState = {
   // 分页相关
   total: 0,
   currentPage: 1,
-  pageSize: 10,
+  pageSize: 20,
 }
 
 export const useMemoryBaseStore = create<MemoryBaseStore>()(
@@ -66,7 +66,7 @@ export const useMemoryBaseStore = create<MemoryBaseStore>()(
     (set, get) => ({
       ...initialState,
 
-      fetchMemoryBases: async (spaceId = '0', page = 1, size = 10) => {
+      fetchMemoryBases: async (spaceId = '0', page = 1, size = 20) => {
         try {
           set({ isLoading: true, error: null })
           const request: GetMemoryBasesRequest = {
@@ -105,7 +105,7 @@ export const useMemoryBaseStore = create<MemoryBaseStore>()(
         }
       },
 
-      searchMemoryBases: async (spaceId: string, query: string, page = 1, size = 10) => {
+      searchMemoryBases: async (spaceId: string, query: string, page = 1, size = 20) => {
         try {
           set({ isSearching: true, error: null })
           const request: SearchMemoryBaseRequest = {
@@ -161,25 +161,21 @@ export const useMemoryBaseStore = create<MemoryBaseStore>()(
 
       updateMemoryBase: async (data: UpdateMemoryBaseRequest) => {
         try {
-          set({ isLoading: true, error: null })
-          const response = await MemoryBaseService.updateMemoryBase(data)
+          await MemoryBaseService.updateMemoryBase(data);
 
-          // 修复类型错误：确保id是必填的string类型，且严格匹配MemoryBase类型
           set((state) => {
-            // 1. 先获取当前要更新的memoryBase，确保存在且id匹配
             const updatedMemoryBases = state.memoryBases.map((mb) => {
-              if (mb.mdb_id === data.mdb_id) { // 注意：这里用data.memory_id（和UpdateMemoryBaseRequest定义一致）
+              if (mb.mdb_id === data.mdb_id) {
                 return {
                   ...mb,
                   name: data.name,
                   description: data.description,
-                  llm_model_config_id: data.llm_model_config_id || mb.llm_model_config_id, // 补充LLM模型ID更新
-                } as MemoryBase; // 显式类型断言确保类型正确
+                  llm_model_config_id: data.llm_model_config_id || mb.llm_model_config_id,
+                } as MemoryBase;
               }
               return mb;
             });
 
-            // 2. 更新currentMemoryBase，确保类型安全
             let updatedCurrentMemoryBase = state.currentMemoryBase;
             if (updatedCurrentMemoryBase?.mdb_id === data.mdb_id) {
               updatedCurrentMemoryBase = {
@@ -187,19 +183,17 @@ export const useMemoryBaseStore = create<MemoryBaseStore>()(
                 name: data.name,
                 description: data.description,
                 llm_model_config_id: data.llm_model_config_id || updatedCurrentMemoryBase.llm_model_config_id,
-              } as MemoryBase; // 显式类型断言
+              } as MemoryBase;
             }
 
-            // 3. 返回严格的Partial<MemoryBaseStore>类型
             return {
               memoryBases: updatedMemoryBases,
               currentMemoryBase: updatedCurrentMemoryBase,
-              isLoading: false,
             };
           });
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to update memory base';
-          set({ error: errorMessage, isLoading: false });
+          set({ error: errorMessage });
           throw error;
         }
       },
