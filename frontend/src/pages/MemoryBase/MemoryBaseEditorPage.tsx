@@ -6,10 +6,7 @@ import {
   FileText, 
   ChevronLeft, 
   ChevronRight, 
-  Edit, 
   Trash2, 
-  Save, 
-  X, 
   RefreshCw, 
   CheckSquare, 
   Square,
@@ -24,23 +21,17 @@ import {
 import { 
   MemoryBase, 
   MemoryItem,
-  GetMemoryStatusRequest,
   MemoryStatusItem,
-  GetMemoryBasesRequest,
-  GetMemoryBasesResponse,
-  MemoryBaseItem,
   UpdateMemoryRequest,
   UpdateMemoryResponse,
   DeleteMemoryBaseRequest,
   DeleteMemoryBaseResponse,
   GetDocumentsListRequest,
   GetDocumentsListResponse,
-  DocumentItem,
   ProcessDocumentsRequest,
   ProcessDocumentsResponse,
   GetDocumentStatusRequest,
   GetDocumentStatusResponse,
-  DocumentStatusItem,
   UpdateDocumentRequest,
   UpdateDocumentResponse,
   DeleteDocumentsRequest,
@@ -110,14 +101,6 @@ const api = {
       user_id: user_id,
       group_id: group_id,
       mem_id: id,
-    })
-  },
-  updateLongTerm: async (user_id: string, group_id: string, id: string, content: string) => {
-    await axios.post('/api/v1/execution/memory/update_longterm_mem', {
-      user_id: user_id,
-      group_id: group_id,
-      mem_id: id,
-      content: content
     })
   },
   
@@ -216,16 +199,9 @@ const MemoryBaseEditorPage: React.FC = () => {
   const [totalMemories, setTotalMemories] = useState(0);
   const [isMemoriesLoading, setIsMemoriesLoading] = useState(false);
   const [currentRequestPage, setCurrentRequestPage] = useState<number | null>(null);
-  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
-  const [editingMemoryContent, setEditingMemoryContent] = useState('');
-  const [editingMemoryType, setEditingMemoryType] = useState<MemoryType>('longterm');
-  const [isUpdating, setIsUpdating] = useState(false);
-  const MAX_MEMORY_CONTENT_LENGTH = 5000;
   
   const [memoryStatuses, setMemoryStatuses] = useState<Record<string, MemoryStatusItem>>({});
-  const [refreshingStatuses, setRefreshingStatuses] = useState<Set<string>>(new Set());
   const [isRefreshingAllStatuses, setIsRefreshingAllStatuses] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
 
   // 删除确认对话框状态
   const [deleteDialog, setDeleteDialog] = useState({
@@ -246,9 +222,6 @@ const MemoryBaseEditorPage: React.FC = () => {
   // 搜索和过滤状态
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<MemoryType | 'all'>('all');
-
-  // 记忆处理状态
-  const [processingMemoryIds, setProcessingMemoryIds] = useState<string[]>([]);
 
   // 用于存储 memoryStatuses 的引用
   const memoryStatusesRef = React.useRef<Record<string, MemoryStatusItem>>({});
@@ -480,43 +453,6 @@ const MemoryBaseEditorPage: React.FC = () => {
     }
   }, [memoryBase?.mdb_id, user?.spaceId]); // 只依赖ID和spaceId，避免重复调用
 
-  // 自动刷新非最终状态的记忆状态
-  useEffect(() => {
-    if (!autoRefreshEnabled || !memoryBase) return;
-
-    let cancelled = false;
-
-    const refreshLoop = async () => {
-      while (!cancelled) {
-        await new Promise(r => setTimeout(r, 10000));
-        if (cancelled) break;
-
-        try {
-          const existingStatuses = memoryStatusesRef.current;
-          const processingMemoryIds = Object.keys(existingStatuses).filter(memoryId => {
-            const status = existingStatuses[memoryId]?.status?.toLowerCase();
-            return status && status !== 'indexed' && status !== 'failed' && status !== 'deleted';
-          });
-
-          if (processingMemoryIds.length > 0) {
-            await fetchMemoryStatuses(processingMemoryIds, true);
-          } else if (Object.keys(existingStatuses).length === 0) {
-            const result = await fetchAllMemoryIds();
-            if (result.allMemoryIds.length > 0) {
-              await fetchMemoryStatuses(result.allMemoryIds, false);
-            }
-          }
-        } catch (error) {
-          console.error(t('memoryBases.editor.autoRefreshError'), error);
-        }
-      }
-    };
-
-    refreshLoop();
-
-    return () => { cancelled = true; };
-  }, [autoRefreshEnabled, memoryBase?.mdb_id, user?.spaceId]);
-
   // 过滤记忆项
   useEffect(() => {
     let filtered = memories;
@@ -524,7 +460,7 @@ const MemoryBaseEditorPage: React.FC = () => {
     // 按类型过滤
     if (selectedTypeFilter !== 'all') {
       if (selectedTypeFilter === 'longterm') {
-        filtered = filtered.filter(mem => mem.type !== 'variable');
+        filtered = filtered.filter(mem => mem.type !== 'variable' && mem.type !== 'summary' );
       } else {
         filtered = filtered.filter(mem => mem.type === selectedTypeFilter);
       }
@@ -570,43 +506,6 @@ const MemoryBaseEditorPage: React.FC = () => {
     }
   }, [pageSize]); // 当pageSize变化时重新获取数据
 
-  // 刷新单个记忆状态
-  const handleRefreshSingleStatus = async (memoryId: string) => {
-    if (!memoryBase || refreshingStatuses.has(memoryId)) return;
-
-    setRefreshingStatuses(prev => new Set(prev).add(memoryId));
-    try {
-      const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID;
-
-      // 模拟获取状态（实际实现中应调用真实API）
-      const statusResponse = {
-        data: {
-          items: [{
-            id: memoryBase.mdb_id,
-            memory_id: memoryId,
-            status: 'success'
-          }]
-        }
-      };
-
-      // 更新状态数据 - 使用fetchMemoryStatuses保持一致性
-      if (statusResponse.data?.items?.length > 0) {
-        await fetchMemoryStatuses([memoryId], true); // 只更新这个记忆的状态
-      }
-
-      showSuccess(t('memoryBases.editor.refreshSuccess'));
-    } catch (error) {
-      console.error('Failed to refresh memory status:', error);
-      showError(t('memoryBases.editor.refreshFailed'));
-    } finally {
-      setRefreshingStatuses(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(memoryId);
-        return newSet;
-      });
-    }
-  };
-
   // 刷新所有记忆状态
   const handleRefreshAllStatuses = async () => {
     if (!memoryBase || filteredMemories.length === 0 || isRefreshingAllStatuses) return;
@@ -650,71 +549,22 @@ const MemoryBaseEditorPage: React.FC = () => {
       setIsRefreshingAllStatuses(false);
     }
   };
-
-  // 状态显示组件
-  const StatusBadge = ({ status, memoryId }: { status: string; memoryId: string }) => {
-    const getStatusColor = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'processing':
-          return 'bg-blue-100 text-blue-800';
-        case 'indexed':
-          return 'bg-green-100 text-green-800';
-        case 'failed':
-          return 'bg-red-100 text-red-800';
-        case 'deleted':
-          return 'bg-gray-100 text-gray-600';
-        default:
-          return 'bg-gray-100 text-gray-800';
-      }
-    };
-
-    const getStatusText = (status: string) => {
-      switch (status.toLowerCase()) {
-        case 'processing':
-          return t('memoryBases.editor.status.processing');
-        case 'indexed':
-          return t('memoryBases.editor.status.indexed');
-        case 'failed':
-          return t('memoryBases.editor.status.failed');
-        case 'deleted':
-          return t('memoryBases.editor.status.deleted');
-        default:
-          return status;
-      }
-    };
-
-    const isAutoRefreshing =
-      autoRefreshEnabled &&
-      status.toLowerCase() !== 'indexed' &&
-      status.toLowerCase() !== 'failed' &&
-      status.toLowerCase() !== 'deleted' &&
-      status.toLowerCase() !== 'unknown';
-
-    return (
-      <div className="flex items-center space-x-2">
-        <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusColor(status)}`}>
-          {getStatusText(status)}
-        </span>
-        {isAutoRefreshing && <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>}
-      </div>
-    );
-  };
-
+  
   // 获取记忆类型图标
   const getMemoryTypeIcon = (type: MemoryType) => {
     switch (type) {
       case 'variable':
-        return <Hash className="w-4 h-4 text-purple-600" />;
+        return <Hash className="w-4 h-4 text-purple-600"/>;
       case 'summary':
-        return <MessageSquare className="w-4 h-4 text-blue-600" />;
+        return <MessageSquare className="w-4 h-4 text-blue-600"/>;
       case 'user_profile':
-        return <User className="w-4 h-4 text-green-600" />;
+        return <User className="w-4 h-4 text-green-600"/>;
       case 'scenario':
-        return <Target className="w-4 h-4 text-yellow-600" />;
+        return <User className="w-4 h-4 text-green-600"/>;
       case 'semantic':
-        return <Brain className="w-4 h-4 text-indigo-600" />;
+        return <User className="w-4 h-4 text-green-600"/>;
       default:
-        return <Hash className="w-4 h-4 text-gray-600" />;
+        return <Hash className="w-4 h-4 text-gray-600"/>;
     }
   };
 
@@ -726,91 +576,14 @@ const MemoryBaseEditorPage: React.FC = () => {
       case 'summary':
         return t('memoryBases.memoryType.summary');
       case 'user_profile':
-        return t('memoryBases.memoryType.profile');
+        return t('memoryBases.memoryType.longterm');
       case 'scenario':
-        return t('memoryBases.memoryType.scenario');
+        return t('memoryBases.memoryType.longterm');
       case 'semantic':
-        return t('memoryBases.memoryType.semantic');
+        return t('memoryBases.memoryType.longterm');
       default:
         return type;
     }
-  };
-
-  // 开始编辑记忆项
-  const handleEditMemory = (memory: ExtendedMemoryItem) => {
-    setEditingMemoryId(memory.id);
-    setEditingMemoryContent(memory.content);
-    if (isMemoryType(memory.type)) {
-      setEditingMemoryType(memory.type);
-    }
-  };
-
-  // 保存记忆项
-  const handleSaveMemory = async (memoryId: string) => {
-    if (!memoryBase || !editingMemoryContent.trim()) return;
-
-    // 验证记忆内容长度
-    if (editingMemoryContent.length > MAX_MEMORY_CONTENT_LENGTH) {
-      showError(t('memoryBases.editor.contentMaxLength', { max: MAX_MEMORY_CONTENT_LENGTH }));
-      return;
-    }
-
-    setIsUpdating(true);
-    try {
-      const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID;
-
-      // 根据记忆类型调用不同的API
-      const memoryToEdit = memories.find(mem => mem.id === memoryId);
-      if (memoryToEdit && memoryToEdit.type === 'variable') {
-        // 更新变量
-        await axios.post('/api/v1/execution/memory/update_user_variable', {
-          user_id: spaceId,
-          group_id: memoryBase.mdb_id,
-          name: memoryId,
-          mem: editingMemoryContent
-        });
-      } else {
-        // 更新长期记忆
-        await api.updateLongTerm(
-          spaceId,
-          memoryBase.mdb_id,
-          memoryId,
-          editingMemoryContent
-        );
-      }
-
-      // 更新本地状态
-      setMemories(mems => mems.map(mem => 
-        mem.id === memoryId ? { 
-          ...mem, 
-          content: editingMemoryContent,
-          type: editingMemoryType
-        } : mem
-      ));
-
-      setFilteredMemories(fms => fms.map(fm => 
-        fm.id === memoryId ? { 
-          ...fm, 
-          content: editingMemoryContent,
-          type: editingMemoryType
-        } : fm
-      ));
-
-      setEditingMemoryId(null);
-      setEditingMemoryContent('');
-      showSuccess(t('memoryBases.editor.updateSuccess'));
-    } catch (error) {
-      console.error('Failed to update memory:', error);
-      showError(t('memoryBases.editor.updateFailed'));
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // 取消编辑
-  const handleCancelEdit = () => {
-    setEditingMemoryId(null);
-    setEditingMemoryContent('');
   };
 
   // 打开删除确认对话框
@@ -968,8 +741,6 @@ const MemoryBaseEditorPage: React.FC = () => {
       }
     });
 
-    // 更新处理中的记忆列表（完全替换，基于所有记忆的状态）
-    setProcessingMemoryIds(processingMemoryIdsList);
   }, [memoryStatuses]);
 
   if (!memoryBase || isLoadingMemoryBase) {
@@ -991,11 +762,10 @@ const MemoryBaseEditorPage: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
               <button onClick={handleBack} className="flex items-center text-gray-600 hover:text-gray-900 mr-4">
-                <ArrowLeft className="w-5 h-5 mr-2" />
+                <ArrowLeft className="w-5 h-5 mr-2"/>
                 {t('common.buttons.back')}
               </button>
               <div className="flex items-center min-w-0 flex-1">
-                <Edit className="w-5 h-5 mr-2 text-gray-500 flex-shrink-0" />
                 <h1 className="text-xl font-semibold text-gray-900 flex items-center min-w-0" title={memoryBase.name}>
                   <span className="truncate max-w-[300px]">
                     {memoryBase.name.length > 30 ? `${memoryBase.name.substring(0, 30)}...` : memoryBase.name}
@@ -1004,25 +774,12 @@ const MemoryBaseEditorPage: React.FC = () => {
                 </h1>
               </div>
             </div>
-            {/* <button onClick={handleAddMemory} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
-              <Plus className="w-4 h-4 mr-2" />
-              {t('memoryBases.settings.addMemory')}
-            </button> */}
           </div>
         </div>
       </div>
 
       {/* 主要内容区域 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 记忆处理中提示 */}
-        {processingMemoryIds.length > 0 && (
-          <div className="mb-6 bg-white rounded-lg shadow p-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-gray-700">{t('memoryBases.editor.processing', { count: processingMemoryIds.length })}</span>
-            </div>
-          </div>
-        )}
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="space-y-6">
@@ -1043,18 +800,12 @@ const MemoryBaseEditorPage: React.FC = () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
                   <h2 className="text-lg font-medium text-gray-900">{t('memoryBases.editor.memoryList')}</h2>
-                  {autoRefreshEnabled && processingMemoryIds.length > 0 && (
-                    <div className="flex items-center text-sm text-green-600">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                      {t('memoryBases.editor.autoRefresh')}
-                    </div>
-                  )}
                 </div>
                 
                 {/* 搜索和过滤工具栏 */}
                 <div className="flex items-center space-x-4">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"/>
                     <input
                       type="text"
                       placeholder={t('memoryBases.searchMemory')}
@@ -1065,7 +816,7 @@ const MemoryBaseEditorPage: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <Filter className="w-5 h-5 text-gray-500" />
+                    <Filter className="w-5 h-5 text-gray-500"/>
                     <select
                       value={selectedTypeFilter}
                       onChange={e => setSelectedTypeFilter(e.target.value as MemoryType | 'all')}
@@ -1075,9 +826,6 @@ const MemoryBaseEditorPage: React.FC = () => {
                       <option value="longterm">{t('memoryBases.memoryType.longterm')}</option>
                       <option value="variable">{t('memoryBases.memoryType.variable')}</option>
                       <option value="summary">{t('memoryBases.memoryType.summary')}</option>
-                      {/* <option value="profile">{t('memoryBases.memoryType.profile')}</option>
-                      <option value="scenario">{t('memoryBases.memoryType.scenario')}</option>
-                      <option value="semantic">{t('memoryBases.memoryType.semantic')}</option> */}
                     </select>
                   </div>
                   
@@ -1086,194 +834,120 @@ const MemoryBaseEditorPage: React.FC = () => {
                       onClick={handleOpenBatchDeleteDialog}
                       className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center text-sm"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
+                      <Trash2 className="w-4 h-4 mr-2"/>
                       {t('memoryBases.editor.deleteSelected', { count: selectedMemoryIds.size })}
                     </button>
                   )}
                   <button
-                    onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-                    disabled={processingMemoryIds.length === 0}
-                    className={`px-3 py-2 rounded-lg flex items-center text-sm ${
-                      processingMemoryIds.length === 0
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : autoRefreshEnabled
-                        ? 'bg-gray-500 text-white hover:bg-gray-600'
-                        : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                    title={processingMemoryIds.length === 0 ? t('memoryBases.editor.noAutoRefreshHint') : ''}
-                  >
-                    {autoRefreshEnabled ? t('memoryBases.editor.stopAutoRefresh') : t('memoryBases.editor.startAutoRefresh')}
-                  </button>
-                  <button
                     onClick={handleRefreshAllStatuses}
                     disabled={filteredMemories.length === 0 || isRefreshingAllStatuses}
-                    className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm"
+                    className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
-                    <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingAllStatuses ? 'animate-spin' : ''}`} />
-                    {isRefreshingAllStatuses ? t('memoryBases.editor.refreshing') : t('memoryBases.editor.refreshStatus')}
+                    <RefreshCw className={`w-4 h-4 ${isRefreshingAllStatuses ? 'animate-spin' : ''}`}/>
                   </button>
                 </div>
               </div>
 
               {isMemoriesLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  <span className="ml-2 text-gray-600">{t('memoryBases.editor.loadingMemories')}</span>
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                  <span className="ml-3 text-gray-600 text-sm">{t('memoryBases.editor.loadingMemories')}</span>
                 </div>
               ) : filteredMemories.length === 0 ? (
-                <div className="text-center py-8">
-                  <FileText className="mx-auto w-12 h-12 text-gray-300 mb-4" />
-                  <p className="text-gray-500 mb-4">{t('memoryBases.editor.noMemories')}</p>
-                  {/* <button onClick={handleAddMemory} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center mx-auto">
-                    <Plus className="w-4 h-4 mr-2" />
-                    {t('memoryBases.editor.addMemory')}
-                  </button> */}
+                <div className="text-center py-12">
+                  <FileText className="mx-auto w-14 h-14 text-gray-300 mb-4"/>
+                  <p className="text-gray-500 text-sm">{t('memoryBases.editor.noMemories')}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                  <div className="border border-gray-200 rounded-lg overflow-x-auto shadow-sm">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                          {/* 全选 */}
+                          <th scope="col" className="px-4 py-3 w-12">
                             <button
                               onClick={handleSelectAll}
-                              className="flex items-center justify-center p-1 rounded hover:bg-gray-200 transition-colors"
+                              className="flex items-center justify-center p-1.5 rounded-md hover:bg-gray-200 transition-colors"
                               title={isAllSelected ? t('memoryBases.editor.deselectAll') : t('memoryBases.editor.selectAll')}
                             >
                               {isAllSelected ? (
-                                <CheckSquare className="w-5 h-5 text-blue-600" />
+                                <CheckSquare className="w-5 h-5 text-blue-600"/>
                               ) : isPartialSelected ? (
-                                <div className="w-5 h-5 border-2 border-blue-600 rounded flex items-center justify-center bg-blue-600">
-                                  <div className="w-2.5 h-0.5 bg-white"></div>
+                                <div className="w-5 h-5 border-2 border-blue-600 rounded flex items-center justify-center bg-white">
+                                  <div className="w-2.5 h-0.5 bg-blue-600"></div>
                                 </div>
                               ) : (
-                                <Square className="w-5 h-5 text-gray-400" />
+                                <Square className="w-5 h-5 text-gray-400"/>
                               )}
                             </button>
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('memoryBases.editor.memoryType')}</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('memoryBases.editor.memoryContent')}</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('memoryBases.settings.status')}
+                          {/* 类型 */}
+                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">
+                            {t('memoryBases.editor.memoryType')}
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('memoryBases.editor.actions')}</th>
+                          {/* 内容 */}
+                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
+                            {t('memoryBases.editor.memoryContent')}
+                          </th>
+                          {/* 操作 */}
+                          <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                            {t('memoryBases.editor.actions')}
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredMemories.map(mem => (
-                          <tr key={mem.id} className={`hover:bg-gray-50 ${selectedMemoryIds.has(mem.id) ? 'bg-blue-50' : ''}`}>
-                            <td className="px-4 py-4 whitespace-nowrap w-12">
+                        {filteredMemories.map((mem) => (
+                          <tr
+                            key={mem.id}
+                            className={`hover:bg-gray-50 transition-colors ${
+                              selectedMemoryIds.has(mem.id) ? 'bg-blue-50' : ''
+                            }`}
+                          >
+                            {/* 单选 */}
+                            <td className="px-4 py-3.5 text-center">
                               <button
                                 onClick={() => handleSelectMemory(mem.id)}
-                                className="flex items-center justify-center p-1 rounded hover:bg-gray-200 transition-colors"
+                                className="flex items-center justify-center p-1.5 rounded-md hover:bg-gray-200 transition-colors"
                               >
                                 {selectedMemoryIds.has(mem.id) ? (
-                                  <CheckSquare className="w-5 h-5 text-blue-600" />
+                                  <CheckSquare className="w-5 h-5 text-blue-600"/>
                                 ) : (
-                                  <Square className="w-5 h-5 text-gray-400" />
+                                  <Square className="w-5 h-5 text-gray-400"/>
                                 )}
                               </button>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            {/* 类型内容 */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
                               <div className="flex items-center">
                                 {isMemoryType(mem.type)
                                   ? getMemoryTypeIcon(mem.type)
-                                  : <Hash className="w-4 h-4 text-gray-600" />}
-                                <span className="ml-2 text-sm text-gray-600">
-                                  {isMemoryType(mem.type) 
-                                    ? getMemoryTypeName(mem.type) 
-                                    : '未知类型'}
+                                  : <Hash className="w-4 h-4 text-gray-600"/>}
+                                <span className="ml-2 text-sm text-gray-700">
+                                  {isMemoryType(mem.type)
+                                    ? getMemoryTypeName(mem.type)
+                                    : t('common.unknown')}
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-sm">
-                              {editingMemoryId === mem.id ? (
-                                <div className="space-y-2">
-                                  <textarea
-                                    value={editingMemoryContent}
-                                    onChange={e => {
-                                      const newValue = e.target.value;
-                                      // 限制输入长度
-                                      if (newValue.length <= MAX_MEMORY_CONTENT_LENGTH) {
-                                        setEditingMemoryContent(newValue);
-                                      }
-                                    }}
-                                    rows={3}
-                                    maxLength={MAX_MEMORY_CONTENT_LENGTH}
-                                    className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                      editingMemoryContent.length >= MAX_MEMORY_CONTENT_LENGTH ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'
-                                    }`}
-                                  />
-                                  <div className="flex items-center justify-between">
-                                    <span
-                                      className={`text-xs ${editingMemoryContent.length >= MAX_MEMORY_CONTENT_LENGTH ? 'text-red-500' : 'text-gray-500'}`}
-                                    >
-                                      {editingMemoryContent.length}/{MAX_MEMORY_CONTENT_LENGTH}
-                                    </span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="max-w-xs truncate text-gray-700" title={mem.content}>
-                                  {mem.content.length > 100 ? `${mem.content.substring(0, 100)}...` : mem.content}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <StatusBadge
-                                status={memoryStatuses[mem.id]?.status || 'unknown'}
-                                memoryId={mem.id}
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <div className="flex items-center space-x-2">
-                                {editingMemoryId === mem.id ? (
-                                  <>
-                                    <button
-                                      onClick={() => handleSaveMemory(mem.id)}
-                                      className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                                      disabled={isUpdating}
-                                      title={t('memoryBases.editor.saveChanges')}
-                                    >
-                                      <Save className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={handleCancelEdit}
-                                      className="text-red-600 hover:text-red-800"
-                                      title={t('memoryBases.editor.cancelEdit')}
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleEditMemory(mem)}
-                                      className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                                      disabled={editingMemoryId !== null || isUpdating}
-                                      title={t('memoryBases.editor.editMemory')}
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleRefreshSingleStatus(mem.id)}
-                                      className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                                      disabled={refreshingStatuses.has(mem.id)}
-                                      title={t('memoryBases.editor.refreshMemoryStatus')}
-                                    >
-                                      <RefreshCw className={`w-4 h-4 ${refreshingStatuses.has(mem.id) ? 'animate-spin' : ''}`} />
-                                    </button>
-                                    <button
-                                      onClick={() => handleOpenDeleteDialog(mem.id, mem.content)}
-                                      className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                                      disabled={editingMemoryId !== null || isUpdating}
-                                      title={t('memoryBases.editor.deleteMemory')}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
+                            {/* 记忆内容 */}
+                            <td className="px-4 py-3.5 max-w-xs">
+                              <div
+                                className="text-sm text-gray-700 truncate"
+                                title={mem.content}
+                              >
+                                {mem.content.length > 120 ? `${mem.content.substring(0, 120)}...` : mem.content}
                               </div>
+                            </td>
+                            {/* 操作按钮 */}
+                            <td className="px-4 py-3.5 text-center">
+                              <button
+                                onClick={() => handleOpenDeleteDialog(mem.id, mem.content)}
+                                className="text-red-600 hover:text-red-800 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                                title={t('memoryBases.editor.deleteMemory')}
+                              >
+                                <Trash2 className="w-4 h-4"/>
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1307,7 +981,7 @@ const MemoryBaseEditorPage: React.FC = () => {
                           disabled={currentPage === 1}
                           className={`p-2 rounded-lg ${currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                          <ChevronLeft className="w-5 h-5" />
+                          <ChevronLeft className="w-5 h-5"/>
                         </button>
 
                         <div className="flex items-center space-x-1">
@@ -1341,7 +1015,7 @@ const MemoryBaseEditorPage: React.FC = () => {
                           disabled={currentPage === totalPages}
                           className={`p-2 rounded-lg ${currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
                         >
-                          <ChevronRight className="w-5 h-5" />
+                          <ChevronRight className="w-5 h-5"/>
                         </button>
 
                         <span className="text-sm text-gray-600 ml-4">{t('common.pagination.page', { current: currentPage, total: totalPages })}</span>
@@ -1381,7 +1055,7 @@ const MemoryBaseEditorPage: React.FC = () => {
         iconType="danger"
       />
 
-      <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar} />
+      <UnifiedSnackbar snackbar={snackbar} onClose={closeSnackbar}/>
     </div>
   );
 };

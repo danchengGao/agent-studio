@@ -4362,12 +4362,9 @@
     "createButton": "Create Memory Base",
     "memoryType": {
       "all": "All Type",
-      "longterm": "Long Term Memory",
+      "longterm": "Memory Fragments",
       "variable": "Variable Memory",
-      "summary": "History Summary",
-      "profile": "User Profile",
-      "scenario": "Scenario Memory",
-      "semantic": "Semantic Memory"
+      "summary": "History Summary"
     },
     "search": {
       "searching": "Searching...",
@@ -4469,12 +4466,7 @@
       "memoryAdded": "Memory added successfully"
     },
     "editor": {
-      "loading": "Loading memory base info...",
       "documentList": "Memory List",
-      "autoRefresh": "Auto-refreshing memory status",
-      "stopAutoRefresh": "Stop auto-refreshing memory status",
-      "startAutoRefresh": "Start auto-refreshing memory status",
-      "noAutoRefreshHint": "No memories are being processed; auto-refresh not needed",
       "refreshing": "Refreshing...",
       "refreshStatus": "Refresh Status",
       "processing": "{{count}} memory(s) being processed",
@@ -4530,8 +4522,8 @@
       "deleteSelected": "Delete Selected ({{count}})",
       "refreshSuccess": "Memory status refreshed successfully",
       "refreshFailed": "Failed to refresh Memory status",
-      "refreshAllSuccess": "All Memory statuses refreshed successfully",
-      "refreshAllFailed": "Failed to refresh all Memory statuses",
+      "refreshAllSuccess": "Get all Memory successfully",
+      "refreshAllFailed": "Get all Memory failed",
       "autoRefreshError": "Auto-refresh of Memory status failed"
     },
     "addDocument": {

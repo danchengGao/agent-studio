@@ -4143,12 +4143,9 @@
     "createButton": "创建记忆库",
     "memoryType": {
       "all": "全部",
-      "longterm": "长期记忆",
+      "longterm": "记忆片段",
       "variable": "变量记忆",
-      "summary": "历史摘要",
-      "profile": "用户画像",
-      "scenario": "场景记忆",
-      "semantic": "语义记忆"
+      "summary": "历史摘要"
     },
     "form": {
       "name": "记忆库名称",
@@ -4237,12 +4234,7 @@
       "memoryAdded": "记忆添加成功"
     },
     "editor": {
-      "loading": "加载记忆库信息...",
       "documentList": "记忆列表",
-      "autoRefresh": "自动刷新记忆状态中",
-      "stopAutoRefresh": "停止自动刷新记忆状态",
-      "startAutoRefresh": "开启自动刷新记忆状态",
-      "noAutoRefreshHint": "没有处理中的记忆，无需自动刷新",
       "refreshing": "刷新中...",
       "refreshStatus": "刷新状态",
       "processing": "记忆处理中 ({{count}} 个记忆)",
@@ -4298,8 +4290,8 @@
       "deleteSelected": "删除选中 ({{count}})",
       "refreshSuccess": "记忆状态刷新成功",
       "refreshFailed": "刷新记忆状态失败",
-      "refreshAllSuccess": "所有记忆状态刷新成功",
-      "refreshAllFailed": "刷新所有记忆状态失败",
+      "refreshAllSuccess": "获取所有记忆成功",
+      "refreshAllFailed": "获取所有记忆失败",
       "autoRefreshError": "自动刷新记忆状态失败"
     },
     "addDocument": {
