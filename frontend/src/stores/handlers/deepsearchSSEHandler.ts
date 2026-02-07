@@ -84,6 +84,16 @@ export class DeepsearchSSEHandler {
    * 主入口：处理 SSE 消息
    */
   public handleSSEMessage(sseData: SSEData): void {
+    // HITL 延续场景：如果当前 MessageItems 状态为 COMPLETED，重新设置为 IN_PROGRESS
+    // 这发生在用户回复 interrupt 消息后，SSE 流继续的情况
+    const lastMessageItems = this.store.getCurrentMessageItems();
+    if (lastMessageItems && !this.store.getMessageItemsIsUser(lastMessageItems)) {
+      if (lastMessageItems.status === TaskStatus.COMPLETED || lastMessageItems.status === TaskStatus.CANCELLED) {
+        // HITL 延续：重新激活 MessageItems 状态
+        this.store.updateMessageItems(lastMessageItems.id, { status: TaskStatus.IN_PROGRESS });
+      }
+    }
+
     const sectionIdx = sseData.section_idx ? parseInt(String(sseData.section_idx), 10) : undefined;
     const planIdx = sseData.plan_idx ? parseInt(String(sseData.plan_idx), 10) : undefined;
     const stepIdx = sseData.step_idx ? parseInt(String(sseData.step_idx), 10) : undefined;
@@ -164,28 +174,12 @@ export class DeepsearchSSEHandler {
           if (prevPlanTask &&
               (prevPlanTask.status === TaskStatus.PENDING ||
                prevPlanTask.status === TaskStatus.IN_PROGRESS)) {
-            const now = Date.now();
-
-            // 递归更新函数：更新任务及其所有子孙
-            const updateTaskAndDescendants = (taskId: string) => {
-              const task = this.store.getMessageById(taskId);
-              if (!task) return;
-
-              // 更新当前任务
-              if (task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) {
-                updateMessage(lastMessageItems.id, task.id, {
-                  status: TaskStatus.UNKNOWN,
-                  updatedAt: now,
-                });
-              }
-
-              // 递归更新所有子孙
-              const children = this.store.getChildMessages(task.id);
-              children.forEach(child => updateTaskAndDescendants(child.id));
-            };
-
             // 从上一个 planTask 开始递归更新
-            updateTaskAndDescendants(prevPlanTask.id);
+            this.updateUnfinishedTasksRecursively(
+              prevPlanTask.id,
+              lastMessageItems.id,
+              TaskStatus.UNKNOWN
+            );
           }
         }
 
@@ -232,6 +226,18 @@ export class DeepsearchSSEHandler {
             status: TaskStatus.IN_PROGRESS,
           });
         } else {
+          // 先有条件地递归更新本章节的最后一个子Message(子Message.status=PENDING 或 IN_PROGRESS):
+          const sectionChildren = this.store.getChildMessages(sectionTask.id);
+          const lastChildMessage = sectionChildren.length > 0 ? sectionChildren[sectionChildren.length - 1] : null;
+          if (lastChildMessage &&
+              (lastChildMessage.status === TaskStatus.PENDING || lastChildMessage.status === TaskStatus.IN_PROGRESS)) {
+            this.updateUnfinishedTasksRecursively(
+              lastChildMessage.id,
+              lastMessageItems.id,
+              TaskStatus.UNKNOWN
+            );
+          }
+
           // 情况1: 不存在章节报告 - 创建新消息（原有逻辑）
           const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
           const childMessage = this.store.addMessageAsChild(
@@ -717,40 +723,24 @@ export class DeepsearchSSEHandler {
         return;
       }
 
+      // 【步骤0】更新上一个 stepTask (task_1_x_n_(k-1))，只在存在上一个stepTask且当前retrieval是本step的第1个retrieval时才更新
+      if (stepIdx > 1 && (!stepTask.childMessageIds || stepTask.childMessageIds.length === 0)) {
+        const prevStepTask = planChildren[stepIdx - 2];
+
+        if (prevStepTask &&
+            (prevStepTask.status === TaskStatus.PENDING ||
+             prevStepTask.status === TaskStatus.IN_PROGRESS)) {
+          // 从上一个 stepTask 开始递归更新
+          this.updateUnfinishedTasksRecursively(
+            prevStepTask.id,
+            lastMessageItems.id,
+            TaskStatus.UNKNOWN
+          );
+        }
+      }
+
       // 处理 content
       if (sseData.agent === 'collector_info_retrieval') {
-        // 【步骤0】更新上一个 stepTask (task_1_x_n_(k-1))
-        if (stepIdx > 1) {
-          const prevStepTask = planChildren[stepIdx - 2];
-
-          if (prevStepTask &&
-              (prevStepTask.status === TaskStatus.PENDING ||
-               prevStepTask.status === TaskStatus.IN_PROGRESS)) {
-            const now = Date.now();
-
-            // 递归更新函数：更新任务及其所有子孙
-            const updateTaskAndDescendants = (taskId: string) => {
-              const task = this.store.getMessageById(taskId);
-              if (!task) return;
-
-              // 更新当前任务
-              if (task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) {
-                updateMessage(lastMessageItems.id, task.id, {
-                  status: TaskStatus.UNKNOWN,
-                  updatedAt: now,
-                });
-              }
-
-              // 递归更新所有子孙
-              const children = this.store.getChildMessages(task.id);
-              children.forEach(child => updateTaskAndDescendants(child.id));
-            };
-
-            // 从上一个 stepTask 开始递归更新
-            updateTaskAndDescendants(prevStepTask.id);
-          }
-        }
-
         // collector_info_retrieval: content是JSON对象，包含url、title、query
         let parsedContent: JSONObject;
         if (typeof sseData.content === 'string') {
@@ -821,9 +811,11 @@ export class DeepsearchSSEHandler {
 
         // 检查 plan 的所有子任务是否都完成
         const planChildren = this.store.getChildMessages(planTask.id);
-        const allStepsCompleted = planChildren.every(step => step.status === TaskStatus.COMPLETED);
+        const allStepsFinished = planChildren.every(step =>
+          step.status !== TaskStatus.PENDING && step.status !== TaskStatus.IN_PROGRESS
+        );
 
-        if (allStepsCompleted) {
+        if (allStepsFinished) {
           updateMessage(lastMessageItems.id, planTask.id, {
             status: TaskStatus.COMPLETED,
           });
@@ -846,10 +838,41 @@ export class DeepsearchSSEHandler {
         );
 
         if (sectionTask) {
-          // 1. 更新 task_1_x: status = COMPLETED
-          updateMessage(lastMessageItems.id, sectionTask.id, {
-            status: TaskStatus.COMPLETED,
-          });
+          // 1. 根据 sectionTask 的最后一个子 Message 的状态来更新 sectionTask
+          const sectionChildren = this.store.getChildMessages(sectionTask.id);
+          const lastChildMessage = sectionChildren.length > 0 ? sectionChildren[sectionChildren.length - 1] : null;
+
+          if (lastChildMessage) {
+            if (lastChildMessage.type !== MessageType.REPORT) {
+              // 最后一个子 Message 不是 REPORT 类型，将 sectionTask 更新为 FAILED
+              this.updateUnfinishedTasksRecursively(
+                sectionTask.id,
+                lastMessageItems.id,
+                TaskStatus.FAILED
+              );
+            } else {
+              // 最后一个子 Message 是 REPORT 类型，根据其状态决定 sectionTask 的状态
+              let targetStatus = lastChildMessage.status;
+
+              // 如果子 REPORT 的状态是 PENDING 或 IN_PROGRESS，将其变为 UNKNOWN
+              if (targetStatus === TaskStatus.PENDING || targetStatus === TaskStatus.IN_PROGRESS) {
+                targetStatus = TaskStatus.UNKNOWN;
+              }
+              // 其他状态（COMPLETED/FAILED/CANCELLED/UNKNOWN）保持不变
+
+              // 使用 updateUnfinishedTasksRecursively 将 sectionTask.status 更新为目标状态
+              this.updateUnfinishedTasksRecursively(
+                sectionTask.id,
+                lastMessageItems.id,
+                targetStatus
+              );
+            }
+          } else {
+            // sectionTask 没有子 Message，默认更新为 FAILED
+            updateMessage(lastMessageItems.id, sectionTask.id, {
+              status: TaskStatus.FAILED,
+            });
+          }
         } else {
           console.error('[SECTION END] Section task NOT FOUND for sectionIdx:', sectionIdx);
         }
@@ -920,7 +943,7 @@ export class DeepsearchSSEHandler {
         } else {
           // 只有在存在 outline 任务时才创建最终报告
           // 如果没有 outline 任务，说明这不是真正的研究请求，不需要创建最终报告
-          if (outlineTask) {
+          if (outlineTask || endData.exception_info) {
             console.warn('[DeepsearchSSEHandler] No pending REPORT message found, creating new one');
             const finalReportMessage = addSystemMessage(
               this.conversationId,
@@ -1116,6 +1139,50 @@ export class DeepsearchSSEHandler {
   // ===== 辅助方法 =====
 
   /**
+   * 递归更新未完成任务及其所有子孙的状态
+   * 只更新状态为 PENDING 或 IN_PROGRESS 的任务
+   * @param taskId 任务ID
+   * @param messageItemsId MessageItems ID
+   * @param updateStatus 要更新的目标状态
+   * @param timestamp 可选的时间戳，默认为当前时间
+   * @returns 受影响的任务数量
+   */
+  private updateUnfinishedTasksRecursively(
+    taskId: string,
+    messageItemsId: string,
+    updateStatus: TaskStatus,
+    timestamp?: number
+  ): number {
+    const task = this.store.getMessageById(taskId);
+    if (!task) return 0;
+
+    const now = timestamp ?? Date.now();
+    let count = 0;
+
+    const updateRecursively = (currentTaskId: string): void => {
+      const currentTask = this.store.getMessageById(currentTaskId);
+      if (!currentTask) return;
+
+      // 递归更新所有子孙
+      const children = this.store.getChildMessages(currentTask.id);
+      children.forEach(child => updateRecursively(child.id));
+
+      // 只更新 PENDING 或 IN_PROGRESS 状态的任务
+      if (currentTask.status === TaskStatus.PENDING ||
+          currentTask.status === TaskStatus.IN_PROGRESS) {
+        this.store.updateMessage(messageItemsId, currentTask.id, {
+          status: updateStatus,
+          updatedAt: now,
+        });
+        count++;
+      }
+    };
+
+    updateRecursively(taskId);
+    return count;
+  }
+
+  /**
    * 查找 section 下已存在的章节报告
    * @param sectionTask 章节 task 消息
    * @returns 已存在的章节报告消息，如果不存在则返回 null
@@ -1227,17 +1294,21 @@ export class DeepsearchSSEHandler {
   }
 
   /**
-   * 递归标记所有未完成的消息
+   * 递归标记所有未完成的消息（公共方法）
    * @param messageItems MessageItems 对象
    * @param markAsCompleted true=标记为 COMPLETED, false=标记为 FAILED
    * 注意：不包括用户手动停止的 CANCELLED 状态
    */
-  private markAllIncompleteMessages(messageItems: MessageItems, markAsCompleted: boolean): void {
+  public markAllIncompleteMessages(messageItems: MessageItems, markAsCompleted: boolean): void {
     const { updateMessage, getChildMessages } = this.store;
     const targetStatus = markAsCompleted ? TaskStatus.COMPLETED : TaskStatus.FAILED;
     let count = 0;
 
     const markRecursively = (message: Message) => {
+      // 递归处理子消息
+      const children = getChildMessages(message.id);
+      children.forEach(child => markRecursively(child));
+
       // 只标记非 COMPLETED/CANCELLED（用户手动停止）/UNKNOWN / FAILED 的消息
       if (message.status !== TaskStatus.COMPLETED && message.status !== TaskStatus.CANCELLED && 
         message.status !== TaskStatus.FAILED && (/*markAsCompleted ||*/ message.status !== TaskStatus.UNKNOWN)) {
@@ -1246,10 +1317,6 @@ export class DeepsearchSSEHandler {
         });
         count++;
       }
-
-      // 递归处理子消息
-      const children = getChildMessages(message.id);
-      children.forEach(child => markRecursively(child));
     };
 
     messageItems.messagesIds.forEach(msgId => {
@@ -1258,3 +1325,4 @@ export class DeepsearchSSEHandler {
     });
   }
 }
+

@@ -17,7 +17,7 @@ export const formatDuration = (ms?: number): string | null => {
   if (days > 0) parts.push(`${days}d`);
   if (hours % 24 > 0) parts.push(`${hours % 24}h`);
   if (minutes % 60 > 0) parts.push(`${minutes % 60}m`);
-  if (totalSeconds % 60 > 0 || parts.length === 0) {
+  if ((totalSeconds % 60 > 0) || (parts.length === 0 && totalSeconds > 0)) {
     parts.push(`${totalSeconds % 60}s`);
   }
 

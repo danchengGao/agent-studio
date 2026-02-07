@@ -49,6 +49,10 @@ export const MESSAGE_TITLES = {
 // 用于识别已生成的旧数据（使用国际化文本作为标题）
 const LEGACY_FINAL_REPORT_TITLES = ['最终报告', 'Final Report'] as const;
 
+// ===== SSE超时监控配置 =====
+// SSE超时时间（分钟）- 超过这个时间没有收到SSE事件，将标记未完成消息为FAILED
+export const SSE_TIMEOUT_MINUTES = 10;
+
 /**
  * 判断消息是否为最终报告
  * 兼容新旧数据：
@@ -183,6 +187,10 @@ export interface ConversationStore {
   sseStreamCache: Map<string, string[]>; // SSE流式数据缓存：key -> content chunks
   sseEventQueue: Array<{sseData: JSONObject; conversationId: string; agentType: string}>; // SSE 事件队列（确保按顺序处理）
   sseProcessingQueue: boolean; // 是否正在处理队列
+
+  // ========== SSE超时监控状态 ==========
+  lastSSEEventTime: number | null;  // 上次SSE事件时间戳
+  sseTimeoutCheckInterval: number | null;  // 超时检查定时器ID
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -454,6 +462,35 @@ export interface ConversationStore {
    * 保留基本信息，释放内存
    */
   unloadCurrentConversation: () => void;
+
+  // ========== SSE超时监控方法 ==========
+
+  /**
+   * 启动SSE超时监控
+   * @param conversationId 要监控的对话ID
+   */
+  startSSETimeoutMonitor: (conversationId: string) => void;
+
+  /**
+   * 停止SSE超时监控
+   */
+  stopSSETimeoutMonitor: () => void;
+
+  /**
+   * 更新最后SSE事件时间
+   */
+  updateLastSSEEventTime: () => void;
+
+  /**
+   * 检查并标记当前对话中未完成的MessageItems为FAILED
+   * @returns 是否标记了失败的消息
+   */
+  checkAndMarkIncompleteAsFailed: () => boolean;
+
+  /**
+   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为FAILED
+   */
+  markCurrentConversationIncompleteAsFailed: () => void;
 }
 
 // ===== Store实现 =====
@@ -490,6 +527,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   sseStreamCache: new Map<string, string[]>(),
   sseEventQueue: [],
   sseProcessingQueue: false,
+  lastSSEEventTime: null,
+  sseTimeoutCheckInterval: null,
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -1084,10 +1123,75 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return state;
       }
 
+      // ===== 前处理：根据子 message 的状态调整 status =====
+      let finalUpdates = { ...updates };
+
+      if (updates.status) {
+        // 获取子 message
+        const childMessages = existingMessage.childMessageIds
+          ?.map(id => state.messagesMap.get(id))
+          .filter((msg): msg is Message => msg !== undefined) || [];
+
+        // 根据不同的传入 status 进行调整
+        switch (updates.status) {
+          case TaskStatus.UNKNOWN:
+            // 优先级：FAILED > CANCELLED > 保持 UNKNOWN
+            if (childMessages.some(child => child.status === TaskStatus.FAILED)) {
+              finalUpdates.status = TaskStatus.FAILED;
+            } else if (childMessages.some(child => child.status === TaskStatus.CANCELLED)) {
+              finalUpdates.status = TaskStatus.CANCELLED;
+            }
+            // 其他情况保持 UNKNOWN
+            break;
+
+          case TaskStatus.COMPLETED:
+            // 优先级：FAILED > CANCELLED > UNKNOWN > 保持 COMPLETED
+            if (childMessages.some(child => child.status === TaskStatus.FAILED)) {
+              finalUpdates.status = TaskStatus.FAILED;
+            } else if (childMessages.some(child => child.status === TaskStatus.CANCELLED)) {
+              finalUpdates.status = TaskStatus.CANCELLED;
+            } else if (childMessages.some(child =>
+              child.status === TaskStatus.PENDING ||
+              child.status === TaskStatus.IN_PROGRESS ||
+              child.status === TaskStatus.UNKNOWN
+            )) {
+              finalUpdates.status = TaskStatus.UNKNOWN;
+            }
+            // 其他情况保持 COMPLETED
+            break;
+
+          // PENDING / IN_PROGRESS / FAILED / CANCELLED 保持不变
+          default:
+            break;
+        }
+
+        // 在根消息的直接子消息状态变为终态时，保存到 IndexDB
+        // 条件：1. 是子消息（有 parentMessageId）
+        //       2. 父消息是根消息（父消息没有 parentMessageId）
+        //       3. 状态变为 COMPLETED/FAILED/CANCELLED（非 PENDING/IN_PROGRESS）
+        //       4. 状态确实发生了变化
+        if (
+          existingMessage.parentMessageId &&  // 是子消息
+          finalUpdates.status &&
+          ![TaskStatus.PENDING, TaskStatus.IN_PROGRESS].includes(finalUpdates.status) &&
+          finalUpdates.status !== existingMessage.status  // 状态确实发生了变化
+        ) {
+          // 检查父消息是否是根消息
+          const parentMessage = state.messagesMap.get(existingMessage.parentMessageId);
+          if (parentMessage && !parentMessage.parentMessageId) {  // 父消息是根消息
+            const messageItems = state.messageItemsMap.get(messageItemsId);
+            if (messageItems && !get().getMessageItemsIsUser(messageItems)) {
+              // 异步保存，不阻塞当前流程
+              get().saveConversationToDB(messageItems.conversationId);
+            }
+          }
+        }
+      }
+
       // 创建新的Message对象
       const updatedMessage: Message = {
         ...existingMessage,
-        ...updates,
+        ...finalUpdates,
         updatedAt: Date.now(),
       };
 
@@ -1300,7 +1404,18 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const eventsToProcess = currentState.sseEventQueue.slice(0, BATCH_SIZE);
 
       if (eventsToProcess.length === 0) {
-        set({ sseProcessingQueue: false });
+        // 队列为空，准备重置处理状态
+        // 但在重置前，先检查是否有新事件到达（处理 race condition）
+        requestAnimationFrame(() => {
+          const nextState = get();
+          if (nextState.sseEventQueue.length > 0) {
+            // 有新事件到达，继续处理（保持 sseProcessingQueue 为 true）
+            get().processSSEQueue();
+          } else {
+            // 确认没有新事件，安全重置处理状态
+            set({ sseProcessingQueue: false });
+          }
+        });
         return;
       }
 
@@ -1958,6 +2073,151 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         messageItemsMap: newMessageItemsMap,
         messagesMap: newMessagesMap,
       };
+    });
+  },
+
+  // ========== SSE超时监控方法 ==========
+
+  /**
+   * 启动SSE超时监控
+   */
+  startSSETimeoutMonitor: (conversationId: string) => {
+    // 先清理旧的监控
+    get().stopSSETimeoutMonitor();
+
+    // 记录开始时间
+    const startTime = Date.now();
+    set({ lastSSEEventTime: startTime });
+
+    // 设置定时检查（每30秒检查一次）
+    const CHECK_INTERVAL_MS = 30 * 1000;  // 30秒
+    const timeoutMs = SSE_TIMEOUT_MINUTES * 60 * 1000;
+
+    let checkCount = 0;
+    const intervalId = window.setInterval(() => {
+      checkCount++;
+      const { lastSSEEventTime, currentConversationId } = get();
+      const timeSinceLastEvent = lastSSEEventTime ? Date.now() - lastSSEEventTime : 0;
+
+      // 如果当前对话已切换，停止监控
+      if (currentConversationId !== conversationId) {
+        get().stopSSETimeoutMonitor();
+        return;
+      }
+
+      // 检查是否超时
+      if (lastSSEEventTime && timeSinceLastEvent > timeoutMs) {
+        // 标记未完成消息为失败
+        get().markCurrentConversationIncompleteAsFailed();
+
+        // 停止监控
+        get().stopSSETimeoutMonitor();
+      }
+    }, CHECK_INTERVAL_MS);
+
+    set({ sseTimeoutCheckInterval: intervalId });
+  },
+
+  /**
+   * 停止SSE超时监控
+   */
+  stopSSETimeoutMonitor: () => {
+    const { sseTimeoutCheckInterval } = get();
+    if (sseTimeoutCheckInterval !== null) {
+      window.clearInterval(sseTimeoutCheckInterval);
+      set({ sseTimeoutCheckInterval: null });
+    }
+  },
+
+  /**
+   * 更新最后SSE事件时间
+   */
+  updateLastSSEEventTime: () => {
+    set({ lastSSEEventTime: Date.now() });
+  },
+
+  /**
+   * 检查并标记当前对话中未完成的MessageItems为FAILED
+   */
+  checkAndMarkIncompleteAsFailed: () => {
+    const { currentConversationId } = get();
+    if (!currentConversationId) {
+      return false;
+    }
+
+    const messageItemsList = get().getCurrentMessageItems();
+    if (messageItemsList.length === 0) {
+      return false;
+    }
+
+    // 检查最后一个MessageItems
+    const lastMessageItems = messageItemsList[messageItemsList.length - 1];
+
+    // 如果是用户消息，不需要检查
+    if (get().getMessageItemsIsUser(lastMessageItems)) {
+      return false;
+    }
+
+    // 检查状态是否为 PENDING 或 IN_PROGRESS
+    if (lastMessageItems.status === TaskStatus.PENDING ||
+        lastMessageItems.status === TaskStatus.IN_PROGRESS) {
+      console.warn('[SSE Timeout] 检测到超时的未完成消息，标记为FAILED');
+      get().markCurrentConversationIncompleteAsFailed();
+      return true;
+    }
+
+    return false;
+  },
+
+  /**
+   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为FAILED
+   */
+  markCurrentConversationIncompleteAsFailed: () => {
+    const { currentConversationId } = get();
+    if (!currentConversationId) {
+      return;
+    }
+
+    const messageItemsList = get().getCurrentMessageItems();
+    if (messageItemsList.length === 0) {
+      return;
+    }
+
+    const lastMessageItems = messageItemsList[messageItemsList.length - 1];
+
+    // 动态导入 handler
+    import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
+      const handler = new DeepsearchSSEHandler(
+        // 传入空的 dependencies，我们只使用 markAllIncompleteMessages 方法
+        {} as any,
+        {} as any,
+        lastMessageItems.conversationId
+      );
+      // 调用公共方法标记为失败
+      handler.markAllIncompleteMessages(lastMessageItems, false);  // false = 标记为 FAILED
+    }).catch((error) => {
+      console.error('[markCurrentConversationIncompleteAsFailed] Failed to load handler:', error);
+
+      // 降级处理: 直接遍历所有消息并标记
+      const markRecursively = (messageId: string) => {
+        const msg = get().getMessageById(messageId);
+        if (!msg) return;
+
+        // 递归处理子消息
+        if (msg.childMessageIds) {
+          msg.childMessageIds.forEach(childId => markRecursively(childId));
+        }
+
+        // 标记未完成的消息
+        if (msg.status === TaskStatus.PENDING || msg.status === TaskStatus.IN_PROGRESS) {
+          get().updateMessage(lastMessageItems.id, msg.id, { status: TaskStatus.FAILED });
+        }
+      };
+
+      lastMessageItems.messagesIds.forEach(msgId => markRecursively(msgId));
+
+      // 更新 MessageItems 状态
+      get().updateMessageItems(lastMessageItems.id, { status: TaskStatus.FAILED });
     });
   },
 }));

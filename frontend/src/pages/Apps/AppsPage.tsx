@@ -506,6 +506,23 @@ const AppsPage: React.FC = () => {
     }
   }, [])
 
+  // ===== SSE超时检测: 页面加载时检查未完成消息 =====
+  useEffect(() => {
+    if (currentConversationId && isDeepSearchMode) {
+      const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsFailed()
+      if (hasIncomplete) {
+        console.log('[AppsPage] Marked incomplete messages as FAILED on page load')
+      }
+    }
+  }, [currentConversationId, isDeepSearchMode])
+
+  // ===== 组件卸载时清理SSE超时监控 =====
+  useEffect(() => {
+    return () => {
+      useConversationStore.getState().stopSSETimeoutMonitor()
+    }
+  }, [])
+
   // 删除消息（删除用户消息及其下一条AI回复）
   const handleDeleteMessage = (messageId: string) => {
     setMessages(prev => {
@@ -704,10 +721,26 @@ const AppsPage: React.FC = () => {
 
     // 切换对话（异步加载）
     await switchConversation(conversationId)
+
+    // ===== 检查新对话是否有未完成的消息 =====
+    const conversation = getConversationById(conversationId)
+    if (conversation?.config?.agentType === 'deepsearch') {
+      // 等待一帧，确保数据已加载
+      requestAnimationFrame(() => {
+        const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsFailed()
+        if (hasIncomplete) {
+          console.log('[AppsPage] Marked incomplete messages as FAILED on conversation switch')
+        }
+      })
+    }
   }
 
   // ===== DeepSearch 插件：消息发送处理 =====
   const handleDeepSearchSend = async (content: string) => {
+    // 标记SSE是否正常完成（收到正常结束信号）
+    // 需要在 try 块外定义，这样 finally 块也能访问
+    let sseCompletedNormally = false
+
     // 如果没有 conversation，先创建一个
     let conversationId = currentConversationId
     if (!conversationId) {
@@ -848,6 +881,11 @@ const AppsPage: React.FC = () => {
                 lastMessage.id,
                 { status: TaskStatus.COMPLETED }
               )
+              // 更新 MessageItems 状态为 COMPLETED，隐藏"生成中"提示
+              useConversationStore.getState().updateMessageItems(
+                lastSystemMessageItems.id,
+                { status: TaskStatus.COMPLETED }
+              )
               interrupt_feedback = 'accepted'
 
               // 验证更新后的状态
@@ -860,6 +898,11 @@ const AppsPage: React.FC = () => {
               useConversationStore.getState().updateMessage(
                 lastSystemMessageItems.id,
                 lastMessage.id,
+                { status: TaskStatus.CANCELLED }
+              )
+              // 更新 MessageItems 状态为 CANCELLED，隐藏"生成中"提示
+              useConversationStore.getState().updateMessageItems(
+                lastSystemMessageItems.id,
                 { status: TaskStatus.CANCELLED }
               )
               interrupt_feedback = ''  // 保持为空
@@ -952,6 +995,9 @@ const AppsPage: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
+      // ===== 启动SSE超时监控 =====
+      useConversationStore.getState().startSSETimeoutMonitor(conversationId)
+
       // 5. 处理 SSE 流式响应
       const reader = response.body?.getReader()
       if (!reader) {
@@ -965,16 +1011,29 @@ const AppsPage: React.FC = () => {
         const { done, value } = await reader.read()
 
         if (done) {
-          // SSE 流结束时，确保所有未完成的 MessageItems 都被标记为完成
-          const state = useConversationStore.getState()
-          const messageItemsList = state.getCurrentMessageItems()
-          messageItemsList.forEach((item) => {
-            if (item.status === TaskStatus.IN_PROGRESS || item.status === TaskStatus.UNKNOWN) {
-              state.updateMessageItems(item.id, {
-                status: TaskStatus.COMPLETED,
-              })
+          // SSE 流读取结束时，需要等待SSE事件队列处理完成
+          // 因为 reader.read() 返回 done: true 不代表所有事件都被处理了
+
+          // 设置一个检查机制，等待队列处理完成后停止监控
+          if (sseCompletedNormally) {
+            // SSE 正常完成，等待队列处理完成后停止监控
+            const checkQueueProcessed = () => {
+              const state = useConversationStore.getState()
+              // 检查队列是否为空且没有正在处理
+              if (state.sseEventQueue.length === 0 && !state.sseProcessingQueue) {
+                useConversationStore.getState().stopSSETimeoutMonitor()
+              } else {
+                // 队列还有事件，继续等待
+                requestAnimationFrame(checkQueueProcessed)
+              }
             }
-          })
+            requestAnimationFrame(checkQueueProcessed)
+          }
+          // 注意：如果 sseCompletedNormally 为 false，不停止监控，让定时器在超时后标记为FAILED
+
+          // SSE 流读取结束时，不再自动标记所有未完成消息为完成
+          // 让SSE事件处理逻辑（如 ALL END）来决定最终状态
+          // 这样可以避免覆盖正常的完成状态
 
           // ===== SSE 录制：停止录制 =====
           if (recordingId) {
@@ -998,11 +1057,18 @@ const AppsPage: React.FC = () => {
         for (const line of lines) {
 
           if (line.trim().startsWith('data:')) {
+            // ===== 每次收到SSE事件，更新时间戳 =====
+            useConversationStore.getState().updateLastSSEEventTime()
             try {
               const jsonStr = line.substring(5).trim() // 移除 'data:' 前缀
               if (!jsonStr || jsonStr === '[DONE]') continue
 
               const data = JSON.parse(jsonStr)
+
+              // 检测是否收到正常结束信号
+              if (data.agent === 'end' && data.content === 'ALL END') {
+                sseCompletedNormally = true
+              }
 
               // ===== SSE 录制：录制事件 =====
               if (recordingId) {
@@ -1022,12 +1088,14 @@ const AppsPage: React.FC = () => {
         }
       }
     } catch (error: any) {
+      // 发生错误时不停止SSE超时监控，让定时器在超时后检测并标记为FAILED
+
       if (error.name !== 'AbortError') {
         console.error('[DeepSearch] Error sending message:', error)
       }
 
       // ===== SSE 录制：错误时也要停止录制 =====
-      if (recordingId && SSERecorder.isRecording()) {
+      if (typeof recordingId !== 'undefined' && recordingId && SSERecorder.isRecording()) {
         try {
           await SSERecorder.stopRecording()
         } catch (error) {
@@ -1035,6 +1103,13 @@ const AppsPage: React.FC = () => {
         }
       }
     } finally {
+      // SSE超时监控的停止逻辑：
+      // 1. SSE正常完成（sseCompletedNormally = true）→ 停止监控
+      // 2. 发生错误/异常中断（sseCompletedNormally = false）→ 不停止监控，让定时器检测超时
+      if (sseCompletedNormally) {
+        useConversationStore.getState().stopSSETimeoutMonitor()
+      }
+
       setIsSending(false)
       setLoading(false)
       setAbortController(null)
