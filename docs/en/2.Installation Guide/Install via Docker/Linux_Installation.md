@@ -22,6 +22,10 @@ Make sure your machine meets the following requirements:
 
 - Refer to the <a href="https://docs.docker.com/engine/install/" target="_blank" rel="nofollow noopener noreferrer">Docker official installation guide</a> and the <a href="https://docs.docker.com/compose/install/" target="_blank" rel="nofollow noopener noreferrer">Docker Compose official installation guide</a> to complete the setup.
 
+- Please ensure Docker and Docker Compose meet the following version requirements:
+  - Docker: 20.10+
+  - Docker Compose: V2+
+
 - Verify the installation of Docker and Docker Compose:
 
     ```
@@ -122,7 +126,7 @@ Make sure your machine meets the following requirements:
 
   Local access: *local access address*
 
-> For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
+  > **Note**: For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
 
 ### 3. Access the system
 

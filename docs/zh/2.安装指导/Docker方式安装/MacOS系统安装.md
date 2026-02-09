@@ -23,6 +23,9 @@
 ### 安装 Docker Desktop
 
 * 下载：访问 <a href="https://www.docker.com/products/docker-desktop/" rel="nofollow">Docker Desktop 官网</a>，点击 “Download for Mac” 获取 .dmg 安装包。；
+* 请确保 Docker Desktop 满足以下内置组件版本要求：
+  * Docker Engine：20.10 版本及以上
+  * Docker Compose：V2 版本及以上版本
 * 双击下载的文件，将 **Docker** 图标 拖拽到 Applications 文件夹；
 * 打开 Launchpad，找到并启动 Docker 应用；
 * 首次运行时，系统会提示输入 macOS 密码以授权安装虚拟机组件，点击 OK 继续；
@@ -90,6 +93,8 @@
   | **EMBED_TIMEOUT**                     | 嵌入模型的最大等待时间（单位秒）<br>默认为`60`       |
   | **EMBED_MAX_RETRIES**                 | 嵌入模型请求失败时的最大重试次数<br>默认为`3`        |
 
+* 如需修改前端页面服务的端口号，请参考[这里](../../../../scripts/README.md#如何修改前端页面服务的端口号)。
+
 * 进入 *service.sh* 所在目录，打开**终端**，输入以下命令启动 openJiuwen：
 
   ```bash
@@ -102,7 +107,7 @@
 
   Local access: *本地访问地址*
 
-  Network access: *网络访问地址*
+  > **注意**：关于容器部署的更多使用细节，可参考[openjiuwen-agent-studio-部署工具使用手册](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册)
 
 ### 3. 访问系统
 

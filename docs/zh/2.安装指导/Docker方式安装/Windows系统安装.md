@@ -36,6 +36,9 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
 **2. 安装 Docker Desktop**
 
 * 下载：前往 <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="nofollow noopener noreferrer"> Docker 官网</a> 下载 Windows 版本安装包（X86 机器请选择 AMD64 版本）；
+* 请确保 Docker Desktop 满足以下内置组件版本要求：
+  * Docker Engine：20.10 版本及以上
+  * Docker Compose：V2 版本及以上版本
 * 运行安装包：​**仅勾选​「Use WSL 2 instead of Hyper-V」、​「Add shortcut to desktop」选项**，点击​「OK」开始安装；
 * 安装完成后，请重启电脑；
 * 重启后，打开 Docker Desktop，等待加载完成（首次启动可能需要 5 ~ 10 分钟）；
@@ -114,6 +117,8 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
   | **EMBED_TIMEOUT**                     | 向量模型的最大等待时间（单位秒），默认值`60`          |
   | **EMBED_MAX_RETRIES**                 | 向量模型请求失败时的最大重试次数,默认值`3`           |
 
+* 如需修改前端页面服务的端口号，请参考[这里](../../../../scripts/README.md#如何修改前端页面服务的端口号)。
+
 * 输入以下命令启动 openJiuwen：
 
   ```bash
@@ -123,6 +128,8 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
   > **注意**：可能会因为网络原因出现 “up Plugin + Sandbox Server failed” 报错，请重新执行 `./service.sh up`。
 
 * 启动成功后会输出 Local access：*访问地址*。
+
+  > **注意**：关于容器部署的更多使用细节，可参考[openjiuwen-agent-studio-部署工具使用手册](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册)
 
 ### 4. 访问系统
 

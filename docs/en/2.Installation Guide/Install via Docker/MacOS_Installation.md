@@ -23,6 +23,9 @@ Ensure your machine meets the following requirements:
 ### Docker Desktop Installation
 
 * Download: Visit the <a href="https://www.docker.com/products/docker-desktop/" rel="nofollow">Docker Desktop official website</a>, and click "Download for Mac" to download the .dmg installer.
+* Please ensure Docker Desktop meets the following built-in component version requirements:
+  * Docker Engine: 20.10+
+  * Docker Compose: V2+
 * Double-click the installer and drag **Docker** into the Applications folder.
 * Find and start the Docker application.
 * Upon first opening Docker, the system will prompt you to enter your macOS password to authorize the installation of virtual machine components. Click OK to continue.
@@ -90,6 +93,9 @@ Ensure your machine meets the following requirements:
     | EMBED_TIMEOUT                     | Maximum wait time for the embedding model(unit: second), default value `60`         |
     | EMBED_MAX_RETRIES                 | Maximum number of retries on embedding request failure, default value `3`           |
 
+
+* To modify the port number of the frontend page service, please refer to [here](../../../../scripts/README.md#如何修改前端页面服务的端口号).
+
 * Open **Terminal**, navigate to the directory where *service.sh* is located, and enter the following command to start openJiuwen: 
 
   ```bash
@@ -102,7 +108,8 @@ Ensure your machine meets the following requirements:
 
   Local access: *local access address*
 
-  Network access: *network access address*
+  > **Note**: For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
+
 
 ### 3. Access the System
 

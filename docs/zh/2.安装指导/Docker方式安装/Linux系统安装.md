@@ -22,6 +22,10 @@
 
 * 请参照 <a href="https://docs.docker.com/engine/install/" target="_blank" rel="nofollow noopener noreferrer">Docker 官方安装指南</a> 以及 <a href="https://docs.docker.com/compose/install/" target="_blank" rel="nofollow noopener noreferrer">Docker Compose 官方安装指南</a> 完成配置。
 
+* 请确保 Docker 和 Docker Compose 满足以下版本要求：
+  * Docker：20.10 版本及以上
+  * Docker Compose：V2 及以上版本
+
 * 验证 Docker 和 Docker Compose 安装:
 
     ```
@@ -108,7 +112,7 @@
   | **EMBED_TIMEOUT**                     | 向量模型的最大等待时间（单位秒），默认值`60`          |
   | **EMBED_MAX_RETRIES**                 | 向量模型请求失败时的最大重试次数,默认值`3`           |
 
-  * 如需修改前端页面服务的端口号，请参考[这里](../../../../scripts/README.md#如何修改前端页面服务的端口号)，
+* 如需修改前端页面服务的端口号，请参考[这里](../../../../scripts/README.md#如何修改前端页面服务的端口号)。
 
 * 输入以下命令启动 openJiuwen：
 
@@ -122,7 +126,7 @@
 
   Local access: *本地访问地址*
 
-> 关于容器部署的更多使用细节，可参考[openjiuwen-agent-studio-部署工具使用手册](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册)
+  > **注意**：关于容器部署的更多使用细节，可参考[openjiuwen-agent-studio-部署工具使用手册](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册)
 
 
 ### 3. 访问系统

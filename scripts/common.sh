@@ -65,22 +65,32 @@ generate_random_chars() {
 # ===================== Check Docker availability =====================
 check_docker() {
     info "Checking Docker..."
-    
     command -v docker >/dev/null 2>&1 || {
-        error "Docker is not installed. Please install it first."
+        error "Docker is not installed. Please install Docker 20.10 or higher first."
     }
     
     docker info >/dev/null 2>&1 || {
         error "Docker daemon is not running. Please start it first."
     }
     
-    # Detect Docker Compose command
-    if docker compose version >/dev/null 2>&1; then
-        CONFIG["DOCKER_COMPOSE_CMD"]="docker compose"
-    elif command -v docker-compose >/dev/null 2>&1; then
-        CONFIG["DOCKER_COMPOSE_CMD"]="docker-compose"
-    else
-        error "Docker Compose is not installed. Please install it first."
+    # Standardize to x.y.z format, then extract major and minor versions,
+    # padding with 0 if insufficient
+    local docker_version=$(docker version --format '{{.Server.Version}}')
+    local major=$(echo "${docker_version}" | cut -d. -f1)
+    local minor=$(echo "${docker_version}" | cut -d. -f2)
+    local docker_version_num=$((100 * major + minor))
+    local min_version_num=$((100 * 20 + 10))
+
+    info "Docker Version: ${docker_version}"
+    if [[ "${docker_version_num}" -lt "${min_version_num}" ]]; then
+        error "Unsupported Docker version: ${docker_version}. Required minimum version is 20.10."
+    fi
+    info "Docker version check passed: ${docker_version} (≥ 20.10)"
+
+    # Only support Docker Compose V2, remove docker-compose V1 completely
+    info "Checking Docker Compose V2..."
+    if ! docker compose version >/dev/null 2>&1; then
+        error "Docker Compose V2 is required (command: docker compose)"
     fi
     
     success "Docker is ready"

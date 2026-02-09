@@ -52,7 +52,6 @@ process_service() {
     fi
 
     local cmd=${ARGS["CMD"]}
-    local docker_compose=${CONFIG["DOCKER_COMPOSE_CMD"]}
     local compose_file=${COMPOSE_FILES["${module}"]}
     local service="${DEPLOY_VARS["${component}_SERVICE"]}"
     local container="${DEPLOY_VARS["${component}_DOCKER"]}"
@@ -60,8 +59,8 @@ process_service() {
     if [ "${cmd}" = "up" ]; then
         cmd_args="-d"
     fi
-    
-    exec_cmd "${docker_compose} -f ${compose_file} ${cmd} ${cmd_args} ${service}"
+
+    exec_cmd "docker compose -f ${compose_file} ${cmd} ${cmd_args} ${service}"
     if [ "${cmd}" == "up" ]; then
         post_start_setup "${module}" "${container}"
     fi

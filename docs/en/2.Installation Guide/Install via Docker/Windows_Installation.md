@@ -36,6 +36,9 @@ Older Windows versions do not support the full automation of this one-click comm
 **2. Install Docker Desktop**
 
 * Download: Go to the <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="nofollow noopener noreferrer">Docker website</a> to download the Windows installer (for x86 machines, choose the AMD64 version);
+* Please ensure Docker Desktop meets the following built-in component version requirements:
+  * Docker Engine: 20.10+
+  * Docker Compose: V2+
 * Run the installer: Select only the “Use WSL 2 instead of Hyper-V” and “Add shortcut to desktop” options, then click “OK” to complete installation;
 * Restart your computer after installation;
 * After restarting, open Docker Desktop and wait for it to finish loading (the first launch may take 5–10 minutes);
@@ -113,19 +116,24 @@ Older Windows versions do not support the full automation of this one-click comm
     | EMBED_TIMEOUT                     | Maximum wait time for the embedding model(unit: second), default value `60`         |
     | EMBED_MAX_RETRIES                 | Maximum number of retries on embedding request failure, default value `3`           |
 
-  * Run the following command to start openJiuwen:
+* To modify the port number of the frontend page service, please refer to [here](../../../../scripts/README.md#如何修改前端页面服务的端口号).
 
-    ```bash
-    ./service.sh up
-    ```
+* Run the following command to start openJiuwen:
+
+  ```bash
+  ./service.sh up
+  ```
 
   >   **Note**: You may see an “up Plugin + Sandbox Server failed” error due to network issues. Please run `./service.sh up` again.
 
 * After a successful start, it will output Local access: access URL.
 
+  > **Note**: For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
+
 ### 4. Access the system
 
 Copy the access URL above into your browser’s address bar and press Enter to see the openJiuwen interface.
+
 
 ## III. Frequently Asked Questions (FAQ)
 

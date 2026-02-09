@@ -18,7 +18,6 @@ declare -A CONFIG=(
     ["PRE_UPGRADE_ENV_DIR"]="${SCRIPT_DIR}/pre_upgrade_envs"
     ["NGINX_TEMPLATE_FILE"]="${SCRIPT_DIR}/conf/nginx.template.conf"
     ["MILVUS_BACKUP_TEMPLATE"]="${SCRIPT_DIR}/conf/milvus-backup.template.yml"
-    ["DOCKER_COMPOSE_CMD"]=""
     ["START_PORT"]="3000"
     ["END_PORT"]="65535"
     ["OS_TYPE"]=""
