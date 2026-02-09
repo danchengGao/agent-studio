@@ -2003,7 +2003,7 @@ export interface ComponentExecuteRequest {
 // 单节点调试响应类型
 export interface ComponentExecuteResponse {
   data: {
-    responseContent: string
+    response: string
     output: {
       result: string
     }

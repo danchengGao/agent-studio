@@ -110,10 +110,10 @@ def get_trace_workflow_output(data):
                     # 检查 payload 中是否有 response 字段
                     if 'response' in payload:
                         text_parts.append(str(payload['response']))
-                        output_key = "responseContent"
+                        output_key = "response"
                     if 'output' in payload:
                         text_parts.append(str(payload['output']))
-                        output_key = "responseContent"
+                        output_key = "response"
 
         if text_parts:
             combined_text = ''.join(text_parts)
@@ -321,11 +321,8 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
     if isinstance(chunk, OutputSchema) and chunk.type == "workflow_final":
         if business_type == "AGENT":
             answer_value = None
-            # 处理 responseContent 情况
-            if chunk.payload.get("responseContent"):
-                answer_value = chunk.payload.get("responseContent")
             # 处理 output 情况
-            elif chunk.payload.get("output"):
+            if chunk.payload.get("output"):
                 output_data = chunk.payload.get("output")
                 # 如果 output 是字典，转换为 key: value 格式的字符串
                 if isinstance(output_data, dict):

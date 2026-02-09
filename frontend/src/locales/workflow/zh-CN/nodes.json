@@ -100,7 +100,7 @@
     },
     "end": {
       "description": "工作流的最终节点，用于返回工作流运行后的结果信息。",
-      "outputConfiguredNote": "已配置\"输出内容\"，工作流将仅返回字段 responseContent；若需返回输出变量，请清空\"输出内容\"配置。"
+      "outputConfiguredNote": "已配置\"输出内容\"，工作流将仅返回字段 response；若需返回输出变量，请清空\"输出内容\"配置。"
     },
     "questioner": {
       "titlePrefix": "提问器",
