@@ -1200,7 +1200,7 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
         <Accordion>
           <AccordionSummary aria-controls="memory-bases-content" id="memory-bases-header">
             <Typography component="span" className="flex items-center">
-              记忆库
+              {t('orchestrationPage.memory.memoryBase.title')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
                   memoryBaseObject ? 'bg-blue-500' : 'bg-gray-400'
@@ -1211,8 +1211,8 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
             </Typography>
             <AddButton
               options={[
-                { label: '添加已有记忆库', value: 'existing' },
-                { label: '创建新记忆库', value: 'new' },
+                { label: t('orchestrationPage.memory.memoryBase.add'), value: 'existing' },
+                { label: t('orchestrationPage.memory.memoryBase.create'), value: 'new' },
               ]}
               onSelect={addType => {
                 if (addType === 'existing') {

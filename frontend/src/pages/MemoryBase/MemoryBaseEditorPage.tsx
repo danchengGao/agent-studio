@@ -549,7 +549,7 @@ const MemoryBaseEditorPage: React.FC = () => {
       setIsRefreshingAllStatuses(false);
     }
   };
-  
+
   // 获取记忆类型图标
   const getMemoryTypeIcon = (type: MemoryType) => {
     switch (type) {

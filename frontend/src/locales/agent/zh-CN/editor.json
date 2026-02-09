@@ -264,6 +264,11 @@
             "enabledLabel": "启用",
             "disabledLabel": "禁用"
           },
+          "memoryBase":{
+            "title": "记忆库",
+            "add": "添加已有记忆库",
+            "create": "创建新记忆库"
+          },
           "longTermTitle": "长期记忆",
           "longTermToggleLabel": "启用长期记忆",
           "longTermDescription": "启用后，智能体将能够记住与用户的对话过程中的用户个人信息和偏好数据"

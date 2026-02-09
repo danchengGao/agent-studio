@@ -264,6 +264,11 @@
             "enabledLabel": "Enabled",
             "disabledLabel": "Disabled"
           },
+          "memoryBase":{
+            "title": "Memory Base",
+            "add": "Add Existing Memory Base",
+            "create": "Create New Memory Base"
+          },
           "longTermTitle": "Long-Term Memory",
           "longTermToggleLabel": "Enable Long-Term Memory",
           "longTermDescription": "When enabled, the agent can remember user personal information and preferences from the conversation history."
