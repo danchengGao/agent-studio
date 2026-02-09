@@ -306,8 +306,6 @@ export const fileRegistry: Partial<JsonSchemaTypeRegistry> = {
     return subtype ? `File<${subtype.label}>` : 'File'
   },
   conditionRule: {
-    [ConditionPresetOp.EQ]: { type: 'file' },
-    [ConditionPresetOp.NEQ]: { type: 'file' },
     [ConditionPresetOp.IS_EMPTY]: null,
     [ConditionPresetOp.IS_NOT_EMPTY]: null,
   },
