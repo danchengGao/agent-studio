@@ -33,7 +33,47 @@ from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponseType
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
 from openjiuwen_studio.core.executor.component.component_execution_manager import component_execution_manager
+from openjiuwen_studio.core.common.language_thread_context import get_language
+from openjiuwen.core.common.exception.codes import StatusCode
+
 execution_router = APIRouter()
+
+
+def _normalize_language(language: Optional[str]) -> str:
+    if not language:
+        return "zh"
+    language = language.strip().lower()
+    if language in {"cn", "zh", "zh-cn", "zh-hans", "zh-hans-cn"} or language.startswith("zh"):
+        return "zh"
+    return "en"
+
+
+def _resolve_language(current_user: Optional[dict]) -> str:
+    """
+    解析当前语言。
+    策略：倾向于英文 (Sticky English)。
+    1. 如果 HTTP Header 指定了英文，返回英文。
+    2. 如果用户配置 (Profile) 指定了英文，返回英文。
+    3. 否则返回中文。
+    """
+    # 1. 检查 Header
+    language = get_language()
+    header_lang = None
+    if language and language.strip().lower() not in {"cn"}:
+        header_lang = _normalize_language(language)
+        if header_lang == "en":
+            return "en"
+
+    # 2. 检查用户配置
+    if current_user:
+        locale = (current_user.get("data") or {}).get("locale")
+        if locale:
+            user_lang = _normalize_language(locale)
+            if user_lang == "en":
+                return "en"
+
+    # 3. 默认中文
+    return "zh"
 
 
 class BaseParas(BaseModel):
@@ -147,9 +187,21 @@ async def handler(
         ).model_dump_json()
     except BaseError as e:
         log_exception(e)
+        message = e.message
+        if e.code == StatusCode.AGENT_TOOL_NOT_FOUND.code:
+            lang = _resolve_language(current_user)
+            if lang == "zh":
+                error_msg = e.params.get("error_msg", "") if e.params else ""
+                if not error_msg and "reason: " in message:
+                    try:
+                        error_msg = message.split("reason: ", 1)[1]
+                    except IndexError:
+                        pass
+                message = f"智能体工具未找到，原因: {error_msg}"
+
         yield ResponseModel(
             code=e.code,
-            message=e.message,
+            message=message,
             data=None
         ).model_dump_json()
     except Exception as e:
