@@ -33,12 +33,14 @@
 
 * 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows_v2.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
   * `setup.ps1`：主安装脚本，串联整个安装流程
-  * `check_git.ps1`：检查 Git 是否安装
-  * `check_nodejs.ps1`：检查 Node.js 是否安装
-  * `check_python.ps1`：检查 Python 是否安装
-  * `check_mysql.ps1`：检查 MySQL 是否安装
-  * `fetch_codes.ps1`：克隆 agent-studio 代码仓库
-  * `user_config.ps1`：用户配置文件（可选，包含代理、pip源、npm源配置）
+  * `utils.ps1`：公共工具
+  * `check_git.ps1`：检查 Git 是否安装，未安装则安装 Git
+  * `check_nodejs.ps1`：检查 Node.js 是否安装，未安装则安装 Node.js
+  * `check_python.ps1`：检查 Python 是否安装，未安装则安装 Python
+  * `check_mysql.ps1`：检查 MySQL 是否安装，未安装则安装 MySQL
+  * `config_mysql.ps1`：配置 MySQL（创建数据库、用户等）
+  * `fetch_codes.ps1`：克隆 agent-studio 代码仓库（支持指定分支）
+  * `user_config.ps1`：用户配置文件（可选，包含代理、pip 源、npm 源配置）
 
 #### 2. 配置代理、pip源和npm源（可选）
 
@@ -92,7 +94,7 @@
 * 进入脚本目录，运行主安装脚本：
 
   ```powershell
-  cd setup_scripts_windows
+  cd setup_scripts_windows_v2
   # 默认使用 MySQL 数据库
   .\setup.ps1
 
@@ -100,14 +102,6 @@
   .\setup.ps1 -DbType sqlite
   ```
 
-* 脚本会自动执行以下步骤：
-  1. 检查系统版本和 PowerShell 版本
-  2. 检查基础工具（git、nodejs、python），如未安装会提示安装
-  3. 拉取 agent-studio 代码仓库
-  4. 生成 AES 密钥
-  5. 配置 .env 文件（根据 -DbType 参数设置数据库类型）
-  6. 部署后端服务（创建虚拟环境、安装依赖、启动服务）
-  7. 部署前端服务（安装依赖、启动服务）
 
 * 脚本执行完成后，会输出后端和前端服务的PID、日志文件路径、前端页面访问地址，在浏览器中访问输出的页面访问地址即可进入openJiuwen界面。
 

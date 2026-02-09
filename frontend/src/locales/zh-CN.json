@@ -4581,5 +4581,50 @@
       "documentType": "文档知识库",
       "embeddingModel": "Embedding 模型"
     }
+ }, 
+   "utils": { 
+     "prompts": { 
+       "utils": { 
+         "validateVersionNumber": { 
+           "empty": "版本号不能为空", 
+           "invalidFormat": "版本号格式错误，请使用 主版本.次版本.修订版本 格式（如：1.2.3）" 
+         }, 
+         "formatDateTime": { 
+           "invalidTime": "无效时间", 
+           "formatError": "时间格式错误" 
+         }, 
+         "copyToClipboard": { 
+           "defaultSuccess": "已复制到剪贴板", 
+           "emptyContent": "复制内容为空", 
+           "autoCopyFailed": "自动复制失败，请手动复制内容", 
+           "copyUnavailable": "复制功能不可用，请手动复制内容" 
+         }, 
+         "toolFormatConverter": { 
+           "generateJsonSchemaFailed": "从parameters生成JSON Schema失败:", 
+           "tool": "工具", 
+           "parseStringFailed": "解析字符串失败", 
+           "saveJsonSchemaFailed": "保存JSON Schema失败", 
+           "parseFailed": "解析失败", 
+           "parseToolJsonSchemaFailed": "解析工具JSON Schema失败，使用默认转换:" 
+         }, 
+         "promptEditPageUtils": { 
+           "unknownError": "未知错误", 
+           "failKeyword": "失败", 
+           "requestFailed": "请求失败", 
+           "variableNameFormatError": "不符合格式要求", 
+           "variableNameTooLong": "变量名长度超过50个字符（当前长度：{{length}}）", 
+           "variableNameCannotStartWithNumber": "变量名不能以数字开头", 
+           "variableNameInvalidCharacters": "变量名只能包含字母、数字、下划线和连字符", 
+           "variableNameNoSpacesInNormalMode": "Normal模式下变量名前后不能有空格", 
+           "skipInvalidVariableName": "跳过提取的无效变量名: \"{{name}}\"，{{error}}", 
+           "targetMessageNotFound": "未找到目标消息", 
+           "baseGroup": "基准组", 
+           "controlGroup": "对照组{{id}}", 
+           "targetMessageNotFoundInGroup": "{{groupName}}中未找到目标消息", 
+           "existingCallNotFound": "索引 {{index}} 的现有调用不存在，跳过处理", 
+           "calculateSelectionIndicesFailed": "计算选中位置失败 - 缺少必要参数" 
+         } 
+       } 
+     }
   }
 }

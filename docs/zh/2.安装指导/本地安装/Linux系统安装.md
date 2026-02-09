@@ -35,18 +35,71 @@
 
 * 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_linux_v2.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
   * `setup.sh`：主安装脚本，串联整个安装流程
-  * `check_curl.sh`：检查并安装 curl
-  * `check_git.sh`：检查并安装 Git
-  * `check_nodejs.sh`：检查并安装 Node.js（通过 NVM）
-  * `check_python.sh`：检查并安装 Python 3.11
-  * `fetch_codes.sh`：克隆 agent-studio 代码仓库
+  * `utils.sh`：公共工具
+  * `check_curl.sh`：检查 curl 是否安装，未安装则安装 curl
+  * `check_git.sh`：检查 Git 是否安装，未安装则安装 Git
+  * `check_nodejs.sh`：检查 Node.js 是否安装，未安装则通过 NVM 安装 Node.js
+  * `check_python.sh`：检查 Python 是否安装，未安装则安装 Python
+  * `check_mysql.sh`：检查 MySQL 是否安装，未安装则安装 MySQL
+  * `config_mysql.sh`：配置 MySQL（创建数据库、用户等）
+  * `fetch_codes.sh`：克隆 agent-studio 代码仓库（支持指定分支）
+  * `user_config.sh`：用户配置文件（可选，包含代理、NVM 镜像、pip 源、npm 源配置）
 
-#### 2. 运行安装脚本
+#### 2. 配置代理、pip 源、NVM 镜像和 npm 源（可选）
+
+如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 pip 源、NVM Node.js 镜像或 npm 源，可以在 `user_config.sh` 文件中进行配置：
+
+* 打开 `user_config.sh` 文件，修改以下变量：
+
+  ```bash
+  # 代理配置（可选）
+  HTTP_PROXY=""   # HTTP 代理地址，例如 http://127.0.0.1:7890
+  HTTPS_PROXY=""  # HTTPS 代理地址，例如 http://127.0.0.1:7890
+  SSL_VERIFY=""   # 可选：true/false（对应 git http.sslVerify）
+
+  # pip 源配置（可选）
+  PIP_INDEX_URL=""      # pip 源地址，例如 https://pypi.tuna.tsinghua.edu.cn/simple
+  PIP_TRUSTED_HOST=""   # 信任的主机地址，例如 pypi.tuna.tsinghua.edu.cn
+
+  # NVM Node.js 下载镜像（可选，安装 Node.js 时使用）
+  NVM_NODEJS_ORG_MIRROR=""  # 例如 https://npmmirror.com/mirrors/node
+
+  # npm 源配置（可选）
+  NPM_REGISTRY=""       # npm 源地址，例如 https://registry.npmmirror.com
+  ```
+
+* 代理配置说明：
+  * **不需要代理**：保持变量为空即可（脚本会自动跳过代理配置）
+  * **需要代理**：填写完整代理地址，例如 `http://127.0.0.1:7890`
+  * **带认证的代理**：支持用户名密码，例如 `http://user:pass@proxy.example.com:8080`
+  * **SSL 验证**：`SSL_VERIFY` 设置为 `true` 或 `false`，`true` 表示开启 Git 的 SSL 证书验证，`false` 为不开启。
+
+* pip 源配置说明：
+  * **不需要配置 pip 源**：保持 `PIP_INDEX_URL` 和 `PIP_TRUSTED_HOST` 为空即可（脚本会自动跳过 pip 源配置，使用默认源）
+  * **需要配置 pip 源**：必须同时设置 `PIP_INDEX_URL` 和 `PIP_TRUSTED_HOST` 两个参数
+  * **常用国内镜像源示例**：
+    * 清华大学：`https://pypi.tuna.tsinghua.edu.cn/simple`，信任主机：`pypi.tuna.tsinghua.edu.cn`
+    * 阿里云：`https://mirrors.aliyun.com/pypi/simple/`，信任主机：`mirrors.aliyun.com`
+    * 中科大：`https://pypi.mirrors.ustc.edu.cn/simple/`，信任主机：`pypi.mirrors.ustc.edu.cn`
+
+* NVM Node.js 镜像说明：
+  * **不需要配置**：保持 `NVM_NODEJS_ORG_MIRROR` 为空，使用 nvm 默认源（nodejs.org）
+  * **需要加速或无法访问默认源**：可配置为 `https://npmmirror.com/mirrors/node` 等镜像，供 check_nodejs.sh 安装 Node.js 时使用。
+
+* npm 源配置说明：
+  * **不需要配置 npm 源**：保持 `NPM_REGISTRY` 为空即可（脚本会自动跳过 npm 源配置，使用默认源）
+  * **需要配置 npm 源**：设置 `NPM_REGISTRY` 为所需的 npm 源地址
+  * **常用国内镜像源示例**：
+    * 淘宝镜像：`https://registry.npmmirror.com`
+    * 腾讯云：`https://mirrors.cloud.tencent.com/npm/`
+    * 华为云：`https://repo.huaweicloud.com/repository/npm/`
+
+#### 3. 运行安装脚本
 
 * 进入脚本目录：
 
   ```bash
-  cd setup_scripts_linux
+  cd setup_scripts_linux_v2
   ```
 
 * 运行主安装脚本（脚本会自动检查和修复执行权限）：
@@ -61,23 +114,19 @@
 
   > **注意**：如果遇到权限问题，可以手动赋予执行权限：`chmod +x *.sh`，或使用 `bash setup.sh` 执行。
 
-* 脚本会自动执行以下步骤：
-  1. 检查并安装基础工具（curl、git、nodejs、python）
-  2. 拉取 agent-studio 代码仓库
-  3. 生成 AES 密钥
-  4. 配置 .env 文件（根据 --db_type 参数设置数据库类型）
-  5. 部署后端服务（创建虚拟环境、安装依赖、启动服务）
-  6. 部署前端服务（安装依赖、启动服务）
 
 * 脚本执行完成后，会输出后端和前端服务的PID、日志文件路径、前端页面访问地址，在浏览器中访问输出的页面访问地址即可进入openJiuwen界面。
 
  ![image](../images/一键安装运行完成截图linux.png)
 
-#### 3. 脚本常用参数说明
+#### 4. 脚本常用参数说明
 
   ```bash
   # 查看前后端服务状态和访问地址
   ./setup.sh --status
+
+  # 启动后端和前端服务
+  ./setup.sh --start
   
   # 停止后端和前端服务
   ./setup.sh --stop
