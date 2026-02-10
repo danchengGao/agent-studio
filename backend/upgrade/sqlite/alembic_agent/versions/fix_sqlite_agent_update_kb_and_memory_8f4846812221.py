@@ -38,7 +38,6 @@ def upgrade() -> None:
     sa.UniqueConstraint('mdb_id', name='uix_mdb_id'),
     comment='记忆库表，存储记忆库基本信息'
     )
-    )
     with op.batch_alter_table('memory_base', schema=None) as batch_op:
         batch_op.create_index('idx_space_id_memory_base', ['space_id'], unique=False)
         batch_op.create_index('idx_space_mdb_memory_base', ['space_id', 'mdb_id'], unique=False)
