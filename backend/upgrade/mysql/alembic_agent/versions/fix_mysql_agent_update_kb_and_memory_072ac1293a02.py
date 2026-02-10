@@ -38,7 +38,6 @@ def upgrade() -> None:
     sa.UniqueConstraint('mdb_id', name='uix_mdb_id'),
     comment='记忆库表，存储记忆库基本信息'
     )
-    )
     op.create_index('idx_space_id', 'memory_base', ['space_id'], unique=False)
     op.create_index('idx_space_mdb', 'memory_base', ['space_id', 'mdb_id'], unique=False)
     op.create_index(op.f('ix_memory_base_embedding_model_config_id'),
