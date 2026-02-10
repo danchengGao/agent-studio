@@ -11,7 +11,7 @@ post_start_setup(){
     if [ "${module}" == "MYSQL" ]; then
         wait_for_mysql
         if [ "${ARGS["IS_UPGRADE"]}" == "false" ]; then
-            create_db_if_not_exist
+            create_all_dbs
         fi
         return
     fi

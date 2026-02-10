@@ -62,61 +62,6 @@ generate_random_chars() {
     echo "$random_str"
 }
 
-# ===================== Check Docker availability =====================
-check_docker() {
-    info "Checking Docker..."
-    command -v docker >/dev/null 2>&1 || {
-        error "Docker is not installed. Please install Docker 20.10 or higher first."
-    }
-    
-    docker info >/dev/null 2>&1 || {
-        error "Docker daemon is not running. Please start it first."
-    }
-    
-    # Standardize to x.y.z format, then extract major and minor versions,
-    # padding with 0 if insufficient
-    local docker_version=$(docker version --format '{{.Server.Version}}')
-    local major=$(echo "${docker_version}" | cut -d. -f1)
-    local minor=$(echo "${docker_version}" | cut -d. -f2)
-    local docker_version_num=$((100 * major + minor))
-    local min_version_num=$((100 * 20 + 10))
-
-    info "Docker Version: ${docker_version}"
-    if [[ "${docker_version_num}" -lt "${min_version_num}" ]]; then
-        error "Unsupported Docker version: ${docker_version}. Required minimum version is 20.10."
-    fi
-    info "Docker version check passed: ${docker_version} (≥ 20.10)"
-
-    # Validate Docker Compose V2 (explicitly reject V1 docker-compose)
-    info "Checking Docker Compose V2 installation..."
-    if ! docker compose version >/dev/null 2>&1; then
-        error "Docker Compose V2 is required (use 'docker compose' command). Please uninstall Docker Compose V1 and install V2."
-    fi
-    
-    # Extract and standardize Compose version (handles formats like v2.19.1, 2.19.1, v2.19.1-beta.1)
-    local compose_version=$(docker compose version | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')
-    # Pad with 0 for missing patch version (e.g., 2.19 → 2.19.0)
-    compose_version=$(echo "${compose_version}" | awk -F. '{printf "%d.%d.%d", $1, $2, ($3? $3 : 0)}')
-
-    # Split Compose version into major/minor/patch components
-    local compose_major=$(echo "${compose_version}" | cut -d. -f1)
-    local compose_minor=$(echo "${compose_version}" | cut -d. -f2)
-    local compose_patch=$(echo "${compose_version}" | cut -d. -f3)
-
-    # Convert to numeric value for precise comparison (2.19.1 → 21901, 2.18.0 → 21800)
-    local compose_version_num=$((10000 * compose_major + 100 * compose_minor + compose_patch))
-    local min_compose_version_num=$((10000 * 2 + 100 * 19 + 1))  # Minimum required: 2.19.1
-
-    info "Docker Compose Version Detected: ${compose_version}"
-    # Dual validation: ensure major version is 2 (V2) AND version ≥ 2.19.1
-    if [[ "${compose_major}" -ne 2 ]] || [[ "${compose_version_num}" -lt "${min_compose_version_num}" ]]; then
-        error "Unsupported Docker Compose version: ${compose_version}. Required minimum version is 2.19.1 (V2 only)."
-    fi
-    info "Docker Compose version check passed: ${compose_version} (≥ 2.19.1, V2)"
-
-    success "Docker environment validation passed (Docker: ${docker_version}, Compose: ${compose_version})"
-}
-
 # ===================== Fetch public IP =====================
 get_public_ip() {
     local local_ip=""

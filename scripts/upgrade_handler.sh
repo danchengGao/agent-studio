@@ -345,6 +345,11 @@ uprade_mysql() {
     local env_file="${CONFIG["ENV_DIR"]}/env.runtime.${DEPLOY_VARS["NAME_SUFFIX"]}"
     exec_cmd "docker cp ${env_file} ${upgrade_container}:/root/.env"
     upgrade_data "mysql"
+
+    if version_is_less_than "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" "0.1.4" \
+        && ! version_is_less_than "${DEPLOY_VARS["VERSION"]}" "0.1.4"; then
+        create_db "${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
+    fi
 }
 
 # Handle SQLite upgrade (copy db files + execute schema upgrade + restore)
