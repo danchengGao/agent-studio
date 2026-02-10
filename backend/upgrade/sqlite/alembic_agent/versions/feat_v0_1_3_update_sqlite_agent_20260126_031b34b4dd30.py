@@ -29,8 +29,10 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column('desc_mk', sa.Text(), nullable=True))
         batch_op.add_column(sa.Column('inputs', sa.JSON(), nullable=True))
 
+    # 设置现有 tool 记录的 available 字段为默认为 True
     with op.batch_alter_table('tool', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('available', sa.Boolean(), nullable=False))
+        batch_op.add_column(sa.Column('available', sa.Boolean(), 
+        nullable=False, server_default=sa.text('1')))	
 
     # 设置现有 tool 记录的 available 字段为 True
     op.execute("UPDATE tool SET available = 1")
