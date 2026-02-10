@@ -3820,6 +3820,7 @@
         "versionNumber": "版本号",
         "versionNumberPlaceholder": "请输入版本号",
         "versionNumberFormat": "格式：主版本.次版本.修订版本（如：1.2.3）",
+        "versionNumberMustBeGreater": "版本号不能小于等于当前版本号",
         "versionDescription": "版本描述",
         "versionDescriptionPlaceholder": "请输入版本说明",
         "versionDescriptionHelper": "描述本次版本的变更内容",
@@ -4587,8 +4588,56 @@
       "documentType": "文档知识库",
       "embeddingModel": "Embedding 模型"
     }
- }, 
-   "utils": { 
+  },
+  "hooks": {
+    "prompts": {
+      "useToolEditDialog": {
+        "toolDeleteSuccess": "工具删除成功！",
+        "toolNameRequired": "请输入工具名称！",
+        "toolNameExists": "工具名称已存在，请重新命名",
+        "toolSaveSuccess": "工具保存成功！",
+        "addToolContextBaseGroup": "设置工具上下文为组{{groupId}}(基准组)",
+        "addToolContextControlGroup": "设置工具上下文为组{{groupId}}(对照组)",
+        "addToolContextMain": "设置工具上下文为主页面",
+        "toolDialogOpened": "工具对话框已打开",
+        "editToolParametersMode": "工具 {{name}} 的 parametersMode:",
+        "editToolContextSet": "设置工具编辑上下文:",
+        "toolSaveTriggerLog": "handleSaveTool 主页面: 调用 triggerAutoSave，updatedTools="
+      },
+      "useSubmitVersionDialog": {
+        "getPromptDetailFailed": "获取prompt详情失败",
+        "cannotSubmitPromptNotSaved": "无法提交版本：提示词尚未保存",
+        "versionNumberRequired": "请输入版本号",
+        "submitSuccess": "新版本提交成功！",
+        "loadDebugContextFailed": "加载调试上下文失败",
+        "reloadAfterSubmitFailed": "提交后重新加载数据失败",
+        "submitNewVersionFailed": "提交新版本失败"
+      },
+      "useMultiRunDialog": {
+        "configValidModelFirst": "请先配置有效的模型",
+        "unknownError": "未知错误",
+        "retryFailedWithMessage": "重试失败: {{message}}",
+        "getPromptDetailFailedWithMessage": "获取提示词详情失败: {{message}}"
+      },
+      "useLoadPrompt": {
+        "loadModelsFailed": "加载模型列表失败，请稍后重试",
+        "getPromptDetailFailed": "查询提示词详情失败",
+        "loadPromptDetailFailed": "加载提示词详情失败，请稍后重试"
+      },
+      "useDebugInputAreaGroup": {
+        "requestPrepareFailedWithMessage": "请求准备失败: {{message}}",
+        "unknownError": "未知错误",
+        "baseGroup": "基准组",
+        "controlGroupWithId": "对照组{{id}}",
+        "groupConfigValidModelFirst": "{{groupName}} 请先配置有效的模型",
+        "retryFailedWithMessage": "重试失败: {{message}}"
+      },
+      "useDebugInputArea": {
+        "configValidModelFirst": "请先配置有效的模型"
+      }
+    }
+  },
+  "utils": { 
      "prompts": { 
        "utils": { 
          "validateVersionNumber": { 

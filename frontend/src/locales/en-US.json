@@ -3833,6 +3833,7 @@
         "versionNumber": "Version Number",
         "versionNumberPlaceholder": "Please enter version number",
         "versionNumberFormat": "Format: major.minor.patch (e.g.: 1.2.3)",
+        "versionNumberMustBeGreater": "Version number must be greater than the current version",
         "versionDescription": "Version Description",
         "versionDescriptionPlaceholder": "Please enter version description",
         "versionDescriptionHelper": "Describe the changes in this version",
@@ -4588,6 +4589,54 @@
       "processing": "Processing",
       "error": "Error",
       "inactive": "Inactive"
+    }
+  },
+  "hooks": {
+    "prompts": {
+      "useToolEditDialog": {
+        "toolDeleteSuccess": "Tool deleted successfully!",
+        "toolNameRequired": "Please enter tool name!",
+        "toolNameExists": "Tool name already exists, please rename",
+        "toolSaveSuccess": "Tool saved successfully!",
+        "addToolContextBaseGroup": "Set tool context to group {{groupId}} (base group)",
+        "addToolContextControlGroup": "Set tool context to group {{groupId}} (control group)",
+        "addToolContextMain": "Set tool context to main page",
+        "toolDialogOpened": "Tool dialog opened",
+        "editToolParametersMode": "Tool {{name}} parametersMode:",
+        "editToolContextSet": "Set tool edit context:",
+        "toolSaveTriggerLog": "handleSaveTool main page: triggerAutoSave called, updatedTools="
+      },
+      "useSubmitVersionDialog": {
+        "getPromptDetailFailed": "Failed to get prompt details",
+        "cannotSubmitPromptNotSaved": "Cannot submit version: prompt not saved yet",
+        "versionNumberRequired": "Please enter version number",
+        "submitSuccess": "New version submitted successfully!",
+        "loadDebugContextFailed": "Failed to load debug context",
+        "reloadAfterSubmitFailed": "Failed to reload data after submit",
+        "submitNewVersionFailed": "Failed to submit new version"
+      },
+      "useMultiRunDialog": {
+        "configValidModelFirst": "Please configure a valid model first",
+        "unknownError": "Unknown error",
+        "retryFailedWithMessage": "Retry failed: {{message}}",
+        "getPromptDetailFailedWithMessage": "Failed to get prompt details: {{message}}"
+      },
+      "useLoadPrompt": {
+        "loadModelsFailed": "Failed to load model list, please try again later",
+        "getPromptDetailFailed": "Failed to get prompt details",
+        "loadPromptDetailFailed": "Failed to load prompt details, please try again later"
+      },
+      "useDebugInputAreaGroup": {
+        "requestPrepareFailedWithMessage": "Request preparation failed: {{message}}",
+        "unknownError": "Unknown error",
+        "baseGroup": "Base group",
+        "controlGroupWithId": "Control group {{id}}",
+        "groupConfigValidModelFirst": "{{groupName}} Please configure a valid model first",
+        "retryFailedWithMessage": "Retry failed: {{message}}"
+      },
+      "useDebugInputArea": {
+        "configValidModelFirst": "Please configure a valid model first"
+      }
     }
   },
   "utils": {	 

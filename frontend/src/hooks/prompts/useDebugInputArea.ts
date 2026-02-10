@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   PromptService,
   type DebugStreamingRequest,
@@ -84,6 +85,7 @@ interface UseDebugInputAreaOptions {
 }
 
 export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
+  const { t } = useTranslation()
   const isStreamingStoppedRef = useRef<boolean>(false)
   const debugControllerRef = useRef<{ cancel: () => void } | null>(null) // 用于管理 debugController
 
@@ -303,7 +305,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
 
       // 如果没有有效的模型，抛出错误
       if (!currentSelectedModel) {
-        throw new Error('请先配置有效的模型')
+        throw new Error(t('hooks.prompts.useDebugInputArea.configValidModelFirst'))
       }
 
       // 构建模型配置 - 动态包含该模型支持的参数
@@ -386,6 +388,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       toolsEnabled,
       promptId,
       convertToolsToNewFormat,
+      t,
     ],
   )
 
@@ -939,6 +942,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       cost_ms?: number,
       lastResponse?: DebugStreamingResponse,
       customParameters?: any[], // 使用 any[] 以兼容 Parameter 类型
+      customTools?: any[], // 可选：覆盖闭包中的 tools，避免自动保存时使用到上次的 tools 状态
     ) => {
       try {
         // 过滤掉系统类型消息，只保留用户和AI消息
@@ -1023,10 +1027,18 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
           }
         })
 
-        // 构建mock_tools
-        const mockTools: MockTool[] = tools.map(tool => ({
+        // 构建mock_tools - 优先使用传入的 customTools（避免自动保存时闭包中的 tools 尚未更新）
+        const toolsToUse = customTools ?? tools
+        console.log('🔍 [DEBUG-CONTEXT] saveDebugContext 构建 mock_tools', {
+          customToolsProvided: customTools !== undefined && customTools !== null,
+          customToolsLen: customTools?.length,
+          closureToolsLen: tools?.length,
+          toolsToUseLen: toolsToUse?.length,
+          toolsToUsePreview: toolsToUse?.slice(0, 3).map((t: any) => ({ name: t?.name, defaultValue: t?.defaultValue, mock_response: t?.defaultValue ?? '' })),
+        })
+        const mockTools: MockTool[] = toolsToUse.map((tool: any) => ({
           name: tool.name,
-          mock_response: tool.defaultValue || '',
+          mock_response: tool.defaultValue ?? '',
         }))
 
         // 构建保存请求
@@ -1067,7 +1079,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
 
     // 检查是否配置了有效的模型
     if (!checkValidModel(selectedModel, modelConfig, availableModels)) {
-      showSnackbar('请先配置有效的模型', 'error')
+      showSnackbar(t('hooks.prompts.useDebugInputArea.configValidModelFirst'), 'error')
       return
     }
 
@@ -1359,6 +1371,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
     debugAbortControllerRef,
     setExpandedReasoningMessages,
     setExpandedToolCallMessages,
+    t,
   ])
 
   /**
@@ -1380,7 +1393,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       // 如果没有找到用户消息，使用空字符串（与handleSendMessage的逻辑一致）
       // 在重置AI消息为加载状态之前，先检查模型是否有效
       if (!checkValidModel(selectedModel, modelConfig, availableModels)) {
-        showSnackbar('请先配置有效的模型', 'error')
+        showSnackbar(t('hooks.prompts.useDebugInputArea.configValidModelFirst'), 'error')
         return
       }
 
@@ -1492,6 +1505,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       saveDebugContext,
       setIsProcessing,
       debugAbortControllerRef,
+      t,
     ],
   )
 
