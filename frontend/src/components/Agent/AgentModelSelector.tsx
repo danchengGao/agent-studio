@@ -116,7 +116,7 @@ const AgentModelSelector = (props: {
   const { user } = useAuthStore()
   const { t } = useScopedTranslation('agents.agentEditor.orchestration')
   const user_id = saveAgentRequest?.space_id || ''
-  const group_id = saveAgentRequest?.agent_id || ''
+  const group_id = saveAgentRequest?.memory?.memory_base?.mdb_id || ''
 
   const [selectedModelName, setSelectedModelName] = useState<string>('')
   const [selectedModel, setSelectedModel] = useState<ModelDetail | null>(null)
