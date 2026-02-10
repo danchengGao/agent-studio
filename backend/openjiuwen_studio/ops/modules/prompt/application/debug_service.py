@@ -9,6 +9,7 @@ from typing import Dict, Any, Optional, AsyncGenerator, List
 import asyncio
 
 from jinja2 import Environment, BaseLoader, TemplateError, UndefinedError
+from jinja2.sandbox import SandboxedEnvironment, SecurityError
 from openai import OpenAIError
 
 from openjiuwen.core.common.logging import logger
@@ -84,7 +85,8 @@ class PromptDebugService:
     ):
         self.debug_ctx_repo = debug_ctx_repo
         self.debug_log_repo = debug_log_repo
-        self.jinja_env = Environment(
+        self.jinja_env = SandboxedEnvironment(
+            autoescape=False,
             loader=BaseLoader(),
             trim_blocks=True,
             lstrip_blocks=True,
@@ -624,7 +626,7 @@ class PromptDebugService:
                     for k, v in var_map.items():
                         content = content.replace(f"{{{k}}}", str(v))
 
-            except (TemplateError, TypeError, UndefinedError) as e:
+            except (TemplateError, TypeError, UndefinedError, SecurityError) as e:
                 raise TemplateRenderError(
                     "Jinja2 渲染失败，变量 map=%s，错误=%s", var_map, str(e)) from e
 
