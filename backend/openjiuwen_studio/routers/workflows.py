@@ -503,7 +503,7 @@ async def get_upload_url(
         logger.error(f"Failed to generate upload URL: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to generate upload URL"
+            detail=f"Failed to generate upload URL: {e}"
         ) from e
 
 
