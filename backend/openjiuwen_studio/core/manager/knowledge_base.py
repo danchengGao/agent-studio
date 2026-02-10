@@ -667,7 +667,9 @@ def knowledge_base_update(req: KnowledgeBaseUpdateRequest, current_user: dict) -
     _ = check_user_space(req.space_id, current_user)
 
     # 2. 检查知识库是否存在
-    kb_get = KnowledgeBaseGet(space_id=req.space_id, kb_id=req.kb_id)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
     get_result = knowledge_base_repository.knowledge_base_get(kb_get)
     if get_result.code == status.HTTP_404_NOT_FOUND or not get_result.data:
         logger.warning(f"[KB_UPDATE] Knowledge base not found - ID: {req.kb_id}, User: {user_id}")
@@ -708,7 +710,13 @@ def knowledge_base_update(req: KnowledgeBaseUpdateRequest, current_user: dict) -
     # 如果 desc 是空字符串，转换为 None 以便正确清空数据库字段
     description_value = req.desc if req.desc else None
     update_result = knowledge_base_repository.knowledge_base_update(
-        KBDetails(space_id=req.space_id, kb_id=req.kb_id), name=req.name, description=description_value
+        KBDetails(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            index_manager_type=_CURR_INDEX_TYPE,
+        ),
+        name=req.name,
+        description=description_value,
     )
 
     if update_result.code != status.HTTP_200_OK:
@@ -1956,7 +1964,11 @@ def knowledge_base_search(req: KnowledgeBaseSearchRequest, current_user: dict) -
 
     # 2. 执行查询（带分页）
     search_result = knowledge_base_repository.knowledge_base_search(
-        space_id=req.space_id, query=req.query, page=page, page_size=page_size
+        space_id=req.space_id,
+        query=req.query,
+        page=page,
+        page_size=page_size,
+        index_manager_type=_CURR_INDEX_TYPE,
     )
 
     if search_result.code != status.HTTP_200_OK:
