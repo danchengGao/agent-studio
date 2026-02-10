@@ -187,11 +187,22 @@ The functions currently included in agent orchestration are as follows:
 
 ## Configure Memory
 
+### Prerequisites
+
+- A memory base has been created.
+- You can click the **+** button in the **Memory Base** section under the Memory column on the **Orchestration Configuration** page, then select **Create New Memory Base** from the dropdown menu to navigate to the Memory Base Management page for configuration. For details on how to configure a memory base, please refer to the relevant sections on memory base management.
+
+   ![Create New Memory Base](../images/create_new_memory_base.png)
+
 ### Operation Steps
 
-1. In the **Orchestration Configuration** page, select the **Skills** section, click the dropdown button in the **Memory Configuration** section to configure, including variables and whether to enable long-term memory:
+1. Click the **+** button in the **Memory Base** section under the Memory column on the **Orchestration Configuration** page, then select **Add Existing Memory Base**:
 
-   ![image](../images/ac38e9bf-0916-4e2f-af96-ee9eaa2aed02.png)
+   ![Add Existing Memory Base](../images/add_existing_memory_base.png)
+
+2. After binding the **memory base**, you can set the memory configuration in the **variable configuration** and **long-term memory** below:
+
+   ![Memory Configuration](../images/memory_configuration.png)
 
    The memory configuration descriptions are as follows:
 
