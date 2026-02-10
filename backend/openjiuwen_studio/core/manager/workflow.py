@@ -1529,18 +1529,22 @@ def workflow_version_list(
 # @with_exception_handling
 def get_upload_url(
         req: dict,
+        current_user: dict,
         minio_client: Minio
 ) -> ResponseModel:
     """获取文件上传自签名URL"""
+    space_id = req.get("space_id")
     object_key = req.get("object_key")
 
-    if not object_key:
+    if not all([space_id, object_key]):
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message="Missing required fields: object_key"
+            message="Missing required fields: object_key or space_id"
         )
+    # 1. 校验用户是否有权限访问该space
+    _ = check_user_space(space_id, current_user)
 
-    # 3. 生成 MinIO 上传 URL
+    # 2. 生成 MinIO 上传 URL
     bucket_name = settings.minio_bucket
 
     if not minio_client.bucket_exists(bucket_name):
@@ -1566,18 +1570,22 @@ def get_upload_url(
 # @with_exception_handling
 def get_download_url(
         req: dict,
+        current_user: dict,
         minio_client: Minio
 ) -> ResponseModel:
     """获取文件上传自签名URL"""
+    space_id = req.get("space_id")
     object_key = req.get("object_key")
 
-    if not object_key:
+    if not all([space_id, object_key]):
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message="Missing required fields: object_key"
+            message="Missing required fields: object_key or space_id"
         )
+    # 1. 校验用户是否有权限访问该space
+    _ = check_user_space(space_id, current_user)
 
-    # 3. 生成 MinIO 下载 URL
+    # 2. 生成 MinIO 下载 URL
     bucket_name = settings.minio_bucket
 
     try:
