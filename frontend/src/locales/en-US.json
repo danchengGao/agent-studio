@@ -2206,7 +2206,7 @@
         "topp": "Top P",
         "toppDesc": "Top-p Sampling: Select the smallest set of words whose cumulative probability reaches p for sampling. Dynamically adjusts the number of candidate words to balance output diversity and quality. Typically set to 0.9-0.95. When used with temperature sampling, it is recommended to adjust only one of them.",
         "timeout": "Timeout(s)",
-        "timeoutDesc": "Timeout range: 1-300 seconds (out-of-range values will be automatically adjusted)"
+        "timeoutDesc": "Timeout range: 1-3600 seconds (out-of-range values will be automatically adjusted)"
       },
       "actions": {
         "save": "Save",
@@ -2242,7 +2242,7 @@
       "nameMaxLength": "Model name cannot exceed 100 characters",
       "modelIdMaxLength": "Model ID cannot exceed 100 characters",
       "descriptionMaxLength": "Description cannot exceed 500 characters",
-      "timeoutRange": "Timeout must be between 1-300 seconds",
+      "timeoutRange": "Timeout must be between 1-3600 seconds",
       "fillRequiredFields": "Please fill in all required fields",
       "systemModelNoEdit": "Pre-built models are not editable",
       "systemModelNoDelete": "Pre-built models cannot be deleted",

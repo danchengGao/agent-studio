@@ -2191,7 +2191,7 @@
         "topp": "核采样",
         "toppDesc": "Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。",
         "timeout": "超时时间(s)",
-        "timeoutDesc": "超时时间范围：1-300秒（输入超出范围将自动调整）"
+        "timeoutDesc": "超时时间范围：1-3600秒（输入超出范围将自动调整）"
       },
       "actions": {
         "save": "保存",
@@ -2227,7 +2227,7 @@
       "nameMaxLength": "模型名称不能超过100个字符",
       "modelIdMaxLength": "模型ID不能超过100个字符",
       "descriptionMaxLength": "描述不能超过500个字符",
-      "timeoutRange": "超时时间必须在1-300秒之间",
+      "timeoutRange": "超时时间必须在1-3600秒之间",
       "fillRequiredFields": "请填写所有必填字段",
       "systemModelNoEdit": "预置模型不支持编辑",
       "systemModelNoDelete": "预置模型不支持删除",
