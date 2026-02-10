@@ -1241,7 +1241,18 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // âœ… æ–
                       </svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <Typography sx={{ fontWeight: 'bold', fontSize: '1rem' }}>{memoryBaseObject.name}</Typography>
+                      <Typography
+                        sx={{
+                          fontWeight: 'bold',
+                          fontSize: '1rem',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={memoryBaseObject.name}
+                      >
+                        {memoryBaseObject.name}
+                      </Typography>
                       {memoryBaseObject.description && (
                         <Typography
                           variant="body2"
@@ -1256,6 +1267,7 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // âœ… æ–
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                           }}
+                          title={memoryBaseObject.description}
                         >
                           {memoryBaseObject.description}
                         </Typography>

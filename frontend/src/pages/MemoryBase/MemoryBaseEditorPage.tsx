@@ -787,11 +787,21 @@ const MemoryBaseEditorPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">{t('memoryBases.settings.name')}</h3>
-                <p className="mt-1 text-gray-900">{memoryBase.name}</p>
+                <p
+                  className="mt-1 text-gray-900 truncate"
+                  title={memoryBase.name}
+                >
+                  {memoryBase.name}
+                </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">{t('memoryBases.settings.description')}</h3>
-                <p className="mt-1 text-gray-900">{memoryBase.description || '-'}</p>
+                <p
+                  className="mt-1 text-gray-900 truncate"
+                  title={memoryBase.description || '-'}
+                >
+                  {memoryBase.description || '-'}
+                </p>
               </div>
             </div>
 
