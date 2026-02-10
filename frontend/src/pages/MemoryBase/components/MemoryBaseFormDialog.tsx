@@ -6,7 +6,7 @@ import { MemoryBase, CreateMemoryBaseRequest, UpdateMemoryBaseRequest } from '@/
 import { useMemoryBaseStore } from '@/stores/useMemoryBaseStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { ENV_CONFIG } from '@/config/environment';
-import { useEmbeddingModels, useTestEmbeddingModel, useToggleEmbeddingModelStatus, useModels } from '@test-agentstudio/api-client';
+import { useEmbeddingModels, useTestEmbeddingModel, useToggleEmbeddingModelStatus, useModels, useTestModel, useToggleModelStatus } from '@test-agentstudio/api-client';
 import { MemoryBaseService } from '@test-agentstudio/api-client';
 import { validateMemoryBaseName } from '../utils/validation';
 import { IconButton, Tooltip } from '@mui/material';
@@ -191,7 +191,8 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
   // 测试和禁用 embedding 模型的 hooks
   const testEmbeddingModelMutation = useTestEmbeddingModel();
   const toggleEmbeddingModelStatusMutation = useToggleEmbeddingModelStatus();
-
+  const testLLMModelMutation = useTestModel();
+  const toggleLLMModelStatusMutation = useToggleModelStatus();
   // 获取所有记忆库名称用于重复检查
   useEffect(() => {
     if (open && user?.spaceId) {
@@ -377,7 +378,57 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
           } catch (toggleError) {
             console.error('禁用Embedding模型失败:', toggleError);
           }
+          
+          // 在测试失败后清除相关的表单字段和错误
+          setFormData(prev => ({ 
+            ...prev, 
+            embedding_model_config_id: 0 // 将embedding模型选择置为空
+          }));
+          
+          // 更新错误状态，移除embedding模型相关的错误
+          setErrors(prev => ({ 
+            ...prev, 
+            embedding_model_config_id: undefined 
+          }));
+          
+          // 重新抛出错误以便上层处理
           throw new Error(t('memoryBases.form.embeddingModelTestFailed') + ': ' + (testError.message || testError));
+        }
+
+        const selectedModelId = formData.llm_model_config_id.toString();
+        try {
+          // 测试 embedding 模型
+          await testLLMModelMutation.mutateAsync({
+            id: selectedModelId,
+            prompt: t('memoryBases.form.testText'),
+            spaceId: user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
+          });
+        } catch (testError: any) {
+          // 测试失败，禁用该模型
+          console.error('LLM 模型测试失败，正在禁用模型:', testError);
+          try {
+            await toggleLLMModelStatusMutation.mutateAsync({
+              id: selectedModelId,
+              spaceId: user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
+            });
+          } catch (toggleError) {
+            console.error('禁用LLM模型失败:', toggleError);
+          }
+          
+          // 在测试失败后清除相关的表单字段和错误
+          setFormData(prev => ({ 
+            ...prev, 
+            llm_model_config_id: 0 // 将embedding模型选择置为空
+          }));
+          
+          // 更新错误状态，移除embedding模型相关的错误
+          setErrors(prev => ({ 
+            ...prev, 
+            llm_model_config_id: undefined 
+          }));
+          
+          // 重新抛出错误以便上层处理
+          throw new Error(t('memoryBases.form.modelTestError') + ': ' + (testError.message || testError));
         }
 
         // 创建记忆库
@@ -416,6 +467,7 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
       }
     } finally {
       setIsLoading(false);
+      setErrors({});
     }
   };
 
