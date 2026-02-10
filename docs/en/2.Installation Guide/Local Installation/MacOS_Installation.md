@@ -1,4 +1,7 @@
-This guide describes how to install openJiuwen locally on macOS.
+This guide describes how to install openJiuwen locally on macOS. Local advanced installation offers two approaches:
+
+* **Method 1: One-click installation script** – Automates most installation and configuration steps and simplifies the process; suitable for quick deployment.
+* **Method 2: Manual installation of all dependencies** – Requires manually installing and configuring all dependent services; suitable for developers who need flexible configuration.
 
 ## I. Environment Preparation
 
@@ -19,11 +22,76 @@ Ensure your machine meets the following requirements:
   * MySQL 8.0 or later
   * Milvus 2.6.2 or later
 
-## II. Dependencies Installation
+## II. Installation Methods
 
-Before proceeding with the main installation, you must first install the required dependencies, then continue with source code retrieval and subsequent installation steps.
+### Method 1: One-Click Installation Script
 
-### 1. Install Git
+The one-click script automates tool checks, code fetch, environment setup, and service startup to simplify installation.
+
+#### 1. Get the Installation Script
+
+* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_macos_v2.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
+  * `setup.sh` – Main installation script that runs the full flow
+  * `check_curl.sh` – Check and install curl
+  * `check_git.sh` – Check and install Git
+  * `check_nodejs.sh` – Check and install Node.js (via NVM)
+  * `check_python.sh` – Check and install Python 3.11
+  * `fetch_codes.sh` – Clone the agent-studio repository
+
+#### 2. Run the Installation Script
+
+* Go to the script directory and make the scripts executable:
+
+  ```bash
+  cd setup_scripts_macos_v2
+  chmod +x *.sh
+  ```
+
+* Run the main installation script:
+
+  ```bash
+  # Use MySQL by default
+  ./setup.sh
+
+  # Or use SQLite
+  ./setup.sh --db_type=sqlite
+  ```
+
+* The script will:
+  1. Check and install basic tools (curl, git, nodejs, python)
+  2. Clone the agent-studio repository
+  3. Generate an AES key
+  4. Configure the .env file (database type is set according to the --db_type parameter)
+  5. Set up the backend (create virtual environment, install dependencies, start service)
+  6. Set up the frontend (install dependencies, start service)
+
+* When the script finishes, it will print backend and frontend PIDs, log paths, and the frontend URL. Open that URL in a browser to use openJiuwen.
+
+  ![image](../images/一键安装运行完成截图mac.png)
+
+#### 3. Common Script Parameters
+
+  ```bash
+  # Show status and access URLs
+  ./setup.sh --status
+
+  # Stop backend and frontend
+  ./setup.sh --stop
+
+  # Restart backend and frontend
+  ./setup.sh --restart
+
+  # List all supported parameters
+  ./setup.sh --help
+  ```
+
+### Method 2: Manual Installation of All Dependencies
+
+Complete dependency installation first, then perform source retrieval and installation.
+
+#### 1. Install Dependencies
+
+##### 1.1. Install Git
 
 * Run the following commands in "Terminal": 
     ```
@@ -34,12 +102,12 @@ Before proceeding with the main installation, you must first install the require
 
 * After installation, enter `git --version` in "Terminal". If the installation was successful, the Git version number will be displayed.
 
-### 2. Install Node.js and npm
+##### 1.2. Install Node.js and npm
 
 * Visit the <a href="http://nodejs.cn/download/" target="_blank" rel="nofollow noopener noreferrer">Node.js official website</a> and download the macOS installer for Node.js 20.0 or later. Double-click the installer and following the installation instructions to complete the installation.
 * After installation, open "Terminal" and run `node -v` and `npm -v`. If the installation was successful, the Node.js and npm version numbers will be displayed. 
 
-### 3. Install Python and uv
+##### 1.3. Install Python and uv
 
 * Run the following command to download and install Python 3.11
 
@@ -56,17 +124,17 @@ Before proceeding with the main installation, you must first install the require
    ```
 * Run `uv --version`. If the installation was successful, the uv version number will be displayed. 
 
-### 4. Install MySQL (Optional Component)
+##### 1.4. Install MySQL (Optional Component)
 
 * **SQLite vs MySQL**:
   * SQLite requires no extra setup and is suitable for development and testing, but it has limitations (e.g., no support for concurrent writes, no user permission management).
   * MySQL offers more robust features and is better suited for complex scenarios, making it the recommended choice for real-world projects and production environments.
 
-#### 4.1 SQLite
+###### 1.4.1 SQLite
 
 * **Note**: SQLite is used by default. Simply keep `DB_TYPE` as `sqlite` in `.env.example` to start the backend service directly—no additional installation or configuration is required.
 
-#### 4.2 MySQL
+###### 1.4.2 MySQL
 
 * **Note**: If you prefer to use MySQL, change `DB_TYPE` in `.env.example` to `mysql` and follow the steps below to install and configure MySQL.
 
@@ -99,7 +167,7 @@ Before proceeding with the main installation, you must first install the require
   FLUSH PRIVILEGES;
   ```
 
-### 5. Milvus (Optional Component) 
+##### 1.5. Milvus (Optional Component) 
 
 * **Note**：`.env.example` uses Chroma by default. Simply keep `INDEX_MANAGER_TYPE` set to `chroma` to directly start the backend service without additional installation or configuration. If you need to use Milvus, please change `INDEX_MANAGER_TYPE` in `.env.example` to `milvus` and refer to [How to enable memory and knowledge base features](#macos-memory) to complete the installation and configuration of Milvus.
 
@@ -107,9 +175,9 @@ Before proceeding with the main installation, you must first install the require
   * Chroma requires no additional installation and boasts a simple configuration. All you need to do is obtain the vector model, making it ideal for quick experimentation and suitable for development and testing environments. For obtaining the vector model, refer to [How to Obtain the Vector Model](#macos-embed-model).
   * Milvus has more comprehensive functions and can meet the needs of complex scenarios, so it is more recommended for use in practical engineering and production environments.
 
-## III. openJiuwen Installation
+#### 2. openJiuwen Installation
 
-### 1. Obtain the Source Code
+##### 2.1. Get the Source Code
 
 * Please make sure you have access to the <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer">openJiuwen repository</a>, If you do not have access, apply for it in advance. 
 
@@ -135,7 +203,7 @@ Before proceeding with the main installation, you must first install the require
   cd agent-studio
   ```
 
-### 2. Generate an AES Key (Optional) 
+##### 2.2. Generate an AES Key (Optional) 
 
 * If you do not need to encrypt sensitive fields, you can skip this step.
 * Run the following commands to generate the key: 
@@ -154,7 +222,7 @@ Before proceeding with the main installation, you must first install the require
 
 * **Note**: The AES key must remain consistent. Changing the key midway will cause previously encrypted data to become undecryptable.
 
-### 3. Start openJiuwen
+##### 2.3. Start openJiuwen
 
 * Open "Terminal" in the root directory of the source code.
 
@@ -181,7 +249,7 @@ Before proceeding with the main installation, you must first install the require
    # Memory data storage path (example, default value: memory_data, can be modified according to actual situation)
    MEMORY_DATA_PATH=memory-data
 
-   # Milvus configuration (Example) 
+   # Milvus configuration (example, only when INDEX_MANAGER_TYPE=milvus)
    MILVUS_HOST=127.0.0.1
    MILVUS_PORT=19530
    MILVUS_COLLECTION_NAME=memory_vector
@@ -210,11 +278,11 @@ Before proceeding with the main installation, you must first install the require
    | **DB_PORT**                 | Database port                                                            | `3306`                                                                    |
    | **DB_USER**                 | Database username                                                            | `your_user_name`                                                             |
    | **DB_PASSWORD**             | Database password                                                             | `your_password`                                                         |
-   | **INDEX_MANAGER_TYPE**        | Vector index type configuration, default value: chroma                                  | `chroma`                              |
+   | **INDEX_MANAGER_TYPE**        | Vector database type; optional values: chroma, milvus; default: chroma                   | `chroma`                              |
    | **MEMORY_DATA_PATH**          | Memory data storage path, default value: memory-data                                    | `memory-data`                         |    
    | **MILVUS_HOST**             | Host address of the Milvus service                                                | `127.0.0.1`                                                                    |
    | **MILVUS_PORT**             | Port of the Milvus service                                                | `19530`                                                                    |
-   | **MILVUS_COLLECTION_NAME**  | Databse name used by Milvus                                                | `memory_vector`                                                                    
+   | **MILVUS_COLLECTION_NAME**  | Database name used by Milvus                                                | `memory_vector`                                                                    
    | **EMBEDDING_MODEL_DIMENTION** | Dimension of the embedding model, determined by the model specified in EMBED_MODEL_NAME              | `1024`                                                                    |                  
    | **EMBED_API_BASE**          | API endpoint of the embedding model                                                  | `https://example.com/embedding_model`            |            
    | **EMBED_MODEL_NAME**        | Name of the embedding model                                                             | `text-embedding-model`                                                       |
@@ -273,13 +341,13 @@ Before proceeding with the main installation, you must first install the require
 
   Network: *network access address*
 
-### 4. Access the System
+##### 2.4. Access the System
 
   * To access locally, Control + click the *local access address*, then click Open Link to view the openJiuwen interface in your local browser. Alternatively, copy the *local access address* into the browser's address bar and press Enter.
   
   * To access on another machine, copy the *network access address* into the browser's address bar and press Enter to view the openJiuwen interface.
 
-## IV. Frequently Asked Questions (FAQ) 
+## III. Frequently Asked Questions (FAQ) 
 
 ### <a id="macos-memory"></a> Question 1: How to Enable the Memory and Knowledge Base Features
 
@@ -322,7 +390,7 @@ The memory and knowledge base function supports two vector databases: Chroma and
   docker pull swr.cn-north-4.myhuaweicloud.com/openjiuwen/milvusdb/milvus-arm64:v2.6.2
   ```
 
-* Edut the "standalone_embed.sh" file and replace the official Milvus image name inside the script (e.g. `milvusdb/milvus:v2.6.7`) with the corresponding image name (e.g. for ARM machines: `swr.cn-north-4.myhuaweicloud.com/openjiuwen/milvusdb/milvus-arm64:v2.6.2`). 
+* Edit the "standalone_embed.sh" file and replace the official Milvus image name inside the script (e.g. `milvusdb/milvus:v2.6.7`) with the corresponding image name (e.g. for ARM machines: `swr.cn-north-4.myhuaweicloud.com/openjiuwen/milvusdb/milvus-arm64:v2.6.2`). 
   
 * After making the change, run the following command in Terminal to start Milvus as a Docker container: 
 
