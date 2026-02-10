@@ -3,6 +3,7 @@ import { Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Button, 
 import { Shell, Settings, X, Variable, Brain, Trash } from 'lucide-react'
 import axios from 'axios'
 import { useScopedTranslation } from '@/i18n'
+import { useTranslation } from 'react-i18next'
 
 type MenuKey = 'variables' | 'longterm'
 
@@ -76,6 +77,7 @@ function formatLocalDate(utcStr?: string) {
 
 export default function MemoryButton({ userId, groupId, enableLongTerm = true }: MemoryButtonProps) {
   const { t } = useScopedTranslation('agents.agentEditor.previewDebug.memoryManager')
+  const { t: globalT } = useTranslation();
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState<MenuKey>('variables')
 
@@ -264,47 +266,94 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
     if (list.length === 0) return <div className="text-sm text-gray-400">{t('table.empty')}</div>
 
     const isLong = active === 'longterm'
-    const gridCls = isLong ? 'grid grid-cols-[1fr_1fr_36px]' : 'grid grid-cols-[1fr_1fr_36px]'
-
+    const getMemoryTypeName = (type: string) => {
+      switch (type) {
+        case 'variable':
+          return globalT('memoryBases.memoryType.variable');
+        case 'summary':
+          return globalT('memoryBases.memoryType.summary');
+        case 'user_profile':
+          return globalT('memoryBases.memoryType.longterm');
+        case 'scenario':
+          return globalT('memoryBases.memoryType.longterm');
+        case 'semantic':
+          return globalT('memoryBases.memoryType.longterm');
+        default:
+          return type;
+      }
+    };
+    const getGridClasses = (isLong) => {
+      return isLong 
+        ? 'grid grid-cols-3 gap-4 flex-1' // 长文本模式：3列 + 合理间距
+        : 'grid grid-cols-2 gap-4 flex-1'; // 变量模式：2列 + 合理间距
+    };
     return (
-      <div className="space-y-3">
-        <div className={`${gridCls} items-center text-sm text-gray-500 px-3`}>
-          {isLong ? (
-            <>
-              <span>{t('table.headers.longTerm.memory')}</span>
-              <span>{t('table.headers.longTerm.updatedAt')}</span>
-              <span />
-            </>
-          ) : (
-            <>
-              <span>{t('table.headers.variables.field')}</span>
-              <span>{t('table.headers.variables.value')}</span>
-              <span />
-            </>
-          )}
-        </div>
-
-        {list.map(row => (
-          <div key={row.id} className={`${gridCls} items-center rounded border border-gray-200 p-3`}>
+      <div className="space-y-3 w-full">
+        {/* 表头：语义化 + 样式统一 */}
+        <div className="flex items-center justify-between px-3 py-2 text-sm text-gray-500 bg-gray-50 rounded-md">
+          <div className={getGridClasses(isLong)}>
             {isLong ? (
               <>
-                <span className="text-gray-600 px-2 py-1">{row.value}</span>
-                <span className="text-gray-400">{row.time}</span>
+                <span className="font-medium">{t('table.headers.longTerm.memory')}</span>
+                <span className="font-medium">{t('table.headers.longTerm.updatedAt')}</span>
+                <span className="font-medium">{t('table.headers.longTerm.type')}</span>
               </>
             ) : (
               <>
-                <span className="font-medium">{row.field}</span>
-                <span className="text-gray-600 px-2 py-1">{row.value}</span>
+                <span className="font-medium">{t('table.headers.variables.field')}</span>
+                <span className="font-medium">{t('table.headers.variables.value')}</span>
               </>
             )}
+          </div>
+          {/* 占位替换空span：语义化更优，避免无用标签 */}
+          <div className="w-8"></div>
+        </div>
 
-            <Tooltip title={t('delete.tooltip')} arrow>
-              <IconButton size="small" onClick={() => handleDelete(row.id)} className="text-gray-400 hover:text-red-600">
+        {/* 列表项：优化 hover 交互 + 布局对齐 + 响应式 */}
+        {list.length > 0 ? (
+          list.map((row) => (
+            <div
+              key={row.id}
+              className="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+            >
+              <div className={getGridClasses(isLong)}>
+                {isLong ? (
+                  <>
+                    <span className="text-gray-600 px-2 py-1 break-words max-w-full">
+                      {row.value}
+                    </span>
+                    <span className="text-gray-400 text-sm">{row.time}</span>
+                    <span className="text-gray-400 text-sm">{getMemoryTypeName(row.field)}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium break-words">{row.field}</span>
+                    <span className="text-gray-600 px-2 py-1 break-words max-w-full">
+                      {row.value}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {/* 删除按钮：优化 hover 效果 + 尺寸统一 */}
+              <Tooltip title={t('delete.tooltip')} arrow placement="top">
+                <IconButton
+                  size="small"
+                  onClick={() => handleDelete(row.id)}
+                  className="w-8 h-8 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                  aria-label="delete item" // 无障碍优化
+                >
                 <Trash className="w-4 h-4" />
               </IconButton>
             </Tooltip>
           </div>
-        ))}
+          ))
+        ) : (
+          // 空状态优化：提升用户体验
+          <div className="text-center py-6 text-gray-400 text-sm">
+            {t('table.empty.noData')}
+          </div>
+        )}
       </div>
     )
   }
@@ -327,7 +376,12 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
   return (
     <>
       <Tooltip title={t('tooltip')} arrow>
-        <IconButton aria-label={t('ariaLabel')} size="small" onClick={show} className="border border-blue-300 text-blue-600 hover:border-blue-400 hover:bg-blue-50">
+        <IconButton 
+          aria-label={t('ariaLabel')} 
+          size="small" 
+          onClick={show} 
+          className="border border-blue-300 text-blue-600 hover:border-blue-400 hover:bg-blue-50"
+        >
           <div className="relative inline-flex">
             <Shell className="w-5 h-5 text-gray-500" />
             <Settings className="w-3 h-3 text-gray-600 absolute -right-0 -bottom-0 bg-white rounded-full p-[1px] border border-gray-200" />
@@ -350,7 +404,10 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
                 key={key}
                 onClick={() => handleMenuClick(key)}
                 className={`w-full flex items-center gap-2 rounded px-3 py-2 text-sm transition
-                  ${active === key ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'}`}
+                  ${active === key ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100'} ${
+                    loading && active !== key ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                disabled={loading && active !== key}
               >
                 <Icon className="w-4 h-4" />
                 {label}
@@ -365,9 +422,13 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         </div>
 
         <DialogActions className="border-t px-4 py-3">
-          <Button onClick={hide}>{t('actions.close')}</Button>
-          <Button variant="contained" onClick={handleSave}>
-            {t('actions.save')}
+          <Button onClick={hide} disabled={loading}>{t('actions.close')}</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSave}
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={20} /> : t('actions.save')}
           </Button>
         </DialogActions>
       </Dialog>

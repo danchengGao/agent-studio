@@ -484,7 +484,8 @@
           "headers": {
             "longTerm": {
               "memory": "Memory",
-              "updatedAt": "Last Updated"
+              "updatedAt": "Last Updated",
+              "type": "Type"
             },
             "variables": {
               "field": "Field",

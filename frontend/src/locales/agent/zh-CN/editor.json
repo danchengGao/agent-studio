@@ -484,7 +484,8 @@
           "headers": {
             "longTerm": {
               "memory": "记忆",
-              "updatedAt": "修改时间"
+              "updatedAt": "修改时间",
+              "type": "类型"
             },
             "variables": {
               "field": "字段名",
