@@ -320,7 +320,7 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
           model => model.model_id === formData.llm_model_config_id
         );
         if (!selectedLlmModel || !selectedLlmModel.is_active) {
-          newErrors.llm_model_config_id = t('memoryBases.form.llmModelUnavailable');
+          newErrors.llm_model_config_id = t('memoryBases.form.modelUnavailable');
         }
       }
     } else {
@@ -330,7 +330,7 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
           model => model.model_id === formData.llm_model_config_id
         );
         if (!selectedLlmModel || !selectedLlmModel.is_active) {
-          newErrors.llm_model_config_id = t('memoryBases.form.llmModelUnavailable');
+          newErrors.llm_model_config_id = t('memoryBases.form.modelUnavailable');
         }
       }
     }

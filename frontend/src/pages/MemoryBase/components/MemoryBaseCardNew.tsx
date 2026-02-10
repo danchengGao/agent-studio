@@ -275,7 +275,7 @@ export const MemoryBaseCardNew: React.FC<MemoryBaseCardNewProps> = ({
       tags.push({
         label: llmModel.model_name,
         variant: 'error',
-        tooltip: t('memoryBases.form.llmModelUnavailable'),
+        tooltip: t('memoryBases.form.modelUnavailable'),
       });
     } else {
       tags.push({ label: llmModel.model_name });

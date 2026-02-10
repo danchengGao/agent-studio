@@ -116,7 +116,7 @@ export const MemoryBaseTableView: React.FC<MemoryBaseTableViewProps> = ({
           
           if (!llmMeta.is_active) {
             return (
-              <Tooltip title={t('memoryBases.form.llmModelUnavailable')} disableInteractive placement="top">
+              <Tooltip title={t('memoryBases.form.modelUnavailable')} disableInteractive placement="top">
                 <div className="text-red-600 flex items-center gap-1 min-w-0">
                   <span className="truncate">{llmMeta.model_name}</span>
                   <Info className="w-3 h-3 flex-shrink-0" />
