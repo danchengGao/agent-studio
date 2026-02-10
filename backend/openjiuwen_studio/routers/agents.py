@@ -295,6 +295,7 @@ async def agent_save(
         # 验证知识库的 embedding 模型一致性（如果有多个知识库）
         if req.knowledge and len(req.knowledge) > 1:
             from openjiuwen_studio.core.database import SessionLocal
+            from openjiuwen_studio.core.manager.knowledge_base import _CURR_INDEX_TYPE
             from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import knowledge_base_repository
             from openjiuwen_studio.core.manager.repositories import EmbeddingModelConfigRepository
             from openjiuwen_studio.schemas.knowledge_base import KnowledgeBaseGet
@@ -306,7 +307,11 @@ async def agent_save(
 
                 for kb_id in req.knowledge:
                     kb_result = knowledge_base_repository.knowledge_base_get(
-                        KnowledgeBaseGet(space_id=req.space_id, kb_id=kb_id)
+                        KnowledgeBaseGet(
+                            space_id=req.space_id,
+                            kb_id=kb_id,
+                            index_manager_type=_CURR_INDEX_TYPE,
+                        )
                     )
                     if kb_result.code != status.HTTP_200_OK or not kb_result.data:
                         continue

@@ -79,7 +79,7 @@ from openjiuwen_studio.core.manager.repositories.knowledge_base_repository impor
     KBDocument,
 )
 
-_CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+_CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "milvus")
 
 # ==================== GraphRAG 配置和模型管理 ====================
 
@@ -1021,7 +1021,7 @@ def _check_index_connection() -> Union[ResponseModel, None]:
     Returns:
         _type_: `Union[ResponseModel, None]`
     """
-    index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+    index_manager_type = _CURR_INDEX_TYPE
     if index_manager_type == "milvus":
         logger.info(f"[KB_CREATE] Checking Milvus connection...")
         milvus_connected, milvus_error = _check_milvus_connection()
@@ -1081,7 +1081,7 @@ def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
     Returns:
         MilvusIndexer | ChromaIndexer
     """
-    index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+    index_manager_type = _CURR_INDEX_TYPE
     if index_manager_type == "chroma":
         data_dir = _get_chroma_data_dir()
         return ChromaIndexer(
@@ -1201,7 +1201,7 @@ def _create_vector_store(collection_name: str) -> Union[MilvusVectorStore, Chrom
     Returns:
         MilvusVectorStore | ChromaVectorStore
     """
-    index_manager_type = os.getenv("INDEX_MANAGER_TYPE", "chroma")
+    index_manager_type = _CURR_INDEX_TYPE
 
     if index_manager_type == "chroma":
         data_dir = _get_chroma_data_dir()

@@ -26,6 +26,7 @@ from openjiuwen_studio.schemas.agent import AgentPlugin
 from openjiuwen_studio.schemas.plugin import PluginToolId
 from openjiuwen_studio.schemas.workflow import WorkflowId
 from openjiuwen_studio.schemas.knowledge_base import KnowledgeBaseGet
+from openjiuwen_studio.core.manager.knowledge_base import _CURR_INDEX_TYPE
 
 
 def workflow_convert(space_id: str, workflow: AgentWorkflowListNodeBase):
@@ -206,7 +207,11 @@ def agent_plugins_convert(space_id: str, plugins: List[AgentPlugin]) -> List[dsl
 
 def knowledge_convert(space_id: str, knowledgeid: str) -> dsl.KnowledgeSchema:
     try:
-        knowledge_id = KnowledgeBaseGet(space_id=space_id, kb_id=knowledgeid)
+        knowledge_id = KnowledgeBaseGet(
+            space_id=space_id,
+            kb_id=knowledgeid,
+            index_manager_type=_CURR_INDEX_TYPE,
+        )
 
         get_result = knowledge_base_repository.knowledge_base_get(knowledge_id)
 
