@@ -24,7 +24,7 @@ Make sure your machine meets the following requirements:
 
 - Please ensure Docker and Docker Compose meet the following version requirements:
   - Docker: 20.10+
-  - Docker Compose: V2+
+  - Docker Compose: v2.19.1+
 
 - Verify the installation of Docker and Docker Compose:
 

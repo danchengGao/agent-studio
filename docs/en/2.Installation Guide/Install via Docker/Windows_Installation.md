@@ -38,7 +38,7 @@ Older Windows versions do not support the full automation of this one-click comm
 * Download: Go to the <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="nofollow noopener noreferrer">Docker website</a> to download the Windows installer (for x86 machines, choose the AMD64 version);
 * Please ensure Docker Desktop meets the following built-in component version requirements:
   * Docker Engine: 20.10+
-  * Docker Compose: V2+
+  * Docker Compose: v2.19.1+
 * Run the installer: Select only the “Use WSL 2 instead of Hyper-V” and “Add shortcut to desktop” options, then click “OK” to complete installation;
 * Restart your computer after installation;
 * After restarting, open Docker Desktop and wait for it to finish loading (the first launch may take 5–10 minutes);

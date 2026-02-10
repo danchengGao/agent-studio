@@ -25,7 +25,7 @@
 * 下载：访问 <a href="https://www.docker.com/products/docker-desktop/" rel="nofollow">Docker Desktop 官网</a>，点击 “Download for Mac” 获取 .dmg 安装包。；
 * 请确保 Docker Desktop 满足以下内置组件版本要求：
   * Docker Engine：20.10 版本及以上
-  * Docker Compose：V2 版本及以上版本
+  * Docker Compose：v2.19.1 及以上版本
 * 双击下载的文件，将 **Docker** 图标 拖拽到 Applications 文件夹；
 * 打开 Launchpad，找到并启动 Docker 应用；
 * 首次运行时，系统会提示输入 macOS 密码以授权安装虚拟机组件，点击 OK 继续；

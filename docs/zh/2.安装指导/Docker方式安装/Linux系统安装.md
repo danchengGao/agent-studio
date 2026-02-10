@@ -24,7 +24,7 @@
 
 * 请确保 Docker 和 Docker Compose 满足以下版本要求：
   * Docker：20.10 版本及以上
-  * Docker Compose：V2 及以上版本
+  * Docker Compose：v2.19.1 及以上版本
 
 * 验证 Docker 和 Docker Compose 安装:
 

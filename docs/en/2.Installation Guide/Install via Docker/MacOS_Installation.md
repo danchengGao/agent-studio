@@ -25,7 +25,7 @@ Ensure your machine meets the following requirements:
 * Download: Visit the <a href="https://www.docker.com/products/docker-desktop/" rel="nofollow">Docker Desktop official website</a>, and click "Download for Mac" to download the .dmg installer.
 * Please ensure Docker Desktop meets the following built-in component version requirements:
   * Docker Engine: 20.10+
-  * Docker Compose: V2+
+  * Docker Compose: v2.19.1+
 * Double-click the installer and drag **Docker** into the Applications folder.
 * Find and start the Docker application.
 * Upon first opening Docker, the system will prompt you to enter your macOS password to authorize the installation of virtual machine components. Click OK to continue.

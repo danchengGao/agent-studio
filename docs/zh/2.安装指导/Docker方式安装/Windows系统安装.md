@@ -38,7 +38,7 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
 * 下载：前往 <a href="https://www.docker.com/products/docker-desktop/" target="_blank" rel="nofollow noopener noreferrer"> Docker 官网</a> 下载 Windows 版本安装包（X86 机器请选择 AMD64 版本）；
 * 请确保 Docker Desktop 满足以下内置组件版本要求：
   * Docker Engine：20.10 版本及以上
-  * Docker Compose：V2 版本及以上版本
+  * Docker Compose：v2.19.1 及以上版本
 * 运行安装包：​**仅勾选​「Use WSL 2 instead of Hyper-V」、​「Add shortcut to desktop」选项**，点击​「OK」开始安装；
 * 安装完成后，请重启电脑；
 * 重启后，打开 Docker Desktop，等待加载完成（首次启动可能需要 5 ~ 10 分钟）；
