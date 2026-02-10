@@ -6,6 +6,7 @@ import json
 import os
 import time
 import hashlib
+import ast
 from typing import List, Dict, Any
 
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -1206,7 +1207,7 @@ async def prompt_bad_cases(
         model_headers = body.get("modelInfo", {}).get("headers", {})
         cases = []
         for badcase in badcases:
-            messages = eval(badcase.get('query', ''))
+            messages = ast.literal_eval(badcase.get('query', ''))
             query, answer = '', ''
             if messages[-1][-1].get('role') == 'assistant':
                 answer = {'answer': messages[-1][-1].get('content', '')}
