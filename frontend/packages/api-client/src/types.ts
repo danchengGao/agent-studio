@@ -2311,6 +2311,7 @@ export interface AgentVersionListResponse {
 // 获取文件上传URL请求类型
 export interface GetUploadUrlRequest {
   object_key: string
+  space_id?: string
 }
 
 // 获取文件上传URL响应类型
@@ -2325,6 +2326,7 @@ export interface GetUploadUrlResponse {
 // 获取文件下载URL请求类型
 export interface GetDownloadUrlRequest {
   object_key?: string
+  space_id?: string
 }
 
 // 获取文件下载URL响应类型
