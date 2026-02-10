@@ -111,7 +111,7 @@ export const MemoryBaseTableView: React.FC<MemoryBaseTableViewProps> = ({
           
           const llmMeta = llmModels.find(model => model.model_id === llmId);
           if (!llmMeta) {
-            return <span className="text-gray-400">-</span>;
+            return <span className="text-gray-400">{t('memoryBases.form.modelDeleted')}</span>;
           }
           
           if (!llmMeta.is_active) {
