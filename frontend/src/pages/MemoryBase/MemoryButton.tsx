@@ -108,10 +108,23 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
   /* 打开弹窗：正式 → 草稿，长期记忆按时间排序 */
   useEffect(() => {
     if (open) {
-      setDraftVars(JSON.parse(JSON.stringify(varList)))
+      setDraftVars([...varList])
       // 长期记忆数据按修改时间排序
-      const sortedLongList = sortLongTermByTime(longList)
-      setDraftLong(sortedLongList)
+      const sortedLongList = sortLongTermByTime(longList);
+
+      // 然后检查每个对象是否有time属性，如果没有则添加
+      const processedList = sortedLongList.map(row => {
+        if (!row.time) {
+          return {
+            ...row,
+            time: new Date().toLocaleString('zh-CN')
+          };
+        }
+        return row;
+      });
+
+      // 设置状态
+      setDraftLong(processedList);
       setToDeleteVar(new Set())
       setToDelete(new Set())
     }
@@ -120,11 +133,12 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
   /* 弹窗打开时自动刷新全量数据 */
   useEffect(() => {
     if (!open) return
+    setLoading(true)
     // 并行拉取变量 & 长期记忆
     Promise.all([api.listVariables(userId, groupId), api.listLongTerm(userId, groupId)])
       .then(([vRes, lRes]) => {
         /* 变量 */
-        const vObj = vRes.data.variable_data
+        const vObj = vRes.data?.variable_data || {}
         const vList = Object.entries(vObj).map(([k, v], idx) => ({
           id: idx + 1,
           field: k,
@@ -132,15 +146,16 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
           time: '', // 隐藏列
         }))
         setVarList(vList)
-        setDraftVars(JSON.parse(JSON.stringify(vList)))
+        setDraftVars([...vList])
 
         /* 长期记忆 */
-        const arr = lRes.data.longterm_mem_data || []
+        const arr = lRes.data?.longterm_mem_data || []
         const lList = arr.map((r: any, idx: number) => ({
           id: idx + 1,
           field: r.type || t('menus.longterm'),
           value: r.content,
           _id: r.mem_id,
+          time: formatLocalDate(r.time || r.timestamp) || new Date().toLocaleString('zh-CN'),
         }))
         setLongList(lList)
         // 长期记忆数据按修改时间排序
@@ -170,13 +185,18 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
     try {
       if (key === 'variables') {
         const res = await api.listVariables(userId, groupId)
-        const obj = res.data.variable_data
-        const list = Object.entries(obj).map(([k, v], idx) => ({ id: idx + 1, field: k, value: String(v), time: new Date().toLocaleString('zh-CN') }))
+        const obj = res.data?.variable_data || {}
+        const list = Object.entries(obj).map(([k, v], idx) => ({ 
+          id: idx + 1, 
+          field: k, 
+          value: String(v), 
+          time: new Date().toLocaleString('zh-CN') 
+        }))
         setVarList(list)
-        setDraftVars(JSON.parse(JSON.stringify(list)))
+        setDraftVars([...list])
       } else {
         const res = await api.listLongTerm(userId, groupId)
-        const arr = res.data.longterm_mem_data || []
+        const arr = res.data?.longterm_mem_data || []
         const list = arr.map((r: any, idx: number) => ({
           id: idx + 1,
           field: r.profile_type || t('menus.longterm'),
