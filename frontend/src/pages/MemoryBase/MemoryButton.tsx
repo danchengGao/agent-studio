@@ -199,10 +199,10 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         const arr = res.data?.longterm_mem_data || []
         const list = arr.map((r: any, idx: number) => ({
           id: idx + 1,
-          field: r.profile_type || t('menus.longterm'),
+          field: r.type || t('menus.longterm'),
           value: r.content,
           time: formatLocalDate(r.time || r.timestamp) || new Date().toLocaleString('zh-CN'),
-          _id: r.id,
+          _id: r.mem_id || r.id, // 统一使用 mem_id
         }))
         setLongList(list)
         // 长期记忆数据按修改时间排序
@@ -227,47 +227,58 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
       const target = draftLong.find(r => r.id === id)
       if (!target || !target._id) return
       setToDelete(prev => new Set(prev).add(target._id!))
-      // 删除后重新排序
-      setDraftLong(prev => sortLongTermByTime(prev.filter(r => r.id !== id)))
+      
+      // 从草稿中移除
+      const updatedDraft = draftLong.filter(r => r.id !== id)
+      setDraftLong(sortLongTermByTime(updatedDraft))
     }
   }
 
   /* 保存：执行删除操作，最后拉全量 */
   const handleSave = async () => {
+    setLoading(true)
     try {
       /* 1. 变量：删除 */
-      if (active === 'variables') {
-        const delArr = Array.from(toDeleteVar)
-        if (delArr.length) await Promise.all(delArr.map(k => api.deleteUserVariable(userId, groupId, k)))
+      if (active === 'variables' && toDeleteVar.size > 0) {
+        const delPromises = Array.from(toDeleteVar).map(k => 
+          api.deleteUserVariable(userId, groupId, k)
+        )
+        
+        await Promise.allSettled(delPromises)
 
+        // 刷新数据
         const freshRes = await api.listVariables(userId, groupId)
-        const freshList = Object.entries(freshRes.data.variable_data).map(([k, v], idx) => ({
+        const freshObj = freshRes.data?.variable_data || {}
+        const freshList = Object.entries(freshObj).map(([k, v], idx) => ({
           id: idx + 1,
           field: k,
           value: String(v),
           time: new Date().toLocaleString('zh-CN'),
         }))
         setVarList(freshList)
+        setDraftVars([...freshList])
         setToDeleteVar(new Set())
-        setDraftVars(JSON.parse(JSON.stringify(freshList)))
       }
 
       /* 2. 长期记忆：删除 */
-      if (active === 'longterm') {
-        const delArr = Array.from(toDelete)
-        if (delArr.length) await Promise.all(delArr.map(id => api.deleteLongTerm(userId, groupId, id)))
+      if (active === 'longterm' && toDelete.size > 0) {
+        const delPromises = Array.from(toDelete).map(id => 
+          api.deleteLongTerm(userId, groupId, id)
+        )
+        
+        await Promise.allSettled(delPromises)
 
+        // 刷新数据
         const freshRes = await api.listLongTerm(userId, groupId)
-        const arr = freshRes.data.longterm_mem_data || []
+        const arr = freshRes.data?.longterm_mem_data || []
         const freshList = arr.map((r: any, idx: number) => ({
           id: idx + 1,
-          field: r.profile_type || t('menus.longterm'),
+          field: r.type || t('menus.longterm'),
           value: r.content,
           time: formatLocalDate(r.time || r.timestamp) || new Date().toLocaleString('zh-CN'),
-          _id: r.id,
+          _id: r.mem_id || r.id,
         }))
         setLongList(freshList)
-        // 保存后重新排序
         const sortedFreshList = sortLongTermByTime(freshList)
         setDraftLong(sortedFreshList)
         setToDelete(new Set())
@@ -275,7 +286,9 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
 
       hide()
     } catch (e: any) {
-      alert(t('errors.saveFailed') + (e.message || t('errors.unknown')))
+      setError(t('errors.saveFailed') + (e.message || t('errors.unknown')))
+    } finally {
+      setLoading(false)
     }
   }
 
