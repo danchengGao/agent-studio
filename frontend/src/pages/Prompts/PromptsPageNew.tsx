@@ -913,6 +913,7 @@ const PromptsPageNew: React.FC = () => {
         onClose={handleCloseAssociationsDialog}
         associations={selectedAssociations}
         versionName={selectedPromptName}
+        workspaceId={workspaceId}
       />
 
       {/* 消息提示 */}

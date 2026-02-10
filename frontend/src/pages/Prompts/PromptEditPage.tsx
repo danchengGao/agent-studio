@@ -4678,6 +4678,7 @@ const PromptEditPage: React.FC = () => {
         onClose={handleCloseAssociationsDialog}
         associations={selectedAssociations}
         versionName={selectedVersionName}
+        workspaceId={workspaceId}
       />
     </div>
   )
