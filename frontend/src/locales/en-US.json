@@ -1182,7 +1182,22 @@
       "editDescriptionInfo": "Click to edit description, maximum 500 characters",
       "showPerPage": "Show per page",
       "totalRecords": "Total {{total}} records",
-      "pageInfo": "Page {{current}} of {{total}}"
+      "pageInfo": "Page {{current}} of {{total}}",
+      "workflowNameInvalid": "Workflow name can only contain letters, numbers, underscores, and must start with a letter",
+      "workflowNameEmpty": "Workflow name cannot be empty",
+      "workflowDescEmpty": "Workflow description cannot be empty",
+      "workflowNotFound": "Workflow to edit not found",
+      "formatError": "Invalid format: only letters, numbers, underscores allowed, must start with a letter",
+      "formatHint": "Only letters, numbers, underscores allowed, must start with a letter",
+      "errorAlreadyExists": "already exists",
+      "errorTooLong": "too long",
+      "errorTooShort": "too short",
+      "errorInvalidFormat": "invalid format",
+      "errorRequired": "is required",
+      "errorEmpty": "cannot be empty",
+      "errorLengthExceeded": "length cannot exceed {{count}} characters",
+      "fieldNameName": "Workflow name",
+      "fieldNameDesc": "Workflow description"
     },
     "workflowCreation": {
       "back": "Back",

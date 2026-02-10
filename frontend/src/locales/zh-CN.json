@@ -1166,7 +1166,22 @@
       "editDescriptionInfo": "点击修改描述，最多可输入500个字符",
       "showPerPage": "每页显示",
       "totalRecords": "共 {{total}} 条记录",
-      "pageInfo": "第 {{current}} 页 / 共 {{total}} 页"
+      "pageInfo": "第 {{current}} 页 / 共 {{total}} 页",
+      "workflowNameInvalid": "工作流名称只能包含字母、数字、下划线，且必须以字母开头",
+      "workflowNameEmpty": "工作流名称不能为空",
+      "workflowDescEmpty": "工作流描述不能为空",
+      "workflowNotFound": "找不到要编辑的工作流",
+      "formatError": "格式错误：只能包含字母、数字、下划线，且必须以字母开头",
+      "formatHint": "只能包含字母、数字、下划线，且必须以字母开头",
+      "errorAlreadyExists": "已存在",
+      "errorTooLong": "过长",
+      "errorTooShort": "过短",
+      "errorInvalidFormat": "格式无效",
+      "errorRequired": "为必填项",
+      "errorEmpty": "不能为空",
+      "errorLengthExceeded": "长度不能超过{{count}}个字符",
+      "fieldNameName": "工作流名称",
+      "fieldNameDesc": "工作流描述"
     },
     "workflowCreation": {
       "back": "返回",

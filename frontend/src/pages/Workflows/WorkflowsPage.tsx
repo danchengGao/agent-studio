@@ -241,7 +241,7 @@ const WorkflowsPage: React.FC = () => {
   // 获取验证错误信息
   const getValidationError = (): string => {
     if (!editingValue || editingValue.trim() === '') {
-      return editingField === 'name' ? '工作流名称不能为空' : '工作流描述不能为空'
+      return editingField === 'name' ? t('workflows.workflowList.workflowNameEmpty') : t('workflows.workflowList.workflowDescEmpty')
     }
 
     // 如果编辑的是名称，需要验证格式
@@ -249,7 +249,7 @@ const WorkflowsPage: React.FC = () => {
       // 工作流名称只能包含字母、数字、下划线，且必须以字母开头
       const namePattern = /^[a-zA-Z][a-zA-Z0-9_]*$/
       if (!namePattern.test(editingValue.trim())) {
-        return '工作流名称只能包含字母、数字、下划线，且必须以字母开头'
+        return t('workflows.workflowList.workflowNameInvalid')
       }
     }
 
@@ -270,7 +270,7 @@ const WorkflowsPage: React.FC = () => {
     // 使用 workflowId 查找工作流，而不是依赖索引
     const workflow = paginatedWorkflows.find(w => w.workflow_id === editingWorkflowId)
     if (!workflow) {
-      showError('找不到要编辑的工作流')
+      showError(t('workflows.workflowList.workflowNotFound'))
       return
     }
 
@@ -384,34 +384,34 @@ const WorkflowsPage: React.FC = () => {
   // 获取友好的错误信息
   const getFriendlyErrorMessage = (errorMsg: string): string => {
     const fieldMap: Record<string, string> = {
-      name: '工作流名称',
-      desc: '工作流描述',
+      name: t('workflows.workflowList.fieldNameName'),
+      desc: t('workflows.workflowList.fieldNameDesc'),
     }
 
     // 检查常见的错误模式
     if (errorMsg.includes('already exists')) {
-      return '已存在'
+      return t('workflows.workflowList.errorAlreadyExists')
     }
     if (errorMsg.includes('too long')) {
-      return '过长'
+      return t('workflows.workflowList.errorTooLong')
     }
     if (errorMsg.includes('too short') || errorMsg.includes('minimum length')) {
-      return '过短'
+      return t('workflows.workflowList.errorTooShort')
     }
     if (errorMsg.includes('invalid') || errorMsg.includes('format')) {
-      return '格式无效'
+      return t('workflows.workflowList.errorInvalidFormat')
     }
     if (errorMsg.includes('required') || errorMsg.includes('field required')) {
-      return '为必填项'
+      return t('workflows.workflowList.errorRequired')
     }
     if (errorMsg.includes('empty') || errorMsg.includes('blank')) {
-      return '不能为空'
+      return t('workflows.workflowList.errorEmpty')
     }
 
     // 字符长度限制信息
     const lengthMatch = errorMsg.match(/(\d+) characters?/)
     if (lengthMatch) {
-      return `长度不能超过${lengthMatch[1]}个字符`
+      return t('workflows.workflowList.errorLengthExceeded', { count: lengthMatch[1] })
     }
 
     return errorMsg
@@ -625,8 +625,8 @@ const WorkflowsPage: React.FC = () => {
                             <div className="flex justify-between items-center">
                               <div className={`text-xs ${editingValue && !isInputValid() ? 'text-red-500' : 'text-gray-500'}`}>
                                 {editingValue && !isInputValid()
-                                  ? '格式错误：只能包含字母、数字、下划线，且必须以字母开头'
-                                  : '只能包含字母、数字、下划线，且必须以字母开头'}
+                                  ? t('workflows.workflowList.formatError')
+                                  : t('workflows.workflowList.formatHint')}
                               </div>
                               <div className="text-xs text-gray-500 text-right">{editingValue.length}/100</div>
                             </div>
