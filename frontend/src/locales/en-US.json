@@ -4428,6 +4428,7 @@
       "selectEmbeddingModel": "Please select an Embedding model",
       "loadingModels": "Loading models...",
       "noLlmModels": "No LLM models available",
+      "noEmbeddingModels": "No Embedding models available",
       "noModels": "No Embedding models available",
       "createModelLink": "Please create an Embedding model first",
       "selectModel": "Please select an Embedding model",

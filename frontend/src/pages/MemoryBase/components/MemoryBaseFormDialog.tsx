@@ -298,9 +298,9 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
     if (!memoryBase) {
       // 验证Embedding模型
       if (embeddingModels.length === 0) {
-        newErrors.embedding_model_config_id = t('memoryBases.form.noEmbeddingModelsError');
+        newErrors.embedding_model_config_id = t('memoryBases.form.noEmbeddingModels');
       } else if (!formData.embedding_model_config_id || formData.embedding_model_config_id === 0) {
-        newErrors.embedding_model_config_id = t('memoryBases.form.selectEmbeddingModelError');
+        newErrors.embedding_model_config_id = t('memoryBases.form.selectEmbeddingModel');
       } else {
         const selectedEmbeddingModel = embeddingModels.find(
           model => parseInt(model.id) === formData.embedding_model_config_id
@@ -312,7 +312,7 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
 
       // 验证LLM模型
       if (modelsList.length === 0) {
-        newErrors.llm_model_config_id = t('memoryBases.form.noLlmModelsError');
+        newErrors.llm_model_config_id = t('memoryBases.form.noLlmModels');
       } else if (!formData.llm_model_config_id || formData.llm_model_config_id === 0) {
         newErrors.llm_model_config_id = t('memoryBases.form.selectLlmModelError');
       } else {
