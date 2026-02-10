@@ -231,8 +231,8 @@ class PromptDebugService:
         reasoning_content, normal_content = "", ""
         for chunk in stream_items:
             delta = chunk
-            if getattr(delta, "reason_content", None):
-                reasoning_content += delta.reason_content
+            if getattr(delta, "reasoning_content", None):
+                reasoning_content += delta.reasoning_content
             if delta.tool_calls is not None:
                 for tc in delta.tool_calls:
                     tool_calls_delta.append(tc.model_dump())
@@ -307,9 +307,9 @@ class PromptDebugService:
                 openai_coroutine, process_outputs=self._parse_llm_stream_res):
                 delta = chk
                 # 1. 思维链
-                if getattr(delta, "reason_content", None):
+                if getattr(delta, "reasoning_content", None):
                     yield f"""data: {DebugStreamingResponse(
-                        delta={'reasoning_content': delta.reason_content},
+                        delta={'reasoning_content': delta.reasoning_content},
                         finish_reason=None,
                         debug_id=str(debug_id),
                         debug_trace_key=req.debug_trace_key
