@@ -376,11 +376,11 @@ const PromptEditPage: React.FC = () => {
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else if (window.innerWidth < 2000) {
         // 中等屏幕：平板、14寸笔记本等
-        setVersionHistoryHeight('calc(100vh - 140px)')
+        setVersionHistoryHeight('calc(100vh - 120px)')
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else {
         // 大屏幕：15寸以上笔记本、台式显示器
-        setVersionHistoryHeight('calc(100vh - 200px)')
+        setVersionHistoryHeight('calc(100vh - 120px)')
         setChatMessageMaxHeight('calc(100vh - 500px)')
       }
     }

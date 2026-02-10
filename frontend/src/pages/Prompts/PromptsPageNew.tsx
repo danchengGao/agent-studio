@@ -388,7 +388,7 @@ const PromptsPageNew: React.FC = () => {
     async (promptKey: string, e?: React.MouseEvent) => {
       e?.stopPropagation()
       try {
-        await copyToClipboard(promptKey, setSnackbar, t('common.messages.success'))
+        await copyToClipboard(promptKey, setSnackbar)
         setCopiedKey(promptKey)
         setTimeout(() => setCopiedKey(null), 2000)
       } catch (error) {

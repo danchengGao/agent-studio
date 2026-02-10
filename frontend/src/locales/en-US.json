@@ -94,7 +94,6 @@
       "disabled": "Disabled",
       "moreActions": "More actions",
       "error": "An error occurred",
-      "success": "Operation successful",
       "confirmDelete": "Are you sure you want to delete this item?",
       "deleteSuccess": "Delete successful",
       "saveSuccess": "Save successful",
@@ -3982,7 +3981,8 @@
         "loading": "Loading models...",
         "noModels": "No available models",
         "providedBy": "Provided by {{vendor}}",
-        "systemBuiltIn": "System Built-in"
+        "systemBuiltIn": "System Built-in",
+        "protocol": "Protocol"
       },
       "quickOptimizeDialog": {
         "title": "Quick Optimize",

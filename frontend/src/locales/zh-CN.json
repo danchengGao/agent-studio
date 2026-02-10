@@ -94,7 +94,6 @@
       "disabled": "已禁用",
       "moreActions": "更多操作",
       "error": "发生错误",
-      "success": "操作成功",
       "confirmDelete": "确认删除此项目？",
       "deleteSuccess": "删除成功",
       "saveSuccess": "保存成功",
@@ -3969,7 +3968,8 @@
         "loading": "加载模型中...",
         "noModels": "暂无可用模型",
         "providedBy": "由{{vendor}}提供",
-        "systemBuiltIn": "系统内置"
+        "systemBuiltIn": "系统内置",	 
+         "protocol": "协议"
       },
       "quickOptimizeDialog": {
         "title": "快捷优化",
