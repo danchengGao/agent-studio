@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { ExternalLink, X } from 'lucide-react';
 import { MemoryBase, CreateMemoryBaseRequest, UpdateMemoryBaseRequest } from '@/types/memoryBase';
 import { useMemoryBaseStore } from '@/stores/useMemoryBaseStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -550,13 +550,16 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
                     {isLoadingEmbeddingModels ? (
                       <div className="text-sm text-gray-500">{t('memoryBases.form.loadingModels')}</div>
                     ) : embeddingModels.length === 0 ? (
-                      <div className="text-sm text-red-500">
-                        {t('memoryBases.form.noModels')}{' '}
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-red-500">
+                          {t('memoryBases.form.noModels')}{' '}
+                        </p>
                         <Link
                           to="/dashboard/models"
-                          className="text-blue-600 hover:text-blue-800 underline"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
-                          {t('memoryBases.form.createModelLink')}
+                          {t('memoryBases.form.createEmbeddingModelLink')}
+                          <ExternalLink className="w-4 h-4" />
                         </Link>
                       </div>
                     ) : (
@@ -619,13 +622,16 @@ const MemoryBaseFormDialog: React.FC<MemoryBaseFormDialogProps> = ({ open, memor
                     {isLoadingLlmModels ? (
                       <div className="text-sm text-gray-500">{t('memoryBases.form.loadingModels')}</div>
                     ) : modelsList.length === 0 ? (
-                      <div className="text-sm text-red-500">
-                        {t('memoryBases.form.noLlmModels')}{' '}
+                      <div className="flex flex-col gap-2">
+                        <p className="text-sm text-red-500">
+                          {t('memoryBases.form.noLlmModels')}{' '}
+                        </p>
                         <Link
                           to="/dashboard/models"
-                          className="text-blue-600 hover:text-blue-800 underline"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                         >
-                          {t('memoryBases.form.createModelLink')}
+                          {t('memoryBases.form.createLLMModelLink')}
+                          <ExternalLink className="w-4 h-4" />
                         </Link>
                       </div>
                     ) : (
