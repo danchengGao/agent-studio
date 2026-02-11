@@ -193,6 +193,7 @@ const MemoryBaseEditorPage: React.FC = () => {
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar();
 
   const [memories, setMemories] = useState<ExtendedMemoryItem[]>([]);
+  const [allMemories, setAllMemories] = useState<ExtendedMemoryItem[]>([]);
   const [filteredMemories, setFilteredMemories] = useState<ExtendedMemoryItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -301,7 +302,7 @@ const MemoryBaseEditorPage: React.FC = () => {
   }, [id]); // 只依赖 id，当 id 变化时重新加载
 
   // 获取记忆项列表
-  const fetchMemories = async (page: number = 1) => {
+  const fetchMemories = async (page: number = 1, pageSize: number = 10) => {
     if (!memoryBase || !memoryBase.mdb_id || isMemoriesLoading || currentRequestPage === page) return;
 
     const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID;
@@ -332,8 +333,9 @@ const MemoryBaseEditorPage: React.FC = () => {
 
       // 合并两个数组
       const allMemories = [...variableMemories, ...longTermMemories];
-      
-      setMemories(allMemories);
+      const paginatedMemories = allMemories.slice((page - 1) * pageSize, page * pageSize);
+      setMemories(paginatedMemories);
+      setAllMemories(allMemories);
       setTotalMemories(allMemories.length);
       setCurrentPage(page);
       
@@ -448,7 +450,7 @@ const MemoryBaseEditorPage: React.FC = () => {
           console.error('Failed to fetch all memory IDs:', error);
           // 如果失败，回退到原来的方式
           setIsMemoriesLoading(false);
-          fetchMemories(1);
+          fetchMemories(1, 10);
         });
     }
   }, [memoryBase?.mdb_id, user?.spaceId]); // 只依赖ID和spaceId，避免重复调用
@@ -456,26 +458,39 @@ const MemoryBaseEditorPage: React.FC = () => {
   // 过滤记忆项
   useEffect(() => {
     let filtered = memories;
-    
+    setTotalMemories(allMemories.length);
     // 按类型过滤
     if (selectedTypeFilter !== 'all') {
       if (selectedTypeFilter === 'longterm') {
-        filtered = filtered.filter(mem => mem.type !== 'variable' && mem.type !== 'summary' );
+        filtered = allMemories.filter(mem => mem.type !== 'variable' && mem.type !== 'summary' );
       } else {
-        filtered = filtered.filter(mem => mem.type === selectedTypeFilter);
+        filtered = allMemories.filter(mem => mem.type === selectedTypeFilter);
       }
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        filtered = allMemories.filter(mem => 
+          mem.content.toLowerCase().includes(term)
+        );
+      }
+      setTotalMemories(filtered.length);
+      setFilteredMemories(filtered);
+      return;
     }
 
     // 按搜索词过滤
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(mem => 
+      filtered = allMemories.filter(mem => 
         mem.content.toLowerCase().includes(term)
       );
+      setTotalMemories(filtered.length);
+      setFilteredMemories(filtered);
+      return
     }
     
     setFilteredMemories(filtered);
-  }, [memories, selectedTypeFilter, searchTerm]);
+    
+  }, [memories, selectedTypeFilter, searchTerm, allMemories]);
 
   const handleBack = () => {
     navigate('/dashboard/memory-bases');
@@ -487,7 +502,7 @@ const MemoryBaseEditorPage: React.FC = () => {
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
-      fetchMemories(newPage);
+      fetchMemories(newPage, pageSize);
     }
   };
 
@@ -502,7 +517,7 @@ const MemoryBaseEditorPage: React.FC = () => {
     // 只有在 memoryBase 已加载且 pageSize 变化时才重新获取数据
     // 避免在初始加载时重复请求（初始加载时已经通过 fetchAllMemoryIds 获取了数据）
     if (memoryBase && totalMemories > 0) {
-      fetchMemories(currentPage);
+      fetchMemories(currentPage, pageSize);
     }
   }, [pageSize]); // 当pageSize变化时重新获取数据
 
@@ -625,7 +640,7 @@ const MemoryBaseEditorPage: React.FC = () => {
       showSuccess(t('memoryBases.editor.deleteSuccess'));
 
       // 刷新记忆列表，确保数据同步
-      await fetchMemories(currentPage);
+      await fetchMemories(currentPage, pageSize);
     } catch (error) {
       console.error('Failed to delete memory:', error);
       showError(t('memoryBases.editor.deleteFailed'));
@@ -704,7 +719,7 @@ const MemoryBaseEditorPage: React.FC = () => {
       showSuccess(t('memoryBases.editor.batchDeleteSuccess', { count: deletedCount }));
 
       // 刷新记忆列表，确保数据同步
-      await fetchMemories(currentPage);
+      await fetchMemories(currentPage, pageSize);
     } catch (error) {
       console.error('Failed to batch delete memories:', error);
       showError(t('memoryBases.editor.batchDeleteFailed'));
@@ -982,7 +997,7 @@ const MemoryBaseEditorPage: React.FC = () => {
                           <option value={50}>50{t('common.pagination.items')}</option>
                           <option value={100}>100{t('common.pagination.items')}</option>
                         </select>
-                        <span className="text-sm text-gray-600">{t('common.pagination.total', { total: filteredMemories.length })}</span>
+                        <span className="text-sm text-gray-600">{t('common.pagination.total', { total: totalMemories })}</span>
                       </div>
 
                       <div className="flex items-center space-x-2">
