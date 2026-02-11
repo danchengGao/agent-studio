@@ -12,6 +12,7 @@ from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.common.language_thread_context import get_language
 from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.core.manager.model_manager.managers import ModelConfigManager
+from openjiuwen_studio.core.utils.compatible_field import mask_sensitive_fields
 from openjiuwen_studio.routers.common import handle_response, validate_request
 import openjiuwen_studio.core.manager.agent as mgr
 from openjiuwen_studio.routers.models import get_model_config_manager
@@ -285,12 +286,12 @@ async def agent_save(
     user_id = data.get('user_id_str', 'unknown')
 
     # 打印完整的请求数据，用于调试
-    logger.info(f"[AGENT_SAVE] Raw request data: {request}")
+    logger.info(f"[AGENT_SAVE] Raw request data: {mask_sensitive_fields(request)}")
 
     try:
         req = validate_request(request, AgentDisplayInfo)
         logger.info(f"[AGENT_SAVE] Validated request - ID: {req.agent_id}, User: {user_id}")
-        logger.info(f"[AGENT_SAVE] Validated request data: {req.model_dump()}")
+        logger.info(f"[AGENT_SAVE] Validated request data: {mask_sensitive_fields(req).model_dump()}")
 
         # 验证知识库的 embedding 模型一致性（如果有多个知识库）
         if req.knowledge and len(req.knowledge) > 1:

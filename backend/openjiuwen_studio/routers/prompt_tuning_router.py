@@ -32,7 +32,7 @@ from openjiuwen_studio.ops.modules.prompt.infra.repositories.job_repo import SQL
 from openjiuwen_studio.ops.modules.llm.llm_config_service import LLMConfigService
 from openjiuwen_studio.ops.common.handle_exceptions_util import handle_exceptions
 from openjiuwen_studio.routers.prompt_llm_router import get_llm_config_service
-from openjiuwen_studio.core.utils.compatible_field import compatible_provider
+from openjiuwen_studio.core.utils.compatible_field import compatible_provider, mask_sensitive_fields
 from openjiuwen_studio.core.common.language_thread_context import get_language
 
 from openjiuwen.dev_tools.tune.chat_agent.chat_agent import create_chat_agent_config, create_chat_agent
@@ -132,7 +132,7 @@ class ModelConfigConverter:
         result["params"]["timeout"] = headers.get("timeout") if headers.get(
             "timeout", None) is not None else model_config_info["params"]["timeout"]
 
-        logger.info(f"convert_to_sdk_format model config : {result}")
+        logger.info(f"convert_to_sdk_format model config : {mask_sensitive_fields(result)}")
         return result
 
 

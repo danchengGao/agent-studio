@@ -33,6 +33,7 @@ from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import (
     DebugStreamingResponse,
 )
 from openjiuwen_studio.ops.modules.prompt.domain.debug_repository import DebugContextRepository, DebugLogRepository
+from openjiuwen_studio.core.utils.compatible_field import mask_sensitive_fields
 
 
 headers = {}
@@ -304,8 +305,10 @@ class PromptDebugService:
             call_kwargs.pop('model', None)
             call_kwargs.pop('model_name', None)
             openai_coroutine = get_llm_client_by_protocol(llm_protocol_config).stream(**call_kwargs)
-            logger.info(f"llm config:\n {json.dumps(llm_protocol_config, indent=4, ensure_ascii=False)}")
-            logger.info(f"llm call_params:\n {json.dumps(call_kwargs, indent=4, ensure_ascii=False)}")
+            logger.info(
+                f"llm config:\n {json.dumps(mask_sensitive_fields(llm_protocol_config), indent=4, ensure_ascii=False)}")
+            logger.info(
+                f"llm call_params:\n {json.dumps(mask_sensitive_fields(call_kwargs), indent=4, ensure_ascii=False)}")
 
             async for chk in llm_span.set_async_stream_output(
                 openai_coroutine, process_outputs=self._parse_llm_stream_res):
