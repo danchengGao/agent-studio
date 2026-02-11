@@ -4,6 +4,7 @@ import { Shell, Settings, X, Variable, Brain, Trash } from 'lucide-react'
 import axios from 'axios'
 import { useScopedTranslation } from '@/i18n'
 import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 type MenuKey = 'variables' | 'longterm'
 
@@ -11,37 +12,77 @@ type MenuKey = 'variables' | 'longterm'
 const api = {
   /* 变量 */
   listVariables: async (user_id: string, group_id: string) => {
-    const { data } = await axios.post('/api/v1/execution/memory/get_user_variable', {
-      user_id: user_id,
-      group_id: group_id,
+    const response = await fetch('/api/v1/execution/memory/get_user_variable', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${useAuthStore.getState().token}`,
+      },
+      body: JSON.stringify({
+        user_id: user_id,
+        group_id: group_id,
+      }),
     })
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+    const data = await response.json()
+    console.log('listVar: ', data)
     return data
   },
   deleteUserVariable: async (user_id: string, group_id: string, key: string) => {
-    await axios.post('/api/v1/execution/memory/delete_user_variable', {
-      user_id: user_id,
-      group_id: group_id,
-      name: key,
+    const response = await fetch('/api/v1/execution/memory/delete_user_variable', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${useAuthStore.getState().token}`,
+      },
+      body: JSON.stringify({
+        user_id: user_id,
+        group_id: group_id,
+        name: key,
+      }),
     })
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
   },
 
   /* 长期记忆 */
   listLongTerm: async (user_id: string, group_id: string) => {
-    const { data } = await axios.post('/api/v1/execution/memory/get_longterm_mem', {
-      user_id: user_id,
-      group_id: group_id,
-      num: 999,
-      page: 1,
+    const response = await fetch('/api/v1/execution/memory/get_longterm_mem', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${useAuthStore.getState().token}`,
+      },
+      body: JSON.stringify({
+        user_id: user_id,
+        group_id: group_id,
+        num: 999,
+        page: 1,
+      }),
     })
+    const data = await response.json()
     console.log('listLongTerm: ', data)
     return data
-  },
+  },  
   deleteLongTerm: async (user_id: string, group_id: string, id: string) => {
-    await axios.post('/api/v1/execution/memory/delete_longterm_mem', {
-      user_id: user_id,
-      group_id: group_id,
-      mem_id: id,
+    const response = await fetch('/api/v1/execution/memory/delete_longterm_mem', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${useAuthStore.getState().token}`,
+      },
+      body: JSON.stringify({
+        user_id: user_id,
+        group_id: group_id,
+        mem_id: id,
+      }),
     })
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
   },
 }
 

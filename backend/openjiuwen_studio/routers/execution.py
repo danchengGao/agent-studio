@@ -490,9 +490,10 @@ async def get_latest_trace_summary(
 
 @execution_router.post("/memory/get_user_variable", response_model=ResponseModel[dict])
 async def search_variable_memory(
-        request: dict,
+        request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = GetUserVar(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await get_user_variable(req)
         return ResponseModel(
@@ -510,9 +511,10 @@ async def search_variable_memory(
 
 @execution_router.post("/memory/get_longterm_mem", response_model=ResponseModel[dict])
 async def search_longterm_memory(
-        request: dict,
+        request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = SearchLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await get_longterm_mem(req)
         return ResponseModel(
@@ -530,9 +532,10 @@ async def search_longterm_memory(
 
 @execution_router.post("/memory/delete_user_variable", response_model=ResponseModel[dict])
 async def delete_variable_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = DeleteVariable(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await delete_user_variable(req)
         return ResponseModel(
@@ -550,9 +553,10 @@ async def delete_variable_memory(
 
 @execution_router.post("/memory/delete_longterm_mem", response_model=ResponseModel[dict])
 async def delete_longterm_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = DeleteLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await delete_longterm_mem(req)
         return ResponseModel(
@@ -590,9 +594,10 @@ async def delete_longterm_mem_by_scope(
 
 @execution_router.post("/memory/update_user_variable", response_model=ResponseModel[dict])
 async def update_variable_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = UpdateVariable(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await update_user_variable(req)
         return ResponseModel(
@@ -610,9 +615,10 @@ async def update_variable_memory(
 
 @execution_router.post("/memory/update_longterm_mem", response_model=ResponseModel[dict])
 async def update_longterm_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = UpdateLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await update_longterm_mem(req)
         return ResponseModel(
