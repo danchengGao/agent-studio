@@ -1172,10 +1172,10 @@ const PromptOptimizeEditPage: React.FC = () => {
           setContentHeight('70vh')
         } else if (window.innerWidth < 2000) {
           // 中等屏幕：平板、14寸笔记本等
-          setContentHeight('72vh')
+          setContentHeight('80vh')
         } else {
           // 大屏幕：15寸以上笔记本、台式显示器
-          setContentHeight('85vh')
+          setContentHeight('90vh')
         }
     }
 

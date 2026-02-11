@@ -108,7 +108,7 @@ Ensure your machine meets the following requirements:
 
   Local access: *local access address*
 
-  > **Note**: For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
+  > **Note**: For more details on container deployment, see the [openJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md).
 
 
 ### 3. Access the System

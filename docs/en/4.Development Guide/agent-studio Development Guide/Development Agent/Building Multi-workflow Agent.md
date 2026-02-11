@@ -1,6 +1,6 @@
 # Building Multi-workflow Agent
 
-OpenJiuwen supports setting multi-workflow mode for agents. In this mode, all user conversations with the agent will trigger corresponding workflows for processing. The agent passes questions through the workflow start node's input and uses the workflow end node's output as the agent's reply. Multi-workflow mode is suitable for scenarios where the agent process is relatively fixed, such as customer service scenarios.
+openJiuwen supports setting multi-workflow mode for agents. In this mode, all user conversations with the agent will trigger corresponding workflows for processing. The agent passes questions through the workflow start node's input and uses the workflow end node's output as the agent's reply. Multi-workflow mode is suitable for scenarios where the agent process is relatively fixed, such as customer service scenarios.
 
 ## Differences Between Multi-workflow Mode and Autonomous Planning Mode
 
@@ -27,7 +27,7 @@ Their key differences are shown in the following table:
 - Multi-workflow mode agents do not support adding memory, knowledge, and other configurations.
 
 ## Operation Steps
-1. Enter the OpenJiuwen development platform.
+1. Enter the openJiuwen development platform.
 2. Edit an existing agent or create a new agent.
 3. In the agent orchestration page, select the agent mode as Single Agent (Multi-workflow) mode.<br>
 ![image](../images/38eb52e0-48e2-44b9-b2b9-a7a19178f03e.png)

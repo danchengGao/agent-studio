@@ -128,7 +128,7 @@ Older Windows versions do not support the full automation of this one-click comm
 
 * After a successful start, it will output Local access: access URL.
 
-  > **Note**: For more details on container deployment, see the [OpenJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md#openjiuwen-agent-studio-部署工具使用手册).
+  > **Note**: For more details on container deployment, see the [openJiuwen Agent Studio Deployment Tool User Manual](../../../../scripts/README.md).
 
 ### 4. Access the system
 
