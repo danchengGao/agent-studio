@@ -95,7 +95,7 @@ def convert_to_properties_format(input_list):
     requires = []
 
     if not input_list:
-        return {}
+        return properties, requires
 
     try:
         for item in input_list:

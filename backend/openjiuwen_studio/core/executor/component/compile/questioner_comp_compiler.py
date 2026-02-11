@@ -26,7 +26,8 @@ class QuestionerCompCompiler(BaseCompCompiler):
                 description=field_info_dict['description'],
                 cn_field_name=field_info_dict['cn_field_name'],
                 required=field_info_dict['required'],
-                default_value=field_info_dict['default_value']
+                default_value=field_info_dict['default_value'],
+                type=field_info_dict['type'],
             )
 
             field_infos.append(field_info)

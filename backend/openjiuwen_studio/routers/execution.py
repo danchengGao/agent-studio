@@ -396,50 +396,6 @@ async def execute_plugin(
         raise handle_http_exception(e, "Plugin execution failed") from e
 
 
-# {
-#     "id": "",
-#     "version": "",
-#     "plugin_id": "Plugin111",
-#     "tool_id": "WeatherReporter",
-#     "inputs": {
-#         "location": "大同",
-#         "date": "2025-08-28"
-#     }
-# }
-
-
-# {
-#     "id": "",
-#     "version": "",
-#     "plugin_id": "Plugin002",
-#     "tool_id": "CodePrint002",
-#     "inputs": {"input1": "lllllllllll", "input2": "ppppppppp"}
-# }
-
-@execution_router.post("/test_plugin", response_model=ResponseModel[dict])
-async def test_plugin(
-    request_body: PluginExecuteParas
-) -> ResponseModel[Dict[str, Any]]:
-    """Run a plugin"""
-
-    try:
-        logger.info(f"in execute: {request_body}")
-        if isinstance(request_body.inputs, UserInput):
-            inputs = InteractiveInput()
-            inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
-        else:
-            inputs = request_body.inputs
-        chunk = await plugin_mgr.run(
-            request_body.plugin_id, request_body.tool_id, inputs, request_body.space_id, "draft", None
-        )
-        logger.warning(f"Received chunk: {chunk}, type: {type(chunk)}")
-        return ResponseModel(code=status.HTTP_200_OK, message="Executed successfully", data=chunk)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_http_exception(e, "Plugin test execution failed") from e
-
-
 @execution_router.post("/get_trace_summary_list", response_model=ResponseModel[list[TraceSummaryBrief]],
                        response_model_by_alias=False)
 async def get_trace_summary_list(
