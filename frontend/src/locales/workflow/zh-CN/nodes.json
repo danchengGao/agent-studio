@@ -224,8 +224,8 @@
     "input": {
       "pleaseInputArray": "请输入数组",
       "pleaseSelectBoolean": "请选择布尔值",
-      "true": "真",
-      "false": "假",
+      "true": "True",
+      "false": "False",
       "pleaseInputInteger": "请输入整数",
       "pleaseInputMap": "请输入映射",
       "pleaseInputNumber": "请输入数字",
