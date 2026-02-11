@@ -397,12 +397,12 @@ def react_agent_convert(
                 # Apply agent_model_config overrides if available
                 if hasattr(agent_info, 'agent_model_config') and agent_info.agent_model_config:
                     agent_model_config = agent_info.agent_model_config
-                    if 'temperature' in agent_model_config:
-                        model_dsl.model_info.temperature = agent_model_config['temperature']
-                    if 'top_p' in agent_model_config:
-                        model_dsl.model_info.top_p = agent_model_config['top_p']
-                    if 'timeout' in agent_model_config:
-                        model_dsl.model_info.timeout = agent_model_config['timeout']
+                    if 'temperature' in agent_model_config and model_dsl.request_config:
+                        model_dsl.request_config.temperature = agent_model_config['temperature']
+                    if 'top_p' in agent_model_config and model_dsl.request_config:
+                        model_dsl.request_config.top_p = agent_model_config['top_p']
+                    if 'timeout' in agent_model_config and model_dsl.model_client_config:
+                        model_dsl.model_client_config.timeout = agent_model_config['timeout']
 
         plugins: list[AgentPlugin] = [AgentPlugin(**p) for p in agent_info.plugins]
 
