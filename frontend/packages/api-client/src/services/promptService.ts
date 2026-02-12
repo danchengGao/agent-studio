@@ -252,11 +252,13 @@ export class PromptService {
   /**
    * 删除提示词
    * @param promptId 提示词ID
+   * @param workspaceId 工作空间ID（请求体 workspace_id）
    * @returns 删除响应
    */
-  static async deletePrompt(promptId: string): Promise<DeletePromptResponse> {
+  static async deletePrompt(promptId: string, workspaceId: string): Promise<DeletePromptResponse> {
     const requestData: DeletePromptRequest = {
       prompt_id: parseInt(promptId),
+      workspace_id: workspaceId,
     }
 
     const response = await getApiClient().delete<DeletePromptResponse>(API_ENDPOINTS.PROMPTS.DELETE.replace(':id', promptId), { data: requestData })
@@ -505,19 +507,18 @@ export class PromptService {
   /**
    * 保存草稿
    * @param promptId 提示词ID
-   * @param spaceId 工作空间ID
+   * @param workspaceId 工作空间ID（放在请求体 workspace_id）
    * @param editorData 编辑器数据
    * @returns 保存草稿响应
    */
-  static async saveDraft(promptId: string, spaceId: string, editorData: any): Promise<SaveDraftResponse> {
+  static async saveDraft(promptId: string, workspaceId: string, editorData: any): Promise<SaveDraftResponse> {
     try {
       const requestData = await this.transformToApiDraftFormat({
         ...editorData,
-        spaceId,
+        spaceId: workspaceId,
       })
 
-      const url = API_ENDPOINTS.PROMPTS.SAVE_DRAFT.replace(':id', promptId) + `?space_id=${spaceId}`
-
+      const url = API_ENDPOINTS.PROMPTS.SAVE_DRAFT.replace(':id', promptId)
       const response = await getApiClient().post<SaveDraftResponse>(url, requestData)
 
       if (response.data.code !== 0) {
@@ -534,11 +535,13 @@ export class PromptService {
   /**
    * 提交版本
    * @param promptId 提示词ID
+   * @param workspaceId 工作空间ID
    * @param data 提交数据
    * @returns 提交版本响应
    */
-  static async commitVersion(promptId: string, data: CommitVersionRequest): Promise<CommitVersionResponse> {
-    const response = await getApiClient().post<CommitVersionResponse>(API_ENDPOINTS.PROMPTS.COMMIT_DRAFT.replace(':id', promptId), data)
+  static async commitVersion(promptId: string, workspaceId: string, data: CommitVersionRequest): Promise<CommitVersionResponse> {
+    const url = API_ENDPOINTS.PROMPTS.COMMIT_DRAFT.replace(':id', promptId) + `?workspace_id=${workspaceId}`
+    const response = await getApiClient().post<CommitVersionResponse>(url, data)
 
     if (response.data.code !== 0) {
       throw new Error(response.data.msg || '提交版本失败')
@@ -550,15 +553,14 @@ export class PromptService {
   /**
    * 还原为指定版本
    * @param promptId 提示词ID
+   * @param workspaceId 工作空间ID
    * @param data 还原数据
    * @returns 还原响应
    */
-  static async revertToVersion(promptId: string, data: RevertToVersionRequest): Promise<RevertToVersionResponse> {
+  static async revertToVersion(promptId: string, workspaceId: string, data: RevertToVersionRequest): Promise<RevertToVersionResponse> {
     try {
-      const response = await getApiClient().post<RevertToVersionResponse>(
-        API_ENDPOINTS.PROMPTS.REVERT_FROM_COMMIT.replace(':id', promptId),
-        data,
-      )
+      const url = API_ENDPOINTS.PROMPTS.REVERT_FROM_COMMIT.replace(':id', promptId) + `?workspace_id=${workspaceId}`
+      const response = await getApiClient().post<RevertToVersionResponse>(url, data)
 
       if (response.data.code !== 0) {
         throw new Error(response.data.msg || '还原版本失败')
@@ -574,11 +576,13 @@ export class PromptService {
   /**
    * 获取版本列表
    * @param promptId 提示词ID
+   * @param workspaceId 工作空间ID
    * @param params 查询参数
    * @returns 版本列表响应
    */
-  static async getVersionList(promptId: string, params?: GetVersionListRequest): Promise<GetVersionListResponse> {
-    const response = await getApiClient().get<GetVersionListResponse>(API_ENDPOINTS.PROMPTS.LIST_COMMITS.replace(':id', promptId), { params })
+  static async getVersionList(promptId: string, workspaceId: string, params?: GetVersionListRequest): Promise<GetVersionListResponse> {
+    const queryParams = { ...params, workspace_id: workspaceId }
+    const response = await getApiClient().get<GetVersionListResponse>(API_ENDPOINTS.PROMPTS.LIST_COMMITS.replace(':id', promptId), { params: queryParams })
 
     if (response.data.code !== 0) {
       throw new Error(response.data.msg || '获取版本列表失败')

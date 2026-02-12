@@ -161,7 +161,7 @@ export function useWorkflowNodePrompt({ nodeId, nodeName, systemPrompt, onSystem
     }
     setVersionLoading(true)
     try {
-      const options = await getVersionOptions(pid)
+      const options = await getVersionOptions(pid, spaceId)
       const merged = mergeCurrentVersionOption(options, pid, currentRelation?.promptVersion)
       setVersionOptions(merged)
     } catch (e) {
@@ -439,7 +439,7 @@ export function useWorkflowNodePrompt({ nodeId, nodeName, systemPrompt, onSystem
         setSaving(false)
         return
       }
-      await PromptService.commitVersion(targetPromptId, {
+      await PromptService.commitVersion(targetPromptId, spaceId, {
         commit_version: promptVersion,
         commit_description: promptDesc || t('workflowCanvas.nodePrompt.commitDescription', { nodeName: nodeName || nodeId }),
       })

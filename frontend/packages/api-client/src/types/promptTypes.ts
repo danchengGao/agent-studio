@@ -109,6 +109,7 @@ export interface EditPromptBasicInfoResponse {
 // 删除提示词请求
 export interface DeletePromptRequest {
   prompt_id: number
+  workspace_id: string
 }
 
 // 删除提示词响应

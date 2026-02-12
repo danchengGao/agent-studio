@@ -2119,7 +2119,7 @@ const PromptEditPage: React.FC = () => {
 
         if (version) {
           // 调用版本列表API
-          const response = await PromptService.getVersionList(id, { page_size: 20 })
+          const response = await PromptService.getVersionList(id, workspaceId, { page_size: 20 })
 
           if (response.code === 0) {
             const versionList = response.prompt_commit_infos

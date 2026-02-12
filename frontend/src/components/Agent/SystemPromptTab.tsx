@@ -159,7 +159,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
     }
     setVersionLoading(true)
     try {
-      const options = await getVersionOptions(pid)
+      const options = await getVersionOptions(pid, workspaceId)
       const merged = mergeCurrentVersionOption(options, pid, currentRelation?.promptVersion)
       setVersionOptions(merged)
     } catch (e) {
@@ -521,7 +521,7 @@ const SystemPromptTab: React.FC<{ agentDetailResponse?: AgentDetailResponse | nu
         setSaving(false)
         return
       }
-      await PromptService.commitVersion(targetPromptId, {
+      await PromptService.commitVersion(targetPromptId, workspaceId, {
         commit_version: promptVersion,
         commit_description: promptDesc || t('messages.commitDescriptionFallback', { agentName: agentName || agentId }),
       })
