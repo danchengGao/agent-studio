@@ -127,6 +127,9 @@ if TYPE_CHECKING:
     # 只为类型检查器服务，运行时不执行
     AgentBaseDBPd: Type[BaseModel]
 
+# Current index manager type from environment
+_CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "milvus")
+
 DEFAULT_PAGE = 1
 
 
@@ -1940,6 +1943,7 @@ def _collect_knowledge_dependencies(
     space_id: str,
     knowledge_bases: list[Dict[str, Any]],
     processed_kb_ids: Set[str],
+    index_manager_type: str | None = None,
 ):
     """收集 Knowledge Base 依赖"""
     if not knowledge_ids:
@@ -1950,7 +1954,9 @@ def _collect_knowledge_dependencies(
             continue
 
         # Get KB Data
-        kb_query = KnowledgeBaseGet(space_id=space_id, kb_id=kb_id)
+        kb_query = KnowledgeBaseGet(
+            space_id=space_id, kb_id=kb_id, index_manager_type=index_manager_type
+        )
         kb_res = knowledge_base_repository.knowledge_base_get(kb_query)
 
         if kb_res.code != status.HTTP_200_OK or not kb_res.data:
@@ -2163,6 +2169,7 @@ async def _import_knowledge_bases(
                         status="uploaded" if file_restored else "failed",
                         index_id=None,  # 清空索引关联
                         index_name=None,
+                        index_manager_type=_CURR_INDEX_TYPE,
                         chunk_count=0,
                         process_info={
                             "message": (
@@ -2289,8 +2296,10 @@ async def _import_knowledge_bases(
 
         target_kb_id = None
 
-        # Check existence
-        kb_query = KnowledgeBaseGet(space_id=space_id, kb_id=old_kb_id)
+        # Check existence - use current environment's index_manager_type
+        kb_query = KnowledgeBaseGet(
+            space_id=space_id, kb_id=old_kb_id, index_manager_type=_CURR_INDEX_TYPE
+        )
         existing_res = knowledge_base_repository.knowledge_base_get(kb_query)
 
         if existing_res.code == status.HTTP_200_OK and existing_res.data:
@@ -2330,6 +2339,7 @@ async def _import_knowledge_bases(
                     "description": kb_data.get("description"),
                     "embedding_model_config_id": emb_id,
                     "config": kb_data.get("config"),
+                    "index_manager_type": _CURR_INDEX_TYPE,
                     "create_time": milliseconds(),
                     "update_time": milliseconds(),
                 }
@@ -2366,6 +2376,7 @@ async def _import_knowledge_bases(
                 "description": kb_data.get("description"),
                 "embedding_model_config_id": emb_id,
                 "config": kb_data.get("config"),
+                "index_manager_type": _CURR_INDEX_TYPE,
                 "create_time": milliseconds(),
                 "update_time": milliseconds(),
             }
@@ -2487,6 +2498,7 @@ def agent_export(
                 req.space_id,
                 knowledge_bases,
                 processed_kb_ids,
+                index_manager_type=_CURR_INDEX_TYPE,
             )
 
         # 3.4 处理提示词模板依赖
