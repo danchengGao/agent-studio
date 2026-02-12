@@ -29,7 +29,7 @@ class ModelConfigBase(BaseModel):
     provider: ModelProvider = Field(..., description="AI model provider")
     space_id: str = Field("0", description="belong to spacific space")
     model_type: str = Field(..., min_length=1, max_length=100, description="Specific model name")
-    base_url: str = Field(..., description="Custom API endpoint URL")
+    base_url: str = Field(..., min_length=1, description="Custom API endpoint URL")
     is_active: Optional[bool] = Field(default=True, description="Whether the model is active")
     description: Optional[str] = Field(None, max_length=500, description="Model description")
     tags: List[str] = Field(default_factory=list, description="Model tags for categorization")
