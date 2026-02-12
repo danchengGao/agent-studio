@@ -34,6 +34,8 @@ from openjiuwen_studio.ops.common.handle_exceptions_util import handle_exception
 from openjiuwen_studio.routers.prompt_llm_router import get_llm_config_service
 from openjiuwen_studio.core.utils.compatible_field import compatible_provider, mask_sensitive_fields
 from openjiuwen_studio.core.common.language_thread_context import get_language
+from openjiuwen_studio.core.manager.login_manager.space import check_user_space
+from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 
 from openjiuwen.dev_tools.tune.chat_agent.chat_agent import create_chat_agent_config, create_chat_agent
 from openjiuwen.dev_tools.tune.optimizer.joint_optimizer import JointOptimizer
@@ -678,11 +680,13 @@ def generate_optimize_task_job_id(body: dict) -> str:
 async def prompt_optimize(
         request: Request,
         workspace_id: str = Query(..., title="空间ID"),
-        user_id: str = Query(..., title="用户ID"),
         llm_service: LLMConfigService = Depends(get_llm_config_service),
-        app_service: JobService = Depends(get_job_service)
+        app_service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)
 ):
     """创建提示词优化任务"""
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
 
     # 解析请求体
     body = await request.json()
@@ -766,10 +770,12 @@ async def prompt_optimize(
 def prompt_optimize_progress(
         job_id: str,
         workspace_id: str = Query(..., title="空间ID"),
-        user_id: str = Query(..., title="用户ID"),
-        service: JobService = Depends(get_job_service)
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)
 ):
     """prompt_optimize_progress"""
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     job_info = service.get_job_info(workspace_id, user_id, job_id)
 
     if job_info is None:
@@ -780,13 +786,14 @@ def prompt_optimize_progress(
 
 @router.post("/templates_optimization/jobs/get_infos", response_model=OptimizeTaskGetInfoResponse)
 @handle_exceptions(response_model=OptimizeTaskGetInfoResponse)
-def prompt_optimize_progress_list(request: OptimizeTaskGetInfoRequest,
-                                        workspace_id: str = Query(..., title="space ID"),
-                                        user_id: str = Query(..., title="User ID"),
-                                        service: JobService = Depends(get_job_service)
-                                        ):
+def prompt_optimize_progress_list(
+        request: OptimizeTaskGetInfoRequest,
+        workspace_id: str = Query(..., title="space ID"),
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)):
     """prompt_optimize_progress_list"""
-
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     return service.get_jobs(workspace_id, user_id, request.id_list)
 
 
@@ -794,12 +801,13 @@ def prompt_optimize_progress_list(request: OptimizeTaskGetInfoRequest,
 @handle_exceptions(response_model=BaseResponse)
 def prompt_optimize_delete(job_id: str,
                            workspace_id: str = Query(..., title="space ID"),
-                           user_id: str = Query(..., title="User ID"),
                            job_type: str = Query("formal", title="Job typpe"),
-                           service: JobService = Depends(get_job_service)
+                           service: JobService = Depends(get_job_service),
+                           current_user: dict = Depends(get_current_user)
                            ):
     """prompt_optimize_delete"""
-
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     # 删除草稿类型任务
     if job_type == "draft":
         service.del_draft(workspace_id, user_id, job_id)
@@ -816,10 +824,12 @@ def prompt_optimize_delete(job_id: str,
 @handle_exceptions(response_model=JobDraftCreateResponse)
 async def save_draft(request: Request,
                workspace_id: str = Query(..., title="space ID"),
-               user_id: str = Query(..., title="User ID"),
                draft_id: str = Query("", title="Draft ID"),
-               service: JobService = Depends(get_job_service)):
+               service: JobService = Depends(get_job_service),
+               current_user: dict = Depends(get_current_user)):
     """用户job任务草稿保存"""
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     body = await request.json()
     process_job_draft_body(body)
     creation_info = OptimizeTaskCreationRequest(**body)
@@ -835,12 +845,14 @@ async def save_draft(request: Request,
 @handle_exceptions(response_model=entities.JobDraftResponse)
 def get_draft(
         workspace_id: str = Query(..., title="space ID"),
-        user_id: str = Query(..., title="User ID"),
         draft_id: str = Query(..., title="Draft ID"),
-        service: JobService = Depends(get_job_service)):
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)):
     """
     获取用户job任务草稿
     """
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     draft = service.get_draft(workspace_id, user_id, draft_id)
 
     if draft is None:
@@ -854,14 +866,16 @@ def get_draft(
 def get_history(
         job_id: str,
         workspace_id: str = Query(..., title="space ID"),
-        user_id: str = Query(..., title="User ID"),
         page_num: int = Query(default=0, description="页码"),
         page_size: int = Query(default=5, description="每页数量"),
         iteration_round: int = Query(default=None, description="迭代轮次"),
-        service: JobService = Depends(get_job_service)):
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)):
     """
     获取用户job任务草稿
     """
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     if iteration_round is None:
         return entities.GetOptimizeResponse(code=404, msg=f"缺少关键参数iteration_round", history=[])
     job_info = service.get_job_info(workspace_id, user_id, job_id)
@@ -907,7 +921,8 @@ async def wrap_sse_generator(original_generator):
 @handle_exceptions()
 async def prompt_generate(
         request: Request,
-        llm_service: LLMConfigService = Depends(get_llm_config_service)
+        llm_service: LLMConfigService = Depends(get_llm_config_service),
+        current_user: dict = Depends(get_current_user)
 ):
     """prompt一键生成接口"""
 
@@ -923,9 +938,11 @@ async def prompt_generate(
         stream = body.get("stream", True)
         tools = body.get("tools")
         template_info = body.get("templateInfo", {})
+        workspace_id = body.get("workspace_id")
         meta_template_type = template_info.get("metaTemplateType", "general")
 
         # 2. 参数验证
+        _ = check_user_space(workspace_id, current_user)
         if not instruct:
             return JSONResponse(
                 content={"error": "instruct parameter is required"},
@@ -1058,7 +1075,8 @@ async def prompt_generate(
 @handle_exceptions()
 async def optimize_feedback(
         request: Request,
-        llm_service: LLMConfigService = Depends(get_llm_config_service)
+        llm_service: LLMConfigService = Depends(get_llm_config_service),
+        current_user: dict = Depends(get_current_user)
 ) -> Response:
     """基于反馈优化prompt"""
 
@@ -1075,6 +1093,9 @@ async def optimize_feedback(
         end_pos = body.get("end_pos")
         stream = body.get("stream", True)
         model_headers = body.get("modelInfo", {}).get("headers", {})
+        workspace_id = body.get("workspace_id")
+
+        _ = check_user_space(workspace_id, current_user)
 
         # 2. 使用convert_to_sdk_format获取模型配置
         model_info_dict = {
@@ -1159,7 +1180,8 @@ async def optimize_feedback(
 @handle_exceptions()
 async def prompt_bad_cases(
         request: Request,
-        llm_service: LLMConfigService = Depends(get_llm_config_service)
+        llm_service: LLMConfigService = Depends(get_llm_config_service),
+        current_user: dict = Depends(get_current_user)
 ) -> Response:
     """基于反馈优化prompt"""
     try:
@@ -1172,6 +1194,10 @@ async def prompt_bad_cases(
         badcases = body.get("badcases", [{}])
         stream = body.get("stream", True)
         model_headers = body.get("modelInfo", {}).get("headers", {})
+        workspace_id = body.get("workspace_id")
+
+        _ = check_user_space(workspace_id, current_user)
+
         cases = []
         for badcase in badcases:
             messages = ast.literal_eval(badcase.get('query', ''))
