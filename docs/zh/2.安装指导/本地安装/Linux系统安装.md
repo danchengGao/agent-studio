@@ -497,26 +497,42 @@
 
    其中 `ENABLE_LINUX_SANDBOX` 表示是否启动 bwrap 沙箱，`PYTHON_SANDBOX_URL` 和 `JS_SANDBOX_URL` 为前面两步启动的 Python 和 JS 服务 URL。
 
-   如果需要启动 bwrap 沙箱，请将 `ENABLE_LINUX_SANDBOX` 设置为1，并修改 `sandbox_server/gateway/openjiuwen_sandbox_gateway/conf/sandbox_config.yaml`，确保 Python 解释器和 Js 解释器以及相关依赖都包的路径都在 `mount` 配置中，以及 `PATH` 环境变量中包含了 Python 解释器和 Js 解释器所在路径。示例如下：
+   如果需要启动 bwrap 沙箱，请将 `ENABLE_LINUX_SANDBOX` 设置为1，并在 `sandbox_server/gateway/openjiuwen_sandbox_gateway/conf/sandbox_config.yaml` 中按需修改安全配置。目前支持 `seccomp` 、`namespace` 、`mount` 文件系统等配置参数。请确保 Python 解释器和 Js 解释器以及相关依赖都包的路径都在 `mount` 配置中，以及 `PATH` 环境变量中包含了 Python 解释器和 Js 解释器所在路径。示例如下：
 
    ```
+   seccomp: # whitelist mode
+     allow:
+       x86_64: ["epoll_wait", "getcwd", "wait4", "pread64", "set_tid_address", "prlimit64", "capget", "pipe2", "eventfd2", "pkey_alloc", "madvise", "sysinfo", "readlink", "geteuid", "getegid", "statx", "access", "clone", "arch_prctl", "clone3", "execve", "open", "lstat", "stat", "newfstatat", "lseek", "getdents64", "write", "close", "openat", "read", "futex", "mmap", "brk", "mprotect", "munmap", "rt_sigreturn", "mremap", "getgid", "getuid", "getpid", "getppid", "gettid", "exit", "exit_group", "rt_sigaction", "sched_yield", "set_robust_list", "get_robust_list", "rseq", "clock_gettime", "gettimeofday", "nanosleep", "epoll_create1", "epoll_ctl", "clock_nanosleep", "pselect6", "time", "rt_sigprocmask", "sigaltstack", "getrandom", "mkdirat", "mkdir", "socket", "connect", "bind", "listen", "accept", "sendto", "recvfrom", "getsockname", "recvmsg", "getpeername", "ppoll", "uname", "sendmsg", "sendmmsg", "fstat", "fcntl", "fstatfs", "poll", "epoll_pwait", 'ioctl']
+       aarch64: ["statx", "getcwd", "readlinkat", "madvise", "sysinfo", "clone", "eventfd2", "pipe2", "fcntl", "prlimit64", "set_tid_address", "faccessat", "execve", "write", "close", "openat", "read", "lseek", "getdents64", "futex", "mmap", "brk", "mprotect", "munmap", "rt_sigreturn", "rt_sigprocmask", "sigaltstack", "mremap", "getuid", "getgid", "geteuid", "getegid", "getpid", "getppid", "gettid", "exit", "exit_group", "rt_sigaction", "sched_yield", "get_robust_list", "set_robust_list", "rseq", "epoll_create1", "clock_gettime", "gettimeofday", "nanosleep", "epoll_ctl", "clock_nanosleep", "pselect6", "timerfd_create", "timerfd_settime", "timerfd_gettime", "getrandom", "mkdirat", "socket", "connect", "bind", "listen", "accept", "sendto", "recvfrom", "recvmsg", "getsockname", "getpeername", "ppoll", "uname", "sendmmsg", "newfstatat", "fstat", "fstatfs", "epoll_pwait", "ioctl"]
+
+   namespace:
+     user: False
+     net: True
+     pid: True
+     ipc: True
+     uts: True
+     cgroup: True
+
    mount:
-   [
-     {src: '/lib', dst: '/lib', mode: 'read'},
-     {src: '/lib64', dst: '/lib64', mode: 'read'},
-     {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
-     {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
-     {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
-     {src: '/usr/share/nodejs', dst: '/usr/share/nodejs', mode: 'read'},
-   ]
+     [
+       {src: '/lib', dst: '/lib', mode: 'read'},
+       {src: '/lib64', dst: '/lib64', mode: 'read'},
+       {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
+       {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
+       {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
+       {src: '/usr/share/nodejs', dst: '/usr/share/nodejs', mode: 'read'},
+     ]
 
    sandbox:
      type: bubblewrap
      path: bwrap
 
+   # Please ensure that both the Python and JavaScript interpreters
+   # are already in the mount directory, and either provide their full
+   # paths or add those paths to the PATH environment variable.
    interpreter:
      python_path: python3
-     node_path: node
+     javascript_path: node
 
    environment:
      PATH: /bin:/usr/bin
