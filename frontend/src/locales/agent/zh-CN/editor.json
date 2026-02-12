@@ -270,6 +270,7 @@
             "create": "创建新记忆库",
             "cancel": "取消",
             "confirm": "确定",
+            "selected": "已选择",
             "needBind": "需绑定记忆库",
             "select": "选择记忆库",
             "variable": "请先绑定记忆库以启用记忆变量功能",

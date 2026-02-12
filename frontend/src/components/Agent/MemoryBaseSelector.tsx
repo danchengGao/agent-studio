@@ -22,7 +22,7 @@ const MemoryBaseItemComponent: React.FC<{
 }> = ({ mb, isSelected, spaceId, onToggle }) => {
   // 获取 embedding 模型信息
   const { data: embeddingModel } = useEmbeddingModel(mb.embedding_model_config_id?.toString() || '', spaceId);
-
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration')
   return (
     <div
       className={`p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
@@ -64,7 +64,7 @@ const MemoryBaseItemComponent: React.FC<{
         {isSelected && (
           <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            <span className="text-sm text-blue-700 font-medium">已选择</span>
+            <span className="text-sm text-blue-700 font-medium">{t('orchestrationPage.memory.memoryBase.selected')}</span>
           </div>
         )}
       </div>
