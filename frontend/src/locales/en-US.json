@@ -686,7 +686,9 @@
       "newConversation": "Start new conversation",
       "conversationTimeout": "Conversation timed out, force stop current transmission",
       "forceStop": "Force stop",
-      "generating": "Generating..."
+      "generating": "Generating...",
+      "deepSearchServiceUnavailable": "DeepSearch service is temporarily unavailable, please visit ",
+      "deepSearchConfigRetry": ", refer to the documentation for configuration and try again"
     },
     "picker": {
       "selectAgent": "Select Agent",

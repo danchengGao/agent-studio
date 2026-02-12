@@ -234,7 +234,7 @@ export { TagService } from './services/tagService'
 export { TraceService, traceService } from './services/traceService'
 export { KnowledgeBaseService } from './services/knowledgeBaseService'
 export { MemoryBaseService } from './services/memoryBaseService'
-export { deepsearchTemplateService, fileToBase64 } from './services/deepsearchTemplateService'
+export { deepsearchTemplateService, deepsearchHeartbeatService, fileToBase64 } from './services/deepsearchTemplateService'
 export { webSearchEngineService } from './services/webSearchEngineService'
 export type { FrontendModelConfig } from './services/modelService'
 export type { Space, SpaceResponse } from './services/spaceService'
@@ -246,7 +246,8 @@ export type {
   TemplateImportResponse,
   TemplateListResponse,
   TemplateDeleteResponse,
-  TemplateContentResponse
+  TemplateContentResponse,
+  HeartbeatResponse
 } from './services/deepsearchTemplateService'
 export type {
   WebSearchEngineConfig,

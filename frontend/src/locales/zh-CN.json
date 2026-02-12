@@ -696,7 +696,9 @@
       "newConversation": "发起新对话",
       "conversationTimeout": "对话已超时，强制中断当前传输",
       "forceStop": "强制中断",
-      "generating": "正在生成中..."
+      "generating": "正在生成中...",
+      "deepSearchServiceUnavailable": "DeepSearch 服务暂不可用，请前往",
+      "deepSearchConfigRetry": "，参考文档进行配置后重试"
     },
     "picker": {
       "selectAgent": "选择智能体",
