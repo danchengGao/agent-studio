@@ -128,8 +128,8 @@ export const useSaveDraft = () => {
   const queryClient = useQueryClient()
 
   return useMutation(
-    ({ promptId, userId, spaceId, editorData }: { promptId: string; userId: string; spaceId: string; editorData: any }) =>
-      PromptService.saveDraft(promptId, userId, spaceId, editorData),
+    ({ promptId, spaceId, editorData }: { promptId: string; spaceId: string; editorData: any }) =>
+      PromptService.saveDraft(promptId, spaceId, editorData),
     {
       onSuccess: (response: any, variables) => {
         if (response.code === 0) {
@@ -150,7 +150,7 @@ export const useCommitVersion = () => {
   const queryClient = useQueryClient()
 
   return useMutation(
-    ({ promptId, userId, data }: { promptId: string; userId: string; data: CommitVersionRequest }) => PromptService.commitVersion(promptId, userId, data),
+    ({ promptId, data }: { promptId: string; data: CommitVersionRequest }) => PromptService.commitVersion(promptId, data),
     {
       onSuccess: (response: any, variables) => {
         if (response.code === 0) {
@@ -172,7 +172,7 @@ export const useRevertToVersion = () => {
   const queryClient = useQueryClient()
 
   return useMutation(
-    ({ promptId, userId, data }: { promptId: string; userId: string; data: RevertToVersionRequest }) => PromptService.revertToVersion(promptId, userId, data),
+    ({ promptId, data }: { promptId: string; data: RevertToVersionRequest }) => PromptService.revertToVersion(promptId, data),
     {
       onSuccess: (response: any, variables) => {
         if (response.code === 0) {

@@ -8,7 +8,15 @@ export type { TokenProvider, AuthStateUpdater } from './client'
 export { ApiClientProvider, useApiClient, useToken } from './context/ApiClientProvider'
 
 // 工具函数
-export { getApiClient, getToken, setGlobalTokenProvider, isApiClientInitialized, waitForApiClientInitialization } from './utils/apiClientFactory'
+export {
+  getApiClient,
+  getToken,
+  setGlobalTokenProvider,
+  isApiClientInitialized,
+  waitForApiClientInitialization,
+  stream,
+} from './utils/apiClientFactory'
+export type { StreamOptions } from './utils/apiClientFactory'
 export { isApiError, getErrorMessage, getErrorResponse } from './utils/errorHandling'
 export type { ApiError } from './utils/errorHandling'
 

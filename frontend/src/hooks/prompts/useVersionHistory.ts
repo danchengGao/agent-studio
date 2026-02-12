@@ -497,7 +497,7 @@ export const useVersionHistory = ({
       setRevertConfirmOpen(false)
 
       // 调用从版本中恢复API
-      const response = await PromptService.revertToVersion(id!, userId!, {
+      const response = await PromptService.revertToVersion(id!, {
         commit_version_reverting_from: selectedVersionData.version,
       })
 

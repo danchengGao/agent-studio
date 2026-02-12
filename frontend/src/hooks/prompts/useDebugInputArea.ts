@@ -498,10 +498,11 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       onStart?.()
 
       try {
-        // 调用调试流式API - 传递 abortController 参数（参考快捷优化的逻辑）
+        // 调用调试流式API - 传递 space_id、abortController 参数（参考快捷优化的逻辑）
         const controllerPromise = PromptService.debugStreaming(
           promptId,
           debugRequest,
+          workspaceId,
           (response: DebugStreamingResponse) => {
             // 检查是否已被用户停止（通过 AbortController）- 参考快捷优化的逻辑
             if (abortControllerRef?.current?.signal.aborted) {
@@ -1056,7 +1057,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
           },
         }
 
-        const response = await PromptService.saveDebugContext(saveRequest, userId)
+        const response = await PromptService.saveDebugContext(saveRequest)
 
         if (response.code !== 0) {
           console.error('❌ 保存调试上下文失败:', response.msg || '保存调试上下文失败')
