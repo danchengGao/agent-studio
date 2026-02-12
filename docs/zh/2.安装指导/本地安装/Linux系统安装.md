@@ -14,7 +14,6 @@
 * 操作系统：
   * Ubuntu：最低 Ubuntu 20.04，推荐 Ubuntu 22.04 (Jammy) 及以上
     > **注意**：Ubuntu 官方与主流软件源已停止支持 Ubuntu 20.04 (Focal) 及以下版本系统。
-  * EulerOS：Huawei Cloud EulerOS 2.0及以上
 
 * 软件（安装方法详见下文）	 
   * Git 2.40及以上 

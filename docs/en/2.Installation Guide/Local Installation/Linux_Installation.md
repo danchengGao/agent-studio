@@ -14,7 +14,6 @@ Please ensure the machine meets the following requirements:
 - Operating System:
   - Ubuntu: Minimum Ubuntu 20.04, Ubuntu 22.04 (Jammy) or newer recommended
     > **Note**: Ubuntu official and mainstream software sources have stopped supporting Ubuntu 20.04 (Focal) and older versions.
-  - EulerOS: Huawei Cloud EulerOS 2.0 or newer
 
 - Software (installation methods detailed below)
   - Git 2.40 or newer
