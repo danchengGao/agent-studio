@@ -2088,6 +2088,16 @@ async def _import_knowledge_bases(
     created_resources = []
     warnings = []
 
+    # 清理 space_id，防止路径穿越
+    if space_id:
+        safe_space_id = Path(space_id).name.lstrip(".").replace("..", "_")
+    else:
+        safe_space_id = None
+
+    if not safe_space_id:
+        warnings.append(f"空间ID无效，跳过知识库导入: {space_id}\n")
+        return created_resources, warnings
+
     async def import_documents(
         target_kb_id: str, source_kb_id: str, documents: list[Dict[str, Any]]
     ):
@@ -2099,6 +2109,26 @@ async def _import_knowledge_bases(
         # doc_ids_to_process = []  # No longer used
         # 收集需要处理的文档信息 (doc_id, file_path)
         docs_to_process = []
+
+        # 清理 source_kb_id，防止路径穿越
+        if source_kb_id:
+            safe_source_kb_id = Path(source_kb_id).name.lstrip(".").replace("..", "_")
+        else:
+            safe_source_kb_id = None
+
+        if not safe_source_kb_id:
+            warnings.append(f"知识库ID无效，跳过文档导入: {source_kb_id}\n")
+            return
+
+        # 清理 target_kb_id，防止路径穿越
+        if target_kb_id:
+            safe_target_kb_id = Path(target_kb_id).name.lstrip(".").replace("..", "_")
+        else:
+            safe_target_kb_id = None
+
+        if not safe_target_kb_id:
+            warnings.append(f"目标知识库ID无效，跳过文档导入: {target_kb_id}\n")
+            return
 
         with get_db_jw() as db:
             for doc_data in documents:
@@ -2119,7 +2149,19 @@ async def _import_knowledge_bases(
                     continue
                 else:
                     # 创建新文档
-                    new_doc_id = doc_data["doc_id"] if overwrite else str(uuid.uuid4())
+                    if overwrite:
+                        # 验证用户提供的 doc_id，防止路径穿越
+                        raw_doc_id = doc_data.get("doc_id", "")
+                        if raw_doc_id:
+                            new_doc_id = Path(str(raw_doc_id)).name.lstrip(".").replace("..", "_")
+                        else:
+                            new_doc_id = None
+
+                        if not new_doc_id:
+                            logger.warning(f"[KB_IMPORT] 无效的 doc_id，生成新的 UUID: {raw_doc_id}")
+                            new_doc_id = str(uuid.uuid4())
+                    else:
+                        new_doc_id = str(uuid.uuid4())
 
                     # 尝试从 ZIP 中恢复文件
                     file_restored = False
@@ -2129,9 +2171,48 @@ async def _import_knowledge_bases(
                         # 在 ZIP 中查找文件: documents/{source_kb_id}/{filename}
                         # 优先尝试 doc name，因为新版 export 使用 doc name
                         filename = doc_data.get("name")
-                        source_file = documents_source_dir / "documents" / source_kb_id / filename
+
+                        # 防止路径穿越攻击：清理文件名，移除路径分隔符和父目录引用
+                        if filename:
+                            # 获取纯文件名，移除任何路径组件
+                            safe_filename = Path(filename).name
+                            # 进一步清理，移除潜在的隐藏文件前缀和危险字符
+                            safe_filename = safe_filename.lstrip(".").replace("..", "_")
+                        else:
+                            safe_filename = None
+
+                        if not safe_filename:
+                            warnings.append(f"文档文件名无效，跳过: {filename}\n")
+                            continue
+
+                        source_file = documents_source_dir / "documents" / safe_source_kb_id / safe_filename
+
+                        # 安全检查：确保解析后的路径仍在预期的基础目录内
+                        expected_base = (documents_source_dir / "documents" / safe_source_kb_id).resolve()
+                        try:
+                            resolved_source_file = source_file.resolve()
+                            if not str(resolved_source_file).startswith(str(expected_base)):
+                                logger.warning(f"[KB_IMPORT] 路径穿越攻击尝试被阻止: {filename}")
+                                warnings.append(f"文档文件名包含非法路径: {filename}\n")
+                                continue
+                        except (OSError, ValueError) as path_err:
+                            logger.warning(f"[KB_IMPORT] 路径解析失败: {filename}, 错误: {path_err}")
+                            warnings.append(f"文档文件名无效: {filename}\n")
+                            continue
 
                         if source_file.exists():
+                            # 安全检查：确保是常规文件，不是符号链接或目录
+                            try:
+                                file_stat = source_file.stat()
+                                if not source_file.is_file():
+                                    logger.warning(f"[KB_IMPORT] 跳过非文件项: {safe_filename}")
+                                    warnings.append(f"文档文件不是常规文件: {safe_filename}\n")
+                                    continue
+                            except (OSError, IOError) as stat_err:
+                                logger.warning(f"[KB_IMPORT] 无法获取文件状态: {safe_filename}, 错误: {stat_err}")
+                                warnings.append(f"文档文件状态获取失败: {safe_filename}\n")
+                                continue
+
                             # 复制到系统的知识库存储目录
                             # 路径规则参考 knowledge_base._get_storage_path
                             # backend/data/knowledge_base/{space_id}/{kb_id}/{doc_id}{ext}
@@ -2148,24 +2229,43 @@ async def _import_knowledge_bases(
                                     backend_dir
                                     / "data"
                                     / "knowledge_base"
-                                    / space_id
-                                    / target_kb_id
+                                    / safe_space_id
+                                    / safe_target_kb_id
                                 )
                                 storage_path.mkdir(parents=True, exist_ok=True)
 
                                 # 生成新文件名
-                                safe_filename = f"{new_doc_id}{Path(filename).suffix}"
-                                target_path = storage_path / safe_filename
+                                target_filename = f"{new_doc_id}{Path(safe_filename).suffix}"
+                                target_path = storage_path / target_filename
+
+                                # 验证文件大小，防止元数据欺骗
+                                actual_file_size = source_file.stat().st_size
+                                declared_file_size = doc_data.get("file_size", 0)
+                                if actual_file_size != declared_file_size:
+                                    logger.warning(
+                                        f"[KB_IMPORT] 文件大小不匹配: {safe_filename} "
+                                        f"(实际: {actual_file_size}, 声明: {declared_file_size})"
+                                    )
+                                    # 可以选择跳过或继续，这里选择继续但记录警告
+
+                                # 可选：文件大小上限检查，防止磁盘耗尽攻击
+                                max_file_size = 100 * 1024 * 1024  # 100MB
+                                if actual_file_size > max_file_size:
+                                    logger.warning(
+                                        f"[KB_IMPORT] 文件超过大小限制 ({max_file_size} bytes): {safe_filename}"
+                                    )
+                                    warnings.append(f"文档文件超过大小限制: {safe_filename}\n")
+                                    continue
 
                                 shutil.copy2(source_file, target_path)
                                 new_file_path = str(target_path)
                                 file_restored = True
                                 logger.info(
-                                    f"[KB_IMPORT] Restored document file: {filename} -> {target_path}"
+                                    f"[KB_IMPORT] Restored document file: {safe_filename} -> {target_path}"
                                 )
                             except Exception as e:
-                                logger.error(f"[KB_IMPORT] Failed to restore file {filename}: {e}")
-                                warnings.append(f"文档文件 {filename} 恢复失败: {e}\n")
+                                logger.error(f"[KB_IMPORT] Failed to restore file {safe_filename}: {e}")
+                                warnings.append(f"文档文件 {safe_filename} 恢复失败: {e}\n")
 
                     new_doc = KnowledgeBaseDocumentDB(
                         space_id=space_id,
@@ -2805,6 +2905,42 @@ async def agent_import_from_file(
                         logger.warning("psutil not available, skipping disk space check")
                     except Exception as e:
                         logger.warning(f"Failed to check disk space: {e}")
+
+                    # 检查点4：检查Zip内文件名是否存在路径穿越风险
+                    resolved_temp_dir = temp_dir.resolve()
+
+                    for member in file_list:
+                        # 解析目标文件的绝对路径
+                        try:
+                            # 拼接路径并解析，以处理 '..' 和符号链接
+                            # 注意：如果文件不存在，pathlib.resolve() 在不同版本行为不同，
+                            # 但此处我们要检查的是路径字符串是否逃逸
+                            member_path = temp_dir / member.filename
+                            resolved_member_path = member_path.resolve()
+                        except Exception:
+                            # 尝试使用 os.path.abspath 作为备选，处理 resolve 可能的异常
+                            # 但通常 resolve 是最准确的
+                            try:
+                                resolved_member_path = Path(os.path.abspath(temp_dir / member.filename))
+                            except Exception as e:
+                                logger.warning(f"Failed to resolve path for {member.filename}: {e}")
+                                return ResponseModel(
+                                    code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
+                                    message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
+                                        msg=f"Invalid file path in ZIP: {member.filename}"
+                                    ),
+                                )
+
+                        if not str(resolved_member_path).startswith(str(resolved_temp_dir)):
+                            logger.warning(
+                                f"Zip path traversal attempt detected: {member.filename} -> {resolved_member_path}"
+                            )
+                            return ResponseModel(
+                                code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
+                                message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
+                                    msg=f"Security error: Zip contains file with illegal path ({member.filename})"
+                                ),
+                            )
 
                     # 所有检查通过之后，解压文件
                     zip_file.extractall(temp_dir)
