@@ -4,6 +4,7 @@ import { X, Cpu, AlertCircle } from 'lucide-react';
 import { MemoryBaseService, useEmbeddingModel, embeddingModelService } from '@test-agentstudio/api-client';
 import { getDefaultSpaceId } from '@/utils/spaceUtils';
 import { MemoryBaseItem } from '@test-agentstudio/api-client';
+import { useScopedTranslation } from '@/i18n';
 
 interface MemoryBaseSelectorProps {
   open: boolean;
@@ -72,6 +73,7 @@ const MemoryBaseItemComponent: React.FC<{
 };
 
 const MemoryBaseSelector: React.FC<MemoryBaseSelectorProps> = ({ open, onClose, onConfirm, initialSelected = null }) => {
+  const { t } = useScopedTranslation('agents.agentEditor.orchestration')
   const [selectedMemoryBase, setSelectedMemoryBase] = useState<string | null>(initialSelected);;
   const [memoryBaseList, setMemoryBaseList] = useState<MemoryBaseItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -154,7 +156,7 @@ const MemoryBaseSelector: React.FC<MemoryBaseSelectorProps> = ({ open, onClose, 
         <div className="relative bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-xl">
           <div className="flex items-center justify-between p-6 border-b">
             <Typography variant="h5" component="h2" sx={{ fontWeight: 'bold' }}>
-              选择记忆库
+              {t('orchestrationPage.memory.memoryBase.select')}
             </Typography>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
               <X className="w-6 h-6" />
@@ -202,7 +204,7 @@ const MemoryBaseSelector: React.FC<MemoryBaseSelectorProps> = ({ open, onClose, 
 
           <div className="flex items-center justify-end space-x-2 p-6 border-t">
             <Button variant="outlined" onClick={onClose}>
-              取消
+              {t('orchestrationPage.memory.memoryBase.cancel')}
             </Button>
             <Button
               variant="contained"
@@ -211,7 +213,7 @@ const MemoryBaseSelector: React.FC<MemoryBaseSelectorProps> = ({ open, onClose, 
               disabled={selectedMemoryBase === null} // ✅ 新的禁用条件：未选择任何项
             >
               {/* 确认 ({selectedMemoryBases.length}) // ❌ 旧的带计数文本 */}
-              确认 {/* ✅ 简单的确认文本 */}
+              {t('orchestrationPage.memory.memoryBase.confirm')} {/* ✅ 简单的确认文本 */}
             </Button>
           </div>
         </div>
