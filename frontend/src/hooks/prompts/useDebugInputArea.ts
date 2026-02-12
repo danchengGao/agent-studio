@@ -1462,6 +1462,10 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
           return newExpanded
         })
 
+        // 重置停止状态，使重试时也显示停止响应按钮
+        setIsStreamingStopped(false)
+        isStreamingStoppedRef.current = false
+
         // 使用通用函数执行流式调试请求
         await executeStreamingDebugRequest(debugRequest, mockTools, {
           messageIndex,
@@ -1509,6 +1513,8 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
       debugTraceInfo,
       saveDebugContext,
       setIsProcessing,
+      setIsStreamingStopped,
+      isStreamingStoppedRef,
       debugAbortControllerRef,
       t,
     ],
