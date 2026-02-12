@@ -4240,11 +4240,6 @@
       "description": "Create new knowledge base and upload documents",
       "success": "Knowledge base created successfully"
     },
-    "addDocument": {
-      "fileSizeLimit": "File size limit: each file must not exceed {{size}}",
-      "filesExceedLimit": "The following files exceed the {{size}} limit:",
-      "oversizedTitle": "File size exceeds limit"
-    },
     "edit": {
       "title": "Edit Knowledge Base",
       "description": "Modify knowledge base information and configuration"
@@ -4346,6 +4341,9 @@
       "noUploadedFiles": "No uploaded files",
       "settingsSuccess": "Document parameters set successfully",
       "settingsFailed": "Document parameter setup failed",
+      "fileSizeLimit": "File size limit: each file must not exceed {{size}}",
+ 	    "filesExceedLimit": "The following files exceed the {{size}} limit:",
+ 	    "oversizedTitle": "File size exceeds limit",
       "steps": {
         "upload": "Upload",
         "settings": "Parameters"
