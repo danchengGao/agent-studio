@@ -41,7 +41,6 @@ from openjiuwen_studio.core.manager.model_manager.managers.model_config_manager 
 # 生成随机字符串用于节点ID
 random_id = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_') for _ in range(5))
 
-# 国际化文本
 DEFAULT_WORKFLOW_TEXTS_ZH = {
     "start_title": "开始",
     "end_title": "结束",
@@ -102,9 +101,7 @@ def get_default_workflow_schema():
                     "title": texts["end_title"],
                     "inputs": {
                         "inputParameters": {
-                            "result": {
-                                "type": "ref",
-                            }
+                            "result": {}
                         }
                     },
                     "streaming": False
@@ -113,9 +110,6 @@ def get_default_workflow_schema():
         ],
         "edges": []
     }
-
-
-DEFAULT_WORKFLOW_SCHEMA = get_default_workflow_schema()
 
 
 def with_exception_handling(func: Callable) -> Callable:
@@ -291,7 +285,8 @@ def workflow_create(
     workflow_id = str(uuid.uuid4())
     current_time = milliseconds()
 
-    inputs, outputs = convert.extract_inputs_and_outputs_from_canvas(DEFAULT_WORKFLOW_SCHEMA)
+    workflow_schema = get_default_workflow_schema()
+    inputs, outputs = convert.extract_inputs_and_outputs_from_canvas(workflow_schema)
 
     workflow = WorkflowBaseDBPd(
         workflow_id=workflow_id,
@@ -302,7 +297,7 @@ def workflow_create(
         space_id=req.space_id,
         create_time=current_time,
         update_time=current_time,
-        schema=json.dumps(DEFAULT_WORKFLOW_SCHEMA),
+        schema=json.dumps(workflow_schema),
         input_parameters=inputs,
         output_parameters=outputs
     )
