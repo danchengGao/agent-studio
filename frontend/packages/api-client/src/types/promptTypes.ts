@@ -427,6 +427,7 @@ export interface DebugStreamingResponse {
 // 保存调试上下文请求
 export interface SaveDebugContextRequest {
   prompt_id: string
+  workspace_id?: string
   debug_context: DebugContext
 }
 

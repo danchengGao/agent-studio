@@ -1045,6 +1045,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
         // 构建保存请求
         const saveRequest: SaveDebugContextRequest = {
           prompt_id: promptId,
+          workspace_id: workspaceId,
           debug_context: {
             debug_core: {
               mock_contexts: mockContexts,
@@ -1066,13 +1067,16 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
         console.error('❌ 保存调试上下文失败:', error)
       }
     },
-    [promptId, userId, parameters, tools],
+    [promptId, workspaceId, userId, parameters, tools],
   )
 
   /**
    * 处理发送消息
+   * @param currentValue 可选，由输入框传入的当前值，避免因父组件 state 未及时更新导致使用旧值
    */
-  const handleSendMessage = useCallback(async () => {
+  const handleSendMessage = useCallback(async (currentValue?: string) => {
+    const message = currentValue !== undefined ? currentValue : inputMessage
+
     // 检查所有 placeholder 消息是否有效
     if (!validateAllPlaceholders()) {
       return
@@ -1085,7 +1089,7 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
     }
 
     // 如果用户没有在输入框中输入消息，根据最后一条消息类型决定逻辑
-    if (!inputMessage.trim()) {
+    if (!message.trim()) {
       // 检查最后一条消息的类型
       const lastMessage = chatMessages.length > 0 ? chatMessages[chatMessages.length - 1] : null
 
@@ -1218,14 +1222,14 @@ export const useDebugInputArea = (options: UseDebugInputAreaOptions) => {
     isStreamingStoppedRef.current = false
 
     let userMessageIndex = chatMessages.length
-    const currentInput = inputMessage.trim() ? inputMessage : ''
-    const hasUserInput = inputMessage.trim() !== ''
+    const currentInput = message.trim() ? message : ''
+    const hasUserInput = message.trim() !== ''
 
     // 只有在消息不为空时才添加用户消息到对话历史
     if (hasUserInput) {
       const userMessage: ChatMessage = {
         type: 'user' as const,
-        content: inputMessage,
+        content: message,
         timestamp: new Date().toLocaleString('zh-CN'),
       }
 

@@ -34,6 +34,7 @@ from openjiuwen_studio.schemas.space import SpaceAWPQuery
 from openjiuwen_studio.core.manager.reference_extractor import extract_workflow_references, \
     check_referenced_dependencies
 from openjiuwen_studio.core.manager.repositories.reference_repository import reference_repository
+from openjiuwen_studio.core.manager.repositories.prompt_relation_repository import prompt_relation_repository
 from openjiuwen_studio.core.common.exceptions import BaseError
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.manager.model_manager.managers.model_config_manager import ModelConfigManager
@@ -941,6 +942,19 @@ def workflow_meta_update(
             f"Synced workflow name in agents: {sync_result.data['updated_count']} updated, "
             f"{sync_result.data['failed_count']} failed"
         )
+
+    # 6. 同步更新 prompt_relation 表中该工作流关联记录的 name（id 格式为 workflow_id&node_id）
+    if req.name is not None:
+        pr_result = prompt_relation_repository.update_member_name_in_prompt_relation(
+            space_id=req.space_id,
+            member_type="WORKFLOW",
+            member_id=req.workflow_id,
+            new_name=req.name,
+        )
+        if pr_result.code == status.HTTP_200_OK:
+            logger.info(f"Synced workflow name in prompt_relation: {pr_result.message}")
+        else:
+            logger.warning(f"Sync workflow name in prompt_relation failed: {pr_result.message}")
 
     res_data = WorkflowResponseUpdate(
         workflow_id=req.workflow_id,

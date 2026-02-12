@@ -791,11 +791,23 @@ def agent_meta_update(
             message=save_result.message,
         )
 
+    # 4. 同步更新 prompt_relation 表中该智能体关联记录的 name（id 存的是智能体id）
+    pr_result = prompt_relation_repository.update_member_name_in_prompt_relation(
+        space_id=req.space_id,
+        member_type="AGENT",
+        member_id=req.agent_id,
+        new_name=req.agent_name,
+    )
+    if pr_result.code == status.HTTP_200_OK:
+        logger.info(f"[AGENT_UPDATE] Synced agent name in prompt_relation: {pr_result.message}")
+    else:
+        logger.warning(f"[AGENT_UPDATE] Sync agent name in prompt_relation failed: {pr_result.message}")
+
     logger.info(
         f"[AGENT_UPDATE] Agent metadata updated, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 4. 返回更新结果
+    # 5. 返回更新结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="update agent success",
