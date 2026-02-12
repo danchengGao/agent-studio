@@ -47,6 +47,7 @@ from openjiuwen.core.foundation.llm import ToolCall
 from openjiuwen.core.foundation.tool import ToolInfo
 from openjiuwen.core.foundation.llm.schema.mode_info import BaseModelInfo
 from openjiuwen.core.foundation.tool.function.function import LocalFunction
+from openjiuwen.core.foundation.tool import ToolCard
 from openjiuwen.core.foundation.llm import Model, ModelRequestConfig, ModelClientConfig  # from ModelConfig
 from openjiuwen.dev_tools.tune.trainer.trainer import Trainer
 from openjiuwen.dev_tools.tune.dataset.case_loader import CaseLoader
@@ -360,48 +361,6 @@ class OptimizationTaskExecutor:
         return type in ["object", "array"]
 
     @staticmethod
-    def _parse_to_sdk_param(field_name: str, field_schema: dict, is_required: bool = False) -> Param:
-        type = field_schema.get('type', 'string')
-
-        if not OptimizationTaskExecutor._is_nested_type(type):
-            return Param(name=field_name,
-                         description=field_schema.get('description', ''),
-                         param_type=type,
-                         default_value=field_schema.get('default', ''),
-                         required=field_schema.get('required', is_required),
-                         minimum=field_schema.get('minimum', 0),
-                         maximum=field_schema.get('maximum', 2000),
-                         enum=field_schema.get('enum', []))
-
-        required = field_schema.get('required', [])
-        schemas = []
-        if type == "object":
-            properties = field_schema.get('properties', {})
-            for name, schema in properties.items():
-                if field_name in required:
-                    schemas.append(OptimizationTaskExecutor._parse_to_sdk_param(name, schema, True))
-                else:
-                    schemas.append(OptimizationTaskExecutor._parse_to_sdk_param(name, schema))
-            return Param(name=field_name,
-                         description=field_schema.get('description', ''),
-                         param_type=type,
-                         schema=schemas)
-        else:
-            items = field_schema.get('items', {})
-            schemas.append(Param(name=field_name,
-                                 description=items.get('description', ''),
-                                 param_type=type,
-                                 default_value=items.get('default', ''),
-                                 required=items.get('required', is_required),
-                                 minimum=items.get('minimum', 0),
-                                 maximum=items.get('maximum', 2000),
-                                 enum=items.get('enum', [])))
-            return Param(name=field_name,
-                         description=field_schema.get('description', ''),
-                         param_type=type,
-                         schema=schemas)
-
-    @staticmethod
     def _convert_agent_tools_to_local_function(agent_tools: List[Dict[str, Any]]) -> List[LocalFunction]:
         """将agentTools转换为LocalFunction列表"""
 
@@ -412,21 +371,21 @@ class OptimizationTaskExecutor:
                 continue
 
             function_data = tool.get("function", {})
-            name = function_data.get("name", "")
-            description = function_data.get("description", "")
             parameters = function_data.get("parameters", {})
 
             # 解析参数
-            params_list = []
             properties = parameters.get("properties", {})
-
             required_list = parameters.get("required", [])
-            param_name_list = []
 
+            param_name_list = []
             for field_name, field_schema in properties.items():
                 param_name_list.append(field_name)
-                params_list.append(OptimizationTaskExecutor._parse_to_sdk_param(field_name, field_schema, (field_name in required_list)))
 
+            tool_card = ToolCard(
+                name=function_data.get("name", ""),
+                description=function_data.get("description", ""),
+                input_params=parameters
+            )
             # 验证必选参数都出现在param_name_list中
             missing_required = [req for req in required_list if req not in param_name_list]
             if missing_required:
@@ -434,9 +393,8 @@ class OptimizationTaskExecutor:
                 continue
             # 创建LocalFunction对象
             local_function = LocalFunction(
-                name=name,
-                description=description,
-                params=params_list
+                card=tool_card,
+                func=lambda a: a
             )
 
             local_functions.append(local_function)
@@ -591,6 +549,15 @@ class OptimizationTaskExecutor:
             logger.warning(f"优化任务执行异常: {e}")
             raise
 
+    @staticmethod
+    def _build_tool_info(tool):
+        return ToolInfo(
+            type=tool.card.input_params.get("type", "function"),
+            name=tool.card.name,
+            description=tool.card.description,
+            parameters=tool.card.input_params
+        )
+
     def _execute_optimization_core(self, task_id: str, creation_info: OptimizeTaskCreationRequest,
                                    space_id: str, user_id: str, model_info: Dict[str, Any],
                                    assistant_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -599,7 +566,7 @@ class OptimizationTaskExecutor:
 
             # 转换agent_tools为ToolInfo列表
             tools = OptimizationTaskExecutor._convert_agent_tools_to_local_function(creation_info.agent_tools)
-            tool_info_list = [tool.get_tool_info() for tool in tools]
+            tool_info_list = [OptimizationTaskExecutor._build_tool_info(tool) for tool in tools]
             for tool_info in tool_info_list:
                 logger.info("tool_info:\n", tool_info.model_dump())
 
