@@ -514,7 +514,8 @@ const MemoryBaseEditorPage: React.FC = () => {
       }
       setTotalMemories(filtered.length);
       // 分页
-      filtered = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+      setCurrentPage(1);
+      filtered = filtered.slice(0, pageSize);
       setFilteredMemories(filtered);
       return;
     }
@@ -534,7 +535,8 @@ const MemoryBaseEditorPage: React.FC = () => {
       }
       setTotalMemories(filtered.length);
       // 分页
-      filtered = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+      setCurrentPage(1);
+      filtered = filtered.slice(0, pageSize);
       setFilteredMemories(filtered);
       return
     }
