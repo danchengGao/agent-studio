@@ -508,7 +508,7 @@ const MemoryBaseEditorPage: React.FC = () => {
       }
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
-        filtered = allMemories.filter(mem => 
+        filtered = filtered.filter(mem => 
           mem.content.toLowerCase().includes(term)
         );
       }
@@ -523,6 +523,13 @@ const MemoryBaseEditorPage: React.FC = () => {
       filtered = allMemories.filter(mem => 
         mem.content.toLowerCase().includes(term)
       );
+      if (selectedTypeFilter !== 'all') {
+        if (selectedTypeFilter === 'longterm') {
+          filtered = filtered.filter(mem => mem.type !== 'variable' && mem.type !== 'summary' );
+        } else {
+          filtered = filtered.filter(mem => mem.type === selectedTypeFilter);
+        }
+      }
       setTotalMemories(filtered.length);
       setFilteredMemories(filtered);
       return
