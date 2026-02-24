@@ -6,6 +6,7 @@ import json
 import os
 import time
 import hashlib
+import ast
 from typing import List, Dict, Any
 
 from concurrent.futures import TimeoutError as FutureTimeoutError
@@ -28,28 +29,33 @@ from openjiuwen_studio.ops.modules.prompt.domain.entities import (
 
 from openjiuwen_studio.ops.modules.prompt.infra.database import get_db_ops
 from openjiuwen_studio.ops.modules.prompt.infra.repositories.job_repo import SQLJobRepository
-
 from openjiuwen_studio.ops.modules.llm.llm_config_service import LLMConfigService
-from openjiuwen_studio.routers.prompt_llm_router import get_llm_config_service
 from openjiuwen_studio.ops.common.handle_exceptions_util import handle_exceptions
+from openjiuwen_studio.routers.prompt_llm_router import get_llm_config_service
+from openjiuwen_studio.core.utils.compatible_field import compatible_provider, mask_sensitive_fields
+from openjiuwen_studio.core.common.language_thread_context import get_language
+from openjiuwen_studio.core.manager.login_manager.space import check_user_space
+from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 
-from openjiuwen.agent.chat_agent import create_chat_agent_config, create_chat_agent
-from openjiuwen.agent.config.base import LLMCallConfig
-from openjiuwen.core.utils.llm.base import BaseModelInfo
-from openjiuwen.agent_builder.tune.optimizer.joint_optimizer import JointOptimizer
-from openjiuwen.agent_builder.tune.evaluator.evaluator import DefaultEvaluator
-from openjiuwen.agent_builder.tune.base import Case, EvaluatedCase
-from openjiuwen.core.utils.tool.schema import ToolInfo, ToolCall
-from openjiuwen.agent_builder.tune.trainer.trainer import Trainer
-from openjiuwen.agent_builder.tune.dataset.case_loader import CaseLoader
-from openjiuwen.core.component.common.configs.model_config import ModelConfig
-
-from openjiuwen.agent_builder.tune.trainer.base import Callbacks, Progress
-from openjiuwen.agent_builder.prompt_builder.builder.meta_template_builder import MetaTemplateBuilder
-from openjiuwen.agent_builder.prompt_builder.builder.feedback_prompt_builder import FeedbackPromptBuilder
-from openjiuwen.agent_builder.prompt_builder.builder.badcase_prompt_builder import BadCasePromptBuilder
+from openjiuwen.dev_tools.tune.chat_agent.chat_agent import create_chat_agent_config, create_chat_agent
+from openjiuwen.dev_tools.tune.optimizer.joint_optimizer import JointOptimizer
+from openjiuwen.dev_tools.tune.evaluator.evaluator import DefaultEvaluator
+from openjiuwen.dev_tools.tune.base import Case, EvaluatedCase
+from openjiuwen.dev_tools.tune.trainer.base import Progress, Callbacks
+from openjiuwen.core.single_agent.legacy import LLMCallConfig
+from openjiuwen.core.common.schema import Param
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.utils.tool.function.function import LocalFunction, Param
+from openjiuwen.core.foundation.llm import ToolCall
+from openjiuwen.core.foundation.tool import ToolInfo
+from openjiuwen.core.foundation.llm.schema.mode_info import BaseModelInfo
+from openjiuwen.core.foundation.tool.function.function import LocalFunction
+from openjiuwen.core.foundation.tool import ToolCard
+from openjiuwen.core.foundation.llm import Model, ModelRequestConfig, ModelClientConfig  # from ModelConfig
+from openjiuwen.dev_tools.tune.trainer.trainer import Trainer
+from openjiuwen.dev_tools.tune.dataset.case_loader import CaseLoader
+from openjiuwen.dev_tools.prompt_builder.builder.meta_template_builder import MetaTemplateBuilder
+from openjiuwen.dev_tools.prompt_builder.builder.feedback_prompt_builder import FeedbackPromptBuilder
+from openjiuwen.dev_tools.prompt_builder.builder.badcase_prompt_builder import BadCasePromptBuilder
 
 router = APIRouter(prefix="/api/v1/prompts/tuning", tags=["prompt tuning"])
 
@@ -129,7 +135,7 @@ class ModelConfigConverter:
         result["params"]["timeout"] = headers.get("timeout") if headers.get(
             "timeout", None) is not None else model_config_info["params"]["timeout"]
 
-        logger.info(f"convert_to_sdk_format model config : {result}")
+        logger.info(f"convert_to_sdk_format model config : {mask_sensitive_fields(result)}")
         return result
 
 
@@ -357,48 +363,6 @@ class OptimizationTaskExecutor:
         return type in ["object", "array"]
 
     @staticmethod
-    def _parse_to_sdk_param(field_name: str, field_schema: dict, is_required: bool = False) -> Param:
-        type = field_schema.get('type', 'string')
-
-        if not OptimizationTaskExecutor._is_nested_type(type):
-            return Param(name=field_name,
-                         description=field_schema.get('description', ''),
-                         param_type=type,
-                         default_value=field_schema.get('default', ''),
-                         required=field_schema.get('required', is_required),
-                         minimum=field_schema.get('minimum', 0),
-                         maximum=field_schema.get('maximum', 2000),
-                         enum=field_schema.get('enum', []))
-
-        required = field_schema.get('required', [])
-        schemas = []
-        if type == "object":
-            properties = field_schema.get('properties', {})
-            for name, schema in properties.items():
-                if field_name in required:
-                    schemas.append(OptimizationTaskExecutor._parse_to_sdk_param(name, schema, True))
-                else:
-                    schemas.append(OptimizationTaskExecutor._parse_to_sdk_param(name, schema))
-            return Param(name=field_name,
-                         description=field_schema.get('description', ''),
-                         param_type=type,
-                         schema=schemas)
-        else:
-            items = field_schema.get('items', {})
-            schemas.append(Param(name=field_name,
-                                 description=items.get('description', ''),
-                                 param_type=type,
-                                 default_value=items.get('default', ''),
-                                 required=items.get('required', is_required),
-                                 minimum=items.get('minimum', 0),
-                                 maximum=items.get('maximum', 2000),
-                                 enum=items.get('enum', [])))
-            return Param(name=field_name,
-                         description=field_schema.get('description', ''),
-                         param_type=type,
-                         schema=schemas)
-
-    @staticmethod
     def _convert_agent_tools_to_local_function(agent_tools: List[Dict[str, Any]]) -> List[LocalFunction]:
         """将agentTools转换为LocalFunction列表"""
 
@@ -409,21 +373,21 @@ class OptimizationTaskExecutor:
                 continue
 
             function_data = tool.get("function", {})
-            name = function_data.get("name", "")
-            description = function_data.get("description", "")
             parameters = function_data.get("parameters", {})
 
             # 解析参数
-            params_list = []
             properties = parameters.get("properties", {})
-
             required_list = parameters.get("required", [])
-            param_name_list = []
 
+            param_name_list = []
             for field_name, field_schema in properties.items():
                 param_name_list.append(field_name)
-                params_list.append(OptimizationTaskExecutor._parse_to_sdk_param(field_name, field_schema, (field_name in required_list)))
 
+            tool_card = ToolCard(
+                name=function_data.get("name", ""),
+                description=function_data.get("description", ""),
+                input_params=parameters
+            )
             # 验证必选参数都出现在param_name_list中
             missing_required = [req for req in required_list if req not in param_name_list]
             if missing_required:
@@ -431,9 +395,8 @@ class OptimizationTaskExecutor:
                 continue
             # 创建LocalFunction对象
             local_function = LocalFunction(
-                name=name,
-                description=description,
-                params=params_list
+                card=tool_card,
+                func=lambda a: a
             )
 
             local_functions.append(local_function)
@@ -445,23 +408,27 @@ class OptimizationTaskExecutor:
     @staticmethod
     def _create_agent(prompt: str, llm_config: Dict[str, Any], tools: List = None):
         """创建聊天Agent"""
-        model = ModelConfig(
-            model_provider=llm_config.get("provider"),
-            model_info=BaseModelInfo(
-                api_base=llm_config.get("base_url"),
-                api_key=llm_config.get("api_key"),
-                model=llm_config.get("model_name"),
-                top_p=llm_config.get("params").get("top_p"),
-                temperature=llm_config.get("params").get("temperature"),
-                timeout=llm_config.get("params").get("timeout"),
-            )
+        model_client_config = ModelClientConfig(
+            client_provider=compatible_provider(llm_config.get("provider")),
+            api_base=llm_config.get("base_url"),
+            api_key=llm_config.get("api_key"),
+            timeout=llm_config.get("params").get("timeout"),
+            verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
+        )
+        model_config = ModelRequestConfig(
+            model=llm_config.get("model_name"),
+            top_p=llm_config.get("params").get("top_p"),
+            temperature=llm_config.get("params").get("temperature"),
+            max_tokens=llm_config.get("max_tokens"),
         )
 
         logger.info(
-            f"_create_agent model_config base_url: {model.model_info.api_base}   model_name: {model.model_info.model_name}")
+            f"_create_agent model_config base_url: {model_client_config.api_base} "
+            f"model_name: {model_config.model_name}")
 
         llm_call_config = LLMCallConfig(
-            model=model,
+            model=model_config,
+            model_client=model_client_config,
             system_prompt=[{"role": "system", "content": prompt}],
             user_prompt=[{"role": "user", "content": "{{query}}"}]
         )
@@ -479,21 +446,23 @@ class OptimizationTaskExecutor:
     @staticmethod
     def _create_trainer(llm_config: Dict[str, Any], optimize_config: Dict[str, Any]):
         """创建训练器"""
-        # 构建模型配置
-        config = ModelConfig(
-            model_provider=llm_config.get("provider"),
-            model_info=BaseModelInfo(
-                api_base=llm_config.get("base_url"),
-                api_key=llm_config.get("api_key"),
-                model=llm_config.get("model_name"),
-                top_p=llm_config.get("params").get("top_p"),
-                temperature=llm_config.get("params").get("temperature"),
-                timeout=llm_config.get("params").get("timeout"),
-            )
+        model_client_config = ModelClientConfig(
+            client_provider=compatible_provider(llm_config.get("provider")),
+            api_base=llm_config.get("base_url"),
+            api_key=llm_config.get("api_key"),
+            timeout=llm_config.get("params").get("timeout"),
+            verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
+        )
+        model_config = ModelRequestConfig(
+            model=llm_config.get("model_name"),
+            top_p=llm_config.get("params").get("top_p"),
+            temperature=llm_config.get("params").get("temperature"),
+            max_tokens=llm_config.get("max_tokens"),
         )
 
         logger.info(
-            f"_create_trainer model_config base_url: {config.model_info.api_base}   model_name: {config.model_info.model_name}")
+            f"_create_trainer model_config base_url: {model_client_config.api_base} "
+            f"model_name: {model_config.model_name}")
 
         # 构建评估指标
         metric_parts = []
@@ -508,13 +477,15 @@ class OptimizationTaskExecutor:
 
         # 创建优化器
         optimizer = JointOptimizer(
-            model_config=config,
+            model_config=model_config,
+            model_client_config=model_client_config,
             num_examples=optimize_config.get("example_num", 0)
         )
 
         # 创建评估器
         evaluator = DefaultEvaluator(
-            model_config=config,
+            model_config=model_config,
+            model_client_config=model_client_config,
             metric=metric
         )
         llm_parallel_num = optimize_config.get("llm_parallel", 1)
@@ -580,6 +551,15 @@ class OptimizationTaskExecutor:
             logger.warning(f"优化任务执行异常: {e}")
             raise
 
+    @staticmethod
+    def _build_tool_info(tool):
+        return ToolInfo(
+            type=tool.card.input_params.get("type", "function"),
+            name=tool.card.name,
+            description=tool.card.description,
+            parameters=tool.card.input_params
+        )
+
     def _execute_optimization_core(self, task_id: str, creation_info: OptimizeTaskCreationRequest,
                                    space_id: str, user_id: str, model_info: Dict[str, Any],
                                    assistant_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -588,7 +568,7 @@ class OptimizationTaskExecutor:
 
             # 转换agent_tools为ToolInfo列表
             tools = OptimizationTaskExecutor._convert_agent_tools_to_local_function(creation_info.agent_tools)
-            tool_info_list = [tool.get_tool_info() for tool in tools]
+            tool_info_list = [OptimizationTaskExecutor._build_tool_info(tool) for tool in tools]
             for tool_info in tool_info_list:
                 logger.info("tool_info:\n", tool_info.model_dump())
 
@@ -700,11 +680,13 @@ def generate_optimize_task_job_id(body: dict) -> str:
 async def prompt_optimize(
         request: Request,
         workspace_id: str = Query(..., title="空间ID"),
-        user_id: str = Query(..., title="用户ID"),
         llm_service: LLMConfigService = Depends(get_llm_config_service),
-        app_service: JobService = Depends(get_job_service)
+        app_service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)
 ):
     """创建提示词优化任务"""
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
 
     # 解析请求体
     body = await request.json()
@@ -788,10 +770,12 @@ async def prompt_optimize(
 def prompt_optimize_progress(
         job_id: str,
         workspace_id: str = Query(..., title="空间ID"),
-        user_id: str = Query(..., title="用户ID"),
-        service: JobService = Depends(get_job_service)
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)
 ):
     """prompt_optimize_progress"""
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     job_info = service.get_job_info(workspace_id, user_id, job_id)
 
     if job_info is None:
@@ -802,13 +786,14 @@ def prompt_optimize_progress(
 
 @router.post("/templates_optimization/jobs/get_infos", response_model=OptimizeTaskGetInfoResponse)
 @handle_exceptions(response_model=OptimizeTaskGetInfoResponse)
-def prompt_optimize_progress_list(request: OptimizeTaskGetInfoRequest,
-                                        workspace_id: str = Query(..., title="space ID"),
-                                        user_id: str = Query(..., title="User ID"),
-                                        service: JobService = Depends(get_job_service)
-                                        ):
+def prompt_optimize_progress_list(
+        request: OptimizeTaskGetInfoRequest,
+        workspace_id: str = Query(..., title="space ID"),
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)):
     """prompt_optimize_progress_list"""
-
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     return service.get_jobs(workspace_id, user_id, request.id_list)
 
 
@@ -816,12 +801,13 @@ def prompt_optimize_progress_list(request: OptimizeTaskGetInfoRequest,
 @handle_exceptions(response_model=BaseResponse)
 def prompt_optimize_delete(job_id: str,
                            workspace_id: str = Query(..., title="space ID"),
-                           user_id: str = Query(..., title="User ID"),
                            job_type: str = Query("formal", title="Job typpe"),
-                           service: JobService = Depends(get_job_service)
+                           service: JobService = Depends(get_job_service),
+                           current_user: dict = Depends(get_current_user)
                            ):
     """prompt_optimize_delete"""
-
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     # 删除草稿类型任务
     if job_type == "draft":
         service.del_draft(workspace_id, user_id, job_id)
@@ -838,10 +824,12 @@ def prompt_optimize_delete(job_id: str,
 @handle_exceptions(response_model=JobDraftCreateResponse)
 async def save_draft(request: Request,
                workspace_id: str = Query(..., title="space ID"),
-               user_id: str = Query(..., title="User ID"),
                draft_id: str = Query("", title="Draft ID"),
-               service: JobService = Depends(get_job_service)):
+               service: JobService = Depends(get_job_service),
+               current_user: dict = Depends(get_current_user)):
     """用户job任务草稿保存"""
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     body = await request.json()
     process_job_draft_body(body)
     creation_info = OptimizeTaskCreationRequest(**body)
@@ -857,12 +845,14 @@ async def save_draft(request: Request,
 @handle_exceptions(response_model=entities.JobDraftResponse)
 def get_draft(
         workspace_id: str = Query(..., title="space ID"),
-        user_id: str = Query(..., title="User ID"),
         draft_id: str = Query(..., title="Draft ID"),
-        service: JobService = Depends(get_job_service)):
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)):
     """
     获取用户job任务草稿
     """
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     draft = service.get_draft(workspace_id, user_id, draft_id)
 
     if draft is None:
@@ -876,14 +866,16 @@ def get_draft(
 def get_history(
         job_id: str,
         workspace_id: str = Query(..., title="space ID"),
-        user_id: str = Query(..., title="User ID"),
         page_num: int = Query(default=0, description="页码"),
         page_size: int = Query(default=5, description="每页数量"),
         iteration_round: int = Query(default=None, description="迭代轮次"),
-        service: JobService = Depends(get_job_service)):
+        service: JobService = Depends(get_job_service),
+        current_user: dict = Depends(get_current_user)):
     """
     获取用户job任务草稿
     """
+    _ = check_user_space(workspace_id, current_user)
+    user_id = current_user.get("data")["user_id_str"]
     if iteration_round is None:
         return entities.GetOptimizeResponse(code=404, msg=f"缺少关键参数iteration_round", history=[])
     job_info = service.get_job_info(workspace_id, user_id, job_id)
@@ -914,12 +906,12 @@ def get_history(
     return entities.GetOptimizeResponse(code=200, msg=f"未找到iteration_round为{iteration_round}的历史记录", history=[])
 
 
-def wrap_sse_generator(original_generator):
+async def wrap_sse_generator(original_generator):
     """
     将原始生成器的输出包装成SSE规范格式
     SSE要求每个数据块以"data: "开头，两个换行(\n\n)结尾
     """
-    for content in original_generator:
+    async for content in original_generator:
         if content:
             res = json.dumps({"content": content})
             yield f"data: {res}\n"
@@ -929,7 +921,8 @@ def wrap_sse_generator(original_generator):
 @handle_exceptions()
 async def prompt_generate(
         request: Request,
-        llm_service: LLMConfigService = Depends(get_llm_config_service)
+        llm_service: LLMConfigService = Depends(get_llm_config_service),
+        current_user: dict = Depends(get_current_user)
 ):
     """prompt一键生成接口"""
 
@@ -945,9 +938,11 @@ async def prompt_generate(
         stream = body.get("stream", True)
         tools = body.get("tools")
         template_info = body.get("templateInfo", {})
+        workspace_id = body.get("workspace_id")
         meta_template_type = template_info.get("metaTemplateType", "general")
 
         # 2. 参数验证
+        _ = check_user_space(workspace_id, current_user)
         if not instruct:
             return JSONResponse(
                 content={"error": "instruct parameter is required"},
@@ -968,19 +963,20 @@ async def prompt_generate(
             )
 
             # 初始化ModelConfig
-            model_config = ModelConfig(
-                model_provider=llm_config.get("provider"),
-                model_info=BaseModelInfo(
-                    api_base=llm_config.get("base_url"),
-                    api_key=llm_config.get("api_key"),
-                    model=llm_config.get("model_name"),
-                    top_p=llm_config.get("params").get("top_p"),
-                    temperature=llm_config.get("params").get("temperature"),
-                    timeout=llm_config.get("params").get("timeout"),
-                )
+            model_client_config = ModelClientConfig(
+                client_provider=compatible_provider(llm_config.get("provider")),
+                api_base=llm_config.get("base_url"),
+                api_key=llm_config.get("api_key"),
+                timeout=llm_config.get("params").get("timeout"),
+                verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
             )
-
-            logger.info(f"prompt_generate model_config: {model_config}")
+            model_config = ModelRequestConfig(
+                model=llm_config.get("model_name"),
+                top_p=llm_config.get("params").get("top_p"),
+                temperature=llm_config.get("params").get("temperature"),
+                max_tokens=llm_config.get("max_tokens"),
+            )
+            logger.info(f"prompt_generate model_config: {model_config}, model_client_config: {model_client_config}")
 
         elif model_from == "user":
             # 从用户请求体中提取模型配置
@@ -994,18 +990,18 @@ async def prompt_generate(
                 )
 
             # 初始化BaseModelInfo
-            model_config = ModelConfig(
-                model_provider=model_provider,
-                model_info=BaseModelInfo(
-                    api_base=model_info.get("api_base", ""),
-                    api_key=model_info.get("api_key", ""),
-                    model=model_info.get("model_type", ""),
-                    temperature=model_info.get("temperature", 0.95),
-                    top_p=model_info.get("top_p", 0.1),
-                    streaming=model_info.get("streaming", False),
-                    timeout=model_info.get("timeout", 60),
-                    model_type=model_info.get("model_type", ""),
-                )
+            model_client_config = ModelClientConfig(
+                client_provider=compatible_provider(model_info.get("provider", "")),
+                api_base=model_info.get("base_url", ""),
+                api_key=model_info.get("api_key", ""),
+                timeout=model_info.get("params").get("timeout", 60),
+                verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
+            )
+            model_config = ModelRequestConfig(
+                model=model_info.get("model_name", ""),
+                top_p=model_info.get("params").get("top_p", 0.1),
+                temperature=model_info.get("params").get("temperature", 0.95),
+                max_tokens=model_info.get("max_tokens", 2000),
             )
 
         else:
@@ -1016,7 +1012,10 @@ async def prompt_generate(
             )
 
         # 4. 初始化MetaTemplateBuilder
-        builder = MetaTemplateBuilder(model_config)
+        builder = MetaTemplateBuilder(
+            model_config=model_config,
+            model_client_config=model_client_config,
+        )
 
         # 5. 确定模板类型
         template_type = "general"
@@ -1032,11 +1031,12 @@ async def prompt_generate(
                 prompt=instruct,
                 tools=tools,
                 template_type=template_type,
+                language="zh-CN" if get_language() in ("zh-cn", "zh") else "en-US",
                 custom_template_name=meta_template_type if template_type == "other" else None
             )
             sse_stream = wrap_sse_generator(stream_generator)
             return StreamingResponse(
-                iterate_in_threadpool(sse_stream),
+                sse_stream,
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
@@ -1050,6 +1050,7 @@ async def prompt_generate(
                 prompt=instruct,
                 tools=tools,
                 template_type=template_type,
+                language="zh-CN" if get_language() in ("zh-cn", "zh") else "en-US",
                 custom_template_name=meta_template_type if template_type == "other" else None
             )
             return JSONResponse(content={
@@ -1074,7 +1075,8 @@ async def prompt_generate(
 @handle_exceptions()
 async def optimize_feedback(
         request: Request,
-        llm_service: LLMConfigService = Depends(get_llm_config_service)
+        llm_service: LLMConfigService = Depends(get_llm_config_service),
+        current_user: dict = Depends(get_current_user)
 ) -> Response:
     """基于反馈优化prompt"""
 
@@ -1091,6 +1093,9 @@ async def optimize_feedback(
         end_pos = body.get("end_pos")
         stream = body.get("stream", True)
         model_headers = body.get("modelInfo", {}).get("headers", {})
+        workspace_id = body.get("workspace_id")
+
+        _ = check_user_space(workspace_id, current_user)
 
         # 2. 使用convert_to_sdk_format获取模型配置
         model_info_dict = {
@@ -1102,20 +1107,25 @@ async def optimize_feedback(
         llm_config = ModelConfigConverter.convert_to_sdk_format(
             llm_service, model_info_dict
         )
-        # 4. 初始化MetaTemplateBuilder
-        model_config = ModelConfig(
-                model_provider=llm_config.get("provider"),
-                model_info=BaseModelInfo(
-                    api_base=llm_config.get("base_url"),
-                    api_key=llm_config.get("api_key"),
-                    model=llm_config.get("model_name"),
-                    top_p=llm_config.get("params").get("top_p"),
-                    temperature=llm_config.get("params").get("temperature"),
-                    timeout=llm_config.get("params").get("timeout"),
-                )
-            )
+        # 4. 初始化FeedbackPromptBuilder
+        model_client_config = ModelClientConfig(
+            client_provider=compatible_provider(llm_config.get("provider")),
+            api_base=llm_config.get("base_url"),
+            api_key=llm_config.get("api_key"),
+            timeout=llm_config.get("params").get("timeout"),
+            verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
+        )
+        model_config = ModelRequestConfig(
+            model=llm_config.get("model_name"),
+            top_p=llm_config.get("params").get("top_p"),
+            temperature=llm_config.get("params").get("temperature"),
+            max_tokens=llm_config.get("max_tokens"),
+        )
         logger.info(f"optimize_feedback model_config： {model_config}")
-        builder = FeedbackPromptBuilder(model_config)
+        builder = FeedbackPromptBuilder(
+            model_config=model_config,
+            model_client_config=model_client_config,
+        )
 
         # 6. 根据stream参数调用不同方法
         if stream:
@@ -1125,11 +1135,12 @@ async def optimize_feedback(
                 feedback=feedback,
                 mode=mode,
                 start_pos=start_pos,
-                end_pos=end_pos
+                end_pos=end_pos,
+                language="zh-CN" if get_language() in ("zh-cn", "zh") else "en-US",
             )
             sse_stream = wrap_sse_generator(stream_generator)
             return StreamingResponse(
-                iterate_in_threadpool(sse_stream),
+                sse_stream,
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
@@ -1144,7 +1155,8 @@ async def optimize_feedback(
                 feedback=feedback,
                 mode=mode,
                 start_pos=start_pos,
-                end_pos=end_pos
+                end_pos=end_pos,
+                language="zh-CN" if get_language() in ("zh-cn", "zh") else "en-US",
             )
             return JSONResponse(content={
                 "content": result,
@@ -1168,7 +1180,8 @@ async def optimize_feedback(
 @handle_exceptions()
 async def prompt_bad_cases(
         request: Request,
-        llm_service: LLMConfigService = Depends(get_llm_config_service)
+        llm_service: LLMConfigService = Depends(get_llm_config_service),
+        current_user: dict = Depends(get_current_user)
 ) -> Response:
     """基于反馈优化prompt"""
     try:
@@ -1181,9 +1194,13 @@ async def prompt_bad_cases(
         badcases = body.get("badcases", [{}])
         stream = body.get("stream", True)
         model_headers = body.get("modelInfo", {}).get("headers", {})
+        workspace_id = body.get("workspace_id")
+
+        _ = check_user_space(workspace_id, current_user)
+
         cases = []
         for badcase in badcases:
-            messages = eval(badcase.get('query', ''))
+            messages = ast.literal_eval(badcase.get('query', ''))
             query, answer = '', ''
             if messages[-1][-1].get('role') == 'assistant':
                 answer = {'answer': messages[-1][-1].get('content', '')}
@@ -1207,31 +1224,37 @@ async def prompt_bad_cases(
             llm_service, model_info_dict
         )
 
-        # 4. 初始化MetaTemplateBuilder
-        model_config = ModelConfig(
-            model_provider=llm_config.get("provider"),
-            model_info=BaseModelInfo(
-                api_base=llm_config.get("base_url"),
-                api_key=llm_config.get("api_key"),
-                model=llm_config.get("model_name"),
-                top_p=llm_config.get("params").get("top_p"),
-                temperature=llm_config.get("params").get("temperature"),
-                timeout=llm_config.get("params").get("timeout"),
-            )
+        # 4. 初始化BadCasePromptBuilder
+        model_client_config = ModelClientConfig(
+            client_provider=compatible_provider(llm_config.get("provider")),
+            api_base=llm_config.get("base_url"),
+            api_key=llm_config.get("api_key"),
+            timeout=llm_config.get("params").get("timeout"),
+            verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
         )
-        logger.info(f"prompt_bad_cases model_config : {model_config}")
-        builder = BadCasePromptBuilder(model_config)
+        model_config = ModelRequestConfig(
+            model=llm_config.get("model_name"),
+            top_p=llm_config.get("params").get("top_p"),
+            temperature=llm_config.get("params").get("temperature"),
+            max_tokens=llm_config.get("max_tokens"),
+        )
+        logger.info(f"optimize_feedback model_config： {model_config}")
+        builder = BadCasePromptBuilder(
+            model_config=model_config,
+            model_client_config=model_client_config,
+        )
 
         # 6. 根据stream参数调用不同方法
         if stream:
             # 流式输出
             stream_generator = builder.stream_build(
                 prompt=prompt,
-                cases=cases
+                cases=cases,
+                language="zh-CN" if get_language() in ("zh-cn", "zh") else "en-US",
             )
             sse_stream = wrap_sse_generator(stream_generator)
             return StreamingResponse(
-                iterate_in_threadpool(sse_stream),
+                sse_stream,
                 media_type="text/event-stream",
                 headers={
                     "Cache-Control": "no-cache",
@@ -1243,7 +1266,8 @@ async def prompt_bad_cases(
             # 非流式输出
             result = builder.build(
                 prompt=prompt,
-                cases=cases
+                cases=cases,
+                language="zh-CN" if get_language() in ("zh-cn", "zh") else "en-US",
             )
             return JSONResponse(content={
                 "content": result,

@@ -1,0 +1,95 @@
+/**
+ * 业务组件类 - 项目自定义的组件级样式
+ * 使用 @layer components 保证优先级正确
+ */
+
+@layer components {
+  /* ========== 卡片阴影 hover（ConfigCard 等） ========== */
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 180ms ease, transform 180ms ease, background 180ms ease;
+  }
+  .shadow-card-hover:hover {
+    background-color: transparent;
+    background-image: url(/images/card-hover.svg);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
+
+  /* ========== 全局 ========== */
+  .global-bg {
+    background-color: var(--global-bg-page);
+  }
+
+  /* ========== 菜单 ========== */
+  .menu-item-active {
+    background: linear-gradient(104.07deg, rgba(26, 203, 255, 0.1) 0%, rgba(95, 12, 255, 0.1) 100%);
+    color: var(--primary-color);
+  }
+  .menu-item-active:hover {
+    background: linear-gradient(104.07deg, rgba(26, 203, 255, 0.1) 0%, rgba(95, 12, 255, 0.1) 100%);
+    color: var(--primary-color);
+  }
+
+  .menu-item-hover:hover:not(.menu-item-active) {
+    background-color: var(--menu-hover-bg);
+    color: var(--menu-hover-text);
+  }
+
+  .menu-text {
+    color: var(--text-gray);
+    @apply font-medium;
+  }
+
+  .menu-section-title {
+    color: var(--menu-section-text);
+    @apply font-normal;
+  }
+
+  /* ========== 主按钮 ========== */
+  .btn-primary {
+    border-radius: 4px;
+    background: var(--primary-gradient);
+    color: white !important;
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    color: white !important;
+    cursor: not-allowed;
+  }
+
+  /* ========== 登录页 ========== */
+  .btn-login {
+    width: 100%;
+    height: 36px;
+    border-radius: 4px;
+    background: linear-gradient(90.12deg, #9628ff 0%, #263eff 50%, #1acbff 100%);
+    color: white;
+  }
+
+  .login-card-bg {
+    background-color: var(--global-bg-white);
+  }
+
+  .openjiuwen-login-logo {
+    color: var(--text-black);
+    @apply font-extrabold text-2xl;
+  }
+
+  .openjiuwen-login-title {
+    color: var(--text-black);
+    @apply font-bold;
+    font-size: 22px;
+  }
+
+  /* ========== Apps 报告：仅居中 div 内的 p（如图表标题） ========== */
+  .markdown-content div[style*="text-align: center"] > p {
+    margin-top: 0.25rem;
+  }
+}

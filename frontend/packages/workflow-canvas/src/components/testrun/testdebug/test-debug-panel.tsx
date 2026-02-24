@@ -95,7 +95,8 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
     if (!node) return null
 
     const registry = node.getNodeRegistry()
-    const icon = registry?.info?.icon
+    const info = typeof registry?.info === 'function' ? registry.info() : registry?.info
+    const icon = info?.icon
     if (!icon) return <MessageSquare size={16} className={styles['interruption-icon']} />
 
     if (typeof icon === 'string') {
@@ -105,7 +106,7 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
     }
   }, [nodeId, document.root.blocks])
 
-  const resetTest = () => {
+  useEffect(() => {
     if (nodeId && lastNodeTestValuesByNodeId.has(nodeId)) {
       const lastValues = lastNodeTestValuesByNodeId.get(nodeId)
       setValues(lastValues || {})
@@ -119,14 +120,18 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
       setValues(preservedValues)
     }
     resetErrors()
-  }
-
-  useEffect(() => {
-    resetTest()
   }, [nodeId])
 
   const handleTestRun = async (currentValues: Record<string, unknown>) => {
-    await execute(currentValues)
+    const valuesWithDefaults: Record<string, unknown> = {}
+    inputFormMeta.forEach(meta => {
+      if (meta.defaultValue !== undefined) {
+        valuesWithDefaults[meta.name] = currentValues[meta.name] ?? meta.defaultValue
+      } else if (currentValues[meta.name] !== undefined) {
+        valuesWithDefaults[meta.name] = currentValues[meta.name]
+      }
+    })
+    await execute(valuesWithDefaults)
   }
 
   const handleCancel = () => {

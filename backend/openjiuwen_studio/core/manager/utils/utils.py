@@ -88,24 +88,35 @@ def check_version(latest: str, current: str) -> tuple[bool, str | None]:
     return True, None
 
 
-def convert_to_properties_format(input_list) -> dict:
+def convert_to_properties_format(input_list):
     """Convert parameter list to properties format"""
 
     properties = {}
+    requires = []
 
     if not input_list:
-        return {}
+        return properties, requires
 
     try:
         for item in input_list:
             property_name = item.get('name')
-            properties[property_name] = {
-                'type': item.get('type'),
-                'description': item.get('description'),
-                'required': item.get('required')
-            }
-
-        return properties
+            param_type = item.get('type')
+            
+            # 处理 date-time 类型：在 JSON Schema 中，date-time 应该作为 format 使用，type 应该是 string
+            if param_type == 'date-time':
+                properties[property_name] = {
+                    'type': 'string',
+                    'format': 'date-time',
+                    'description': item.get('description'),
+                }
+            else:
+                properties[property_name] = {
+                    'type': param_type,
+                    'description': item.get('description'),
+                }
+            if item.get('required') is True:
+                requires.append(property_name)
+        return properties, requires
     except (KeyError, TypeError) as e:
         logger.error(f"[AGENT_CONVERT] failed to convert parameters to properties format - Error: {e}")
         raise ValueError(f"Failed to convert properties format: {e}") from e
@@ -121,11 +132,11 @@ def get_current_project_version() -> str:
         # pyproject.toml is in backend/
         backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file)))))
         pyproject_path = os.path.join(backend_dir, "pyproject.toml")
-        
+
         # Read and parse pyproject.toml
         with open(pyproject_path, "rb") as f:
             pyproject_data = tomllib.load(f)
-        
+
         # Get version from project section
         version = pyproject_data.get("project", {}).get("version", "")
         return version

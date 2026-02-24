@@ -23,6 +23,9 @@ interface UseDebugOptimizeDialogProps {
   abortControllerRef: React.MutableRefObject<AbortController | null>
   badcaseOptimizeStreamingRef: React.MutableRefObject<string>
 
+  // 工作空间
+  workspaceId: string
+
   // 数据
   optimizationSource: OptimizationSource
   promptMessages: PromptMessage[]
@@ -71,6 +74,7 @@ export const useDebugOptimizeDialog = (props: UseDebugOptimizeDialogProps): UseD
     setAiReplyOptimizeDialogOpen,
     abortControllerRef,
     badcaseOptimizeStreamingRef,
+    workspaceId,
     optimizationSource,
     promptMessages,
     setPromptMessages,
@@ -203,6 +207,7 @@ export const useDebugOptimizeDialog = (props: UseDebugOptimizeDialogProps): UseD
 
         await FeedbackOptService.optimizeBadcase(
           request,
+          workspaceId,
           data => {
             // 使用类似快捷优化的流式处理逻辑
             badcaseOptimizeStreamingRef.current += data
@@ -210,7 +215,7 @@ export const useDebugOptimizeDialog = (props: UseDebugOptimizeDialogProps): UseD
           },
           error => {
             // 错误处理
-            const errorMessage = isRetry ? error || '重新优化失败，请重试' : error || 'badcase优化失败，请重试'
+            const errorMessage = isRetry ? error || t('components.prompts.promptEditPage.reoptimizeFailed') : error || t('components.prompts.promptEditPage.badcaseOptimizationFailed')
             setSnackbar({ open: true, message: errorMessage, severity: 'error' })
             setAiReplyOptimizeStep('input')
           },

@@ -180,6 +180,8 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
     codeLanguage: 'python' as 'javascript' | 'python',
   })
   const [deletingToolId, setDeletingToolId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [toolToDelete, setToolToDelete] = useState<PluginCodeInfo | null>(null)
 
   // Tool creation API
   const createCodeToolApi = usePluginCreateCode()
@@ -216,7 +218,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
   const handleCodePluginToolSubmit = async () => {
     // Validate form
     if (!codePluginToolForm.name.trim() || !codePluginToolForm.description.trim() || !codePluginToolForm.runtime || !codePluginToolForm.code.trim()) {
-      showError(t('plugins.messages.fillRequiredFields', '请填写所有必填字段'))
+      showError(t('plugins.messages.fillRequiredFields'))
       return
     }
 
@@ -264,31 +266,37 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
           })
         }
       } else {
-        showError(`${t('plugins.pluginConfig.createFailed')}: ${response.message || t('plugins.messages.unknownError', '未知错误')}`)
+        showError(`${t('plugins.pluginConfig.createFailed')}: ${response.message || t('plugins.messages.unknownError')}`)
       }
     } catch (error: unknown) {
-      console.error('创建工具失败:', error)
-      const errorMessage = error.response?.data?.message || error.message || t('plugins.pluginConfig.createFailedRetry', '创建工具失败，请稍后重试')
+      console.error(t('plugins.pluginConfig.createFailed'), error)
+      const errorMessage = error.response?.data?.message || error.message || t('plugins.pluginConfig.createFailedRetry')
       showError(errorMessage)
     }
   }
 
   const handleDeleteTool = async (tool: PluginCodeInfo) => {
     if (!plugin_id || !tool?.tool_id) return
+    setToolToDelete(tool)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteTool = async () => {
+    if (!toolToDelete || !plugin_id || !toolToDelete?.tool_id) return
 
     try {
-      setDeletingToolId(tool.tool_id)
+      setDeletingToolId(toolToDelete.tool_id)
 
       const deleteRequest = {
         space_id: getDefaultSpaceId(),
         plugin_id,
-        tool_id: tool.tool_id,
+        tool_id: toolToDelete.tool_id,
       }
 
       const response = await deleteToolApi.mutateAsync(deleteRequest)
 
       if (response.code === 200) {
-        showSuccess(t('plugins.pluginConfig.toolDeletedSuccess', { name: tool.name || t('plugins.pluginConfig.unnamedTool', '未命名工具') }))
+        showSuccess(t('plugins.pluginConfig.toolDeletedSuccess', { name: tool.name || t('plugins.pluginConfig.unnamedTool') }))
         // Refresh the tool list after successful deletion (only in edit mode)
         if (configTabValue === 'advanced' && !isReadOnly) {
           setTimeout(async () => {
@@ -296,14 +304,16 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
           }, 5) // Small delay to ensure backend processes deletion
         }
       } else {
-        showError(t('plugins.pluginConfig.deleteFailed', '删除失败: {{message}}').replace('{{message}}', response.message || '未知错误'))
+        showError(`${t('plugins.pluginConfig.deleteFailed')}: ${response.message || t('plugins.messages.unknownError')}`)
       }
     } catch (error: unknown) {
-      console.error('删除工具失败:', error)
-      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.pluginConfig.deleteFailedRetry', '删除工具失败，请稍后重试')
+      console.error(t('plugins.pluginConfig.deleteFailed'), error)
+      const errorMessage = error?.response?.data?.message || error?.message || t('plugins.pluginConfig.deleteFailedRetry')
       showError(errorMessage)
     } finally {
       setDeletingToolId(null)
+      setDeleteDialogOpen(false)
+      setToolToDelete(null)
     }
   }
 
@@ -338,13 +348,13 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
         <div className="text-center">
           <Code className="w-16 h-16 mx-auto mb-4 text-yellow-500" />
           <Typography variant="h6" className="mb-2">
-            {t('plugins.pluginConfig.notFound', '插件未找到')}
+            {t('plugins.pluginConfig.notFound')}
           </Typography>
           <Typography variant="body2" color="text.secondary" className="mb-4">
-            {t('plugins.pluginConfig.checkPluginId', '请检查插件ID是否正确')}
+            {t('plugins.pluginConfig.checkPluginId')}
           </Typography>
           <Button variant="contained" onClick={() => navigate('/dashboard/plugins')}>
-            {t('plugins.actions.returnToPluginManagement', '返回插件管理')}
+            {t('plugins.actions.returnToPluginManagement')}
           </Button>
         </div>
       </div>
@@ -358,7 +368,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
         <div className="mb-8">
           <div className="mb-6 flex items-center justify-between">
             <Button variant="outlined" startIcon={<ArrowLeft className="w-4 h-4" />} onClick={() => navigate('/dashboard/plugins')}>
-              {t('plugins.actions.returnToPluginManagement', '返回插件管理')}
+              {t('plugins.actions.returnToPluginManagement')}
             </Button>
             <Button
               variant="outlined"
@@ -366,7 +376,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               onClick={() => setIsHistoryDialogOpen(true)}
               className="text-blue-600 border-blue-600 hover:bg-blue-50"
             >
-              {t('plugins.actions.versionHistory', '版本历史')}
+              {t('plugins.actions.versionHistory')}
             </Button>
           </div>
 
@@ -382,7 +392,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                     onBlur={handleNameSubmit}
                     size="small"
                     variant="outlined"
-                    placeholder={t('plugins.basicInfo.name', '插件名称')}
+                    placeholder={t('plugins.basicInfo.name')}
                     inputProps={{ maxLength: 128, style: { fontSize: '2rem', fontWeight: 'bold' } }}
                     className="font-bold text-gray-900"
                     autoFocus
@@ -395,7 +405,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                 <div
                   className="cursor-pointer hover:text-blue-600 transition-colors"
                   onClick={handleEditName}
-                  title={t('plugins.actions.editPluginName', '点击编辑插件名称')}
+                  title={t('plugins.actions.editPluginName')}
                 >
                   <Typography variant="h4" className="font-bold text-gray-900 hover:text-blue-600">
                     {configForm.name || plugin.name}
@@ -415,7 +425,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
           <Card className="p-6">
             <Typography variant="h6" className="mb-4 flex items-center">
               <Info className="w-5 h-5 mr-2 text-blue-600" />
-              {t('plugins.basicInfoLabel', '基本信息')}
+              {t('plugins.basicInfoLabel')}
             </Typography>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
@@ -426,7 +436,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               </div>
               <div>
                 <Typography variant="subtitle2" className="font-medium text-gray-700 mb-2">
-                  {t('plugins.versionHistory.pluginType', '插件类型')}
+                  {t('plugins.versionHistory.pluginType')}
                 </Typography>
                 <Typography variant="div" component="div">
                   <Chip label={plugin.category} size="small" />
@@ -439,12 +449,12 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
           <Card className="p-6">
             <Typography variant="h6" className="mb-4 flex items-center">
               <Settings className="w-5 h-5 mr-2 text-purple-600" />
-              {t('plugins.pluginConfig.configOptions', '配置选项')}
+              {t('plugins.pluginConfig.configOptions')}
             </Typography>
 
             <Tabs value={configTabValue} onChange={(e, newValue) => handleTabChange(newValue)} className="mb-6">
-              <Tab label={t('plugins.pluginConfig.basicTab', '基本配置')} value="basic" />
-              <Tab label={t('plugins.pluginConfig.toolsTab', '工具设置')} value="advanced" />
+              <Tab label={t('plugins.pluginConfig.basicTab')} value="basic" />
+              <Tab label={t('plugins.pluginConfig.toolsTab')} value="advanced" />
             </Tabs>
 
             {/* Tab Content */}
@@ -452,28 +462,28 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               <div className="space-y-6">
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-sm font-bold text-gray-800 mb-3">{t('plugins.pluginConfig.pluginDescription', '插件描述')}</label>
+                    <label className="block text-sm font-bold text-gray-800 mb-3">{t('plugins.pluginConfig.pluginDescription')}</label>
                     <TextField
                       fullWidth
                       multiline
                       rows={4}
                       value={configForm.desc}
                       onChange={e => setConfigForm(prev => ({ ...prev, desc: e.target.value }))}
-                      placeholder={t('plugins.pluginConfig.descriptionPlaceholder', '详细描述插件的功能、用途和特性...')}
-                      helperText={`${t('plugins.pluginConfig.descriptionHelper', '详细描述插件的功能和行为，帮助用户了解插件的作用')} (${configForm.desc.length}/258)`}
+                      placeholder={t('plugins.pluginConfig.descriptionPlaceholder')}
+                      helperText={`${t('plugins.pluginConfig.descriptionHelper')} (${configForm.desc.length}/258)`}
                       inputProps={{ maxLength: 258 }}
                       disabled={isReadOnly}
                     />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <label className="block text-sm font-bold text-gray-800">插件详情 (markdown格式)</label>
+                      <label className="block text-sm font-bold text-gray-800">{t('plugins.pluginConfig.pluginDetailsMarkdown')}</label>
                       {configForm.desc_mk && (
                         <IconButton
                           size="small"
                           onClick={() => setIsMarkdownPreviewOpen(true)}
                           className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 -ml-1 -mt-1"
-                          title="预览Markdown"
+                          title={t('plugins.pluginConfig.previewMarkdown')}
                         >
                           <Eye className="w-4 h-4" />
                         </IconButton>
@@ -485,13 +495,13 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                       rows={6}
                       value={configForm.desc_mk || ''}
                       onChange={e => setConfigForm(prev => ({ ...prev, desc_mk: e.target.value }))}
-                      placeholder="支持Markdown格式的详细描述..."
-                      helperText={`使用Markdown语法编写富文本描述 (${(configForm.desc_mk || '').length}字符)`}
+                      placeholder={t('plugins.pluginConfig.markdownDetailedDesc')}
+                      helperText={t('plugins.pluginConfig.useMarkdownSyntax', { count: (configForm.desc_mk || '').length })}
                       disabled={isReadOnly}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-800 mb-3">{t('plugins.versionHistory.pluginIcon', '插件图标')}</label>
+                    <label className="block text-sm font-bold text-gray-800 mb-3">{t('plugins.versionHistory.pluginIcon')}</label>
 
                     {/* Icon selection grid - Hidden in read-only mode */}
                     {!isReadOnly && (
@@ -513,7 +523,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                         {/* Current selection display */}
                         <div className="mt-4 text-center">
                           <Typography variant="body2" className="text-gray-500">
-                            {t('plugins.pluginConfig.currentSelection', '当前选择')}: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
+                            {t('plugins.pluginConfig.currentSelection')}: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
                           </Typography>
                         </div>
                       </>
@@ -527,7 +537,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               <div className="space-y-6">
                 <div className="flex items-center justify-between mb-4">
                   <Typography variant="subtitle2" className="font-medium">
-                    {t('plugins.pluginConfig.codeToolsList', '代码工具列表')}
+                    {t('plugins.pluginConfig.codeToolsList')}
                   </Typography>
                   {currentToolsQuery?.isLoading && <CircularProgress size={20} />}
                 </div>
@@ -535,11 +545,11 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                 {codeTools.length === 0 ? (
                   <div className="bg-gray-50 rounded-lg p-8 text-center">
                     <Typography variant="body1" color="text.secondary" className="mb-4">
-                      {t('plugins.pluginConfig.noToolsConfigured', '暂无工具配置')}
+                      {t('plugins.pluginConfig.noToolsConfigured')}
                     </Typography>
                     {!isReadOnly && (
                       <Button variant="contained" startIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCodePluginToolDialogOpen(true)}>
-                        {t('plugins.pluginConfig.addCodeTool', '添加代码工具')}
+                        {t('plugins.pluginConfig.addCodeTool')}
                       </Button>
                     )}
                   </div>
@@ -564,16 +574,16 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <Typography variant="subtitle1" className="font-medium mb-1">
-                              {tool.name || t('plugins.pluginConfig.unnamedTool', '未命名工具')}
+                              {tool.name || t('plugins.pluginConfig.unnamedTool')}
                             </Typography>
                             <Typography variant="body2" color="text.secondary" className="mb-2">
-                              {tool.desc || t('plugins.pluginConfig.noDescription', '暂无描述')}
+                              {tool.desc || t('plugins.pluginConfig.noDescription')}
                             </Typography>
                             <div className="flex items-center space-x-4 text-sm text-gray-500">
-                              <span>{t('plugins.pluginConfig.language', '语言')}: {tool.language || 'unknown'}</span>
-                              <span>{t('plugins.pluginConfig.codeTool', '代码工具')}</span>
+                              <span>{t('plugins.pluginConfig.language')}: {tool.language || 'unknown'}</span>
+                              <span>{t('plugins.pluginConfig.codeTool')}</span>
                               <Chip
-                                label={tool.available ? t('plugins.pluginConfig.enabled', '启用') : t('plugins.pluginConfig.disabled', '禁用')}
+                                label={tool.available ? t('plugins.actions.enable', '启用') : t('plugins.actions.disable', '禁用')}
                                 size="small"
                                 color={tool.available ? 'success' : 'default'}
                               />
@@ -595,7 +605,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                                     },
                                   })
                                 }}
-                                title={t('plugins.pluginConfig.editTool', '编辑工具')}
+                                title={t('plugins.pluginConfig.editTool')}
                               >
                                 <Edit className="w-4 h-4" />
                               </IconButton>
@@ -608,7 +618,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                                   startIcon={<CircularProgress size={14} />}
                                   sx={{ minWidth: 'auto', fontSize: '0.75rem', padding: '4px 8px' }}
                                 >
-                                  删除中
+                                  {t('plugins.pluginConfig.deleting')}
                                 </Button>
                               ) : (
                                 <IconButton
@@ -617,7 +627,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                                     e.stopPropagation()
                                     handleDeleteTool(tool)
                                   }}
-                                  title={t('plugins.pluginConfig.deleteTool', '删除工具')}
+                                  title={t('plugins.pluginConfig.deleteTool')}
                                 >
                                   <Trash2 className="w-4 h-4 text-red-500 hover:text-red-700" />
                                 </IconButton>
@@ -629,7 +639,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                     {!isReadOnly && (
                       <div className="flex justify-center mt-4">
                         <Button variant="outlined" startIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCodePluginToolDialogOpen(true)}>
-                          {t('plugins.pluginConfig.addNewCodeTool', '添加新代码工具')}
+                          {t('plugins.pluginConfig.addNewCodeTool')}
                         </Button>
                       </div>
                     )}
@@ -645,7 +655,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
         {!isReadOnly && (
           <div className="mt-8 flex justify-end space-x-3">
             <Button variant="outlined" onClick={() => navigate('/dashboard/plugins')}>
-              {t('common.actions.cancel', '取消')}
+              {t('common.actions.cancel')}
             </Button>
             <Button
               variant="contained"
@@ -654,7 +664,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               startIcon={<Rocket className="w-4 h-4" />}
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 mr-3"
             >
-              {t('plugins.pluginConfig.publishPlugin', '发布插件')}
+              {t('plugins.pluginConfig.publishPlugin')}
             </Button>
             <Button
               variant="contained"
@@ -665,10 +675,10 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
               {updatePluginApi.isLoading ? (
                 <div className="flex items-center">
                   <CircularProgress size={16} className="mr-2" />
-                  {t('common.actions.saving', '保存中...')}
+                  {t('common.actions.saving')}
                 </div>
               ) : (
-                t('plugins.config.saveConfig', '保存配置')
+                t('plugins.pluginConfig.saveConfig')
               )}
             </Button>
           </div>
@@ -707,14 +717,41 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
           sx: { maxHeight: '80vh' },
         }}
       >
-        <DialogTitle>Markdown预览</DialogTitle>
+        <DialogTitle>{t('plugins.pluginConfig.markdownPreview')}</DialogTitle>
         <DialogContent dividers>
           <div className="prose prose-sm max-w-none overflow-y-auto" style={{ maxHeight: '60vh' }}>
             <ReactMarkdown>{configForm.desc_mk || ''}</ReactMarkdown>
           </div>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsMarkdownPreviewOpen(false)}>关闭</Button>
+          <Button onClick={() => setIsMarkdownPreviewOpen(false)}>{t('common.actions.close')}</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{t('plugins.tools.deleteDialog.title', '确认删除工具')}</DialogTitle>
+        <DialogContent>
+          <div className="space-y-4 mt-2">
+            <Typography variant="body1">{t('plugins.tools.deleteDialog.content', { name: toolToDelete?.name || '未命名工具' })}</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t('plugins.tools.deleteDialog.warning', '此操作不可撤销，删除后所有相关配置将被永久移除。')}
+            </Typography>
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={deleteToolApi.isLoading}>
+            {t('common.buttons.cancel', '取消')}
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmDeleteTool}
+            disabled={deleteToolApi.isLoading}
+            startIcon={deleteToolApi.isLoading ? <CircularProgress size={16} /> : <Trash2 className="w-4 h-4" />}
+          >
+            {deleteToolApi.isLoading ? t('common.buttons.deleting', '删除中...') : t('common.buttons.confirmDelete', '确认删除')}
+          </Button>
         </DialogActions>
       </Dialog>
 

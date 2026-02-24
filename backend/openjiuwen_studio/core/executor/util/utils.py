@@ -5,9 +5,42 @@ import json
 import time
 from typing import Any, Dict, Optional, List
 from openjiuwen.core.common.logging import logger
-from openjiuwen.core.stream.writer import TraceSchema, OutputSchema
-from openjiuwen.core.tracer.span import TraceWorkflowSpan, TraceAgentSpan
-from openjiuwen.core.runtime.interaction.interaction import InteractionOutput
+
+# MySQL LONGTEXT 最大长度约为 4GB，但为了防止内存问题，设置一个合理的上限
+# 这里设置为 10MB，应该足够存储大多数正常输出，同时避免数据库问题
+MAX_OUTPUT_LENGTH = 10 * 1024 * 1024
+
+
+def _truncate_data(data: Any, max_length: int = MAX_OUTPUT_LENGTH) -> str:
+    """
+    将数据转换为字符串并截断到指定长度
+    
+    Args:
+        data: 任意数据
+        max_length: 最大长度限制
+        
+    Returns:
+        截断后的字符串
+    """
+    if data is None:
+        return ""
+    
+    try:
+        if isinstance(data, str):
+            text = data
+        else:
+            text = json.dumps(data, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        text = str(data)
+    
+    if len(text) > max_length:
+        truncation_warning = f"\n...[Content truncated: exceeded {max_length} characters]"
+        text = text[:max_length - len(truncation_warning)] + truncation_warning
+    
+    return text
+from openjiuwen.core.session.stream import TraceSchema, OutputSchema
+from openjiuwen.core.session.tracer.span import TraceAgentSpan, TraceWorkflowSpan
+from openjiuwen.core.session.interaction.interaction import InteractionOutput
 from openjiuwen_studio.core.manager.repositories.workflow_execution_repository import workflow_execution_repository
 from openjiuwen_studio.core.manager.repositories.agent_execution_repository import agent_execution_repository
 from openjiuwen_studio.core.manager.repositories.trace_detail_repository import trace_detail_repository
@@ -48,8 +81,8 @@ def _workflowspan_2_tracedetail(business_type: str, workflowspan: TraceWorkflowS
         end_time_micros=int(time.mktime(workflowspan.end_time.timetuple()) * 1e6 +
                             workflowspan.end_time.microsecond) if workflowspan.end_time else None,
         status_code=workflowspan.status,
-        input=str(workflowspan.inputs),
-        output=str(workflowspan.outputs),
+        input=_truncate_data(workflowspan.inputs),
+        output=_truncate_data(workflowspan.outputs),
         attributes=None
     )
 
@@ -79,8 +112,8 @@ def _agentspan_2_tracedetail(business_type: str, agentspan: TraceAgentSpan, mapp
         end_time_micros=int(time.mktime(agentspan.end_time.timetuple()) * 1e6 +
                             agentspan.end_time.microsecond) if agentspan.end_time else None,
         status_code="error" if agentspan.error else ("finish" if agentspan.end_time else "start"),
-        input=str(agentspan.inputs),
-        output=str(agentspan.outputs),
+        input=_truncate_data(agentspan.inputs),
+        output=_truncate_data(agentspan.outputs),
         attributes=None
     )
 
@@ -102,18 +135,18 @@ def get_trace_workflow_output(data):
             if isinstance(item, dict) and 'output' in item:
                 text_parts.append(str(item['output']))
 
-            # 第二种格式: {'type': 'end node stream', 'index': 0, 'payload': {'answer': 'value'}}
+            # 第二种格式: {'type': 'end node stream', 'index': 0, 'payload': {'response': 'value'}}
             # 第三种格式: {'type': 'output', 'index': 0, 'payload': {'output': '111', 'result_type': 'answer'}}
             elif isinstance(item, dict) and 'payload' in item:
                 payload = item.get('payload', {})
                 if isinstance(payload, dict):
-                    # 检查 payload 中是否有 answer 字段
-                    if 'answer' in payload:
-                        text_parts.append(str(payload['answer']))
-                        output_key = "responseContent"
+                    # 检查 payload 中是否有 response 字段
+                    if 'response' in payload:
+                        text_parts.append(str(payload['response']))
+                        output_key = "response"
                     if 'output' in payload:
                         text_parts.append(str(payload['output']))
-                        output_key = "responseContent"
+                        output_key = "response"
 
         if text_parts:
             combined_text = ''.join(text_parts)
@@ -270,9 +303,9 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
 
     # Streaming output
     if isinstance(chunk, OutputSchema) and chunk.type == "end node stream":
-        # 将原有payload={"answer": "你好"} 转换成 payload={"output": "你好", "result_type": "answer"}格式
-        if isinstance(chunk.payload, dict) and "answer" in chunk.payload:
-            answer_value = chunk.payload.get("answer", "")
+        # 将原有payload={"response": "你好"} 转换成 payload={"output": "你好", "result_type": "answer"}格式
+        if isinstance(chunk.payload, dict) and "response" in chunk.payload:
+            answer_value = chunk.payload.get("response", "")
             # 确保answer是字符串类型，如果不是则序列化为JSON字符串
             if not isinstance(answer_value, str):
                 try:
@@ -284,7 +317,8 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                 "output": answer_value,
                 "result_type": "answer",
                 "node_id": "end_0",
-                "node_name": "结束"
+                "node_name": "结束",
+                "index": chunk.index
             }
         elif isinstance(chunk.payload, dict) and "output" in chunk.payload:
             output_value = chunk.payload.get("output", {})
@@ -301,23 +335,27 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                 "output": output_value,
                 "result_type": "answer",
                 "node_id": "end_0",
-                "node_name": "结束"
+                "node_name": "结束",
+                "index": chunk.index
             }
         else:
             transformed_payload = chunk.payload
+            if isinstance(transformed_payload, dict):
+                transformed_payload["index"] = chunk.index
 
-        return ExecuteResponse(type=ExecuteResponseType.Workflow, payload=transformed_payload).model_dump(), None, None
+        response_type = ExecuteResponseType.Workflow
+        if business_type == "AGENT":
+            response_type = ExecuteResponseType.Agent
+
+        return ExecuteResponse(type=response_type, payload=transformed_payload).model_dump(), None, None
 
     # Agent workflow run result
     # not processing workflow_final type
     if isinstance(chunk, OutputSchema) and chunk.type == "workflow_final":
         if business_type == "AGENT":
             answer_value = None
-            # 处理 responseContent 情况
-            if chunk.payload.get("responseContent"):
-                answer_value = chunk.payload.get("responseContent")
             # 处理 output 情况
-            elif chunk.payload.get("output"):
+            if chunk.payload.get("output"):
                 output_data = chunk.payload.get("output")
                 # 如果 output 是字典，转换为 key: value 格式的字符串
                 if isinstance(output_data, dict):
@@ -329,6 +367,19 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                     answer_value = "\n".join(formatted_items)
                 else:
                     answer_value = str(output_data)
+            # 处理 response 情况
+            elif chunk.payload.get("response"):
+                response_data = chunk.payload.get("response")
+                if isinstance(response_data, dict):
+                    formatted_items = []
+                    for key, value in response_data.items():
+                        if not isinstance(value, str):
+                            value = str(value)
+                        formatted_items.append(f"{key}: {value}")
+                    answer_value = "\n".join(formatted_items)
+                else:
+                    answer_value = str(response_data)
+
             if answer_value:
                 agent_payload = {"output": answer_value, "result_type": "answer"}
                 return ExecuteResponse(type=ExecuteResponseType.Agent, payload=agent_payload).model_dump(), None, None

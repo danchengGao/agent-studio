@@ -8,7 +8,15 @@ export type { TokenProvider, AuthStateUpdater } from './client'
 export { ApiClientProvider, useApiClient, useToken } from './context/ApiClientProvider'
 
 // 工具函数
-export { getApiClient, getToken, setGlobalTokenProvider, isApiClientInitialized, waitForApiClientInitialization } from './utils/apiClientFactory'
+export {
+  getApiClient,
+  getToken,
+  setGlobalTokenProvider,
+  isApiClientInitialized,
+  waitForApiClientInitialization,
+  stream,
+} from './utils/apiClientFactory'
+export type { StreamOptions } from './utils/apiClientFactory'
 export { isApiError, getErrorMessage, getErrorResponse } from './utils/errorHandling'
 export type { ApiError } from './utils/errorHandling'
 
@@ -225,10 +233,34 @@ export { PluginService } from './services/pluginService'
 export { TagService } from './services/tagService'
 export { TraceService, traceService } from './services/traceService'
 export { KnowledgeBaseService } from './services/knowledgeBaseService'
+export { MemoryBaseService } from './services/memoryBaseService'
+export { deepsearchTemplateService, deepsearchHeartbeatService, fileToBase64 } from './services/deepsearchTemplateService'
+export { webSearchEngineService } from './services/webSearchEngineService'
 export type { FrontendModelConfig } from './services/modelService'
 export type { Space, SpaceResponse } from './services/spaceService'
 export { MemberType } from './services/relatedMemberService'
 export type { RelatedMemberInfo } from './services/relatedMemberService'
+export type {
+  ReportTemplate,
+  TemplateImportRequest,
+  TemplateImportResponse,
+  TemplateListResponse,
+  TemplateDeleteResponse,
+  TemplateContentResponse,
+  HeartbeatResponse
+} from './services/deepsearchTemplateService'
+export type {
+  WebSearchEngineConfig,
+  WebSearchEngineCreateRequest,
+  WebSearchEngineCreateResponse,
+  WebSearchEngineListResponse,
+  WebSearchEngineDeleteResponse,
+  WebSearchEngineUpdateRequest,
+  WebSearchEngineUpdateResponse,
+  WebSearchEngineDetailResponse,
+  WebSearchEngineTestRequest,
+  WebSearchEngineTestResponse
+} from './services/webSearchEngineService'
 
 // Hooks
 export * from './hooks/useWorkflow'
@@ -323,3 +355,21 @@ export type {
   SearchKnowledgeBaseResponse,
   SearchKnowledgeBaseItem,
 } from './types/knowledgeBase'
+
+export type {
+  CreateMemoryBaseRequest,
+  CreateMemoryBaseResponse,
+  GetMemoryBasesRequest,
+  GetMemoryBasesResponse,
+  MemoryBaseItem,
+  MemoryBase,
+  UpdateMemoryBaseRequest,
+  UpdateMemoryBaseResponse,
+  DeleteMemoryBaseRequest,
+  DeleteMemoryBaseResponse,
+  GetMemoryBaseDetailRequest,
+  GetMemoryBaseDetailResponse,
+  SearchMemoryBaseRequest,
+  SearchMemoryBaseResponse,
+  SearchMemoryBaseItem,
+} from './types/memoryBase'

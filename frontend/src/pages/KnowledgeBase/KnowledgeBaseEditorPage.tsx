@@ -25,7 +25,6 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   const location = useLocation()
   const { user } = useAuthStore()
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
-
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -912,7 +911,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 py-6">
       {/* 头部导航 */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -6,7 +6,7 @@ export interface DeleteConfirmationDialogProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
-  itemType?: 'agent' | 'workflow' | 'model' | 'plugin' | 'knowledgeBase'
+  itemType?: 'agent' | 'workflow' | 'model' | 'plugin' | 'knowledgeBase' | 'memoryBase'
   itemName?: string
   isLoading?: boolean
   title?: string
@@ -43,7 +43,9 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
       case 'plugin':
         return t('common.confirmDialog.titles.plugin')
       case 'knowledgeBase':
-        return '删除知识库'
+        return t('common.confirmDialog.titles.knowledgeBase')
+      case 'memoryBase':
+        return t('common.confirmDialog.titles.memoryBase')
       default:
         return t('common.confirmDialog.titles.default')
     }
@@ -60,7 +62,9 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
       case 'plugin':
         return t('common.confirmDialog.messages.plugin', { name: itemName })
       case 'knowledgeBase':
-        return `确定要删除知识库"${itemName}"吗？此操作无法撤销。`
+        return t('common.confirmDialog.messages.knowledgeBase', { name: itemName })
+      case 'memoryBase':
+        return t('common.confirmDialog.messages.memoryBase', { name: itemName })
       default:
         return t('common.confirmDialog.messages.default', { name: itemName })
     }
@@ -77,7 +81,9 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
       case 'plugin':
         return t('common.confirmDialog.buttons.deletePlugin')
       case 'knowledgeBase':
-        return '删除知识库'
+        return t('common.confirmDialog.buttons.deleteKnowledgeBase')
+      case 'memoryBase':
+        return t('common.confirmDialog.buttons.deleteMemoryBase')
       default:
         return t('common.confirmDialog.buttons.delete')
     }
@@ -113,9 +119,9 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold text-gray-900 mb-4">{displayTitle}</h3>
           {typeof displayMessage === 'string' ? (
-            <p className="text-gray-600 text-lg leading-relaxed">{displayMessage}</p>
+            <p className="text-gray-600 text-lg leading-relaxed break-all max-w-full">{displayMessage}</p>
           ) : (
-            <div className="text-gray-600 text-lg leading-relaxed">{displayMessage}</div>
+            <div className="text-gray-600 text-lg leading-relaxed break-words max-w-full">{displayMessage}</div>
           )}
         </div>
 

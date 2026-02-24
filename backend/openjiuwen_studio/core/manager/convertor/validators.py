@@ -34,8 +34,9 @@ def validate_title(node: Node) -> None:
     """
     if not node.data.title or node.data.title.strip() == "":
         raise JiuWenComponentException(
-            error_code=StatusCode.COMPONENT_CONFIG_INVALID.code,
-            message=f"[{node.data.title or 'node'}] title is empty, please check!",
+            code=StatusCode.COMPONENT_CONFIG_INVALID.code,
+            message=StatusCode.COMPONENT_CONFIG_INVALID.errmsg.format(
+                msg=f"[{node.data.title or 'node'}] title is empty, please check!"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -52,13 +53,14 @@ def validate_model(node: Node) -> None:
     Raises:
         JiuWenComponentException: 当 model.id 为空时
     """
-    component_name = node.data.title or "组件"
+    component_name = node.data.title or "component"
 
     # 检查 inputs -> llmParam -> model -> id 链路
     if node.data.inputs is None:
         raise JiuWenComponentException(
-            error_code=StatusCode.LLM_COMPONENT_CONFIG_INVALID.code,
-            message=f"[{component_name}] model config is empty, please check!",
+            code=StatusCode.LLM_COMPONENT_CONFIG_INVALID.code,
+            message=StatusCode.LLM_COMPONENT_CONFIG_INVALID.errmsg.format(
+                msg=f"[{component_name}] model config is empty, please check!"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -67,8 +69,9 @@ def validate_model(node: Node) -> None:
     llm_param = node.data.inputs.llm_param
     if llm_param is None:
         raise JiuWenComponentException(
-            error_code=StatusCode.LLM_COMPONENT_CONFIG_INVALID.code,
-            message=f"[{component_name}] model config is empty, please check!",
+            code=StatusCode.LLM_COMPONENT_CONFIG_INVALID.code,
+            message=StatusCode.LLM_COMPONENT_CONFIG_INVALID.errmsg.format(
+                msg=f"[{component_name}] model config is empty, please check!"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -76,8 +79,9 @@ def validate_model(node: Node) -> None:
 
     if llm_param.model is None or llm_param.model.id is None or llm_param.model.id == "":
         raise JiuWenComponentException(
-            error_code=StatusCode.LLM_COMPONENT_CONFIG_INVALID.code,
-            message=f"[{component_name}] model config is empty, please check!",
+            code=StatusCode.LLM_COMPONENT_CONFIG_INVALID.code,
+            message=StatusCode.LLM_COMPONENT_CONFIG_INVALID.errmsg.format(
+                msg=f"[{component_name}] model config is empty, please check!"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -108,9 +112,11 @@ def validate_input_parameters(node: Node, all_nodes: list[Node]) -> None:
             source_node_id = param.content[0]
             if source_node_id not in node_ids:
                 raise JiuWenComponentException(
-                    error_code=StatusCode.COMPONENT_CONFIG_INVALID.code,
-                    message=(f"[{node.data.title or 'node'}] ref parameter [{param_name}] "
-                             f"source node [{source_node_id}] not found, please check!"),
+                    code=StatusCode.COMPONENT_CONFIG_INVALID.code,
+                    message=StatusCode.COMPONENT_CONFIG_INVALID.errmsg.format(
+                        msg=f"[{node.data.title or 'node'}' "
+                            f"ref parameter [{param_name}] "
+                            f"source node [{source_node_id}] not found, please check!"),
                     component_id=node.id,
                     component_type=int(node.type),
                     error_stage="validate"
@@ -126,9 +132,9 @@ def validate_input_parameters(node: Node, all_nodes: list[Node]) -> None:
             # 检查空字符串
             if isinstance(content, str) and content.strip() == "":
                 raise JiuWenComponentException(
-                    error_code=StatusCode.COMPONENT_CONFIG_INVALID.code,
-                    message=(f"[{node.data.title or 'node'}] parameter [{param_name}] "
-                             f"is empty, please check!"),
+                    code=StatusCode.COMPONENT_CONFIG_INVALID.code,
+                    message=StatusCode.COMPONENT_CONFIG_INVALID.errmsg.format(
+                        msg=f"[{node.data.title or 'node'}] parameter [{param_name}] is empty, please check!"),
                     component_id=node.id,
                     component_type=int(node.type),
                     error_stage="validate"
@@ -154,8 +160,11 @@ def validate_exception_return_content(node: Node) -> None:
         # 检查 return_content 是否为 None、空字典或不包含 result
         if return_content is None or not return_content or "result" not in return_content:
             raise JiuWenComponentException(
-                error_code=StatusCode.CODE_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Code 组件'}] 异常处理类型为返回内容时，返回内容必须包含 result",
+                code=StatusCode.CODE_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.CODE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title or 'Code component'}] "
+                        f"return content must contain 'result' "
+                        f"when process_type is return_content"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -179,8 +188,9 @@ def validate_streaming_template(node: Node) -> None:
         content = node.data.inputs.content
         if content is None or content.content is None or content.content.strip() == "":
             raise JiuWenComponentException(
-                error_code=StatusCode.OUTPUT_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or '组件'}] 开启流式输出时，输出模板不能为空",
+                code=StatusCode.OUTPUT_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.OUTPUT_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title}] output template cannot be empty when streaming is enabled"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -202,16 +212,18 @@ def validate_loop_num_range(node: Node, loop_num_value: Any) -> None:
         loop_num = int(loop_num_value)
         if loop_num < 1 or loop_num > 1000:
             raise JiuWenComponentException(
-                error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Loop 组件'}] 循环次数必须是 1-1000 之间的整数",
+                code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title or 'Loop component'}] loop number must be an integer between 1 and 1000"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
             )
     except (ValueError, TypeError) as e:
         raise JiuWenComponentException(
-            error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Loop 组件'}] 循环次数必须是有效的整数",
+            code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Loop component'}] loop number must be a valid integer"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -238,8 +250,9 @@ def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
     schema_type = var_value.schema.type if var_value.schema else None
     if schema_type != "array":
         raise JiuWenComponentException(
-            error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Loop 组件'}] 变量 {var_name} 必须是数组类型",
+            code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Loop component'}] variable {var_name} must be of array type"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -248,8 +261,9 @@ def validate_array_variable(var_name: str, var_value: Any, node: Node) -> None:
     # 检查 content 是否为空
     if var_value.content is None or (isinstance(var_value.content, list) and len(var_value.content) == 0):
         raise JiuWenComponentException(
-            error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Loop 组件'}] 数组变量 {var_name} 不能为空",
+            code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Loop component'}] array variable {var_name} cannot be empty"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -269,8 +283,11 @@ def validate_max_response_range(node: Node, max_response: int) -> None:
     """
     if max_response <= 0 or max_response > 10:
         raise JiuWenComponentException(
-            error_code=StatusCode.QUESTION_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Questioner 组件'}] 最大提问次数必须是大于 0 且不大于 10 的整数",
+            code=StatusCode.QUESTION_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.QUESTION_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Questioner component'}] "
+                    f"max response count must be an integer "
+                    f"greater than 0 and not greater than 10"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -291,8 +308,9 @@ def validate_outputs_count(node: Node, min_count: int) -> None:
     outputs = node.data.outputs
     if outputs is None or len(outputs.properties) < min_count:
         raise JiuWenComponentException(
-            error_code=StatusCode.QUESTION_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Questioner 组件'}] 输出至少需要 {min_count} 个变量",
+            code=StatusCode.QUESTION_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.QUESTION_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Questioner component'}] output requires at least {min_count} variables"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -315,8 +333,9 @@ def validate_variable_merge(node: Node) -> None:
     variable_merge = node.data.inputs.variable_merge
     if len(variable_merge) == 0:
         raise JiuWenComponentException(
-            error_code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Variable-merge 组件'}] 至少需要一个分组",
+            code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Variable-merge component'}] at least one group is required"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -325,16 +344,20 @@ def validate_variable_merge(node: Node) -> None:
     for group in variable_merge:
         if group.name is None or group.name.strip() == "":
             raise JiuWenComponentException(
-                error_code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Variable-merge 组件'}] 分组名称不能为空",
+                code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title or 'Variable-merge component'}] group name cannot be empty"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
             )
         if group.items is None or len(group.items) == 0:
             raise JiuWenComponentException(
-                error_code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Variable-merge 组件'}] 分组 {group.name} 至少包含一个变量",
+                code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title or 'Variable-merge component'}] "
+                        f"group {group.name} must contain "
+                        f"at least one variable"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -359,8 +382,11 @@ def validate_intermediate_vars(node: Node) -> None:
         for var_name, var in intermediate_var.items():
             if var.content is None or var.content == "":
                 raise JiuWenComponentException(
-                    error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-                    message=f"[{node.data.title or 'Loop 组件'}] 中间变量 {var_name} 不能为空",
+                    code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+                    message=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.errmsg.format(
+                        msg=f"[{node.data.title or 'Loop component'}] "
+                            f"intermediate variable {var_name} "
+                            f"cannot be empty"),
                     component_id=node.id,
                     component_type=int(node.type),
                     error_stage="validate"
@@ -389,8 +415,9 @@ def validate_branch_connection(branch: BranchInfo, all_edges: list[Edge], node_i
 
     if not branch_connected:
         raise JiuWenComponentException(
-            error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node_title or 'Condition 组件'}] 分支 [{branch.branch_id}] 必须连线到节点",
+            code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.IF_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node_title or 'Condition component'}] branch [{branch.branch_id}] must be connected to a node"),
             component_id=node_id,
             component_type=int(ComponentType.COMPONENT_TYPE_IF),
             error_stage="validate"
@@ -450,8 +477,9 @@ def validate_loop_node(node: Node, all_nodes: list[Node], all_edges: list[Edge])
                 has_end = True
         if not has_start or not has_end:
             raise JiuWenComponentException(
-                error_code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Loop 组件'}] 循环体必须包含开始和结束节点",
+                code=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.LOOP_COMPONENT_CONVERT_FAILED.message.format(
+                    msg=f"[{node.data.title or 'Loop component'}] loop body must contain start and end nodes"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -468,8 +496,9 @@ def validate_intent_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
     if node.data.inputs is not None and node.data.inputs.input_parameters is not None:
         if "query" not in node.data.inputs.input_parameters:
             raise JiuWenComponentException(
-                error_code=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Intent 组件'}] query 参数必须存在",
+                code=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title or 'Intent component'}] query parameter must exist"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -479,8 +508,9 @@ def validate_intent_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
     intents = node.data.inputs.intents if node.data.inputs else None
     if intents is None or len(intents) == 0:
         raise JiuWenComponentException(
-            error_code=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Intent 组件'}] 至少需要一个意图",
+            code=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Intent component'}] at least one intent is required"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -489,8 +519,11 @@ def validate_intent_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
     for intent in intents:
         if intent.name is None or len(intent.name) > 50:
             raise JiuWenComponentException(
-                error_code=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.code,
-                message=f"[{node.data.title or 'Intent 组件'}] 意图名称不能为空，长度不超过 50 个字符",
+                code=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.INTENT_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{node.data.title or 'Intent component'}] "
+                        f"intent name cannot be empty "
+                        f"and must not exceed 50 characters"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -507,8 +540,9 @@ def validate_branch_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
     branches = node.data.branches
     if branches is None or len(branches) == 0:
         raise JiuWenComponentException(
-            error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
-            message=f"[{node.data.title or 'Condition 组件'}] 至少要有一个分支",
+            code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
+            message=StatusCode.IF_COMPONENT_CONVERT_FAILED.errmsg.format(
+                msg=f"[{node.data.title or 'Condition component'}] at least one branch is required"),
             component_id=node.id,
             component_type=int(node.type),
             error_stage="validate"
@@ -522,8 +556,10 @@ def validate_branch_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
                 if condition.left is not None and condition.left.type == "constant":
                     if condition.left.content is None or condition.left.content == "":
                         raise JiuWenComponentException(
-                            error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
-                            message=f"[{node.data.title or 'Condition 组件'}] 分支条件值不能为空",
+                            code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
+                            message=StatusCode.IF_COMPONENT_CONVERT_FAILED.errmsg.format(
+                                msg=f"[{node.data.title or 'Condition component'}/] "
+                                    f"branch condition value cannot be empty"),
                             component_id=node.id,
                             component_type=int(node.type),
                             error_stage="validate"
@@ -532,8 +568,10 @@ def validate_branch_node(node: Node, all_nodes: list[Node], all_edges: list[Edge
                 if condition.right is not None and condition.right.type == "constant":
                     if condition.right.content is None or condition.right.content == "":
                         raise JiuWenComponentException(
-                            error_code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
-                            message=f"[{node.data.title or 'Condition 组件'}] 分支条件值不能为空",
+                            code=StatusCode.IF_COMPONENT_CONVERT_FAILED.code,
+                            message=StatusCode.IF_COMPONENT_CONVERT_FAILED.errmsg.format(
+                                msg=f"[{node.data.title or 'Condition component'}/] "
+                                    f"branch condition value cannot be empty"),
                             component_id=node.id,
                             component_type=int(node.type),
                             error_stage="validate"

@@ -121,6 +121,22 @@ export interface SaveAgentRequest {
   memory: {
     max_tokens: number
     longterm_memory_config?: boolean
+    memory_bases?: Array<{
+ 	      mdb_id: string
+        name: string
+        status: string
+        description?: string
+        embedding_model_config_id?: number
+        llm_model_config_id?: number
+ 	     }>
+    memory_base?: {
+ 	      mdb_id: string
+        name: string
+        status: string
+        description?: string
+        embedding_model_config_id?: number
+        llm_model_config_id?: number
+ 	     }
     variable_config?: Array<{
       id: string
       name: string
@@ -219,6 +235,7 @@ export interface UserInfoWithTag extends UserInfo {
 // 登录响应数据接口
 interface LoginData {
   access_token: string
+  refresh_token: string
   token_type: string
   user: UserInfo
 }
@@ -243,6 +260,12 @@ export interface ChangePasswordRequest {
   currentPassword: string
   newPassword: string
   confirmPassword: string
+}
+
+export interface ResetPasswordRequest {
+  email: string
+  new_pwd: string
+  code: string
 }
 
 // 用户相关类型
@@ -1164,6 +1187,7 @@ export interface UpdatePromptResponse extends ApiResponse<{
 // 删除提示词请求类型
 export interface DeletePromptRequest {
   prompt_id: string
+  workspace_id: string
 }
 
 // 删除提示词响应类型
@@ -1434,9 +1458,17 @@ export interface AgentListResponse {
       usage_count: number
       tags: string[]
       create_time: number
+      update_time?: number
       api_endpoint: string
       agent_version: string
-      agent_type: string
+      agent_type?: string
+      latest_publish_version?: string
+      latest_publish_time?: number
+      relation_count?: {
+        workflows: number
+        knowledge: number
+        plugins: number
+      }
     }>
     pagination: {
       page: number
@@ -1474,6 +1506,7 @@ export interface AgentSearchResponse {
       usage_count: number
       tags: string[]
       create_time: number
+      update_time?: number
       api_endpoint: string
       agent_version: string
       agent_type: string
@@ -1971,7 +2004,7 @@ export interface ComponentExecuteRequest {
 // 单节点调试响应类型
 export interface ComponentExecuteResponse {
   data: {
-    responseContent: string
+    response: string
     output: {
       result: string
     }
@@ -2279,6 +2312,7 @@ export interface AgentVersionListResponse {
 // 获取文件上传URL请求类型
 export interface GetUploadUrlRequest {
   object_key: string
+  space_id?: string
 }
 
 // 获取文件上传URL响应类型
@@ -2293,6 +2327,7 @@ export interface GetUploadUrlResponse {
 // 获取文件下载URL请求类型
 export interface GetDownloadUrlRequest {
   object_key?: string
+  space_id?: string
 }
 
 // 获取文件下载URL响应类型

@@ -5,7 +5,7 @@ import { ExecutionService, SaveAgentRequest } from '@test-agentstudio/api-client
 import { ActionSlotMount } from '@/components/Common/ActionSlot'
 import AgentOperationsBar from './AgentOperationsBar'
 import AgentDebugPanel from './AgentDebugPanel'
-import MemoryButton from '@/pages/Memory/MemoryButton'
+import MemoryButton from '@/pages/MemoryBase/MemoryButton'
 import { MessageRenderer } from './messages/MessageRenderer'
 import { useScopedTranslation } from '@/i18n'
 
@@ -27,6 +27,8 @@ const extractTextFromOutput = (outputRaw: any) => {
 interface AgentDebugChatProps {
   /** 智能体ID */
   agentId: string
+  /** 此智能体的记忆库ID */
+  mdbId?: string
   /** 调试信息面板开关变化回调 */
   onDebugInfoChange?: (open: boolean) => void
   /** 是否显示长期记忆，透传给MemoryButton */
@@ -43,10 +45,10 @@ interface AgentDebugChatProps {
  * 智能体调试聊天组件
  * 提供与智能体交互的聊天界面，支持调试信息显示
  */
-const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest, isModelActive = true }: AgentDebugChatProps) => {
+const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hideMemoryButton, saveAgentRequest, isModelActive = true }: AgentDebugChatProps) => {
   // 提供给MemoryEngine
   const userIdForMem = getDefaultSpaceId()
-  const groupIdForMem = agentId
+  const groupIdForMem = mdbId || agentId
   // 状态管理
   const [showDebugInfo, setShowDebugInfo] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
@@ -70,7 +72,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
   // agent_version 为空字符串表示草稿状态，执行 API 使用空字符串或 'draft' 均可
   const agentVersion = saveAgentRequest.agent_version || 'draft'
 
-  const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
+  const { t, i18n } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
 
   // 模型未配置的判断
   const modelNotConfigured = !model
@@ -142,6 +144,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
     type: string
     nodeId?: string
     nodeName?: string
+    index?: number
   } | null => {
     if (!raw || typeof raw !== 'object') return null
 
@@ -154,9 +157,10 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
       const nodeId = nodeIdRaw != null && String(nodeIdRaw).trim() ? String(nodeIdRaw) : undefined
       const nodeNameRaw = streamPayload?.node_name ?? streamPayload?.nodeName ?? streamPayload?.name
       const nodeName = nodeNameRaw != null && String(nodeNameRaw).trim() ? String(nodeNameRaw) : undefined
+      const index = typeof streamPayload?.index === 'number' ? streamPayload.index : undefined
       const text = extractTextFromOutput(streamPayload?.output ?? streamPayload?.answer ?? streamPayload?.output_text)
       if (!text) return null
-      return { text, type: eventType || 'workflow', nodeId, nodeName }
+      return { text, type: eventType || 'workflow', nodeId, nodeName, index }
     }
 
     const outputText = event.output_text
@@ -180,7 +184,11 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
     return null
   }
 
-  const updateAssistantStreamingContent = (ts: number | null, incoming: string, meta?: { type: string; nodeId?: string; nodeName?: string }) => {
+  const updateAssistantStreamingContent = (
+    ts: number | null,
+    incoming: string,
+    meta?: { type: string; nodeId?: string; nodeName?: string; index?: number },
+  ) => {
     if (!ts) return
     setChatHistory(prev => {
       const idx = prev.findIndex(m => m.timestamp === ts && m.role === 'assistant')
@@ -191,10 +199,23 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
       const safeType = meta?.type || 'agent'
       const safeNodeId = meta?.nodeId
       const safeNodeName = meta?.nodeName
+      const safeIndex = meta?.index
 
       let nextChunks = msg.chunks ? [...msg.chunks] : []
 
-      const existingIdx = nextChunks.findIndex(c => c.type === safeType && c.nodeId === safeNodeId)
+      let existingIdx = -1
+      // If index is 0, we force creating a new chunk, so skip searching for existing one.
+      if (safeIndex !== 0) {
+        // Search from end to find the latest matching chunk
+        for (let i = nextChunks.length - 1; i >= 0; i--) {
+          const c = nextChunks[i]
+          if (c.type === safeType && c.nodeId === safeNodeId) {
+            existingIdx = i
+            break
+          }
+        }
+      }
+
       if (existingIdx >= 0) {
         const existing = nextChunks[existingIdx]
         // 直接拼接，不再使用 mergeStreamText
@@ -205,6 +226,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
           nodeName: existing.nodeName || safeNodeName,
           content: newContent,
           status: 'streaming',
+          index: safeIndex ?? existing.index,
         }
       } else {
         nextChunks.push({
@@ -214,6 +236,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
           nodeName: safeNodeName,
           content: incoming,
           status: 'streaming',
+          index: safeIndex,
         })
       }
 
@@ -264,7 +287,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
 
   const normalizeErrorSignature = (content: string) => {
     const trimmed = (content || '').trim()
-    const withoutCodePrefix = trimmed.replace(/^错误\s*\d+[:：]\s*/i, '')
+    const withoutCodePrefix = trimmed.replace(/^(?:错误|Error)\s*\d+[:：]\s*/i, '')
     return withoutCodePrefix.trim()
   }
 
@@ -322,6 +345,7 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
         type: normalized.type,
         nodeId: normalized.nodeId,
         nodeName: normalized.nodeName,
+        index: normalized.index,
       })
     }
     return {}
@@ -482,14 +506,31 @@ const AgentDebugChat = ({ agentId, onDebugInfoChange, enableLongTerm, hideMemory
   }
 
   const formatError = (e: any): string => {
+    let errorMsg = ''
     try {
-      if (!e) return t('errors.executeFailed')
-      if (typeof e === 'string') return e
-      if (e && typeof e === 'object' && 'message' in e && e.message) return String(e.message)
-      return JSON.stringify(e)
+      if (!e) errorMsg = t('errors.executeFailed')
+      else if (typeof e === 'string') errorMsg = e
+      else if (e && typeof e === 'object' && 'message' in e && e.message) errorMsg = String(e.message)
+      else errorMsg = JSON.stringify(e)
     } catch {
-      return String(e)
+      errorMsg = String(e)
     }
+
+    // 处理错误码前缀的多语言显示
+    // 匹配 "error 120000:" 格式
+    const match = errorMsg.match(/^error\s+(\d+)[:：](.*)/i)
+    if (match) {
+      const code = match[1]
+      const rest = match[2]
+      // 如果是中文环境，替换为 "错误 120000："
+      if (i18n.language.startsWith('zh')) {
+        return `错误 ${code}：${rest}`
+      }
+      // 英文环境确保 Error 首字母大写
+      return `Error ${code}:${rest}`
+    }
+
+    return errorMsg
   }
 
   // 聊天历史更新时滚动到底部

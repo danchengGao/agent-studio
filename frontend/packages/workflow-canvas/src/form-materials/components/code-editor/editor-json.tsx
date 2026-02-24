@@ -8,6 +8,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 
 import { BaseEditor } from '../base-editor'
 import type { BaseEditorProps } from '../base-editor'
+import { useTranslation } from '../../../i18n'
 
 export interface EditorJsonProps extends Omit<BaseEditorProps, 'language'> {
   value?: Record<string, unknown> | unknown
@@ -24,7 +25,6 @@ export interface EditorJsonProps extends Omit<BaseEditorProps, 'language'> {
   compact?: boolean
 }
 
-// Enhanced type for ref
 export interface JsonCodeEditorRef {
   formatJson: () => void
   getValue: () => Record<string, unknown> | unknown
@@ -33,16 +33,6 @@ export interface JsonCodeEditorRef {
   error?: string
 }
 
-/**
- * Enhanced JSON Editor Component
- *
- * Features:
- * - Automatic JSON.stringify/parse handling
- * - Debounced parsing to avoid errors during typing
- * - Built-in error handling and validation
- * - Clean separation between display and data states
- * - Consistent behavior across all usage
- */
 const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEditorRef, EditorJsonProps> = (
   {
     value,
@@ -67,13 +57,17 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
   },
   ref,
 ) => {
+  const { t } = useTranslation()
+
   const stringifyValue = useCallback((val: unknown) => {
     return compact ? JSON.stringify(val) : JSON.stringify(val, null, 2)
   }, [compact])
 
+  const hasValue = value !== undefined && value !== null && value !== ''
+
   const [editorValue, setEditorValue] = useState<string>(() => {
     try {
-      if (value !== undefined && value !== null) {
+      if (hasValue) {
         return stringifyValue(value)
       } else if (defaultFormat) {
         return defaultFormat
@@ -86,7 +80,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     }
   })
 
-  // Validation state
   const [validationState, setValidationState] = useState<{
     isValid: boolean
     error?: string
@@ -94,21 +87,19 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     isInternalUpdate?: boolean
   }>(() => ({
     isValid: true,
-    lastValidValue: value !== undefined && value !== null ? value : defaultFormat ? undefined : {},
+    lastValidValue: hasValue ? value : defaultFormat ? undefined : {},
     isInternalUpdate: false,
   }))
 
-  // Sync external value changes to editor using ref to avoid unnecessary updates
   const lastValueRef = useRef(value)
-
-  // Use ref to track internal update state to avoid useEffect dependency cycles
   const isInternalUpdateRef = useRef(false)
 
   useEffect(() => {
     if (value !== lastValueRef.current && !isInternalUpdateRef.current) {
       try {
+        const newHasValue = value !== undefined && value !== null && value !== ''
         let newEditorValue: string
-        if (value !== undefined && value !== null) {
+        if (newHasValue) {
           newEditorValue = stringifyValue(value)
         } else if (defaultFormat) {
           newEditorValue = defaultFormat
@@ -120,7 +111,7 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
         setValidationState(prev => ({
           ...prev,
           isValid: true,
-          lastValidValue: value !== undefined && value !== null ? value : defaultFormat ? undefined : {},
+          lastValidValue: newHasValue ? value : defaultFormat ? undefined : {},
           isInternalUpdate: false,
         }))
         lastValueRef.current = value
@@ -130,19 +121,16 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     }
   }, [value, defaultFormat, stringifyValue])
 
-  // Validate array element types
   const validateArrayElementTypes = useCallback(
     (data: unknown): { isValid: boolean; error?: string } => {
       if (!validateArrayElements || !arrayElementType) {
         return { isValid: true }
       }
 
-      // Only validate if data is an array
       if (!Array.isArray(data)) {
         return { isValid: true }
       }
 
-      // Validate each element in the array
       for (let i = 0; i < data.length; i++) {
         const element = data[i]
         let isValid = false
@@ -167,30 +155,19 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
             isValid = Array.isArray(element)
             break
           default:
-            // For unknown types, allow any value
             isValid = true
             break
         }
 
         if (!isValid) {
-          const typeName =
-            arrayElementType === 'boolean'
-              ? '布尔值'
-              : arrayElementType === 'integer'
-                ? '整数'
-                : arrayElementType === 'number'
-                  ? '数字'
-                  : arrayElementType === 'string'
-                    ? '字符串'
-                    : arrayElementType === 'object'
-                      ? '对象'
-                      : arrayElementType === 'array'
-                        ? '数组'
-                        : arrayElementType
-
+          const typeName = t(`workflowCanvas.jsonEditor.type.${arrayElementType}`)
           return {
             isValid: false,
-            error: `数组第${i + 1}个元素类型不匹配，期望${typeName}类型，实际为${typeof element}类型`,
+            error: t('workflowCanvas.jsonEditor.arrayElementTypeMismatch', {
+              index: i + 1,
+              expectedType: typeName,
+              actualType: t(`workflowCanvas.jsonEditor.type.${typeof element}`)
+            }),
           }
         }
       }
@@ -200,7 +177,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     [validateArrayElements, arrayElementType],
   )
 
-  // Parse JSON with error handling
   const parseJsonSafely = useCallback(
     (
       jsonString: string,
@@ -216,7 +192,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
       try {
         const parsed = JSON.parse(jsonString)
 
-        // Validate array element types if enabled
         const arrayValidation = validateArrayElementTypes(parsed)
         if (!arrayValidation.isValid) {
           return { success: false, error: arrayValidation.error }
@@ -231,7 +206,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     [defaultFormat, validateArrayElementTypes],
   )
 
-  // Debounced parsing function
   const debouncedParse = useCallback(
     (jsonString: string) => {
       const timeoutId = setTimeout(() => {
@@ -245,23 +219,17 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
             isInternalUpdate: result.success,
           }
 
-          // Notify parent about validation changes
           onValidationChange?.(newState.isValid, newState.error)
 
-          // Trigger onChange only on successful parse (deferred to next tick)
-          // For failed validation, do NOT call onChange to preserve other form field values
           if (result.success && onChange) {
-            // Set the internal update flag BEFORE calling onChange to prevent race conditions
             isInternalUpdateRef.current = true
             setTimeout(() => {
               onChange(result.data)
-              // Reset the flag after the change has been processed
               setTimeout(() => {
                 isInternalUpdateRef.current = false
               }, 50)
             }, 0)
           } else {
-            // Reset the flag immediately for failed validation
             isInternalUpdateRef.current = false
           }
 
@@ -269,13 +237,11 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
         })
       }, parseDelay)
 
-      // Cleanup function
       return () => clearTimeout(timeoutId)
     },
-    [parseJsonSafely, parseDelay],
+    [parseJsonSafely, parseDelay, onValidationChange, onChange],
   )
 
-  // Store cleanup function ref
   const cleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
@@ -287,12 +253,10 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     }
   }, [])
 
-  // Handle editor value changes
   const handleEditorChange = useCallback(
     (newValue: string) => {
       setEditorValue(newValue)
 
-      // Clear previous timeout
       if (cleanupRef.current) {
         cleanupRef.current()
       }
@@ -300,7 +264,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
       if (!validateOnBlur) {
         cleanupRef.current = debouncedParse(newValue)
       } else {
-        // When validateOnBlur is true, hide errors during typing
         setValidationState(prev => ({
           ...prev,
           isValid: true,
@@ -311,7 +274,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     [debouncedParse, validateOnBlur],
   )
 
-  // Handle blur event for validation
   const handleBlur = useCallback(() => {
     if (validateOnBlur) {
       const result = parseJsonSafely(editorValue)
@@ -327,17 +289,14 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
         onValidationChange?.(newState.isValid, newState.error)
 
         if (result.success && onChange) {
-          // Set the internal update flag BEFORE calling onChange to prevent race conditions
           isInternalUpdateRef.current = true
           setTimeout(() => {
             onChange(result.data)
-            // Reset the flag after the change has been processed
             setTimeout(() => {
               isInternalUpdateRef.current = false
             }, 50)
           }, 0)
         } else {
-          // Reset the flag immediately for failed validation
           isInternalUpdateRef.current = false
         }
 
@@ -346,7 +305,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     }
   }, [validateOnBlur, editorValue, parseJsonSafely, onChange, onValidationChange])
 
-  // Format JSON on demand (optional utility)
   const formatJson = useCallback(() => {
     const result = parseJsonSafely(editorValue)
     if (result.success && result.data) {
@@ -359,7 +317,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     }
   }, [editorValue, parseJsonSafely])
 
-  // Expose methods via ref
   React.useImperativeHandle(
     ref,
     () => ({
@@ -372,7 +329,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     [formatJson, validationState, editorValue],
   )
 
-  // Default error renderer
   const defaultErrorRenderer = useCallback(
     (error: string) => (
       <div
@@ -386,16 +342,14 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
           borderRadius: '4px',
         }}
       >
-        JSON格式错误: {error}
+        {t('workflowCanvas.jsonEditor.formatError')}: {error}
       </div>
     ),
     [],
   )
 
-  // Create stable options object to prevent BaseEditor recreation
   const stableOptions = useMemo(
     () => ({
-      // JSON-specific options
       tabSize: 2,
       indentUnit: 2,
       jsonValidation: true,
@@ -405,7 +359,6 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
     [options],
   )
 
-  // Create stable extensions object to prevent BaseEditor recreation
   const stableExtensions = useMemo(() => extensions || {}, [extensions])
 
   return (
@@ -437,10 +390,8 @@ const JsonCodeEditorWithEnhancedLogic: React.ForwardRefRenderFunction<JsonCodeEd
   )
 }
 
-// Export both enhanced version with ref and legacy version
 export const JsonCodeEditor = React.forwardRef(JsonCodeEditorWithEnhancedLogic)
 
-// Legacy export for compatibility
 export const loadJsonLanguage = () => Promise.resolve()
 
 JsonCodeEditor.displayName = 'JsonCodeEditor'

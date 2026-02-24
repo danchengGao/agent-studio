@@ -34,60 +34,83 @@ from openjiuwen_studio.schemas.space import SpaceAWPQuery
 from openjiuwen_studio.core.manager.reference_extractor import extract_workflow_references, \
     check_referenced_dependencies
 from openjiuwen_studio.core.manager.repositories.reference_repository import reference_repository
-from openjiuwen.core.common.exception.exception import JiuWenBaseException
+from openjiuwen_studio.core.manager.repositories.prompt_relation_repository import prompt_relation_repository
+from openjiuwen_studio.core.common.exceptions import BaseError
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
+from openjiuwen_studio.core.manager.model_manager.managers.model_config_manager import ModelConfigManager
 
 # 生成随机字符串用于节点ID
 random_id = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_') for _ in range(5))
 
-DEFAULT_WORKFLOW_SCHEMA = {
-    "nodes": [
-        {
-            "id": f"start_{random_id}",
-            "type": "1",
-            "meta": {
-                "position": {
-                    "x": 180,
-                    "y": 36
-                }
-            },
-            "data": {
-                "title": "开始",
-                "outputs": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "default": "你好，请帮我分析一下这个问题。"
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "id": f"end_{random_id}",
-            "type": "2",
-            "meta": {
-                "position": {
-                    "x": 1100,
-                    "y": 36
-                }
-            },
-            "data": {
-                "title": "结束",
-                "inputs": {
-                    "inputParameters": {
-                        "result": {
-                            "type": "ref",
-                        }
+DEFAULT_WORKFLOW_TEXTS_ZH = {
+    "start_title": "开始",
+    "end_title": "结束",
+    "query_default": "你好，请帮我分析一下这个问题。"
+}
+
+DEFAULT_WORKFLOW_TEXTS_EN = {
+    "start_title": "Start",
+    "end_title": "End",
+    "query_default": "Hello, please help me analyze this question."
+}
+
+
+def get_default_workflow_schema():
+    """获取默认工作流schema，根据当前语言返回对应文本"""
+    from openjiuwen_studio.core.common.language_thread_context import get_language
+
+    language = get_language()
+    if language in ("zh-cn", "zh"):
+        texts = DEFAULT_WORKFLOW_TEXTS_ZH
+    else:
+        texts = DEFAULT_WORKFLOW_TEXTS_EN
+
+    return {
+        "nodes": [
+            {
+                "id": f"start_{random_id}",
+                "type": "1",
+                "meta": {
+                    "position": {
+                        "x": 180,
+                        "y": 36
                     }
                 },
-                "streaming": False
+                "data": {
+                    "title": texts["start_title"],
+                    "outputs": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "default": texts["query_default"]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "id": f"end_{random_id}",
+                "type": "2",
+                "meta": {
+                    "position": {
+                        "x": 1100,
+                        "y": 36
+                    }
+                },
+                "data": {
+                    "title": texts["end_title"],
+                    "inputs": {
+                        "inputParameters": {
+                            "result": {}
+                        }
+                    },
+                    "streaming": False
+                }
             }
-        }
-    ],
-    "edges": []
-}
+        ],
+        "edges": []
+    }
 
 
 def with_exception_handling(func: Callable) -> Callable:
@@ -100,37 +123,37 @@ def with_exception_handling(func: Callable) -> Callable:
                 code=status.HTTP_400_BAD_REQUEST,
                 message=str(e)
             )
-        except JiuWenBaseException as e:
+        except BaseError as e:
             log_exception(e)
             if isinstance(e, JiuWenComponentException):
                 type_name_map = {
-                    ComponentType.COMPONENT_TYPE_START: "开始",
-                    ComponentType.COMPONENT_TYPE_LLM: "大模型",
-                    ComponentType.COMPONENT_TYPE_END: "结束",
-                    ComponentType.COMPONENT_TYPE_IF: "选择器",
-                    ComponentType.COMPONENT_TYPE_LOOP: "循环",
-                    ComponentType.COMPONENT_TYPE_INPUT: "输入",
-                    ComponentType.COMPONENT_TYPE_OUTPUT: "输出",
-                    ComponentType.COMPONENT_TYPE_QUESTION: "提问器",
-                    ComponentType.COMPONENT_TYPE_CONTINUE: "继续",
-                    ComponentType.COMPONENT_TYPE_BREAK: "中断",
-                    ComponentType.COMPONENT_TYPE_TEXT_EDITOR: "文本编辑",
-                    ComponentType.COMPONENT_TYPE_INTENT: "意图识别",
-                    ComponentType.COMPONENT_TYPE_SUB_WORKFLOW: "子工作流",
-                    ComponentType.COMPONENT_TYPE_EMPTY_START: "空开始",
-                    ComponentType.COMPONENT_TYPE_EMPTY_END: "空结束",
-                    ComponentType.COMPONENT_TYPE_CODE: "代码",
-                    ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: "变量聚合",
-                    ComponentType.COMPONENT_TYPE_SET_VARIABLE: "设置变量",
-                    ComponentType.COMPONENT_TYPE_PLUGIN: "插件",
+                    ComponentType.COMPONENT_TYPE_START: "START",
+                    ComponentType.COMPONENT_TYPE_LLM: "LLM",
+                    ComponentType.COMPONENT_TYPE_END: "END",
+                    ComponentType.COMPONENT_TYPE_IF: "IF",
+                    ComponentType.COMPONENT_TYPE_LOOP: "LOOP",
+                    ComponentType.COMPONENT_TYPE_INPUT: "INPUT",
+                    ComponentType.COMPONENT_TYPE_OUTPUT: "OUTPUT",
+                    ComponentType.COMPONENT_TYPE_QUESTION: "QUESTION",
+                    ComponentType.COMPONENT_TYPE_CONTINUE: "CONTINUE",
+                    ComponentType.COMPONENT_TYPE_BREAK: "BREAK",
+                    ComponentType.COMPONENT_TYPE_TEXT_EDITOR: "TEXT_EDITOR",
+                    ComponentType.COMPONENT_TYPE_INTENT: "INTENT",
+                    ComponentType.COMPONENT_TYPE_SUB_WORKFLOW: "SUB_WORKFLOW",
+                    ComponentType.COMPONENT_TYPE_EMPTY_START: "EMPTY_START",
+                    ComponentType.COMPONENT_TYPE_EMPTY_END: "EMPTY_END",
+                    ComponentType.COMPONENT_TYPE_CODE: "CODE",
+                    ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: "VARIABLE_MERGE",
+                    ComponentType.COMPONENT_TYPE_SET_VARIABLE: "SET_VARIABLE",
+                    ComponentType.COMPONENT_TYPE_PLUGIN: "PLUGIN",
                 }
                 type_name = type_name_map.get(getattr(e, "component_type", 0), str(getattr(e, "component_type", "")))
-                formatted_message = f"{type_name}组件[{getattr(e, 'component_id', '')}]: {e.message}"
+                formatted_message = f"{type_name} component [{getattr(e, 'component_id', '')}]: {e.message}"
                 return ResponseModel(
                     code=status.HTTP_400_BAD_REQUEST,
                     message=formatted_message,
                     data={
-                        "error_code": getattr(e, "error_code", -1),
+                        "error_code": getattr(e, "code", -1),
                         "component_id": e.component_id,
                         "component_type": e.component_type,
                         "error_stage": e.error_stage,
@@ -140,7 +163,7 @@ def with_exception_handling(func: Callable) -> Callable:
                 return ResponseModel(
                     code=status.HTTP_400_BAD_REQUEST,
                     message=e.message,
-                    data={"error_code": getattr(e, "error_code", -1)}
+                    data={"error_code": getattr(e, "code", -1)}
                 )
         except Exception as e:
             log_exception(e)
@@ -263,7 +286,8 @@ def workflow_create(
     workflow_id = str(uuid.uuid4())
     current_time = milliseconds()
 
-    inputs, outputs = convert.extract_inputs_and_outputs_from_canvas(DEFAULT_WORKFLOW_SCHEMA)
+    workflow_schema = get_default_workflow_schema()
+    inputs, outputs = convert.extract_inputs_and_outputs_from_canvas(workflow_schema)
 
     workflow = WorkflowBaseDBPd(
         workflow_id=workflow_id,
@@ -274,7 +298,7 @@ def workflow_create(
         space_id=req.space_id,
         create_time=current_time,
         update_time=current_time,
-        schema=json.dumps(DEFAULT_WORKFLOW_SCHEMA),
+        schema=json.dumps(workflow_schema),
         input_parameters=inputs,
         output_parameters=outputs
     )
@@ -314,6 +338,69 @@ def workflow_create(
     )
 
 
+def _sync_model_config_in_schema(schema: dict, space_id: str) -> bool:
+    """
+    Sync model configuration (name, type) in workflow schema with latest data from DB.
+    Recursively traverses nodes and blocks.
+    
+    Returns:
+        bool: True if any changes were made, False otherwise
+    """
+    has_changes = False
+    
+    def _traverse_and_update(nodes, model_mgr):
+        nonlocal has_changes
+        if not nodes:
+            return
+            
+        for node in nodes:
+            # Update model config in inputs.llmParam
+            try:
+                if "data" in node and "inputs" in node["data"]:
+                    inputs = node["data"]["inputs"]
+                    if "llmParam" in inputs:
+                        llm_param = inputs["llmParam"]
+                        if "model" in llm_param:
+                            model_info = llm_param["model"]
+                            model_id = model_info.get("id")
+                            if model_id:
+                                try:
+                                    # Fetch latest config
+                                    model_config = model_mgr.get_config_by_id(int(model_id), space_id)
+                                    if model_config:
+                                        # Update name and type
+                                        # name in schema corresponds to model_config.name (user defined name)
+                                        # type in schema corresponds to model_config.model_type (actual model type)
+                                        if model_info.get("name") != model_config.name or \
+                                           model_info.get("type") != model_config.model_type:
+                                            model_info["name"] = model_config.name
+                                            model_info["type"] = model_config.model_type
+                                            has_changes = True
+                                            logger.debug(f"Synced model {model_id} for node {node.get('id')}")
+                                except Exception as e:
+                                    # Log but don't fail the whole request if one model is missing or error
+                                    logger.warning(
+                                        "Failed to sync model config for node "
+                                        f"{node.get('id')}, model_id {model_id}: {e}"
+                                    )
+            except Exception as e:
+                logger.warning(f"Error processing node {node.get('id')}: {e}")
+
+            # Recursive check for nested blocks (e.g. Loop)
+            if "blocks" in node and isinstance(node["blocks"], list):
+                _traverse_and_update(node["blocks"], model_mgr)
+
+    try:
+        with get_db_jw() as db:
+            model_mgr = ModelConfigManager(db)
+            if "nodes" in schema and isinstance(schema["nodes"], list):
+                _traverse_and_update(schema["nodes"], model_mgr)
+    except Exception as e:
+        logger.error(f"Error in _sync_model_config_in_schema: {e}")
+        
+    return has_changes
+
+
 @with_exception_handling
 def workflow_canvas(
         req: WorkflowId,
@@ -331,6 +418,34 @@ def workflow_canvas(
             code=canvas_result.code,
             message=canvas_result.message,
         )
+
+    # 同步更新模型配置信息
+    try:
+        if canvas_result.data and "schema" in canvas_result.data:
+            schema_str = canvas_result.data["schema"]
+            if schema_str:
+                schema = json.loads(schema_str)
+                is_changed = _sync_model_config_in_schema(schema, req.space_id)
+                
+                if is_changed:
+                    new_schema_str = json.dumps(schema)
+                    canvas_result.data["schema"] = new_schema_str
+                    
+                    # 仅在草稿模式下自动保存变更
+                    is_draft = not req.workflow_version or req.workflow_version == 'draft'
+                    if is_draft:
+                        logger.info(f"Auto-saving updated model config for workflow {req.workflow_id}")
+                        update_data = {
+                            "workflow_id": req.workflow_id,
+                            "space_id": req.space_id,
+                            "schema": new_schema_str
+                        }
+                        # 保存到数据库
+                        workflow_repository.workflow_save(update_data)
+                        
+    except Exception as e:
+        logger.error(f"Failed to sync model config in workflow canvas: {e}")
+
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="canvas workflow success",
@@ -827,6 +942,19 @@ def workflow_meta_update(
             f"Synced workflow name in agents: {sync_result.data['updated_count']} updated, "
             f"{sync_result.data['failed_count']} failed"
         )
+
+    # 6. 同步更新 prompt_relation 表中该工作流关联记录的 name（id 格式为 workflow_id&node_id）
+    if req.name is not None:
+        pr_result = prompt_relation_repository.update_member_name_in_prompt_relation(
+            space_id=req.space_id,
+            member_type="WORKFLOW",
+            member_id=req.workflow_id,
+            new_name=req.name,
+        )
+        if pr_result.code == status.HTTP_200_OK:
+            logger.info(f"Synced workflow name in prompt_relation: {pr_result.message}")
+        else:
+            logger.warning(f"Sync workflow name in prompt_relation failed: {pr_result.message}")
 
     res_data = WorkflowResponseUpdate(
         workflow_id=req.workflow_id,
@@ -1410,18 +1538,22 @@ def workflow_version_list(
 # @with_exception_handling
 def get_upload_url(
         req: dict,
+        current_user: dict,
         minio_client: Minio
 ) -> ResponseModel:
     """获取文件上传自签名URL"""
+    space_id = req.get("space_id")
     object_key = req.get("object_key")
 
-    if not object_key:
+    if not all([space_id, object_key]):
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message="Missing required fields: object_key"
+            message="Missing required fields: object_key or space_id"
         )
+    # 1. 校验用户是否有权限访问该space
+    _ = check_user_space(space_id, current_user)
 
-    # 3. 生成 MinIO 上传 URL
+    # 2. 生成 MinIO 上传 URL
     bucket_name = settings.minio_bucket
 
     if not minio_client.bucket_exists(bucket_name):
@@ -1447,18 +1579,22 @@ def get_upload_url(
 # @with_exception_handling
 def get_download_url(
         req: dict,
+        current_user: dict,
         minio_client: Minio
 ) -> ResponseModel:
     """获取文件上传自签名URL"""
+    space_id = req.get("space_id")
     object_key = req.get("object_key")
 
-    if not object_key:
+    if not all([space_id, object_key]):
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message="Missing required fields: object_key"
+            message="Missing required fields: object_key or space_id"
         )
+    # 1. 校验用户是否有权限访问该space
+    _ = check_user_space(space_id, current_user)
 
-    # 3. 生成 MinIO 下载 URL
+    # 2. 生成 MinIO 下载 URL
     bucket_name = settings.minio_bucket
 
     try:
