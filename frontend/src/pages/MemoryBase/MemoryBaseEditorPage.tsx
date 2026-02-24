@@ -587,44 +587,23 @@ const MemoryBaseEditorPage: React.FC = () => {
     setFilteredMemories(paginatedFiltered);
   };
 
-  // 刷新所有记忆状态
+  // 重新获取记忆
   const handleRefreshAllStatuses = async () => {
-    if (!memoryBase || filteredMemories.length === 0 || isRefreshingAllStatuses) return;
+    if (!memoryBase || isRefreshingAllStatuses) return;
 
     setIsRefreshingAllStatuses(true);
     try {
-      const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID;
-
-      const memoryIds = filteredMemories.map(mem => mem.id);
-
-      // 模拟获取状态（实际实现中应调用真实API）
-      const statusResponse = {
-        data: {
-          items: memoryIds.map(id => ({
-            id: memoryBase.mdb_id,
-            memory_id: id,
-            status: 'success'
-          }))
-        }
-      };
-
-      // 更新所有状态数据
-      if (statusResponse.data?.items) {
-        const statusMap: Record<string, MemoryStatusItem> = {};
-        statusResponse.data.items.forEach(statusItem => {
-          if (statusItem.memory_id) {
-            statusMap[statusItem.memory_id] = statusItem;
-          }
-        });
-        setMemoryStatuses(prev => ({
-          ...prev,
-          ...statusMap,
-        }));
-      }
+      // 清空当前记忆数据
+      setAllMemories([]);
+      setFilteredMemories([]);
+      setTotalMemories(0);
+      
+      // 重新获取记忆数据
+      await fetchMemories(currentPage);
 
       showSuccess(t('memoryBases.editor.refreshAllSuccess'));
     } catch (error) {
-      console.error('Failed to refresh all memory statuses:', error);
+      console.error('Failed to refresh all memories:', error);
       showError(t('memoryBases.editor.refreshAllFailed'));
     } finally {
       setIsRefreshingAllStatuses(false);
@@ -931,7 +910,7 @@ const MemoryBaseEditorPage: React.FC = () => {
                   )}
                   <button
                     onClick={handleRefreshAllStatuses}
-                    disabled={filteredMemories.length === 0 || isRefreshingAllStatuses}
+                    disabled={isRefreshingAllStatuses}
                     className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                   >
                     <RefreshCw className={`w-4 h-4 ${isRefreshingAllStatuses ? 'animate-spin' : ''}`}/>
