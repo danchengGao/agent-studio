@@ -610,7 +610,23 @@ const AppsPage: React.FC = () => {
 
   // 处理智能体选择（首次配置弹出配置弹窗，非首次配置直接选中）
   const handleAgentSelect = (agent: MentionItem) => {
-    // 检查该智能体是否已有配置
+    // 如果是 DeepSearch 智能体，总是检查服务状态
+    if (agent.id === 'deepsearch') {
+      // 如果正在检查心跳，避免重复检查
+      if (checkingDeepsearch) {
+        setPendingAgent(agent)
+        return
+      }
+
+      // 总是重新检查心跳，确保获取最新状态
+      // 这修复了 stale state 问题（服务从可用变为不可用时）
+      checkDeepsearchHeartbeatCallback()
+      // 暂时保存待选择的智能体，等心跳检查完成后再处理
+      setPendingAgent(agent)
+      return
+    }
+
+    // 其他智能体：检查该智能体是否已有配置
     const hasConfig = agentConfigs[agent.id] !== undefined
 
     if (!hasConfig) {
@@ -620,7 +636,6 @@ const AppsPage: React.FC = () => {
       setConfigDialogOpen(true)
     } else {
       // 已有配置：直接选中智能体
-      // 心跳检测由 useEffect 统一处理
       setSelectedAgent(agent)
     }
   }
@@ -679,6 +694,33 @@ const AppsPage: React.FC = () => {
       setDeepsearchServiceAvailable(null)
     }
   }, [selectedAgent?.id, checkDeepsearchHeartbeatCallback])
+
+  // 心跳检查完成后，处理待选择的智能体
+  useEffect(() => {
+    if (pendingAgent && deepsearchServiceAvailable !== null && !checkingDeepsearch) {
+      if (pendingAgent.id === 'deepsearch') {
+        if (deepsearchServiceAvailable === false) {
+          // 服务不可用：选中智能体以显示警告
+          setSelectedAgent(pendingAgent)
+          setPendingAgent(null)
+        } else {
+          // 服务可用：检查配置
+          const hasConfig = agentConfigs[pendingAgent.id] !== undefined
+          if (!hasConfig) {
+            // 无配置：打开配置弹窗（使用 pendingAgent 作为 agent prop）
+            // 不选中智能体，避免触发心跳检查 useEffect
+            setIsFirstConfigMode(true)
+            setConfigDialogOpen(true)
+            // 注意：这里不清除 pendingAgent，等用户保存配置或关闭弹窗后再清除
+          } else {
+            // 有配置：直接选中智能体
+            setSelectedAgent(pendingAgent)
+            setPendingAgent(null)
+          }
+        }
+      }
+    }
+  }, [pendingAgent, deepsearchServiceAvailable, checkingDeepsearch])
 
   // 处理文件上传
   const handleFileUpload = (files: FileList) => {
@@ -1331,11 +1373,9 @@ const AppsPage: React.FC = () => {
         open={configDialogOpen}
         onClose={() => {
           setConfigDialogOpen(false)
-          // 如果是首次配置模式且用户取消了，清除待选择的智能体
-          if (isFirstConfigMode) {
-            setPendingAgent(null)
-            setIsFirstConfigMode(false)
-          }
+          // 无论是否是首次配置模式，都清除待选择的智能体
+          setPendingAgent(null)
+          setIsFirstConfigMode(false)
         }}
         onSave={handleSaveAgentConfig}
         savedConfigs={agentConfigs}

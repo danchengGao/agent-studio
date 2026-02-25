@@ -692,7 +692,9 @@
       "forceStop": "Force stop",
       "generating": "Generating...",
       "deepSearchServiceUnavailable": "DeepSearch service is temporarily unavailable, please visit ",
-      "deepSearchConfigRetry": ", refer to the documentation for configuration and try again"
+      "deepSearchConfigRetry": ", refer to the documentation for configuration and try again",
+      "checkingDeepsearch": "Checking DeepSearch service status...",
+      "deepsearchServiceDown": "DeepSearch service is temporarily unavailable"
     },
     "picker": {
       "selectAgent": "Select Agent",

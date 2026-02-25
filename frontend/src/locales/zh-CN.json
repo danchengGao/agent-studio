@@ -702,7 +702,9 @@
       "forceStop": "强制中断",
       "generating": "正在生成中...",
       "deepSearchServiceUnavailable": "DeepSearch 服务暂不可用，请前往",
-      "deepSearchConfigRetry": "，参考文档进行配置后重试"
+      "deepSearchConfigRetry": "，参考文档进行配置后重试",
+      "checkingDeepsearch": "正在检查 DeepSearch 服务状态...",
+      "deepsearchServiceDown": "DeepSearch 服务暂时不可用"
     },
     "picker": {
       "selectAgent": "选择智能体",
