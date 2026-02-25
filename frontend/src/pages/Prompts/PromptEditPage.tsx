@@ -76,7 +76,7 @@ import { copyToClipboard } from '@/utils/prompts/utils'
 import { PromptService, PromptModelService, type RelationObj, type MockContext } from '@test-agentstudio/api-client'
 
 const PromptEditPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const isNew = id === 'new'
@@ -260,6 +260,7 @@ const PromptEditPage: React.FC = () => {
   const [isLoadingFromAPI, setIsLoadingFromAPI] = useState(false) // 标记是否正在从API加载数据
   const loadingRef = useRef(false) // 防止重复调用的标志
   const modelsLoadingRef = useRef(false) // 防止模型列表重复调用的标志
+  const pendingModelRestoreRef = useRef<{ modelId: string; modelFrom: string } | null>(null) // 待恢复的模型信息
   const [isInitialized, setIsInitialized] = useState(false) // 组件初始化完成标志
 
   // 对照组数量（不包括基准组）
@@ -375,12 +376,12 @@ const PromptEditPage: React.FC = () => {
         setChatMessageMaxHeight('calc(100vh - 350px)')
       } else if (window.innerWidth < 2000) {
         // 中等屏幕：平板、14寸笔记本等
-        setVersionHistoryHeight('calc(100vh - 140px)')
-        setChatMessageMaxHeight('calc(100vh - 350px)')
+        setVersionHistoryHeight('calc(100vh - 120px)')
+        setChatMessageMaxHeight('calc(100vh - 200px)')
       } else {
         // 大屏幕：15寸以上笔记本、台式显示器
-        setVersionHistoryHeight('calc(100vh - 200px)')
-        setChatMessageMaxHeight('calc(100vh - 500px)')
+        setVersionHistoryHeight('calc(100vh - 120px)')
+        setChatMessageMaxHeight('calc(100vh - 400px)')
       }
     }
 
@@ -2051,6 +2052,71 @@ const PromptEditPage: React.FC = () => {
     }
   }, [isNew, id, isNewPromptScenario, availableModels, selectedModel, modelsLoading])
 
+  // 监听语言变化，重新加载模型列表以获取对应语言的模型参数信息
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // 如果已经有选中的模型，保存当前模型信息，然后重新加载模型列表
+      if (selectedModel && workspaceId) {
+        pendingModelRestoreRef.current = {
+          modelId: selectedModel.openModel.model_id,
+          modelFrom: selectedModel.model_from,
+        }
+        loadModels()
+      }
+    }
+
+    i18n.on('languageChanged', handleLanguageChange)
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange)
+    }
+  }, [i18n, selectedModel, workspaceId, loadModels])
+
+  // 当模型列表更新后，恢复之前选中的模型（用于语言切换场景）
+  useEffect(() => {
+    if (pendingModelRestoreRef.current && availableModels.length > 0) {
+      const { modelId, modelFrom } = pendingModelRestoreRef.current
+      const restoredModel = findModelByIdAndFrom(modelId, modelFrom, availableModels)
+      if (restoredModel) {
+        setSelectedModel(restoredModel)
+      }
+      // 清除待恢复标记
+      pendingModelRestoreRef.current = null
+    }
+  }, [availableModels, setSelectedModel])
+
+  // 新建提示词场景：自动选择第一个模型
+  useEffect(() => {
+    // 检查是否是新建场景：isNew 为 true，或者是刚创建的提示词（通过 localStorage 判断）
+    const basicInfoStr = localStorage.getItem('newPromptBasicInfo')
+    const basicInfo = basicInfoStr ? JSON.parse(basicInfoStr) : null
+    const isNewlyCreated = basicInfo && basicInfo.prompt_id && String(basicInfo.prompt_id) === id
+    const isNewScenario = isNew || isNewlyCreated || isNewPromptScenario
+
+    // 只在新建场景下执行
+    if (!isNewScenario) {
+      return
+    }
+
+    // 如果已经有选中的模型，不需要自动选择
+    if (selectedModel) {
+      return
+    }
+
+    // 如果模型列表已加载且没有选中模型，自动选择第一个模型
+    if (availableModels.length > 0 && !selectedModel && !modelsLoading) {
+      const firstModel = availableModels[0]
+      setSelectedModel(firstModel)
+      const defaultParams = PromptModelService.getModelDefaultParams(firstModel)
+      setModelConfig(prev => ({
+        ...prev,
+        model: firstModel.openModel.model_id,
+        model_from: firstModel.model_from,
+        ...defaultParams,
+      }))
+    }
+  }, [isNew, id, isNewPromptScenario, availableModels, selectedModel, modelsLoading])
+
   // 【统一加载逻辑】整合所有进入提示词页面的加载逻辑
   useEffect(() => {
     // 检查基础条件：必须有workspaceId和初始化完成
@@ -2085,7 +2151,7 @@ const PromptEditPage: React.FC = () => {
 
         if (version) {
           // 调用版本列表API
-          const response = await PromptService.getVersionList(id, { page_size: 20 })
+          const response = await PromptService.getVersionList(id, workspaceId, { page_size: 20 })
 
           if (response.code === 0) {
             const versionList = response.prompt_commit_infos
@@ -2424,6 +2490,7 @@ const PromptEditPage: React.FC = () => {
   }
 
   const deleteMessage = (index: number) => {
+    const updatedMessages = chatMessages.filter((_, i) => i !== index)
     setChatMessages(prev => prev.filter((_, i) => i !== index))
     // 同时清理对应的格式状态
     setMessageFormats(prev => {
@@ -2438,6 +2505,13 @@ const PromptEditPage: React.FC = () => {
       })
       return reindexed
     })
+
+    // 非对比模式下，删除消息后保存调试上下文
+    if (!isComparisonMode) {
+      saveDebugContext(updatedMessages, debugTraceInfo, undefined, undefined, parameters).catch(err => {
+        console.error('保存调试上下文失败:', err)
+      })
+    }
   }
 
   // 监听聊天消息变化，自动滚动到底部
@@ -2789,6 +2863,7 @@ const PromptEditPage: React.FC = () => {
       selectedModel,
       modelConfig,
       availableModels,
+      workspaceId,
       getPromptContentBySource,
       calculateSelectionIndices,
       setSnackbar,
@@ -2822,6 +2897,7 @@ const PromptEditPage: React.FC = () => {
     selectedModel,
     modelConfig,
     availableModels,
+    workspaceId,
     setSnackbar,
     setPromptMessages,
     setMessageInputValues,
@@ -2854,6 +2930,7 @@ const PromptEditPage: React.FC = () => {
     setAiReplyOptimizeDialogOpen,
     abortControllerRef,
     badcaseOptimizeStreamingRef,
+    workspaceId,
     optimizationSource,
     promptMessages,
     setPromptMessages,
@@ -3208,7 +3285,7 @@ const PromptEditPage: React.FC = () => {
       setParameters(prev => {
         const updatedParameters = prev.map(param => (param.name === paramName ? { ...param, value } : param))
 
-        // 在状态更新后触发自动保存
+        // 在状态更新后触发自动保存草稿（草稿保存成功后会统一调用 saveDebugContext，避免重复触发）
         setTimeout(() => {
           setHasUnsavedChanges(true)
           triggerAutoSave({ parameters: updatedParameters })
@@ -3221,7 +3298,7 @@ const PromptEditPage: React.FC = () => {
   )
 
   return (
-    <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40" style={{ minHeight: '93vh', minWidth: 'fit-content', width: '100%' }}>
+    <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 px-6 py-6 h-full" style={{ minHeight: '93vh', width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
       {/* Page header */}
       <PromptEditHeader
         isNew={isNew}
@@ -3245,7 +3322,7 @@ const PromptEditPage: React.FC = () => {
 
       {/* 自由对比模式 */}
       {isComparisonMode ? (
-        <div className="min-h-[calc(100vh-300px)]">
+        <div className="min-h-[calc(100vh-200px)]">
           {/* 动态列对比布局 */}
           <div
             className={`grid grid-cols-1 ${controlGroupCount === 1 ? 'xl:grid-cols-2' : controlGroupCount === 2 ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} gap-0`}
@@ -3255,7 +3332,7 @@ const PromptEditPage: React.FC = () => {
               <div
                 key={group.id}
                 ref={el => (groupContainerRefs.current[group.id] = el)}
-                className="bg-white border border-gray-200 flex flex-col h-[calc(100vh-320px)]"
+                className="bg-white border border-gray-200 flex flex-col h-[calc(100vh-250px)]"
               >
                 <div className="p-4 border-b border-gray-200 bg-gray-50">
                   <div className="flex items-center justify-between">
@@ -3795,7 +3872,7 @@ const PromptEditPage: React.FC = () => {
         </div>
       ) : (
         /* 正常编辑模式 */
-        <div className={`resizable-columns-container flex min-h-[calc(100vh-200px)] gap-0`} style={{ minWidth: 'fit-content', width: '100%' }}>
+        <div className="resizable-columns-container flex min-h-[calc(100vh-200px)] gap-0 h-[calc(100%-72px)]" style={{ minWidth: 'fit-content', width: '100%' }}>
           {/* Column 1: 编写提示词 */}
           <div style={{ width: `${visibleModules.actualWidths[0]}%` }}>
             <Card className="h-full shadow-lg border-0 bg-white/60 backdrop-blur-sm flex flex-col overflow-hidden" sx={{ borderRadius: 0 }}>
@@ -4636,6 +4713,7 @@ const PromptEditPage: React.FC = () => {
         onClose={handleCloseAssociationsDialog}
         associations={selectedAssociations}
         versionName={selectedVersionName}
+        workspaceId={workspaceId}
       />
     </div>
   )

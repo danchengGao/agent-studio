@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
+from openjiuwen_studio.core.utils.compatible_field import mask_sensitive_fields
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
@@ -34,22 +35,6 @@ def get_model_tester(db: Session = Depends(get_db)) -> ModelTester:
 
 def get_security_utils() -> SecurityUtils:
     return SecurityUtils()
-
-
-def get_agent_repository(db: Session = Depends(get_db)) -> AgentRepository:
-    return AgentRepository(db)
-
-
-def get_prompt_relation_repository(db: Session = Depends(get_db)) -> PromptRelationRepository:
-    return PromptRelationRepository(db)
-
-
-def get_workflow_repository(db: Session = Depends(get_db)) -> WorkflowRepository:
-    return WorkflowRepository(db)
-
-
-def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
-    return UserRepository(db)
 
 
 def create_usage_stats_from_model(model: ModelConfig) -> ModelUsageStats:
@@ -100,7 +85,9 @@ def model_to_response(model: ModelConfig) -> ModelConfigResponse:
         created_at=model.created_at,
         updated_at=model.updated_at or model.created_at,  # Fallback to created_at if updated_at is None
         usage_stats=create_usage_stats_from_model(model),
-        api_key_masked=masked_api_key
+        api_key_masked=masked_api_key,
+        is_system_model=model.is_system_model,
+        system_model_id=model.system_model_id
     )
 
 
@@ -195,7 +182,7 @@ async def create_model_config(
     """Create a new model configuration"""
     try:
         # Log the received data for debugging
-        logger.info(f"Creating model config with data: {model_config.dict()}")
+        logger.info(f"Creating model config with data: {mask_sensitive_fields(model_config.dict())}")
         db_model = manager.create_config(model_config)
         
         return ResponseModel(

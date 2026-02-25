@@ -16,7 +16,14 @@ import { type JsonSchemaTypeRegistry } from '../types'
 export const numberRegistry: Partial<JsonSchemaTypeRegistry> = {
   type: 'number',
   ConstantRenderer: props => (
-    <InputNumber placeholder={t('workflowCanvas.formMaterials.input.pleaseInputNumber')} size="small" disabled={props.readonly} hideButtons {...props} />
+    <InputNumber
+      placeholder={t('workflowCanvas.formMaterials.input.pleaseInputNumber')}
+      size="small"
+      disabled={props.readonly}
+      hideButtons
+      max={Number.MAX_VALUE}
+      {...props}
+    />
   ),
   conditionRule: {
     [ConditionPresetOp.EQ]: { type: 'number' },

@@ -110,7 +110,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
     if (!targetId) return
     setVersionLoading(true)
     try {
-      const formatted = await getVersionOptions(targetId)
+      const formatted = await getVersionOptions(targetId, workspaceId)
       setCommitsList(formatted)
 
       // 根据 preferVersion 优先选中对应版本，否则选择最新
@@ -354,7 +354,7 @@ const AgentAssociatePromptDialog: React.FC<AgentAssociatePromptDialogProps> = ({
             variant="contained"
             onClick={handleReplace}
             disabled={!extractPreviewContent() || replacing}
-            className="bg-gradient-to-r from-blue-600 to-purple-600"
+            className="btn-primary"
             startIcon={replacing ? <CircularProgress size={16} /> : undefined}
           >
             {replacing ? t('replacing') : t('replaceSystemPrompt')}

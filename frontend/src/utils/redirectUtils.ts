@@ -1,13 +1,14 @@
 /**
  * 重定向工具函数 - 智能处理页面跳转，避免不必要的重定向
  */
+import { getLoginPagePath } from '@/Common/LoginPage.ts'
 
 // 检查当前是否已经在登录页面
 export const isCurrentLoginPage = (): boolean => {
   if (typeof window === 'undefined') return false
 
   const currentPath = window.location.pathname
-  return currentPath === '/login' || currentPath.includes('/login')
+  return currentPath === getLoginPagePath() || currentPath.includes(getLoginPagePath())
 }
 
 // 检查是否应该跳转到登录页面
@@ -26,26 +27,33 @@ export const smartRedirectToLogin = (): void => {
   if (shouldRedirectToLogin()) {
     console.log('🔄 [RedirectUtils] Redirecting to login page...')
     if (typeof window !== 'undefined') {
-      window.location.href = '/login'
+      window.location.href = getLoginPagePath()
     }
   } else {
     console.log('⏭️ [RedirectUtils] Skipping login redirect - already on login page')
   }
 }
 
-// 重定向到Dashboard（带智能检查）
+
+// 获取 Dashboard 目标路径（统一使用新版首页）
+const getDashboardTargetPath = (): string => {
+  return '/dashboard/agents'
+}
+
+// 重定向到 Dashboard（带智能检查）
 export const smartRedirectToDashboard = (): void => {
   if (typeof window !== 'undefined') {
     const currentPath = window.location.pathname
+    const targetPath = getDashboardTargetPath()
 
-    // 如果已经在dashboard，不需要重定向
-    if (currentPath === '/dashboard') {
-      console.log('🏠 [RedirectUtils] Already on dashboard, skipping redirect')
+    // 如果已经在目标页面，不需要重定向
+    if (currentPath === targetPath || currentPath.startsWith(targetPath + '/')) {
+      console.log(`🏠 [RedirectUtils] Already on ${targetPath}, skipping redirect`)
       return
     }
 
-    console.log('🚀 [RedirectUtils] Redirecting to dashboard...')
-    window.location.href = '/dashboard'
+    console.log(`🚀 [RedirectUtils] Redirecting to ${targetPath}...`)
+    window.location.href = targetPath
   }
 }
 
@@ -54,7 +62,7 @@ export const createSmartRedirect = (navigate: (path: string, options?: any) => v
   toLogin: () => {
     if (shouldRedirectToLogin()) {
       console.log('🔄 [RedirectUtils] React Router: Redirecting to login...')
-      navigate('/login', { replace: true })
+      navigate(getLoginPagePath(), { replace: true })
     } else {
       console.log('⏭️ [RedirectUtils] React Router: Skipping login redirect - already on login page')
     }
@@ -63,14 +71,15 @@ export const createSmartRedirect = (navigate: (path: string, options?: any) => v
   toDashboard: () => {
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname
+      const targetPath = getDashboardTargetPath()
 
-      if (currentPath === '/dashboard') {
-        console.log('🏠 [RedirectUtils] React Router: Already on dashboard, skipping redirect')
+      if (currentPath === targetPath || currentPath.startsWith(targetPath + '/')) {
+        console.log(`🏠 [RedirectUtils] React Router: Already on ${targetPath}, skipping redirect`)
         return
       }
 
-      console.log('🚀 [RedirectUtils] React Router: Redirecting to dashboard...')
-      navigate('/dashboard', { replace: true })
+      console.log(`🚀 [RedirectUtils] React Router: Redirecting to ${targetPath}...`)
+      navigate(targetPath, { replace: true })
     }
   },
 })
@@ -80,7 +89,7 @@ export const isAuthRelatedPage = (): boolean => {
   if (typeof window === 'undefined') return false
 
   const currentPath = window.location.pathname
-  const authPaths = ['/login', '/register', '/forgot-password']
+  const authPaths = ['/login', '/register', '/forgot-password', '/user_login']
 
   return authPaths.some(path => currentPath === path || currentPath.includes(path))
 }

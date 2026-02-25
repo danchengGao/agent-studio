@@ -2,9 +2,9 @@ from typing import Any, Optional, Dict, AsyncGenerator, Union
 from pydantic import ValidationError
 
 from fastapi import APIRouter, HTTPException, Request, status, Depends
-from openjiuwen.core.common.exception.exception import JiuWenBaseException
-from openjiuwen.core.common.logging import logger, set_thread_session, get_thread_session
-from openjiuwen.core.runtime.interaction.interactive_input import InteractiveInput
+from openjiuwen_studio.core.common.exceptions import BaseError
+from openjiuwen.core.common.logging import logger, set_session_id, get_session_id
+from openjiuwen.core.session.interaction.interactive_input import InteractiveInput
 from pydantic import BaseModel, Field
 from sse_starlette import EventSourceResponse
 
@@ -22,16 +22,58 @@ from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.schemas.trace_summary import (TraceSummaryListRequest, TraceSummaryByTraceIdRequest,
                                        TraceSummaryLatestRequest, TraceSummaryBrief)
 from openjiuwen_studio.schemas.execution_log import ExecutionLogSummary
-from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, UpdateLongtermMem, UpdateVariable, GetUserVar, \
-    SearchLongtermMem
+from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, UpdateLongtermMem, UpdateVariable, \
+    GetUserVar, \
+    SearchLongtermMem, DeleteScopeLongtermMem
 from openjiuwen_studio.core.manager.memory import delete_user_variable, delete_longterm_mem, update_user_variable, \
-    update_longterm_mem, get_longterm_mem, get_user_variable
+    update_longterm_mem, get_longterm_mem, get_user_variable, delete_longterm_mem_by_scope_id
+
 from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, WorkflowErrorData, ErrorNodeInfo
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
-from openjiuwen_studio.core.common.message import ExecuteResponse, ExecuteResponseType
+from openjiuwen_studio.core.common.message import ExecuteResponseType
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
 from openjiuwen_studio.core.executor.component.component_execution_manager import component_execution_manager
+from openjiuwen_studio.core.common.language_thread_context import get_language
+from openjiuwen.core.common.exception.codes import StatusCode
+
 execution_router = APIRouter()
+
+
+def _normalize_language(language: Optional[str]) -> str:
+    if not language:
+        return "zh"
+    language = language.strip().lower()
+    if language in {"cn", "zh", "zh-cn", "zh-hans", "zh-hans-cn"} or language.startswith("zh"):
+        return "zh"
+    return "en"
+
+
+def _resolve_language(current_user: Optional[dict]) -> str:
+    """
+    解析当前语言。
+    策略：倾向于英文 (Sticky English)。
+    1. 如果 HTTP Header 指定了英文，返回英文。
+    2. 如果用户配置 (Profile) 指定了英文，返回英文。
+    3. 否则返回中文。
+    """
+    # 1. 检查 Header
+    language = get_language()
+    header_lang = None
+    if language and language.strip().lower() not in {"cn"}:
+        header_lang = _normalize_language(language)
+        if header_lang == "en":
+            return "en"
+
+    # 2. 检查用户配置
+    if current_user:
+        locale = (current_user.get("data") or {}).get("locale")
+        if locale:
+            user_lang = _normalize_language(locale)
+            if user_lang == "en":
+                return "en"
+
+    # 3. 默认中文
+    return "zh"
 
 
 class BaseParas(BaseModel):
@@ -101,12 +143,12 @@ async def handler(
         session_id = " ".join(
             [
                 id_val.strip()
-                for id_val in [request_body.space_id, request_body.conversation_id, get_thread_session()]
+                for id_val in [request_body.space_id, request_body.conversation_id, get_session_id()]
                 if id_val and id_val.strip()
             ]
         )
         if session_id:
-            set_thread_session(session_id)
+            set_session_id(session_id)
 
         async for chunk in mgr.run(request_body.id, request_body.version, inputs,
                                    request_body.conversation_id, request_body.space_id, current_user):
@@ -121,21 +163,21 @@ async def handler(
             ).model_dump_json()
     except JiuWenExecuteException as e:
         log_exception(e)
-        error_node_info = ErrorNodeInfo(error_code=e.error_code, error_message=e.message,
+        error_node_info = ErrorNodeInfo(error_code=e.code, error_message=e.message,
                                         node_id=e.node_id, connection=e.connection)
         data = WorkflowErrorData(workflow_id=e.workflow_id, error_nodes_info=[error_node_info])
-        yield WorkflowFailedResponse(data=data, code=e.error_code, message=e.message).model_dump_json()
+        yield WorkflowFailedResponse(data=data, code=e.code, message=e.message).model_dump_json()
     except JiuWenGraphException as e:
         log_exception(e)
         yield ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data=None
         ).model_dump_json()
     except JiuWenComponentException as e:
         log_exception(e)
         yield ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data={
                 "component_id": e.component_id,
@@ -143,11 +185,23 @@ async def handler(
                 "error_stage": e.error_stage
             }
         ).model_dump_json()
-    except JiuWenBaseException as e:
+    except BaseError as e:
         log_exception(e)
+        message = e.message
+        if e.code == StatusCode.AGENT_TOOL_NOT_FOUND.code:
+            lang = _resolve_language(current_user)
+            if lang == "zh":
+                error_msg = e.params.get("error_msg", "") if e.params else ""
+                if not error_msg and "reason: " in message:
+                    try:
+                        error_msg = message.split("reason: ", 1)[1]
+                    except IndexError:
+                        pass
+                message = f"智能体工具未找到，原因: {error_msg}"
+
         yield ResponseModel(
-            code=e.error_code,
-            message=e.message,
+            code=e.code,
+            message=message,
             data=None
         ).model_dump_json()
     except Exception as e:
@@ -238,16 +292,27 @@ async def execute_component(
                                          request_body.space_id, current_user, request_body.loop_id,
                                          request_body.conversation_id)
         logger.info(f"Received result: {result}")
-        return ResponseModel(code=status.HTTP_200_OK, message="Component Executed successfully", data=result)
+        return ResponseModel(
+            code=status.HTTP_200_OK, message="Component Executed successfully", data=result
+        )
     except JiuWenComponentException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except JiuWenGraphException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
-    except JiuWenBaseException as e:
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
+    except BaseError as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -269,14 +334,14 @@ async def validate_workflow(
     except JiuWenGraphException as e:
         logger.info(f"JiuWenGraphException: {repr(e)}")
         return ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data={}
         )
     except JiuWenComponentException as e:
         logger.info(f"JiuWenComponentException: {repr(e)}")
         return ResponseModel(
-            code=e.error_code,
+            code=e.code,
             message=e.message,
             data={
                 "component_id": e.component_id,
@@ -309,59 +374,26 @@ async def execute_plugin(
         return ResponseModel(code=status.HTTP_200_OK, message="Executed successfully", data=chunk)
     except JiuWenComponentException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except JiuWenGraphException as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
-    except JiuWenBaseException as e:
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
+    except BaseError as e:
         log_exception(e)
-        return ResponseModel(code=e.error_code, message=e.message, data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}})
+        return ResponseModel(
+            code=e.code, message=e.message,
+            data={"type": "node", "payload": {"output": {"result": e.message, "is_success": False}}}
+        )
     except HTTPException:
         raise
     except Exception as e:
         raise handle_http_exception(e, "Plugin execution failed") from e
-
-
-# {
-#     "id": "",
-#     "version": "",
-#     "plugin_id": "Plugin111",
-#     "tool_id": "WeatherReporter",
-#     "inputs": {
-#         "location": "大同",
-#         "date": "2025-08-28"
-#     }
-# }
-
-
-# {
-#     "id": "",
-#     "version": "",
-#     "plugin_id": "Plugin002",
-#     "tool_id": "CodePrint002",
-#     "inputs": {"input1": "lllllllllll", "input2": "ppppppppp"}
-# }
-
-@execution_router.post("/test_plugin", response_model=ResponseModel[dict])
-async def test_plugin(
-    request_body: PluginExecuteParas
-) -> ResponseModel[Dict[str, Any]]:
-    """Run a plugin"""
-
-    try:
-        logger.info(f"in execute: {request_body}")
-        if isinstance(request_body.inputs, UserInput):
-            inputs = InteractiveInput()
-            inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
-        else:
-            inputs = request_body.inputs
-        chunk = await plugin_mgr.run(request_body.plugin_id, request_body.tool_id, inputs, request_body.space_id, "draft", None)
-        logger.warning(f"Received chunk: {chunk}, type: {type(chunk)}")
-        return ResponseModel(code=status.HTTP_200_OK, message="Executed successfully", data=chunk)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise handle_http_exception(e, "Plugin test execution failed") from e
 
 
 @execution_router.post("/get_trace_summary_list", response_model=ResponseModel[list[TraceSummaryBrief]],
@@ -414,9 +446,10 @@ async def get_latest_trace_summary(
 
 @execution_router.post("/memory/get_user_variable", response_model=ResponseModel[dict])
 async def search_variable_memory(
-        request: dict,
+        request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = GetUserVar(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await get_user_variable(req)
         return ResponseModel(
@@ -434,9 +467,10 @@ async def search_variable_memory(
 
 @execution_router.post("/memory/get_longterm_mem", response_model=ResponseModel[dict])
 async def search_longterm_memory(
-        request: dict,
+        request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = SearchLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await get_longterm_mem(req)
         return ResponseModel(
@@ -454,9 +488,10 @@ async def search_longterm_memory(
 
 @execution_router.post("/memory/delete_user_variable", response_model=ResponseModel[dict])
 async def delete_variable_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = DeleteVariable(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await delete_user_variable(req)
         return ResponseModel(
@@ -474,9 +509,10 @@ async def delete_variable_memory(
 
 @execution_router.post("/memory/delete_longterm_mem", response_model=ResponseModel[dict])
 async def delete_longterm_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = DeleteLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await delete_longterm_mem(req)
         return ResponseModel(
@@ -492,11 +528,32 @@ async def delete_longterm_memory(
         )
 
 
-@execution_router.post("/memory/update_user_variable", response_model=ResponseModel[dict])
-async def update_variable_memory(
+@execution_router.post("/memory/delete_longterm_mem_by_scope", response_model=ResponseModel[dict])
+async def delete_longterm_mem_by_scope(
     request: dict,
 ) -> ResponseModel[Dict[str, Any]]:
+    req = DeleteScopeLongtermMem(**request)
+    try:
+        data = await delete_longterm_mem_by_scope_id(req)
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="delete long term memory success",
+            data=data
+        )
+    except Exception as e:
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            message=f"Failed to delete long-term memory: {str(e)}",
+            data=None
+        )
+
+
+@execution_router.post("/memory/update_user_variable", response_model=ResponseModel[dict])
+async def update_variable_memory(
+    request: dict, current_user: dict = Depends(get_current_user)
+) -> ResponseModel[Dict[str, Any]]:
     req = UpdateVariable(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await update_user_variable(req)
         return ResponseModel(
@@ -514,9 +571,10 @@ async def update_variable_memory(
 
 @execution_router.post("/memory/update_longterm_mem", response_model=ResponseModel[dict])
 async def update_longterm_memory(
-    request: dict,
+    request: dict, current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = UpdateLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await update_longterm_mem(req)
         return ResponseModel(
@@ -586,6 +644,7 @@ async def cancel_workflow_execution(
         ResponseModel: 取消操作的结果
     """
     try:
+        logger.info(f"Start to cancel workflow execution")
         _ = check_user_space(request_body.space_id, current_user)
         # 获取执行信息以验证权限
         execution_info = workflow_execution_manager.get_execution(request_body.conversation_id)

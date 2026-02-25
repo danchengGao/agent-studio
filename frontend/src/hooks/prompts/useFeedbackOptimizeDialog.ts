@@ -60,6 +60,9 @@ interface UseFeedbackOptimizeDialogProps {
   modelConfig: ModelConfig
   availableModels: Model[]
 
+  // 工作空间
+  workspaceId: string
+
   // 辅助函数
   getPromptContentBySource: (messageId?: string, optimizationSourceOverride?: OptimizationSource) => string
   calculateSelectionIndices: (selectedText: string, promptContent: string) => { start: number; end: number } | null
@@ -129,6 +132,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
     selectedModel,
     modelConfig,
     availableModels,
+    workspaceId,
     getPromptContentBySource,
     calculateSelectionIndices,
     setSnackbar,
@@ -215,7 +219,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
       // 检查是否配置了有效的模型
       const currentSelectedModel = selectedModelRef.current
       if (!checkValidModel(currentSelectedModel, currentModelConfig, availableModels)) {
-        setSnackbar({ open: true, message: '请先配置有效的模型', severity: 'error' })
+        setSnackbar({ open: true, message: t('components.prompts.promptEditPage.noModelConfigured'), severity: 'error' })
         return
       }
 
@@ -626,7 +630,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
       }
 
       const handleError = (error: string) => {
-        setSnackbar({ open: true, message: error || '优化失败，请重试', severity: 'error' })
+        setSnackbar({ open: true, message: error || t('components.prompts.promptEditPage.optimizationFailed'), severity: 'error' })
       }
 
       const handleComplete = () => {
@@ -651,6 +655,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
           // 场景1：反馈优化 - 不传递位置参数
           await FeedbackOptService.optimizeFeedback(
             { ...baseRequest, mode: 'general' },
+            workspaceId,
             handleData,
             handleError,
             handleComplete,
@@ -675,6 +680,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
             }
             await FeedbackOptService.optimizeFeedback(
               { ...baseRequest, mode: 'insert', start_pos: cursorPosition.position },
+              workspaceId,
               handleData,
               handleError,
               handleComplete,
@@ -737,6 +743,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
               if (updatedIndices) {
                 await FeedbackOptService.optimizeFeedback(
                   { ...baseRequest, mode: 'select', start_pos: updatedIndices.start, end_pos: updatedIndices.end },
+                  workspaceId,
                   handleData,
                   handleError,
                   handleComplete,
@@ -1120,7 +1127,7 @@ export const useFeedbackOptimizeDialog = (props: UseFeedbackOptimizeDialogProps)
     }
 
     if (currentOptimizationType === 'select' && (!selectedText || !selectionIndices)) {
-      const errorMsg = !selectedText ? '选中优化需要选中文本' : '无法确定选中位置'
+      const errorMsg = !selectedText ? t('components.prompts.promptEditPage.selectOptimizationNeedsSelectedText') : t('components.prompts.promptEditPage.selectedPositionNotDetermined')
       setSnackbar({ open: true, message: errorMsg, severity: 'error' })
       return
     }

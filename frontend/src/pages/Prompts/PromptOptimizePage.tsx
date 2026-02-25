@@ -25,7 +25,7 @@ import {
 import { useOptimizationJobList, useDeleteOptimizationJob, useRefreshOptimizationJobList, type JobDetail } from '@test-agentstudio/api-client'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import ConditionalTooltip from '@/components/Prompts/ConditionalTooltip'
-import Pagination from '@/components/Prompts/Pagination'
+import { Pagination } from '@/components/Common/common-table'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { ENV_CONFIG } from '@/config/environment'
 
@@ -234,7 +234,7 @@ const PromptOptimizePage: React.FC = () => {
   }
 
   // 使用 hooks 获取任务列表
-  const { data: jobListData, isLoading, refetch: refetchJobList } = useOptimizationJobList(['*'], workspaceId, userId)
+  const { data: jobListData, isLoading, refetch: refetchJobList } = useOptimizationJobList(['*'], workspaceId)
   const refreshJobListMutation = useRefreshOptimizationJobList()
   const deleteJobMutation = useDeleteOptimizationJob()
 
@@ -276,7 +276,7 @@ const PromptOptimizePage: React.FC = () => {
     if (isRefresh) {
       setRefreshing(true)
       try {
-        await refreshJobListMutation.mutateAsync({ idList: ['*'], workspaceId, userId })
+        await refreshJobListMutation.mutateAsync({ idList: ['*'], workspaceId })
       } catch (error) {
         console.error('刷新任务列表失败:', error)
         showSnackbar(t('prompts.optimizePage.messages.refreshFailed'), 'error')
@@ -381,7 +381,6 @@ const PromptOptimizePage: React.FC = () => {
       await deleteJobMutation.mutateAsync({
         jobId,
         workspaceId,
-        userId,
         jobType,
       })
       showSnackbar(t('prompts.optimizePage.messages.deleteSuccess'), 'success')
@@ -687,13 +686,17 @@ const PromptOptimizePage: React.FC = () => {
 
       {/* 分页组件 - 右下角 */}
       <Pagination
-        currentPage={currentPage}
-        totalCount={filteredPrompts.length}
-        pageSize={pageSize}
+        pager={{
+          total: filteredPrompts.length,
+          currentPage: currentPage,
+          pageSize: pageSize,
+          pageSizeOptions: [10, 20, 30, 40, 50],
+        }}
         loading={loading}
-        onPageChange={handlePageChange}
-        onPageSizeChange={handlePageSizeChange}
-        pageSizeOptions={[10, 20, 30, 40, 50]}
+        onPagerChange={(page, pageSize) => {
+          handlePageChange(page)
+          handlePageSizeChange(pageSize)
+        }}
       />
 
       {/* Snackbar提示 */}

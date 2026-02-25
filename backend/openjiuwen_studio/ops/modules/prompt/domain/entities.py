@@ -146,6 +146,7 @@ class ModelConfig(BaseModel):
     temperature: Optional[float] = None
     top_k: Optional[int] = None
     top_p: Optional[float] = None
+    timeout: Optional[int] = None
     presence_penalty: Optional[float] = None
     frequency_penalty: Optional[float] = None
     json_mode: Optional[bool] = None
@@ -348,6 +349,7 @@ class ListPromptResponse(BaseModel):
 
 class UpdatePromptRequest(BaseModel):
     prompt_id: Optional[int] = None
+    workspace_id: Optional[int] = None
     prompt_name: Optional[str] = None
     prompt_description: Optional[str] = None
     Base: Optional[Base] = None
@@ -367,6 +369,7 @@ class GetPromptResponse(BaseModel):
 
 class DeletePromptRequest(BaseModel):
     prompt_id: Optional[int] = None
+    workspace_id: Optional[int] = None
     Base: Optional[Base] = None
 
 
@@ -483,6 +486,7 @@ class PromptQuery(BaseModel):
 
 class BatchGetPromptRequest(BaseModel):
     queries: List[PromptQuery]
+    workspace_id: Optional[int] = None
 
 
 class BatchPromptResponseItem(BaseModel):

@@ -20,10 +20,12 @@ from openjiuwen.core.common.logging import logger
 from pydantic import BaseModel, ValidationError
 from pymilvus import connections
 import psutil
+from openjiuwen_studio.core.common.agent_defaults import AgentDefaults
 
 import openjiuwen_studio.core.manager.knowledge_base as kb_mgr
 import openjiuwen_studio.core.manager.convertor.agent as convert
 from openjiuwen_studio.core.common.dsl import AgentEditMode
+from openjiuwen_studio.core.common.language_thread_context import get_language
 from openjiuwen_studio.core.common.status_code import StatusCode
 from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.core.manager.internal.agent import (
@@ -55,24 +57,26 @@ from openjiuwen_studio.core.manager.repositories.knowledge_base_repository impor
 )
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
 from openjiuwen_studio.core.manager.repositories.tool_repository import tool_repository
-from openjiuwen_studio.ops.dependencies import get_db_ops
+from openjiuwen_studio.ops.dependencies import get_db_ops, get_db_agent
 from openjiuwen_studio.core.manager.utils.utils import (
     Version,
     check_version,
     get_current_project_version,
 )
-from openjiuwen_studio.models.agent import AgentBaseDBPd
+from openjiuwen_studio.models.agent import AgentBaseDBPd, AgentModelConfig
 from openjiuwen_studio.models.agent import AgentPublishDBPd
 from openjiuwen_studio.models.embedding_model_config import EmbeddingModelConfig
 from openjiuwen_studio.models.knowledge_base_document import KnowledgeBaseDocumentDB
 from openjiuwen_studio.models.workflow import WorkflowBaseDBPd
-from openjiuwen_studio.core.manager.repositories.prompt_relation_repository import prompt_relation_repository
+from openjiuwen_studio.core.manager.repositories.prompt_relation_repository import (
+    prompt_relation_repository,
+)
 from openjiuwen_studio.schemas import related_member
 from sqlalchemy import and_
 from openjiuwen_studio.ops.modules.prompt.infra.repositories.orm_repo import (
     PromptBasicModel,
     PromptCommitModel,
-    PromptUserDraftModel
+    PromptUserDraftModel,
 )
 from openjiuwen_studio.schemas.agent import (
     AGENT_NAME_MAX_SIZE,
@@ -123,10 +127,12 @@ if TYPE_CHECKING:
     # 只为类型检查器服务，运行时不执行
     AgentBaseDBPd: Type[BaseModel]
 
-DEFAULT_OPENING_REMARKS = (
-    "您好！我是您的智能助手，很高兴为您服务。请问有什么可以帮助您的吗？"
-)
+# Current index manager type from environment
+_CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "milvus")
+
 DEFAULT_PAGE = 1
+
+
 DEFAULT_PAGE_SIZE = 10
 
 
@@ -134,6 +140,17 @@ DEFAULT_PAGE_SIZE = 10
 def get_db_ops_session():
     """Helper to get ops database session as context manager"""
     gen = get_db_ops()
+    try:
+        db = next(gen)
+        yield db
+    finally:
+        gen.close()
+
+
+@contextmanager
+def get_db_agent_session():
+    """Helper to get agent database session as context manager"""
+    gen = get_db_agent()
     try:
         db = next(gen)
         yield db
@@ -300,7 +317,7 @@ def create_agent_react_info(req: AgentCreate) -> AgentBaseDBPd:
         # plugins=plugins,  # 待plugins功能完善后再获取
         # model=req.model,
         constraint=constraint.model_dump(),
-        opening_remarks=DEFAULT_OPENING_REMARKS,
+        opening_remarks=AgentDefaults.OPENING_REMARKS.msg,
         create_time=current_time,
         update_time=current_time,
     )
@@ -536,8 +553,9 @@ def get_single_agent_info(
             id=model.id,
             name=model.name,
             type=model.model_type,
-            api_key=model.api_key or "",
-            api_base=model.base_url or "",
+            # 隐藏掉api_key和api_base数据
+            api_key="",
+            api_base="",
             model_provider=model.provider,
             streaming=model.enable_streaming,
             timeout=model.timeout,
@@ -555,11 +573,39 @@ def get_single_agent_info(
         agent_option_info=options
     )
 
+    resp_data = data_response.model_dump(by_alias=False)
+
+    # 补充model信息
+    if agent_info.model_id:
+        models, _ = manager.get_paginated_configs(
+            page=1, size=1, filters={"id": agent_info.model_id, "space_id": req.space_id}
+        )
+        if models:
+            model_config = models[0]
+            saved_config = agent_info.agent_model_config or {}
+
+            model_info = {
+                "model_id": model_config.id,
+                "model_name": model_config.name,
+                "model_type": model_config.model_type,
+                "api_base": "",
+                "api_key": "",
+                "streaming": model_config.enable_streaming,
+                "temperature": saved_config.get("temperature", 0.7),
+                "top_p": saved_config.get("top_p", 0.9),
+                "timeout": saved_config.get("timeout", 300),
+            }
+
+            resp_data["agent_info"]["model"] = {
+                "model_provider": model_config.provider,
+                "model_info": model_info
+            }
+
     # 5. 返回创建结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="create agent success",
-        data=data_response.model_dump(by_alias=False),
+        data=resp_data,
     )
 
 
@@ -616,50 +662,34 @@ def agent_save(
         )
         model_using = models[0] if models else None
 
+    req_dict.pop("model", None)
     if model_using:
         # 提取模型基础参数
-        model_params = model_using.parameters
-        model_base_config = {
-            "model_name": model_using.name,
-            "model_type": model_using.model_type,
-            "api_key": model_using.api_key,
-            "api_base": model_using.base_url,
-            "streaming": model_using.enable_streaming,
-            "timeout": model_using.timeout,
-            "temperature": model_params.get("temperature", 0.7),
-            "top_p": model_params.get("top_p", 0.9),
-            "max_tokens": model_params.get("max_tokens", 4096),
-            "provider": model_using.provider,
-        }
-        logger.info(
-            f"[AGENT_SAVE] model url: {model_using.base_url}, model id: {model_using.model_type}"
-        )
-
-        # 合并模型信息
         req_model_info = req_model.model_info.model_dump()
-        # 更新必要字段
-        req_model_info.update(
-            {
-                "api_key": model_base_config["api_key"],
-                "api_base": model_base_config["api_base"],
-                "model_id": model_using.id,  # 确保设置model_id
-            }
+
+        req_dict["model_id"] = model_using.id
+
+        # 使用定义的 Schema 来构建model_config配置
+        model_config_data = AgentModelConfig(
+            timeout=req_model_info.get("timeout") or 300,
+            temperature=req_model_info.get("temperature") or 0.7,
+            top_p=req_model_info.get("top_p") or 0.9,
         )
-
-        # 填充空值
-        for key, value in req_model_info.items():
-            if value is None and key in model_base_config:
-                req_model_info[key] = model_base_config[key]
-
-        # 构建完整模型字典
-        req_dict["model"] = {
-            "model_provider": model_using.provider,
-            "model_info": req_model_info,
-        }
-        logger.info(f"[AGENT_SAVE] model_provider: {model_using.provider}")
+        req_dict["agent_model_config"] = model_config_data.model_dump(exclude_none=True)
+    else:
+        # 如果指定了model_info但找不到对应模型，则报错
+        if req_model and req_model.model_info and req_model.model_info.model_name:
+            logger.error(f"[AGENT_SAVE] {req_model.model_info.model_name} Model not found")
+            return ResponseModel(
+                code=StatusCode.AGENT_MODEL_NOT_FOUND.code,
+                message=StatusCode.AGENT_MODEL_NOT_FOUND.errmsg.format(msg=req_model.model_info.model_name)
+            )
 
     # 创建AgentBaseDBPd实例
-    agent_info = AgentBaseDBPd(**req_dict, update_time=milliseconds())
+    try:
+        agent_info = AgentBaseDBPd(**req_dict, update_time=milliseconds())
+    except ValidationError as e:
+        raise e
 
     # 4. 更新agent_info信息至DB中
     save_result = agent_repository.save_agent_db(agent_info)
@@ -676,8 +706,9 @@ def agent_save(
     # 5. 管理引用关系
     try:
         # 查询是否存在旧关系
-        search_result = reference_repository.get_records_by_referer_with_version(req.space_id, "AGENT",
-                                                                                 req.agent_id, "draft")
+        search_result = reference_repository.get_records_by_referer_with_version(
+            req.space_id, "AGENT", req.agent_id, "draft"
+        )
         if search_result["code"] == status.HTTP_200_OK and search_result["data"]:
             # 5.1 删除旧的草稿引用关系
             delete_result = reference_repository.reference_delete_by_referer_with_version(
@@ -741,8 +772,10 @@ def agent_meta_update(
     _ = check_user_space(req.space_id, current_user)
 
     # 2. 构建agent_info对象
+    req_dict = req.model_dump()
+
     agent_info = AgentBaseDBPd(
-        **req.model_dump(),
+        **req_dict,
         update_time=milliseconds()
     )
 
@@ -758,25 +791,27 @@ def agent_meta_update(
             message=save_result.message,
         )
 
+    # 4. 同步更新 prompt_relation 表中该智能体关联记录的 name（id 存的是智能体id）
+    pr_result = prompt_relation_repository.update_member_name_in_prompt_relation(
+        space_id=req.space_id,
+        member_type="AGENT",
+        member_id=req.agent_id,
+        new_name=req.agent_name,
+    )
+    if pr_result.code == status.HTTP_200_OK:
+        logger.info(f"[AGENT_UPDATE] Synced agent name in prompt_relation: {pr_result.message}")
+    else:
+        logger.warning(f"[AGENT_UPDATE] Sync agent name in prompt_relation failed: {pr_result.message}")
+
     logger.info(
         f"[AGENT_UPDATE] Agent metadata updated, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 4. 返回更新结果
+    # 5. 返回更新结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="update agent success",
     )
-
-
-def check_agent_validity(agent_meta: dict) -> bool:
-    """检查agent信息是否合法"""
-    try:
-        agent_info = AgentBaseDBPd(**agent_meta)
-        # 检查必要字段是否存在且有效
-        return bool(agent_info.agent_id and agent_info.agent_name)
-    except Exception:
-        return False
 
 
 @with_exception_handling
@@ -811,10 +846,27 @@ def agent_get_list(
             message=list_result.message
         )
 
+    # 批量获取模型信息
+    model_ids = {item.get("model_id") for item in list_result.data["items"] if item.get("model_id")}
+    model_name_map = {}
+    if model_ids:
+        try:
+            with get_db_agent_session() as db:
+                model_mgr = ModelConfigManager(db)
+                models = model_mgr.get_configs_by_ids(list(model_ids))
+                if models:
+                    for m in models:
+                        model_name_map[m.id] = m.name
+        except Exception as e:
+            logger.error(f"[AGENT_GET_LIST] Failed to fetch model names: {e}")
+
     items: list[AgentItem] = []
     for item_data in list_result.data["items"]:
         model_name = "no model"
-        if item_data.get("model"):
+        m_id = item_data.get("model_id")
+        if m_id and m_id in model_name_map:
+            model_name = model_name_map[m_id]
+        elif item_data.get("model"): # 兼容旧数据
             try:
                 # 简化模型数据处理
                 model = AgentModel(**item_data.get("model"))
@@ -950,7 +1002,52 @@ def agent_publish(
 
     # 5. 使用agent_convert进行智能体校验
     logger.debug(f"[AGENT_PUBLISH] Starting validation - ID: {req.agent_id}")
-    agent_dsl, err = convert.agent_convert(req.space_id, agent_data)
+    # 临时获取模型信息用于校验
+    model_details = None
+    if agent_data.model_id:
+        try:
+            with get_db_agent_session() as db:
+                model_mgr = ModelConfigManager(db)
+                models, _ = model_mgr.get_paginated_configs(
+                    page=1, size=1, filters={"id": agent_data.model_id}
+                )
+                if models:
+                    m = models[0]
+                    model_details = {
+                        "id": m.id,
+                        "name": m.name,
+                        "model_type": m.model_type,
+                        "provider": m.provider,
+                        "api_key": m.api_key,
+                        "base_url": m.base_url,
+                        "enable_streaming": m.enable_streaming,
+                        "timeout": m.timeout,
+                        "parameters": m.parameters,
+                    }
+
+                    # Apply model_config overrides
+                    if agent_data.agent_model_config:
+                        if model_details.get("parameters") is None:
+                            model_details["parameters"] = {}
+                        if agent_data.agent_model_config.get("temperature") is not None:
+                            model_details["parameters"]["temperature"] = (
+                                agent_data.agent_model_config.get("temperature")
+                            )
+                        if agent_data.agent_model_config.get("top_p") is not None:
+                            model_details["parameters"]["top_p"] = (
+                                agent_data.agent_model_config.get("top_p")
+                            )
+                        if agent_data.agent_model_config.get("timeout") is not None:
+                            model_details["timeout"] = (
+                                agent_data.agent_model_config.get("timeout")
+                            )
+
+        except Exception as e:
+            logger.warning(
+                f"[AGENT_PUBLISH] Failed to fetch model info for validation: {e}"
+            )
+
+    _, err = convert.agent_convert(req.space_id, agent_data, model_details)
     if err is not None:
         logger.error(
             f"[AGENT_PUBLISH] Validation failed - ID: {req.agent_id}, Error: {err}"
@@ -1058,9 +1155,49 @@ def agent_convert(
             message=get_result.message,
         )
 
-    # 2. 将展示面信息转换成执行面可用信息
+    # 2. 获取模型详情 (if model_id exists)
+    model_details = None
+    model_id = get_result.data.get("model_id")
+    model_config = get_result.data.get("agent_model_config")
+    if model_id:
+        try:
+            with get_db_agent_session() as db:
+                model_mgr = ModelConfigManager(db)
+                models, _ = model_mgr.get_paginated_configs(
+                    page=1, size=1, filters={"id": model_id, "space_id": req.space_id}
+                )
+                if models:
+                    m = models[0]
+                    model_details = {
+                        "id": m.id,
+                        "name": m.name,
+                        "model_type": m.model_type,
+                        "provider": m.provider,
+                        "api_key": m.api_key,
+                        "base_url": m.base_url,
+                        "enable_streaming": m.enable_streaming,
+                        "timeout": m.timeout,
+                        "parameters": m.parameters
+                    }
+        except Exception as e:
+            logger.error(f"[AGENT_CONVERT] Failed to fetch model config: {e}")
+
+    if model_details and model_config:
+        # 优先使用 agent 自身的配置覆盖模型的默认配置
+        if model_config.get("timeout") is not None:
+            model_details["timeout"] = model_config.get("timeout")
+        # 确保 parameters 字典存在
+        if "parameters" in model_details and model_details["parameters"] is not None:
+            if model_config.get("max_tokens") is not None:
+                model_details["parameters"]["max_tokens"] = model_config.get("max_tokens")
+            if model_config.get("temperature") is not None:
+                model_details["parameters"]["temperature"] = model_config.get("temperature")
+            if model_config.get("top_p") is not None:
+                model_details["parameters"]["top_p"] = model_config.get("top_p")
+
+    # 3. 将展示面信息转换成执行面可用信息
     agent_dsl, err = convert.agent_convert(
-        req.space_id, AgentBaseDBPd(**get_result.data)
+        req.space_id, AgentBaseDBPd(**get_result.data), model_details
     )
     if err is not None:
         return ResponseModel(
@@ -1094,6 +1231,8 @@ def agent_react_copy(
     # 准备复制数据
     agent_data = get_result.data.copy()
     agent_data.pop("agent_version", None)  # 复制的智能体只能生成draft版本
+    agent_data.pop("latest_publish_version", None)
+    agent_data.pop("latest_publish_time", None)
 
     # 创建复制的智能体
     agent_copy = AgentBaseDBPd(**agent_data)
@@ -1139,7 +1278,7 @@ def agent_search(
         sort_by=req.sort_by.value if req.sort_by else "update_time",
         sort_order=req.sort_order.value if req.sort_order else "desc",
         page=req.page or 1,
-        page_size=req.page_size or 10
+        page_size=req.page_size or 10,
     )
 
     # 3. 调用现有的get_space_agent_list_db接口（已支持搜索）
@@ -1405,6 +1544,26 @@ def _update_plugin_ids_in_json(data: Any, plugin_id_map: Dict[str, str]) -> Any:
         return new_data
     elif isinstance(data, list):
         return [_update_plugin_ids_in_json(item, plugin_id_map) for item in data]
+    else:
+        return data
+
+
+def _update_tool_ids_in_json(data: Any, tool_id_map: Dict[str, str]) -> Any:
+    """递归更新JSON中的tool_id"""
+    if isinstance(data, dict):
+        new_data = {}
+        for k, v in data.items():
+            # 检查值是否为旧工具ID
+            if k == "toolID" or k == "tool_id":
+                if isinstance(v, str) and v in tool_id_map:
+                    new_data[k] = tool_id_map[v]
+                else:
+                    new_data[k] = v
+            else:
+                new_data[k] = _update_tool_ids_in_json(v, tool_id_map)
+        return new_data
+    elif isinstance(data, list):
+        return [_update_tool_ids_in_json(item, tool_id_map) for item in data]
     else:
         return data
 
@@ -1796,6 +1955,7 @@ def _collect_knowledge_dependencies(
     space_id: str,
     knowledge_bases: list[Dict[str, Any]],
     processed_kb_ids: Set[str],
+    index_manager_type: str | None = None,
 ):
     """收集 Knowledge Base 依赖"""
     if not knowledge_ids:
@@ -1806,7 +1966,9 @@ def _collect_knowledge_dependencies(
             continue
 
         # Get KB Data
-        kb_query = KnowledgeBaseGet(space_id=space_id, kb_id=kb_id)
+        kb_query = KnowledgeBaseGet(
+            space_id=space_id, kb_id=kb_id, index_manager_type=index_manager_type
+        )
         kb_res = knowledge_base_repository.knowledge_base_get(kb_query)
 
         if kb_res.code != status.HTTP_200_OK or not kb_res.data:
@@ -1855,8 +2017,9 @@ def _collect_knowledge_dependencies(
                     "file_type": doc.file_type,
                     "mime_type": doc.mime_type,
                     "status": doc.status,
-                    "es_index_id": doc.es_index_id,
-                    "es_index_name": doc.es_index_name,
+                    "index_manager_type": doc.index_manager_type,
+                    "index_id": doc.index_id,
+                    "index_name": doc.index_name,
                     "chunk_count": doc.chunk_count,
                     "process_info": doc.process_info,
                     "doc_metadata": doc.doc_metadata,
@@ -1925,7 +2088,19 @@ async def _import_knowledge_bases(
     created_resources = []
     warnings = []
 
-    async def import_documents(target_kb_id: str, source_kb_id: str, documents: list[Dict[str, Any]]):
+    # 清理 space_id，防止路径穿越
+    if space_id:
+        safe_space_id = Path(space_id).name.lstrip(".").replace("..", "_")
+    else:
+        safe_space_id = None
+
+    if not safe_space_id:
+        warnings.append(f"空间ID无效，跳过知识库导入: {space_id}\n")
+        return created_resources, warnings
+
+    async def import_documents(
+        target_kb_id: str, source_kb_id: str, documents: list[Dict[str, Any]]
+    ):
         """导入文档记录并处理文件"""
         if not documents:
             return
@@ -1934,6 +2109,26 @@ async def _import_knowledge_bases(
         # doc_ids_to_process = []  # No longer used
         # 收集需要处理的文档信息 (doc_id, file_path)
         docs_to_process = []
+
+        # 清理 source_kb_id，防止路径穿越
+        if source_kb_id:
+            safe_source_kb_id = Path(source_kb_id).name.lstrip(".").replace("..", "_")
+        else:
+            safe_source_kb_id = None
+
+        if not safe_source_kb_id:
+            warnings.append(f"知识库ID无效，跳过文档导入: {source_kb_id}\n")
+            return
+
+        # 清理 target_kb_id，防止路径穿越
+        if target_kb_id:
+            safe_target_kb_id = Path(target_kb_id).name.lstrip(".").replace("..", "_")
+        else:
+            safe_target_kb_id = None
+
+        if not safe_target_kb_id:
+            warnings.append(f"目标知识库ID无效，跳过文档导入: {target_kb_id}\n")
+            return
 
         with get_db_jw() as db:
             for doc_data in documents:
@@ -1954,23 +2149,74 @@ async def _import_knowledge_bases(
                     continue
                 else:
                     # 创建新文档
-                    new_doc_id = doc_data["doc_id"] if overwrite else str(uuid.uuid4())
-                    
+                    if overwrite:
+                        # 验证用户提供的 doc_id，防止路径穿越
+                        raw_doc_id = doc_data.get("doc_id", "")
+                        if raw_doc_id:
+                            new_doc_id = Path(str(raw_doc_id)).name.lstrip(".").replace("..", "_")
+                        else:
+                            new_doc_id = None
+
+                        if not new_doc_id:
+                            logger.warning(f"[KB_IMPORT] 无效的 doc_id，生成新的 UUID: {raw_doc_id}")
+                            new_doc_id = str(uuid.uuid4())
+                    else:
+                        new_doc_id = str(uuid.uuid4())
+
                     # 尝试从 ZIP 中恢复文件
                     file_restored = False
-                    new_file_path = doc_data["file_path"] # 默认使用原有路径（可能无效）
-                    
+                    new_file_path = doc_data["file_path"]  # 默认使用原有路径（可能无效）
+
                     if documents_source_dir:
                         # 在 ZIP 中查找文件: documents/{source_kb_id}/{filename}
                         # 优先尝试 doc name，因为新版 export 使用 doc name
                         filename = doc_data.get("name")
-                        source_file = documents_source_dir / "documents" / source_kb_id / filename
+
+                        # 防止路径穿越攻击：清理文件名，移除路径分隔符和父目录引用
+                        if filename:
+                            # 获取纯文件名，移除任何路径组件
+                            safe_filename = Path(filename).name
+                            # 进一步清理，移除潜在的隐藏文件前缀和危险字符
+                            safe_filename = safe_filename.lstrip(".").replace("..", "_")
+                        else:
+                            safe_filename = None
+
+                        if not safe_filename:
+                            warnings.append(f"文档文件名无效，跳过: {filename}\n")
+                            continue
+
+                        source_file = documents_source_dir / "documents" / safe_source_kb_id / safe_filename
+
+                        # 安全检查：确保解析后的路径仍在预期的基础目录内
+                        expected_base = (documents_source_dir / "documents" / safe_source_kb_id).resolve()
+                        try:
+                            resolved_source_file = source_file.resolve()
+                            if not str(resolved_source_file).startswith(str(expected_base)):
+                                logger.warning(f"[KB_IMPORT] 路径穿越攻击尝试被阻止: {filename}")
+                                warnings.append(f"文档文件名包含非法路径: {filename}\n")
+                                continue
+                        except (OSError, ValueError) as path_err:
+                            logger.warning(f"[KB_IMPORT] 路径解析失败: {filename}, 错误: {path_err}")
+                            warnings.append(f"文档文件名无效: {filename}\n")
+                            continue
 
                         if source_file.exists():
+                            # 安全检查：确保是常规文件，不是符号链接或目录
+                            try:
+                                file_stat = source_file.stat()
+                                if not source_file.is_file():
+                                    logger.warning(f"[KB_IMPORT] 跳过非文件项: {safe_filename}")
+                                    warnings.append(f"文档文件不是常规文件: {safe_filename}\n")
+                                    continue
+                            except (OSError, IOError) as stat_err:
+                                logger.warning(f"[KB_IMPORT] 无法获取文件状态: {safe_filename}, 错误: {stat_err}")
+                                warnings.append(f"文档文件状态获取失败: {safe_filename}\n")
+                                continue
+
                             # 复制到系统的知识库存储目录
                             # 路径规则参考 knowledge_base._get_storage_path
                             # backend/data/knowledge_base/{space_id}/{kb_id}/{doc_id}{ext}
-                            
+
                             # 获取后端数据目录 (假设在当前工作区根目录的 backend/data)
                             # 这里需要一种可靠的方式获取数据目录，通常配置在 settings 中
                             # 暂时使用相对路径推断
@@ -1979,20 +2225,47 @@ async def _import_knowledge_bases(
                                 # xxx/agent-studio/backend/openjiuwen_studio/core/manager/agent.py
                                 # -> backend/data
                                 backend_dir = Path(__file__).resolve().parent.parent.parent.parent
-                                storage_path = backend_dir / "data" / "knowledge_base" / space_id / target_kb_id
+                                storage_path = (
+                                    backend_dir
+                                    / "data"
+                                    / "knowledge_base"
+                                    / safe_space_id
+                                    / safe_target_kb_id
+                                )
                                 storage_path.mkdir(parents=True, exist_ok=True)
-                                
+
                                 # 生成新文件名
-                                safe_filename = f"{new_doc_id}{Path(filename).suffix}"
-                                target_path = storage_path / safe_filename
-                                
+                                target_filename = f"{new_doc_id}{Path(safe_filename).suffix}"
+                                target_path = storage_path / target_filename
+
+                                # 验证文件大小，防止元数据欺骗
+                                actual_file_size = source_file.stat().st_size
+                                declared_file_size = doc_data.get("file_size", 0)
+                                if actual_file_size != declared_file_size:
+                                    logger.warning(
+                                        f"[KB_IMPORT] 文件大小不匹配: {safe_filename} "
+                                        f"(实际: {actual_file_size}, 声明: {declared_file_size})"
+                                    )
+                                    # 可以选择跳过或继续，这里选择继续但记录警告
+
+                                # 可选：文件大小上限检查，防止磁盘耗尽攻击
+                                max_file_size = 100 * 1024 * 1024  # 100MB
+                                if actual_file_size > max_file_size:
+                                    logger.warning(
+                                        f"[KB_IMPORT] 文件超过大小限制 ({max_file_size} bytes): {safe_filename}"
+                                    )
+                                    warnings.append(f"文档文件超过大小限制: {safe_filename}\n")
+                                    continue
+
                                 shutil.copy2(source_file, target_path)
                                 new_file_path = str(target_path)
                                 file_restored = True
-                                logger.info(f"[KB_IMPORT] Restored document file: {filename} -> {target_path}")
+                                logger.info(
+                                    f"[KB_IMPORT] Restored document file: {safe_filename} -> {target_path}"
+                                )
                             except Exception as e:
-                                logger.error(f"[KB_IMPORT] Failed to restore file {filename}: {e}")
-                                warnings.append(f"文档文件 {filename} 恢复失败: {e}\n")
+                                logger.error(f"[KB_IMPORT] Failed to restore file {safe_filename}: {e}")
+                                warnings.append(f"文档文件 {safe_filename} 恢复失败: {e}\n")
 
                     new_doc = KnowledgeBaseDocumentDB(
                         space_id=space_id,
@@ -2006,11 +2279,16 @@ async def _import_knowledge_bases(
                         # 如果文件恢复成功，设置为 UPLOADED 以便触发处理
                         # 否则设置为 FAILED
                         status="uploaded" if file_restored else "failed",
-                        es_index_id=None,  # 清空索引关联
-                        es_index_name=None,
+                        index_id=None,  # 清空索引关联
+                        index_name=None,
+                        index_manager_type=_CURR_INDEX_TYPE,
                         chunk_count=0,
                         process_info={
-                            "message": "Imported from agent export." if file_restored else "Imported but file missing.",
+                            "message": (
+                                "Imported from agent export."
+                                if file_restored
+                                else "Imported but file missing."
+                            ),
                             "original_process_info": doc_data.get("process_info"),
                         },
                         doc_metadata=doc_data.get("doc_metadata"),
@@ -2019,16 +2297,18 @@ async def _import_knowledge_bases(
                         update_time=milliseconds(),
                     )
                     db.add(new_doc)
-                    
+
                     if file_restored:
-                        docs_to_process.append({
-                            "doc_id": new_doc_id,
-                            "file_path": new_file_path,
-                            "process_info": doc_data.get("process_info", {})
-                        })
-                        
+                        docs_to_process.append(
+                            {
+                                "doc_id": new_doc_id,
+                                "file_path": new_file_path,
+                                "process_info": doc_data.get("process_info", {}),
+                            }
+                        )
+
             db.commit()
-            
+
         # 触发文档处理（同步/内联 await，不使用 background task 以避免连接上下文丢失问题）
         if docs_to_process:
             try:
@@ -2037,24 +2317,22 @@ async def _import_knowledge_bases(
                     milvus_host = os.getenv("MILVUS_HOST", "localhost")
                     milvus_port = os.getenv("MILVUS_PORT", "19530")
                     # 尝试连接 default alias，这通常是 pymilvus 的默认连接
-                    connections.connect(
-                        alias="default",
-                        host=milvus_host,
-                        port=milvus_port
-                    )
+                    connections.connect(alias="default", host=milvus_host, port=milvus_port)
                     logger.info("[KB_IMPORT] Explicitly established Milvus connection for import.")
                 except Exception as conn_err:
-                    logger.warning(f"[KB_IMPORT] Failed to explicitly connect to Milvus: {conn_err}")
+                    logger.warning(
+                        f"[KB_IMPORT] Failed to explicitly connect to Milvus: {conn_err}"
+                    )
 
                 # 构造策略对象 (使用第一个文档的信息作为模板)
                 ref_info = docs_to_process[0].get("process_info", {})
-                
+
                 # ParsingStrategy
                 parsing_dict = ref_info.get("parsing_strategy", {})
                 if not parsing_dict.get("strategy_type"):
                     parsing_dict["strategy_type"] = "1"
                 parsing_strategy = ParsingStrategy(**parsing_dict)
-                
+
                 # SegmentationStrategy
                 seg_dict = ref_info.get("segmentation_strategy", {})
                 if not seg_dict.get("strategy_type"):
@@ -2062,7 +2340,7 @@ async def _import_knowledge_bases(
                 if not seg_dict.get("strategy_config"):
                     seg_dict["strategy_config"] = {"max_tokens": 512, "chunk_overlap_percent": 10}
                 segmentation_strategy = SegmentationStrategy(**seg_dict)
-                
+
                 # IndexingStrategy
                 idx_dict = ref_info.get("indexing_strategy", {})
                 if idx_dict.get("llm_model_id") is None:
@@ -2078,20 +2356,22 @@ async def _import_knowledge_bases(
                     "segmentation_strategy": segmentation_strategy.model_dump(),
                     "indexing_strategy": indexing_strategy.model_dump(),
                     "start_time": current_time,
-                    "import_task": True # 标记为导入任务
+                    "import_task": True,  # 标记为导入任务
                 }
 
                 # 串行处理每个文档
                 for idx, doc_item in enumerate(docs_to_process):
                     doc_id = doc_item["doc_id"]
                     file_path = doc_item["file_path"]
-                    
-                    logger.info(f"[KB_IMPORT] Processing document {idx+1}/{len(docs_to_process)}: {doc_id}")
-                    
+
+                    logger.info(
+                        f"[KB_IMPORT] Processing document {idx+1}/{len(docs_to_process)}: {doc_id}"
+                    )
+
                     process_info = {
                         **process_info_base,
                         "current_index": idx + 1,
-                        "total_count": len(docs_to_process)
+                        "total_count": len(docs_to_process),
                     }
 
                     # 直接调用 manager 的内部处理函数 (await)
@@ -2105,17 +2385,21 @@ async def _import_knowledge_bases(
                             parsing_strategy=parsing_strategy,
                             segmentation_strategy=segmentation_strategy,
                             indexing_strategy=indexing_strategy,
-                            process_info=process_info
+                            process_info=process_info,
                         )
                     except Exception as inner_e:
                         logger.error(f"[KB_IMPORT] Failed to process document {doc_id}: {inner_e}")
                         # 不中断整个导入，继续下一个
                         continue
 
-                logger.info(f"[KB_IMPORT] Completed document processing for {len(docs_to_process)} documents.")
-                
+                logger.info(
+                    f"[KB_IMPORT] Completed document processing for {len(docs_to_process)} documents."
+                )
+
             except Exception as e:
-                logger.error(f"[KB_IMPORT] Failed to trigger document processing: {e}", exc_info=True)
+                logger.error(
+                    f"[KB_IMPORT] Failed to trigger document processing: {e}", exc_info=True
+                )
 
     for kb_data in knowledge_bases_data:
         old_kb_id = kb_data.get("kb_id")
@@ -2124,8 +2408,10 @@ async def _import_knowledge_bases(
 
         target_kb_id = None
 
-        # Check existence
-        kb_query = KnowledgeBaseGet(space_id=space_id, kb_id=old_kb_id)
+        # Check existence - use current environment's index_manager_type
+        kb_query = KnowledgeBaseGet(
+            space_id=space_id, kb_id=old_kb_id, index_manager_type=_CURR_INDEX_TYPE
+        )
         existing_res = knowledge_base_repository.knowledge_base_get(kb_query)
 
         if existing_res.code == status.HTTP_200_OK and existing_res.data:
@@ -2141,22 +2427,16 @@ async def _import_knowledge_bases(
                 logger.info(
                     f"Creating copy of Knowledge Base '{kb_data.get('name')}' because overwrite=False"
                 )
-                
+
                 # 1. Generate new ID
                 new_kb_id = uuid.uuid4().hex
                 kb_id_map[old_kb_id] = new_kb_id
-                
+
                 # 2. Check embedding model
-                emb_id = _resolve_embedding_model_id(
-                    space_id, kb_data.get("embedding_model_info")
-                )
+                emb_id = _resolve_embedding_model_id(space_id, kb_data.get("embedding_model_info"))
                 if not emb_id:
-                    model_id = (
-                        kb_data.get("embedding_model_info", {}).get("model_id") or "unknown"
-                    )
-                    warning_msg = (
-                        f"Embedding模型 '{model_id}' 未找到。请手动添加模型信息后再重新配置知识库！\n"
-                    )
+                    model_id = kb_data.get("embedding_model_info", {}).get("model_id") or "unknown"
+                    warning_msg = f"Embedding模型 '{model_id}' 未找到。请手动添加模型信息后再重新配置知识库！\n"
                     logger.warning(warning_msg)
                     warnings.append(warning_msg)
                     # Even if model missing, we mapped ID, but can't create KB effectively without model
@@ -2171,10 +2451,11 @@ async def _import_knowledge_bases(
                     "description": kb_data.get("description"),
                     "embedding_model_config_id": emb_id,
                     "config": kb_data.get("config"),
+                    "index_manager_type": _CURR_INDEX_TYPE,
                     "create_time": milliseconds(),
                     "update_time": milliseconds(),
                 }
-                
+
                 # 4. Create KB
                 res = knowledge_base_repository.knowledge_base_create(new_kb_data)
                 if res.code == status.HTTP_200_OK:
@@ -2185,13 +2466,9 @@ async def _import_knowledge_bases(
                     warnings.append(f"知识库副本 {new_kb_data['name']} 创建失败！\n")
         else:
             # Create new with original ID
-            emb_id = _resolve_embedding_model_id(
-                space_id, kb_data.get("embedding_model_info")
-            )
+            emb_id = _resolve_embedding_model_id(space_id, kb_data.get("embedding_model_info"))
             if not emb_id:
-                model_id = (
-                    kb_data.get("embedding_model_info", {}).get("model_id") or "unknown"
-                )
+                model_id = kb_data.get("embedding_model_info", {}).get("model_id") or "unknown"
                 warning_msg = (
                     f"Embedding模型 '{model_id}' 未找到。请手动添加模型信息后再重新配置知识库！\n"
                 )
@@ -2211,6 +2488,7 @@ async def _import_knowledge_bases(
                 "description": kb_data.get("description"),
                 "embedding_model_config_id": emb_id,
                 "config": kb_data.get("config"),
+                "index_manager_type": _CURR_INDEX_TYPE,
                 "create_time": milliseconds(),
                 "update_time": milliseconds(),
             }
@@ -2233,18 +2511,12 @@ async def _import_knowledge_bases(
                     new_kb_data["kb_id"] = new_kb_id
                     new_kb_data["name"] = f"{new_kb_data['name']}_copy"
 
-                    retry_res = knowledge_base_repository.knowledge_base_create(
-                        new_kb_data
-                    )
+                    retry_res = knowledge_base_repository.knowledge_base_create(new_kb_data)
                     if retry_res.code == status.HTTP_200_OK:
-                        created_resources.append(
-                            {"type": "knowledge_base", "id": new_kb_id}
-                        )
+                        created_resources.append({"type": "knowledge_base", "id": new_kb_id})
                         target_kb_id = new_kb_id
                     else:
-                        logger.error(
-                            f"Failed to create KB with new ID: {retry_res.message}"
-                        )
+                        logger.error(f"Failed to create KB with new ID: {retry_res.message}")
                 else:
                     logger.error(f"Failed to create KB: {res.message}")
 
@@ -2258,7 +2530,9 @@ async def _import_knowledge_bases(
 
 
 @with_exception_handling
-def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseModel, Tuple[io.BytesIO, str]]:
+def agent_export(
+    req: AgentExportRequest, current_user: dict
+) -> Union[ResponseModel, Tuple[io.BytesIO, str]]:
     """导出智能体及其依赖项"""
     data = current_user.get("data", {})
     user_id = (
@@ -2287,7 +2561,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
     if not get_result.data:
         return ResponseModel(
             code=StatusCode.AGENT_EXPORT_AGENT_NOT_FOUND.code,
-            message=StatusCode.AGENT_EXPORT_AGENT_NOT_FOUND.errmsg
+            message=StatusCode.AGENT_EXPORT_AGENT_NOT_FOUND.errmsg,
         )
 
     agent_data = get_result.data
@@ -2304,7 +2578,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
         processed_plugin_ids: Set[str] = set()
         processed_kb_ids: Set[str] = set()
         processed_prompt_ids: Set[str] = set()
-    
+
         # 3.1 处理直接依赖的Workflows
         agent_workflows = agent_data.get("workflows", []) or []
         for wf in agent_workflows:
@@ -2319,7 +2593,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
                     plugins,
                     processed_plugin_ids,
                 )
-    
+
         # 3.2 处理直接依赖的Plugins
         agent_plugins = agent_data.get("plugins", []) or []
         for pl in agent_plugins:
@@ -2336,37 +2610,38 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
                 req.space_id,
                 knowledge_bases,
                 processed_kb_ids,
+                index_manager_type=_CURR_INDEX_TYPE,
             )
-        
+
         # 3.4 处理提示词模板依赖
         # 获取Agent关联的prompt模板
         agent_related_info = related_member.RelatedMemberInfo(
             id=req.agent_id,
             version=req.agent_version or "draft",
             type=related_member.MemberType.AGENT,
-            name=agent_data.get("agent_name", "")
+            name=agent_data.get("agent_name", ""),
         )
-        
+
         prompt_relations_res = prompt_relation_repository.get_prompt_relate_tbl(
             space_id=req.space_id,
             find_member_info=agent_related_info,
             only_active=True
         )
-        
+
         if prompt_relations_res.code == status.HTTP_200_OK and prompt_relations_res.data:
             prompt_relations = prompt_relations_res.data
-            
+
             # 使用直接数据库查询获取完整的prompt模板信息
             with get_db_ops_session() as db:
                 # 动态导入prompt相关模型
                 for relation in prompt_relations:
                     prompt_id = relation.get("prompt_id")
                     prompt_version = relation.get("prompt_version")
-                    
+
                     # 只要有prompt_id就尝试导出，增加容错性
                     if prompt_id and prompt_id not in processed_prompt_ids:
                         processed_prompt_ids.add(prompt_id)
-                        
+
                         try:
                             # 查询prompt基本信息
                             prompt_basic = db.query(PromptBasicModel).filter(
@@ -2378,36 +2653,47 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
                             
                             # 查询prompt提交信息
                             prompt_commit = None
-                            
+
                             # 1. 尝试根据关联的版本号查找
                             if prompt_version and prompt_version != "draft":
-                                prompt_commit = db.query(PromptCommitModel).filter(
-                                    and_(
-                                        PromptCommitModel.prompt_id == int(prompt_id),
-                                        PromptCommitModel.version == prompt_version
+                                prompt_commit = (
+                                    db.query(PromptCommitModel)
+                                    .filter(
+                                        and_(
+                                            PromptCommitModel.prompt_id == int(prompt_id),
+                                            PromptCommitModel.version == prompt_version,
+                                        )
                                     )
                                 ).first()
                             
                             # 2. 如果没找到，或者版本是draft，或者关联版本查找失败，尝试查找最新提交
                             if not prompt_commit and prompt_basic and prompt_basic.latest_version:
-                                prompt_commit = db.query(PromptCommitModel).filter(
-                                    and_(
-                                        PromptCommitModel.prompt_id == int(prompt_id),
-                                        PromptCommitModel.version == prompt_basic.latest_version
+                                prompt_commit = (
+                                    db.query(PromptCommitModel)
+                                    .filter(
+                                        and_(
+                                            PromptCommitModel.prompt_id == int(prompt_id),
+                                            PromptCommitModel.version
+                                            == prompt_basic.latest_version,
+                                        )
                                     )
                                 ).first()
                                 
                             # 3. 如果还是没找到，尝试查找用户草稿
                             prompt_draft = None
                             if not prompt_commit:
-                                prompt_draft = db.query(PromptUserDraftModel).filter(
-                                    and_(
-                                        PromptUserDraftModel.prompt_id == int(prompt_id),
-                                        PromptUserDraftModel.user_id == user_id,
-                                        PromptUserDraftModel.deleted_at == 0
+                                prompt_draft = (
+                                    db.query(PromptUserDraftModel)
+                                    .filter(
+                                        and_(
+                                            PromptUserDraftModel.prompt_id == int(prompt_id),
+                                            PromptUserDraftModel.user_id == user_id,
+                                            PromptUserDraftModel.deleted_at == 0,
+                                        )
                                     )
-                                ).first()
-                            
+                                    .first()
+                                )
+
                             # 构建prompt_commit_dict
                             prompt_commit_dict = {}
                             if prompt_commit:
@@ -2425,12 +2711,12 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
                                     "version": prompt_commit.version,
                                     "base_version": prompt_commit.base_version,
                                     "committed_by": prompt_commit.committed_by,
-                                    "description": prompt_commit.description
+                                    "description": prompt_commit.description,
                                 }
                             elif prompt_draft:
                                 # 使用草稿模拟commit数据
                                 prompt_commit_dict = {
-                                    "id": None, # 草稿没有commit id
+                                    "id": None,  # 草稿没有commit id
                                     "space_id": prompt_draft.space_id,
                                     "prompt_id": prompt_draft.prompt_id,
                                     "prompt_key": prompt_basic.prompt_key if prompt_basic else "",
@@ -2440,58 +2726,63 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
                                     "variable_defs": prompt_draft.variable_defs,
                                     "tools": prompt_draft.tools,
                                     "tool_call_config": prompt_draft.tool_call_config,
-                                    "version": prompt_version \
-                                    if prompt_version and prompt_version != "draft" \
-                                    else "draft",
+                                    "version": (
+                                        prompt_version
+                                        if prompt_version and prompt_version != "draft"
+                                        else "draft"
+                                    ),
                                     "base_version": prompt_draft.base_version,
                                     "committed_by": prompt_draft.user_id,
-                                    "description": "Exported from draft"
+                                    "description": "Exported from draft",
                                 }
-                            
+
                             # 构建完整的prompt模板数据
                             prompt_template = {
                                 "prompt_id": prompt_id,
                                 "prompt_version": prompt_version,
                                 "prompt_name": relation.get("prompt_name", ""),
-                                "prompt_basic": {
-                                    "id": prompt_basic.id if prompt_basic else None,
-                                    "space_id": prompt_basic.space_id if prompt_basic else None,
-                                    "prompt_key": prompt_basic.prompt_key if prompt_basic else "",
-                                    "name": prompt_basic.name if prompt_basic else "",
-                                    "description": prompt_basic.description if prompt_basic else "",
-                                    "latest_version": prompt_basic.latest_version if prompt_basic else ""
-                                } if prompt_basic else {},
-                                "prompt_commit": prompt_commit_dict
+                                "prompt_basic": (
+                                    {
+                                        "id": prompt_basic.id if prompt_basic else None,
+                                        "space_id": prompt_basic.space_id if prompt_basic else None,
+                                        "prompt_key": (
+                                            prompt_basic.prompt_key if prompt_basic else ""
+                                        ),
+                                        "name": prompt_basic.name if prompt_basic else "",
+                                        "description": (
+                                            prompt_basic.description if prompt_basic else ""
+                                        ),
+                                        "latest_version": (
+                                            prompt_basic.latest_version if prompt_basic else ""
+                                        ),
+                                    }
+                                    if prompt_basic
+                                    else {}
+                                ),
+                                "prompt_commit": prompt_commit_dict,
                             }
                             prompt_templates.append(prompt_template)
                         except Exception as e:
-                            logger.error(f"[AGENT_EXPORT] Failed to get prompt detail for {prompt_id}: {e}")
+                            logger.error(
+                                f"[AGENT_EXPORT] Failed to get prompt detail for {prompt_id}: {e}"
+                            )
                             # 如果获取失败，使用基本信息
                             prompt_template = {
                                 "prompt_id": prompt_id,
                                 "prompt_version": prompt_version,
-                                "prompt_name": relation.get("prompt_name", "")
+                                "prompt_name": relation.get("prompt_name", ""),
                             }
                             prompt_templates.append(prompt_template)
     except Exception as e:
         logger.error(f"[AGENT_EXPORT] Dependency collection failed: {e}", exc_info=True)
         return ResponseModel(
             code=StatusCode.AGENT_EXPORT_DEPENDENCY_ERROR.code,
-            message=StatusCode.AGENT_EXPORT_DEPENDENCY_ERROR.errmsg.format(msg=str(e))
+            message=StatusCode.AGENT_EXPORT_DEPENDENCY_ERROR.errmsg.format(msg=str(e)),
         )
 
     # 4. 清理敏感信息 (如 API Key)
-    if "model" in agent_data and agent_data["model"]:
-        if "model_info" in agent_data["model"]:
-            # 注意：如果是 dict 访问，如果是对象则 getattr
-            # agent_data 来自 repository get_agent_db，通常是 dict
-            if (
-                isinstance(agent_data["model"], dict)
-                and "model_info" in agent_data["model"]
-            ):
-                if isinstance(agent_data["model"]["model_info"], dict):
-                    agent_data["model"]["model_info"]["api_key"] = ""
-                    agent_data["model"]["model_info"]["api_base"] = ""
+    # model字段已弃用，不再处理
+    # agent_model_config 中不包含敏感信息，model_id 直接导出供参考
 
     # 5. 构建导出数据
     version = get_current_project_version()
@@ -2499,7 +2790,10 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
         version=version,  # 暂定和代码发布版本相同
         agent=agent_data,
         dependencies=AgentDependencies(
-            workflows=workflows, plugins=plugins, knowledge_bases=knowledge_bases, prompt_templates=prompt_templates
+            workflows=workflows,
+            plugins=plugins,
+            knowledge_bases=knowledge_bases,
+            prompt_templates=prompt_templates,
         ),
         metadata=AgentExportMetadata(
             export_time=datetime.datetime.now(datetime.timezone.utc).isoformat(),
@@ -2514,7 +2808,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
     )
 
     # 统一文件名格式
-    timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+    timestamp = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%d%H%M%S")
     base_filename = f"{agent_data.get('agent_name', 'agent')}-export-{timestamp}"
 
     if has_documents:
@@ -2522,10 +2816,10 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             # 1. 写入 json文件
             zip_file.writestr(
-                f"{base_filename}.json", 
-                json.dumps(export_data.model_dump(), ensure_ascii=False, indent=2)
+                f"{base_filename}.json",
+                json.dumps(export_data.model_dump(), ensure_ascii=False, indent=2),
             )
-            
+
             # 2. 写入知识库文档
             for kb in knowledge_bases:
                 documents = kb.get("documents", [])
@@ -2537,7 +2831,7 @@ def agent_export(req: AgentExportRequest, current_user: dict) -> Union[ResponseM
                         file_name = doc.get("name") or os.path.basename(file_path)
                         zip_path = f"documents/{kb.get('kb_id')}/{file_name}"
                         zip_file.write(file_path, zip_path)
-        
+
         zip_buffer.seek(0)
         filename = f"{base_filename}.zip"
         return zip_buffer, filename
@@ -2557,25 +2851,25 @@ async def agent_import_from_file(
     # 安全限制常量
     MAX_EXTRACT_SIZE = 100 * 1024 * 1024  # 文件大小检查，限定100MB
     MAX_FILE_COUNT = 50  # 最多50个文件
-    
+
     # 临时目录用于解压
     temp_dir = Path(f"/tmp/agent_import_{uuid.uuid4()}")
     temp_dir.mkdir(parents=True, exist_ok=True)
-    
+
     try:
         import_data_dict = None
         is_zip = False
-        
+
         # 1. 识别文件类型并处理
         file_io = io.BytesIO(file_content)
-        
+
         if zipfile.is_zipfile(file_io):
             # 处理 ZIP 文件
             try:
                 with zipfile.ZipFile(file_io) as zip_file:
                     # 安全检查：防止路径遍历攻击和恶意文件
                     file_list = zip_file.infolist()
-                    
+
                     # 检查点1：检查文件个数，文件个数大于预期值时上报异常退出
                     file_count = len(file_list)
                     if file_count > MAX_FILE_COUNT:
@@ -2583,9 +2877,9 @@ async def agent_import_from_file(
                             code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
                             message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
                                 msg=f"ZIP contains {file_count} files, exceeds limit of {MAX_FILE_COUNT}"
-                            )
+                            ),
                         )
-                    
+
                     # 检查点2：检查第一层解压文件总大小，总大小超过设定的上限值
                     total_size = sum(info.file_size for info in file_list)
                     if total_size > MAX_EXTRACT_SIZE:
@@ -2593,9 +2887,9 @@ async def agent_import_from_file(
                             code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
                             message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
                                 msg=f"ZIP size exceeds limit ({MAX_EXTRACT_SIZE//(1024*1024)}MB)"
-                            )
+                            ),
                         )
-                    
+
                     # 检查点3：检查磁盘剩余空间是否足够（如果psutil可用）
                     try:
                         disk_usage = psutil.disk_usage(temp_dir)
@@ -2604,49 +2898,91 @@ async def agent_import_from_file(
                                 code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
                                 message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
                                     msg=f"ZIP {total_size//(1024*1024)}MB exceeds free disk space"
-                                )
+                                ),
                             )
                     except ImportError:
                         # psutil不可用，跳过磁盘空间检查
                         logger.warning("psutil not available, skipping disk space check")
                     except Exception as e:
                         logger.warning(f"Failed to check disk space: {e}")
-                    
+
+                    # 检查点4：检查Zip内文件名是否存在路径穿越风险
+                    resolved_temp_dir = temp_dir.resolve()
+
+                    for member in file_list:
+                        # 解析目标文件的绝对路径
+                        try:
+                            # 拼接路径并解析，以处理 '..' 和符号链接
+                            # 注意：如果文件不存在，pathlib.resolve() 在不同版本行为不同，
+                            # 但此处我们要检查的是路径字符串是否逃逸
+                            member_path = temp_dir / member.filename
+                            resolved_member_path = member_path.resolve()
+                        except Exception:
+                            # 尝试使用 os.path.abspath 作为备选，处理 resolve 可能的异常
+                            # 但通常 resolve 是最准确的
+                            try:
+                                resolved_member_path = Path(os.path.abspath(temp_dir / member.filename))
+                            except Exception as e:
+                                logger.warning(f"Failed to resolve path for {member.filename}: {e}")
+                                return ResponseModel(
+                                    code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
+                                    message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
+                                        msg=f"Invalid file path in ZIP: {member.filename}"
+                                    ),
+                                )
+
+                        if not str(resolved_member_path).startswith(str(resolved_temp_dir)):
+                            logger.warning(
+                                f"Zip path traversal attempt detected: {member.filename} -> {resolved_member_path}"
+                            )
+                            return ResponseModel(
+                                code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
+                                message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
+                                    msg=f"Security error: Zip contains file with illegal path ({member.filename})"
+                                ),
+                            )
+
                     # 所有检查通过之后，解压文件
                     zip_file.extractall(temp_dir)
                     is_zip = True
-                    
+
                     # 查找 agent JSON 配置文件
                     json_files = list(temp_dir.glob("*.json"))
                     if not json_files:
                         return ResponseModel(
                             code=StatusCode.AGENT_IMPORT_CONFIG_MISSING.code,
-                            message=StatusCode.AGENT_IMPORT_CONFIG_MISSING.errmsg
+                            message=StatusCode.AGENT_IMPORT_CONFIG_MISSING.errmsg,
                         )
-                    
+
                     # 假设只有一个 JSON 文件，或者找名字匹配模式的
                     # 优先找包含 '-export-' 的，否则取第一个
-                    config_file = next((f for f in json_files if "-export-" in f.name), json_files[0])
-                    
-                    with open(config_file, 'r', encoding='utf-8') as f:
+                    config_file = next(
+                        (f for f in json_files if "-export-" in f.name), json_files[0]
+                    )
+
+                    with open(config_file, "r", encoding="utf-8") as f:
                         import_data_dict = json.load(f)
-            
+
             except zipfile.BadZipFile:
                 return ResponseModel(
                     code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
-                    message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(msg="Invalid ZIP file format")
+                    message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
+                        msg="Invalid ZIP file format"
+                    ),
                 )
             except (IOError, OSError) as e:
                 return ResponseModel(
                     code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
-                    message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(msg=f"File operation error: {e}")
+                    message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
+                        msg=f"File operation error: {e}"
+                    ),
                 )
             except json.JSONDecodeError as e:
                 return ResponseModel(
                     code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
                     message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
                         msg=f"Invalid JSON in config file: {e}"
-                    )
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"Unexpected error during ZIP processing: {e}", exc_info=True)
@@ -2654,48 +2990,50 @@ async def agent_import_from_file(
                     code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
                     message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
                         msg=f"Error processing ZIP file: {e}"
-                    )
+                    ),
                 )
-        
+
         else:
             # 不是 ZIP，作为 JSON 处理
             try:
-                import_data_dict = json.loads(file_content.decode('utf-8'))
+                import_data_dict = json.loads(file_content.decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 return ResponseModel(
                     code=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.code,
                     message=StatusCode.AGENT_IMPORT_FILE_FORMAT_ERROR.errmsg.format(
                         msg="Unsupported format. Use valid ZIP or JSON"
-                    )
+                    ),
                 )
-        
+
         # 2. 构造 AgentImportRequest 对象
         try:
             # import_data_dict 应该符合 AgentExportData 结构
             import_data = AgentExportData(**import_data_dict)
-            
+
             # 构造请求对象
             req = AgentImportRequest(
                 space_id=space_id,
                 import_data=import_data,
                 overwrite=overwrite
             )
-            
+
             # 3. 调用核心导入逻辑（复用现有逻辑）
-            res = await _agent_import_core(req, current_user, documents_source_dir=temp_dir if is_zip else None)
+            res = await _agent_import_core(
+                req, current_user, documents_source_dir=temp_dir if is_zip else None
+            )
             return res
-            
+
         except ValidationError as e:
             return ResponseModel(
                 code=StatusCode.AGENT_IMPORT_DATA_VALIDATION_ERROR.code,
-                message=StatusCode.AGENT_IMPORT_DATA_VALIDATION_ERROR.errmsg.format(msg=str(e))
+                message=StatusCode.AGENT_IMPORT_DATA_VALIDATION_ERROR.errmsg.format(msg=str(e)),
             )
 
     except Exception as e:
         logger.error(f"[AGENT_IMPORT_FILE] Error: {e}", exc_info=True)
         return ResponseModel(
             code=StatusCode.AGENT_IMPORT_FAILED.code,
-            message=StatusCode.AGENT_IMPORT_FAILED.errmsg.format(msg=str(e))
+            message=StatusCode.AGENT_IMPORT_FAILED.errmsg.format(msg=str(e)),
         )
     finally:
         if temp_dir.exists():
@@ -2775,9 +3113,9 @@ async def _agent_import_core(
             check_query = {"plugin_id": old_plugin_id, "space_id": space_id}
             existing_plugin_res, _ = plugin_repository.plugin_get(check_query)
 
-            if existing_plugin_res.get(
-                "code"
-            ) == status.HTTP_200_OK and existing_plugin_res.get("data"):
+            if existing_plugin_res.get("code") == status.HTTP_200_OK and existing_plugin_res.get(
+                "data"
+            ):
                 if req.overwrite:
                     # 覆盖：使用原有ID更新
                     plugin_data["space_id"] = space_id
@@ -2791,7 +3129,7 @@ async def _agent_import_core(
                     # For simplicity, we only track completely new resources.
                     for tid in created_tools:
                         created_resources.append({"type": "tool", "id": tid})
-                    
+
                     # 记录ID映射
                     plugin_id_map[old_plugin_id] = old_plugin_id
                 else:
@@ -2799,13 +3137,13 @@ async def _agent_import_core(
                     # 1. 生成新 Plugin ID
                     new_plugin_id = str(uuid.uuid4())
                     plugin_id_map[old_plugin_id] = new_plugin_id
-                    
+
                     # 2. 更新 Plugin 数据
                     plugin_data["plugin_id"] = new_plugin_id
                     plugin_data["name"] = f"{plugin_data.get('name')}_copy"
                     plugin_data["create_time"] = None
                     plugin_data["update_time"] = None
-                    
+
                     # 3. 更新 Tool IDs
                     if "tool_list" in plugin_data and isinstance(plugin_data["tool_list"], list):
                         for tool in plugin_data["tool_list"]:
@@ -2814,26 +3152,28 @@ async def _agent_import_core(
                                 new_tool_id = str(uuid.uuid4())
                                 tool_id_map[old_tool_id] = new_tool_id
                                 tool["tool_id"] = new_tool_id
-                    
+
                     # 4. 创建新插件副本
                     logger.info(f"[AGENT_IMPORT] Creating plugin copy {plugin_data.get('name')}")
-                    
+
                     created_pid, created_tools = _create_plugin_and_tools(
                         space_id, plugin_data, tool_id_map
                     )
-                    
+
                     if created_pid:
                         created_resources.append({"type": "plugin", "id": created_pid})
                         for tid in created_tools:
                             created_resources.append({"type": "tool", "id": tid})
-                        
+
                         # 更新 map 为实际创建的 ID
                         plugin_id_map[old_plugin_id] = created_pid
                         logger.info(
                             f"[AGENT_IMPORT] Created plugin copy {plugin_data.get('name')} with ID {created_pid}"
                         )
                     else:
-                        logger.error(f"[AGENT_IMPORT] Failed to create plugin copy for {old_plugin_id}")
+                        logger.error(
+                            f"[AGENT_IMPORT] Failed to create plugin copy for {old_plugin_id}"
+                        )
             else:
                 # 使用_create_plugin_and_tools创建插件和工具
                 logger.info(f"[AGENT_IMPORT] Creating plugin {plugin_data.get('name')}")
@@ -2924,12 +3264,12 @@ async def _agent_import_core(
             logger.info("[AGENT_IMPORT] Installing knowledge bases from import data")
             if documents_source_dir:
                 created_kbs, warnings = await _import_knowledge_bases(
-                    dependencies.knowledge_bases, 
-                    space_id, 
-                    kb_id_map, 
-                    current_user, 
-                    req.overwrite, 
-                    documents_source_dir=documents_source_dir
+                    dependencies.knowledge_bases,
+                    space_id,
+                    kb_id_map,
+                    current_user,
+                    req.overwrite,
+                    documents_source_dir=documents_source_dir,
                 )
             else:
                 created_kbs, warnings = await _import_knowledge_bases(
@@ -2943,23 +3283,25 @@ async def _agent_import_core(
         prompt_templates_data = []  # 保存导入的prompt模板数据，用于后续建立关联
         if dependencies.prompt_templates:
             logger.info("[AGENT_IMPORT] Installing prompt templates from import data")
-            
+
             # 使用直接数据库操作导入prompt模板
             with get_db_ops_session() as db:
                 for prompt_data in dependencies.prompt_templates:
                     old_prompt_id = prompt_data.get("prompt_id")
                     if not old_prompt_id:
                         continue
-                    
+
                     raw_version = prompt_data.get("prompt_version")
                     # 如果版本为空，默认设为0.0.1，以确保能生成有效的Commit记录
                     if not raw_version:
                         prompt_version = "0.0.1"
                     else:
                         prompt_version = raw_version
-                        
-                    prompt_name = prompt_data.get("prompt_name", f"导入的提示词_{old_prompt_id}")  # 默认名称
-                    
+
+                    prompt_name = prompt_data.get(
+                        "prompt_name", f"导入的提示词_{old_prompt_id}"
+                    )  # 默认名称
+
                     # 确保prompt_basic_data和prompt_commit_data不为空
                     prompt_basic_data = prompt_data.get("prompt_basic", {})
                     prompt_commit_data = prompt_data.get("prompt_commit", {})
@@ -2970,7 +3312,7 @@ async def _agent_import_core(
                             f"[AGENT_IMPORT] Prompt commit data is empty for {prompt_name}, "
                             f"trying to recover from agent config"
                         )
-                        
+
                         # 尝试从 agent.configs.system_prompt 恢复
                         system_prompt = agent_data.get("configs", {}).get("system_prompt")
                         if system_prompt:
@@ -2984,54 +3326,68 @@ async def _agent_import_core(
                             
                             if not prompt_commit_data:
                                 prompt_commit_data = {}
-                            
+
                             prompt_commit_data["messages"] = recovered_messages
-                            prompt_commit_data["template_type"] = "normal" # 默认为普通模板
+                            prompt_commit_data["template_type"] = "normal"  # 默认为普通模板
                             prompt_commit_data["version"] = prompt_version
                             prompt_commit_data["description"] = "Recovered from agent config"
-                            
+
                             # 尝试恢复 prompt_model_config
                             if not prompt_commit_data.get("prompt_model_config"):
                                 agent_model = agent_data.get("model", {}).get("model_info", {})
                                 if agent_model:
-                                    prompt_commit_data["prompt_model_config"] = json.dumps({
-                                        "parameters": {
-                                            "temperature": agent_model.get("temperature", 0.7),
-                                            "max_tokens": agent_model.get("max_tokens", 4096),
-                                            "top_p": agent_model.get("top_p", 0.9),
+                                    prompt_commit_data["prompt_model_config"] = json.dumps(
+                                        {
+                                            "parameters": {
+                                                "temperature": agent_model.get("temperature", 0.7),
+                                                "max_tokens": agent_model.get("max_tokens", 4096),
+                                                "top_p": agent_model.get("top_p", 0.9),
+                                            }
                                         }
-                                    })
-                            
-                            logger.info(f"[AGENT_IMPORT] Recovered prompt messages from agent config for {prompt_name}")
-                    
+                                    )
+
+                            logger.info(
+                                f"[AGENT_IMPORT] Recovered prompt messages from agent config for {prompt_name}"
+                            )
+
                     try:
                         # 2.1 检查是否存在 (根据 prompt_key 和 version)
-                        original_key = prompt_basic_data.get("prompt_key") or f"prompt_{old_prompt_id}"
+                        original_key = (
+                            prompt_basic_data.get("prompt_key") or f"prompt_{old_prompt_id}"
+                        )
                         target_version = prompt_commit_data.get("version") or prompt_version
-                        
-                        existing_basic = db.query(PromptBasicModel).filter(
-                            and_(
-                                PromptBasicModel.space_id == space_id,
-                                PromptBasicModel.prompt_key == original_key,
-                                PromptBasicModel.deleted_at.is_(None)
+
+                        existing_basic = (
+                            db.query(PromptBasicModel)
+                            .filter(
+                                and_(
+                                    PromptBasicModel.space_id == space_id,
+                                    PromptBasicModel.prompt_key == original_key,
+                                    PromptBasicModel.deleted_at.is_(None),
+                                )
                             )
-                        ).first()
-                        
+                            .first()
+                        )
+
                         current_prompt_id = None
-                        
+
                         if existing_basic:
                             # 检查版本是否匹配
-                            existing_commit = db.query(PromptCommitModel).filter(
-                                and_(
-                                    PromptCommitModel.prompt_id == existing_basic.id,
-                                    PromptCommitModel.version == target_version
+                            existing_commit = (
+                                db.query(PromptCommitModel)
+                                .filter(
+                                    and_(
+                                        PromptCommitModel.prompt_id == existing_basic.id,
+                                        PromptCommitModel.version == target_version,
+                                    )
                                 )
-                            ).first()
-                            
+                                .first()
+                            )
+
                             if existing_commit:
                                 # 存在且版本匹配，直接复用
                                 current_prompt_id = existing_basic.id
-                        
+
                         if not current_prompt_id:
                             # 2.2 不存在或版本不匹配，创建新的
                             # 确定新的prompt_key
@@ -3046,24 +3402,30 @@ async def _agent_import_core(
                             else:
                                 # Key不存在，尝试使用原始Key
                                 new_prompt_key = original_key
-                                logger.info(f"[AGENT_IMPORT] Creating new prompt template with key: {new_prompt_key}")
+                                logger.info(
+                                    f"[AGENT_IMPORT] Creating new prompt template with key: {new_prompt_key}"
+                                )
 
                             # 创建 PromptBasicModel
                             new_prompt_basic = PromptBasicModel(
                                 space_id=space_id,
                                 prompt_key=new_prompt_key,
                                 name=prompt_basic_data.get("name", prompt_name),
-                                description=prompt_basic_data.get("description", "导入的提示词模板"),
+                                description=prompt_basic_data.get(
+                                    "description", "导入的提示词模板"
+                                ),
                                 created_by=data.get("user_id_str", "unknown"),
                                 updated_by=data.get("user_id_str", "unknown"),
                                 latest_version=target_version,  # 使用当前导入的版本作为最新版本，确保一致性
-                                latest_commit_time=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                                latest_commit_time=datetime.datetime.now(
+                                    datetime.timezone.utc
+                                ).replace(tzinfo=None),
                             )
                             db.add(new_prompt_basic)
                             db.flush()  # 获取数据库生成的自增ID
-                            
+
                             current_prompt_id = new_prompt_basic.id
-                            
+
                             # 创建 PromptCommitModel
                             new_prompt_commit = PromptCommitModel(
                                 space_id=space_id,
@@ -3071,41 +3433,51 @@ async def _agent_import_core(
                                 prompt_key=new_prompt_key,
                                 template_type=prompt_commit_data.get("template_type", "normal"),
                                 messages=prompt_commit_data.get("messages", ""),
-                                prompt_model_config=prompt_commit_data.get("prompt_model_config", ""),
+                                prompt_model_config=prompt_commit_data.get(
+                                    "prompt_model_config", ""
+                                ),
                                 variable_defs=prompt_commit_data.get("variable_defs", ""),
                                 tools=prompt_commit_data.get("tools", ""),
                                 tool_call_config=prompt_commit_data.get("tool_call_config", ""),
                                 version=prompt_commit_data.get("version", prompt_version),
                                 base_version=prompt_commit_data.get("base_version", ""),
-                                committed_by=prompt_commit_data.get("committed_by", data.get("username", "unknown")),
-                                description=prompt_commit_data.get("description", "导入的提示词版本")
+                                committed_by=prompt_commit_data.get(
+                                    "committed_by", data.get("username", "unknown")
+                                ),
+                                description=prompt_commit_data.get(
+                                    "description", "导入的提示词版本"
+                                ),
                             )
                             db.add(new_prompt_commit)
-                            
+
                             logger.info(
                                 f"[AGENT_IMPORT] Created new prompt {current_prompt_id} "
                                 f"(version: {new_prompt_commit.version})"
                             )
-                        
+
                         # 记录ID映射
                         prompt_id_map[old_prompt_id] = str(current_prompt_id)
-                        
+
                         # 无论prompt模板是否已存在，都要为目标用户创建prompt草稿
                         # 这样用户才能在前端提示词管理中看到导入的模板
                         user_id = data.get("user_id_str", "unknown")
-                        
+
                         # 检查草稿是否已存在
-                        existing_draft = db.query(PromptUserDraftModel).filter(
-                            PromptUserDraftModel.prompt_id == int(current_prompt_id),
-                            PromptUserDraftModel.user_id == user_id,
-                            PromptUserDraftModel.deleted_at == 0
-                        ).first()
-                        
+                        existing_draft = (
+                            db.query(PromptUserDraftModel)
+                            .filter(
+                                PromptUserDraftModel.prompt_id == int(current_prompt_id),
+                                PromptUserDraftModel.user_id == user_id,
+                                PromptUserDraftModel.deleted_at == 0,
+                            )
+                            .first()
+                        )
+
                         if not existing_draft:
                             # 获取提交数据（如果存在的话）
                             # 由于总是创建新的提交记录，所以直接使用prompt_commit_data
                             commit_data = prompt_commit_data or {}
-                            
+
                             # 创建新草稿
                             new_draft = PromptUserDraftModel(
                                 space_id=int(space_id),
@@ -3119,25 +3491,29 @@ async def _agent_import_core(
                                 tool_call_config=commit_data.get("tool_call_config", ""),
                                 base_version=target_version,
                                 is_draft_edited=False,
-                                deleted_at=0
+                                deleted_at=0,
                             )
                             db.add(new_draft)
-                        
+
                         logger.info(
                             f"[AGENT_IMPORT] Processed prompt template: {prompt_name} "
                             f"(ID: {prompt_id_map[old_prompt_id]})"
                         )
                         # 保存prompt模板数据，用于后续建立关联
-                        prompt_templates_data.append({
-                            "old_prompt_id": old_prompt_id,
-                            "prompt_version": prompt_version,
-                            "prompt_name": prompt_name
-                        })
+                        prompt_templates_data.append(
+                            {
+                                "old_prompt_id": old_prompt_id,
+                                "prompt_version": prompt_version,
+                                "prompt_name": prompt_name,
+                            }
+                        )
                     except Exception as e:
-                        logger.error(f"[AGENT_IMPORT] Failed to import prompt template {old_prompt_id}: {e}")
+                        logger.error(
+                            f"[AGENT_IMPORT] Failed to import prompt template {old_prompt_id}: {e}"
+                        )
                         # 记录原始ID映射，以便后续处理
                         prompt_id_map[old_prompt_id] = old_prompt_id
-                
+
                 # 提交所有更改
                 db.commit()
 
@@ -3158,24 +3534,24 @@ async def _agent_import_core(
                 try:
                     schema_obj = json.loads(wf_data["schema"])
                     updated_schema = schema_obj
-                    
+
                     # 更新工作流ID引用
                     if workflow_id_map:
                         updated_schema = _update_workflow_ids_in_json(
                             updated_schema, workflow_id_map
                         )
-                    
+
                     # 更新插件ID引用
                     if plugin_id_map:
-                        updated_schema = _update_plugin_ids_in_json(
-                            updated_schema, plugin_id_map
-                        )
+                        updated_schema = _update_plugin_ids_in_json(updated_schema, plugin_id_map)
+
+                    # 更新工具ID引用
+                    if tool_id_map:
+                        updated_schema = _update_tool_ids_in_json(updated_schema, tool_id_map)
 
                     # 如果 schema 发生变化，更新 wf_data
                     if updated_schema != schema_obj:
-                        wf_data["schema"] = json.dumps(
-                            updated_schema, ensure_ascii=False
-                        )
+                        wf_data["schema"] = json.dumps(updated_schema, ensure_ascii=False)
                         logger.info(
                             f"[AGENT_IMPORT] Updated schema for workflow {old_wf_id} with new dependencies"
                         )
@@ -3206,50 +3582,58 @@ async def _agent_import_core(
                     wf_data["workflow_id"] = new_wf_id
                     wf_data["name"] = f"{wf_data.get('name')}_copy"
                     workflow_name_map[old_wf_id] = wf_data["name"]
-                    
+
                     # 创建新工作流
                     wf_data["space_id"] = space_id
                     wf_data["create_time"] = None
                     wf_data["update_time"] = None
-                    
+
                     try:
                         wf_obj = WorkflowBaseDBPd(**wf_data)
                         wf_obj.create_time = None
                         wf_obj.update_time = None
-                        
+
                         create_res = workflow_repository.workflow_create(wf_obj)
                         if create_res.code == status.HTTP_200_OK:
                             created_resources.append({"type": "workflow", "id": new_wf_id})
-                            logger.info(f"[AGENT_IMPORT] Created copy workflow: {new_wf_id} (original: {old_wf_id})")
+                            logger.info(
+                                f"[AGENT_IMPORT] Created copy workflow: {new_wf_id} (original: {old_wf_id})"
+                            )
                         else:
                             logger.error(
                                 f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: "
                                 f"{create_res.message}"
                             )
                     except Exception as e:
-                        logger.error(f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: {e}")
+                        logger.error(
+                            f"[AGENT_IMPORT] Failed to create copy workflow {old_wf_id}: {e}"
+                        )
             else:
                 # 当前用户空间下不存在该workflow_id，直接生成新的workflow_id来写入，避免id冲突
                 new_wf_id = str(uuid.uuid4())
                 workflow_id_map[old_wf_id] = new_wf_id
                 wf_data["workflow_id"] = new_wf_id
-                
+
                 # 创建新工作流
                 wf_data["space_id"] = space_id
                 wf_data["create_time"] = None
                 wf_data["update_time"] = None
-                
+
                 try:
                     wf_obj = WorkflowBaseDBPd(**wf_data)
                     wf_obj.create_time = None
                     wf_obj.update_time = None
-                    
+
                     create_res = workflow_repository.workflow_create(wf_obj)
                     if create_res.code == status.HTTP_200_OK:
                         created_resources.append({"type": "workflow", "id": new_wf_id})
-                        logger.info(f"[AGENT_IMPORT] Created workflow with new ID: {new_wf_id} (original: {old_wf_id})")
+                        logger.info(
+                            f"[AGENT_IMPORT] Created workflow with new ID: {new_wf_id} (original: {old_wf_id})"
+                        )
                     else:
-                        logger.error(f"[AGENT_IMPORT] Failed to create workflow {old_wf_id}: {create_res.message}")
+                        logger.error(
+                            f"[AGENT_IMPORT] Failed to create workflow {old_wf_id}: {create_res.message}"
+                        )
                 except Exception as e:
                     logger.error(f"[AGENT_IMPORT] Failed to create workflow {old_wf_id}: {e}")
 
@@ -3337,7 +3721,7 @@ async def _agent_import_core(
                             wf["id"] = new_id
                         if "workflow_id" in wf:
                             wf["workflow_id"] = new_id
-                        
+
                         # Update name if it was changed (copy created)
                         if old_ref_id in workflow_name_map:
                             new_name = workflow_name_map[old_ref_id]
@@ -3370,7 +3754,7 @@ async def _agent_import_core(
                 else:
                     new_knowledge_list.append(k_id)
             agent_data["knowledge"] = new_knowledge_list
-        
+
         # Update prompt template references
         if "prompt_template" in agent_data and agent_data["prompt_template"]:
             logger.info(
@@ -3400,6 +3784,10 @@ async def _agent_import_core(
                 agent_data["space_id"] = space_id
                 agent_data["update_time"] = milliseconds()
 
+                # model_id 在不同环境可能不同，导入时作为参考，保留原值
+                # agent_model_config 不包含敏感信息，直接导入
+
+                # 创建AgentBaseDBPd实例 (不再处理model字段)
                 agent_obj = AgentBaseDBPd(**agent_data)
                 save_res = agent_repository.save_agent_db(agent_obj)
                 if save_res.code != status.HTTP_200_OK:
@@ -3409,7 +3797,9 @@ async def _agent_import_core(
                     rollback_resources(created_resources)
                     return ResponseModel(
                         code=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.code,
-                        message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(msg=save_res.message)
+                        message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(
+                            msg=save_res.message
+                        ),
                     )
             else:
                 # 不覆盖，创建副本：生成新的agent_id
@@ -3422,8 +3812,13 @@ async def _agent_import_core(
                 agent_data["update_time"] = milliseconds()
                 # 确保没有 agent_version (Draft)
                 agent_data.pop("agent_version", None)
+                agent_data.pop("latest_publish_version", None)
+                agent_data.pop("latest_publish_time", None)
 
-                logger.info(f"[AGENT_IMPORT] Creating agent copy with new ID {new_agent_id} (original: {old_agent_id})")
+                # 创建AgentBaseDBPd实例 (不再处理model字段)
+                logger.info(
+                    f"[AGENT_IMPORT] Creating agent copy with new ID {new_agent_id} (original: {old_agent_id})"
+                )
                 agent_obj = AgentBaseDBPd(**agent_data)
                 create_res = agent_repository.create_agent_db(agent_obj)
 
@@ -3435,7 +3830,9 @@ async def _agent_import_core(
                     rollback_resources(created_resources)
                     return ResponseModel(
                         code=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.code,
-                        message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(msg=create_res.message)
+                        message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(
+                            msg=create_res.message
+                        ),
                     )
 
                 final_agent_id = new_agent_id
@@ -3448,6 +3845,8 @@ async def _agent_import_core(
             agent_data["update_time"] = milliseconds()
             # 确保没有 agent_version (Draft)
             agent_data.pop("agent_version", None)
+            agent_data.pop("latest_publish_version", None)
+            agent_data.pop("latest_publish_time", None)
 
             logger.info(f"[AGENT_IMPORT] Creating agent with new ID {new_agent_id}")
             agent_obj = AgentBaseDBPd(**agent_data)
@@ -3461,7 +3860,9 @@ async def _agent_import_core(
                 rollback_resources(created_resources)
                 return ResponseModel(
                     code=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.code,
-                    message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(msg=create_res.message)
+                    message=StatusCode.AGENT_IMPORT_AGENT_CREATE_ERROR.errmsg.format(
+                        msg=create_res.message
+                    ),
                 )
 
             final_agent_id = new_agent_id
@@ -3472,27 +3873,27 @@ async def _agent_import_core(
                 old_prompt_id = prompt_data.get("old_prompt_id")
                 prompt_version = prompt_data.get("prompt_version")
                 prompt_name = prompt_data.get("prompt_name", "")
-                
+
                 # 获取实际的prompt_id（可能是原始ID或新生成的ID）
                 actual_prompt_id = prompt_id_map.get(old_prompt_id, old_prompt_id)
-                
+
                 try:
                     # 构建prompt信息
                     prompt_info = related_member.RelatedMemberInfo(
                         id=actual_prompt_id,
                         version=prompt_version,
                         type=related_member.MemberType.PROMPT,
-                        name=prompt_name
+                        name=prompt_name,
                     )
-                    
+
                     # 构建agent信息
                     agent_info = related_member.RelatedMemberInfo(
                         id=final_agent_id,  # 这是导入后的agent_id
                         version="draft",  # 导入的agent默认是draft版本
                         type=related_member.MemberType.AGENT,
-                        name=agent_data.get("agent_name", "")
+                        name=agent_data.get("agent_name", ""),
                     )
-                    
+
                     # 创建或更新关联关系
                     prompt_relation_repository.create_prompt_relate_tbl(
                         space_id=space_id,
@@ -3504,7 +3905,7 @@ async def _agent_import_core(
                         f"[AGENT_IMPORT] Failed to create relation between prompt {actual_prompt_id} "
                         f"and agent {final_agent_id}: {e}"
                     )
-        
+
         return ResponseModel(
             code=status.HTTP_200_OK,
             message="import agent success",
