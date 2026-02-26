@@ -102,6 +102,7 @@ from openjiuwen_studio.schemas.agent import (
     AgentExportData,
     AgentDependencies,
     AgentExportMetadata,
+    ModelReference,
 )
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.model_config import ModelParameters
@@ -2785,7 +2786,125 @@ def agent_export(
     # model字段已弃用，不再处理
     # agent_model_config 中不包含敏感信息，model_id 直接导出供参考
 
-    # 5. 构建导出数据
+    # 5. 收集模型引用信息（用于跨环境迁移）
+    # 使用 provider + model_type 作为key，确保相同模型只导出一次
+    model_references = {}
+    processed_model_ids = set()  # 避免重复处理相同的模型
+    
+    def _get_model_ref_key(provider: str, model_type: str) -> str:
+        """生成模型引用key，用于去重"""
+        return f"{provider}/{model_type}"
+    
+    def _build_model_reference(model_config) -> ModelReference:
+        """构建模型引用对象"""
+        return ModelReference(
+            provider=model_config.provider,
+            model_type=model_config.model_type,
+            name=model_config.name,
+            base_url=model_config.base_url,
+            api_key=None,  # 运行时注入，导出时为null
+            timeout=model_config.timeout or 300,
+            parameters=model_config.parameters or {"temperature": 0.7, "top_p": 0.9}
+        )
+    
+    def _collect_model_from_config(model_config):
+        """收集模型配置，自动去重"""
+        if not model_config:
+            return
+        
+        model_id = getattr(model_config, 'id', None)
+        if model_id and model_id in processed_model_ids:
+            return
+        
+        ref_key = _get_model_ref_key(model_config.provider, model_config.model_type)
+        if ref_key not in model_references:
+            model_references[ref_key] = _build_model_reference(model_config)
+            logger.info(f"[AGENT_EXPORT] Collected model ref: {ref_key} -> {model_config.name}")
+        
+        if model_id:
+            processed_model_ids.add(model_id)
+    
+    def _collect_model_from_node(node: dict, wf_id: str, parent_path: str = ""):
+        """
+        从节点中收集模型引用（递归处理嵌套节点）
+        
+        Args:
+            node: 节点数据
+            wf_id: 工作流ID
+            parent_path: 父节点路径（用于生成唯一引用key）
+        """
+        node_id = node.get("id", "unknown")
+        node_type = str(node.get("type", ""))  # 确保是字符串
+        current_path = f"{parent_path}/{node_id}" if parent_path else node_id
+        
+        # 处理使用模型的节点类型
+        # 节点类型: "3"=LLM大模型, "6"=Intent意图识别, "7"=Questioner提问器
+        if node_type in ["3", "6", "7"]:
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                llm_param = inputs.get("llmParam", {})
+                model_info = llm_param.get("model", {})
+                model_id = model_info.get("id")
+                
+                if model_id:
+                    model_id_int = int(model_id)
+                    if model_id_int in processed_model_ids:
+                        return
+                    
+                    with get_db_agent_session() as db:
+                        model_mgr = ModelConfigManager(db)
+                        model_config = model_mgr.get_config_by_id(model_id_int, req.space_id)
+                        _collect_model_from_config(model_config)
+            except Exception as e:
+                logger.warning(f"[AGENT_EXPORT] Failed to get model reference for node {node_id}: {e}")
+        
+        # 递归处理循环组件内的子节点 (type="8" 表示循环组件)
+        if node_type == "8":
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                loop_children = inputs.get("loopChildren", [])
+                logger.debug(f"[AGENT_EXPORT] Processing loop node {node_id} with {len(loop_children)} children")
+                for child_node in loop_children:
+                    _collect_model_from_node(child_node, wf_id, current_path)
+            except Exception as e:
+                logger.warning(f"[AGENT_EXPORT] Failed to process loop node {node_id}: {e}")
+        
+        # 递归处理子工作流 (type="10" 表示子工作流)
+        if node_type == "10":
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                sub_wf_schema = inputs.get("subWorkflow", {})
+                sub_wf_nodes = sub_wf_schema.get("nodes", [])
+                logger.debug(f"[AGENT_EXPORT] Processing sub-workflow node {node_id} with {len(sub_wf_nodes)} nodes")
+                for sub_node in sub_wf_nodes:
+                    _collect_model_from_node(sub_node, wf_id, current_path)
+            except Exception as e:
+                logger.warning(f"[AGENT_EXPORT] Failed to process sub-workflow node {node_id}: {e}")
+    
+    # 5.1 收集Agent主模型引用
+    if agent_data.get("model_id"):
+        try:
+            with get_db_agent_session() as db:
+                model_mgr = ModelConfigManager(db)
+                model_config = model_mgr.get_config_by_id(agent_data["model_id"], req.space_id)
+                _collect_model_from_config(model_config)
+        except Exception as e:
+            logger.warning(f"[AGENT_EXPORT] Failed to get model reference for agent: {e}")
+    
+    # 5.2 收集所有Workflow节点模型引用（包括嵌套节点）
+    for wf in workflows:
+        try:
+            wf_id = wf.get("workflow_id") or wf.get("id", "unknown")
+            schema = json.loads(wf.get("schema", "{}"))
+            nodes = schema.get("nodes", [])
+            
+            for node in nodes:
+                _collect_model_from_node(node, wf_id)
+                
+        except Exception as e:
+            logger.warning(f"[AGENT_EXPORT] Failed to process workflow schema: {e}")
+
+    # 6. 构建导出数据
     version = get_current_project_version()
     export_data = AgentExportData(
         version=version,  # 暂定和代码发布版本相同
@@ -2801,6 +2920,8 @@ def agent_export(
             export_by=username,
             agent_studio_version=version,
         ),
+        model_references=model_references if model_references else None,
+        env_config=None,  # 后续运行时根据 config_template 自行处理环境变量
     )
 
     # 检查是否有知识库文档需要导出
@@ -3640,6 +3761,59 @@ async def _agent_import_core(
 
         # 4. 导入 Agent
 
+        # 4.0 处理模型引用映射（用于跨环境迁移）
+        model_id_map = {}
+        if import_data.model_references:
+            logger.info(f"[AGENT_IMPORT] Resolving model references: {import_data.model_references}")
+            
+            for ref_key, reference in import_data.model_references.items():
+                try:
+                    # 匹配本地模型
+                    matched_model = _match_model_reference(reference, space_id)
+                    if matched_model:
+                        model_id_map[ref_key] = matched_model.id
+                        logger.info(
+                            f"[AGENT_IMPORT] Matched model {ref_key}: {reference.name} -> "
+                            f"{matched_model.name} (ID: {matched_model.id})"
+                        )
+                    else:
+                        logger.warning(
+                            f"[AGENT_IMPORT] No matching model found for {ref_key}: "
+                            f"{reference.provider}/{reference.model_type}"
+                        )
+                except Exception as e:
+                    logger.warning(f"[AGENT_IMPORT] Failed to match model {ref_key}: {e}")
+
+        # 更新Agent主模型ID
+        if "agent_model" in model_id_map:
+            old_model_id = agent_data.get("model_id")
+            agent_data["model_id"] = model_id_map["agent_model"]
+            logger.info(f"[AGENT_IMPORT] Mapped agent model: {old_model_id} -> {agent_data['model_id']}")
+
+        # 更新Workflow节点中的模型ID
+        if "workflows" in agent_data and agent_data["workflows"]:
+            for wf in agent_data["workflows"]:
+                wf_id = wf.get("workflow_id") or wf.get("id")
+                if wf_id and wf_id in workflow_id_map:
+                    # 这个workflow被导入了，需要更新其中的模型ID
+                    schema = wf.get("schema", "{}")
+                    if isinstance(schema, str):
+                        try:
+                            schema_obj = json.loads(schema)
+                        except json.JSONDecodeError:
+                            schema_obj = {}
+                    else:
+                        schema_obj = schema
+                    
+                    for node in schema_obj.get("nodes", []):
+                        node_type = str(node.get("type", ""))
+                        # 节点类型: "3"=LLM, "6"=Intent, "7"=Questioner, "8"=Loop, "10"=SubWorkflow
+                        if node_type in ["3", "6", "7", "8", "10"]:
+                            _update_node_model_recursive(node, model_id_map, wf_id)
+                    
+                    # 更新schema
+                    wf["schema"] = json.dumps(schema_obj, ensure_ascii=False)
+
         # 更新引用了plugin_id/tool_id的字段
         if "plugins" in agent_data and agent_data["plugins"]:
             logger.info(
@@ -3920,3 +4094,107 @@ async def _agent_import_core(
             code=StatusCode.AGENT_IMPORT_FAILED.code,
             message=StatusCode.AGENT_IMPORT_FAILED.errmsg.format(msg=str(e)),
         )
+
+
+def _match_model_reference(reference: ModelReference, space_id: str):
+    """
+    匹配模型引用到本地模型
+    
+    匹配策略：
+    1. 精确匹配：provider + model_type
+    2. 模糊匹配：provider + name similarity
+    
+    Returns:
+        匹配到的模型配置对象，或 None
+    """
+    try:
+        with get_db_agent_session() as db:
+            model_mgr = ModelConfigManager(db)
+            # 获取空间下的所有模型
+            models, _ = model_mgr.get_paginated_configs(
+                page=1, size=1000, filters={"space_id": space_id}
+            )
+            
+            if not models:
+                return None
+            
+            # 1. 精确匹配：provider + model_type
+            for model in models:
+                if (model.provider == reference.provider and 
+                    model.model_type == reference.model_type):
+                    return model
+            
+            # 2. 模糊匹配：provider + name similarity
+            # 简单实现：相同 provider 且名称包含关系
+            for model in models:
+                if model.provider == reference.provider:
+                    ref_name = reference.name.lower()
+                    model_name = model.name.lower()
+                    # 名称互相包含视为匹配
+                    if ref_name in model_name or model_name in ref_name:
+                        return model
+            
+            return None
+    except Exception as e:
+        logger.error(f"[AGENT_IMPORT] Error matching model reference: {e}")
+        return None
+
+
+def _update_node_model_id(node: dict, new_model_id: int):
+    """
+    更新节点中的模型ID
+    
+    与 node schema 对齐：
+    - LLM/Intent/Questioner 节点：node.data.inputs.llmParam.model.id
+    """
+    try:
+        data = node.get("data", {})
+        inputs = data.get("inputs", {})
+        llm_param = inputs.get("llmParam", {})
+        model_info = llm_param.get("model", {})
+        
+        old_id = model_info.get("id")
+        model_info["id"] = str(new_model_id)
+        
+        logger.debug(f"[AGENT_IMPORT] Updated node {node.get('id')} model: {old_id} -> {new_model_id}")
+    except Exception as e:
+        logger.warning(f"[AGENT_IMPORT] Failed to update node model ID: {e}")
+
+
+def _update_node_model_recursive(node: dict, model_id_map: dict, wf_id: str):
+    """
+    递归更新节点中的模型ID（支持嵌套节点）
+    
+    Args:
+        node: 节点数据
+        model_id_map: 模型ID映射表
+        wf_id: 工作流ID
+    """
+    node_id = node.get("id", "unknown")
+    node_type = str(node.get("type", ""))
+    ref_key = f"node_{node_id}"
+    
+    # 更新当前节点的模型ID（如果是使用模型的节点）
+    if node_type in ["3", "6", "7"] and ref_key in model_id_map:
+        _update_node_model_id(node, model_id_map[ref_key])
+    
+    # 递归处理循环组件内的子节点 (type="8")
+    if node_type == "8":
+        try:
+            inputs = node.get("data", {}).get("inputs", {})
+            loop_children = inputs.get("loopChildren", [])
+            for child_node in loop_children:
+                _update_node_model_recursive(child_node, model_id_map, wf_id)
+        except Exception as e:
+            logger.warning(f"[AGENT_IMPORT] Failed to update loop node {node_id}: {e}")
+    
+    # 递归处理子工作流内的节点 (type="10")
+    if node_type == "10":
+        try:
+            inputs = node.get("data", {}).get("inputs", {})
+            sub_wf_schema = inputs.get("subWorkflow", {})
+            sub_wf_nodes = sub_wf_schema.get("nodes", [])
+            for sub_node in sub_wf_nodes:
+                _update_node_model_recursive(sub_node, model_id_map, wf_id)
+        except Exception as e:
+            logger.warning(f"[AGENT_IMPORT] Failed to update sub-workflow node {node_id}: {e}")
