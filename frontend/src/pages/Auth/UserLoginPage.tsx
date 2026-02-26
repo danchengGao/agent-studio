@@ -22,6 +22,7 @@ interface FormData {
   password?: string // 密码字段（登录/注册界面）
   confirmPassword?: string // 确认密码字段（注册界面）
   newPassword?: string // 新密码字段（忘记密码界面）
+  confirmNewPassword?: string // 确认新密码字段（忘记密码界面）
   verifyCode?: string // 验证码字段（注册/忘记密码界面）
 }
 
@@ -190,6 +191,7 @@ const UserLoginPage: React.FC = () => {
       password: '',
       confirmPassword: '',
       newPassword: '',
+      confirmNewPassword: '',
       verifyCode: '',
     },
   })
@@ -389,9 +391,9 @@ const UserLoginPage: React.FC = () => {
   // 忘记密码--获取验证码
   const handleForgotPassword = async () => {
     // 获取当前表单值
-    const { username, newPassword } = getValues()
-    // 用户名和密码不为空才能获取验证码
-    const isValid = username && newPassword
+    const { username, newPassword, confirmNewPassword } = getValues()
+    // 用户名、新密码和确认密码都不为空, 且新密码和确认密码一致才能获取验证码
+    const isValid = username && newPassword && confirmNewPassword && newPassword === confirmNewPassword
     if (!isValid) return
 
     // 记密码获取验证码添加错误处理
@@ -750,6 +752,7 @@ const UserLoginPage: React.FC = () => {
     const password = data.password
     const verifyCode = data.verifyCode
     const newPassword = data.newPassword
+    const confirmNewPassword = data.confirmNewPassword
 
     switch (activeTab) {
       case 'login':
@@ -840,14 +843,14 @@ const UserLoginPage: React.FC = () => {
 
   // 判断获取验证码按钮是否可点击
   const isVerifyCodeBtnDisabled = () => {
-    const { username, password, confirmPassword, newPassword } = getValues()
+    const { username, password, confirmPassword, newPassword, confirmNewPassword } = getValues()
     // 倒计时中禁用，或输入不完整禁用
     if (isCountdownActive) return true
 
     if (activeTab === 'register') {
       return !username || !password || !confirmPassword || password !== confirmPassword
     } else if (activeTab === 'forgot') {
-      return !username || !newPassword
+      return !username || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword
     }
     return true
   }
@@ -989,6 +992,7 @@ const UserLoginPage: React.FC = () => {
                 <p className="mt-1 text-sm text-red-600">{errors.password?.message || errors.newPassword?.message}</p>
               </div>
 
+              {/* 确认密码输入框 - 注册显示 */}
               {activeTab === 'register' && (
                 <div>
                   <input
@@ -1011,6 +1015,34 @@ const UserLoginPage: React.FC = () => {
                     placeholder={t('auth.register.confirmPasswordPlaceholder')}
                   />
                   <p className="mt-1 text-sm text-red-600">{errors.confirmPassword?.message}</p>
+                </div>
+              )}
+
+              {/* 确认新密码输入框 - 忘记密码显示 */}
+              {activeTab === 'forgot' && (
+                <div>
+                  <input
+                    {...register('confirmNewPassword', {
+                      required: t('auth.forgotPassword.confirmPasswordRequired'),
+                      minLength: {
+                        value: PASSWORD_MIN_LENGTH,
+                        message: t('auth.common.minPasswordLength'),
+                      },
+                      maxLength: {
+                        value: PASSWORD_MAX_LENGTH,
+                        message: t('auth.common.maxPasswordLength'),
+                      },
+                      validate: value => {
+                        const newPasswordValue = getValues('newPassword');
+                        return value === newPasswordValue || t('auth.forgotPassword.passwordsNotMatch');
+                      },
+                    })}
+                    type="password"
+                    id="confirmNewPassword"
+                    className={inputFieldClass}
+                    placeholder={t('auth.forgotPassword.confirmPasswordPlaceholder')}
+                  />
+                  <p className="mt-1 text-sm text-red-600">{errors.confirmNewPassword?.message}</p>
                 </div>
               )}
 
