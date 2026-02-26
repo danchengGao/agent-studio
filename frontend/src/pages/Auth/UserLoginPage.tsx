@@ -968,15 +968,19 @@ const UserLoginPage: React.FC = () => {
                         : activeTab === 'register'
                           ? t('auth.register.passwordPlaceholder')
                           : t('auth.forgotPassword.newPasswordPlaceholder'),
-                    minLength: {
-                      value: PASSWORD_MIN_LENGTH,
-                      message: t('auth.common.minPasswordLength'),
-                    },
-                    maxLength: {
-                      value: PASSWORD_MAX_LENGTH,
-                      message: t('auth.common.maxPasswordLength'),
-                    },
-                    validate: validatePasswordStrength,
+                    ...(activeTab === 'login'
+                      ? {}
+                      : {
+                          minLength: {
+                            value: PASSWORD_MIN_LENGTH,
+                            message: t('auth.common.minPasswordLength'),
+                          },
+                          maxLength: {
+                            value: PASSWORD_MAX_LENGTH,
+                            message: t('auth.common.maxPasswordLength'),
+                          },
+                          validate: validatePasswordStrength,
+                        }),
                   })}
                   type="password"
                   id={activeTab === 'forgot' ? 'newPassword' : 'password'}
