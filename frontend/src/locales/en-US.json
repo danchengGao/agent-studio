@@ -350,9 +350,9 @@
       "noAccount": "Don't have an account?",
       "signUp": "Sign up now",
       "loginSuccess": "Login successful",
-      "loginFailed": "Login failed, please check username and password",
+      "loginFailed": "Login failed",
       "invalidCredentials": "Invalid username or password",
-      "networkError": "Network error, please try again later",
+      "networkError": "The network request failed. Please check your network connection.",
       "registerLink": "Don't have an account yet?",
       "remainingAttempts": "Remaining login attempts {{count}}",
       "lockedMessage": "Too many login failures, the account has been locked {{time}}. After the lock time, you can try again"

@@ -642,9 +642,10 @@ const UserLoginPage: React.FC = () => {
       }
 
       const backendDetail = err?.response?.data?.detail || err?.response?.data?.message
+      const isNetworkOrTimeoutError = err?.name === 'NetworkError' || err?.code === 'ECONNABORTED' || !err?.response
       setError('root', {
         type: 'manual',
-        message: backendDetail || err?.message || t('auth.login.loginFailed'),
+        message: isNetworkOrTimeoutError ? t('auth.login.networkError') : backendDetail || err?.message || t('auth.login.loginFailed'),
       })
       console.error('Login error:', error)
       return false
@@ -717,7 +718,7 @@ const UserLoginPage: React.FC = () => {
     }
 
     try {
-      // 🔴 重置密码前清空通用错误
+      // 重置密码前清空通用错误
       setCommonError('')
       const response = await resetPasswordMutation.mutateAsync(resetReq)
       if (!response || response.code !== 200 || !response.data) {
@@ -759,6 +760,9 @@ const UserLoginPage: React.FC = () => {
         if (!username || isAccountLocked)
           // 如果账户是锁定状态，不能登录
           return
+        // 发起新一轮登录前，先清空上次错误；若本次失败会重新设置
+        setLoginError('')
+        clearErrors('root')
         handleLogin(data, remainingAttempts).then(loginSuccess => {
           if (loginSuccess) {
             // 登录成功，清理该邮箱的锁定信息
@@ -862,6 +866,13 @@ const UserLoginPage: React.FC = () => {
     'w-full text-base font-medium btn-login disabled:cursor-not-allowed'
   // 链接样式
   const linkClass = 'text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-sm'
+  const rootErrorMessage = typeof errors.root?.message === 'string' ? errors.root.message : ''
+  const mergedLoginError =
+    activeTab === 'login' && !isAccountLocked && remainingAttempts !== 0
+      ? loginError && rootErrorMessage && rootErrorMessage !== loginError
+        ? `${loginError}：${rootErrorMessage}`
+        : loginError || rootErrorMessage
+      : ''
 
   if (isCheckingAuth) {
     return (
@@ -1093,17 +1104,10 @@ const UserLoginPage: React.FC = () => {
                   <p className="text-sm text-green-600">{successMsg}</p>
                 </div>
               )}
-              {/* 锁定时不显示登录错误 */}
-              {!isAccountLocked && remainingAttempts !== 0 && loginError && (
+              {/* 登录失败提示：合并通用错误与具体错误到一个提示框 */}
+              {mergedLoginError && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm text-red-600">{loginError}</p>
-                </div>
-              )}
-
-              {/* 移除根错误的显示条件限制，只在登录场景显示 */}
-              {activeTab === 'login' && !isAccountLocked && remainingAttempts !== 0 && errors.root && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm text-red-600">{errors.root.message}</p>
+                  <p className="text-sm text-red-600">{mergedLoginError}</p>
                 </div>
               )}
 
