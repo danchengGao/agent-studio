@@ -6,7 +6,7 @@
 import { FC } from 'react'
 
 import classNames from 'classnames'
-import { Input, Switch, InputNumber, DatePicker } from '@douyinfe/semi-ui'
+import { Input, Select, InputNumber, DatePicker } from '@douyinfe/semi-ui'
 import dayjs from 'dayjs'
 import { useTranslation } from '../../../i18n'
 
@@ -54,7 +54,16 @@ export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputForm
       case 'boolean':
         return (
           <div className={styles.fieldInput}>
-            <Switch checked={field.value} onChange={checked => field.onChange(checked)} />
+            <Select
+              size="small"
+              placeholder={t('workflowCanvas.formMaterials.input.pleaseSelectBoolean')}
+              optionList={[
+                { label: t('workflowCanvas.formMaterials.input.true'), value: 1 },
+                { label: t('workflowCanvas.formMaterials.input.false'), value: 0 },
+              ]}
+              value={field.value !== undefined && field.value !== null ? (field.value ? 1 : 0) : undefined}
+              onChange={value => field.onChange(value !== undefined ? !!value : undefined)}
+            />
             {hasError && <div className={styles.errorMessage}>{field.error}</div>}
           </div>
         )
