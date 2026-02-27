@@ -36,6 +36,7 @@ from openjiuwen.core.common.logging import logger, interface_logger
 from openjiuwen_studio.core.common.logging.events import CustomLogEventType
 from openjiuwen_studio.core.alembic_version_check import check_alembic_versions
 from openjiuwen_studio.ops.config import settings as ops_settings
+from openjiuwen_studio.core.config import settings
 # Import Trace models
 from openjiuwen_studio.models.trace_detail import TraceDetailDB
 from openjiuwen_studio.models.trace_summary import TraceSummaryDB
@@ -123,16 +124,18 @@ async def lifespan_func(app: FastAPI):
     create_database_tables()
     logger.info("✅ Database tables created")
 
-    runner_config = get_runner_config()
-    runner_config.checkpointer_config = CheckpointerConfig(
-        type="redis",
-        conf={
-            "connection": {
-                "redis_client": redis_manager_bytes.client
+    # 初始化 Runner
+    if settings.enable_redis_checkpoint:
+        runner_config = get_runner_config()
+        runner_config.checkpointer_config = CheckpointerConfig(
+            type="redis",
+            conf={
+                "connection": {
+                    "redis_client": redis_manager_bytes.client
+                }
             }
-        }
-    )
-    Runner.set_config(runner_config)
+        )
+        Runner.set_config(runner_config)
 
     await Runner.start()
 
