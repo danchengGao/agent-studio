@@ -83,6 +83,7 @@ const AppsPage: React.FC = () => {
   const selectedResultMessageId = useConversationStore(state => state.selectedResultMessageId)
   const isLoading = useConversationStore(state => state.isLoading)
   const sseProcessingQueue = useConversationStore(state => state.sseProcessingQueue)
+  const SESSION_CONVERSATION_ID = useConversationStore(state => state.SESSION_CONVERSATION_ID)
 
   // 订阅 conversation 来触发 messageItemsList 重新计算
   const conversation = useConversationStore(state =>
@@ -981,6 +982,8 @@ const AppsPage: React.FC = () => {
               console.log('[HITL] Agent not matched, cancelling interrupt message. hitlAgent:', hitlAgent)
             }
           } else {
+            // 不是 HITL interrupt 消息，清除 SESSION_CONVERSATION_ID
+            useConversationStore.getState().setSessionConversationId(null)
             console.log('[HITL Debug] Last message is not HITL interrupt. type:', lastMessage?.type, 'status:', lastMessage?.status)
           }
         } else {
@@ -991,20 +994,19 @@ const AppsPage: React.FC = () => {
       }
 
       // ===== 计算 DeepSearch 运行 Session ID =====
-      // sessionId = 当前对话中用户消息的数量
       // 因为已经添加了用户消息，所以用户消息数量就是应该用的 sessionId
       const userMessageCount = messageItemsList.filter(items =>
         useConversationStore.getState().getMessageItemsIsUser(items)
       ).length
 
-      // sessionId 计算逻辑：
-      // - 如果是新的 deepsearch：sessionId = 用户消息数量（新添加的消息被计算在内）
-      // - 如果是 HITL 延续：sessionId = 用户消息数量 - 1（HITL 回复不是新的 deepsearch）
-      const sessionId = isNewDeepSearchRun ? userMessageCount : (userMessageCount - 1)
-      console.log('[DeepSearch] Session ID:', sessionId, '(user message count:', userMessageCount, ', isNewRun:', isNewDeepSearchRun, ')')
+      console.log('[DeepSearch]:', '(user message count:', userMessageCount, ', isNewRun:', isNewDeepSearchRun, ')')
 
       // ===== 生成后端使用的 conversation_id =====
-      const backendConversationId = `${conversationId}.${sessionId}`
+      // 如果是新的 deepsearch 运行，或者没有 SESSION_CONVERSATION_ID，则生成新的后端 conversation_id
+      // 否则使用现有的 SESSION_CONVERSATION_ID
+      const backendConversationId = (isNewDeepSearchRun || !SESSION_CONVERSATION_ID)
+        ? `${conversationId}_${Math.random().toString(36).substring(2, 6)}_${String(userMessageCount).padStart(3, '0')}`
+        : SESSION_CONVERSATION_ID
       console.log('[DeepSearch] Backend conversation_id:', backendConversationId, '(original:', conversationId, ')')
 
       // ===== SSE 录制：开始录制（仅开发模式） =====

@@ -147,7 +147,13 @@
       "publishNotImplemented": "Publish feature is not yet implemented",
       "publishFailed": "Publish failed, please try again",
       "enterVersionNumber": "Please enter version number",
-      "executionFailed": "Sorry, an error occurred while processing your request. Please try again later"
+      "executionFailed": "Sorry, an error occurred while processing your request. Please try again later",
+      "sse": {
+        "timeoutError": {
+          "title": "Connection Timeout",
+          "content": "The request timed out because no data was received for an extended period. Please check your network connection and try again."
+        }
+      }
     },
     "pagination": {
       "previous": "Previous",
@@ -1031,7 +1037,7 @@
       "link": "Link",
       "collapse": "Collapse",
       "expand": "Expand {{count}} items",
-      "statusUnknown": "Status Unknown",
+      "statusUnknown": "Conditionally Complete",
       "collapseContent": "Collapse Content",
       "expandContent": "Expand Content",
       "status": {
@@ -1040,7 +1046,7 @@
         "completed": "Report Generated",
         "failed": "Generation Failed",
         "cancelled": "Manually Ended",
-        "unknown": "Status Unknown",
+        "unknown": "Conditionally Complete",
         "default": "Unknown Status"
       },
       "loading": "Loading...",

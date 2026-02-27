@@ -147,7 +147,13 @@
       "publishNotImplemented": "发布功能暂未实现",
       "publishFailed": "发布失败，请重试",
       "enterVersionNumber": "请输入版本号",
-      "executionFailed": "抱歉，处理您的请求时遇到了问题。请稍后再试"
+      "executionFailed": "抱歉，处理您的请求时遇到了问题。请稍后再试",
+      "sse": {
+        "timeoutError": {
+          "title": "连接超时",
+          "content": "由于长时间未接收到数据，请求已超时。请检查网络连接后重试。"
+        }
+      }
     },
     "pagination": {
       "previous": "上一页",
@@ -1040,7 +1046,7 @@
       "link": "链接",
       "collapse": "收起",
       "expand": "展开 {{count}} 项",
-      "statusUnknown": "状态未知",
+      "statusUnknown": "准完成",
       "collapseContent": "折叠内容",
       "expandContent": "展开内容",
       "status": {
@@ -1049,7 +1055,7 @@
         "completed": "报告已生成",
         "failed": "生成失败",
         "cancelled": "已手动结束",
-        "unknown": "状态未知",
+        "unknown": "准完成",
         "default": "未知状态"
       },
       "loading": "加载中...",
