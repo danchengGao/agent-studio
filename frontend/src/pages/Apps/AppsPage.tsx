@@ -1226,7 +1226,7 @@ const AppsPage: React.FC = () => {
                     <p className={`${TEXT_BASE} text-orange-600 mb-2`}>
                       {t('apps.chat.deepSearchServiceUnavailable')}
                       <a
-                        href="https://openjiuwen.com"
+                        href="https://gitcode.com/openJiuwen/deepsearch/blob/v0.1.0/docs/zh/2.%E5%AE%89%E8%A3%85%E6%8C%87%E5%AF%BC/DeepSearch%E5%AE%8C%E6%95%B4%E7%89%88%E5%AE%89%E8%A3%85%E6%8C%87%E5%AF%BC.md"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 hover:text-blue-600 underline mx-0.5"
