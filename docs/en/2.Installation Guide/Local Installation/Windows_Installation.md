@@ -224,17 +224,30 @@ Complete dependency installation first, then perform source retrieval and instal
 ##### 2.2. Generate an AES Key (Optional)
 
 * If you do not need to encrypt sensitive fields at rest, skip this step.
-* In the project root, open PowerShell and run:
+* In the project root, open GitBash and run:
 
   ```bash
-  cd backend
-  powershell -ExecutionPolicy Bypass -File .\build_AES_master_key.ps1
+  cd scripts
+  bash build_AES_master_key.sh
   ```
 
 * When the script finishes, it will print the key. Use it as needed. It’s recommended to set it as an environment variable and store it separately.
 
   ```bash
-  $env:SERVER_AES_MASTER_KEY_ENV = .\build_AES_master_key.ps1
+  # If your installation/deployment is executed in Git Bash
+  export SERVER_AES_MASTER_KEY_ENV=your_aes_key
+    
+  # If your installation/deployment is executed in PowerShell
+  # Method 1: Set a temporary environment variable in PowerShell
+  $env:SERVER_AES_MASTER_KEY_ENV="your_aes_key"
+  # Method 2: Add it as a Windows system environment variable
+  """
+    1. Press Win + R, type sysdm.cpl, and press Enter.
+    2. Click on the 'Advanced' tab, then click 'Environment Variables'.
+    3. Under 'System variables' or 'User variables', add:
+         Variable name: SERVER_AES_MASTER_KEY_ENV
+         Variable value: your_aes_key
+  """
   ```
 
 * **Note**: The AES key must remain unchanged. Changing it later will make previously encrypted data impossible to decrypt.

@@ -247,7 +247,7 @@ Complete dependency installation first, then perform source retrieval and instal
 - If you do not need to encrypt critical fields for storage, you can skip this step.
 - Run the following commands to generate a key:
   ```bash
-  cd backend
+  cd scripts
     
   bash build_AES_master_key.sh
   ```

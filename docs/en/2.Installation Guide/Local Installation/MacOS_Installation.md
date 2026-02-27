@@ -208,7 +208,7 @@ Complete dependency installation first, then perform source retrieval and instal
 * Run the following commands to generate the key: 
 
   ```bash
-  cd backend
+  cd scripts
     
   bash build_AES_master_key.sh
   ```
