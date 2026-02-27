@@ -316,6 +316,7 @@
     "testRunInput": "Test Run Input",
     "completeInputToContinue": "Complete the following input to continue test run",
     "continueRunning": "Continue Running",
+    "continueRunningWithCount": "Continue ({{count}} more pending)",
     "cancel": "Cancel",
     "run": "Run",
     "testRun": "Test Run"

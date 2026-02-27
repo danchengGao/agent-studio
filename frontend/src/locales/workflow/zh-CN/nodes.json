@@ -315,6 +315,7 @@
     "testRunInput": "试运行输入",
     "completeInputToContinue": "完成以下输入后，继续试运行",
     "continueRunning": "继续运行",
+    "continueRunningWithCount": "继续运行 (还有 {{count}} 个待处理)",
     "cancel": "取消",
     "run": "运行",
     "testRun": "试运行"
