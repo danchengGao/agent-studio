@@ -302,8 +302,6 @@ class PromptDebugService:
                 "step": "llm_call"
             })
             llm_span.set_start_time_first_rest()
-            call_kwargs.pop('model', None)
-            call_kwargs.pop('model_name', None)
             openai_coroutine = get_llm_client_by_protocol(llm_protocol_config).stream(**call_kwargs)
             logger.info(
                 f"llm config:\n {json.dumps(mask_sensitive_fields(llm_protocol_config), indent=4, ensure_ascii=False)}")

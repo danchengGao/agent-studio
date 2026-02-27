@@ -248,7 +248,10 @@ class SecurityUtils:
         
         if not isinstance(stored_key, str):
             raise ValueError("Stored key must be a string")
-        
+
+        if not self.master_key:
+            return stored_key
+
         try:
             data = base64.b64decode(stored_key)
         except Exception:
