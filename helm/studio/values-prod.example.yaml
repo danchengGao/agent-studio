@@ -3,7 +3,7 @@ backend:
     replicaCount: 3
     image:
       repository: "swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-server-amd64"
-      tag: "0.1.3"
+      tag: "0.1.4"
     extraVolumes:
       - name: localtime
         hostPath:
@@ -18,8 +18,8 @@ frontend:
   deployment:
     replicaCount: 2
     image:
-      repository: "swr.ap-southeast-1.myhuaweicloud.com/openjiuwen-online-test/studio-server-no-https-amd64"
-      tag: "0.1.3"
+      repository: "swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-http-web-amd64"
+      tag: "0.1.4"
     extraVolumes:
       - name: localtime
         hostPath:
@@ -37,7 +37,7 @@ sandbox-gateway:
   deployment:
     image:
       repository: "swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-sandbox-gateway-amd64"
-      tag: "0.1.3"
+      tag: "0.1.4"
     extraVolumes:
       - name: localtime
         hostPath:
@@ -59,4 +59,8 @@ configmap:
     SMTP_PASSWORD: ""
     SMTP_PORT: ""
     SMTP_USER: ""
+    OBS_BUCKET: ""
+    OBS_SERVER: ""
+    OBS_ACCESS_KEY_ID: ""
+    OBS_SECRET_ACCESS_KEY: ""
     SERVER_AES_MASTER_KEY_ENV: "xxx"

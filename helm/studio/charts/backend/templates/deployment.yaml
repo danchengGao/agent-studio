@@ -76,7 +76,7 @@ spec:
           volumeMounts:
             {{- if .Values.deployment.extraVolumeMounts }}
               {{- toYaml .Values.deployment.extraVolumeMounts | nindent 12 }}
-              {{ - end }}
+              {{- end }}
 
 
       volumes:
