@@ -1,4 +1,4 @@
-import random
+import secrets
 import string
 
 from openjiuwen_studio.core.manager.redis_manager.redis_client import redis_manager_str as redis_manager
@@ -23,7 +23,7 @@ class SecurityManager:
     @classmethod
     def generate_and_save_code(cls, email: str, action_type: str = "reg") -> str:
         """生成验证码并存入 Redis"""
-        code = ''.join(random.choices(string.digits, k=6))
+        code = ''.join(secrets.choice(string.digits) for _ in range(6))
         template = cls._REG_CODE_KEY if action_type == "reg" else cls._RESET_CODE_KEY
         limit_template = cls._REG_LIMIT_KEY if action_type == "reg" else cls._RESET_LIMIT_KEY
         # 存储验证码和频率限制
