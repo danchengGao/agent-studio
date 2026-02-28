@@ -224,11 +224,13 @@ export class PromptService {
   /**
    * 编辑提示词基本信息
    * @param promptId 提示词ID
+   * @param workspaceId 工作空间ID（请求体 workspace_id）
    * @param data 编辑数据
    * @returns 编辑响应
    */
   static async editPromptBasicInfo(
     promptId: string,
+    workspaceId: string,
     data: {
       prompt_name: string
       prompt_description: string
@@ -238,6 +240,7 @@ export class PromptService {
       prompt_id: parseInt(promptId),
       prompt_name: data.prompt_name,
       prompt_description: data.prompt_description,
+      workspace_id: workspaceId,
     }
 
     const response = await getApiClient().put<EditPromptBasicInfoResponse>(API_ENDPOINTS.PROMPTS.UPDATE.replace(':id', promptId), requestData)
