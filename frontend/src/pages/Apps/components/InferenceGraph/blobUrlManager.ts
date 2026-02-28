@@ -2,6 +2,7 @@
  * Blob URL 管理器
  * 用于处理推理图谱的 Base64 编码内容与 Blob URL 之间的转换和生命周期管理
  */
+import DOMPurify from 'dompurify'
 
 /**
  * 将 Base64 编码的 HTML 内容转换为 Blob URL
@@ -18,8 +19,14 @@ function base64ToBlobUrl(base64Content: string): string {
   const decoder = new TextDecoder()
   const htmlContent = decoder.decode(bytes)
 
+  // 消毒 HTML 内容，移除危险脚本
+  const sanitizedContent = DOMPurify.sanitize(htmlContent, {
+    WHOLE_DOCUMENT: true,
+    ADD_TAGS: ['style', 'link'],
+  })
+
   // 创建 Blob
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+  const blob = new Blob([sanitizedContent], { type: 'text/html;charset=utf-8' })
 
   // 创建并返回 Blob URL
   return URL.createObjectURL(blob)

@@ -176,6 +176,7 @@ export const GraphIframe: React.FC<GraphIframeProps> = ({
           key={iframeKey}
           src={inferFileUrl}
           className="h-full w-full border-0"
+          sandbox="allow-same-origin"
           onLoad={handleLoad}
           onError={handleError}
           title={t('apps.inferenceGraph.title')}
