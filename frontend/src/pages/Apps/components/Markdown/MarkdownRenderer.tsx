@@ -9,7 +9,6 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import 'katex/dist/katex.min.css'
 import type { Components } from 'react-markdown'
 import type { MarkdownProps } from './types'
@@ -106,24 +105,10 @@ export const MarkdownRenderer: React.FC<{
     return markdownComponents
   }, [citations, instanceId])
 
-  const sanitizeSchema = useMemo(() => ({
-    ...defaultSchema,
-    attributes: {
-      ...defaultSchema.attributes,
-      // 保留 KaTeX 渲染所需的 class 和 style 属性
-      span: [...(defaultSchema.attributes?.span || []), 'className', 'style'],
-      div: [...(defaultSchema.attributes?.div || []), 'className', 'style'],
-    },
-    // 移除所有脚本相关标签
-    tagNames: (defaultSchema.tagNames || []).filter(
-      tag => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'textarea'].includes(tag)
-    ),
-  }), [])
-
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
-      rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
+      rehypePlugins={[rehypeRaw, rehypeKatex]}
       components={defaultComponents}
     >
       {content}

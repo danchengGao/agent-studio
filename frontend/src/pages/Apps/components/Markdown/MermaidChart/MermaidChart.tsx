@@ -6,7 +6,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import mermaid from 'mermaid'
-import DOMPurify from 'dompurify'
 import type { MermaidCodeBlockProps } from '../types'
 import { initMermaid, adjustViewBox } from './utils'
 import { centerTimelineTitle, optimizeTimelineColors } from './timeline'
@@ -95,12 +94,8 @@ export const MermaidChart: React.FC<MermaidCodeBlockProps> = ({ code }) => {
 
       if (!ref.current) return
 
-      // 插入消毒后的 SVG
-      ref.current.innerHTML = DOMPurify.sanitize(svg, {
-        USE_PROFILES: { svg: true, svgFilters: true },
-        ADD_TAGS: ['foreignObject'],
-        FORBID_ATTR: ['xlink:href', 'onclick', 'onload', 'onerror', 'onmouseover'],
-      })
+      // 插入 SVG
+      ref.current.innerHTML = svg
       const svgElement = ref.current.querySelector('svg')
       if (!svgElement) return
 

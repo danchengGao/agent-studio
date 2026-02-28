@@ -5,7 +5,6 @@
 
 import React, { useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import DOMPurify from 'dompurify'
 import type { CitationData } from '@/pages/Apps/types'
 
 export interface CitationTooltipContentProps {
@@ -17,14 +16,9 @@ export interface CitationTooltipContentProps {
 // 高亮内容的样式
 const HIGHLIGHT_MARK_STYLE = 'background-color: #fef08a; padding: 0 0.25rem; border-radius: 0.25rem;'
 
-// 格式化content中的mark标签并消毒HTML
+// 格式化content中的mark标签
 const formatContent = (content: string): string => {
-  const rawHtml = content.replace(/\n/g, '<br>').replace(/<mark>(.*?)<\/mark>/g, (_match, p1) => `<mark style="${HIGHLIGHT_MARK_STYLE}">${p1}</mark>`)
-  return DOMPurify.sanitize(rawHtml, {
-    ALLOWED_TAGS: ['br', 'mark', 'b', 'i', 'em', 'strong', 'span'],
-    ALLOWED_ATTR: ['style'],
-    ALLOW_DATA_ATTR: false,
-  })
+  return content.replace(/\n/g, '<br>').replace(/<mark>(.*?)<\/mark>/g, (_match, p1) => `<mark style="${HIGHLIGHT_MARK_STYLE}">${p1}</mark>`)
 }
 
 // 滚动到高亮内容的Hook
