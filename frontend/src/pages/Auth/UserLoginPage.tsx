@@ -14,7 +14,7 @@ import {
 import { useAuthStore } from '@/stores/useAuthStore.ts'
 import { generateLetterAvatar } from '@/utils/avatar.ts'
 import { useNavigate } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Eye, EyeOff } from 'lucide-react'
 import LanguageDropdown from '@/components/Common/LanguageDropdown.tsx'
 
 interface FormData {
@@ -128,6 +128,12 @@ const accountLockStorage = {
 
 const UserLoginPage: React.FC = () => {
   const MAX_ATTEMPT_NUM = 5
+  const [passwordVisible, setPasswordVisible] = useState({
+    password: false,
+    newPassword: false,
+    confirmPassword: false,
+    confirmNewPassword: false,
+  })
 
   // 状态管理：当前激活的标签（login/register/forgot）、倒计时、倒计时状态
   const [activeTab, setActiveTab] = useState('login')
@@ -181,6 +187,7 @@ const UserLoginPage: React.FC = () => {
     formState: { errors, isDirty },
     clearErrors,
     setError,
+    trigger,
     getValues,
     watch,
     reset,
@@ -198,6 +205,24 @@ const UserLoginPage: React.FC = () => {
 
   // 监听当前输入的邮箱
   const currentEmail = watch('username', '')
+  // 监听验证码按钮依赖字段
+  const currentPassword = watch('password', '')
+  const currentConfirmPassword = watch('confirmPassword', '')
+  const currentNewPassword = watch('newPassword', '')
+  const currentConfirmNewPassword = watch('confirmNewPassword', '')
+
+  // 当主密码变化时，主动触发确认密码校验
+  useEffect(() => {
+    if (activeTab === 'register' && currentConfirmPassword) {
+      trigger('confirmPassword')
+    }
+  }, [activeTab, currentPassword, currentConfirmPassword, trigger])
+
+  useEffect(() => {
+    if (activeTab === 'forgot' && currentConfirmNewPassword) {
+      trigger('confirmNewPassword')
+    }
+  }, [activeTab, currentNewPassword, currentConfirmNewPassword, trigger])
 
   // 切换标签时清空所有错误状态
   useEffect(() => {
@@ -847,14 +872,13 @@ const UserLoginPage: React.FC = () => {
 
   // 判断获取验证码按钮是否可点击
   const isVerifyCodeBtnDisabled = () => {
-    const { username, password, confirmPassword, newPassword, confirmNewPassword } = getValues()
     // 倒计时中禁用，或输入不完整禁用
     if (isCountdownActive) return true
 
     if (activeTab === 'register') {
-      return !username || !password || !confirmPassword || password !== confirmPassword
+      return !currentEmail || !currentPassword || !currentConfirmPassword || currentPassword !== currentConfirmPassword
     } else if (activeTab === 'forgot') {
-      return !username || !newPassword || !confirmNewPassword || newPassword !== confirmNewPassword
+      return !currentEmail || !currentNewPassword || !currentConfirmNewPassword || currentNewPassword !== currentConfirmNewPassword
     }
     return true
   }
@@ -873,6 +897,13 @@ const UserLoginPage: React.FC = () => {
         ? `${loginError}：${rootErrorMessage}`
         : loginError || rootErrorMessage
       : ''
+
+  const togglePasswordVisible = (field: 'password' | 'newPassword' | 'confirmPassword' | 'confirmNewPassword') => {
+    setPasswordVisible(prev => ({
+      ...prev,
+      [field]: !prev[field],
+    }))
+  }
 
   if (isCheckingAuth) {
     return (
@@ -947,7 +978,7 @@ const UserLoginPage: React.FC = () => {
             {/* 表单区域 */}
             <form className="space-y-6 flex-1" onSubmit={handleSubmit(onFormSubmit)}>
               {/* 邮箱输入框（所有界面都有） */}
-              <div>
+              <div className="relative">
                 <input
                   {...register('username', {
                     required: t('auth.login.usernamePlaceholder'),
@@ -970,7 +1001,7 @@ const UserLoginPage: React.FC = () => {
               </div>
 
               {/* 密码输入框 - 登录/注册显示密码，忘记密码显示新密码 */}
-              <div>
+              <div className="relative">
                 <input
                   {...register(activeTab === 'forgot' ? 'newPassword' : 'password', {
                     required:
@@ -993,9 +1024,11 @@ const UserLoginPage: React.FC = () => {
                           validate: validatePasswordStrength,
                         }),
                   })}
-                  type="password"
+                  type={activeTab === 'forgot'
+                    ? (passwordVisible.newPassword ? 'text' : 'password')
+                    : (passwordVisible.password ? 'text' : 'password')}
                   id={activeTab === 'forgot' ? 'newPassword' : 'password'}
-                  className={inputFieldClass}
+                  className={`${inputFieldClass} pr-10`}
                   placeholder={
                     activeTab === 'login'
                       ? t('auth.login.passwordPlaceholder')
@@ -1004,12 +1037,23 @@ const UserLoginPage: React.FC = () => {
                         : t('auth.forgotPassword.newPasswordPlaceholder')
                   }
                 />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisible(activeTab === 'forgot' ? 'newPassword' : 'password')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {(activeTab === 'forgot' ? passwordVisible.newPassword : passwordVisible.password) ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
                 <p className="mt-1 text-sm text-red-600">{errors.password?.message || errors.newPassword?.message}</p>
               </div>
 
               {/* 确认密码输入框 - 注册显示 */}
               {activeTab === 'register' && (
-                <div>
+                <div className="relative">
                   <input
                     {...register('confirmPassword', {
                       required: t('auth.register.confirmPasswordRequired'),
@@ -1024,18 +1068,25 @@ const UserLoginPage: React.FC = () => {
                       validate: value =>
                         value === getValues('password') || t('auth.register.passwordsNotMatch'),
                     })}
-                    type="password"
+                    type={passwordVisible.confirmPassword ? 'text' : 'password'}
                     id="confirmPassword"
-                    className={inputFieldClass}
+                    className={`${inputFieldClass} pr-10`}
                     placeholder={t('auth.register.confirmPasswordPlaceholder')}
                   />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisible('confirmPassword')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {passwordVisible.confirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                   <p className="mt-1 text-sm text-red-600">{errors.confirmPassword?.message}</p>
                 </div>
               )}
 
               {/* 确认新密码输入框 - 忘记密码显示 */}
               {activeTab === 'forgot' && (
-                <div>
+                <div className="relative">
                   <input
                     {...register('confirmNewPassword', {
                       required: t('auth.forgotPassword.confirmPasswordRequired'),
@@ -1052,11 +1103,18 @@ const UserLoginPage: React.FC = () => {
                         return value === newPasswordValue || t('auth.forgotPassword.passwordsNotMatch');
                       },
                     })}
-                    type="password"
+                    type={passwordVisible.confirmNewPassword ? 'text' : 'password'}
                     id="confirmNewPassword"
-                    className={inputFieldClass}
+                    className={`${inputFieldClass} pr-10`}
                     placeholder={t('auth.forgotPassword.confirmPasswordPlaceholder')}
                   />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisible('confirmNewPassword')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {passwordVisible.confirmNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                   <p className="mt-1 text-sm text-red-600">{errors.confirmNewPassword?.message}</p>
                 </div>
               )}
