@@ -697,5 +697,5 @@ async def agent_import(
         logger.error(f"[AGENT_IMPORT] Unexpected error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Import failed: {str(e)}"
+            detail="Import failed: an internal error occurred. Please try again or contact the administrator."
         ) from e
