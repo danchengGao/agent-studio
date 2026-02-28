@@ -104,7 +104,7 @@ class PluginCodeTool(CodeComponent, Tool):
         self.node_id: str = card.id
         # Use the existing name field if available, otherwise fall back to tool_id
         self.name: str = conf.name or card.id
-        self.params = card.input_params
+        self.params = conf.input_params
         self.description = self.conf.description
 
     @classmethod
