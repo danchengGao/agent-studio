@@ -11,6 +11,8 @@ class SecurityManager:
     _RESET_CODE_KEY = "auth:reset:code:{email}"
     _RESET_LIMIT_KEY = "auth:reset:limit:{email}"
     _FAIL_COUNT_KEY = "auth:fail:count:{email}"
+    _VERIFY_ATTEMPT_KEY = "auth:verify:attempt:{email}:{action_type}"
+    MAX_VERIFY_ATTEMPTS = 5
 
     MAX_LOGIN_ATTEMPTS = 5
     LOCK_TIME = 1800  # 30分钟锁定
@@ -33,12 +35,21 @@ class SecurityManager:
     def verify_code(cls, email: str, input_code: str, action_type: str = "reg") -> bool:
         """校验验证码，通过后立即销毁"""
         template = cls._REG_CODE_KEY if action_type == "reg" else cls._RESET_CODE_KEY
+        attempt_key = cls._VERIFY_ATTEMPT_KEY.format(email=email, action_type=action_type)
+        attempt_count = redis_manager.get(attempt_key)
         key = template.format(email=email)
+        if attempt_count and int(attempt_count) >= cls.MAX_VERIFY_ATTEMPTS:
+            redis_manager.delete(key) # 超过重试上限后销毁验证码
+            redis_manager.delete(attempt_key) # 清除重试次数
+            return False
         saved_code = redis_manager.get(key)
         
         if saved_code and saved_code == input_code:
             redis_manager.delete(key) # 验证通过立即销毁
+            redis_manager.delete(attempt_key) # 清除重试次数
             return True
+        # 失败次数累计
+        redis_manager.incr(attempt_key, cls.CODE_EXPIRE)
         return False
 
     @classmethod
