@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.database import milliseconds
 from openjiuwen_studio.core.manager.repositories import JiuwenBaseRepository
-from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
+from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import escape_like, get_db_jw
 from openjiuwen_studio.models import knowledge_base as kb_models
 from openjiuwen_studio.models import knowledge_base_document as kb_doc_models
 from openjiuwen_studio.schemas.common import ResponseModel
@@ -380,11 +380,12 @@ class KnowledgeBaseRepository:
             kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
 
             # 构建查询条件：查询词完整出现在名称或描述中（大小写不敏感）
-            # 使用 func.lower() 实现大小写不敏感匹配
+            # 使用 func.lower() + ilike 实现大小写不敏感匹配，escape_like 防止 LIKE 通配符注入
             query_lower = query.lower()
+            escaped_query = escape_like(query_lower)
             search_conditions = or_(
-                func.lower(kb_models.KnowledgeBaseDB.name).contains(query_lower),
-                func.lower(kb_models.KnowledgeBaseDB.description).contains(query_lower),
+                func.lower(kb_models.KnowledgeBaseDB.name).ilike(f"%{escaped_query}%", escape="\\"),
+                func.lower(kb_models.KnowledgeBaseDB.description).ilike(f"%{escaped_query}%", escape="\\"),
             )
 
             # 构建基础查询条件
