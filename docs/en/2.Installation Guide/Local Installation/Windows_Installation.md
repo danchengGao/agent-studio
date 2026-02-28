@@ -317,10 +317,24 @@ Complete dependency installation first, then perform source retrieval and instal
   uv sync
   ```
 
+* Execute database version stamp commands to facilitate subsequent database operations:
+  ```bash
+  # Agent database
+  alembic -n alembic_mysql_agent stamp head
+  alembic -n alembic_mysql_ops stamp head
+
+  # SQLite database
+  alembic -n alembic_sqlite_agent stamp head
+  alembic -n alembic_sqlite_ops stamp head
+  ```
+
+  > Description: The above commands are used to mark that the current database is already the latest version, facilitating subsequent database operations. Need to be executed separately for agent and ops databases. If using MySQL, execute `alembic -n alembic_mysql_agent stamp head` and `alembic -n alembic_mysql_ops stamp head`. For alembic usage methods, refer to [DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE_EN.md)
+
   > **Note**: If it hangs for more than 20 minutes, press Ctrl + C, then try editing the url of [[tool.uv.index]] in pyproject.toml to another available mirror, and re-run uv sync.
 
   > **Note**: If uv sync fails, try: `uv sync --native-tls` to force using the system native TLS library (fix HTTPS download compatibility issues).
 
+* Create log directory and start backend service
   ```bash
   mkdir logs
   mkdir logs\run

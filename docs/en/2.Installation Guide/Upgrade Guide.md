@@ -1,10 +1,6 @@
 # openJiuwen Studio Upgrade Guide
 
-⚠️ **Upgrade operations are not supported at this time.**
-
 ## Upgrade Note
-
-⚠️ **Important Notice:** The current version upgrade does not support cross-version data compatibility in the database. Please back up all important data before upgrading.
 
 Please carefully read this guide before upgrading and follow the steps to complete the upgrade operation.
 
@@ -19,7 +15,7 @@ Please carefully read this guide before upgrading and follow the steps to comple
    git pull
    ```
 
-3. Switch to the 0.1.2 version branch:
+3. Switch to the specified version branch (e.g., v0.1.2):
 
    ```bash
    git checkout v0.1.2
@@ -59,7 +55,10 @@ Please carefully read this guide before upgrading and follow the steps to comple
    uv sync
    ```
 
-3. Activate the virtual environment and start the backend service:
+3. Database upgrade:
+   Please refer to the [DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE_EN.md#2-version-upgrade-notes) section [2. Version Upgrade Notes](../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE_EN.md#2-version-upgrade-notes) for backend database upgrade.
+
+4. Activate the virtual environment and start the backend service:
 
    ```bash
    source .venv/bin/activate
