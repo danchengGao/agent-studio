@@ -383,7 +383,7 @@ upgrade_data() {
 }
 
 # Handle MySQL upgrade (copy env file + execute migration commands)
-uprade_mysql() {
+upgrade_mysql() {
     if [[ "${ARGS["IS_UPGRADE"]}" == "false" 
         || "${DEPLOY_VARS["IS_UPGRADE_MYSQL"]}" == "false" ]]; then
         info "Skip upgrade MySQL: disabled in deployment config"

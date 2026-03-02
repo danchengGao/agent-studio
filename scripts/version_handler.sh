@@ -61,13 +61,13 @@ check_docker() {
 
 # Check docker compose version and availability
 check_docker_compose() {
+    local min_version="v2.19.1"
     info "Checking Docker Compose installation..."
     if ! docker compose version >/dev/null 2>&1; then
         error "Docker Compose not installed. Please install Docker Compose ${min_version} or higher first.."
     fi
 
     local version=$(docker compose version)
-    local min_version="v2.19.1"
     version=$(echo "${version}" | sed -E 's/^[^0-9.]+//')
 
     if version_is_less_than "${version}" "${min_version}"; then
