@@ -70,14 +70,27 @@ export const TestRunForm: FC<TestRunFormProps> = ({ values, setValues, inputForm
       case 'integer':
         return (
           <div className={styles.fieldInput}>
-            <InputNumber precision={0} value={field.value} onChange={value => field.onChange(value)} type={hasError ? 'error' : 'default'} />
+            <InputNumber
+              precision={0}
+              max={Number.MAX_SAFE_INTEGER}
+              min={Number.MIN_SAFE_INTEGER}
+              value={field.value}
+              onChange={value => field.onChange(value)}
+              type={hasError ? 'error' : 'default'}
+            />
             {hasError && <div className={styles.errorMessage}>{field.error}</div>}
           </div>
         )
       case 'number':
         return (
           <div className={styles.fieldInput}>
-            <InputNumber value={field.value} onChange={value => field.onChange(value)} type={hasError ? 'error' : 'default'} />
+            <InputNumber
+              hideButtons
+              max={Number.MAX_VALUE}
+              value={field.value}
+              onChange={value => field.onChange(value)}
+              type={hasError ? 'error' : 'default'}
+            />
             {hasError && <div className={styles.errorMessage}>{field.error}</div>}
           </div>
         )
