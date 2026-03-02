@@ -459,7 +459,7 @@ def with_exception_handling(func):
                 logger.error(f"[KNOWLEDGE_BASE] Error in {func.__name__}: {str(e)}", exc_info=True)
                 return ResponseModel(
                     code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    message=f"Internal server error: {str(e)}",
+                    message="Internal server error",
                 )
 
         return async_wrapper
@@ -471,7 +471,7 @@ def with_exception_handling(func):
             logger.error(f"[KNOWLEDGE_BASE] Error in {func.__name__}: {str(e)}", exc_info=True)
             return ResponseModel(
                 code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                message=f"Internal server error: {str(e)}",
+                message="Internal server error",
             )
 
     return wrapper
