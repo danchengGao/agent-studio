@@ -1,6 +1,7 @@
 #!/usr/bin/python3.10
 # -*- coding: utf-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
+import re
 import json
 import time
 from dataclasses import dataclass
@@ -35,6 +36,9 @@ from openjiuwen_studio.ops.modules.prompt.domain.debug_entity import (
 from openjiuwen_studio.ops.modules.prompt.domain.debug_repository import DebugContextRepository, DebugLogRepository
 from openjiuwen_studio.core.utils.compatible_field import mask_sensitive_fields
 
+
+# OpenAI工具函数名验证正则表达式
+_FUNCTION_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 headers = {}
 
@@ -173,11 +177,26 @@ class PromptDebugService:
             if isinstance(parameters, list):
                 parameters = _array_to_schema(parameters)
 
+            # 验证函数名格式
+            func_name = func_def.get("name")
+            if not func_name:
+                # 如果没有函数名，使用默认名称
+                func_name = "unnamed_function"
+            elif not _FUNCTION_NAME_PATTERN.match(func_name):
+                original_name = func_name
+                func_name = re.sub(r'[^a-zA-Z0-9_-]', '_', func_name)
+                if func_name and func_name[0].isdigit():
+                    func_name = 'func_' + func_name
+                if not func_name:
+                    func_name = "unnamed_function"
+                logger.warning(
+                    f"Tool function name '{original_name}' sanitized to '{func_name}' to match OpenAI API requirements")
+
             functions.append(
                 {
                     "type": "function",
                     "function": {
-                        "name": func_def.get("name"),
+                        "name": func_name,
                         "description": func_def.get("description") or "",
                         "parameters": parameters,
                     },
