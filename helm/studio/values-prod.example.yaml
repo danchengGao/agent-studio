@@ -31,7 +31,7 @@ frontend:
         readOnly: true
   service:
     elb:
-      id: xxx
+      id: "xxx"
 
 sandbox-gateway:
   deployment:

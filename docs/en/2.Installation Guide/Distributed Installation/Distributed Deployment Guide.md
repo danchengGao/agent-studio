@@ -6,7 +6,7 @@ This guide describes how to deploy **openJiuwen** on **Linux** using **Kubernete
 
 ## 1. Prerequisites
 
-### 1.1 Cloud resources (Huawei Cloud example)
+### 1.1 Cloud resources (Huawei Cloud example, Huawei Cloud Official Website: https://www.huaweicloud.com/)
 
 Prepare the following resources in the **same VPC/subnet** to ensure private network connectivity.
 
@@ -50,7 +50,7 @@ Prepare the following resources in the **same VPC/subnet** to ensure private net
     - Disk: reserve sufficient space for your data
   - Ensure CCE storage add-ons are ready (e.g. StorageClass `csi-disk`).
 
-- **ELB + EIP (public entry for external access)**
+- **ELB + EIP (public entry for external access, optional; required when the project needs to be exposed to the Internet)**
   - Prepare an ELB instance (shared or dedicated) for the frontend, and bind an **EIP**.
   - Information to record:
     - ELB instance ID
@@ -58,8 +58,8 @@ Prepare the following resources in the **same VPC/subnet** to ensure private net
     - Bound EIP (public IP)
   - You will access the system via `EIP + frontend exposed port`.
     - Domain DNS records, certificate mounting, and TLS termination can be done by yourself, or refer to:
-      - [Encryption and Authentication Guide](./Encryption%20and%20Authentication%20Guide.md)
-      - [HTTPS Configuration Guide](./Configure%20HTTPS.md)
+      - [Encryption and Authentication Guide](./Encryption and Authentication Guide.md)
+      - [HTTPS Configuration Guide](./Configure HTTPS.md)
 
 ### 1.2 Bastion host / ops machine
 
@@ -142,7 +142,7 @@ cp values-prod.example.yaml values-prod.yaml
 
 ### 4.2 Configure MySQL (RDS)
 
-Edit `values-prod.yaml` and fill in MySQL parameters (field names depend on the template; common examples are):
+Edit `values-prod.yaml` (some fields such as `DB_USER` have defaults in `values.yaml`; you may omit them in `values-prod.yaml` if they match your configuration). Fill in MySQL parameters based on your Huawei Cloud RDS instance (field names depend on the template; add fields manually if they are missing; common examples include):
 
 - DB endpoint:
   - `DB_HOST: <your-rds-host>`
@@ -172,7 +172,7 @@ Fill in Redis parameters (create them if missing in the file):
 
 Fill in the following 4 parameters in `values-prod.yaml`:
 
-- `OBS_BUCKET`: bucket name
+- `OBS_BUCKET`: bucket name, e.g. `openjiuwen-bucket1`
 - `OBS_SERVER`: OBS endpoint (server), e.g. `obs.cn-north-4.myhuaweicloud.com`
 - `OBS_ACCESS_KEY_ID`: Access Key ID with bucket permissions
 - `OBS_SECRET_ACCESS_KEY`: Secret Access Key
@@ -212,8 +212,8 @@ frontend:
 > Notes:
 >
 > - DNS records, certificate mounting, and TLS termination on ELB can be done by yourself, or refer to:
->   - [Encryption and Authentication Guide](./Encryption%20and%20Authentication%20Guide.md)
->   - [HTTPS Configuration Guide](./Configure%20HTTPS.md)
+>   - [Encryption and Authentication Guide](./Encryption and Authentication Guide.md)
+>   - [HTTPS Configuration Guide](./Configure HTTPS.md)
 > - If you only need intranet access or prefer another exposure method, adjust Service/Ingress accordingly.
 
 #### 4.6.2 Other access methods (optional)
@@ -221,10 +221,14 @@ frontend:
 - If you use an Ingress controller:
   - Enable Ingress
   - Configure domain and TLS parameters
-- For intranet testing:
-  - You may use NodePort / LoadBalancer, etc.
+- For intranet testing only:
+  - You may use NodePort (intranet access only).
 
 > See `values-prod.example.yaml` for ELB/Service/Ingress examples.
+
+### 4.7 Instances parameter
+Parameters related to backend, frontend, and sandbox-gateway instances, including but not limited to the number of instances (replicaCount) and image version (tag), can all be configured in values-prod.yaml:
+![image](../images/distributed/distributed-values-yaml.png)
 
 ---
 
@@ -246,8 +250,10 @@ helm upgrade --install studio . -f values-prod.yaml
 
 Explanation:
 
-- `helm dependency build`: fetch chart dependencies
-- `helm upgrade --install`: install or upgrade the release named `studio`
+- `helm dependency build`: fetch and update chart dependencies
+- `helm upgrade --install studio . -f values-prod.yaml`:
+  - Install or upgrade the release named `studio` in the current namespace (default `default`; use `-n <namespace>` to specify). You may use a different release name; this guide uses `studio` as an example.
+  - Use parameters from `values-prod.yaml` to override default configuration.
 
 If you want to deploy into a dedicated namespace:
 
@@ -261,6 +267,8 @@ Check pods:
 kubectl get pods -n <namespace>
 ```
 
+When all core component pods are `Running` / `Ready`, the deployment is complete.
+
 ---
 
 ## 6. Access the system
@@ -270,12 +278,18 @@ Depends on your Service/ELB configuration:
 - **If ELB is enabled**:
   - Access (default frontend port is `3000` if not changed):
     - `http://<your-eip>:<your-frontend-port>`
-- **If NodePort / LoadBalancer is used**:
+
+  ![image](../images/distributed/distributed-huweicloud-elb-eip.png)
+
+- **If NodePort is used (intranet access only)**:
   - Check services:
 
-```bash
-kubectl get svc -n <namespace>
-```
+  ```bash
+  kubectl get svc -n <namespace>
+  ```
+
+  Access via the returned Service type, cluster IP, and port:
+  - `http://<your-node-ip>:<your-frontend-service-node-port>`
 
 If you use HTTPS with a self-signed certificate, the browser may warn "Your connection is not private".
 
@@ -294,7 +308,12 @@ Check StorageClass:
 kubectl get storageclass
 ```
 
-Make sure there is a default StorageClass (marked as `(default)`).
+Make sure there is a default StorageClass (marked as `(default)`). If not configured or incorrect, you can set `csi-disk` (or another StorageClass) as default:
+
+```bash
+kubectl patch storageclass csi-disk \
+  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+```
 
 ### Q2: Pods cannot connect to MySQL/Redis
 
@@ -329,4 +348,18 @@ helm uninstall studio -n <namespace>
 ```
 
 PVC/PV resources are **not** removed automatically by `helm uninstall`. Delete them carefully if you no longer need the data.
+
+As an example, on **Huawei Cloud CCE**, you can clean up unused PVC/PV from the console (make sure the data is no longer needed before doing this):
+
+1. Log in to the Huawei Cloud console, go to **Cloud Container Engine (CCE)**, and open the target cluster.
+2. In the left navigation, go to `Storage` → `PersistentVolumeClaims (PVC)`:
+   - In the target namespace (for example, `studio`), locate PVCs related to this deployment.
+   - After confirming the associated workloads are removed and data is backed up or no longer required, delete the PVCs you no longer need.
+3. If you also want to clean up underlying PVs, go to `Storage` → `PersistentVolumes (PV)`:
+   - Check PVs that are associated with the deleted PVCs (typically in `Released` or similar status).
+   - Delete the PVs you no longer need to release the underlying cloud disk or storage resources.
+
+Example screenshot (PVC cleanup on Huawei Cloud CCE):
+
+![image](../images/distributed/distributed-huweicloud-rm-pvcs.png)
 
