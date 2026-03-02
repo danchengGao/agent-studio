@@ -460,7 +460,11 @@ export class PromptService {
       // 如果没有selectedModel但有models_id，尝试获取模型详情
       try {
         const modelFrom = editorData.modelConfig.model_from
-        const model = await PromptModelService.getModelDetail(editorData.modelConfig.model, modelFrom)
+        const model = await PromptModelService.getModelDetail(
+          editorData.modelConfig.model,
+          modelFrom,
+          editorData.spaceId,
+        )
         modelConfig.models_name = model.openModel.name
         modelConfig.models_id = model.openModel.model_id && model.openModel.model_id.trim() !== '' ? model.openModel.model_id : null
         modelConfig.model_from = model.model_from
