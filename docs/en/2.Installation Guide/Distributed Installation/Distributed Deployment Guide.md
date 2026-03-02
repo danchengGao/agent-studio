@@ -22,6 +22,7 @@ Prepare the following resources in the **same VPC/subnet** to ensure private net
     - ![image](../images/distributed/distributed-huweicloud-rds-db.png)
   - Notes:
     - Allow MySQL port (default `3306`) from the CCE node CIDR in the security group
+    - Grant the corresponding database permissions to the created account
 
 - **DCS (Redis)**
   - Recommended version: Redis 6.0+
@@ -228,6 +229,7 @@ frontend:
 
 ### 4.7 Instances parameter
 Parameters related to backend, frontend, and sandbox-gateway instances, including but not limited to the number of instances (replicaCount) and image version (tag), can all be configured in values-prod.yaml:
+
 ![image](../images/distributed/distributed-values-yaml.png)
 
 ---
