@@ -19,10 +19,12 @@ from openjiuwen_studio.core.manager.login_manager.session_auth import (create_ac
 from openjiuwen_studio.core.manager.login_manager.user import create_user_db
 from openjiuwen_studio.core.manager.repositories.user_repository import user_repository
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
+from openjiuwen_studio.core.manager.login_manager.user import get_user_email
 from openjiuwen_studio.routers.users import create_user_response, get_current_user
+
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.space import SpaceDBPd
-from openjiuwen_studio.schemas.user import RefreshTokenRequest, RoleType, UserDBPd, UserLogin
+from openjiuwen_studio.schemas.user import RefreshTokenRequest, RoleType, UserDBPd
 
 auth_router = APIRouter()
 security_utils = SecurityUtils()
@@ -242,6 +244,8 @@ async def register(request: Request, form_data: OAuth2PasswordRequestForm = Depe
 @auth_router.post("/logout", response_model=ResponseModel[dict])
 async def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
     """User logout endpoint"""
+    # 清空用户的session_key
+    user_repository.update_session_key(get_user_email(current_user), '')
     # In a real application, you might want to blacklist the token
     return ResponseModel(
         code=status.HTTP_200_OK,
