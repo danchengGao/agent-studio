@@ -1681,6 +1681,7 @@
         "originalPrompt": "原始提示词",
         "optimizedPrompt": "优化后的提示词",
         "evaluationDetail": "评测详情",
+        "optimizationDetail": "优化详情",
         "comparison": "对比",
         "viewDiff": "查看差异",
         "applyOptimization": "应用优化",

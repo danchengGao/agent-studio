@@ -1696,6 +1696,7 @@
         "originalPrompt": "Original Prompt",
         "optimizedPrompt": "Optimized Prompt",
         "evaluationDetail": "Evaluation Details",
+        "optimizationDetail": "Optimization Details",
         "comparison": "Comparison",
         "viewDiff": "View Diff",
         "applyOptimization": "Apply Optimization",
