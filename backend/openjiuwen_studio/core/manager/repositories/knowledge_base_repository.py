@@ -628,44 +628,37 @@ class KnowledgeBaseRepository:
     description: 检查知识库是否有图增强构建的文档
     param {str} space_id  空间ID
     param {str} kb_id  知识库ID
-    return {bool} 是否有图增强文档（异常时返回 False，避免影响列表接口）
+    return {bool} 是否有图增强文档
     """
 
-    @staticmethod
+    @with_exception_handling
     def has_graph_enhancement_documents(
-        space_id: str, kb_id: str, db_session: Session | None = None
+        self, space_id: str, kb_id: str, db_session: Session | None = None
     ) -> bool:
-        """检查知识库中是否有图增强构建的文档。异常时返回 False，保证调用方始终得到 bool。"""
-        try:
-            with get_db_jw(db_session) as db:
-                # 查询该知识库下所有已索引的文档
-                docs = (
-                    db.query(kb_doc_models.KnowledgeBaseDocumentDB)
-                    .filter(
-                        kb_doc_models.KnowledgeBaseDocumentDB.space_id == space_id,
-                        kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kb_id,
-                        kb_doc_models.KnowledgeBaseDocumentDB.status == "indexed",
-                    )
-                    .all()
+        """检查知识库中是否有图增强构建的文档。"""
+        with get_db_jw(db_session) as db:
+            # 查询该知识库下所有已索引的文档
+            docs = (
+                db.query(kb_doc_models.KnowledgeBaseDocumentDB)
+                .filter(
+                    kb_doc_models.KnowledgeBaseDocumentDB.space_id == space_id,
+                    kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kb_id,
+                    kb_doc_models.KnowledgeBaseDocumentDB.status == "indexed",
                 )
-
-                # 检查是否有文档使用了图增强
-                for doc in docs:
-                    if doc.process_info and isinstance(doc.process_info, dict):
-                        indexing_strategy = doc.process_info.get("indexing_strategy")
-                        if isinstance(indexing_strategy, dict):
-                            enable_graph_enhancement = indexing_strategy.get(
-                                "enable_graph_enhancement", False
-                            )
-                            if enable_graph_enhancement:
-                                return True
-
-                return False
-        except Exception as e:
-            logger.debug(
-                f"has_graph_enhancement_documents failed: space_id={space_id}, kb_id={kb_id}, error={e}",
-                exc_info=True,
+                .all()
             )
+
+            # 检查是否有文档使用了图增强
+            for doc in docs:
+                if doc.process_info and isinstance(doc.process_info, dict):
+                    indexing_strategy = doc.process_info.get("indexing_strategy")
+                    if isinstance(indexing_strategy, dict):
+                        enable_graph_enhancement = indexing_strategy.get(
+                            "enable_graph_enhancement", False
+                        )
+                        if enable_graph_enhancement:
+                            return True
+
             return False
 
 
