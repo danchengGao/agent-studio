@@ -109,7 +109,7 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           >
-            <Route path="apps" element={<AppsPage />} />
+            {!enable_pwd && <Route path="apps" element={<AppsPage />} />}
             <Route path="agents" element={<AgentsPageNew />} />
             <Route
               path="agents/new"
