@@ -138,26 +138,17 @@ const ArrayInputsValues = ({
                       style={{ width: '100%' }}
                       value={item.value.content}
                       onChange={handleRefChange}
-                      includeSchema={{ type: 'array', extra: { weak: true } } }
+                      includeSchema={{ type: 'array', extra: { weak: true } }}
                     />
                   </div>
                   <div className="gedit-m-dynamic-value-input-trigger">
-                    <IconButton
-                      theme="borderless"
-                      icon={<IconDelete size="small" />}
-                      size="small"
-                      onClick={() => handleRefChange(undefined)}
-                    />
+                    <IconButton theme="borderless" icon={<IconDelete size="small" />} size="small" onClick={() => handleRefChange(undefined)} />
                   </div>
                 </>
               ) : (
                 <>
                   <div className="gedit-m-dynamic-value-input-type">
-                    <TypeSelector
-                      value={{ type: itemsType }}
-                      onChange={handleTypeChange}
-                      excludeTypes={['array', 'object']}
-                    />
+                    <TypeSelector value={{ type: itemsType }} onChange={handleTypeChange} excludeTypes={['array', 'object']} />
                   </div>
                   <div className="gedit-m-dynamic-value-input-main">
                     <ConstantInput
@@ -165,11 +156,7 @@ const ArrayInputsValues = ({
                       onChange={handleContentChange}
                       schema={fullSchema}
                       fallbackRenderer={() => (
-                        <InjectVariableSelector
-                          style={{ width: '100%' }}
-                          onChange={handleRefChange}
-                          includeSchema={{ type: 'array', extra: { weak: true } } }
-                        />
+                        <InjectVariableSelector style={{ width: '100%' }} onChange={handleRefChange} includeSchema={{ type: 'array', extra: { weak: true } }} />
                       )}
                     />
                   </div>
@@ -177,21 +164,14 @@ const ArrayInputsValues = ({
                     <InjectVariableSelector
                       value={undefined}
                       onChange={handleRefChange}
-                      includeSchema={{ type: 'array', extra: { weak: true } } }
-                      triggerRender={() => (
-                        <IconButton theme="borderless" icon={<IconSetting size="small" />} size="small" />
-                      )}
+                      includeSchema={{ type: 'array', extra: { weak: true } }}
+                      triggerRender={() => <IconButton theme="borderless" icon={<IconSetting size="small" />} size="small" />}
                     />
                   </div>
                 </>
               )}
             </div>
-            <IconButton
-              theme="borderless"
-              icon={<IconDelete size="small" />}
-              size="small"
-              onClick={() => remove(item.id)}
-            />
+            <IconButton theme="borderless" icon={<IconDelete size="small" />} size="small" onClick={() => remove(item.id)} />
           </div>
         )
       })}
@@ -205,9 +185,7 @@ const ArrayInputsValues = ({
             schema: { type: 'array', items: { type: 'string' } },
           })
         }
-      >
-        {t('workflowCanvas.formMaterials.common.add')}
-      </Button>
+      />
     </div>
   )
 }
