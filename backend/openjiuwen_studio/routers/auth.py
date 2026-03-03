@@ -25,7 +25,6 @@ from openjiuwen_studio.routers.users import create_user_response, get_current_us
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.space import SpaceDBPd
 from openjiuwen_studio.schemas.user import RefreshTokenRequest, RoleType, UserDBPd
-from openjiuwen_studio.core.manager.login_manager.security_manager import SecurityManager
 
 auth_router = APIRouter()
 security_utils = SecurityUtils()
@@ -61,8 +60,6 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     不需要密码验证
     """
     try:
-        # 对登录进行频率控制
-        SecurityManager.login_rate_limit(request.client.host)
         username = form_data.username
         logger.info(f"username: {username}")
 
@@ -132,8 +129,6 @@ async def register_internal(username: str, language: str = "zh", host: str = "")
     不需要密码，使用空密码或默认密码
     """
     try:
-        # 对注册进行频率控制
-        SecurityManager.register_rate_limit(host)
         # 检查用户是否已存在（双重检查）
         ret = user_repository.find_user_tbl(email=username)
         if ret["code"] == status.HTTP_500_INTERNAL_SERVER_ERROR:
