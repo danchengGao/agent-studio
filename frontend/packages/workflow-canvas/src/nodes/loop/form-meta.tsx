@@ -258,11 +258,20 @@ export const LoopFormRender = () => {
             return (
               <FormItem name={t('workflowCanvas.loop.loopArray')} vertical>
                 <Field<Record<string, IFlowValue | undefined> | undefined> name={`inputs.loopParam.loopArray`}>
-                  {({ field: arrayField }) => (
-                    <PrivateScopeProvider>
-                      <ArrayInputsValues value={arrayField.value} onChange={value => arrayField.onChange(value)} />
-                    </PrivateScopeProvider>
-                  )}
+                  {({ field: arrayField }) => {
+                    const validKeys = Object.keys(arrayField.value || {}).filter(key => key && key.trim() !== '')
+                    const showHint = validKeys.length >= 2
+                    return (
+                      <PrivateScopeProvider>
+                        <ArrayInputsValues value={arrayField.value} onChange={value => arrayField.onChange(value)} />
+                        {showHint && (
+                          <div style={{ color: 'var(--semi-color-text-2)', fontSize: 12, marginTop: 4 }}>
+                            {t('workflowCanvas.loop.arrayTruncateHint')}
+                          </div>
+                        )}
+                      </PrivateScopeProvider>
+                    )
+                  }}
                 </Field>
               </FormItem>
             )
@@ -274,22 +283,32 @@ export const LoopFormRender = () => {
       <FormItem name={t('workflowCanvas.loop.intermediateVar')} vertical>
         <Field<Record<string, IFlowValue | undefined> | undefined> name="inputs.loopParam.intermediateVar">
           {({ field }) => (
-            <PrivateScopeProvider>
-              <InputsValues
-                value={field.value}
-                onChange={value => field.onChange(value)}
-                onValidateKey={(key, itemId, allItems) => {
-                  if (key === 'index') {
-                    return t('workflowCanvas.loop.indexReserved')
-                  }
-                  const isDuplicate = allItems.some(item => item.id !== itemId && item.key === key)
-                  if (isDuplicate && key) {
-                    return t('workflowCanvas.loop.variableExists', { key })
-                  }
-                  return undefined
-                }}
-              />
-            </PrivateScopeProvider>
+            <Field<Record<string, IFlowValue | undefined> | undefined> name="inputs.loopParam.loopArray">
+              {({ field: arrayField }) => {
+                const arrayKeys = Object.keys(arrayField.value || {}).filter(k => k && k.trim() !== '')
+                return (
+                  <PrivateScopeProvider>
+                    <InputsValues
+                      value={field.value}
+                      onChange={value => field.onChange(value)}
+                      onValidateKey={(key, itemId, allItems) => {
+                        if (key === 'index') {
+                          return t('workflowCanvas.loop.indexReserved')
+                        }
+                        const isDuplicate = allItems.some(item => item.id !== itemId && item.key === key)
+                        if (isDuplicate && key) {
+                          return t('workflowCanvas.loop.variableExists', { key })
+                        }
+                        if (arrayKeys.includes(key)) {
+                          return t('workflowCanvas.loop.variableNameDuplicate')
+                        }
+                        return undefined
+                      }}
+                    />
+                  </PrivateScopeProvider>
+                )
+              }}
+            </Field>
           )}
         </Field>
       </FormItem>
