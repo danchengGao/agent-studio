@@ -368,6 +368,7 @@
       "loginFailed": "登录失败",
       "invalidCredentials": "用户名或密码错误",
       "invalidEmailFormat": "请输入正确的邮箱",
+      "invalidEmailLength": "邮箱前缀至少需要3个字符",
       "passwordTooShort": "密码长度至少需要6位",
       "networkError": "网络请求失败，请检查网络连接",
       "registerLink": "还没有账号?",

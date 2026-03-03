@@ -2,6 +2,7 @@ import secrets
 import string
 
 from openjiuwen_studio.core.manager.redis_manager.redis_client import redis_manager_str as redis_manager
+from fastapi import HTTPException
 
 
 class SecurityManager:
@@ -12,6 +13,8 @@ class SecurityManager:
     _RESET_LIMIT_KEY = "auth:reset:limit:{email}"
     _FAIL_COUNT_KEY = "auth:fail:count:{email}"
     _VERIFY_ATTEMPT_KEY = "auth:verify:attempt:{email}:{action_type}"
+    _LOGIN_RATE_LIMIT_KEY = "rate_limit:login:{client_ip}"
+    _REGISTER_RATE_LIMIT_KEY = "rate_limit:register:{client_ip}"
     MAX_VERIFY_ATTEMPTS = 5
 
     MAX_LOGIN_ATTEMPTS = 5
@@ -85,3 +88,21 @@ class SecurityManager:
     def clear_auth_status(cls, email: str):
         """清理安全限制状态(重置密码或登录成功后)"""
         redis_manager.delete(cls._FAIL_COUNT_KEY.format(email=email))
+
+    @classmethod
+    def login_rate_limit(cls, client_ip: str, max_requests: int = 10, window_seconds: int = 60):
+        """
+        检查是否超过登录限流
+        """
+        count = redis_manager.incr(cls._LOGIN_RATE_LIMIT_KEY.format(client_ip=client_ip), window_seconds)
+        if count > max_requests:
+            raise HTTPException(status_code=429, detail=f"登录过于频繁，请 {window_seconds} 秒后再试")
+        
+    @classmethod
+    def register_rate_limit(cls, client_ip: str, max_requests: int = 5, window_seconds: int = 3600):
+        """
+        检查是否超过注册限流
+        """
+        count = redis_manager.incr(cls._REGISTER_RATE_LIMIT_KEY.format(client_ip=client_ip), window_seconds)
+        if count > max_requests:
+            raise HTTPException(status_code=429, detail=f"注册过于频繁，请 {window_seconds} 秒后再试")
