@@ -631,8 +631,9 @@ class KnowledgeBaseRepository:
     return {bool} 是否有图增强文档（异常时返回 False，避免影响列表接口）
     """
 
+    @staticmethod
     def has_graph_enhancement_documents(
-        self, space_id: str, kb_id: str, db_session: Session | None = None
+        space_id: str, kb_id: str, db_session: Session | None = None
     ) -> bool:
         """检查知识库中是否有图增强构建的文档。异常时返回 False，保证调用方始终得到 bool。"""
         try:
