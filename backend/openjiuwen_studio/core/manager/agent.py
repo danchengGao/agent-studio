@@ -3,14 +3,14 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import datetime
 import functools
+import io
+import json
 import math
 import os
+import shutil
 import time
 import uuid
-import json
 import zipfile
-import io
-import shutil
 from pathlib import Path
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Callable, Type, Set, Any, Dict, Optional, Union, Tuple
@@ -2013,7 +2013,7 @@ def _collect_knowledge_dependencies(
                 doc_dict = {
                     "doc_id": doc.doc_id,
                     "name": doc.name,
-                    "file_path": doc.file_path,  # 需要导出文件
+                    "file_path": doc.file_path,
                     "obs_name": doc.obs_name,
                     "file_size": doc.file_size,
                     "file_type": doc.file_type,
@@ -2167,7 +2167,11 @@ async def _import_knowledge_bases(
 
                     # 尝试从 ZIP 中恢复文件
                     file_restored = False
-                    new_file_path = doc_data["file_path"]  # 默认使用原有路径（可能无效）
+                    new_file_path = doc_data.get("file_path")
+                    if not new_file_path:
+                        name_or_id = doc_data.get("name") or doc_data.get("doc_id") or "unknown"
+                        warnings.append(f"文档 \"{name_or_id}\" 的 file_path 缺失，已跳过（不应缺失，请检查导出数据）。\n")
+                        continue
 
                     if documents_source_dir:
                         # 在 ZIP 中查找文件: documents/{source_kb_id}/{filename}
@@ -2269,12 +2273,21 @@ async def _import_knowledge_bases(
                                 logger.error(f"[KB_IMPORT] Failed to restore file {safe_filename}: {e}")
                                 warnings.append(f"文档文件 {safe_filename} 恢复失败: {e}\n")
 
+                    # file_path already validated above (skip if missing); should not be empty here
+                    if not new_file_path:
+                        warnings.append(
+                            f"文档 \"{doc_data.get('name', '')}\" (doc_id: {doc_data.get('doc_id', '')}) "
+                            f"在 ZIP 中未找到对应文件且无 file_path，已跳过。\n"
+                        )
+                        continue
+
                     new_doc = KnowledgeBaseDocumentDB(
                         space_id=space_id,
                         kb_id=target_kb_id,
                         doc_id=new_doc_id,
                         name=doc_data["name"],
                         file_path=new_file_path,
+                        obs_name=doc_data.get("obs_name", ""),
                         file_size=doc_data["file_size"],
                         file_type=doc_data["file_type"],
                         mime_type=doc_data["mime_type"],
@@ -2532,7 +2545,7 @@ async def _import_knowledge_bases(
 
 
 @with_exception_handling
-def agent_export(
+async def agent_export(
     req: AgentExportRequest, current_user: dict
 ) -> Union[ResponseModel, Tuple[io.BytesIO, str]]:
     """导出智能体及其依赖项"""
@@ -2934,26 +2947,47 @@ def agent_export(
     base_filename = f"{agent_data.get('agent_name', 'agent')}-export-{timestamp}"
 
     if has_documents:
+        doc_entries = []
+        obs_manager = None
+        for kb in knowledge_bases:
+            documents = kb.get("documents", [])
+            kb_id = kb.get("kb_id", "")
+            for doc in documents:
+                file_path = doc.get("file_path")
+                obs_name = doc.get("obs_name", "")  # NOT NULL; old export JSON may lack this key
+                file_name = doc.get("name") or (os.path.basename(file_path) if file_path else None)
+                if not file_name:
+                    continue
+                if not file_path:
+                    name_or_id = doc.get("name", "unknown") or doc.get("doc_id", "unknown")
+                    raise ValueError(
+                        f"文档 \"{name_or_id}\" 的 file_path 缺失，无法导出（不应缺失，请检查数据）。"
+                    )
+                zip_path = f"documents/{kb_id}/{file_name}"
+                if os.path.exists(file_path):
+                    doc_entries.append((file_path, zip_path))
+                elif obs_name:
+                    if obs_manager is None:
+                        obs_manager = kb_mgr.OBSDocumentManager()
+                    try:
+                        await obs_manager.download_document(object_name=obs_name, file_path=file_path)
+                        doc_entries.append((file_path, zip_path))
+                    except Exception as e:
+                        logger.warning("[AGENT_EXPORT] OBS download skipped for %s: %s", file_name, e)
+                else:
+                    logger.warning(
+                        "[AGENT_EXPORT] Document skipped (local file missing, no OBS): path=%s, name=%s",
+                        file_path,
+                        file_name,
+                    )
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            # 1. 写入 json文件
             zip_file.writestr(
                 f"{base_filename}.json",
                 json.dumps(export_data.model_dump(), ensure_ascii=False, indent=2),
             )
-
-            # 2. 写入知识库文档
-            for kb in knowledge_bases:
-                documents = kb.get("documents", [])
-                for doc in documents:
-                    file_path = doc.get("file_path")
-                    if file_path and os.path.exists(file_path):
-                        # 使用 doc name 作为文件名，方便用户查看
-                        # 如果没有 doc name，则使用 file_path 的 basename
-                        file_name = doc.get("name") or os.path.basename(file_path)
-                        zip_path = f"documents/{kb.get('kb_id')}/{file_name}"
-                        zip_file.write(file_path, zip_path)
-
+            for src_path, zpath in doc_entries:
+                zip_file.write(src_path, zpath)
         zip_buffer.seek(0)
         filename = f"{base_filename}.zip"
         return zip_buffer, filename

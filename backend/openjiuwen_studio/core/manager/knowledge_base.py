@@ -1681,6 +1681,8 @@ async def process_single_document(
     obs_name: str = None,
 ):
     """在后台异步处理单个文档"""
+    if not file_path:
+        raise ValueError("file_path is required for process_single_document")
     kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
     try:
         logger.info(
@@ -2498,9 +2500,10 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
                         f"[DOC_DELETE] Failed to delete local file - Path: {file_path}, Error: {str(e)}"
                     )
 
-            # deleting document from OBS
-            obs_manager = OBSDocumentManager()
-            await obs_manager.delete_document(obs_name)
+            # deleting document from OBS (skip if no obs_name)
+            if obs_name:
+                obs_manager = OBSDocumentManager()
+                await obs_manager.delete_document(obs_name)
 
             # 同步删除索引中的数据（使用新的知识库系统）
             try:

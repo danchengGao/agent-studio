@@ -614,7 +614,8 @@ async def agent_export(
     """
     try:
         req = validate_request(request, AgentExportRequest)
-        res = mgr.agent_export(req, current_user)
+        # agent_export is async (OBS download when building ZIP); must await to get result
+        res = await mgr.agent_export(req, current_user)
 
         if isinstance(res, tuple) and len(res) == 2:
             zip_buffer, filename = res
