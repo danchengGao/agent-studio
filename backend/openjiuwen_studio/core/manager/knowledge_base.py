@@ -11,7 +11,7 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, Union, Tuple
+from typing import Dict, Any, Union, Tuple, Optional
 from typing import List
 
 from fastapi import status, UploadFile
@@ -1049,7 +1049,7 @@ def _create_chunker(segmentation_strategy, embed_model=None) -> TextChunker:
 
 
 def _check_milvus_connection() -> Tuple[bool, str]:
-    """检查 Milvus 连接性
+    """创建知识库前的 Milvus 连通性预检：使用独立 alias 连接后验证并断开，不占用 default。
 
     Returns:
         tuple[bool, str]: (是否连接成功, 错误信息)
@@ -1057,26 +1057,15 @@ def _check_milvus_connection() -> Tuple[bool, str]:
     try:
         from pymilvus import connections, utility
 
-        milvus_host = os.getenv("MILVUS_HOST", "localhost")
-        milvus_port = os.getenv("MILVUS_PORT", "19530")
-        milvus_token = SecurityUtils.get_decrypted_secret(
-            "MILVUS_TOKEN",
-            os.getenv("MILVUS_TOKEN", None),
-        )
-
-        # 尝试连接 Milvus
+        host, port, token = _get_milvus_connection_params()
         alias = "kb_connection_test"
         try:
-            # 如果连接已存在，先断开
             if connections.has_connection(alias):
                 connections.disconnect(alias)
         except Exception as e:
             logger.warning(f"[MILVUS] Failed to disconnect connection: {alias}, Error: {str(e)}")
 
-        # 建立新连接
-        connections.connect(
-            alias=alias, host=milvus_host, port=int(milvus_port), token=milvus_token
-        )
+        connections.connect(alias=alias, host=host, port=port, token=token)
 
         # 验证连接是否有效（尝试列出集合）
         try:
@@ -1169,19 +1158,25 @@ def _default_index_config() -> VectorStoreConfig:
     return VectorStoreConfig(collection_name="default", database_name="")
 
 
-def _create_milvus_index_manager() -> MilvusIndexer:
-    """Create Milvus index manager (used by _check_milvus_connection and _create_index_manager)."""
-    milvus_host = os.getenv("MILVUS_HOST", "localhost")
-    milvus_port = os.getenv("MILVUS_PORT", "19530")
-    milvus_token = SecurityUtils.get_decrypted_secret(
+def _get_milvus_connection_params() -> Tuple[str, int, Optional[str]]:
+    """从环境读取 Milvus 连接参数，供连接校验与索引入口复用。返回 (host, port, token)。"""
+    host = os.getenv("MILVUS_HOST", "localhost")
+    port = int(os.getenv("MILVUS_PORT", "19530"))
+    token = SecurityUtils.get_decrypted_secret(
         "MILVUS_TOKEN",
         os.getenv("MILVUS_TOKEN", None),
     )
-    milvus_uri = f"http://{milvus_host}:{milvus_port}"
+    return host, port, token
+
+
+def _create_milvus_index_manager() -> MilvusIndexer:
+    """Create Milvus index manager (used by _check_milvus_connection and _create_index_manager)."""
+    host, port, token = _get_milvus_connection_params()
+    milvus_uri = f"http://{host}:{port}"
     return MilvusIndexer(
         config=_default_index_config(),
         milvus_uri=milvus_uri,
-        milvus_token=milvus_token,
+        milvus_token=token,
     )
 
 
@@ -1203,6 +1198,26 @@ def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
         return _create_milvus_index_manager()
     else:
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
+
+
+def ensure_milvus_connection_for_indexing() -> None:
+    """在索引入口确保 pymilvus 的 default 连接已建立，仅当 INDEX_MANAGER_TYPE=milvus 时执行。
+
+    文档处理与 KB 导入等异步/后台路径可能未持有 default 连接，导致 build_index 等抛出
+    ConnectionNotExistException。在每次索引入口调用本函数可避免该问题；若已存在 default 连接则
+    直接返回，无额外开销。
+    """
+    if _CURR_INDEX_TYPE != "milvus":
+        return
+    try:
+        from pymilvus import connections
+    except ImportError:
+        return
+    if connections.has_connection("default"):
+        return
+    host, port, token = _get_milvus_connection_params()
+    connections.connect(alias="default", host=host, port=port, token=token)
+    logger.info("[MILVUS] Ensured default connection for indexing.")
 
 
 async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
@@ -1530,6 +1545,8 @@ async def _index_documents(
         raise Exception(f"Failed to update status to INDEXING: {update_indexing_result.message}")
 
     logger.info(f"[INDEX] Document status updated to INDEXING - Doc ID: {doc_id}")
+
+    ensure_milvus_connection_for_indexing()
 
     # 2. 加载配置
     use_graph = bool(getattr(indexing_strategy, "enable_graph_enhancement", False))
