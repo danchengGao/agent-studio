@@ -2272,6 +2272,9 @@ async def _import_knowledge_bases(
                             except Exception as e:
                                 logger.error(f"[KB_IMPORT] Failed to restore file {safe_filename}: {e}")
                                 warnings.append(f"文档文件 {safe_filename} 恢复失败: {e}\n")
+                        else:
+                            doc_name = doc_data.get("name") or doc_data.get("doc_id") or safe_filename or "unknown"
+                            warnings.append(f"文档 \"{doc_name}\" 在导入包中未找到文件，已标记为失败。\n")
 
                     # file_path already validated above (skip if missing); should not be empty here
                     if not new_file_path:
@@ -2966,7 +2969,8 @@ async def agent_export(
                 zip_path = f"documents/{kb_id}/{file_name}"
                 if os.path.exists(file_path):
                     doc_entries.append((file_path, zip_path))
-                elif obs_name:
+                elif obs_name and os.getenv("OBS_BUCKET"):
+                    # OBS download only when bucket is configured.
                     if obs_manager is None:
                         obs_manager = kb_mgr.OBSDocumentManager()
                     try:

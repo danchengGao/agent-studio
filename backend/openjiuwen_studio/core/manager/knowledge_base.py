@@ -121,6 +121,8 @@ class OBSDocumentManager:
         return storage_path / file_name
 
     async def delete_document(self, object_name: str):
+        if not self.bucket:
+            return
         await self.obs_client.delete_object(self.bucket, object_name)
 
     async def download_document(
@@ -128,6 +130,8 @@ class OBSDocumentManager:
         object_name: str,
         file_path: str | Path,
     ):
+        if not self.bucket:
+            return
         file_path = Path(file_path)
 
         # Create file path directory if it does not exist
@@ -142,6 +146,8 @@ class OBSDocumentManager:
         object_name: str,
         file_path: str | Path,
     ):
+        if not self.bucket:
+            return
         await self.obs_client.upload_file(self.bucket, object_name, file_path)
 
     async def download_if_updated(
@@ -1746,8 +1752,8 @@ async def process_single_document(
             if not file_name:
                 file_name = Path(file_path).name
 
-            # If local file is missing (e.g. multi-worker deployments), try to fetch from OBS.
-            if not os.path.exists(file_path) and obs_name:
+            # When local file is missing, fetch from OBS only if OBS is configured.
+            if not os.path.exists(file_path) and obs_name and os.getenv("OBS_BUCKET"):
                 logger.info(
                     f'[DOC_PROCESS_BG] Local file missing, downloading from OBS - "{obs_name}" -> "{file_path}"'
                 )
@@ -2517,8 +2523,8 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
                         f"[DOC_DELETE] Failed to delete local file - Path: {file_path}, Error: {str(e)}"
                     )
 
-            # deleting document from OBS (skip if no obs_name)
-            if obs_name:
+            # deleting document from OBS (skip if no obs_name or OBS not configured)
+            if obs_name and os.getenv("OBS_BUCKET"):
                 obs_manager = OBSDocumentManager()
                 await obs_manager.delete_document(obs_name)
 
