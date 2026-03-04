@@ -155,7 +155,7 @@ def get_trace_workflow_output(data):
     return outputs_value
 
 
-def get_trace_workflow_input(data):
+def get_trace_workflow_input(data, output_value=None):
     """
     获取trace_workflow中streamInputs或inputs
     """
@@ -183,6 +183,10 @@ def get_trace_workflow_input(data):
             combined_text = ''.join(value_list)
             inputs_value[key] = combined_text
 
+    # 特殊处理：对于 UserInputComponent，如果 inputs 为空，则从 outputs 中提取
+    if not inputs_value and output_value and data.component_type == "UserInputComponent":
+        inputs_value = output_value.copy() if isinstance(output_value, dict) else {}
+
     if not inputs_value:
         inputs_value=None
 
@@ -203,8 +207,8 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
         if EMPTY_NODE_ID_PREFIX in data.invoke_id:
             return None, None, None
 
-        input_value = get_trace_workflow_input(data)
         output_value = get_trace_workflow_output(data)
+        input_value = get_trace_workflow_input(data, output_value)
         data.inputs = input_value
         data.outputs = output_value
 
