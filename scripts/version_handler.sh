@@ -80,5 +80,28 @@ check_docker_compose() {
 check_software_dependency() {
     check_docker
     check_docker_compose
+    check_cmds
 }
 
+check_cmds() {
+    for cmd in sed awk grep sort head wc tr cut od chmod mkdir cp rm mv cat echo printf seq netstat openssl
+    do
+        check_cmd ${cmd}
+    done
+
+    local os_type=${DEPLOY_VARS["OS_TYPE"]}
+    if [ "${os_type}" == "macos" ]; then
+        for cmd in jot lsof
+        do
+            check_cmd ${cmd}
+        done
+    fi
+}
+
+check_cmd() {
+    if command -v "$1" >/dev/null 2>&1; then
+        success "$1 is OK."
+    else
+        error "$1 is not installed. Please install it first."
+    fi
+}

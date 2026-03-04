@@ -106,6 +106,7 @@ IP=<IP address of the server where the instance components are located>
 6. During the upgrade process, data from the MySQL and Milvus components of the old instance will be copied and migrated to the new instance. Before the upgrade, check the total data volume of the above components in the old instance, and ensure that the remaining disk space is not less than twice the total volume to meet the space requirements for the upgrade.
 
 ### Execute the Upgrade Command
+> Upgrade Notice: Ensure the previous instance remains running normally. Do not perform any shutdown operation, and verify the old container is healthy. The upgrade requires connecting to the old container to read business data.
 
 In the root directory of the new-version deployment tool, execute the following one-click upgrade command to start the new-version instance and complete the migration of old data:
 
