@@ -2628,7 +2628,9 @@
       "getVersionInfoFailed": "Failed to get plugin version information",
       "pluginDataNotLoaded": "Plugin data not loaded, please refresh the page",
       "saveFailed": "Save failed",
-      "savePluginVersionConfigFailed": "Failed to save plugin version configuration"
+      "savePluginVersionConfigFailed": "Failed to save plugin version configuration",
+      "pluginNameRequired": "Please enter plugin name",
+      "pluginDescRequired": "Please enter plugin description"
     },
     "loading": "Loading",
     "loadingDescription": "Loading plugin list...",
@@ -2636,6 +2638,7 @@
     "loadFailedDescription": "Failed to load plugin list, please try again later",
     "noMatching": "No matching plugins",
     "noMatchingDescription": "No plugins found matching the criteria, please try adjusting filters",
+    "noDescription": "No description",
     "categories": {
       "tools": "Tools",
       "uncategorized": "Uncategorized",

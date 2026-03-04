@@ -2614,7 +2614,9 @@
       "getVersionInfoFailed": "获取插件版本信息失败",
       "pluginDataNotLoaded": "插件数据未加载，请刷新页面",
       "saveFailed": "保存失败",
-      "savePluginVersionConfigFailed": "保存插件版本配置失败"
+      "savePluginVersionConfigFailed": "保存插件版本配置失败",
+      "pluginNameRequired": "请输入插件名称",
+      "pluginDescRequired": "请输入插件描述"
     },
     "loading": "加载中",
     "loadingDescription": "正在加载插件列表...",
@@ -2622,6 +2624,7 @@
     "loadFailedDescription": "加载插件列表失败，请稍后重试",
     "noMatching": "未找到匹配的插件",
     "noMatchingDescription": "没有找到符合条件的插件，请尝试调整筛选条件",
+    "noDescription": "暂无描述",
     "categories": {
       "tools": "工具",
       "uncategorized": "未分类",

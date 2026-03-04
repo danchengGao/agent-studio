@@ -170,7 +170,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
         <MuiDialogTitle className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+              <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <History className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -252,7 +252,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                               <FileText className="w-4 h-4 text-blue-600" />
                             </div>
                             <div>
@@ -309,7 +309,7 @@ const PluginVersionHistory: React.FC<PluginVersionHistoryProps> = ({ open, onClo
                         {/* 版本描述 */}
                         {version.desc && (
                           <div className="mb-3">
-                            <Typography variant="body2" className="text-gray-700">
+                            <Typography variant="body2" className="text-gray-700 overflow-hidden break-words line-clamp-2" title={version.desc}>
                               {version.desc}
                             </Typography>
                           </div>
