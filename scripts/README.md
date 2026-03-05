@@ -611,3 +611,6 @@ time="2026-02-13T11:12:41+08:00" level=warning msg="Found orphan containers ([ji
 
 **处理建议**
 将Bash 升级至 5.2 及以上版本，使用新版bash运行脚本。
+```
+/path/to/bash service.sh <command>
+```
