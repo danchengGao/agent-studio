@@ -108,7 +108,7 @@ scripts/
 
 - Docker：20.10 版本及以上
 - Docker Compose：v2.19.1 及以上版本
-- Bash: 5.2及以上版本
+- Bash: 5.0及以上版本
 
 ✔️ **参数说明**
 
@@ -610,7 +610,7 @@ time="2026-02-13T11:12:41+08:00" level=warning msg="Found orphan containers ([ji
 该问题在 macOS 环境中尤为常见，其根本原因是 macOS 系统默认搭载的 Bash 版本为 3.2（发布于 2007 年）。此版本对现代 Bash 语法支持有限，无法正确解析关联数组中 ["ENV_DIR"] 格式的键名，会将其错误地识别为独立变量 $ENV_DIR，从而触发 “未绑定变量” 的解析错误。
 
 **处理建议**
-将Bash 升级至 5.2 及以上版本，使用新版bash运行脚本。
+将Bash 升级至 5.0 及以上版本，使用新版bash运行脚本。
 
 ```
 /path/to/bash service.sh <command>
