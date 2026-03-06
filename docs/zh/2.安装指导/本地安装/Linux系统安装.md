@@ -15,15 +15,6 @@
   * Ubuntu：最低 Ubuntu 20.04，推荐 Ubuntu 22.04 (Jammy) 及以上
     > **注意**：Ubuntu 官方与主流软件源已停止支持 Ubuntu 20.04 (Focal) 及以下版本系统。
 
-* 软件（安装方法详见下文）	 
-  * Git 2.40及以上 
-  * Node.js 20.0及以上 
-  * npm 10.0及以上 
-  * Python 3.11及以上 
-  * uv 0.5.0及以上 
-  * MySQL 8.0及以上 
-  * Milvus 2.6.2及以上
-
 ## 二、安装方法
 
 ### 方法一：使用一键安装部署脚本
@@ -270,7 +261,7 @@
 * 如果不需要对关键字段加密存储，可跳过当前步骤
 * 运行以下命令生成密钥：
   ```bash
-  cd backend
+  cd scripts
     
   bash build_AES_master_key.sh
   ```
@@ -292,6 +283,8 @@
 * 请在 *.env* 文件中根据实际情况修改以下变量的值（勿覆盖其他变量）：
 
   > **说明**：DB_HOST、DB_PORT 等变量的值可替换为实际数据库信息，DB_USER、DB_PASSWORD 为上文新建的 MySQL 用户与密码。如果密码中包含特殊字符，可参考 [特殊字符转义表](#linux-special-char) 将特殊字符替换为 URL 编码。
+  >
+  > **OBS 配置**：单机/本地部署且不使用对象存储时，OBS 相关项（OBS_BUCKET、OBS_SERVER 等）在 `.env.example` 中已留空，复制为 `.env` 后无需填写；仅在使用对象存储（如分布式部署）时再填写真实值，详见 [分布式部署安装](../分布式部署安装/README.md)。
 
   ```env
    # 配置数据库（样例）
@@ -343,11 +336,24 @@
   uv venv
   uv sync
   ```
+* 执行数据库版本标识命令，确认当前数据库版本：
+  ```bash
+  # Agent数据库
+  alembic -n alembic_mysql_agent stamp head
+  alembic -n alembic_mysql_ops stamp head
+
+  # SQLite数据库
+  alembic -n alembic_sqlite_agent stamp head
+  alembic -n alembic_sqlite_ops stamp head
+  ```
+
+  > 详细说明：以上命令用于标识当前数据库已是最新版本，方便后续进行数据库操作。需要分别对agent和ops数据库执行。如使用MySQL需执行alembic -n alembic_mysql_agent stamp head和alembic -n alembic_mysql_ops stamp head，关于alembic的使用方法参考[DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md)
 
   > **注意**：如果持续卡死超过 20 分钟，请按下 “Ctrl + C”，尝试修改本目录下 “pyproject.toml” 文件中 [[tool.uv.index]] 的 url 值，切换成其他可用源后，再重新执行 “uv sync”。
 
   > **注意**：若执行 `uv sync` 失败，可尝试：`uv sync --native-tls`  强制使用系统原生TLS库（解决HTTPS下载兼容问题）
 
+* 创建日志目录并启动后端服务
   ```bash
   mkdir -p logs/run
   source .venv/bin/activate
