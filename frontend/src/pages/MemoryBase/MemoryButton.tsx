@@ -315,11 +315,11 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         case 'summary':
           return globalT('memoryBases.memoryType.summary');
         case 'user_profile':
-          return globalT('memoryBases.memoryType.longterm');
-        case 'scenario':
-          return globalT('memoryBases.memoryType.longterm');
-        case 'semantic':
-          return globalT('memoryBases.memoryType.longterm');
+          return globalT('memoryBases.memoryType.profile');
+        case 'episodic_memory':
+          return globalT('memoryBases.memoryType.episodic');
+        case 'semantic_memory':
+          return globalT('memoryBases.memoryType.semantic');
         default:
           return type;
       }

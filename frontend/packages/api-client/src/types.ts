@@ -121,18 +121,13 @@ export interface SaveAgentRequest {
   memory: {
     max_tokens: number
     longterm_memory_config?: boolean
-    memory_bases?: Array<{
- 	      mdb_id: string
-        name: string
-        status: string
-        description?: string
-        embedding_model_config_id?: number
-        llm_model_config_id?: number
- 	     }>
+    user_profile_config?: boolean
+    semantic_memory_config?: boolean
+    episodic_memory_config?: boolean
+    summary_memory_config?: boolean
     memory_base?: {
  	      mdb_id: string
         name: string
-        status: string
         description?: string
         embedding_model_config_id?: number
         llm_model_config_id?: number
@@ -1634,6 +1629,17 @@ export interface AgentDetailResponse {
       memory: {
         max_tokens: number
         longterm_memory_config?: boolean
+        user_profile_config?: boolean
+        semantic_memory_config?: boolean
+        episodic_memory_config?: boolean
+        summary_memory_config?: boolean
+        memory_base?: {
+          mdb_id: string
+          name: string
+          description?: string
+          embedding_model_config_id?: number
+          llm_model_config_id?: number
+        }
         variable_config?: Array<{
           id: string
           name: string

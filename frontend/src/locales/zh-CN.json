@@ -4187,13 +4187,16 @@
       "actions": "操作"
     },
     "searchPlaceholder": "搜索记忆库名称或描述...",
-    "searchMemory": "搜索记忆名称",
+    "searchMemory": "搜索记忆",
     "createButton": "创建记忆库",
     "memoryType": {
       "all": "全部",
       "longterm": "记忆片段",
       "variable": "变量记忆",
-      "summary": "历史摘要"
+      "summary": "历史摘要",
+      "profile": "用户画像",
+      "episodic": "情景记忆",
+      "semantic": "语义记忆"
     },
     "form": {
       "name": "记忆库名称",

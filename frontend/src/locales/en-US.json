@@ -4405,11 +4405,15 @@
     },
     "searchPlaceholder": "Search by memory base name or description...",
     "createButton": "Create Memory Base",
+    "searchMemory": "Search Memory",
     "memoryType": {
       "all": "All Type",
       "longterm": "Memory Fragments",
       "variable": "Variable Memory",
-      "summary": "History Summary"
+      "summary": "History Summary",
+      "profile": "User Profile",
+      "episodic": "Episodic Memory",
+      "semantic": "Semantic Memory"
     },
     "search": {
       "searching": "Searching...",
