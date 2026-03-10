@@ -436,7 +436,7 @@ export default function MemoryButton({ userId, groupId, enableLongTerm = true }:
         </DialogTitle>
 
         <div className="flex h-[calc(709px-120px)] border-t">
-          <nav className="w-48 border-r bg-gray-50 p-3 space-y-2">
+          <nav className="w-48 flex-shrink-0 border-r bg-gray-50 p-3 space-y-2">
             {menus.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
