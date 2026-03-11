@@ -716,7 +716,8 @@
       "deepSearchServiceUnavailable": "DeepSearch 服务暂不可用，请前往",
       "deepSearchConfigRetry": "，参考文档进行配置后重试",
       "checkingDeepsearch": "正在检查 DeepSearch 服务状态...",
-      "deepsearchServiceDown": "DeepSearch 服务暂时不可用"
+      "deepsearchServiceDown": "DeepSearch 服务暂时不可用",
+      "stopDeepSearch": "停止 DeepSearch"
     },
     "picker": {
       "selectAgent": "选择智能体",
@@ -1051,6 +1052,8 @@
       "collapse": "收起",
       "expand": "展开 {{count}} 项",
       "statusUnknown": "准完成",
+      "conversationCancelled": "对话已取消",
+      "conversationCancelledTip": "DeepSearch 对话已被手动中断",
       "collapseContent": "折叠内容",
       "expandContent": "展开内容",
       "status": {

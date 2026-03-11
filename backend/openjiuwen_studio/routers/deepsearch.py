@@ -94,8 +94,15 @@ async def run(
     payload = request.model_dump(exclude_none=True)
     _ = check_user_space(payload["space_id"], current_user)
 
-    model_config = get_model_configs(payload["model_config_id"], payload["space_id"])
-    payload["llm_config"] = model_config
+    # 取消请求不需要获取模型配置，直接转发到 deepsearch 服务
+    if request.interrupt_feedback == "cancel":
+        logger.info(f"[DeepSearch Cancel] Received cancel request for conversation_id={payload.get('conversation_id')}")
+        # 取消请求：不需要 llm_config，直接转发
+        pass
+    else:
+        # 正常请求：需要获取模型配置
+        model_config = get_model_configs(payload["model_config_id"], payload["space_id"])
+        payload["llm_config"] = model_config
 
     async def stream():
         try:
@@ -332,4 +339,3 @@ async def deepsearch_heartbeat():
             "status": "unavailable",
             "message": "DeepSearch service error"
         }
-

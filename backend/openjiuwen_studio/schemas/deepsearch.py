@@ -29,12 +29,12 @@ class DeepSearchRequest(BaseModel):
                                                                                      "web: 联网搜索"
                                                                                      "local: 本地搜索工具搜索"
                                                                                      "all : 联网+本地融合搜索")
-    model_config_id: int = Field(..., description="模型配置ID")
+    model_config_id: Optional[int] = Field(default=None, description="模型配置ID")
     web_search_config: WebSearchConfig = Field(default=None, description="Web搜索引擎配置，和本地知识库配置至少选择一个")
     local_search_config: Optional[LocalSearchConfig] = Field(default=None,
                                                    description="本地知识库配置，和Web搜索引擎配置至少选择一个")
     template_id: int = Field(default=-1, description="报告模板ID（可选）")
-    interrupt_feedback: Literal["", "accepted"] = Field(default="", description="中断反馈标识（可选）")
+    interrupt_feedback: Literal["", "accepted", "cancel"] = Field(default="", description="中断反馈标识（可选）")
     search_mode: Literal["research", "search"] = Field(default="research", description="生成研究报告还是生成答案")
 
 

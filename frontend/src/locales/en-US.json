@@ -705,7 +705,8 @@
       "deepSearchServiceUnavailable": "DeepSearch service is temporarily unavailable, please visit ",
       "deepSearchConfigRetry": ", refer to the documentation for configuration and try again",
       "checkingDeepsearch": "Checking DeepSearch service status...",
-      "deepsearchServiceDown": "DeepSearch service is temporarily unavailable"
+      "deepsearchServiceDown": "DeepSearch service is temporarily unavailable",
+      "stopDeepSearch": "Stop DeepSearch"
     },
     "picker": {
       "selectAgent": "Select Agent",
@@ -1041,6 +1042,8 @@
       "collapse": "Collapse",
       "expand": "Expand {{count}} items",
       "statusUnknown": "Conditionally Complete",
+      "conversationCancelled": "Conversation Cancelled",
+      "conversationCancelledTip": "DeepSearch conversation has been manually interrupted",
       "collapseContent": "Collapse Content",
       "expandContent": "Expand Content",
       "status": {
