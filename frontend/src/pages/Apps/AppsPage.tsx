@@ -226,6 +226,28 @@ const AppsPage: React.FC = () => {
     return map
   }, [modelsData])
 
+  // 转换模型数据为 ModelSelector 需要的格式
+  const availableModels = React.useMemo(() => {
+    if (!modelsData?.items) return []
+    return modelsData.items.map(model => ({
+      tags: model.tags || [],
+      icon: '',
+      openModel: {
+        model_id: String(model.id),
+        name: model.name,
+        desc: model.description || '',
+        workspace_id: '',
+        param_config: { param_schemas: [] },
+      },
+      series: {
+        icon: '',
+        name: model.model_type || '',
+        vendor: model.provider || '',
+      },
+      model_from: model.is_system_model ? 'config' : 'db',
+    }))
+  }, [modelsData])
+
   // 从 localStorage 恢复对话状态和智能体配置
   useEffect(() => {
     const savedData = storage.get<{ messages: Message[], inputValue: string, hasConversation: boolean, selectedAgent: MentionItem | null }>(STORAGE_KEYS.APPS_PAGE_STATE)
@@ -257,6 +279,23 @@ const AppsPage: React.FC = () => {
       setAgentConfigs({})
     }
   }, [user?.spaceId])
+
+  // 当 agentConfigs.deepsearch.generalModelId 变化时，同步到 selectedModelId（反向同步）
+  useEffect(() => {
+    const deepsearchConfig = agentConfigs['deepsearch']
+    if (deepsearchConfig?.generalModelId) {
+      const modelId = Number(deepsearchConfig.generalModelId)
+      if (modelId !== selectedModelId && modelId !== -1) {
+        setSelectedModelId(modelId)
+        // 同时需要更新 selectedModel 字符串
+        const modelName = Array.from(modelIdMap.entries())
+          .find(([_, id]) => id === modelId)?.[0]
+        if (modelName) {
+          setSelectedModel(modelName)
+        }
+      }
+    }
+  }, [agentConfigs['deepsearch']?.generalModelId, modelIdMap, selectedModelId])
 
   // 从 IndexDB 初始化对话数据
   useEffect(() => {
@@ -756,8 +795,20 @@ const AppsPage: React.FC = () => {
   // 处理模型选择
   const handleModelSelect = (model: string) => {
     setSelectedModel(model)
-    setSelectedModelId(modelIdMap.get(model) || -1)
+    const modelId = modelIdMap.get(model) || -1
+    setSelectedModelId(modelId)
     setShowModelPicker(false)
+
+    // 同步到智能体配置的通用模型（仅对 deepsearch 智能体）
+    if (selectedAgent?.id === 'deepsearch' && modelId !== -1) {
+      setAgentConfigs(prev => ({
+        ...prev,
+        deepsearch: {
+          ...prev['deepsearch'],
+          generalModelId: String(modelId),
+        }
+      }))
+    }
   }
 
   // 发起新对话
@@ -1012,7 +1063,7 @@ const AppsPage: React.FC = () => {
         },
         body: JSON.stringify({
           space_id: user?.spaceId || getDefaultSpaceId(),
-          model_config_id: selectedModelId,
+          general_model_config_id: selectedModelId,
           message: content,
           conversation_id: backendConversationId, // 使用带 session 的 conversation_id
           search_mode: 'research', // DeepSearch 模式固定为 research
@@ -1025,6 +1076,10 @@ const AppsPage: React.FC = () => {
           local_search_config,  // 新增：可能是undefined
           template_id: config.selectedTemplateId ?? -1,
           interrupt_feedback: interrupt_feedback,   // 中断反馈标识, 可填值: ['accepted', ''], 默认''
+          // 高级配置模型 ID（可选，仅在有值时传递）
+          ...(config.planUnderstandingModelId && { plan_understanding_model_id: parseInt(config.planUnderstandingModelId) }),
+          ...(config.infoCollectingModelId && { info_collecting_model_id: parseInt(config.infoCollectingModelId) }),
+          ...(config.writingCheckingModelId && { writing_checking_model_id: parseInt(config.writingCheckingModelId) }),
         }),
         signal: controller.signal,
       })
@@ -1426,6 +1481,8 @@ const AppsPage: React.FC = () => {
         spaceId={user?.spaceId || getDefaultSpaceId()}
         modelConfigId={selectedModelId}
         isFirstConfig={isFirstConfigMode}
+        availableModels={availableModels}
+        modelsLoading={modelsLoading}
       />
 
       {/* 模型选择弹窗 */}
