@@ -1028,6 +1028,9 @@ const AppsPage: React.FC = () => {
         ? `${conversationId}_${Math.random().toString(36).substring(2, 6)}_${String(userMessageCount).padStart(3, '0')}`
         : SESSION_CONVERSATION_ID
 
+      // 立即保存到 Store 中，以便取消请求时使用
+      useConversationStore.getState().setSessionConversationId(backendConversationId)
+
       // ===== SSE 录制：开始录制（仅开发模式） =====
       let recordingId: string | undefined
       if (ENABLE_SSE_DEBUG) {
@@ -1211,8 +1214,9 @@ const AppsPage: React.FC = () => {
 
   // ===== DeepSearch 停止请求处理 =====
   const handleStopDeepSearch = async () => {
-    // 使用 currentConversationId 作为 conversation_id（优先），如果为空则使用 SESSION_CONVERSATION_ID
-    const conversation_id = currentConversationId || useConversationStore.getState().SESSION_CONVERSATION_ID
+    // 使用 SESSION_CONVERSATION_ID (带随机后缀的 ID)，如果为空则回退到 currentConversationId
+    // 必须与 handleDeepSearchSend 中生成的 backendConversationId 保持一致
+    const conversation_id = useConversationStore.getState().SESSION_CONVERSATION_ID || currentConversationId
 
     if (!conversation_id) {
       console.error('[DeepSearch Cancel] No conversationId found')
@@ -1254,6 +1258,7 @@ const AppsPage: React.FC = () => {
         conversation_id: conversation_id,
         message: '',  // 必填字段，取消请求时为空字符串
         interrupt_feedback: 'cancel',  // DeepSearch 服务根据这个字段识别取消请求
+        general_model_config_id: -1, // 必填字段，但在取消请求中不使用
       }),
       signal: cancelAbortController.signal,
     }).then(async (response) => {
