@@ -4062,8 +4062,9 @@
         "loading": "加载模型中...",
         "noModels": "暂无可用模型",
         "providedBy": "由{{vendor}}提供",
-        "systemBuiltIn": "系统内置",	 
-         "protocol": "协议"
+        "systemBuiltIn": "系统内置",
+        "protocol": "协议",
+        "validating": "模型连通性验证中..."
       },
       "quickOptimizeDialog": {
         "title": "快捷优化",

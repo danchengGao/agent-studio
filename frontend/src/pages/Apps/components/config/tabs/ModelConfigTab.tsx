@@ -4,24 +4,24 @@
  * 包含基础配置（通用模型）和高级配置（生成大纲、信息选择、报告撰写）
  */
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Info, Play, Loader2, X } from 'lucide-react'
-import { Button, Dialog, DialogContent, DialogTitle, DialogActions, TextField, Chip, Typography, Box } from '@mui/material'
-import { useTestModel } from '@test-agentstudio/api-client'
+import { Info } from 'lucide-react'
 import { ConfigTabProps } from '../ConfigRegistry'
 import { ConfigSection } from '../ConfigSection'
 import { ModelSelector } from '@/components/Prompts'
-import type { PromptModel } from '@test-agentstudio/api-client'
+import type { Model } from '@/types/promptType'
+import { useTestModel } from '@test-agentstudio/api-client'
+import { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 
 // 从父组件传入的控件组件
 export interface ModelConfigTabProps extends ConfigTabProps {
   /** 可用模型列表 */
-  availableModels: PromptModel[]
+  availableModels: Model[]
   /** 模型加载状态 */
   modelsLoading: boolean
-  /** 空间 ID */
-  spaceId: string
+  /** 空间 ID，用于模型测试 */
+  spaceId?: string
 }
 
 // 模型配置项类型
@@ -40,14 +40,16 @@ const ModelConfigItem: React.FC<{
   label: string
   description: string
   recommendation?: string
-  availableModels: PromptModel[]
-  selectedModel: PromptModel | null
+  availableModels: Model[]
+  selectedModel: Model | null
   modelsLoading: boolean
-  onModelChange: (model: PromptModel | null) => void
-  onClear?: () => void
+  onModelChange: (model: Model | null) => void
   placeholder?: string
   required?: boolean
-  onOpenTestDialog: (model: PromptModel) => void
+  // 测试中状态 - 当前选项是否正在测试
+  isCurrentTesting?: boolean
+  // 其他选项是否正在测试（用于锁定）
+  isOtherTesting?: boolean
 }> = ({
   label,
   description,
@@ -56,15 +58,23 @@ const ModelConfigItem: React.FC<{
   selectedModel,
   modelsLoading,
   onModelChange,
-  onClear,
   placeholder,
   required = false,
-  onOpenTestDialog,
+  isCurrentTesting,
+  isOtherTesting,
 }) => {
-  // 清空处理：只调用 onClear 回调，由父组件负责更新配置
-  const handleClear = React.useCallback(() => {
-    onClear?.()
-  }, [onClear])
+  const { t } = useTranslation()
+
+  // 当前选项正在测试：显示验证中 placeholder 和灰色，清除选中状态
+  // 其他选项正在测试：显示灰色锁定，但保留选中状态和 placeholder
+  const isLocked = isOtherTesting
+  const isTesting = isCurrentTesting
+
+  // 测试期间显示验证中的 placeholder（仅当前测试的选项）
+  const displayPlaceholder = isTesting ? t('components.prompts.modelSelector.validating') : placeholder
+
+  // 仅当前测试的选项清除选中状态，其他选项保持原有选中状态
+  const displaySelectedModel = isTesting ? null : selectedModel
 
   return (
     <div className="flex items-center gap-4 py-1">
@@ -73,23 +83,18 @@ const ModelConfigItem: React.FC<{
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </span>
-        {description && (
-          <p className="text-xs text-gray-500 mt-0.5">{description}</p>
-        )}
-        {recommendation && (
-          <p className="text-xs text-gray-500 mt-1">{recommendation}</p>
-        )}
+        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        {recommendation && <p className="text-xs text-gray-500 mt-1">{recommendation}</p>}
       </div>
       <div className="flex-1 min-w-[240px]">
         <ModelSelector
           availableModels={availableModels}
-          selectedModel={selectedModel}
+          selectedModel={displaySelectedModel}
           onModelChange={onModelChange}
-          onClear={handleClear}
-          modelsLoading={modelsLoading}
-          placeholder={placeholder}
-          className="bg-white rounded-lg"
-          onOpenTestDialog={onOpenTestDialog}
+          modelsLoading={modelsLoading || !!isTesting || !!isLocked}
+          placeholder={displayPlaceholder}
+          className={`bg-white rounded-lg ${isLocked || isTesting ? 'opacity-75' : ''}`}
+          disabled={isLocked || isTesting}
         />
       </div>
     </div>
@@ -99,23 +104,21 @@ const ModelConfigItem: React.FC<{
 /**
  * 模型配置标签组件
  */
-export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
-  config,
-  updateConfig,
-  availableModels,
-  modelsLoading,
-  spaceId,
-}) => {
+export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateConfig, availableModels, modelsLoading, spaceId }) => {
   const { t } = useTranslation()
-  const { mutateAsync: testModel } = useTestModel()
 
-  // 测试对话框相关状态
-  const [showTestDialog, setShowTestDialog] = useState(false)
-  const [testingModel, setTestingModel] = useState<PromptModel | null>(null)
-  const [testPrompt, setTestPrompt] = useState('你好，请介绍一下你自己')
-  const [testResult, setTestResult] = useState('')
-  const [isTesting, setIsTesting] = useState(false)
-  const testGenerationRef = useRef(0)
+  // 模型测试状态
+  const [testingModelId, setTestingModelId] = useState<string | null>(null)
+  // 正在测试的配置项 key
+  const [testingConfigKey, setTestingConfigKey] = useState<
+    'generalModelId' | 'planUnderstandingModelId' | 'infoCollectingModelId' | 'writingCheckingModelId' | null
+  >(null)
+
+  // 模型测试 hook
+  const testModelMutation = useTestModel()
+
+  // Snackbar hook
+  const { showSuccess, showError } = useUnifiedSnackbar()
 
   // 高级模型配置项
   const advancedModelConfigs: ModelConfigItem[] = [
@@ -143,120 +146,82 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
   ]
 
   // 根据模型 ID 获取模型对象
-  const getModelById = (modelId: string | undefined): PromptModel | null => {
+  const getModelById = (modelId: string | undefined): Model | null => {
     if (!modelId) return null
-    return availableModels.find(
-      m => m.openModel.model_id === modelId
-    ) || null
+    return availableModels.find(m => m.openModel.model_id === modelId) || null
   }
 
-  // 打开测试对话框
-  const handleOpenTestDialog = (model: PromptModel) => {
-    setTestingModel(model)
-    setTestPrompt('你好，请介绍一下你自己')
-    setTestResult('')
-    setShowTestDialog(true)
-  }
+  // 带验证的模型选择处理函数
+  const handleModelSelectWithTest = useCallback(
+    async (model: Model | null, configKey: 'generalModelId' | 'planUnderstandingModelId' | 'infoCollectingModelId' | 'writingCheckingModelId') => {
+      // 用户选择空值，直接清除
+      if (!model) {
+        updateConfig(configKey, undefined)
+        return
+      }
 
-  // 关闭测试对话框
-  const handleCloseTestDialog = () => {
-    setShowTestDialog(false)
-    setTestingModel(null)
-    setTestPrompt('')
-    setTestResult('')
-  }
+      // 检查是否已经有 spaceId
+      if (!spaceId) {
+        showError('缺少 spaceId，无法测试模型')
+        return
+      }
 
-  // 执行测试
-  const handleTestModel = async () => {
-    if (!testPrompt.trim() || !testingModel) return
-    if (testPrompt.length > 1000) return
+      // 如果已经是当前选中的模型，不做任何操作
+      const currentModelId = config[configKey]
+      if (model.openModel.model_id === currentModelId) {
+        return
+      }
 
-    testGenerationRef.current += 1
-    const currentGeneration = testGenerationRef.current
-    const currentModelId = testingModel.openModel.model_id
+      // 如果已经在测试这个模型，忽略此次请求
+      if (testingModelId === model.openModel.model_id) {
+        return
+      }
 
-    setIsTesting(true)
+      // 先清除当前选中的模型（在 UI 上立即反映）
+      updateConfig(configKey, undefined)
 
-    try {
-      const result = await testModel({
-        id: currentModelId,
-        prompt: testPrompt,
-        spaceId,
-        parameters: {
-          temperature: 0.7,
-          top_p: 0.9,
-          max_tokens: 100,
-        },
-      })
+      // 记录待测试的模型和配置项，进入"pending"状态
+      setTestingModelId(model.openModel.model_id)
+      setTestingConfigKey(configKey)
 
-      // 检查是否是当前最新的测试请求
-      if (currentGeneration === testGenerationRef.current && showTestDialog) {
+      try {
+        // 调用测试接口，发送"你好"作为测试 prompt
+        const result = await testModelMutation.mutateAsync({
+          id: model.openModel.model_id,
+          prompt: '你好',
+          spaceId: spaceId,
+          parameters: { temperature: 0.7, max_tokens: 100 },
+        })
+
         if (result.success) {
-          setTestResult(
-            `${t('models.testSuccess')}\n${t('models.modelName')}: ${testingModel.openModel.name}\n${t('models.promptText')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s`,
-          )
+          // 测试通过，正式选中模型
+          updateConfig(configKey, model.openModel.model_id)
+          showSuccess('模型可用性验证通过')
         } else {
-          setTestResult(`${t('models.testFailed')}: ${result.error || t('models.unknownError')}\n${t('models.modelName')}: ${testingModel.openModel.name}\n${t('models.promptText')}: ${testPrompt}`)
+          // 测试失败，显示错误提示
+          showError(`模型不可用：${result.error || '未知错误'}`)
         }
+      } catch (error: any) {
+        // 测试异常，显示错误提示
+        const errorMessage = error?.response?.data?.message || error?.message || '模型测试失败'
+        showError(`模型不可用：${errorMessage}`)
+      } finally {
+        // 清除测试状态
+        setTestingModelId(null)
+        setTestingConfigKey(null)
       }
-    } catch (error: any) {
-      let errorMessage = t('models.testFailed')
+    },
+    [testModelMutation, spaceId, config, updateConfig, testingModelId, showSuccess, showError],
+  )
 
-      // 尝试获取详细错误信息
-      let detailData = null
-      if (error?.response?.data?.detail) {
-        detailData = error.response.data.detail
-      } else if (error?.data?.detail) {
-        detailData = error.data.detail
-      } else if ((error as any)?.detail) {
-        detailData = (error as any).detail
-      }
-
-      if (detailData) {
-        if (typeof detailData === 'string') {
-          errorMessage = detailData
-        } else {
-          errorMessage = JSON.stringify(detailData)
-        }
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
-
-      if (currentGeneration === testGenerationRef.current && showTestDialog) {
-        setTestResult(`${t('models.testFailed')}: ${errorMessage}\n${t('models.modelName')}: ${testingModel.openModel.name}\n${t('models.promptText')}: ${testPrompt}`)
-      }
-    } finally {
-      // 直接设置为 false，无需检查旧值
-      setIsTesting(false)
-    }
+  // 处理通用模型选择变更（带验证）
+  const handleGeneralModelChange = (model: Model | null) => {
+    handleModelSelectWithTest(model, 'generalModelId')
   }
 
-  // 处理通用模型选择变更
-  const handleGeneralModelChange = (model: PromptModel | null) => {
-    const modelId = model?.openModel.model_id
-    updateConfig('generalModelId', modelId)
-  }
-
-  // 处理通用模型清空
-  const handleGeneralModelClear = () => {
-    updateConfig('generalModelId', undefined)
-  }
-
-  // 处理高级模型选择变更
-  const handleModelChange = (
-    configKey: 'planUnderstandingModelId' | 'infoCollectingModelId' | 'writingCheckingModelId',
-    model: PromptModel | null
-  ) => {
-    updateConfig(configKey, model?.openModel.model_id)
-  }
-
-  // 处理高级模型清空
-  const handleModelClear = (
-    configKey: 'planUnderstandingModelId' | 'infoCollectingModelId' | 'writingCheckingModelId'
-  ) => {
-    updateConfig(configKey, undefined)
+  // 处理高级模型选择变更（带验证）
+  const handleModelChange = (configKey: 'planUnderstandingModelId' | 'infoCollectingModelId' | 'writingCheckingModelId', model: Model | null) => {
+    handleModelSelectWithTest(model, configKey)
   }
 
   return (
@@ -272,11 +237,10 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
               selectedModel={getModelById(config.generalModelId)}
               modelsLoading={modelsLoading}
               onModelChange={handleGeneralModelChange}
-              onClear={handleGeneralModelClear}
               placeholder={t('apps.config.model.useGeneral')}
               required={true}
-              spaceId={spaceId}
-              onOpenTestDialog={handleOpenTestDialog}
+              isCurrentTesting={testingConfigKey === 'generalModelId'}
+              isOtherTesting={!!testingModelId && testingConfigKey !== 'generalModelId'}
             />
           </div>
         </ConfigSection>
@@ -286,14 +250,12 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
           {/* 提示信息横幅 */}
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
             <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-700">
-              {t('apps.config.model.advanced.info')}
-            </p>
+            <p className="text-xs text-blue-700">{t('apps.config.model.advanced.info')}</p>
           </div>
 
           {/* 高级配置项 */}
           <div className="space-y-4">
-            {advancedModelConfigs.map((modelConfig) => (
+            {advancedModelConfigs.map(modelConfig => (
               <ModelConfigItem
                 key={modelConfig.id}
                 label={t(modelConfig.labelKey)}
@@ -302,145 +264,15 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
                 availableModels={availableModels}
                 selectedModel={getModelById(config[modelConfig.configKey])}
                 modelsLoading={modelsLoading}
-                onModelChange={(model) => handleModelChange(modelConfig.configKey, model)}
-                onClear={() => handleModelClear(modelConfig.configKey)}
+                onModelChange={model => handleModelChange(modelConfig.configKey, model)}
                 placeholder={t('apps.config.model.useGeneral')}
-                spaceId={spaceId}
-                onOpenTestDialog={handleOpenTestDialog}
+                isCurrentTesting={testingConfigKey === modelConfig.configKey}
+                isOtherTesting={!!testingModelId && testingConfigKey !== modelConfig.configKey}
               />
             ))}
           </div>
         </ConfigSection>
       </div>
-
-      {/* 测试模型对话框 */}
-      <Dialog
-        open={showTestDialog}
-        onClose={handleCloseTestDialog}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          className: 'rounded-2xl shadow-2xl border border-gray-100',
-        }}
-        disableRestoreFocus
-      >
-        <DialogTitle className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <Play className="w-4 h-4 text-white" />
-              </div>
-              <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
-                {t('models.testModel')}: {testingModel?.openModel.name}
-              </Typography>
-            </div>
-            <Button
-              onClick={handleCloseTestDialog}
-              disabled={isTesting}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <X className="w-5 h-5" />
-            </Button>
-          </div>
-        </DialogTitle>
-        <DialogContent>
-          <div className="space-y-4 pt-4">
-            {/* 常用语句 */}
-            <div>
-              <Typography variant="subtitle2" className="text-gray-700 mb-2 font-medium">
-                {t('models.commonTestPrompts')}
-              </Typography>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <Chip
-                  label={t('models.introducePrompt')}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setTestPrompt(t('models.introducePrompt'))}
-                  disabled={isTesting}
-                  className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
-                />
-                <Chip
-                  label={t('models.aiConceptsPrompt')}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setTestPrompt(t('models.aiConceptsPrompt'))}
-                  disabled={isTesting}
-                  className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
-                />
-                <Chip
-                  label="Hello World"
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setTestPrompt('Hello World')}
-                  disabled={isTesting}
-                  className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
-                />
-              </div>
-            </div>
-
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              label={t('models.testPrompt')}
-              value={testPrompt}
-              onChange={e => setTestPrompt(e.target.value)}
-              placeholder={t('models.testPrompt')}
-              disabled={isTesting}
-              helperText={
-                testPrompt.length > 1000 ? t('models.promptLimit', { length: testPrompt.length }) : t('models.promptLength', { length: testPrompt.length })
-              }
-              error={testPrompt.length > 1000}
-            />
-
-            <div className="flex space-x-3">
-              <Button
-                variant="contained"
-                startIcon={isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                onClick={handleTestModel}
-                disabled={isTesting || !testPrompt.trim()}
-                className={`px-6 py-2 rounded-lg font-semibold transition-all duration-300 shadow-lg ${
-                  isTesting || !testPrompt.trim()
-                    ? 'bg-gray-400 text-white cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-105 hover:shadow-xl'
-                }`}
-              >
-                {isTesting ? t('models.testing') : t('models.startTest')}
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setTestPrompt('')
-                  setTestResult('')
-                }}
-                disabled={isTesting}
-                className="px-4 py-2 rounded-lg transition-all duration-200"
-              >
-                {t('models.reset')}
-              </Button>
-            </div>
-
-            {testResult && (
-              <div>
-                <Typography variant="h6" className="mb-2 font-bold">
-                  {t('models.testResult')}
-                </Typography>
-                <Box className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4">
-                  <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-white p-3 rounded-lg border border-gray-200">{testResult}</pre>
-                </Box>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-        <DialogActions className="bg-gray-50 px-6 py-4">
-          <Button
-            onClick={handleCloseTestDialog}
-            className="text-gray-600 hover:text-gray-700 hover:bg-gray-100 px-4 py-2 rounded-lg transition-all duration-200"
-          >
-            {t('models.close')}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   )
 }

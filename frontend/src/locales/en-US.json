@@ -4075,7 +4075,8 @@
         "noModels": "No available models",
         "providedBy": "Provided by {{vendor}}",
         "systemBuiltIn": "System Built-in",
-        "protocol": "Protocol"
+        "protocol": "Protocol",
+        "validating": "Validating model connectivity..."
       },
       "quickOptimizeDialog": {
         "title": "Quick Optimize",
