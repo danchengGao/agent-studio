@@ -1285,42 +1285,36 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
         chunk_index = f"kb_{kb_id}_chunks"
         triple_index = f"kb_{kb_id}_triples"
 
-        try:
-            # 循环删除每个文档的索引
-            for doc in documents:
-                doc_id = doc.get("doc_id") or doc.get("id")
-                if not doc_id:
-                    continue
+        # 循环删除每个文档的索引
+        for doc in documents:
+            doc_id = doc.get("doc_id") or doc.get("id")
+            if not doc_id:
+                continue
 
-                try:
-                    # 删除 chunks 索引
-                    await _delete_document_from_index(
-                        index_manager=index_manager,
-                        index_name=chunk_index,
-                        doc_id=doc_id,
-                        kb_id=kb_id,
-                        index_type="chunks",
-                    )
-
-                    # 删除 triples 索引（如果有图增强）
-                    await _delete_document_from_index(
-                        index_manager=index_manager,
-                        index_name=triple_index,
-                        doc_id=doc_id,
-                        kb_id=kb_id,
-                        index_type="triples",
-                    )
-
-                    result["success_count"] += 1
-                except Exception as e:
-                    result["failed_count"] += 1
-                    result["errors"].append(f"Doc {doc_id}: {str(e)}")
-                    logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
-        finally:
             try:
-                index_manager.close()
+                # 删除 chunks 索引
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=chunk_index,
+                    doc_id=doc_id,
+                    kb_id=kb_id,
+                    index_type="chunks",
+                )
+
+                # 删除 triples 索引（如果有图增强）
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=triple_index,
+                    doc_id=doc_id,
+                    kb_id=kb_id,
+                    index_type="triples",
+                )
+
+                result["success_count"] += 1
             except Exception as e:
-                logger.warning(f"[KB_DELETE] Failed to close index manager: {e}")
+                result["failed_count"] += 1
+                result["errors"].append(f"Doc {doc_id}: {str(e)}")
+                logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
 
         logger.info(
             f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "
@@ -1678,48 +1672,41 @@ async def _index_documents(
         )
 
     # 8. 调用 add_documents 构建索引（会自动进行分块和索引构建）
+    doc_ids = await knowledge_base.add_documents(documents)
+
+    if not doc_ids:
+        raise RuntimeError("Index build failed: no document IDs returned")
+
+    # 获取实际创建的chunk数量
+    chunk_count = 0
     try:
-        doc_ids = await knowledge_base.add_documents(documents)
+        # 尝试通过分块器估算chunk数量
+        # 注意：这里只是估算，实际数量可能因为分块策略而有所不同
+        total_text_length = sum(len(doc.text) for doc in documents)
+        if chunker.chunk_size > 0:
+            # 粗略估算：总文本长度 / chunk_size（不考虑重叠）
+            estimated_chunks = max(1, total_text_length // chunker.chunk_size)
+            chunk_count = estimated_chunks
+            logger.debug(
+                f"[INDEX] Estimated chunk count: {chunk_count} "
+                f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})"
+            )
+    except Exception as e:
+        logger.warning(f"[INDEX] Failed to estimate chunk count: {str(e)}")
+        # 如果估算失败，使用文档数量作为fallback
+        chunk_count = len(documents)
 
-        if not doc_ids:
-            raise RuntimeError("Index build failed: no document IDs returned")
+    logger.debug(
+        f"[INDEX] Indexing completed - KB ID: {kb_id}, Doc ID: {doc_id}, "
+        f"Chunk index: {chunk_index}, Triple index: {triple_index}, "
+        f"Estimated chunks: {chunk_count}"
+    )
 
-        # 获取实际创建的chunk数量
-        chunk_count = 0
-        try:
-            # 尝试通过分块器估算chunk数量
-            # 注意：这里只是估算，实际数量可能因为分块策略而有所不同
-            total_text_length = sum(len(doc.text) for doc in documents)
-            if chunker.chunk_size > 0:
-                # 粗略估算：总文本长度 / chunk_size（不考虑重叠）
-                estimated_chunks = max(1, total_text_length // chunker.chunk_size)
-                chunk_count = estimated_chunks
-                logger.debug(
-                    f"[INDEX] Estimated chunk count: {chunk_count} "
-                    f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})"
-                )
-        except Exception as e:
-            logger.warning(f"[INDEX] Failed to estimate chunk count: {str(e)}")
-            # 如果估算失败，使用文档数量作为fallback
-            chunk_count = len(documents)
-
-        logger.debug(
-            f"[INDEX] Indexing completed - KB ID: {kb_id}, Doc ID: {doc_id}, "
-            f"Chunk index: {chunk_index}, Triple index: {triple_index}, "
-            f"Estimated chunks: {chunk_count}"
-        )
-
-        return {
-            "chunk_index": chunk_index,
-            "triple_index": triple_index,
-            "chunk_count": chunk_count,
-        }
-    finally:
-        if knowledge_base is not None:
-            try:
-                await knowledge_base.close()
-            except Exception as e:
-                logger.warning(f"[INDEX] Failed to close knowledge base: {str(e)}")
+    return {
+        "chunk_index": chunk_index,
+        "triple_index": triple_index,
+        "chunk_count": chunk_count,
+    }
 
 
 async def process_single_document(
