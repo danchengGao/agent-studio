@@ -941,6 +941,17 @@
         "saving": "保存中...",
         "cancel": "取消",
         "confirm": "确认",
+        "status": {
+          "enabled": "启用",
+          "disabled": "禁用"
+        },
+        "action": {
+          "test": "测试",
+          "edit": "编辑",
+          "delete": "删除",
+          "enable": "启用",
+          "disable": "禁用"
+        },
         "error": {
           "selectType": "请选择一个联网增强引擎类型",
           "invalidName": "引擎名称必须是预设值之一",
@@ -948,7 +959,7 @@
         },
         "presets": {
           "xunfei": "讯飞搜索",
-          "petal": "花瓣搜索",
+          "petal": "小艺AI问答\n联网增强",
           "tavily": "Tavily",
           "google": "Google",
           "custom": "自定义"

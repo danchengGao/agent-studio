@@ -930,6 +930,17 @@
         "saving": "Saving...",
         "cancel": "Cancel",
         "confirm": "Confirm",
+        "status": {
+          "enabled": "Enabled",
+          "disabled": "Disabled"
+        },
+        "action": {
+          "test": "Test",
+          "edit": "Edit",
+          "delete": "Delete",
+          "enable": "Enable",
+          "disable": "Disable"
+        },
         "error": {
           "selectType": "Please select an online enhancement engine type",
           "invalidName": "Engine name must be one of the preset values",
@@ -937,7 +948,7 @@
         },
         "presets": {
           "xunfei": "Xunfei Search",
-          "petal": "Petal Search",
+          "petal": "Network-assisted AI Q&A enhancement",
           "tavily": "Tavily",
           "google": "Google",
           "custom": "Custom"

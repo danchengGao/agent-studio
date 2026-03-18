@@ -162,7 +162,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   modelsLoading = false,
 }) => {
   const { t } = useTranslation()
-  const { snackbar, closeSnackbar } = useUnifiedSnackbar()
+  const { snackbar, closeSnackbar, showError } = useUnifiedSnackbar()
   const [showSaved, setShowSaved] = useState(false)
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -718,10 +718,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
       const errorMessage = err instanceof Error ? err.message : t('apps.config.engine.test.networkError')
 
-      snackbar({
-        message: errorMessage,
-        severity: 'error',
-      })
+      showError(errorMessage)
     } finally {
       setIsTesting(false)
     }
@@ -1021,7 +1018,6 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
       <TemplateViewDialog
         open={viewDialog.isOpen}
         onClose={() => setViewDialog(prev => ({ ...prev, isOpen: false }))}
-        templateId={viewDialog.templateId}
         templateName={viewDialog.templateName}
         templateDesc={viewDialog.templateDesc}
         templateContent={viewDialog.templateContent}
@@ -1355,13 +1351,13 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
                                 ? 'bg-green-100 text-green-800'
                                 : 'bg-gray-200 text-gray-600'
                             }`}>
-                              {engine.isActive ? '启用' : '禁用'}
+                              {engine.isActive ? t('apps.config.engine.status.enabled') : t('apps.config.engine.status.disabled')}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
                           {onTestEngine && (
-                            <Tooltip title="测试">
+                            <Tooltip title={t('apps.config.engine.action.test')}>
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -1374,20 +1370,20 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
                               </IconButton>
                             </Tooltip>
                           )}
-                          <Tooltip title="编辑">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onEditEngine(engine.id)
-                              }}
-                              className={`text-gray-700 hover:text-blue-600 hover:bg-blue-50 ${isDisabled ? 'opacity-60' : ''}`}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </IconButton>
+                          <Tooltip title={t('apps.config.engine.action.edit')}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onEditEngine(engine.id)
+                                }}
+                                className={`text-gray-700 hover:text-blue-600 hover:bg-blue-50 ${isDisabled ? 'opacity-60' : ''}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </IconButton>
                           </Tooltip>
                           {onToggleEngineStatus && (
-                            <Tooltip title={engine.isActive ? '禁用' : '启用'}>
+                            <Tooltip title={engine.isActive ? t('apps.config.engine.action.disable') : t('apps.config.engine.action.enable')}>
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -1404,7 +1400,7 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
                             </Tooltip>
                           )}
                           {selectedId !== engine.id && (
-                            <Tooltip title="删除">
+                            <Tooltip title={t('apps.config.engine.action.delete')}>
                               <IconButton
                                 size="small"
                                 onClick={(e) => {
@@ -1658,7 +1654,7 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
                       type="button"
                       onClick={() => handlePresetSelect(preset)}
                       className={`
-                        px-3 py-2 ${RADIUS_BUTTON} text-xs font-medium transition-all duration-200 border
+                        px-3 py-2 ${RADIUS_BUTTON} text-xs font-medium whitespace-pre-line leading-tight transition-all duration-200 border
                         ${engineName === preset.name
                           ? 'bg-blue-50 border-blue-200 text-blue-700'
                           : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
