@@ -23,6 +23,7 @@ export enum MessageType {
   // 特殊类型
   ERROR = 'error',            // 错误信息
   INTERRUPT = 'interrupt',    // 中断等待用户输入
+  OUTLINE_INTERACTION = 'outline_interaction', // 大纲交互等待用户确认
 }
 
 export enum TaskStatus {
@@ -206,6 +207,12 @@ export interface ConversationStore {
 
   // ========== 连续对话系列状态 ==========
   SESSION_CONVERSATION_ID: string | null;  // 连续对话系列的conversationId（null表示非连续对话）
+
+  // ========== 大纲交互状态 ==========
+  pendingOutlineInteraction: {
+    messageId: string;
+    userMessage: string;
+  } | null;  // 待处理的大纲交互接受请求
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -513,6 +520,19 @@ export interface ConversationStore {
    * @param conversationId 连续对话系列的conversationId
    */
   setSessionConversationId: (conversationId: string | null) => void;
+
+  /**
+   * 触发大纲交互接受
+   * @param messageId 消息ID
+   * @param userMessage 用户消息
+   */
+  triggerOutlineInteractionAccept: (messageId: string, userMessage: string) => void;
+
+  /**
+   * 清除待处理的大纲交互
+   */
+  clearPendingOutlineInteraction: () => void;
+
   /**
    * 更新当前 MessageItems 状态为 CANCELLED（用于 DeepSearch 取消功能）
    * 同时更新所有子消息的状态，确保 UI 正确显示取消状态
@@ -558,6 +578,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   lastSSEEventTime: null,
   sseTimeoutCheckInterval: null,
   SESSION_CONVERSATION_ID: null,
+  pendingOutlineInteraction: null,
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -2219,6 +2240,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
    */
   setSessionConversationId: (conversationId: string | null) => {
     set({ SESSION_CONVERSATION_ID: conversationId });
+  },
+
+  triggerOutlineInteractionAccept: (messageId: string, userMessage: string) => {
+    set({ pendingOutlineInteraction: { messageId, userMessage } });
+  },
+
+  clearPendingOutlineInteraction: () => {
+    set({ pendingOutlineInteraction: null });
   },
 
   /**

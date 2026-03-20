@@ -6,6 +6,8 @@ import { DeepSearchConfig } from '../components/AgentConfigDialog'
  */
 export const DEFAULT_DEEPSEARCH_CONFIG: DeepSearchConfig = {
   enableHumanInteraction: true,
+  outlineInteractionEnabled: true, // 大纲交互开关，默认开启
+  outlineInteractionMaxRounds: 3, // 大纲最大修改次数限制，默认3
   planChapterCount: 5,
   enableTraceability: true,
   enableSourceTracerInfer: true, // 溯源推理功能开关，默认开启

@@ -790,6 +790,14 @@
       "cancelledTip": "Cancelled",
       "unknownTip": "Unknown status"
     },
+    "outlineInteraction": {
+      "researchOutline": "Research Outline",
+      "waitingForConfirm": "Waiting for confirmation",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "modifyTip": "To modify the outline, enter your changes in the input box; click Start Research if the outline looks good",
+      "startResearch": "Start Research"
+    },
     "chart": {
       "mermaidError": "Mermaid chart error",
       "syntaxError": "Mermaid syntax error",
@@ -876,6 +884,10 @@
         "interactionSettings": "Interaction Settings",
         "enableHumanInteraction": "Enable Human-in-the-Loop",
         "enableHumanInteractionDesc": "Ask for confirmation during execution",
+        "outlineInteractionEnabled": "Enable Outline Interaction",
+        "outlineInteractionEnabledDesc": "Allow users to modify during outline phase",
+        "outlineInteractionMaxRounds": "Outline Max Modification Rounds",
+        "outlineInteractionMaxRoundsDesc": "Limit the maximum rounds of outline modifications",
         "enableTraceability": "Enable Traceability",
         "enableTraceabilityDesc": "Show information sources",
         "enableSourceTracerInfer": "Enable Traceability Inference",

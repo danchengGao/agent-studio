@@ -43,6 +43,8 @@ export interface ReportTemplate {
 export interface DeepSearchConfig {
   // 通用配置
   enableHumanInteraction: boolean
+  outlineInteractionEnabled: boolean // 大纲交互开关
+  outlineInteractionMaxRounds: number // 大纲最大修改次数限制，默认3
   planChapterCount: number // 范围: [1, 10]
   enableTraceability: boolean
   enableSourceTracerInfer: boolean // 溯源推理功能开关
