@@ -26,6 +26,7 @@ from openjiuwen_studio.routers import (
     system_model,
     memory_base,
     deepsearch_knowledge_base,
+    runtimes
 )
 
 api_router = APIRouter()
@@ -47,7 +48,7 @@ def router_register(app: FastAPI):
     v1_router.include_router(agents.agents_router, prefix="/agents", tags=["Agents"])
     v1_router.include_router(execution.execution_router, prefix="/execution", tags=["Execution"])
     v1_router.include_router(workflows.workflows_router, prefix="/workflows", tags=["Workflows"])
-    v1_router.include_router(deepsearch.deepsearch_router, prefix="/agent/deepsearch", tags=["deepsearch"])
+    v1_router.include_router(deepsearch.deepsearch_router, prefix="/agent/deepsearch", tags=["DeepSearch"])
     v1_router.include_router(related_member.related_router, prefix="/related", tags=["Relation"])
     v1_router.include_router(plugin.plugin_router, prefix="/plugin", tags=["Plugin"])
     v1_router.include_router(tags.tags_router, prefix="/tags", tags=["Tags"])
@@ -59,6 +60,7 @@ def router_register(app: FastAPI):
     )
     v1_router.include_router(system_model.system_router, prefix="/system", tags=["System"])
     v1_router.include_router(memory_base.memory_base_router, prefix="/memory", tags=["Memory Base"])
+    v1_router.include_router(runtimes.runtime_router, prefix="/runtime", tags=["RunTime"])
 
     # Add health check endpoint directly to api_router (not v1_router)
     @api_router.get("/health")
