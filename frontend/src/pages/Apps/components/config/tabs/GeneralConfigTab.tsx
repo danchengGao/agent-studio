@@ -52,33 +52,16 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
             />
           </div>
 
-          {config.enableHumanInteraction && (
-            <>
-              <div className="flex items-center justify-between py-1 pl-4 border-l-2 border-blue-200">
-                <div>
-                  <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.outlineInteractionEnabled')}</span>
-                  <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.outlineInteractionEnabledDesc')}</p>
-                </div>
-                <ToggleSwitch
-                  checked={config.outlineInteractionEnabled}
-                  onChange={checked => updateConfig('outlineInteractionEnabled', checked)}
-                />
-              </div>
-
-              {config.outlineInteractionEnabled && (
-                <div className="pl-4 border-l-2 border-blue-200">
-                  <RangeSlider
-                    label={t('apps.config.general.outlineInteractionMaxRounds')}
-                    description={t('apps.config.general.outlineInteractionMaxRoundsDesc')}
-                    value={config.outlineInteractionMaxRounds}
-                    min={1}
-                    max={10}
-                    onChange={value => updateConfig('outlineInteractionMaxRounds', value)}
-                  />
-                </div>
-              )}
-            </>
-          )}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.outlineInteractionEnabled')}</span>
+              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.outlineInteractionEnabledDesc')}</p>
+            </div>
+            <ToggleSwitch
+              checked={config.outlineInteractionEnabled}
+              onChange={checked => updateConfig('outlineInteractionEnabled', checked)}
+            />
+          </div>
 
           <div className="flex items-center justify-between py-1">
             <div>

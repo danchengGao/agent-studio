@@ -6,6 +6,8 @@ import {
   JSONObject,
   MESSAGE_TITLES,
   isFinalReportMessage,
+  OUTLINE_INTERACTION_MAX_ROUNDS,
+  OUTLINE_INTERACTION_WARNING_THRESHOLD,
 } from '../useConversationStore';
 import i18n from '@/i18n';
 
@@ -1090,13 +1092,20 @@ export class DeepsearchSSEHandler {
     // 根据 agent 类型创建不同类型的消息
     const isOutlineInteraction = sseData.agent === 'outline_interaction';
     const messageType = isOutlineInteraction ? MessageType.OUTLINE_INTERACTION : MessageType.INTERRUPT;
+    const currentRound = isOutlineInteraction ? this.parseOutlineInteractionRound(sseData.content) : undefined;
+    const remainingRoundsInfo = this.buildOutlineInteractionRemainingInfo(currentRound);
 
     // 获取大纲内容（如果是 outline_interaction，需要从缓存中获取 outline 的内容）
     let outlineContent: any = sseData.content || '';
     if (isOutlineInteraction) {
       const cachedOutline = this.getOutlineContentFromCache();
       if (cachedOutline) {
-        outlineContent = cachedOutline;
+        outlineContent = remainingRoundsInfo ? {
+          ...cachedOutline,
+          outlineInteractionCurrentRound: remainingRoundsInfo.currentRound,
+          outlineInteractionRemainingRounds: remainingRoundsInfo.remainingRounds,
+          outlineInteractionRemainingTip: remainingRoundsInfo.tip,
+        } : cachedOutline;
         this.streamCache.set('__outline_content__', [JSON.stringify(outlineContent)]);
       }
     }
@@ -1436,6 +1445,37 @@ export class DeepsearchSSEHandler {
 
     const parsed = Number.parseInt(String(value), 10);
     return Number.isNaN(parsed) ? undefined : parsed;
+  }
+
+  private parseOutlineInteractionRound(content?: string | JSONObject): number | undefined {
+    if (typeof content !== 'string') {
+      return undefined;
+    }
+    const match = content.match(/Round\s+(\d+)\s*:/i);
+    if (!match?.[1]) {
+      return undefined;
+    }
+    const round = Number.parseInt(match[1], 10);
+    return Number.isNaN(round) ? undefined : round;
+  }
+
+  private buildOutlineInteractionRemainingInfo(currentRound?: number): {
+    currentRound: number;
+    remainingRounds: number;
+    tip: string;
+  } | null {
+    if (!currentRound || currentRound <= 0) {
+      return null;
+    }
+    const remainingRounds = Math.max(0, OUTLINE_INTERACTION_MAX_ROUNDS - currentRound + 1);
+    if (remainingRounds > OUTLINE_INTERACTION_WARNING_THRESHOLD) {
+      return null;
+    }
+    return {
+      currentRound,
+      remainingRounds,
+      tip: i18n.t('apps.outlineInteraction.remainingRoundsWarning', { count: remainingRounds }),
+    };
   }
 
   /**

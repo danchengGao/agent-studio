@@ -7,7 +7,7 @@ import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
 import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { useConversationStore, MessageType, TaskStatus, AgentType, type MessageItems } from '../../stores/useConversationStore'
+import { useConversationStore, MessageType, TaskStatus, AgentType, type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS } from '../../stores/useConversationStore'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import SSERecorder from '../../utils/sseRecorder'
 import PlaybackPanel from '../../components/Conversation/PlaybackPanel'
@@ -484,14 +484,17 @@ const AppsPage: React.FC = () => {
   
   useEffect(() => {
     if (!pendingOutlineInteraction) return
-    
-    const { userMessage } = pendingOutlineInteraction
-    
+
+    const { userMessage, backendMessage, interruptFeedback } = pendingOutlineInteraction
+
     console.log('[AppsPage] Received outline-interaction-accept:', pendingOutlineInteraction)
-    
+
     clearPendingOutlineInteraction()
-    
-    handleDeepSearchSend(userMessage, { interrupt_feedback: 'accepted' })
+
+    handleDeepSearchSend(userMessage, {
+      interrupt_feedback: interruptFeedback || 'accepted',
+      backend_message: backendMessage,
+    })
   }, [pendingOutlineInteraction])
 
   // ===== SSE 回放事件监听 =====
@@ -872,10 +875,14 @@ const AppsPage: React.FC = () => {
   }
 
   // ===== DeepSearch 插件：消息发送处理 =====
-  const handleDeepSearchSend = async (content: string, options?: { interrupt_feedback?: string }) => {
+  const handleDeepSearchSend = async (
+    content: string,
+    options?: { interrupt_feedback?: string; backend_message?: string }
+  ) => {
     // 标记SSE是否正常完成（收到正常结束信号）
     // 需要在 try 块外定义，这样 finally 块也能访问
     let sseCompletedNormally = false
+    let recordingId: string | undefined
 
     // 如果没有 conversation，先创建一个
     let conversationId = currentConversationId
@@ -1058,7 +1065,6 @@ const AppsPage: React.FC = () => {
       useConversationStore.getState().setSessionConversationId(backendConversationId)
 
       // ===== SSE 录制：开始录制（仅开发模式） =====
-      let recordingId: string | undefined
       if (ENABLE_SSE_DEBUG) {
         try {
           // 从 localStorage 读取压缩配置
@@ -1084,6 +1090,8 @@ const AppsPage: React.FC = () => {
         throw new Error('无法获取认证信息，请重新登录')
       }
 
+      const messageToBackend = options?.backend_message ?? content
+
       const response = await fetch('/api/v1/agent/deepsearch/run', {
         method: 'POST',
         headers: {
@@ -1093,13 +1101,13 @@ const AppsPage: React.FC = () => {
         body: JSON.stringify({
           space_id: user?.spaceId || getDefaultSpaceId(),
           general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
-          message: content,
+          message: messageToBackend,
           conversation_id: backendConversationId, // 使用带 session 的 conversation_id
           search_mode: 'research', // DeepSearch 模式固定为 research
           outliner_max_section_num: config.planChapterCount,
           workflow_human_in_the_loop: config.enableHumanInteraction,
-          outline_interaction_enabled: config.enableHumanInteraction && config.outlineInteractionEnabled,
-          outline_interaction_max_rounds: config.enableHumanInteraction && config.outlineInteractionEnabled ? config.outlineInteractionMaxRounds : undefined,
+          outline_interaction_enabled: config.outlineInteractionEnabled,
+          outline_interaction_max_rounds: config.outlineInteractionEnabled ? OUTLINE_INTERACTION_MAX_ROUNDS : undefined,
           info_collector_search_method: config.searchMode,
           source_tracer_research_trace_source_switch: config.enableTraceability,
           source_tracer_source_tracer_infer_switch: config.enableSourceTracerInfer,

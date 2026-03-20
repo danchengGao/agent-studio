@@ -82,7 +82,9 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
 
     return (
       <div className="flex justify-start mb-4">
-        <div className={`bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200 overflow-x-hidden ${hasOnlyOutlineInteraction ? 'w-[90%]' : 'max-w-[90%]'}`}>
+        <div
+          className={`overflow-x-hidden ${hasOnlyOutlineInteraction ? 'w-[90%]' : 'max-w-[90%] bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200'}`}
+        >
             {/* 消息列表 */}
             {topLevelMessages.map((message, index) => {
               

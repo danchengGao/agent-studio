@@ -65,6 +65,12 @@ const LEGACY_FINAL_REPORT_TITLES = ['最终报告', 'Final Report'] as const;
 // SSE超时时间（分钟）- 超过这个时间没有收到SSE事件，将标记未完成消息为FAILED
 export const SSE_TIMEOUT_MINUTES = 30;
 
+// ===== 大纲交互常量 =====
+// 大纲最大修改次数限制
+export const OUTLINE_INTERACTION_MAX_ROUNDS = 100;
+// 大纲交互提醒阈值（剩余次数小于等于该值时提醒）
+export const OUTLINE_INTERACTION_WARNING_THRESHOLD = 3;
+
 /**
  * 判断消息是否为最终报告
  * 兼容新旧数据：
@@ -212,6 +218,8 @@ export interface ConversationStore {
   pendingOutlineInteraction: {
     messageId: string;
     userMessage: string;
+    backendMessage?: string;
+    interruptFeedback: string;
   } | null;  // 待处理的大纲交互接受请求
 
   // ========== Conversation 层级：查询函数 ==========
@@ -525,8 +533,10 @@ export interface ConversationStore {
    * 触发大纲交互接受
    * @param messageId 消息ID
    * @param userMessage 用户消息
+   * @param backendMessage 发送给后端 message 字段的数据
+   * @param interruptFeedback 中断反馈标识
    */
-  triggerOutlineInteractionAccept: (messageId: string, userMessage: string) => void;
+  triggerOutlineInteractionAccept: (messageId: string, userMessage: string, backendMessage?: string, interruptFeedback?: string) => void;
 
   /**
    * 清除待处理的大纲交互
@@ -2242,8 +2252,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     set({ SESSION_CONVERSATION_ID: conversationId });
   },
 
-  triggerOutlineInteractionAccept: (messageId: string, userMessage: string) => {
-    set({ pendingOutlineInteraction: { messageId, userMessage } });
+  triggerOutlineInteractionAccept: (messageId: string, userMessage: string, backendMessage?: string, interruptFeedback: string = 'accepted') => {
+    set({ pendingOutlineInteraction: { messageId, userMessage, backendMessage, interruptFeedback } });
   },
 
   clearPendingOutlineInteraction: () => {
