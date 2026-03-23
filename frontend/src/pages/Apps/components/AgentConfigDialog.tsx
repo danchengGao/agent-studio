@@ -67,6 +67,7 @@ export interface DeepSearchConfig {
   planUnderstandingModelId?: string // 计划理解模型ID
   infoCollectingModelId?: string // 信息收集模型ID
   writingCheckingModelId?: string // 写作检查模型ID
+  execution_method?: string,   // DeepSearch执行模式："parallel", "dependency_driving"
 }
 
 export interface AgentConfigDialogProps {

@@ -8,7 +8,10 @@ import {
   isFinalReportMessage,
   OUTLINE_INTERACTION_MAX_ROUNDS,
   OUTLINE_INTERACTION_WARNING_THRESHOLD,
+  isTaskOngoing,
+  DeepsearchExecutionMethod
 } from '../useConversationStore';
+import { ThoughtNodeType, EdgeRelationType, ThoughtNode } from './deepsearchMindMapHandler';
 import i18n from '@/i18n';
 
 /**
@@ -32,24 +35,65 @@ export interface SSEData {
 
 interface StoreDependencies {
   getCurrentMessageItems: () => MessageItems | undefined;
-  addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string) => Message | null;
-  addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string) => Message;
+  addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string, indexPath?: string) => Message | null;
+  addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string, indexPath?: string) => Message;
   updateMessage: (messageItemsId: string, messageId: string, updates: Partial<Message>) => void;
   deleteMessage: (messageItemsId: string, messageId: string) => void;
   updateMessageItems: (id: string, updates: Partial<MessageItems>) => void;
   appendMessageContent: (messageItemsId: string, messageId: string, content: string) => void;
   getMessageById: (id: string) => Message | undefined;
+  getMessageItemsById: (id: string) => MessageItems | undefined;  // 新增：通过ID获取MessageItems
   getMessageTree: (messageId: string) => Message | null;  // 新增：获取消息树
   getChildMessages: (messageId: string) => Message[];
   getMessageItemsIsUser: (messageItems: MessageItems) => boolean;  // 新增：兼容历史数据
   setSessionConversationId: (conversationId: string | null) => void;  // 新增：设置连续对话系列ID
   saveConversationToDB: (conversationId: string) => Promise<void>;
+  getOrCreateMindMapManager: (messageItemsId: string) => any;  // 获取或创建思维链图管理器集合（{sectionGraph, taskGraph}）
 }
 
 interface StreamCache {
   get: (key: string) => string[] | undefined;
   set: (key: string, chunks: string[]) => void;
   delete: (key: string) => void;
+}
+
+// ===== 工具函数 =====
+
+/**
+ * 解析索引值，支持两种格式：
+ * - 简单数字： "123" -> 123
+ * - 复合格式： "1-2-3" -> 3 (取最后一个数字)
+ */
+function parseIndexValue(value: string | number | undefined): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const strValue = String(value);
+
+  // 如果包含 '-'，按 '-' 分割并取最后一个部分
+  if (strValue.includes('-')) {
+    const parts = strValue.split('-');
+    const lastPart = parts[parts.length - 1];
+    return parseInt(lastPart, 10);
+  }
+
+  // 否则直接解析整个字符串
+  return parseInt(strValue, 10);
+}
+
+/**
+ * 构建 indexPath 字符串
+ * @param sectionIdx 章节索引
+ * @param planIdx 计划索引
+ * @param stepIdx 步骤索引
+ * @returns 格式 "section-plan-step"，如 "0-1-2"；如果所有参数都为 undefined 则返回 undefined
+ */
+function buildIndexPath(sectionIdx?: number, planIdx?: number, stepIdx?: number): string | undefined {
+  if (sectionIdx === undefined && planIdx === undefined && stepIdx === undefined) {
+    return undefined;
+  }
+  return `${sectionIdx ?? 0}-${planIdx ?? 0}-${stepIdx ?? 0}`;
 }
 
 // ===== Handler 类 =====
@@ -108,9 +152,9 @@ export class DeepsearchSSEHandler {
       }
     }
 
-    const sectionIdx = this.parseOptionalIndex(sseData.section_idx);
-    const planIdx = this.parseOptionalIndex(sseData.plan_idx);
-    const stepIdx = this.parseOptionalIndex(sseData.step_idx);
+    const sectionIdx = parseIndexValue(sseData.section_idx);
+    const planIdx = parseIndexValue(sseData.plan_idx);
+    const stepIdx = parseIndexValue(sseData.step_idx);
 
     switch (sseData.event) {
       case 'start':
@@ -158,7 +202,7 @@ export class DeepsearchSSEHandler {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.streamCache.set(streamKey, [content]);
 
-      const lastMessageItems = this.store.getCurrentMessageItems();
+      let lastMessageItems = this.store.getCurrentMessageItems();
       if (lastMessageItems && sectionIdx !== undefined && planIdx !== undefined) {
 
         // 检查是否存在根 TASK 消息（sectionIdx=0），如果不存在则从缓存创建
@@ -171,28 +215,34 @@ export class DeepsearchSSEHandler {
         if (!rootTask) {
           const outlineContent = this.getOutlineContentFromCache();
           if (outlineContent) {
-            rootTask = this.createRootTaskFromOutline(lastMessageItems.id, outlineContent);
+            rootTask = this.createRootTaskFromOutline(outlineContent);
+            // 更新 lastMessageItems 指向 rootTask 的 messageItems
+            if (rootTask) {
+              lastMessageItems = this.store.getMessageItemsById(rootTask.messageItemsId);
+              if(!lastMessageItems)
+                return;
+            }
           } else {
             console.warn('[DeepsearchSSEHandler] No cached outline found for creating root TASK');
           }
         }
 
+        // 使用 indexPath 查找 sectionTask
+        const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
         const sectionTask = this.findTaskInMessages(
           lastMessageItems.messagesIds,
-          msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+          msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
           `section_${sectionIdx}` // 添加缓存key
         );
 
         // 【步骤1】更新上一个 planTask (task_1_x_(n-1))
         if (planIdx > 1 && sectionTask) {
-          const prevPlanTitle = i18n.t('apps.deepSearch.informationCollection', { index: planIdx - 1 });
+          const prevPlanTitle = i18n.t('apps.deepSearch.informationCollection', { sectionId: sectionIdx, planIndex: planIdx - 1 });
           const prevPlanTask = this.store.getChildMessages(sectionTask.id).find(task =>
             task.title?.includes(prevPlanTitle)
           );
 
-          if (prevPlanTask &&
-              (prevPlanTask.status === TaskStatus.PENDING ||
-               prevPlanTask.status === TaskStatus.IN_PROGRESS)) {
+          if (prevPlanTask && isTaskOngoing(prevPlanTask.status)) {
             // 从上一个 planTask 开始递归更新
             this.updateUnfinishedTasksRecursively(
               prevPlanTask.id,
@@ -226,9 +276,11 @@ export class DeepsearchSSEHandler {
       const lastMessageItems = this.store.getCurrentMessageItems();
       if (!lastMessageItems) return;
 
+      // 使用 indexPath 查找 sectionTask
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       const sectionTask = this.findTaskInMessages(
         lastMessageItems.messagesIds,
-        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
         `section_${sectionIdx}` // 添加缓存key
       );
 
@@ -244,12 +296,16 @@ export class DeepsearchSSEHandler {
             isStreaming: true,
             status: TaskStatus.IN_PROGRESS,
           });
+
+          // 将父节点 sectionTask 状态改为 REPORTING
+          updateMessage(lastMessageItems.id, sectionTask.id, {
+            status: TaskStatus.REPORTING,
+          });
         } else {
           // 先有条件地递归更新本章节的最后一个子Message(子Message.status=PENDING 或 IN_PROGRESS):
           const sectionChildren = this.store.getChildMessages(sectionTask.id);
           const lastChildMessage = sectionChildren.length > 0 ? sectionChildren[sectionChildren.length - 1] : null;
-          if (lastChildMessage &&
-              (lastChildMessage.status === TaskStatus.PENDING || lastChildMessage.status === TaskStatus.IN_PROGRESS)) {
+          if (lastChildMessage && isTaskOngoing(lastChildMessage.status)) {
             this.updateUnfinishedTasksRecursively(
               lastChildMessage.id,
               lastMessageItems.id,
@@ -258,49 +314,52 @@ export class DeepsearchSSEHandler {
           }
 
           // 情况1: 不存在章节报告 - 创建新消息（原有逻辑）
-          const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
+          // const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
+          const subTitle = `${sectionTask.title}`;
           const childMessage = this.store.addMessageAsChild(
             lastMessageItems.id,
             sectionTask.id,
             MessageType.REPORT,
             '',
-            subTitle
+            subTitle,
+            buildIndexPath(sectionIdx, 0, 0)
           );
 
           updateMessage(lastMessageItems.id, childMessage.id, {
             status: TaskStatus.IN_PROGRESS,
             isStreaming: true,
           });
+
+          // 将父节点 sectionTask 状态改为 REPORTING
+          updateMessage(lastMessageItems.id, sectionTask.id, {
+            status: TaskStatus.REPORTING,
+          });
+
+          // 将子报告节点添加至思维链中
+          this.addSubReportToMindMap(childMessage.id, lastMessageItems.id);
         }
 
       }
       return;
     }
 
-    // entry: 初始化缓存，创建占位消息
-    if (sseData.agent === 'entry') {
-      const content = typeof sseData.content === 'string' ? sseData.content : '';
-      this.streamCache.set(streamKey, [content]);
-
-      addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), '', undefined, undefined, 'deepsearch');
+    // entry 或 generate_questions: 创建占位消息（不使用 streamCache）
+    if (sseData.agent === 'entry' || sseData.agent === 'generate_questions') {
+      const lastMessage = addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), '', undefined, undefined, 'deepsearch', buildIndexPath(sectionIdx, planIdx, stepIdx));
 
       const lastMessageItems = this.store.getCurrentMessageItems();
-      if (lastMessageItems) {
-        const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
-      const lastMessage = lastMessageId ? this.store.getMessageById(lastMessageId) : undefined;
-        if (lastMessage) {
-          updateMessage(lastMessageItems.id, lastMessage.id, {
-            content: sseData.content || '',
-            isStreaming: true,
-          });
-        }
+      if (lastMessageItems && lastMessage) {
+        updateMessage(lastMessageItems.id, lastMessage.id, {
+          content: sseData.content || '',
+          isStreaming: true,
+        });
       }
       return;
     }
 
-    // 其他类型：创建普通TEXT消息，比如generate_questions
+    // 其他类型：创建普通TEXT消息
     const content = typeof sseData.content === 'string' ? sseData.content : '';
-    addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), content, undefined, undefined, 'deepsearch');
+    addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), content, undefined, undefined, 'deepsearch', buildIndexPath(sectionIdx, planIdx, stepIdx));
   }
 
   /**
@@ -337,9 +396,11 @@ export class DeepsearchSSEHandler {
       const lastMessageItems = this.store.getCurrentMessageItems();
       if (!lastMessageItems) return;
 
+      // 使用 indexPath 查找 sectionTask
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       const sectionTask = this.findTaskInMessages(
         lastMessageItems.messagesIds,
-        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
         `section_${sectionIdx}` // 添加缓存key
       );
 
@@ -355,7 +416,7 @@ export class DeepsearchSSEHandler {
       return;
     }
 
-    // 其他消息：追加内容
+    // 其他消息(如entry, generate_questions)：追加内容
     const lastMessageItems = this.store.getCurrentMessageItems();
     if (lastMessageItems && !this.store.getMessageItemsIsUser(lastMessageItems)) {
       const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
@@ -400,17 +461,20 @@ export class DeepsearchSSEHandler {
 
     // plan_reasoning 完成
     if (sseData.agent === 'plan_reasoning' && sectionIdx !== undefined && planIdx !== undefined) {
+      // 使用 indexPath 查找 sectionTask
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       let sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-        msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+        msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath
       );
 
       // ===== 修复：如果section任务不存在（因为outline为空），动态创建 =====
       if (!sectionTask) {
         console.warn('[DeepsearchSSEHandler] Section task not found for plan_reasoning, creating one. sectionIdx:', sectionIdx);
 
-        // 找到根大纲任务（sectionIdx=0）
+        // 找到根大纲任务（使用 indexPath）
+        const rootIndexPath = buildIndexPath(0, 0, 0);
         const rootTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-          msg.type === MessageType.TASK && msg.sectionIdx === 0
+          msg.type === MessageType.TASK && msg.indexPath === rootIndexPath
         );
 
         if (rootTask) {
@@ -419,7 +483,8 @@ export class DeepsearchSSEHandler {
             rootTask.id,
             MessageType.TASK,
             i18n.t('apps.deepSearch.researchChapter', { index: sectionIdx }),
-            i18n.t('apps.deepSearch.chapter', { index: sectionIdx })
+            i18n.t('apps.deepSearch.chapter', { index: sectionIdx }),
+            buildIndexPath(sectionIdx, 0, 0)
           );
 
           updateMessage(lastMessageItems.id, sectionTask.id, {
@@ -428,6 +493,8 @@ export class DeepsearchSSEHandler {
             isStreaming: false,
           });
 
+          /// 将 sectionTask 节点添加到思维链 graph 中
+          this.addSectionTaskToMindMap(sectionTask.id, lastMessageItems.id);
         } else {
           console.error('[DeepsearchSSEHandler] Root outline task not found, cannot create section task');
           this.streamCache.delete(streamKey);
@@ -453,7 +520,7 @@ export class DeepsearchSSEHandler {
 
         const parsedContent = JSON.parse(cachedContent);
 
-        const planTask = this.findOrCreatePlanTask(sectionTask, planIdx, lastMessageItems.id);
+        const planTask = this.findOrCreatePlanTask(sectionTask, planIdx, lastMessageItems.id, parsedContent.title);
         
         if (!planTask) {
           console.error('[DeepsearchSSEHandler] Failed to find or create plan task');
@@ -472,6 +539,8 @@ export class DeepsearchSSEHandler {
           status: TaskStatus.IN_PROGRESS,
         });
 
+        // ===== 初始化计划级依赖集合 =====
+        const dependOnPlanIds: { [id: string]: string } = {};
         // 为每个 step 创建子任务
         if (parsedContent.steps && Array.isArray(parsedContent.steps)) {
           const planChildren = this.store.getChildMessages(planTask.id);
@@ -480,21 +549,69 @@ export class DeepsearchSSEHandler {
             const existingStep = planChildren.find(st => st.title === step.title);
             if (existingStep) return;
 
+            // ===== 依赖项解析 =====
+            const dependIds: string[] = Array.isArray(step.parent_ids) ? step.parent_ids : [];
+            const relationships: string[] = Array.isArray(step.relationships) ? step.relationships : [];
+
+            const dependOnMessageIds: { [id: string]: string } = {};
+
+            // 只有两个长度一致时才处理
+            if (dependIds.length > 0 && dependIds.length === relationships.length) {
+              for (let i = 0; i < dependIds.length; i++) {
+                const dependIndexPath = dependIds[i];  // 直接使用,不加 "-0-0"
+
+                const dependMessage = this.findTaskInMessages(
+                  lastMessageItems.messagesIds,
+                  msg => msg.indexPath === dependIndexPath && msg.type === MessageType.TASK
+                );
+
+                if (dependMessage) {
+                  // 添加到消息级依赖
+                  dependOnMessageIds[dependMessage.id] = relationships[i];
+
+                  // 如果依赖的父消息不是当前planTask,添加到计划级依赖
+                  if (dependMessage.parentMessageId && dependMessage.parentMessageId !== planTask.id) {
+                    const parentId = dependMessage.parentMessageId;
+                    if (!dependOnPlanIds[parentId]) {
+                      dependOnPlanIds[parentId] = relationships[i];
+                    } else {
+                      dependOnPlanIds[parentId] += ", " + relationships[i];
+                    }
+                  }
+                }
+              }
+            }
+
             const stepTask = this.store.addMessageAsChild(
               lastMessageItems.id,
               planTask.id,
               MessageType.TASK,
               step.description || '',
-              step.title
+              step.title,
+              buildIndexPath(sectionIdx, planIdx, _stepIndex + 1)
             );
 
             updateMessage(lastMessageItems.id, stepTask.id, {
               status: TaskStatus.PENDING,
               isStreaming: false,
+              ...(Object.keys(dependOnMessageIds).length > 0 ? { dependOnMessageIds } : {}),  // 只在非空时添加
             });
 
           });
+
+          // ===== 更新 planTask 的计划级依赖到 dependOnMessageIds =====
+          if (Object.keys(dependOnPlanIds).length > 0) {
+            updateMessage(lastMessageItems.id, planTask.id, {
+              dependOnMessageIds: {
+                ...(planTask.dependOnMessageIds || {}),
+                ...dependOnPlanIds
+              }
+            });
+          }
         }
+
+        // 添加 plan节点至思维链图中
+        this.addPlanTaskToMindMap(planTask.id, lastMessageItems.id);
 
         this.streamCache.delete(streamKey);
       } catch (e) {
@@ -513,9 +630,11 @@ export class DeepsearchSSEHandler {
     // sub_reporter 完成
     if (sseData.agent === 'sub_reporter' && sectionIdx !== undefined && sectionIdx > 0) {
       const cachedContent = this.getCacheContent(streamKey);
+      // 使用 indexPath 查找 sectionTask
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       const sectionTask = this.findTaskInMessages(
         lastMessageItems.messagesIds,
-        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
         `section_${sectionIdx}` // 添加缓存key
       );
 
@@ -537,15 +656,14 @@ export class DeepsearchSSEHandler {
       return;
     }
 
-    // entry 完成
-    if (sseData.agent === 'entry') {
-      const cachedContent = this.getCacheContent(streamKey);
-
+    // entry 或 generate_questions 完成
+    if (sseData.agent === 'entry' || sseData.agent === 'generate_questions') {
       const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
       const lastMessage = lastMessageId ? this.store.getMessageById(lastMessageId) : undefined;
 
-      // 检查 entry 的 content 是否为空，如果为空则删除该消息
-      if (!cachedContent || cachedContent.trim() === '') {
+      // 检查消息的实际内容是否为空，如果为空则删除该消息
+      const messageContent = typeof lastMessage?.content === 'string' ? lastMessage.content : '';
+      if (!messageContent || messageContent.trim() === '') {
         if (lastMessage && lastMessage.isStreaming) {
           // 删除空消息
           this.store.deleteMessage(lastMessageItems.id, lastMessage.id);
@@ -560,12 +678,11 @@ export class DeepsearchSSEHandler {
         }
       }
 
-      this.streamCache.delete(streamKey);
       // Entry 处理完成，直接返回，避免执行后面的通用逻辑
       return;
     }
 
-    // end 完成：保存 DeepSearch 结果
+    // end 完成：保存 DeepSearch 结果，流程不会走到这里
     if (sseData.agent === 'end') {
       try {
         let content: string | JSONObject | undefined = sseData.content;
@@ -582,9 +699,11 @@ export class DeepsearchSSEHandler {
 
         // 检查是否包含最终结果（不是简单的 SECTION END 或 ALL END）
         if (content && typeof content === 'object' && (content.response_content || content.exception_info)) {
+          // 使用 indexPath 查找 outlineTask
+          const outlineIndexPath = buildIndexPath(0, 0, 0);
           const outlineTask = this.findTaskInMessages(
             lastMessageItems.messagesIds,
-            msg => msg.type === MessageType.TASK && msg.sectionIdx === 0,
+            msg => msg.type === MessageType.TASK && msg.indexPath === outlineIndexPath,
             'outline_root' // 添加缓存key
           );
 
@@ -594,13 +713,15 @@ export class DeepsearchSSEHandler {
               outlineTask.id,
               MessageType.REPORT,  // 修正：应该是 REPORT 类型
               content || '',
-              MESSAGE_TITLES.FINAL_REPORT
+              MESSAGE_TITLES.FINAL_REPORT,
+              buildIndexPath(0, 0, 0)
             );
             updateMessage(lastMessageItems.id, finalReportTask.id, {
               status: TaskStatus.COMPLETED,
               isStreaming: false,
             });
           }
+
         }
       } catch (error) {
         console.error('[DeepsearchSSEHandler] Failed to process end event:', error);
@@ -636,22 +757,26 @@ export class DeepsearchSSEHandler {
     if (['collector_info_retrieval', 'collector_summary'].includes(sseData.agent) &&
         sectionIdx !== undefined && planIdx !== undefined && stepIdx !== undefined) {
 
+      // 修复：使用 indexPath 查找 sectionTask
+      // sectionTask 的 indexPath 格式：sectionIdx-0-0
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       const sectionTask = this.findTaskInMessages(
         lastMessageItems.messagesIds,
-        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
         `section_${sectionIdx}` // 添加缓存key
       );
 
       if (!sectionTask) {
-        console.warn('[DeepsearchSSEHandler] Section task not found, sectionIdx:', sectionIdx);
+        console.warn('[DeepsearchSSEHandler] Section task not found, sectionIdx:', sectionIdx, 'sectionIndexPath:', sectionIndexPath);
         return;
       }
 
       const sectionChildren = this.store.getChildMessages(sectionTask.id);
-      const planTitle = i18n.t('apps.deepSearch.informationCollection', { index: planIdx });
-      const planTask = sectionChildren.find(task =>
-        task.title && task.title.includes(planTitle)
-      );
+
+      // 修复：使用 indexPath 查找 planTask，而不是依赖 title
+      // planTask 的 indexPath 格式：sectionIdx-planIdx-0
+      const planIndexPath = buildIndexPath(sectionIdx, planIdx, 0);
+      const planTask = sectionChildren.find(task => task.indexPath === planIndexPath);
 
       if (!planTask) {
         console.warn('[DeepsearchSSEHandler] Plan task not found, planIdx:', planIdx);
@@ -670,9 +795,7 @@ export class DeepsearchSSEHandler {
       if (stepIdx > 1 && (!stepTask.childMessageIds || stepTask.childMessageIds.length === 0)) {
         const prevStepTask = planChildren[stepIdx - 2];
 
-        if (prevStepTask &&
-            (prevStepTask.status === TaskStatus.PENDING ||
-             prevStepTask.status === TaskStatus.IN_PROGRESS)) {
+        if (prevStepTask && isTaskOngoing(prevStepTask.status)) {
           // 从上一个 stepTask 开始递归更新
           this.updateUnfinishedTasksRecursively(
             prevStepTask.id,
@@ -707,7 +830,8 @@ export class DeepsearchSSEHandler {
           stepTask.id,
           MessageType.LINK,
           parsedContent,
-          messageTitle
+          messageTitle,
+          buildIndexPath(sectionIdx, planIdx, stepIdx)
         );
 
         /// 更新本step状态为正在进行中（只有PENDING状态才更新）
@@ -738,7 +862,8 @@ export class DeepsearchSSEHandler {
         stepTask.id,
         MessageType.TEXT,
         summaryContent,
-        i18n.t('deepResearch.handler.informationSummary')
+        i18n.t('deepResearch.handler.informationSummary'),
+        buildIndexPath(sectionIdx, planIdx, stepIdx)
       );
 
       updateMessage(lastMessageItems.id, childMessage.id, {
@@ -754,9 +879,7 @@ export class DeepsearchSSEHandler {
 
         // 检查 plan 的所有子任务是否都完成
         const planChildren = this.store.getChildMessages(planTask.id);
-        const allStepsFinished = planChildren.every(step =>
-          step.status !== TaskStatus.PENDING && step.status !== TaskStatus.IN_PROGRESS
-        );
+        const allStepsFinished = planChildren.every(step => !isTaskOngoing(step.status));
 
         if (allStepsFinished) {
           updateMessage(lastMessageItems.id, planTask.id, {
@@ -784,10 +907,11 @@ export class DeepsearchSSEHandler {
         return; // 直接跳过，不处理
       }
 
-      // 2. 找到对应的 sectionTask
+      // 2. 找到对应的 sectionTask（使用 indexPath）
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       const sectionTask = this.findTaskInMessages(
         lastMessageItems.messagesIds,
-        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
         `section_${sectionIdx}` // 添加缓存key
       );
 
@@ -810,13 +934,15 @@ export class DeepsearchSSEHandler {
         });
       } else {
         // 情况B: 最后一个 child 不是 REPORT 或不存在 - 创建新消息
-        const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
+        // const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
+        const subTitle = `${sectionTask.title}`;
         const newReport = this.store.addMessageAsChild(
           lastMessageItems.id,
           sectionTask.id,
           MessageType.REPORT,
           sseData.content,
-          subTitle
+          subTitle,
+          buildIndexPath(sectionIdx, 0, 0)
         );
 
         updateMessage(lastMessageItems.id, newReport.id, {
@@ -826,12 +952,10 @@ export class DeepsearchSSEHandler {
       }
 
       // 5. 递归更新倒数第二个 child message（task_x_(N-1)_0_0）
-      // 条件：N > 1 且该 message 的状态是 PENDING 或 IN_PROGRESS
+      // 条件：N > 1 且该 message 的状态是进行中
       if (sectionChildren.length > 1) {
         const secondLastChild = sectionChildren[sectionChildren.length - 2];
-        if (secondLastChild &&
-            (secondLastChild.status === TaskStatus.PENDING ||
-             secondLastChild.status === TaskStatus.IN_PROGRESS)) {
+        if (secondLastChild && isTaskOngoing(secondLastChild.status)) {
           this.updateUnfinishedTasksRecursively(
             secondLastChild.id,
             lastMessageItems.id,
@@ -845,14 +969,18 @@ export class DeepsearchSSEHandler {
 
     // end 事件
     if (sseData.agent === 'end') {
+      // 使用 indexPath 查找 outlineTask
+      const outlineIndexPath = buildIndexPath(0, 0, 0);
       const outlineTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
-        msg.type === MessageType.TASK && msg.sectionIdx === 0
+        msg.type === MessageType.TASK && msg.indexPath === outlineIndexPath
       );
 
       // "SECTION END" 标识 (第6点)
       if (sseData.content === 'SECTION END' && sectionIdx !== undefined) {
+        // 使用 indexPath 查找 sectionTask
+        const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
         const sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds,
-          msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx
+          msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath
         );
 
         if (sectionTask) {
@@ -862,6 +990,43 @@ export class DeepsearchSSEHandler {
 
           if (lastChildMessage) {
             if (lastChildMessage.type !== MessageType.REPORT) {
+              // ===== 依赖驱动模式下跳过此逻辑 =====
+              const executionMethod = lastMessageItems.agentConfig?.execution_method as string | undefined;
+
+              /// 依赖模式下，lastChildMessage非子报告的话，说明是信息收集类型，状态设置为准完成
+              if (executionMethod === DeepsearchExecutionMethod.DEPENDENCY_DRIVING) {
+                // 1. 将信息收集类型任务状态设置为已完成
+                this.updateUnfinishedTasksRecursively(
+                  lastChildMessage.id,
+                  lastMessageItems.id,
+                  TaskStatus.UNKNOWN
+                );
+                // 2. 创建章节报告 task_x_N_0_0，类型为 report
+                const newReportTask = this.store.addMessageAsChild(
+                  lastMessageItems.id,
+                  sectionTask.id,
+                  MessageType.REPORT,
+                  '',
+                  `${sectionTask.title}`,
+                  buildIndexPath(sectionIdx, 0, 0)
+                );
+                // 更新 newReportTask.status 为 PENDING
+                updateMessage(lastMessageItems.id, newReportTask.id, {
+                  isStreaming: false,
+                  status: TaskStatus.PENDING,
+                });
+                // 将章节报告加入思维链图
+                this.addSubReportToMindMap(
+                  newReportTask.id,
+                  lastMessageItems.id
+                )
+                // 3. 更新 sectionTask.status 为 REPORTING
+                updateMessage(lastMessageItems.id, sectionTask.id, {
+                  status: TaskStatus.REPORTING,
+                });
+                return;
+              }
+
               // 最后一个子 Message 不是 REPORT 类型，将 sectionTask 更新为 FAILED
               this.updateUnfinishedTasksRecursively(
                 sectionTask.id,
@@ -872,8 +1037,12 @@ export class DeepsearchSSEHandler {
               // 最后一个子 Message 是 REPORT 类型，根据其状态决定 sectionTask 的状态
               let targetStatus = lastChildMessage.status;
 
-              // 如果子 REPORT 的状态是 PENDING 或 IN_PROGRESS，将其变为 UNKNOWN
-              if (targetStatus === TaskStatus.PENDING || targetStatus === TaskStatus.IN_PROGRESS) {
+              if(targetStatus == TaskStatus.PENDING) {
+                // 如果子 REPORT 的状态是PENDING状态，说明任务没开始，则已经失败
+                targetStatus = TaskStatus.FAILED;
+              }
+              else if(isTaskOngoing(targetStatus)) {
+                // 任务还在进进行中，将其变为 UNKNOWN
                 targetStatus = TaskStatus.UNKNOWN;
               }
               // 其他状态（COMPLETED/FAILED/CANCELLED/UNKNOWN）保持不变
@@ -898,9 +1067,7 @@ export class DeepsearchSSEHandler {
         // 2. 检查 outline 的所有 childTasks 是否都完成
         if (outlineTask) {
           const outlineChildren = this.store.getChildMessages(outlineTask.id);
-          const allChildrenFinished = outlineChildren.every(child =>
-            child.status !== TaskStatus.PENDING && child.status !== TaskStatus.IN_PROGRESS
-          );
+          const allChildrenFinished = outlineChildren.every(child => !isTaskOngoing(child.status));
 
           if (allChildrenFinished) {
             // 创建最终报告 message（与 outline_task 同级）
@@ -910,13 +1077,17 @@ export class DeepsearchSSEHandler {
               '',  // 初始 content 为空
               undefined,  // parentId 为 undefined，与 outline_task 同级
               MESSAGE_TITLES.FINAL_REPORT,
-              'deepsearch'  // agent 类型
+              'deepsearch',  // agent 类型
+              buildIndexPath(0, 0, 0)
             );
             if (finalReportMessage) {
               updateMessage(lastMessageItems.id, finalReportMessage.id, {
                 status: TaskStatus.IN_PROGRESS,
                 isStreaming: false,
               });
+
+              // 将最终报告添加至思维链中
+              this.addFinalReportToMindMap(finalReportMessage.id, lastMessageItems.id, outlineTask);
             }
 
             // 3. 更新 task_1 (outline_task): status = COMPLETED
@@ -948,8 +1119,8 @@ export class DeepsearchSSEHandler {
           .filter((msg): msg is Message => msg !== undefined)
           .filter(msg =>
             msg.type === MessageType.REPORT &&
-            (msg.status === TaskStatus.PENDING || msg.status === TaskStatus.IN_PROGRESS) &&
-            isFinalReportMessage(msg.title) &&
+            isTaskOngoing(msg.status) &&
+            isFinalReportMessage(msg) &&
             !msg.parentMessageId  // ← 确保是顶级 message
           )
           .pop();  // 取最后一个
@@ -971,13 +1142,16 @@ export class DeepsearchSSEHandler {
               endData || '',
               undefined,  // 与 outline_task 同级
               MESSAGE_TITLES.FINAL_REPORT,
-              'deepsearch'  // agent 类型
+              'deepsearch',  // agent 类型
+              buildIndexPath(0, 0, 0)
             );
             if (finalReportMessage) {
               updateMessage(lastMessageItems.id, finalReportMessage.id, {
                 status: TaskStatus.COMPLETED,
                 isStreaming: false,
               });
+              // 将最终报告添加至思维链中
+              this.addFinalReportToMindMap(finalReportMessage.id, lastMessageItems.id, outlineTask);
             }
           } else {
             // 非研究请求：将 response_content 作为普通消息显示
@@ -1001,7 +1175,8 @@ export class DeepsearchSSEHandler {
                   content,
                   undefined,
                   undefined,
-                  'deepsearch'
+                  'deepsearch',
+                  buildIndexPath()
                 );
                 if (normalMessage) {
                   updateMessage(lastMessageItems.id, normalMessage.id, {
@@ -1023,7 +1198,7 @@ export class DeepsearchSSEHandler {
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            isFinalReportMessage(msg.title) &&
+            isFinalReportMessage(msg) &&
             !msg.parentMessageId
           );
 
@@ -1075,7 +1250,7 @@ export class DeepsearchSSEHandler {
     }
 
     // 其他 summary_response
-    addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), sseData.content || '', undefined, undefined, 'deepsearch');
+    addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), sseData.content || '', undefined, undefined, 'deepsearch', buildIndexPath());
   }
 
   /** 处理 waiting_user_input 事件
@@ -1118,7 +1293,8 @@ export class DeepsearchSSEHandler {
       outlineContent,
       undefined,
       undefined,
-      'deepsearch'
+      'deepsearch', 
+      buildIndexPath()
     );
 
     // 如果创建失败（例如对话已被取消），跳过后续处理
@@ -1127,10 +1303,12 @@ export class DeepsearchSSEHandler {
     }
 
     // 更新消息状态
-    updateMessage(lastMessageItems.id, message.id, {
-      status: TaskStatus.IN_PROGRESS,
-      isStreaming: false,
-    });
+    if(lastMessageItems){
+      updateMessage(lastMessageItems.id, message.id, {
+        status: TaskStatus.IN_PROGRESS,
+        isStreaming: false,
+      });
+    }
 
     // 给 SESSION_CONVERSATION_ID 赋值
     if (sseData.conversation_id) {
@@ -1166,7 +1344,7 @@ export class DeepsearchSSEHandler {
     }
 
     try {
-      const taskMessage = this.createRootTaskFromOutline(lastMessageItems.id, outlineContent);
+      const taskMessage = this.createRootTaskFromOutline(outlineContent);
       if (!taskMessage) {
         return;
       }
@@ -1185,7 +1363,6 @@ export class DeepsearchSSEHandler {
    * 处理 error 事件
    * error 事件包含 exception_info，需要更新到最终报告
    */
-
   private handleError(sseData: SSEData, sectionIdx?: number, planIdx?: number, stepIdx?: number): void {
     const { updateMessage, addSystemMessage, getMessageItemsIsUser } = this.store;
     const lastMessageItems = this.store.getCurrentMessageItems();
@@ -1212,7 +1389,7 @@ export class DeepsearchSSEHandler {
           .map(msgId => this.store.getMessageById(msgId))
           .find(msg =>
             msg?.type === MessageType.REPORT &&
-            isFinalReportMessage(msg.title) &&
+            isFinalReportMessage(msg) &&
             !msg.parentMessageId  // ← 确保是顶级 message
           );
 
@@ -1229,13 +1406,16 @@ export class DeepsearchSSEHandler {
             errorData,
             undefined,
             MESSAGE_TITLES.FINAL_REPORT,
-            'deepsearch'  // agent 类型
+            'deepsearch',  // agent 类型
+            buildIndexPath(0, 0, 0)
           );
           if (newReport) {
             updateMessage(lastMessageItems.id, newReport.id, {
-              status: TaskStatus.FAILED,
-              isStreaming: false,
-            });
+                status: TaskStatus.FAILED,
+                isStreaming: false,
+              });
+            // 将最终报告添加至思维链中
+            this.addFinalReportToMindMap(newReport.id, lastMessageItems.id);
           }
         }
       }
@@ -1245,9 +1425,11 @@ export class DeepsearchSSEHandler {
     if (['collector_info_retrieval', 'collector_summary'].includes(sseData.agent) &&
         sectionIdx !== undefined && planIdx !== undefined && stepIdx !== undefined) {
 
+      // 使用 indexPath 查找 sectionTask
+      const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       const sectionTask = this.findTaskInMessages(
         lastMessageItems.messagesIds,
-        msg => msg.type === MessageType.TASK && msg.sectionIdx === sectionIdx,
+        msg => msg.type === MessageType.TASK && msg.indexPath === sectionIndexPath,
         `section_${sectionIdx}`
       );
 
@@ -1256,10 +1438,9 @@ export class DeepsearchSSEHandler {
         // 跳过后续处理，继续执行 end agent 的清理逻辑（如果是 end 的话）
       } else {
         const sectionChildren = this.store.getChildMessages(sectionTask.id);
-        const planTitle = i18n.t('apps.deepSearch.informationCollection', { index: planIdx });
-        const planTask = sectionChildren.find(task =>
-          task.title && task.title.includes(planTitle)
-        );
+        // 使用 indexPath 查找 planTask，而不是依赖 title
+        const planIndexPath = buildIndexPath(sectionIdx, planIdx, 0);
+        const planTask = sectionChildren.find(task => task.indexPath === planIndexPath);
 
         if (!planTask) {
           console.warn('[DeepsearchSSEHandler] Plan task not found for error, planIdx:', planIdx);
@@ -1297,7 +1478,8 @@ export class DeepsearchSSEHandler {
                 stepTask.id,
                 MessageType.LINK,
                 parsedContent,
-                messageTitle
+                messageTitle,
+                buildIndexPath(sectionIdx, planIdx, stepIdx)
               );
 
               updateMessage(lastMessageItems.id, childMessage.id, {
@@ -1318,7 +1500,8 @@ export class DeepsearchSSEHandler {
                 stepTask.id,
                 MessageType.TEXT,
                 summaryContent,
-                i18n.t('deepResearch.handler.informationSummary')
+                i18n.t('deepResearch.handler.informationSummary'),
+                buildIndexPath(sectionIdx, planIdx, stepIdx)
               );
 
               updateMessage(lastMessageItems.id, childMessage.id, {
@@ -1333,9 +1516,7 @@ export class DeepsearchSSEHandler {
 
               // 检查 plan 的所有子任务是否都完成或失败
               const planChildren = this.store.getChildMessages(planTask.id);
-              const allStepsFinished = planChildren.every(step =>
-                step.status !== TaskStatus.PENDING && step.status !== TaskStatus.IN_PROGRESS
-              );
+              const allStepsFinished = planChildren.every(step => !isTaskOngoing(step.status));
 
               if (allStepsFinished) {
                 // 检查是否有任何一个 step 失败，如果有则 planTask 也失败
@@ -1363,7 +1544,7 @@ export class DeepsearchSSEHandler {
 
   /**
    * 递归更新未完成任务及其所有子孙的状态
-   * 只更新状态为 PENDING 或 IN_PROGRESS 的任务
+   * 只更新状态为 PENDING 或 IN_PROGRESS 或 REPORTING 的任务
    * @param taskId 任务ID
    * @param messageItemsId MessageItems ID
    * @param updateStatus 要更新的目标状态
@@ -1390,9 +1571,8 @@ export class DeepsearchSSEHandler {
       const children = this.store.getChildMessages(currentTask.id);
       children.forEach(child => updateRecursively(child.id));
 
-      // 只更新 PENDING 或 IN_PROGRESS 状态的任务
-      if (currentTask.status === TaskStatus.PENDING ||
-          currentTask.status === TaskStatus.IN_PROGRESS) {
+      // 只更新进行中状态的任务
+      if (isTaskOngoing(currentTask.status)) {
         this.store.updateMessage(messageItemsId, currentTask.id, {
           status: updateStatus,
           updatedAt: now,
@@ -1413,13 +1593,372 @@ export class DeepsearchSSEHandler {
   private findExistingChapterReport(sectionTask: Message): Message | null {
     const childMessages = this.store.getChildMessages(sectionTask.id);
 
-    // 查找 type=REPORT 且 title 以 "章节报告:" 开头的消息
+    // 查找 type=REPORT 且 indexPath 符合 "{i}-0-0" 格式的消息（i为自然数）
     const existingReport = childMessages.find(msg =>
       msg.type === MessageType.REPORT &&
-      msg.title?.startsWith(i18n.t('deepResearch.handler.chapterReport') + ':')
+      /^\d+-0-0$/.test(msg.indexPath || '')
     );
 
     return existingReport || null;
+  }
+
+  /**
+   * 将 outline 节点添加到思维链中
+   * @param lastMessageId 最后一条消息的id
+   * @param lastMessageItemsId MessageItems ID
+   */
+  private addOutlineToMindMap(
+    lastMessageId: string,
+    lastMessageItemsId: string
+  ): void {
+    try {
+      const mindMapManagers = this.store.getOrCreateMindMapManager(lastMessageItemsId);
+      // OUTLINE节点添加到章节图中
+      mindMapManagers.sectionGraph.addNode({
+        messageId: lastMessageId,
+        type: ThoughtNodeType.OUTLINE,
+      });
+
+      // OUTLINE节点添加到任务图中
+      mindMapManagers.taskGraph.addNode({
+        messageId: lastMessageId,
+        type: ThoughtNodeType.OUTLINE,
+      });
+
+      // 生成 OUTLINE 节点的深度
+      mindMapManagers.sectionGraph.regenerateNodeDepth(lastMessageId);
+      mindMapManagers.taskGraph.regenerateNodeDepth(lastMessageId);
+    } catch (error) {
+      console.error('[DeepsearchSSEHandler] Failed to add outline node to mind map:', error);
+    }
+  }
+
+  /**
+   * 将 section 任务节点添加到思维链中
+   * @param sectionTaskId section 任务消息的id
+   * @param lastMessageItemsId MessageItems ID
+   */
+  private addSectionTaskToMindMap(
+    sectionTaskId: string,
+    lastMessageItemsId: string
+  ): void {
+    try {
+      // 1. 获取 sectionTask
+      const sectionTask = this.store.getMessageById(sectionTaskId);
+      if (!sectionTask) {
+        console.error('[DeepsearchSSEHandler] Section task not found:', sectionTaskId);
+        return;
+      }
+
+      // 2. 获取父 outline 任务ID
+      const outlineTaskId = sectionTask.parentMessageId;
+      if (!outlineTaskId) {
+        console.error('[DeepsearchSSEHandler] Section task has no parent message id');
+        return;
+      }
+
+      // 3. 获取思维链管理器集合
+      const mindMapManagers = this.store.getOrCreateMindMapManager(lastMessageItemsId);
+      
+      // 4. 添加 SECTION 节点添加到 sectionGraph 中
+      mindMapManagers.sectionGraph.addNode({
+        messageId: sectionTaskId,
+        type: ThoughtNodeType.SECTION,
+      });
+      
+      // 5. SECTION节点也添加到taskGraph中（因为task图包含所有节点）
+      mindMapManagers.taskGraph.addNode({
+        messageId: sectionTaskId,
+        type: ThoughtNodeType.SECTION,
+      });
+      
+      // 添加 section与outline的 PARENT 边
+      mindMapManagers.taskGraph.addEdge({
+        sourceId: outlineTaskId,
+        targetId: sectionTaskId,
+        relation: EdgeRelationType.PARENT,
+        visible: true,
+      });
+
+      // 下面往 sectionGraph 添加章节的边
+      const dependOnMessageIds = sectionTask.dependOnMessageIds || {};
+      if (Object.keys(dependOnMessageIds).length > 0) {
+        // 6. 往 sectionGraph 添加章节之间的依赖关系：如果 dependOnMessageIds 非空，则往图中加边
+        Object.entries(dependOnMessageIds).forEach(([sourceId, label]) => {
+          mindMapManagers.sectionGraph.addEdge({
+            sourceId: sourceId,
+            targetId: sectionTaskId,
+            relation: EdgeRelationType.SECTION_DEPEND,
+            label: label,
+            visible: true,
+          });
+        });
+      }
+      else{
+        // 7. 往 sectionGraph 添加 section与outline的 PARENT 边，只有章节无依赖的章节才添加
+        mindMapManagers.sectionGraph.addEdge({
+          sourceId: outlineTaskId,
+          targetId: sectionTaskId,
+          relation: EdgeRelationType.PARENT,
+          visible: true,
+        });
+      }
+            
+      // 8. 生成 章节 节点的深度
+      mindMapManagers.sectionGraph.regenerateNodeDepth(sectionTaskId);
+      mindMapManagers.taskGraph.regenerateNodeDepth(sectionTaskId);
+      
+    } catch (error) {
+      console.error('[DeepsearchSSEHandler] Failed to add section task to mind map:', error);
+    }
+  }
+
+  /**
+   * 将 plan 任务节点添加到思维链中
+   * @param planTaskId plan 任务消息的id
+   * @param lastMessageItemsId MessageItems ID
+   */
+  private addPlanTaskToMindMap(
+    planTaskId: string,
+    lastMessageItemsId: string
+  ): void {
+    try {
+      // 1. 获取 planTask
+      const planTask = this.store.getMessageById(planTaskId);
+      if (!planTask) {
+        console.error('[DeepsearchSSEHandler] Plan task not found:', planTaskId);
+        return;
+      }
+
+      // 2. 获取父 sectionTask
+      const sectionTaskId = planTask.parentMessageId;
+      if (!sectionTaskId) {
+        console.error('[DeepsearchSSEHandler] Plan task has no parent message id');
+        return;
+      }
+
+      // 3. 获取思维链管理器集合
+      const mindMapManagers = this.store.getOrCreateMindMapManager(lastMessageItemsId);
+      
+      // 4. 添加 PLAN 节点到 taskGraph 中
+      mindMapManagers.taskGraph.addNode({
+        messageId: planTaskId,
+        type: ThoughtNodeType.PLAN,
+      });
+
+      // 5. 添加DEPEND边：将dependOnPlanIds中所有的边均添加至思维链中，类型根据是否跨章节决定，且可见
+      const dependOnPlanIds = planTask.dependOnMessageIds || {};
+      if (Object.keys(dependOnPlanIds).length > 0) {
+        Object.entries(dependOnPlanIds).forEach(([sourceId, label]) => {
+          const sourceMessage = this.store.getMessageById(sourceId);
+          const sourceParentId = sourceMessage?.parentMessageId;
+          // 判断是否跨章节依赖：如果source和target的parentId不一样，则为跨章节依赖
+          const isCrossSection = sourceParentId !== planTask.parentMessageId;
+          mindMapManagers.taskGraph.addEdge({
+            sourceId: sourceId,
+            targetId: planTaskId,
+            relation: isCrossSection ? EdgeRelationType.CROSS_SECTION_DEPEND : EdgeRelationType.PLAN_DEPEND,
+            // label: label,
+            visible: true,
+          });
+        });
+      }
+
+      // 6. 判断是否添加PARENT边：只有当plan节点的父节点sectionTask的.id，不在dependOnPlanIds中所有节点的父节点集合中时才添加
+      let shouldAddParentEdge = true;
+
+      if (Object.keys(dependOnPlanIds).length > 0) {
+        // 获取所有被依赖的 plan 的父节点ID集合
+        const parentIdsOfDependedPlans = Object.keys(dependOnPlanIds)
+          .map(planId => this.store.getMessageById(planId)?.parentMessageId)
+          .filter((id): id is string => id !== undefined);
+
+        // 判断 sectionTask.id 是否在这些父节点ID中
+        shouldAddParentEdge = !parentIdsOfDependedPlans.includes(sectionTaskId);
+      }
+
+      if (shouldAddParentEdge) {
+        mindMapManagers.taskGraph.addEdge({
+          sourceId: sectionTaskId,
+          targetId: planTaskId,
+          relation: EdgeRelationType.PARENT,
+          visible: true,
+        });
+      }
+
+      // 7. 生成 章节 节点的深度
+      mindMapManagers.taskGraph.regenerateNodeDepth(planTaskId);
+
+    } catch (error) {
+      console.error('[DeepsearchSSEHandler] Failed to add plan task to mind map:', error);
+    }
+  }
+
+  /**
+   * 将子报告节点添加至思维链中
+   * @param subReportMessageId 子报告消息的id
+   * @param lastMessageItemsId MessageItems ID
+   */
+  private addSubReportToMindMap(
+    subReportMessageId: string,
+    lastMessageItemsId: string
+  ): void {
+    try {
+      // 1. 获取子报告消息
+      const subReportMessage = this.store.getMessageById(subReportMessageId);
+      if (!subReportMessage) {
+        console.error('[DeepsearchSSEHandler] Sub report message not found:', subReportMessageId);
+        return;
+      }
+
+      // 2. 获取父 sectionTask 的ID
+      const sectionTaskId = subReportMessage.parentMessageId;
+      if (!sectionTaskId) {
+        console.error('[DeepsearchSSEHandler] Sub report has no parent message id');
+        return;
+      }
+
+      // 3. 获取思维链管理器集合
+      const mindMapManagers = this.store.getOrCreateMindMapManager(lastMessageItemsId);
+      
+      // 4. 添加子报告节点到 taskGraph 中
+      mindMapManagers.taskGraph.addNode({
+        messageId: subReportMessage.id,
+        type: ThoughtNodeType.SUB_REPORT,
+      });
+
+      // 5. 获取 section 下所有的 plan 节点集合（排除子报告节点本身）
+      const sectionChildren = this.store.getChildMessages(sectionTaskId);
+      const planNodes = sectionChildren.filter(msg => msg.type === MessageType.TASK);
+
+      // 6. 添加 章节报告与章节中各 plan任务的 DEPEND 边
+      planNodes.forEach(planNode => {
+        // 获取 plan 节点在思维链图中的子节点
+        const childNodesInGraph = mindMapManagers.taskGraph.getChildNodes(planNode.id);
+
+        // 判断：如果 plan 节点的子节点中有一个在 planNodes 集合中，则不添加边
+        const hasChildInPlanSet = childNodesInGraph.some((childNode: ThoughtNode) =>
+          planNodes.some(plan => plan.id === childNode.messageId)
+        );
+
+        // 只有在 plan 节点的子节点不在 planNodes 集合中时，才添加边
+        if (!hasChildInPlanSet) {
+          mindMapManagers.taskGraph.addEdge({
+            sourceId: planNode.id,
+            targetId: subReportMessage.id,
+            relation: EdgeRelationType.REPORT_DEPEND,
+            visible: true,
+          });
+        }
+      });
+
+      // 7. 生成 章节 节点的深度
+      mindMapManagers.taskGraph.regenerateNodeDepth(subReportMessage.id);
+
+    } catch (error) {
+      console.error('[DeepsearchSSEHandler] Failed to add sub report to mind map:', error);
+    }
+  }
+  
+  /**
+   * 将最终报告添加至思维链中
+   * @param finalReportMessageId 最终报告消息的id
+   * @param lastMessageItems 当前 MessageItems
+   * @param outlineTask 大纲任务消息
+   */
+  private addFinalReportToMindMap(
+    finalReportMessageId: string,
+    lastMessageItemsId: string,
+    outlineTask?: Message | null
+  ): void {
+    try {
+      // 通过 ID 获取 finalReportMessage
+      const finalReportMessage = this.store.getMessageById(finalReportMessageId);
+      if (!finalReportMessage) {
+        console.error('[DeepsearchSSEHandler] Final report message not found:', finalReportMessageId);
+        return;
+      }
+
+      // 如果 outlineTask 输入的是空的，则先取outlineTask
+      if (!outlineTask) {
+        // 通过 ID 获取 MessageItems
+        const messageItems = this.store.getMessageItemsById(lastMessageItemsId);
+        if (!messageItems) return;
+
+        // 遍历 messageItems.messagesIds 查找 outlineTask
+        for (const messageId of messageItems.messagesIds) {
+          const message = this.store.getMessageById(messageId);
+          if (message && message.type === MessageType.TASK && message.indexPath === "0-0-0") {
+            outlineTask = message;
+            break;
+          }
+        }
+      }
+
+      // 如果 outlineTask 还是为空，直接返回
+      if (!outlineTask) {
+        return;
+      }
+
+      const mindMapManagers = this.store.getOrCreateMindMapManager(lastMessageItemsId);
+
+      // 1. 添加最终报告节点
+      mindMapManagers.sectionGraph.addNode({
+        messageId: finalReportMessage.id,
+        type: ThoughtNodeType.FINAL_REPORT,
+      });
+
+      mindMapManagers.taskGraph.addNode({
+        messageId: finalReportMessage.id,
+        type: ThoughtNodeType.FINAL_REPORT,
+      });
+
+      // 2. 如果存在 outlineTask，找到所有章节的子报告并添加 DEPEND 边
+      const outlineChildren = this.store.getChildMessages(outlineTask.id);
+
+      // 筛选出所有 SECTION 类型的节点
+      const sectionTasks = outlineChildren.filter(msg => msg.type === MessageType.TASK && (msg.sectionIdx ?? 0) > 0);
+
+      // 遍历每个 section，查找其子报告
+      sectionTasks.forEach(sectionTask => {
+        // 1. 往 sectionGraph 添加 章节 和 最终报告的边
+        // 检查该章节在 sectionGraph 中是否已有出边，如果没有则添加指向最终报告的边
+        const sectionChildEdges = mindMapManagers.sectionGraph.getChildEdges(sectionTask.id);
+        if (sectionChildEdges.length === 0) {
+          mindMapManagers.sectionGraph.addEdge({
+            sourceId: sectionTask.id,
+            targetId: finalReportMessage.id,
+            relation: EdgeRelationType.REPORT_DEPEND,
+            visible: true,
+          });
+        }
+
+        // 2. 往 taskGraph 添加 章节报告和最终报告的边
+        const sectionChildren = this.store.getChildMessages(sectionTask.id);
+
+        // 2.1 查找该 section 下的 REPORT 类型消息（章节报告）
+        const chapterReports = sectionChildren.filter(msg =>
+          msg.type === MessageType.REPORT
+        );
+
+        // 2.2 为每个章节报告添加指向最终报告的 DEPEND 边
+        chapterReports.forEach(chapterReport => {
+          mindMapManagers.taskGraph.addEdge({
+            sourceId: chapterReport.id,
+            targetId: finalReportMessage.id,
+            relation: EdgeRelationType.REPORT_DEPEND,
+            visible: true,
+          });
+        });
+      });
+
+      // 3. 将2张图的节点深度都重新计算一遍
+      mindMapManagers.sectionGraph.regenerateAllDepths();
+      mindMapManagers.taskGraph.regenerateAllDepths();
+
+    } catch (error) {
+      console.error('[DeepsearchSSEHandler] Failed to add final report to mind map:', error);
+    }
   }
 
   /**
@@ -1439,15 +1978,6 @@ export class DeepsearchSSEHandler {
   private addToCache(key: string, content: string): void {
     const chunks = this.streamCache.get(key) || [];
     this.streamCache.set(key, [...chunks, content]);
-  }
-
-  private parseOptionalIndex(value?: string | number): number | undefined {
-    if (value === undefined || value === null || value === '') {
-      return undefined;
-    }
-
-    const parsed = Number.parseInt(String(value), 10);
-    return Number.isNaN(parsed) ? undefined : parsed;
   }
 
   private parseOutlineInteractionRound(content?: string | JSONObject): number | undefined {
@@ -1512,7 +2042,7 @@ export class DeepsearchSSEHandler {
     return null;
   }
 
-  private createRootTaskFromOutline(messageItemsId: string, outlineContent: any): Message | null {
+  private createRootTaskFromOutline(outlineContent: any): Message | null {
     const { addSystemMessage, updateMessage } = this.store;
     const title = outlineContent.title || i18n.t('deepResearch.handler.researchOutline');
 
@@ -1522,37 +2052,74 @@ export class DeepsearchSSEHandler {
       outlineContent.thought || '',
       undefined,
       title,
-      'deepsearch'
+      'deepsearch',
+      buildIndexPath(0, 0, 0)
     );
 
     if (!rootTask) {
       return null;
     }
 
-    updateMessage(messageItemsId, rootTask.id, {
+    updateMessage(rootTask.messageItemsId, rootTask.id, {
       status: TaskStatus.IN_PROGRESS,
       isStreaming: false,
       sectionIdx: 0,
     });
+
+    // 将 outline 节点添加到思维链 graph 中
+    this.addOutlineToMindMap(rootTask.id, rootTask.messageItemsId);
+
 
     if (outlineContent.sections && Array.isArray(outlineContent.sections)) {
       outlineContent.sections.forEach((section: any, index: number) => {
         const sectionTitle = section.title || i18n.t('deepResearch.handler.chapter', { index: index + 1 });
         const sectionDescription = section.description || '';
 
+        // ===== 依赖项解析 =====
+        const dependIds: string[] = Array.isArray(section.parent_ids) ? section.parent_ids : [];
+        const relationships: string[] = Array.isArray(section.relationships) ? section.relationships : [];
+
+        const dependOnMessageIds: { [id: string]: string } = {};
+
+        // 通过 messageItemsId 获取对应的 messageItems
+        const messageItems = this.store.getMessageItemsById(rootTask.messageItemsId);
+
+        // 依赖关系后处理：只有2个相关list的长度一致时，才处理依赖关系
+        if (dependIds.length > 0 && dependIds.length === relationships.length && messageItems) {
+          for (let i = 0; i < dependIds.length; i++) {
+            const dependIndexPath = `${dependIds[i]}-0-0`;
+
+            // 在当前messageItems中查找对应的依赖消息
+            const dependMessage = this.findTaskInMessages(
+              messageItems.messagesIds,
+              msg => msg.indexPath === dependIndexPath && msg.type === MessageType.TASK
+            );
+
+            if (dependMessage) {
+              dependOnMessageIds[dependMessage.id] = relationships[i];
+            }
+          }
+        }
+
+        // 创建sectionTask
         const sectionTask = this.store.addMessageAsChild(
-          messageItemsId,
+          rootTask.messageItemsId,
           rootTask.id,
           MessageType.TASK,
           sectionDescription,
-          sectionTitle
+          sectionTitle,
+          buildIndexPath(index + 1, 0, 0)
         );
 
-        updateMessage(messageItemsId, sectionTask.id, {
+        updateMessage(rootTask.messageItemsId, sectionTask.id, {
           sectionIdx: index + 1,
           status: TaskStatus.PENDING,
           isStreaming: false,
+          ...(Object.keys(dependOnMessageIds).length > 0 ? { dependOnMessageIds } : {}),  // 只在非空时添加
         });
+        
+        // 将 sectionTask 节点添加到思维链 graph 中
+        this.addSectionTaskToMindMap(sectionTask.id, rootTask.messageItemsId);
       });
     }
 
@@ -1598,24 +2165,29 @@ export class DeepsearchSSEHandler {
   /**
    * 查找或创建 plan 任务
    */
-  private findOrCreatePlanTask(sectionTask: Message, targetPlanIdx: number, messageItemsId: string): Message | null {
+  private findOrCreatePlanTask(sectionTask: Message, targetPlanIdx: number, messageItemsId: string, title?: string): Message | null {
     const childMessages = this.store.getChildMessages(sectionTask.id);
 
-    const planTitle = i18n.t('apps.deepSearch.informationCollection', { index: targetPlanIdx });
-    const existingPlan = childMessages.find(task =>
-      task.title && task.title.includes(planTitle)
-    );
+    // 使用 indexPath 查找现有的 planTask
+    const planIndexPath = buildIndexPath(sectionTask.sectionIdx, targetPlanIdx, 0);
+    const existingPlan = childMessages.find(task => task.indexPath === planIndexPath);
 
     if (existingPlan) {
       return existingPlan;
     }
+
+    // 如果不存在indexPath，使用标题查找：如果传入了自定义 title 且非空，则使用自定义格式
+    const planTitle = title && title.trim()
+      ? `${sectionTask.sectionIdx}.${targetPlanIdx} ${title}`.trim()
+      : i18n.t('apps.deepSearch.informationCollection', { sectionId: sectionTask.sectionIdx, planIndex: targetPlanIdx });
 
     const planTask = this.store.addMessageAsChild(
       messageItemsId,
       sectionTask.id,
       MessageType.TASK,
       { title: planTitle },
-      planTitle
+      planTitle,
+      planIndexPath
     );
 
     this.store.updateMessage(messageItemsId, planTask.id, {

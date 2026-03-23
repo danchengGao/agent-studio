@@ -135,22 +135,22 @@ const ReportCard: React.FC<{
         };
       case TaskStatus.UNKNOWN:
         return {
-          // 未知状态：浅橙色主题，可点击打开右面板（轻微提示）
+          // 准完成状态：蓝色主题，可点击打开右面板（样式与完成状态一样）
           statusText: t('apps.deepSearch.status.unknown'),
           statusIcon: (
-            <div className="flex-shrink-0 w-3.5 h-3.5 rounded-full bg-orange-400 flex items-center justify-center" title={t('apps.deepSearch.status.unknown')}>
-              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+            <div className="flex-shrink-0 w-3.5 h-3.5 rounded-full bg-blue-500 flex items-center justify-center" title={t('apps.deepSearch.status.unknown')}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
           ),
-          bgGradient: 'from-orange-50 via-amber-50 to-yellow-50',
-          borderColor: 'border-orange-200/50 hover:border-orange-300/60',
-          iconBg: 'bg-gradient-to-br from-orange-300 to-amber-400',
+          bgGradient: 'from-blue-50 via-indigo-50 to-cyan-50',
+          borderColor: 'border-blue-200/50 hover:border-blue-300/60',
+          iconBg: 'bg-gradient-to-br from-blue-400 to-indigo-500',
           iconColor: 'text-white',
-          hoverClass: 'hover:scale-[1.01] hover:shadow-md hover:shadow-orange-500/10',
+          hoverClass: 'hover:scale-[1.01] hover:shadow-md hover:shadow-blue-500/10',
           cursorClass: 'cursor-pointer',
-          textColor: 'text-orange-700',
+          textColor: 'text-blue-700',
           titleColor: 'text-gray-900',
           showArrow: true,
         };
@@ -360,7 +360,7 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
   }, [childMessages]);
 
   // 判断是否为最终报告（必须在所有 hooks 之后，避免 early return 导致 hook 数量变化）
-  const isFinalReport = isFinalReportMessage(message.title);
+  const isFinalReport = isFinalReportMessage(message);
   if (isFinalReport) {
     return (
       <DeepSearchReportCard

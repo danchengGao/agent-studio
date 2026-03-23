@@ -11,7 +11,8 @@ import {
   Clock,
   ExternalLink,
   Maximize2,
-  Minimize2
+  Minimize2,
+  FileText
 } from 'lucide-react';
 import { ReportMarkdown } from '@/pages/Apps/components/Markdown';
 import ReportMessage from './ReportMessage';
@@ -235,11 +236,15 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
   const translateTaskTitle = (title: string | undefined): string => {
     if (!title) return '';
 
-    // 检测 "信息收集1", "信息收集2" 等模式
-    const match = title.match(/^信息收集(\d+)$/);
+    // 检测 "1.1", "1.2" 等模式 (sectionId.planIndex)
+    const match = title.match(/^(\d+)\.(\d+)\s*(.*)$/);
     if (match) {
-      const index = match[1];
-      return t('apps.deepSearch.informationCollection', { index });
+      const sectionId = match[1];
+      const planIndex = match[2];
+      const customTitle = match[3].trim();
+      return customTitle
+        ? `${t('apps.deepSearch.informationCollection', { sectionId, planIndex })} ${customTitle}`.trim()
+        : t('apps.deepSearch.informationCollection', { sectionId, planIndex });
     }
 
     // 其他标题保持原样
@@ -269,8 +274,8 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
 
   // 对于进行中的任务，每秒更新当前时间（未开始的任务不需要更新，因为不显示耗时）
   useEffect(() => {
-    if (message.status !== TaskStatus.IN_PROGRESS) {
-      // 非进行中的任务不需要定时器
+    if (message.status !== TaskStatus.IN_PROGRESS && message.status !== TaskStatus.REPORTING) {
+      // 非进行中和报告生成中的任务不需要定时器
       return;
     }
 
@@ -288,7 +293,8 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
         // 未开始：不显示耗时
         return undefined;
       case TaskStatus.IN_PROGRESS:
-        // 进行中：当前时间 - 创建时间，确保不为负数
+      case TaskStatus.REPORTING:
+        // 进行中或报告生成中：当前时间 - 创建时间，确保不为负数
         return Math.max(0, currentTime - message.createdAt);
       case TaskStatus.COMPLETED:
       case TaskStatus.FAILED:
@@ -394,6 +400,13 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
             </div>
           </div>
         );
+      case TaskStatus.REPORTING:
+        // 报告生成中：文档图标配合跳动动画
+        return (
+          <div className="flex-shrink-0 w-4 h-4 relative">
+            <FileText size={16} className="text-purple-500 animate-bounce" />
+          </div>
+        );
       case TaskStatus.COMPLETED:
         // 绿底白勾（简单勾号，圆形）
         return (
@@ -408,9 +421,9 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
       case TaskStatus.CANCELLED:
         return <Ban size={16} className="text-yellow-500 flex-shrink-0" />;
       case TaskStatus.UNKNOWN:
-        // 橙色对勾（轻微提示）
+        // 绿底白勾（准完成状态，样式与完成状态一样）
         return (
-          <div className="flex-shrink-0 w-4 h-4 rounded-full bg-orange-400 flex items-center justify-center" title={t('apps.deepSearch.statusUnknown')}>
+          <div className="flex-shrink-0 w-4 h-4 rounded-full bg-green-500 flex items-center justify-center" title={t('apps.deepSearch.statusUnknown')}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
@@ -428,6 +441,8 @@ export const TaskMessage: React.FC<TaskMessageProps> = ({
         return 'text-gray-400';
       case TaskStatus.IN_PROGRESS:
         return 'text-gray-800';
+      case TaskStatus.REPORTING:
+        return 'text-gray-900 font-semibold';
       case TaskStatus.COMPLETED:
       case TaskStatus.UNKNOWN:
         return 'text-gray-900 font-semibold';

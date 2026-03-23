@@ -911,6 +911,8 @@
         "enableHumanInteractionDesc": "在问答过程中与用户交互确认",
         "outlineInteractionEnabled": "启用大纲交互",
         "outlineInteractionEnabledDesc": "允许用户在大纲阶段进行修改",
+        "executionModeEnabled": "启用依赖模式",
+        "executionModeEnabledDesc": "选择deepsearch的运行模式：平行/依赖模式",
         "enableTraceability": "启用溯源",
         "enableTraceabilityDesc": "显示信息来源",
         "enableSourceTracerInfer": "启用溯源推理",
@@ -1112,7 +1114,12 @@
       "networkError": "网络连接失败，请检查网络"
     },
     "deepSearch": {
-      "informationCollection": "信息收集{{index}}",
+      "informationCollection": "任务{{sectionId}}.{{planIndex}}",
+      "planNode": "任务计划",
+      "subTask": "任务",
+      "subTaskDetail": "子任务详情",
+      "more": "更多...",
+      "clickToViewDetails": "点击查看详细信息...",
       "informationSummary": "信息总结",
       "researchOutline": "研究大纲",
       "generatingOutline": "正在生成大纲...",
@@ -1132,12 +1139,43 @@
       "expandContent": "展开内容",
       "status": {
         "pending": "待开始",
-        "inProgress": "报告生成中",
-        "completed": "报告已生成",
+        "inProgress": "进行中",
+        "reporting": "报告正在生成中",
+        "completed": "已完成",
         "failed": "生成失败",
-        "cancelled": "已手动结束",
+        "cancelled": "已取消",
         "unknown": "准完成",
         "default": "未知状态"
+      },
+      "mindMapStatus": {
+        "pending": "等待中",
+        "inProgress": "研究中",
+        "reporting": "报告正在生成中",
+        "completed": "已完成",
+        "failed": "失败",
+        "cancelled": "取消",
+        "unknown": "准完成",
+        "default": "状态未知"
+      },
+      "mindMap": {
+        "title": "思维链",
+        "sectionGraph": "章节图",
+        "taskGraph": "任务图",
+        "toggleGraphType": "切换图类型",
+        "toggleDirection": "切换布局方向",
+        "openMindMap": "查看思维链",
+        "viewMindMap": "思维链",
+        "noData": "暂无思维链数据",
+        "relayout": "重新布局",
+        "researchTopic": "研究主题",
+        "researchCompleted": "研究完成",
+        "finalReport": {
+          "waitingForWriting": "等待撰写",
+          "writingInProgress": "撰写中...",
+          "writingCompleted": "生成时间: {{time}}",
+          "writingException": "撰写异常",
+          "cancelled": "已取消"
+        }
       },
       "loading": "加载中...",
       "reportCard": "报告",
@@ -1147,9 +1185,9 @@
         "generating": "最终报告生成中",
         "summarizing": "正在汇总分析结果，请稍候...",
         "failed": "报告生成失败",
-        "unknownError": "未知异常",
-        "bothEmpty": "报告内容和异常信息均为空",
-        "noDataError": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
+        "exceptionError": "报告生成异常，详见：https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "unknownError": "报告生成异常，详见：https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "noDataError": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。详见：https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md"
       },
       "playback": {
         "panelTitle": "调试面板",
@@ -1207,7 +1245,7 @@
       "researchChapter": "研究章节 {{sectionIdx}}",
       "finalReport": "最终报告",
       "informationSummary": "信息总结",
-      "informationCollection": "信息收集{{index}}",
+      "informationCollection": "任务{{sectionId}}.{{planIndex}}",
       "searchResult": "搜索结果",
       "reportGenerationFailed": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
     }

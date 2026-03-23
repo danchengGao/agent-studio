@@ -18,6 +18,7 @@ export const DEFAULT_DEEPSEARCH_CONFIG: DeepSearchConfig = {
   recallThreshold: 0.5, // 最小匹配分数，默认 0.5
   enableTemplate: false,
   selectedTemplateId: undefined,
+  execution_method: "parallel",   // "parallel", "dependency_driving", 默认平行模式
   // 模型配置（undefined 表示未配置）
   generalModelId: undefined,
   planUnderstandingModelId: undefined,

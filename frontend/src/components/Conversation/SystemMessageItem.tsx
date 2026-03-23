@@ -10,9 +10,11 @@ import ReportMessage from './messageTypes/ReportMessage';
 import { ErrorMessage } from './messageTypes/ErrorMessage';
 import { InterruptMessage } from './messageTypes/InterruptMessage';
 import OutlineInteractionMessage from './messageTypes/OutlineInteractionMessage';
+import { FileText } from 'lucide-react';
 
 interface SystemMessageItemProps {
   messageItems: MessageItems;
+  onOpenMindMap?: (messageItemsId: string) => void;
 }
 
 /**
@@ -24,17 +26,22 @@ interface SystemMessageItemProps {
  * 3. 如果MessageItems还在进行中，最后的message会跟着数据更新显示
  * 4. 之前的message不会变化
  */
-export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageItems }) => {
+export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageItems, onOpenMindMap }) => {
   const { t } = useTranslation();
   const getMessageById = useConversationStore(state => state.getMessageById);
   const getMessageItemsIsUser = useConversationStore(state => state.getMessageItemsIsUser);
+  const mindMapManagersMap = useConversationStore(state => state.mindMapManagersMap);
   const { messagesIds, status } = messageItems;
 
-  // 判断是否正在进行中
+  // 判断是否正在进行中或报告生成中
   const isInProgress = status === TaskStatus.IN_PROGRESS;
+  const isReporting = status === TaskStatus.REPORTING;
 
   // 判断是否是用户消息（兼容历史数据）
   const isUserMessage = getMessageItemsIsUser(messageItems);
+
+  // 判断是否有思维链数据
+  const hasMindMapData = mindMapManagersMap.has(messageItems.id);
 
   // 通过 messagesIds 获取实际的 Message 对象
   const messages = messagesIds
@@ -83,13 +90,31 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
     return (
       <div className="flex justify-start mb-4">
         <div
-          className={`overflow-x-hidden ${hasOnlyOutlineInteraction ? 'w-[90%]' : 'max-w-[90%] bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200'}`}
+          className={`overflow-x-hidden relative ${hasOnlyOutlineInteraction ? 'w-[90%]' : 'max-w-[90%] bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200'}`}
         >
-            {/* 消息列表 */}
+            {/* 思维链按钮 - 仅在有回调且有思维链数据时显示 */}
+          {onOpenMindMap && hasMindMapData && (
+            <button
+              onClick={() => onOpenMindMap(messageItems.id)}
+              className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-blue-500 hover:bg-blue-50 rounded transition-colors"
+              title={t('apps.deepSearch.mindMap.openMindMap', '查看思维链')}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="5" r="3" />
+                <circle cx="5" cy="19" r="3" />
+                <circle cx="19" cy="19" r="3" />
+                <line x1="12" y1="8" x2="5" y2="16" />
+                <line x1="12" y1="8" x2="19" y2="16" />
+              </svg>
+              <span>{t('apps.deepSearch.mindMap.viewMindMap', '思维链')}</span>
+            </button>
+          )}
+
+          {/* 消息列表 */}
             {topLevelMessages.map((message, index) => {
               
               // 判断是否是最后一个进行中的消息
-            const isLastStreaming = isInProgress && index === topLevelMessages.length - 1 && message.isStreaming;
+            const isLastStreaming = (isInProgress || isReporting) && index === topLevelMessages.length - 1 && message.isStreaming;
 
             return (
               <div key={message.id} className="mb-3 last:mb-0">
@@ -106,14 +131,29 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
 
         {/* 状态指示器 */}
         <div className="flex items-center justify-between mt-2">
-          {isInProgress && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-75"></div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-150"></div>
-              </div>
-              <span>{t('apps.chat.generating')}</span>
+          {(isInProgress || isReporting) && (
+            <div className={`flex items-center gap-2 text-sm ${isReporting ? 'text-purple-600' : 'text-gray-500'}`}>
+              {isReporting ? (
+                // REPORTING 状态：紫色跳动文档图标
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-purple-500 animate-bounce" />
+                  <span className="font-medium">
+                    {t('apps.deepSearch.status.reporting')}
+                  </span>
+                </div>
+              ) : (
+                // IN_PROGRESS 状态：蓝色脉冲点动画
+                <>
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-75"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-150"></div>
+                  </div>
+                  <span>
+                    {t('apps.chat.generating')}
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -144,6 +184,9 @@ const MessageRenderer: React.FC<MessageRendererProps> = ({ message, isStreaming 
     } else {
       // 点击不同消息，打开面板
       setSelectedResultMessageId(task.id);
+      // 清除思维链状态，确保从思维链切换到报告
+      // 由于showMindMap和mindMapMessageItemsId是在AppsPage组件中管理的，
+      // 我们通过设置selectedResultMessageId，AppsPage中的条件渲染会自动处理思维链的显示
     }
   };
 

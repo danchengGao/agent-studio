@@ -93,9 +93,9 @@ const ErrorReportCard: React.FC<{
       if (isDevMode && exceptionInfo) {
         return exceptionInfo;
       }
-      return t('apps.deepSearch.finalReportStatus.unknownError');
+      return t('apps.deepSearch.finalReportStatus.exceptionError');
     }
-    return t('apps.deepSearch.finalReportStatus.bothEmpty');
+    return t('apps.deepSearch.finalReportStatus.unknownError');
   };
 
   return (
@@ -191,11 +191,11 @@ const DeepSearchReportCard: React.FC<DeepSearchReportCardProps> = ({
 
     // 如果 content 是空字符串
     if (typeof content === 'string' && !content.trim()) {
-      // 如果是进行中状态（PENDING、IN_PROGRESS 或 UNKNOWN），显示加载中卡片
-      if (message.status === TaskStatus.PENDING || message.status === TaskStatus.IN_PROGRESS || message.status === TaskStatus.UNKNOWN) {
+      // 如果是进行中状态（PENDING、IN_PROGRESS），显示加载中卡片
+      if (message.status === TaskStatus.PENDING || message.status === TaskStatus.IN_PROGRESS) {
         return { report: null, errorType: null, exceptionInfo: null, isLoading: true };
       }
-      // 如果是完成/失败状态，显示错误卡片
+      // 如果是完成/失败/未知状态，显示错误卡片
       return { report: null, errorType: 'both_empty', exceptionInfo: null, isLoading: false };
     }
 

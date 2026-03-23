@@ -900,6 +900,8 @@
         "enableHumanInteractionDesc": "Interact with users for confirmation during Q&A",
         "outlineInteractionEnabled": "Enable Outline Interaction",
         "outlineInteractionEnabledDesc": "Allow users to modify during outline phase",
+        "executionModeEnabled": "Enable Dependency Mode",
+        "executionModeEnabledDesc": "Choose deepsearch execution mode: Parallel/Dependency-driven",
         "enableTraceability": "Enable Traceability",
         "enableTraceabilityDesc": "Show information sources",
         "enableSourceTracerInfer": "Enable Traceability Inference",
@@ -1102,7 +1104,12 @@
       "networkError": "Network connection failed, please check your network"
     },
     "deepSearch": {
-      "informationCollection": "Information Collection {{index}}",
+      "informationCollection": "Task {{sectionId}}.{{planIndex}}",
+      "planNode": "Task Plan",
+      "subTask": "Task",
+      "subTaskDetail": "Sub-task Detail",
+      "more": "more...",
+      "clickToViewDetails": "Click to view details...",
       "informationSummary": "Information Summary",
       "researchOutline": "Research Outline",
       "generatingOutline": "Generating outline...",
@@ -1122,12 +1129,43 @@
       "expandContent": "Expand Content",
       "status": {
         "pending": "Pending",
-        "inProgress": "Generating Report",
-        "completed": "Report Generated",
-        "failed": "Generation Failed",
-        "cancelled": "Manually Ended",
+        "inProgress": "In Progress",
+        "reporting": "Generating Report",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
         "unknown": "Conditionally Complete",
         "default": "Unknown Status"
+      },
+      "mindMapStatus": {
+        "pending": "Waiting",
+        "inProgress": "Researching",
+        "reporting": "Generating Report",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
+        "unknown": "Conditionally Complete",
+        "default": "Unknown Status"
+      },
+      "mindMap": {
+        "title": "Thought Chain",
+        "sectionGraph": "Section Graph",
+        "taskGraph": "Task Graph",
+        "toggleGraphType": "Toggle Graph Type",
+        "toggleDirection": "Toggle Layout Direction",
+        "openMindMap": "View Thought Chain",
+        "viewMindMap": "Mind Map",
+        "noData": "No thought chain data",
+        "relayout": "Re-layout",
+        "researchTopic": "Research Topic",
+        "researchCompleted": "Research Completed",
+        "finalReport": {
+          "waitingForWriting": "Waiting for writing",
+          "writingInProgress": "Writing...",
+          "writingCompleted": "Generated at: {{time}}",
+          "writingException": "Writing exception",
+          "cancelled": "Cancelled"
+        }
       },
       "loading": "Loading...",
       "reportCard": "Report",
@@ -1137,9 +1175,9 @@
         "generating": "Generating final report",
         "summarizing": "Summarizing analysis results, please wait...",
         "failed": "Report generation failed",
-        "unknownError": "Unknown error",
-        "bothEmpty": "Both report content and exception info are empty",
-        "noDataError": "Report generation failed: No final report data received. Possible reasons include: Network connection interrupted, server error, or task was terminated prematurely."
+        "exceptionError": "Report generation error: https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "unknownError": "Report generation error: https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "noDataError": "Report generation failed: No final report data received. Possible reasons include: Network connection interrupted, server error, or task was terminated prematurely. https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md"
       },
       "playback": {
         "panelTitle": "Debug Panel",

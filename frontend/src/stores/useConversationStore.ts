@@ -2,54 +2,64 @@ import { create } from 'zustand'
 import { conversationDB, conversationEventEmitter } from '../utils/conversationDB'
 import i18n from '../i18n'
 
+// ===== 从共享类型文件导入（供内部使用）=====
+import {
+  MessageType,
+  TaskStatus,
+  AgentType,
+  DeepsearchExecutionMethod,
+  // 基础接口
+  ErrorMessageConfig,
+  // 消息相关类型
+  LinkContent,
+  JSONObject,
+  MessageContent,
+  Message,
+  // 数据容器类型
+  MessageItems,
+  Conversation,
+  ConversationData,
+  ConversationsIndex,
+  ThoughtGraphType,
+  MindMapManagers,
+} from '../types/conversationTypes';
+
+// ===== 思维链相关导入 =====
+import {
+  MindMapManager,
+  createMindMapManager
+} from './handlers/deepsearchMindMapHandler';
+
+// ===== 重新导出（保持向后兼容）=====
+export {
+  MessageType,
+  TaskStatus,
+  AgentType,
+  DeepsearchExecutionMethod,
+};
+
+export type {
+  // 基础接口
+  ErrorMessageConfig,
+  // 消息相关类型
+  LinkContent,
+  JSONObject,
+  MessageContent,
+  Message,
+  // 数据容器类型
+  MessageItems,
+  Conversation,
+  ConversationData,
+  ConversationsIndex,
+  ThoughtGraphType,
+  MindMapManagers,
+};
+
 // ===== LocalStorage 键名常量 =====
 const STORAGE_KEYS = {
   CONVERSATION_DATA_PREFIX: 'conv_data_',
   CONVERSATIONS_INDEX: 'conv_index',
 } as const
-
-// ===== 枚举定义 =====
-// 消息的类型定义
-export enum MessageType {
-  // 基础类型
-  TEXT = 'text',              // 普通文本/Markdown
-  REPORT = 'report',          // 报告类型, 其他数据和TEXT一样，只是前端使用报告的模板进行显示
-  LINK = 'link',              // 外部链接（网页）
-  DETAIL_LINK = 'detail_link',// 详情链接（打开右侧面板）
-
-  // 任务类型（带子任务）
-  TASK = 'task',              // 任务容器
-
-  // 特殊类型
-  ERROR = 'error',            // 错误信息
-  INTERRUPT = 'interrupt',    // 中断等待用户输入
-  OUTLINE_INTERACTION = 'outline_interaction', // 大纲交互等待用户确认
-}
-
-export enum TaskStatus {
-  PENDING = 'pending',        // 未开始
-  IN_PROGRESS = 'in_progress', // 进行中
-  COMPLETED = 'completed',    // 完成
-  FAILED = 'failed',          // 失败
-  CANCELLED = 'cancelled',    // 手动结束
-  UNKNOWN = 'unknown',        // 未知/提示状态, 有时后端api可能缺少某些流程的数据，导致消息的状态未知
-}
-
-// 对话过程中，某次发问所选择的agent类型
-export enum AgentType {
-  ORDINARY = 'ordinary',   // 普通agent
-  DEEPSEARCH = 'deepsearch', // 深度研究
-}
-
-// ===== 错误消息配置 =====
-/**
- * 错误消息配置接口
- * 用于在消息处理失败时添加错误提示
- */
-export interface ErrorMessageConfig {
-  title: string;
-  content: string;
-}
 
 // ===== 消息标题常量 =====
 // 用于程序判断，与语言环境无关
@@ -74,117 +84,45 @@ export const OUTLINE_INTERACTION_WARNING_THRESHOLD = 3;
 /**
  * 判断消息是否为最终报告
  * 兼容新旧数据：
- * - 新数据：使用 MESSAGE_TITLES.FINAL_REPORT（'FINAL_REPORT'）
- * - 旧数据：使用国际化文本（'最终报告'、'Final Report'）
+ * - 新数据：使用 type=REPORT + indexPath="0-0-0"
+ * - 旧数据：使用 MESSAGE_TITLES.FINAL_REPORT（'FINAL_REPORT'）或国际化文本（'最终报告'、'Final Report'）
  *
- * @param title - 消息标题
+ * @param message - 消息对象
  * @returns 是否为最终报告
  */
-export function isFinalReportMessage(title: string | undefined): boolean {
+export function isFinalReportMessage(message: Message): boolean {
+  // 新数据：优先使用 type + indexPath 判断
+  if (message.type === MessageType.REPORT && message.indexPath === "0-0-0") {
+    return true;
+  }
+
+  // 旧数据：回退到 title 判断（兼容历史数据）
+  const title = message.title;
   if (!title) return false;
   return title === MESSAGE_TITLES.FINAL_REPORT ||
          LEGACY_FINAL_REPORT_TITLES.includes(title as any);
 }
 
-
-export interface LinkContent {
-  url: string;                 // 链接地址
-  title: string;               // 链接标题
-  query?: string;              // 搜索词（collector_info_retrieval返回）
-  description?: string;        // 简短描述
-  source?: string;             // 来源（如：网页、知识库）
-  publishTime?: string;        // 发布时间
-  cardStyle?: 'text' | 'card'; // 展示样式
+/**
+ * 判断任务状态是否为进行中状态
+ * 进行中状态包括：PENDING、IN_PROGRESS、REPORTING
+ *
+ * @param status - 任务状态
+ * @returns true=进行中, false=非进行中
+ *
+ * @example
+ * ```ts
+ * if (isTaskOngoing(message.status)) {
+ *   // 处理进行中的消息
+ * }
+ * ```
+ */
+export function isTaskOngoing(status: TaskStatus): boolean {
+  return status === TaskStatus.PENDING ||
+         status === TaskStatus.IN_PROGRESS ||
+         status === TaskStatus.REPORTING;
 }
 
-// JSON 对象类型定义
-export type JSONObject = Record<string, unknown>;
-
-// Message 内容的类型定义
-export type MessageContent = string | LinkContent | JSONObject;
-
-export interface Message {
-  // ===== 必选字段 =====
-  id: string;                  // 消息唯一标识，格式：task_1[_{section}[_{plan}[_{step}]]]
-  type: MessageType;           // 消息类型
-  status: TaskStatus;          // 状态
-  content: MessageContent;     // 数据内容
-                               // - TEXT/REPORT: Markdown字符串或JSONObject
-                               // - LINK/DETAIL_LINK: LinkContent对象
-
-  // ===== 可选字段 =====
-  title?: string;              // 标题（可选）
-  icon?: string;               // 图标标识
-
-  // ===== 元数据字段 =====
-  parentMessageId?: string;    // 父消息ID（用于构建树形结构）
-  childMessageIds?: string[];     // 子任务ID列表（只存ID，不存对象）
-
-  // ===== 外键字段（用于关联和快速查找） =====
-  messageItemsId: string;      // 所属 MessageItems 的 ID
-  conversationId: string;       // 所属 Conversation 的 ID
-
-  // ===== 时间字段 =====
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
-
-  // ===== SSE流式相关 =====
-  isStreaming?: boolean;       // 是否正在接收
-
-  // TASK类型数据相关
-  sectionIdx?: number;         // 作用于task类型消息中，用于章节索引：0=主任务, 1-10=章节，用于标识任务在层级结构中的位置
-}
-
-export interface MessageItems {
-  id: string;                  // MessageItems唯一标识
-  status: TaskStatus;          // 状态
-  messagesIds: string[];       // 消息Message的id list, 如果是task的message，只写入根节点的id(子节点由根节点去索引)
-
-  // ===== 时间字段 =====
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
-
-  // ===== 其他 =====
-  conversationId: string;      // 会话ID
-
-  // ===== 配置信息 =====
-  isUser: boolean;             // 是否用户消息
-  agentType?: AgentType;       // Agent类型，用于HITL场景判断agent匹配
-  llm?: string;                // 大模型名称
-  agentConfig?: { [key: string]: any }; // agent的参数配置项
-}
-
-export interface Conversation {
-  id: string;                  // Conversation的id
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  config: {
-    agentType: string;         // agent类型：deepsearch|travel|...
-    [key: string]: any;
-  };
-  messageItemsIds: string[];    // 消息MessageItems的id列表
-  last_session_conversation_id?: string; // 连续对话系列中的上一个会话ID，用于恢复对话上下文；连续对话类型包括：deepsearch,
-}
-
-// ===== 数据导出类型 =====
-
-export interface ConversationData {
-  conversation: Conversation;
-  messageItems: MessageItems[];
-  messages: Record<string, Message>;  // Map转对象以便序列化
-}
-
-export interface ConversationsIndex {
-  conversations: Record<string, {
-    id: string;
-    title: string;
-    createdAt: number;
-    updatedAt: number;
-    config: Conversation['config'];
-  }>;
-  lastUpdated: number;
-}
 
 export interface ConversationStore {
   // ===== 核心数据存储 =====
@@ -221,6 +159,12 @@ export interface ConversationStore {
     backendMessage?: string;
     interruptFeedback: string;
   } | null;  // 待处理的大纲交互接受请求
+
+  // ========== 对话配置映射 ==========
+  conversationConfigs: Map<string, { [key: string]: any }>;  // conversationId -> agentConfig
+
+  // ========== 思维链图状态 ==========
+  mindMapManagersMap: Map<string, MindMapManagers>;  // messageItemsId -> { sectionGraph, taskGraph } (思维链图管理器集合)
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -290,6 +234,23 @@ export interface ConversationStore {
    */
   getChildMessages: (messageId: string) => Message[];
 
+  // ========== 对话配置管理 ==========
+
+  /**
+   * 设置对话的 agent 配置
+   */
+  setConversationConfig: (conversationId: string, config: { [key: string]: any }) => void;
+
+  /**
+   * 获取对话的 agent 配置
+   */
+  getConversationConfig: (conversationId: string) => { [key: string]: any } | undefined;
+
+  /**
+   * 清除对话的 agent 配置
+   */
+  clearConversationConfig: (conversationId: string) => void;
+
   // ========== Conversation 操作函数 ==========
 
   /**
@@ -344,6 +305,23 @@ export interface ConversationStore {
    */
   deleteMessageItems: (messageItemsId: string) => void;
 
+  // ========== 思维链图操作函数 ==========
+
+  /**
+   * 获取或创建思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @returns MindMapManager 实例
+   */
+  getOrCreateMindMapManager: (messageItemsId: string) => MindMapManagers;
+
+  /**
+   * 获取思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @param graphType 可选的图类型，指定后返回对应的图管理器
+   * @returns MindMapManager 实例或 undefined
+   */
+  getMindMapManager: (messageItemsId: string, graphType?: ThoughtGraphType) => MindMapManager | undefined;
+
   // ========== Message 操作函数 ==========
 
   /**
@@ -360,6 +338,7 @@ export interface ConversationStore {
   /**
    * 添加系统消息（快捷方法）
    * @param agentType Agent类型（如：deepsearch），用于设置MessageItems.agentType，用于HITL场景匹配
+   * @param indexPath 位置索引路径，格式："section-plan-step"，如 "0-1-2"
    * @returns 返回创建的 Message，如果对话已取消则返回 null
    */
   addSystemMessage: (
@@ -368,7 +347,8 @@ export interface ConversationStore {
     content: any,
     parentId?: string,
     title?: string,
-    agentType?: string
+    agentType?: string,
+    indexPath?: string
   ) => Message | null;
 
   /**
@@ -404,13 +384,15 @@ export interface ConversationStore {
 
   /**
    * 添加子消息到父消息（构建树形结构）
+   * @param indexPath 位置索引路径，格式："section-plan-step"，如 "0-1-2"
    */
   addMessageAsChild: (
     messageItemsId: string,
     parentId: string,
     type: MessageType,
     content: any,
-    title?: string
+    title?: string,
+    indexPath?: string
   ) => Message;
 
   // ========== 流式消息处理 =====
@@ -589,6 +571,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   sseTimeoutCheckInterval: null,
   SESSION_CONVERSATION_ID: null,
   pendingOutlineInteraction: null,
+  conversationConfigs: new Map<string, { [key: string]: any }>(),
+  mindMapManagersMap: new Map<string, MindMapManagers>(),
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -648,10 +632,24 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       });
     });
 
+    // 收集思维链数据
+    const thoughtGraphsMap: Record<string, any> = {};
+    messageItems.forEach(items => {
+      const managers = state.mindMapManagersMap.get(items.id);
+      if (managers) {
+        // 保存两个图：章节图和任务图
+        thoughtGraphsMap[items.id] = {
+          sectionGraph: managers.sectionGraph.getGraph(),
+          taskGraph: managers.taskGraph.getGraph(),
+        };
+      }
+    });
+
     return {
       conversation,
       messageItems,
       messages: messagesMap,
+      thoughtGraphs: thoughtGraphsMap,
     };
   },
 
@@ -719,6 +717,28 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     return message.childMessageIds
       .map(id => get().messagesMap.get(id))
       .filter((msg): msg is Message => msg !== undefined);
+  },
+
+  // ========== 对话配置管理函数 ==========
+
+  setConversationConfig: (conversationId: string, config: { [key: string]: any }) => {
+    set((state) => {
+      const newConfigs = new Map(state.conversationConfigs);
+      newConfigs.set(conversationId, config);
+      return { conversationConfigs: newConfigs };
+    });
+  },
+
+  getConversationConfig: (conversationId: string) => {
+    return get().conversationConfigs.get(conversationId);
+  },
+
+  clearConversationConfig: (conversationId: string) => {
+    set((state) => {
+      const newConfigs = new Map(state.conversationConfigs);
+      newConfigs.delete(conversationId);
+      return { conversationConfigs: newConfigs };
+    });
   },
 
   // ========== Conversation 操作函数 ==========
@@ -1018,6 +1038,73 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     });
   },
 
+  // ========== 思维链图操作函数 ==========
+
+  /**
+   * 获取或创建思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @returns MindMapManager 实例
+   */
+  getOrCreateMindMapManager: (messageItemsId: string) => {
+    const state = get();
+    let managers = state.mindMapManagersMap.get(messageItemsId);
+
+    if (!managers) {
+      const messageItems = state.messageItemsMap.get(messageItemsId);
+      if (!messageItems) {
+        console.warn('[getOrCreateMindMapManager] MessageItems not found:', messageItemsId);
+        throw new Error(`MessageItems not found: ${messageItemsId}`);
+      }
+
+      // 创建新的思维链图管理器集合（包含章节图和任务图）
+      const newManagers: MindMapManagers = {
+        sectionGraph: createMindMapManager(
+          undefined,
+          messageItemsId,
+          messageItems.conversationId
+        ),
+        taskGraph: createMindMapManager(
+          undefined,
+          messageItemsId,
+          messageItems.conversationId
+        ),
+      };
+
+      // 保存到状态中
+      set((state) => {
+        const newManagersMap = new Map(state.mindMapManagersMap);
+        newManagersMap.set(messageItemsId, newManagers);
+        return {
+          mindMapManagersMap: newManagersMap,
+        };
+      });
+
+      return newManagers;
+    }
+
+    return managers;
+  },
+
+  /**
+   * 获取思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @returns MindMapManager 实例或 undefined
+   */
+  getMindMapManager: (messageItemsId: string, graphType?: ThoughtGraphType) => {
+    const managers = get().mindMapManagersMap.get(messageItemsId);
+    if (!managers) return undefined;
+    
+    // 如果指定了 graphType，返回对应的图管理器
+    if (graphType === ThoughtGraphType.SECTION) {
+      return managers.sectionGraph;
+    } else if (graphType === ThoughtGraphType.TASK) {
+      return managers.taskGraph;
+    }
+    
+    // 默认返回整个 managers 对象（向后兼容）
+    return managers;
+  },
+
   // ========== Message 操作函数 ==========
 
   addUserMessage: (conversationId: string, content: string) => {
@@ -1033,7 +1120,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
     const message: Message = {
       id: messageId,
-      type: MessageType.REPORT,
+      type: MessageType.TEXT,
       status: TaskStatus.COMPLETED,
       content,
       messageItemsId,
@@ -1071,8 +1158,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     return messageItems;
   },
 
-  addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string) => {
+  addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string, indexPath?: string) => {
     const messageId = get().generateMessageId();
+
+    // 自动读取配置
+    const agentConfig = get().getConversationConfig(conversationId);
 
     // 查找当前正在进行中的MessageItems，如果没有则创建新的
     const currentMessageItemsList = get().getCurrentMessageItems();
@@ -1091,6 +1181,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         createdAt: Date.now(),
         updatedAt: Date.now(),
         agentType: agentType === 'deepsearch' ? AgentType.DEEPSEARCH : AgentType.ORDINARY,  // 保存 agent 类型到 MessageItems（用于HITL场景匹配）
+        agentConfig,  // 自动保存配置
       };
 
       get().addMessageItems(lastMessageItems, conversationId);
@@ -1111,6 +1202,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           updatedAt: Date.now(),
           // 如果传入了 agentType 且当前 MessageItems 没有 agentType，则保存
           ...(agentType && !existingItems.agentType ? { agentType: agentType === 'deepsearch' ? AgentType.DEEPSEARCH : AgentType.ORDINARY } : {}),
+          // 如果存在配置且当前 MessageItems 没有配置，则保存
+          ...(agentConfig && !existingItems.agentConfig ? { agentConfig } : {}),
         });
         set({ messageItemsMap: newMessageItemsMap });
       }
@@ -1130,6 +1223,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       isStreaming: true,
       parentMessageId: parentId,
       childMessageIds: type === MessageType.TASK ? [] : undefined,
+      indexPath,
     };
 
     // 添加 message 到 messagesMap
@@ -1216,8 +1310,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             } else if (childMessages.some(child => child.status === TaskStatus.CANCELLED)) {
               finalUpdates.status = TaskStatus.CANCELLED;
             } else if (childMessages.some(child =>
-              child.status === TaskStatus.PENDING ||
-              child.status === TaskStatus.IN_PROGRESS ||
+              isTaskOngoing(child.status) ||
               child.status === TaskStatus.UNKNOWN
             )) {
               finalUpdates.status = TaskStatus.UNKNOWN;
@@ -1225,7 +1318,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             // 其他情况保持 COMPLETED
             break;
 
-          // PENDING / IN_PROGRESS / FAILED / CANCELLED 保持不变
+          // PENDING / IN_PROGRESS / REPORTING / FAILED / CANCELLED 保持不变
           default:
             break;
         }
@@ -1233,12 +1326,12 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         // 在根消息的直接子消息状态变为终态时，保存到 IndexDB
         // 条件：1. 是子消息（有 parentMessageId）
         //       2. 父消息是根消息（父消息没有 parentMessageId）
-        //       3. 状态变为 COMPLETED/FAILED/CANCELLED（非 PENDING/IN_PROGRESS）
+        //       3. 状态变为 COMPLETED/FAILED/CANCELLED（非 PENDING/IN_PROGRESS/REPORTING）
         //       4. 状态确实发生了变化
         if (
           existingMessage.parentMessageId &&  // 是子消息
           finalUpdates.status &&
-          ![TaskStatus.PENDING, TaskStatus.IN_PROGRESS].includes(finalUpdates.status) &&
+          !isTaskOngoing(finalUpdates.status) &&
           finalUpdates.status !== existingMessage.status  // 状态确实发生了变化
         ) {
           // 检查父消息是否是根消息
@@ -1371,7 +1464,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     });
   },
 
-  addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string) => {
+  addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string, indexPath?: string) => {
     const messageId = get().generateMessageId();
 
     // 获取 messageItems 以获得 conversationId
@@ -1394,6 +1487,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       isStreaming: false,
       parentMessageId: parentId,
       childMessageIds: type === MessageType.TASK ? [] : undefined,
+      indexPath,
     };
 
     set((state) => {
@@ -1504,9 +1598,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             getMessageById: get().getMessageById,
             getMessageTree: get().getMessageTree,
             getChildMessages: get().getChildMessages,
+            getMessageItemsById: get().getMessageItemsById,
             getMessageItemsIsUser: get().getMessageItemsIsUser,
             setSessionConversationId: get().setSessionConversationId,
             saveConversationToDB: get().saveConversationToDB,
+            getOrCreateMindMapManager: get().getOrCreateMindMapManager,
           },
           {
             get: (key: string) => get().sseStreamCache.get(key),
@@ -2004,9 +2100,32 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           });
         }
 
+        // 恢复思维链管理器
+        const newMindMapManagersMap = new Map(state.mindMapManagersMap);
+        if (doc.thoughtGraphs) {
+          Object.entries(doc.thoughtGraphs).forEach(([messageItemsId, graphs]) => {
+            // graphs 包含 sectionGraph 和 taskGraph 两个 ThoughtGraph
+            const managers: MindMapManagers = {
+              sectionGraph: createMindMapManager(
+                graphs.sectionGraph as any,
+                messageItemsId,
+                conversationId
+              ),
+              taskGraph: createMindMapManager(
+                graphs.taskGraph as any,
+                messageItemsId,
+                conversationId
+              ),
+            };
+            newMindMapManagersMap.set(messageItemsId, managers);
+          });
+          console.log(`[loadConversationFullData] Restored ${Object.keys(doc.thoughtGraphs).length} mind map manager collections`);
+        }
+
         return {
           messageItemsMap: newMessageItemsMap,
           messagesMap: newMessagesMap,
+          mindMapManagersMap: newMindMapManagersMap,
           conversationsMap: newConversationsMap,
         };
       });
@@ -2146,9 +2265,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       return false;
     }
 
-    // 检查状态是否为 PENDING 或 IN_PROGRESS
-    if (lastMessageItems.status === TaskStatus.PENDING ||
-        lastMessageItems.status === TaskStatus.IN_PROGRESS) {
+    // 检查状态是否为进行中
+    if (isTaskOngoing(lastMessageItems.status)) {
       const hasInterruptLikeMessage = lastMessageItems.messagesIds.some((msgId) => {
         const msg = get().getMessageById(msgId);
         return msg?.type === MessageType.INTERRUPT || msg?.type === MessageType.OUTLINE_INTERACTION;
@@ -2227,7 +2345,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         }
 
         // 标记未完成的消息
-        if (msg.status === TaskStatus.PENDING || msg.status === TaskStatus.IN_PROGRESS) {
+        if (isTaskOngoing(msg.status)) {
           get().updateMessage(lastMessageItems.id, msg.id, { status: TaskStatus.FAILED });
         }
       };
@@ -2436,8 +2554,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const updateMessageToCancelled = (messageId: string) => {
         const message = getMessageById(messageId);
         if (message) {
-          // 只要消息状态不是已经完成的或失败的，都更新为 CANCELLED
-          if (message.status === TaskStatus.IN_PROGRESS || message.status === TaskStatus.PENDING || message.status === TaskStatus.COMPLETED) {
+          // 只要消息状态是进行中的，都更新为 CANCELLED
+          if (isTaskOngoing(message.status)) {
             updateMessage(lastMessageItems.id, messageId, {
               status: TaskStatus.CANCELLED,
               isStreaming: false,  // 清除流式标志

@@ -65,6 +65,17 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
 
           <div className="flex items-center justify-between py-1">
             <div>
+              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.executionModeEnabled')}</span>
+              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.executionModeEnabledDesc')}</p>
+            </div>
+            <ToggleSwitch
+              checked={config.execution_method === "dependency_driving"}
+              onChange={checked => updateConfig('execution_method', checked ? "dependency_driving" : "parallel")}
+            />
+          </div>
+
+          <div className="flex items-center justify-between py-1">
+            <div>
               <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.enableTraceability')}</span>
               <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.enableTraceabilityDesc')}</p>
             </div>

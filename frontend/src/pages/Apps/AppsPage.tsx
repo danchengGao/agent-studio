@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Copy, Trash2, RefreshCw, History } from 'lucide-react'
+import { Copy, Trash2, RefreshCw, History, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/MentionPicker'
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
@@ -7,7 +7,7 @@ import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
 import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { useConversationStore, MessageType, TaskStatus, AgentType, type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS } from '../../stores/useConversationStore'
+import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS } from '../../stores/useConversationStore'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import SSERecorder from '../../utils/sseRecorder'
 import PlaybackPanel from '../../components/Conversation/PlaybackPanel'
@@ -23,6 +23,7 @@ import type { Message } from './types'
 import { SystemMessageItem } from '../../components/Conversation'
 import ResultPanel from '../../components/Conversation/ResultPanel'
 import ConversationHistorySidebar from './components/ConversationHistorySidebar'
+import { MindMapPanel } from '../../components/Conversation/MindMap'
 
 // ==================== 开发调试配置 ====================
 // 从环境变量读取，默认为 false（生产环境）
@@ -51,6 +52,15 @@ const AppsPage: React.FC = () => {
   const [showPlaybackPanel, setShowPlaybackPanel] = useState(false)
   const [deepsearchServiceAvailable, setDeepsearchServiceAvailable] = useState<boolean | null>(null)
   const [checkingDeepsearch, setCheckingDeepsearch] = useState(false)
+
+  // ===== MindMap 思维链面板状态 =====
+  const [showMindMap, setShowMindMap] = useState(false)
+  const [mindMapMessageItemsId, setMindMapMessageItemsId] = useState<string | null>(null)
+  
+  // ===== 右侧面板状态管理 =====
+  const [currentMessageItemsId, setCurrentMessageItemsId] = useState<string | null>(null)
+  const [lastSelectedReportId, setLastSelectedReportId] = useState<string | null>(null)
+  const [currentGraphType, setCurrentGraphType] = useState<'sectionGraph' | 'taskGraph'>('sectionGraph')
 
   // ===== 对话限制对话框状态 =====
   const [limitDialogOpen, setLimitDialogOpen] = useState(false)
@@ -84,6 +94,8 @@ const AppsPage: React.FC = () => {
   const isLoading = useConversationStore(state => state.isLoading)
   const sseProcessingQueue = useConversationStore(state => state.sseProcessingQueue)
   const SESSION_CONVERSATION_ID = useConversationStore(state => state.SESSION_CONVERSATION_ID)
+  const getMessageItemsByConversationId = useConversationStore(state => state.getMessageItemsByConversationId)
+  const mindMapManagersMap = useConversationStore(state => state.mindMapManagersMap)
 
   // 订阅 conversation 来触发 messageItemsList 重新计算
   const conversation = useConversationStore(state =>
@@ -114,13 +126,37 @@ const AppsPage: React.FC = () => {
   const checkCreateConversationWarning = useConversationStore(state => state.checkCreateConversationWarning)
   const switchConversation = useConversationStore(state => state.switchConversation)
   const getConversationById = useConversationStore(state => state.getConversationById)
+  const getMessageById = useConversationStore(state => state.getMessageById)
   const addUserMessage = useConversationStore(state => state.addUserMessage)
   const addSystemMessage = useConversationStore(state => state.addSystemMessage)
+  const setConversationConfig = useConversationStore(state => state.setConversationConfig)
+  const clearConversationConfig = useConversationStore(state => state.clearConversationConfig)
   const setLoading = useConversationStore(state => state.setLoading)
   const setSelectedResultMessageId = useConversationStore(state => state.setSelectedResultMessageId)
   const clearAll = useConversationStore(state => state.clearAll)
   const clearCurrentConversation = useConversationStore(state => state.clearCurrentConversation)
   const initializeFromDB = useConversationStore(state => state.initializeFromDB)
+
+  // 计算当前选中消息的messageItemsId（用于兼容旧逻辑）
+  const getCurrentMessageItemsId = useMemo(() => {
+    if (!selectedResultMessageId) return null
+    
+    // 直接从选中的消息中获取messageItemsId
+    const message = getMessageById(selectedResultMessageId)
+    if (message) {
+      return message.messageItemsId
+    }
+    
+    // 兼容旧逻辑：通过遍历messageItems.messagesIds来查找
+    if (!currentConversationId) return null
+    const messageItemsList = getMessageItemsByConversationId(currentConversationId)
+    for (const messageItems of messageItemsList) {
+      if (messageItems.messagesIds.includes(selectedResultMessageId)) {
+        return messageItems.id
+      }
+    }
+    return null
+  }, [selectedResultMessageId, currentConversationId, getMessageItemsByConversationId, getMessageById])
 
   // ===== 处理创建对话前警告 =====
   const handleCreateConversation = async (title: string, config: any) => {
@@ -847,6 +883,57 @@ const AppsPage: React.FC = () => {
     setInputValue('')
   }
 
+  // 当selectedResultMessageId变化时，自动关闭思维链面板并更新currentMessageItemsId
+  useEffect(() => {
+    if (selectedResultMessageId) {
+      setShowMindMap(false)
+      setMindMapMessageItemsId(null)
+      // 更新currentMessageItemsId为当前报告所属的messageItemsId
+      const messageItemsId = getCurrentMessageItemsId
+      setCurrentMessageItemsId(messageItemsId)
+    }
+  }, [selectedResultMessageId, getCurrentMessageItemsId])
+
+  // 打开思维链面板
+  const handleOpenMindMap = (messageItemsId: string) => {
+    // 如果当前已经在显示思维链且是同一个messageItemsId，关闭思维链面板
+    if (showMindMap && mindMapMessageItemsId === messageItemsId) {
+      setShowMindMap(false)
+      setMindMapMessageItemsId(null)
+      setCurrentMessageItemsId(null)
+      setLastSelectedReportId(null)
+    } else {
+      // 保存当前选中的报告ID
+      if (selectedResultMessageId) {
+        setLastSelectedReportId(selectedResultMessageId)
+      }
+      // 否则打开思维链面板
+      setMindMapMessageItemsId(messageItemsId)
+      setCurrentMessageItemsId(messageItemsId)
+      setShowMindMap(true)
+      setSelectedResultMessageId(null) // 清除报告选择，避免状态冲突
+    }
+  }
+
+  // 关闭思维链面板
+  const handleCloseMindMap = () => {
+    setShowMindMap(false)
+    setMindMapMessageItemsId(null)
+    setCurrentMessageItemsId(null)
+    setLastSelectedReportId(null)
+    setCurrentGraphType('sectionGraph')
+  }
+
+  // 关闭右侧面板（共用）
+  const handleCloseRightPanel = () => {
+    setShowMindMap(false)
+    setMindMapMessageItemsId(null)
+    setSelectedResultMessageId(null)
+    setCurrentMessageItemsId(null)
+    setLastSelectedReportId(null)
+    setCurrentGraphType('sectionGraph')
+  }
+
   // 切换历史对话
   const handleConversationSelect = async (conversationId: string) => {
     // 如果有正在进行的 SSE，先中断
@@ -855,8 +942,13 @@ const AppsPage: React.FC = () => {
       setAbortController(null)
     }
 
-    // 清除选择的结果面板（修复bug：切换对话时需要清除，否则会导致页面空白）
+    // 清除选择的结果面板和思维链面板（修复bug：切换对话时需要清除，否则会导致页面空白）
     setSelectedResultMessageId(null)
+    setShowMindMap(false)
+    setMindMapMessageItemsId(null)
+    setCurrentMessageItemsId(null)
+    setLastSelectedReportId(null)
+    setCurrentGraphType('sectionGraph')
 
     // 切换对话（异步加载）
     await switchConversation(conversationId)
@@ -996,7 +1088,7 @@ const AppsPage: React.FC = () => {
           if (lastMessage &&
               (lastMessage.type === MessageType.INTERRUPT || lastMessage.type === MessageType.OUTLINE_INTERACTION) &&
               (lastMessage.status === TaskStatus.IN_PROGRESS || lastMessage.status === TaskStatus.PENDING || lastMessage.status === TaskStatus.UNKNOWN)) {
-            // 这是 HITL 的第一次回复，判断 agent 是否匹配
+            // 说明本次提问是 HITL 的第1次回复的再次提问，判断 agent 是否匹配
             const hitlAgent = lastSystemMessageItems.agentType  // 从 MessageItems 获取 agentType
 
             if (hitlAgent === AgentType.DEEPSEARCH) {
@@ -1041,10 +1133,8 @@ const AppsPage: React.FC = () => {
             // 不是 HITL interrupt 消息，清除 SESSION_CONVERSATION_ID
             useConversationStore.getState().setSessionConversationId(null)
           }
-        } else {
         }
-      } else {
-      }
+      } 
 
       // ===== 计算 DeepSearch 运行 Session ID =====
       // 因为已经添加了用户消息，所以用户消息数量就是应该用的 sessionId
@@ -1092,34 +1182,41 @@ const AppsPage: React.FC = () => {
 
       const messageToBackend = options?.backend_message ?? content
 
+      // ===== 提取并保存配置参数 =====
+      const agentConfig = {
+        space_id: user?.spaceId || getDefaultSpaceId(),
+        general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
+        conversation_id: backendConversationId, // 使用带 session 的 conversation_id
+        search_mode: 'research', // DeepSearch 模式固定为 research
+        outliner_max_section_num: config.planChapterCount,
+        workflow_human_in_the_loop: config.enableHumanInteraction,
+        outline_interaction_enabled: config.outlineInteractionEnabled,
+        outline_interaction_max_rounds: config.outlineInteractionEnabled ? OUTLINE_INTERACTION_MAX_ROUNDS : undefined,
+        info_collector_search_method: config.searchMode,
+        source_tracer_research_trace_source_switch: config.enableTraceability,
+        source_tracer_source_tracer_infer_switch: config.enableSourceTracerInfer,
+        web_search_config,  // 可能是undefined
+        local_search_config,  // 新增：可能是undefined
+        template_id: config.selectedTemplateId ?? -1,
+        interrupt_feedback: interrupt_feedback,   // 中断反馈标识, 可填值: ['accepted', ''], 默认''
+        execution_method: config.execution_method || DeepsearchExecutionMethod.DEPENDENCY_DRIVING,
+        // 高级配置模型 ID（可选，仅在有值时传递）
+        ...(config.planUnderstandingModelId && { plan_understanding_model_id: parseInt(config.planUnderstandingModelId) }),
+        ...(config.infoCollectingModelId && { info_collecting_model_id: parseInt(config.infoCollectingModelId) }),
+        ...(config.writingCheckingModelId && { writing_checking_model_id: parseInt(config.writingCheckingModelId) }),
+      };
+
+      // 保存到 store（用于 SSE Handler 读取）
+      setConversationConfig(conversationId, agentConfig);
+
+
       const response = await fetch('/api/v1/agent/deepsearch/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          space_id: user?.spaceId || getDefaultSpaceId(),
-          general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
-          message: messageToBackend,
-          conversation_id: backendConversationId, // 使用带 session 的 conversation_id
-          search_mode: 'research', // DeepSearch 模式固定为 research
-          outliner_max_section_num: config.planChapterCount,
-          workflow_human_in_the_loop: config.enableHumanInteraction,
-          outline_interaction_enabled: config.outlineInteractionEnabled,
-          outline_interaction_max_rounds: config.outlineInteractionEnabled ? OUTLINE_INTERACTION_MAX_ROUNDS : undefined,
-          info_collector_search_method: config.searchMode,
-          source_tracer_research_trace_source_switch: config.enableTraceability,
-          source_tracer_source_tracer_infer_switch: config.enableSourceTracerInfer,
-          web_search_config,  // 可能是undefined
-          local_search_config,  // 新增：可能是undefined
-          template_id: config.selectedTemplateId ?? -1,
-          interrupt_feedback: interrupt_feedback,   // 中断反馈标识, 可填值: ['accepted', ''], 默认''
-          // 高级配置模型 ID（可选，仅在有值时传递）
-          ...(config.planUnderstandingModelId && { plan_understanding_model_id: parseInt(config.planUnderstandingModelId) }),
-          ...(config.infoCollectingModelId && { info_collecting_model_id: parseInt(config.infoCollectingModelId) }),
-          ...(config.writingCheckingModelId && { writing_checking_model_id: parseInt(config.writingCheckingModelId) }),
-        }),
+        body: JSON.stringify({ ...agentConfig, message: messageToBackend,}),
         signal: controller.signal,
       })
 
@@ -1349,7 +1446,7 @@ const AppsPage: React.FC = () => {
 
         {/* 右侧主内容区 */}
         <div
-          className={`flex-1 flex min-h-0 overflow-hidden ${selectedResultMessageId ? 'flex-row' : 'flex-col'}`}
+          className={`flex-1 flex min-h-0 overflow-hidden ${(selectedResultMessageId || showMindMap) ? 'flex-row' : 'flex-col'}`}
         >
           {/* 无对话状态 - 居中的输入框 */}
           {!hasConversation && !selectedResultMessageId && (
@@ -1444,11 +1541,15 @@ const AppsPage: React.FC = () => {
           {hasConversation && (
             <>
               {/* 对话区域 */}
-              <div className={`flex flex-col min-h-0 ${selectedResultMessageId ? 'w-2/5' : 'flex-1'}`}>
+              <div className={`flex flex-col min-h-0 ${(selectedResultMessageId || showMindMap) ? 'w-2/5' : 'flex-1'}`}>
                 <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
                 <div className="max-w-4xl mx-auto space-y-4">
                   {messageItemsList.map((messageItems) => (
-                    <SystemMessageItem key={messageItems.id} messageItems={messageItems} />
+                    <SystemMessageItem 
+                      key={messageItems.id} 
+                      messageItems={messageItems}
+                      onOpenMindMap={isDeepSearchMode ? handleOpenMindMap : undefined}
+                    />
                   ))}
 
                   {/* AI 正在输入指示器 */}
@@ -1496,10 +1597,106 @@ const AppsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 右侧：结果面板（分屏显示） */}
-            {selectedResultMessageId && (
-              <div className="w-3/5 h-full bg-white border border-gray-200 rounded-lg ml-4 overflow-hidden">
-                <ResultPanel />
+            {/* 右侧：结果面板或思维链面板（分屏显示） */}
+            {(selectedResultMessageId || showMindMap) && (
+              <div className="w-3/5 h-full bg-white border border-gray-200 rounded-lg ml-4 overflow-hidden flex flex-col">
+                {/* 顶部栏：标题、切换按钮和关闭按钮 */}
+                {(() => {
+                  // 优先使用mindMapMessageItemsId，然后使用currentMessageItemsId，最后使用getCurrentMessageItemsId
+                  const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
+                  if (!currentId) return null
+                  
+                  // 检查当前messageItems是否有报告
+                  const hasReport = () => {
+                    const messageItems = messageItemsMap.get(currentId)
+                    if (!messageItems) return false
+                    return messageItems.messagesIds.some(id => {
+                      const message = getMessageById(id)
+                      return message && message.type === MessageType.REPORT
+                    })
+                  }
+                  
+                  // 检查当前messageItems是否有思维链
+                  const hasMindMap = mindMapManagersMap.has(currentId)
+                  
+                  // 只有同时存在报告和思维链时才显示顶部栏
+                  if (hasReport() && hasMindMap) {
+                    return (
+                      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
+                        {/* 标题和切换按钮 */}
+                        <div className="flex items-center flex-1 justify-center">
+                          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                            {/* 报告按钮 */}
+                            <button
+                              onClick={() => {
+                                setShowMindMap(false)
+                                setMindMapMessageItemsId(null)
+                                setCurrentMessageItemsId(currentId)
+                                // 切换到报告时，使用之前保存的报告ID或获取当前messageItems中的报告消息ID
+                                if (lastSelectedReportId) {
+                                  setSelectedResultMessageId(lastSelectedReportId)
+                                } else {
+                                  const messageItems = messageItemsMap.get(currentId)
+                                  if (messageItems) {
+                                    const messages = messageItems.messagesIds.map(id => getMessageById(id)).filter(msg => msg !== undefined)
+                                    const reportMessage = messages.find(msg => msg.type === MessageType.REPORT)
+                                    if (reportMessage) {
+                                      setSelectedResultMessageId(reportMessage.id)
+                                    }
+                                  }
+                                }
+                              }}
+                              className={`px-4 py-1 text-sm transition-colors ${!showMindMap && selectedResultMessageId ? 'bg-white text-gray-900 font-semibold rounded-md shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                            >
+                              报告
+                            </button>
+                            
+                            {/* 思维链按钮 */}
+                            <button
+                              onClick={() => {
+                                // 保存当前选中的报告ID
+                                if (selectedResultMessageId) {
+                                  setLastSelectedReportId(selectedResultMessageId)
+                                }
+                                setMindMapMessageItemsId(currentId)
+                                setCurrentMessageItemsId(currentId)
+                                setShowMindMap(true)
+                                setSelectedResultMessageId(null)
+                              }}
+                              className={`px-4 py-1 text-sm transition-colors ${showMindMap ? 'bg-white text-gray-900 font-semibold rounded-md shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+                            >
+                              思维链
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* 关闭按钮 */}
+                        <button
+                          onClick={handleCloseRightPanel}
+                          className="p-1.5 rounded hover:bg-gray-100 transition-colors ml-4"
+                          title="关闭"
+                        >
+                          <X className="w-4 h-4 text-gray-500" />
+                        </button>
+                      </div>
+                    )
+                  }
+                  
+                  // 只存在报告或只存在思维链时，不显示顶部栏
+                  return null
+                })()}
+                
+                {/* 共用面板内容 */}
+                {showMindMap && mindMapMessageItemsId ? (
+                  <MindMapPanel
+                    messageItemsId={mindMapMessageItemsId}
+                    onClose={handleCloseMindMap}
+                    graphType={currentGraphType}
+                    onGraphTypeChange={setCurrentGraphType}
+                  />
+                ) : (
+                  <ResultPanel />
+                )}
               </div>
             )}
           </>

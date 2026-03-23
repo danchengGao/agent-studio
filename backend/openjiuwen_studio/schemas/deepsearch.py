@@ -51,6 +51,10 @@ class DeepSearchRequest(BaseModel):
     plan_understanding_model_id: Optional[int] = Field(default=None, description="计划理解模型ID（可选）")
     info_collecting_model_id: Optional[int] = Field(default=None, description="信息收集模型ID（可选）")
     writing_checking_model_id: Optional[int] = Field(default=None, description="写作检查模型ID（可选）")
+    execution_method: Literal["parallel", "dependency_driving"] = Field(default="parallel",
+                                                                         description="执行方法："
+                                                                                     "parallel: 并行工作流执行"
+                                                                                     "dependency_driving: 依赖驱动工作流执行")
 
 
 class TemplateImportRequest(BaseModel):

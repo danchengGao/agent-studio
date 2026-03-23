@@ -39,7 +39,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
 
   // 解析 DeepSearch 结果（从 selectedMessage.content）
   const deepSearchResult = React.useMemo(() => {
-    if (!selectedMessage || !isFinalReportMessage(selectedMessage.title)) {
+    if (!selectedMessage || !isFinalReportMessage(selectedMessage)) {
       return null;
     }
 
@@ -88,7 +88,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
     }
 
     // 检查是否为最终报告
-    const isFinalReport = isFinalReportMessage(selectedMessage.title);
+    const isFinalReport = isFinalReportMessage(selectedMessage);
 
     if (isFinalReport) {
       // 最终报告：从DeepSearchResult获取完整数据
@@ -132,7 +132,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
   // 如果是REPORT类型且有report对象，使用ReportPanel组件渲染
   if (isReportType) {
     // 对于最终报告但缺少DeepSearchResult的情况
-    if (isFinalReportMessage(selectedMessage.title) && !report) {
+    if (isFinalReportMessage(selectedMessage) && !report) {
       return (
         <div className={`w-full h-full flex items-center justify-center ${className}`}>
           <p className="text-gray-500 text-sm">正在加载报告数据...</p>

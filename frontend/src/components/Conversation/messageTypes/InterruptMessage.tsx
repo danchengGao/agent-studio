@@ -77,15 +77,15 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
         };
       case TaskStatus.UNKNOWN:
         return {
-          bg: 'bg-orange-50',
-          border: 'border-orange-200',
-          icon: AlertCircle,
-          iconColor: 'text-orange-500',
-          titleColor: 'text-orange-700',
-          tipColor: 'text-orange-500',
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          icon: CheckCircle,
+          iconColor: 'text-green-600',
+          titleColor: 'text-green-800',
+          tipColor: 'text-green-600',
           title: t('apps.interrupt.title'),
           tip: t('apps.interrupt.unknownTip'),
-          padding: 'p-3',
+          padding: 'p-2',
         };
       default:
         return {
