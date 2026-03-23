@@ -499,7 +499,7 @@ class RuntimeAgentClient:
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 response_text = e.response.text.lower()
-                if "not found" in response_text and "agent_" in response_text:
+                if "not found" in response_text:
                     logger.warning(
                         f"[DELETE_AGENT] Deployment not found (may already be deleted): deployment_id={deployment_id}")
                     return Response(
@@ -536,7 +536,7 @@ class RuntimeAgentClient:
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 response_text = e.response.text.lower()
-                if "not found" in response_text and "agent_" in response_text:
+                if "not found" in response_text:
                     logger.warning(
                         f"[GET_DEPLOY_DETAIL] runtime not found: deployment_id={deployment_id}")
                     return Response(
