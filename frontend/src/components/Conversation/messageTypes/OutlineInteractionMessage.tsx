@@ -38,23 +38,23 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
   const updateMessageItems = useConversationStore(state => state.updateMessageItems);
   const getCurrentMessageItems = useConversationStore(state => state.getCurrentMessageItems);
 
-  const outlineContent: OutlineContent = typeof message.content === 'string'
-    ? (() => {
-        try {
-          return JSON.parse(message.content);
-        } catch {
-          return {};
-        }
-      })()
-    : (message.content as OutlineContent) || {};
+  const outlineContent: OutlineContent =
+    typeof message.content === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(message.content);
+          } catch {
+            return {};
+          }
+        })()
+      : (message.content as OutlineContent) || {};
 
   const { sections } = outlineContent;
-  const thoughtText = typeof outlineContent.thought === 'string'
-    ? outlineContent.thought
-    : '';
-  const remainingRoundsTip = typeof outlineContent.outlineInteractionRemainingTip === 'string'
-    ? outlineContent.outlineInteractionRemainingTip
-    : '';
+  const thoughtText = typeof outlineContent.thought === 'string' ? outlineContent.thought : '';
+  const remainingRoundsTip =
+    typeof outlineContent.outlineInteractionRemainingTip === 'string'
+      ? outlineContent.outlineInteractionRemainingTip
+      : '';
 
   const isWaiting = message.status === TaskStatus.PENDING || message.status === TaskStatus.IN_PROGRESS;
 
@@ -74,7 +74,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
     userMessage: string,
     interruptFeedback: string,
     backendMessage?: string,
-    updatedOutlineContent?: OutlineContent
+    updatedOutlineContent?: OutlineContent,
   ) => {
     const messageItemsList = getCurrentMessageItems();
     if (!messageItemsList || messageItemsList.length === 0) return;
@@ -91,7 +91,9 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
 
     updateMessage(lastMessageItems.id, message.id, messageUpdates);
     updateMessageItems(lastMessageItems.id, { status: TaskStatus.COMPLETED });
-    useConversationStore.getState().triggerOutlineInteractionAccept(message.id, userMessage, backendMessage, interruptFeedback);
+    useConversationStore
+      .getState()
+      .triggerOutlineInteractionAccept(message.id, userMessage, backendMessage, interruptFeedback);
   };
 
   const handleStartResearch = async () => {
@@ -101,12 +103,14 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
 
   const handleOpenEditModal = () => {
     if (!isWaiting) return;
-    setEditableSections((sections || []).map(section => ({
-      ...section,
-      parent_ids: Array.isArray(section.parent_ids) ? [...section.parent_ids] : [],
-      relationships: Array.isArray(section.relationships) ? [...section.relationships] : [],
-      plans: Array.isArray(section.plans) ? [...section.plans] : [],
-    })));
+    setEditableSections(
+      (sections || []).map(section => ({
+        ...section,
+        parent_ids: Array.isArray(section.parent_ids) ? [...section.parent_ids] : [],
+        relationships: Array.isArray(section.relationships) ? [...section.relationships] : [],
+        plans: Array.isArray(section.plans) ? [...section.plans] : [],
+      })),
+    );
     setIsEditModalOpen(true);
   };
 
@@ -115,17 +119,19 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
   };
 
   const handleUpdateSection = (index: number, key: 'title' | 'description', value: string) => {
-    setEditableSections(prev => prev.map((section, sectionIndex) => {
-      if (sectionIndex !== index) return section;
-      return {
-        ...section,
-        [key]: value,
-      };
-    }));
+    setEditableSections(prev =>
+      prev.map((section, sectionIndex) => {
+        if (sectionIndex !== index) return section;
+        return {
+          ...section,
+          [key]: value,
+        };
+      }),
+    );
   };
 
   const handleAddSection = () => {
-    setEditableSections(prev => ([
+    setEditableSections(prev => [
       ...prev,
       {
         id: `new_${Date.now()}_${prev.length + 1}`,
@@ -136,7 +142,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
         relationships: [],
         plans: [],
       },
-    ]));
+    ]);
   };
 
   const handleDeleteSection = (index: number) => {
@@ -163,7 +169,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
       t('apps.outlineInteraction.editAndRevisePrompt'),
       'revise_outline',
       backendMessage,
-      revisedOutline
+      revisedOutline,
     );
     setIsEditModalOpen(false);
   };
@@ -172,17 +178,11 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
     <div className="outline-interaction-message w-full mt-3">
       <div className="mb-2">
         {thoughtText && (
-          <div className="text-[14px] leading-[24px] text-[#191919] whitespace-pre-wrap mb-1">
-            {thoughtText}
-          </div>
+          <div className="text-[14px] leading-[24px] text-[#191919] whitespace-pre-wrap mb-1">{thoughtText}</div>
         )}
-        <div className="text-[14px] leading-[24px] text-[#191919]">
-          {t('apps.outlineInteraction.modifyTip')}
-        </div>
+        <div className="text-[14px] leading-[24px] text-[#191919]">{t('apps.outlineInteraction.modifyTip')}</div>
         {remainingRoundsTip && (
-          <div className="text-[14px] leading-[24px] text-orange-600 mt-1">
-            {remainingRoundsTip}
-          </div>
+          <div className="text-[14px] leading-[24px] text-orange-600 mt-1">{remainingRoundsTip}</div>
         )}
       </div>
       <div className="bg-white rounded-xl py-4 px-3">
@@ -228,9 +228,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
                       </div>
                       {isExpanded && section.description && (
                         <div className="pl-2 pr-4 pb-4 pt-0">
-                          <div className="text-sm text-gray-600 leading-7">
-                            {section.description}
-                          </div>
+                          <div className="text-sm text-gray-600 leading-7">{section.description}</div>
                         </div>
                       )}
                     </div>
@@ -257,9 +255,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
           <div className="absolute inset-0 bg-black/35" onClick={handleCloseEditModal} />
           <div className="relative bg-white rounded-2xl shadow-xl w-[min(920px,calc(100vw-32px))] max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {t('apps.outlineInteraction.editOutline')}
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900">{t('apps.outlineInteraction.editOutline')}</h3>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleAddSection}
@@ -295,16 +291,18 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
                       <div className="text-sm text-gray-600 mb-1">{t('apps.outlineInteraction.sectionTitle')}</div>
                       <input
                         value={section.title || ''}
-                        onChange={(e) => handleUpdateSection(index, 'title', e.target.value)}
+                        onChange={e => handleUpdateSection(index, 'title', e.target.value)}
                         placeholder={t('apps.outlineInteraction.titlePlaceholder')}
                         className="w-full h-10 px-3 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600 mb-1">{t('apps.outlineInteraction.sectionDescription')}</div>
+                      <div className="text-sm text-gray-600 mb-1">
+                        {t('apps.outlineInteraction.sectionDescription')}
+                      </div>
                       <textarea
                         value={section.description || ''}
-                        onChange={(e) => handleUpdateSection(index, 'description', e.target.value)}
+                        onChange={e => handleUpdateSection(index, 'description', e.target.value)}
                         placeholder={t('apps.outlineInteraction.descriptionPlaceholder')}
                         className="w-full min-h-[92px] p-3 border border-gray-300 rounded-md text-sm text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />

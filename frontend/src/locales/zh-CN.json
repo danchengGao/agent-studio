@@ -164,9 +164,10 @@
       "page": "第 {{current}} 页，共 {{total}} 页",
       "pagePrefix": "第",
       "pageSuffix": "/ {{total}} 页",
-      "total": "共 {{total}} 条记录",
+      "total": "共 {{total}} 条",
       "pageSize": "每页显示",
-      "items": "条"
+      "items": "条",
+      "itemsPerPage": "条/页"
     },
     "search": {
       "placeholder": "搜索...",
