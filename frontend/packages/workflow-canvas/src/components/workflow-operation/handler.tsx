@@ -11,6 +11,8 @@ import { Toast, Modal } from '@douyinfe/semi-ui'
 import { CheckCircle, XCircle, Info } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { t } from '../../i18n'
+import { getDefaultSpaceId } from '@/utils/spaceUtils'
+import { buildWorkflowExportEnrichment, mergeWorkflowExportDocument, unwrapWorkflowImportPayload } from '../../utils/workflow-export-enrichment'
 
 interface WorkflowOperationsHandlerProps {
   workflowId: string | undefined
@@ -109,7 +111,7 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
       const workflowData = context.document.toJSON()
 
       if (workflowId && canvasData) {
-        const finalSpaceId = spaceId || canvasData?.space_id || '1'
+        const finalSpaceId = (spaceId && String(spaceId).trim()) || (canvasData?.space_id && String(canvasData.space_id).trim()) || getDefaultSpaceId() || '1'
 
         await saveWorkflowMutation.mutateAsync({
           workflow_id: workflowId,
@@ -149,10 +151,15 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
     })
   }
 
-  const handleExportWorkflow = () => {
+  const handleExportWorkflow = async () => {
     try {
       const workflowData = context.document.toJSON()
-      const dataStr = JSON.stringify(workflowData, null, 2)
+      const finalSpaceId = (spaceId && String(spaceId).trim()) || (canvasData?.space_id && String(canvasData.space_id).trim()) || getDefaultSpaceId() || '1'
+
+      const enrichment = await buildWorkflowExportEnrichment(workflowData, finalSpaceId)
+      const payload = mergeWorkflowExportDocument(workflowData, enrichment)
+
+      const dataStr = JSON.stringify(payload, null, 2)
       const dataBlob = new Blob([dataStr], { type: 'application/json' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(dataBlob)
@@ -169,6 +176,14 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
     }
   }
 
+  // 使用 ref 避免事件监听闭包过期（保存/导出需读取最新画布与 spaceId）
+  const saveRef = React.useRef(handleSaveWorkflowWithHook)
+  const importRef = React.useRef(handleImportWorkflow)
+  const exportRef = React.useRef(handleExportWorkflow)
+  saveRef.current = handleSaveWorkflowWithHook
+  importRef.current = handleImportWorkflow
+  exportRef.current = handleExportWorkflow
+
   // Expose the save function through ref for the WorkflowControl component
   React.useEffect(() => {
     if (onSaveRef) {
@@ -179,10 +194,10 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
   // Listen for custom events from the main Editor component
   React.useEffect(() => {
     const handleSaveEvent = () => {
-      handleSaveWorkflowWithHook()
+      void saveRef.current()
     }
-    const handleImportEvent = () => handleImportWorkflow()
-    const handleExportEvent = () => handleExportWorkflow()
+    const handleImportEvent = () => importRef.current()
+    const handleExportEvent = () => void exportRef.current()
 
     window.addEventListener('workflow-save', handleSaveEvent)
     window.addEventListener('workflow-import', handleImportEvent)
@@ -211,11 +226,12 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
             const reader = new FileReader()
             reader.onload = e => {
               try {
-                const importedData = JSON.parse(e.target?.result as string)
+                const raw = JSON.parse(e.target?.result as string)
+                const importedData = unwrapWorkflowImportPayload(raw)
 
                 historyService.stop()
                 context.document.clear()
-                context.document.fromJSON(importedData)
+                context.document.fromJSON(importedData as Record<string, unknown>)
                 historyService.start()
 
                 showToast(t('workflowCanvas.ui.importSuccess'), 'success')
