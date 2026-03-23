@@ -43,6 +43,7 @@ interface StoreDependencies {
   getChildMessages: (messageId: string) => Message[];
   getMessageItemsIsUser: (messageItems: MessageItems) => boolean;  // 新增：兼容历史数据
   setSessionConversationId: (conversationId: string | null) => void;  // 新增：设置连续对话系列ID
+  saveConversationToDB: (conversationId: string) => Promise<void>;
 }
 
 interface StreamCache {
@@ -1080,7 +1081,7 @@ export class DeepsearchSSEHandler {
   /** 处理 waiting_user_input 事件
    */
   private handleWaitingUserInput(sseData: SSEData): void {
-    const { addSystemMessage, updateMessage, getCurrentMessageItems } = this.store;
+    const { addSystemMessage, updateMessage, getCurrentMessageItems, saveConversationToDB } = this.store;
 
     // 检查当前 MessageItems 状态，如果已经是 CANCELLED，说明用户已手动取消，不需要再创建消息
     const lastMessageItems = getCurrentMessageItems();
@@ -1135,6 +1136,8 @@ export class DeepsearchSSEHandler {
     if (sseData.conversation_id) {
       this.store.setSessionConversationId(sseData.conversation_id);
     }
+
+    saveConversationToDB(this.conversationId);
   }
 
   /**

@@ -1506,6 +1506,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             getChildMessages: get().getChildMessages,
             getMessageItemsIsUser: get().getMessageItemsIsUser,
             setSessionConversationId: get().setSessionConversationId,
+            saveConversationToDB: get().saveConversationToDB,
           },
           {
             get: (key: string) => get().sseStreamCache.get(key),
@@ -2148,6 +2149,17 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     // 检查状态是否为 PENDING 或 IN_PROGRESS
     if (lastMessageItems.status === TaskStatus.PENDING ||
         lastMessageItems.status === TaskStatus.IN_PROGRESS) {
+      const hasInterruptLikeMessage = lastMessageItems.messagesIds.some((msgId) => {
+        const msg = get().getMessageById(msgId);
+        return msg?.type === MessageType.INTERRUPT || msg?.type === MessageType.OUTLINE_INTERACTION;
+      });
+
+      if (hasInterruptLikeMessage) {
+        console.warn('[SSE Timeout] 检测到超时的 interrupt/outline_interaction 消息，标记为CANCELLED');
+        get().updateMessageItemsStatusToCancelled();
+        return true;
+      }
+
       console.warn('[SSE Timeout] 检测到超时的未完成消息，标记为FAILED');
       get().markCurrentConversationIncompleteAsFailed();
       return true;

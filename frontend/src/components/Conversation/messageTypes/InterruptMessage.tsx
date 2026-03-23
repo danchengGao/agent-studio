@@ -17,7 +17,7 @@ interface InterruptMessageProps {
  * - PENDING/IN_PROGRESS: 黄色主题，等待用户输入
  * - COMPLETED: 绿色主题，用户已回复
  * - FAILED: 红色主题，发生错误
- * - CANCELLED: 黄色主题，对话已取消（使用感叹号图标）
+ * - CANCELLED: 灰色主题，对话已取消（使用感叹号图标）
  * - UNKNOWN: 橙色主题，未知状态
  */
 export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) => {
@@ -65,12 +65,12 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
         };
       case TaskStatus.CANCELLED:
         return {
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-200',
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
           icon: AlertCircle,
-          iconColor: 'text-yellow-600',
-          titleColor: 'text-yellow-800',
-          tipColor: 'text-yellow-700',
+          iconColor: 'text-gray-500',
+          titleColor: 'text-gray-700',
+          tipColor: 'text-gray-600',
           title: t('apps.deepSearch.conversationCancelled'),
           tip: t('apps.deepSearch.conversationCancelledTip'),
           padding: 'p-3',
