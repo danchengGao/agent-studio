@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Copy, Trash2, RefreshCw, History, X } from 'lucide-react'
+import { Copy, Trash2, RefreshCw, History } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/MentionPicker'
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
@@ -24,6 +24,7 @@ import { SystemMessageItem } from '../../components/Conversation'
 import ResultPanel from '../../components/Conversation/ResultPanel'
 import ConversationHistorySidebar from './components/ConversationHistorySidebar'
 import { MindMapPanel } from '../../components/Conversation/MindMap'
+import { TopToolbar, ViewType } from '../../components/Conversation'
 
 // ==================== 开发调试配置 ====================
 // 从环境变量读取，默认为 false（生产环境）
@@ -894,6 +895,55 @@ const AppsPage: React.FC = () => {
     }
   }, [selectedResultMessageId, getCurrentMessageItemsId])
 
+  // 当思维链数据开始生成时，自动打开思维链视图
+  // 使用 messageItemsList 来获取当前对话中最新的 messageItemsId
+  const prevMindMapSizeRef = useRef(mindMapManagersMap.size)
+
+  useEffect(() => {
+    // 检查 mindMapManagersMap 是否有新增条目
+    if (mindMapManagersMap.size <= prevMindMapSizeRef.current) {
+      prevMindMapSizeRef.current = mindMapManagersMap.size
+      return
+    }
+    prevMindMapSizeRef.current = mindMapManagersMap.size
+
+    // 找到最新创建的 mindMap 对应的 messageItemsId
+    if (!currentConversationId || selectedResultMessageId) {
+      return
+    }
+
+    // 获取当前会话的 messageItems
+    const conversationMessageItems = getMessageItemsByConversationId(currentConversationId)
+    const latestMessageItems = conversationMessageItems
+      .sort((a, b) => b.createdAt - a.createdAt)[0]
+
+    if (!latestMessageItems) return
+
+    // 检查这个 messageItems 是否有 mindMap
+    if (mindMapManagersMap.has(latestMessageItems.id)) {
+      // 检查当前显示的思维链是否属于当前会话
+      // 如果不属于当前会话，需要先关闭再打开新的
+      const currentMindMapBelongsToCurrentConversation = mindMapMessageItemsId &&
+        conversationMessageItems.some(mi => mi.id === mindMapMessageItemsId)
+
+      if (showMindMap && !currentMindMapBelongsToCurrentConversation) {
+        setShowMindMap(false)
+        setMindMapMessageItemsId(null)
+        setCurrentMessageItemsId(null)
+        // 使用 setTimeout 确保状态更新后再打开
+        setTimeout(() => {
+          setMindMapMessageItemsId(latestMessageItems.id)
+          setCurrentMessageItemsId(latestMessageItems.id)
+          setShowMindMap(true)
+        }, 0)
+      } else if (!showMindMap) {
+        setMindMapMessageItemsId(latestMessageItems.id)
+        setCurrentMessageItemsId(latestMessageItems.id)
+        setShowMindMap(true)
+      }
+    }
+  }, [mindMapManagersMap, currentConversationId, selectedResultMessageId, showMindMap, mindMapMessageItemsId, getMessageItemsByConversationId])
+
   // 打开思维链面板
   const handleOpenMindMap = (messageItemsId: string) => {
     // 如果当前已经在显示思维链且是同一个messageItemsId，关闭思维链面板
@@ -934,6 +984,65 @@ const AppsPage: React.FC = () => {
     setCurrentGraphType('sectionGraph')
   }
 
+  // ===== 视图切换逻辑 =====
+  // 派生当前视图类型
+  const activeView: ViewType = showMindMap ? 'thinking' : 'report'
+
+  // 视图切换处理函数
+  const handleViewChange = useCallback((view: ViewType) => {
+    const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
+    if (!currentId) return
+
+    if (view === 'thinking') {
+      // 切换到思维链
+      if (selectedResultMessageId) {
+        setLastSelectedReportId(selectedResultMessageId)
+      }
+      setMindMapMessageItemsId(currentId)
+      setCurrentMessageItemsId(currentId)
+      setShowMindMap(true)
+      setSelectedResultMessageId(null)
+    } else {
+      // 切换到报告
+      setShowMindMap(false)
+      setMindMapMessageItemsId(null)
+      setCurrentMessageItemsId(currentId)
+      if (lastSelectedReportId) {
+        setSelectedResultMessageId(lastSelectedReportId)
+      } else {
+        // 查找当前 messageItems 中的报告消息
+        const messageItems = messageItemsMap.get(currentId)
+        if (messageItems) {
+          const messages = messageItems.messagesIds.map(id => getMessageById(id)).filter((msg): msg is NonNullable<typeof msg> => msg !== undefined)
+          const reportMessage = messages.find(msg => msg.type === MessageType.REPORT)
+          if (reportMessage) {
+            setSelectedResultMessageId(reportMessage.id)
+          }
+        }
+      }
+    }
+  }, [mindMapMessageItemsId, currentMessageItemsId, getCurrentMessageItemsId, selectedResultMessageId, lastSelectedReportId, messageItemsMap, getMessageById])
+
+  // ===== TopToolbar 渲染条件（使用 useMemo 稳定渲染） =====
+  const toolbarState = useMemo(() => {
+    const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
+    if (!currentId) return { show: false, disabledViews: [] as ViewType[] }
+
+    const hasMindMap = mindMapManagersMap.has(currentId)
+    if (!hasMindMap) return { show: false, disabledViews: [] as ViewType[] }
+
+    const messageItems = messageItemsMap.get(currentId)
+    const hasReport = messageItems?.messagesIds.some(id => {
+      const message = getMessageById(id)
+      return message && message.type === MessageType.REPORT
+    })
+
+    return {
+      show: true,
+      disabledViews: hasReport ? [] : ['report'] as ViewType[]
+    }
+  }, [mindMapMessageItemsId, currentMessageItemsId, getCurrentMessageItemsId, mindMapManagersMap, messageItemsMap, getMessageById])
+
   // 切换历史对话
   const handleConversationSelect = async (conversationId: string) => {
     // 如果有正在进行的 SSE，先中断
@@ -949,6 +1058,9 @@ const AppsPage: React.FC = () => {
     setCurrentMessageItemsId(null)
     setLastSelectedReportId(null)
     setCurrentGraphType('sectionGraph')
+
+    // 重置思维链大小追踪 ref，防止切换会话后自动打开错误的思维链
+    prevMindMapSizeRef.current = mindMapManagersMap.size
 
     // 切换对话（异步加载）
     await switchConversation(conversationId)
@@ -1204,6 +1316,9 @@ const AppsPage: React.FC = () => {
         ...(config.planUnderstandingModelId && { plan_understanding_model_id: parseInt(config.planUnderstandingModelId) }),
         ...(config.infoCollectingModelId && { info_collecting_model_id: parseInt(config.infoCollectingModelId) }),
         ...(config.writingCheckingModelId && { writing_checking_model_id: parseInt(config.writingCheckingModelId) }),
+        // 用户反馈优化配置
+        user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
+        user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
       };
 
       // 保存到 store（用于 SSE Handler 读取）
@@ -1600,92 +1715,16 @@ const AppsPage: React.FC = () => {
             {/* 右侧：结果面板或思维链面板（分屏显示） */}
             {(selectedResultMessageId || showMindMap) && (
               <div className="w-3/5 h-full bg-white border border-gray-200 rounded-lg ml-4 overflow-hidden flex flex-col">
-                {/* 顶部栏：标题、切换按钮和关闭按钮 */}
-                {(() => {
-                  // 优先使用mindMapMessageItemsId，然后使用currentMessageItemsId，最后使用getCurrentMessageItemsId
-                  const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
-                  if (!currentId) return null
-                  
-                  // 检查当前messageItems是否有报告
-                  const hasReport = () => {
-                    const messageItems = messageItemsMap.get(currentId)
-                    if (!messageItems) return false
-                    return messageItems.messagesIds.some(id => {
-                      const message = getMessageById(id)
-                      return message && message.type === MessageType.REPORT
-                    })
-                  }
-                  
-                  // 检查当前messageItems是否有思维链
-                  const hasMindMap = mindMapManagersMap.has(currentId)
-                  
-                  // 只有同时存在报告和思维链时才显示顶部栏
-                  if (hasReport() && hasMindMap) {
-                    return (
-                      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
-                        {/* 标题和切换按钮 */}
-                        <div className="flex items-center flex-1 justify-center">
-                          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-                            {/* 报告按钮 */}
-                            <button
-                              onClick={() => {
-                                setShowMindMap(false)
-                                setMindMapMessageItemsId(null)
-                                setCurrentMessageItemsId(currentId)
-                                // 切换到报告时，使用之前保存的报告ID或获取当前messageItems中的报告消息ID
-                                if (lastSelectedReportId) {
-                                  setSelectedResultMessageId(lastSelectedReportId)
-                                } else {
-                                  const messageItems = messageItemsMap.get(currentId)
-                                  if (messageItems) {
-                                    const messages = messageItems.messagesIds.map(id => getMessageById(id)).filter(msg => msg !== undefined)
-                                    const reportMessage = messages.find(msg => msg.type === MessageType.REPORT)
-                                    if (reportMessage) {
-                                      setSelectedResultMessageId(reportMessage.id)
-                                    }
-                                  }
-                                }
-                              }}
-                              className={`px-4 py-1 text-sm transition-colors ${!showMindMap && selectedResultMessageId ? 'bg-white text-gray-900 font-semibold rounded-md shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-                            >
-                              报告
-                            </button>
-                            
-                            {/* 思维链按钮 */}
-                            <button
-                              onClick={() => {
-                                // 保存当前选中的报告ID
-                                if (selectedResultMessageId) {
-                                  setLastSelectedReportId(selectedResultMessageId)
-                                }
-                                setMindMapMessageItemsId(currentId)
-                                setCurrentMessageItemsId(currentId)
-                                setShowMindMap(true)
-                                setSelectedResultMessageId(null)
-                              }}
-                              className={`px-4 py-1 text-sm transition-colors ${showMindMap ? 'bg-white text-gray-900 font-semibold rounded-md shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
-                            >
-                              思维链
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {/* 关闭按钮 */}
-                        <button
-                          onClick={handleCloseRightPanel}
-                          className="p-1.5 rounded hover:bg-gray-100 transition-colors ml-4"
-                          title="关闭"
-                        >
-                          <X className="w-4 h-4 text-gray-500" />
-                        </button>
-                      </div>
-                    )
-                  }
-                  
-                  // 只存在报告或只存在思维链时，不显示顶部栏
-                  return null
-                })()}
-                
+                {/* 顶部工具栏 */}
+                {toolbarState.show && (
+                  <TopToolbar
+                    activeView={activeView}
+                    onViewChange={handleViewChange}
+                    onClose={handleCloseRightPanel}
+                    disabledViews={toolbarState.disabledViews}
+                  />
+                )}
+
                 {/* 共用面板内容 */}
                 {showMindMap && mindMapMessageItemsId ? (
                   <MindMapPanel

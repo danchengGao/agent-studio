@@ -84,6 +84,17 @@ export const GeneralConfigTab: React.FC<GeneralConfigTabProps> = ({
               onChange={checked => updateConfig('enableTraceability', checked)}
             />
           </div>
+
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <span className="text-sm text-gray-900 font-medium">{t('apps.config.general.userFeedbackProcessorEnable')}</span>
+              <p className="text-xs text-gray-500 mt-0.5">{t('apps.config.general.userFeedbackProcessorEnableDesc')}</p>
+            </div>
+            <ToggleSwitch
+              checked={config.userFeedbackProcessorEnable}
+              onChange={checked => updateConfig('userFeedbackProcessorEnable', checked)}
+            />
+          </div>
         </div>
       </ConfigSection>
 

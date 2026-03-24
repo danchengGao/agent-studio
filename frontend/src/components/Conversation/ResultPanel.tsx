@@ -145,7 +145,6 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
       return (
         <ReportPanel
           report={report}
-          onClose={handleClose}
           className={className}
         />
       );

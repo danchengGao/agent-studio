@@ -45,6 +45,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
 
   // 加载状态
   const [loadingState, setLoadingState] = useState<LoadingState>('loading')
+  // 使用 ref 跟踪当前加载状态（用于在超时定时器中检查）
   const loadingStateRef = useRef<LoadingState>('loading')
 
   // 超时和空内容检测
@@ -54,22 +55,17 @@ export const ReportView: React.FC<ReportViewProps> = ({
     loadingStateRef.current = 'loading'
 
     // 检查内容是否为空
-    const hasContent = report.response_content?.trim()
+    const hasContent = report.content?.trim()
 
     // 正常加载：200ms 后显示内容或空状态
     const normalTimer = setTimeout(() => {
-      if (hasContent) {
-        setLoadingState('loaded')
-        loadingStateRef.current = 'loaded'
-      } else {
-        setLoadingState('empty')
-        loadingStateRef.current = 'empty'
-      }
+      const newState = hasContent ? 'loaded' : 'empty'
+      setLoadingState(newState)
+      loadingStateRef.current = newState
     }, 200)
 
-    // 超时保护：3 秒后强制显示超时状态
+    // 超时保护：3 秒后强制显示超时状态（仅当仍为 loading 时）
     const timeoutTimer = setTimeout(() => {
-      // 只有当前仍然是 loading 状态时才设置为超时
       if (loadingStateRef.current === 'loading') {
         setLoadingState('timeout')
         loadingStateRef.current = 'timeout'
@@ -80,7 +76,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
       clearTimeout(normalTimer)
       clearTimeout(timeoutTimer)
     }
-  }, [report.id, report.response_content])
+  }, [report.id, report.content])
 
   // 生成唯一的 instanceId，用于缓存管理和引用链接标识
   const instanceId = useMemo(() => `report-${report.id}`, [report.id])
@@ -88,17 +84,29 @@ export const ReportView: React.FC<ReportViewProps> = ({
   return (
     <div className={`relative h-full flex flex-col ${className}`}>
       {/* 推理图浮层 - 定位在报告右下角 */}
-      {report.infer_messages && report.infer_messages.length > 0 && (
+      {report.inferMessages && report.inferMessages.length > 0 && (
         <InferenceGraph
-          inferMessages={report.infer_messages}
+          inferMessages={report.inferMessages}
           instanceId={instanceId}
         />
       )}
 
       {/* 内容区域 - 可滚动 */}
-      <div className={`flex-1 overflow-auto ${prefersReducedMotion ? '' : 'scroll-smooth'}`}>
+      <div
+        className={`flex-1 overflow-auto ${prefersReducedMotion ? '' : 'scroll-smooth'} group`}
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'transparent transparent',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.scrollbarColor = '#6b7280 transparent'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.scrollbarColor = 'transparent transparent'
+        }}
+      >
         <article
-          className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8 min-h-[200px]"
+          className="max-w-10xl mx-auto bg-gray-50 px-6 pb-6 md:px-8 md:pb-8 min-h-[200px]"
           aria-label={`${t('apps.report.reportLabel')}: ${report.title || t('apps.report.unnamedReport')}`}
           aria-busy={loadingState === 'loading'}
           role="article"
@@ -130,9 +138,9 @@ export const ReportView: React.FC<ReportViewProps> = ({
             // 正常内容
             <ReportMarkdown
               instanceId={instanceId}
-              content={report.response_content}
-              citations={report.citation_messages || null}
-              inferMessages={report.infer_messages}
+              content={report.content}
+              citations={report.citations || null}
+              inferMessages={report.inferMessages}
             />
           )}
         </article>

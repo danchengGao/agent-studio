@@ -60,6 +60,26 @@ interface StreamCache {
 // ===== 工具函数 =====
 
 /**
+ * 安全解析 SSE 内容为 JSON 对象
+ * @param content SSE 消息内容（字符串或对象）
+ * @param fallback 解析失败时的默认值
+ * @returns 解析后的对象或 fallback
+ */
+function parseSSEContent<T = JSONObject>(content: string | JSONObject | undefined, fallback: T): T {
+  if (!content) {
+    return fallback;
+  }
+  if (typeof content === 'string') {
+    try {
+      return JSON.parse(content);
+    } catch {
+      return fallback;
+    }
+  }
+  return content as T;
+}
+
+/**
  * 解析索引值，支持两种格式：
  * - 简单数字： "123" -> 123
  * - 复合格式： "1-2-3" -> 3 (取最后一个数字)
@@ -97,6 +117,11 @@ function buildIndexPath(sectionIdx?: number, planIdx?: number, stepIdx?: number)
 }
 
 // ===== Handler 类 =====
+
+// Agent 名称常量
+const AGENT_NAMES = {
+  USER_FEEDBACK_PROCESSOR: 'user_feedback_processor',
+} as const;
 
 export class DeepsearchSSEHandler {
   private store: StoreDependencies;
@@ -145,8 +170,14 @@ export class DeepsearchSSEHandler {
 
     // HITL 延续场景：如果当前 MessageItems 状态为 COMPLETED，重新设置为 IN_PROGRESS
     // 这发生在用户回复 interrupt 消息后，SSE 流继续的情况
+    // 但对于 user_feedback_processor 相关事件（done, waiting_user_input），不应该重新激活状态
+    // 因为此时报告已经完成，只是等待用户进行 AI 改写操作
+    const isUserFeedbackProcessorEvent =
+      sseData.agent === AGENT_NAMES.USER_FEEDBACK_PROCESSOR &&
+      (sseData.event === 'done' || sseData.event === 'waiting_user_input');
+
     if (lastMessageItems && !this.store.getMessageItemsIsUser(lastMessageItems)) {
-      if (lastMessageItems.status === TaskStatus.COMPLETED) {
+      if (lastMessageItems.status === TaskStatus.COMPLETED && !isUserFeedbackProcessorEvent) {
         // HITL 延续：重新激活 MessageItems 状态
         this.store.updateMessageItems(lastMessageItems.id, { status: TaskStatus.IN_PROGRESS });
       }
@@ -179,6 +210,9 @@ export class DeepsearchSSEHandler {
         this.handleError(sseData, sectionIdx, planIdx, stepIdx);
         break;
     }
+
+    // 清除消息查找缓存，防止内存泄漏
+    this.messageFindCache.clear();
   }
 
   /**
@@ -368,6 +402,13 @@ export class DeepsearchSSEHandler {
   private handleMessage(sseData: SSEData, sectionIdx?: number, planIdx?: number, stepIdx?: number): void {
     const streamKey = this.generateStreamKey(sseData.agent, sectionIdx, planIdx, stepIdx);
 
+    // user_feedback_processor: 处理 final_result，更新或创建最终报告
+    // 当开启 user_feedback_processor_enable 时，报告生成完成后会发送 final_result
+    if (sseData.agent === AGENT_NAMES.USER_FEEDBACK_PROCESSOR) {
+      this.handleUserFeedbackProcessorMessage(sseData);
+      return;
+    }
+
     // outline: 追加内容到缓存，不创建消息
     if (sseData.agent === 'outline') {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
@@ -454,8 +495,6 @@ export class DeepsearchSSEHandler {
     }
 
     if (!lastMessageItems || getMessageItemsIsUser(lastMessageItems)) {
-      // 清除缓存
-      this.messageFindCache.clear();
       return;
     }
 
@@ -740,9 +779,6 @@ export class DeepsearchSSEHandler {
         isStreaming: false,
       });
     }
-
-    // 处理完成后清除缓存
-    this.messageFindCache.clear();
   }
 
   /**
@@ -1253,6 +1289,107 @@ export class DeepsearchSSEHandler {
     addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), sseData.content || '', undefined, undefined, 'deepsearch', buildIndexPath());
   }
 
+  /**
+   * 处理 user_feedback_processor 的 message 事件
+   * 当开启 user_feedback_processor_enable 时，报告生成完成后会发送 final_result
+   * 每次 AI 改写后都会发送新的 final_result，创建新的报告卡片
+   */
+  private handleUserFeedbackProcessorMessage(sseData: SSEData): void {
+    const { addSystemMessage, updateMessage, updateMessageItems } = this.store;
+    const lastMessageItems = this.store.getCurrentMessageItems();
+    if (!lastMessageItems) return;
+
+    // 使用工具函数解析 final_result
+    const finalResult = parseSSEContent(sseData.content, null as any);
+    if (!finalResult || (!finalResult.response_content && !finalResult.final_result)) {
+      console.warn('[DeepsearchSSEHandler] No valid final_result in user_feedback_processor message');
+      return;
+    }
+
+    // 提取实际的 final_result（可能在 nested 结构中）
+    const actualFinalResult = finalResult.final_result || finalResult;
+    const responseContent = actualFinalResult.response_content || '';
+    const citationMessages = actualFinalResult.citation_messages || {};
+    const inferMessages = actualFinalResult.infer_messages || [];
+
+    // 构建 content 对象
+    const reportContent = {
+      response_content: responseContent,
+      citation_messages: citationMessages,
+      infer_messages: inferMessages,
+    };
+
+    // 查找是否存在正在进行中的最终报告（由 SECTION END 创建的占位报告）
+    const existingInProgressReport = lastMessageItems.messagesIds
+      .map(msgId => this.store.getMessageById(msgId))
+      .filter((msg): msg is Message => msg !== undefined)
+      .find(msg =>
+        msg.type === MessageType.REPORT &&
+        isFinalReportMessage(msg) &&
+        !msg.parentMessageId &&
+        isTaskOngoing(msg.status)
+      );
+
+    // 查找 outline 任务（根节点）
+    const outlineTask = this.findTaskInMessages(
+      lastMessageItems.messagesIds,
+      msg => msg.type === MessageType.TASK && msg.sectionIdx === 0
+    );
+
+    if (existingInProgressReport) {
+      // 情况1: 存在进行中的报告 → 更新现有报告的内容和状态
+      updateMessage(lastMessageItems.id, existingInProgressReport.id, {
+        content: reportContent,
+        status: TaskStatus.COMPLETED,
+        isStreaming: false,
+      });
+      console.log('[DeepsearchSSEHandler] Updated existing IN_PROGRESS report with content');
+
+      // 更新 outline 任务（根节点）状态为 COMPLETED
+      if (outlineTask) {
+        updateMessage(lastMessageItems.id, outlineTask.id, {
+          status: TaskStatus.COMPLETED,
+        });
+      }
+    } else {
+      // 情况2: 不存在进行中的报告 → 创建新报告卡片（AI 改写后生成新版本）
+      const finalReportMessage = addSystemMessage(
+        this.conversationId,
+        MessageType.REPORT,
+        reportContent,
+        undefined,
+        MESSAGE_TITLES.FINAL_REPORT,
+        'deepsearch',
+        buildIndexPath(0, 0, 0)
+      );
+      if (finalReportMessage) {
+        updateMessage(lastMessageItems.id, finalReportMessage.id, {
+          status: TaskStatus.COMPLETED,
+          isStreaming: false,
+        });
+
+        // 使用带缓存的 findTaskInMessages 查找 outline 任务并添加到思维链
+        const outlineTask = this.findTaskInMessages(
+          lastMessageItems.messagesIds,
+          msg => msg.type === MessageType.TASK && msg.sectionIdx === 0
+        );
+
+        if (outlineTask) {
+          this.addFinalReportToMindMap(finalReportMessage.id, lastMessageItems.id, outlineTask);
+          // 更新 outline 任务（根节点）状态为 COMPLETED
+          updateMessage(lastMessageItems.id, outlineTask.id, {
+            status: TaskStatus.COMPLETED,
+          });
+        }
+        console.log('[DeepsearchSSEHandler] Created new final report from user_feedback_processor');
+      }
+    }
+
+    // 更新 MessageItems 状态为 COMPLETED
+    updateMessageItems(lastMessageItems.id, { status: TaskStatus.COMPLETED });
+    console.log('[DeepsearchSSEHandler] Updated MessageItems status to COMPLETED');
+  }
+
   /** 处理 waiting_user_input 事件
    */
   private handleWaitingUserInput(sseData: SSEData): void {
@@ -1260,8 +1397,22 @@ export class DeepsearchSSEHandler {
 
     // 检查当前 MessageItems 状态，如果已经是 CANCELLED，说明用户已手动取消，不需要再创建消息
     const lastMessageItems = getCurrentMessageItems();
+
     if (lastMessageItems && lastMessageItems.status === TaskStatus.CANCELLED) {
       console.log('[DeepsearchSSEHandler] MessageItems already cancelled, skipping waiting_user_input event');
+      return;
+    }
+
+    // 处理 user_feedback_processor 的 waiting_user_input 事件
+    // 此时报告已经生成完成，后端保持连接等待用户发起 AI 改写操作
+    // 不需要创建中断消息，用户可以主动对 report 进行编辑
+    if (sseData.agent === AGENT_NAMES.USER_FEEDBACK_PROCESSOR) {
+      // 给 SESSION_CONVERSATION_ID 赋值
+      if (sseData.conversation_id) {
+        this.store.setSessionConversationId(sseData.conversation_id);
+      }
+      saveConversationToDB(this.conversationId);
+      console.log('[DeepsearchSSEHandler] user_feedback_processor waiting for user feedback action');
       return;
     }
 

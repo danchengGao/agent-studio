@@ -47,6 +47,8 @@ export interface DeepSearchConfig {
   planChapterCount: number // 范围: [1, 10]
   enableTraceability: boolean
   enableSourceTracerInfer: boolean // 溯源推理功能开关
+  userFeedbackProcessorEnable: boolean // 报告改写功能开关，默认开启
+  userFeedbackProcessorMaxInteractions: number // 用户反馈优化最大交互次数，默认 3（隐藏配置）
 
   // 搜索配置
   searchMode: 'local' | 'web' | 'all'

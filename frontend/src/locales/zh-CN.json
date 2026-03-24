@@ -838,7 +838,14 @@
       "createdAt": "创建时间",
       "contentEmpty": "报告内容为空",
       "loadingTimeout": "加载超时",
-      "timeoutMessage": "报告内容加载时间过长，请稍后重试"
+      "timeoutMessage": "报告内容加载时间过长，请稍后重试",
+      "viewToggle": {
+        "thinkingChain": "思维链",
+        "reportView": "报告",
+        "ariaLabel": "视图切换",
+        "comingSoon": "功能开发中，敬请期待..."
+      },
+      "edit": "编辑"
     },
     "user": {
       "defaultUsername": "用户"
@@ -917,6 +924,8 @@
         "enableTraceabilityDesc": "显示信息来源",
         "enableSourceTracerInfer": "启用溯源推理",
         "enableSourceTracerInferDesc": "生成溯源推理图谱",
+        "userFeedbackProcessorEnable": "启用用户反馈优化",
+        "userFeedbackProcessorEnableDesc": "生成报告后支持基于用户反馈的 AI 优化",
         "chapterCount": "章节数量",
         "chapterCountDesc": "控制报告最大章节数量"
       },

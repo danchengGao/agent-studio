@@ -2,7 +2,7 @@
  * 报告相关工具函数
  */
 
-import type { InferMessage, DeepSearchResult, Report } from '@/pages/Apps/types';
+import type { DeepSearchResult, Report } from '@/pages/Apps/types';
 import { MESSAGE_TITLES } from '@/stores/useConversationStore';
 
 // ==================== 内容清理 ====================
@@ -94,8 +94,8 @@ export function buildReportFromDeepSearch(
     id: messageId,
     title,
     createdAt: new Date(messageCreatedAt || Date.now()).toISOString(),
-    response_content: responseContent,
-    citation_messages: deepSearchResult.citation_messages || null,
-    infer_messages: deepSearchResult.infer_messages || [],
+    content: responseContent,
+    citations: deepSearchResult.citation_messages || null,
+    inferMessages: deepSearchResult.infer_messages || [],
   };
 }

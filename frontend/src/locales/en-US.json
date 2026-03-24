@@ -827,7 +827,14 @@
       "createdAt": "Created at",
       "contentEmpty": "Report content is empty",
       "loadingTimeout": "Loading timeout",
-      "timeoutMessage": "Report content is taking too long to load, please try again later"
+      "timeoutMessage": "Report content is taking too long to load, please try again later",
+      "viewToggle": {
+        "thinkingChain": "Thinking Chain",
+        "reportView": "Report",
+        "ariaLabel": "View toggle",
+        "comingSoon": "Feature coming soon..."
+      },
+      "edit": "Edit"
     },
     "user": {
       "defaultUsername": "User"
@@ -906,6 +913,8 @@
         "enableTraceabilityDesc": "Show information sources",
         "enableSourceTracerInfer": "Enable Traceability Inference",
         "enableSourceTracerInferDesc": "Generate traceability inference graph",
+        "userFeedbackProcessorEnable": "Enable User Feedback Optimization",
+        "userFeedbackProcessorEnableDesc": "Support AI optimization based on user feedback",
         "chapterCount": "Chapter Count",
         "chapterCountDesc": "Control maximum report chapter count"
       },
