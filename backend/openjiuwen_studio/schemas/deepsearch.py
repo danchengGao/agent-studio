@@ -47,6 +47,7 @@ class DeepSearchRequest(BaseModel):
     search_mode: Literal["research", "search"] = Field(default="research", description="生成研究报告还是生成答案")
     outline_interaction_enabled: bool = Field(default=False, description="大纲交互开关")
     outline_interaction_max_rounds: Optional[int] = Field(default=None, ge=1, description="大纲交互最大轮数")
+    web_search_max_qps: float = Field(default=0, ge=0, description="联网搜索最大 QPS，0 表示不限流，支持浮点数如 0.5 表示每 2 秒 1 个请求")
     # 高级配置模型 ID（可选）
     plan_understanding_model_id: Optional[int] = Field(default=None, description="计划理解模型ID（可选）")
     info_collecting_model_id: Optional[int] = Field(default=None, description="信息收集模型ID（可选）")

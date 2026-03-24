@@ -1319,6 +1319,8 @@ const AppsPage: React.FC = () => {
         // 用户反馈优化配置
         user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
         user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+        // 联网搜索QPS限制，0表示不限流
+        web_search_max_qps: config.webSearchMaxQps ?? 0,
       };
 
       // 保存到 store（用于 SSE Handler 读取）

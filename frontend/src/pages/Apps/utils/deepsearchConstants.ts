@@ -16,6 +16,7 @@ export const DEFAULT_DEEPSEARCH_CONFIG: DeepSearchConfig = {
   selectedWebSearchEngineId: undefined,
   webSearchResultCount: 5,
   localSearchResultCount: 5,
+  webSearchMaxQps: 0, // 联网搜索最大 QPS，0 表示不限流
   selectedKnowledgeBaseIds: [], // 本地知识库ID列表
   recallThreshold: 0.5, // 最小匹配分数，默认 0.5
   enableTemplate: false,

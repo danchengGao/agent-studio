@@ -36,6 +36,45 @@ interface RangeSliderProps {
   step?: number
 }
 
+/**
+ * QPS 输入框组件
+ * - 支持任意浮点数输入
+ * - 聚焦时值为0则清空，方便用户输入
+ * - 隐藏number input的上下箭头按钮
+ */
+const QpsInput: React.FC<{
+  value: number
+  onChange: (value: number) => void
+  placeholder?: string
+  suffix?: string
+}> = ({ value, onChange, placeholder, suffix }) => {
+  const [isFocused, setIsFocused] = React.useState(false)
+  const displayValue = isFocused && value === 0 ? '' : String(value)
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value
+    if (inputValue === '') { onChange(0); return }
+    const parsedValue = parseFloat(inputValue)
+    if (!isNaN(parsedValue) && parsedValue >= 0) { onChange(parsedValue) }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder={placeholder}
+        step="any"
+        className="w-28 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-auto"
+      />
+      {suffix && <span className="text-sm text-gray-500">{suffix}</span>}
+    </div>
+  )
+}
+
 export interface SearchConfigTabProps extends ConfigTabProps {
   /** 滑块组件 */
   RangeSlider: React.FC<RangeSliderProps>
@@ -265,6 +304,21 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
           </div>
         )}
       </ConfigSection>
+
+      {/* 请求速率控制 - 仅联网搜索模式显示 */}
+      {showWebSearch && (
+        <ConfigSection title={t('apps.config.search.qpsTitle')}>
+          <div className="flex items-center gap-3">
+            <QpsInput
+              value={config.webSearchMaxQps}
+              onChange={value => updateConfig('webSearchMaxQps', value)}
+              suffix={t('apps.config.search.qpsInputSuffix')}
+              placeholder={t('apps.config.search.qpsInputPlaceholder')}
+            />
+            <span className="text-xs text-gray-500">{t('apps.config.search.qpsUnlimited')}</span>
+          </div>
+        </ConfigSection>
+      )}
 
       {/* 搜索结果配置 - 已隐藏，如需启用请取消下面的注释 */}
       {/* <ConfigSection title="搜索结果数量配置">

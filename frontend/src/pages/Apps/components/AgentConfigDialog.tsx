@@ -55,6 +55,7 @@ export interface DeepSearchConfig {
   selectedWebSearchEngineId?: number // 搜索引擎配置ID（从后端获取）
   webSearchResultCount: number // 网络搜索返回结果数量，范围: [1, 10]
   localSearchResultCount: number // 本地搜索返回结果数量，范围: [1, 10]
+  webSearchMaxQps: number // 联网搜索最大 QPS，0 表示不限流
 
   // 本地知识库配置
   selectedKnowledgeBaseIds: string[] // 选中的知识库ID列表
