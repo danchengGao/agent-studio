@@ -734,6 +734,15 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     }
   }, [config.searchMode, config.selectedWebSearchEngineId, registry, t])
 
+  // 更新徽章状态（模型配置需要配置时）
+  React.useEffect(() => {
+    if (!config.generalModelId) {
+      registry.updateTab('model', { badge: true, badgeText: t('apps.config.tabs.needsConfig') })
+    } else {
+      registry.updateTab('model', { badge: false })
+    }
+  }, [config.generalModelId, registry, t])
+
   if (!open || !agent) return null
 
   return (
@@ -789,6 +798,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                         enginesLoading,
                         onEditEngine: handleEditEngine,
                         onShowEngineConfig: () => setShowEngineConfig(true),
+                        onTestEngine: handleTestEngine,
                         // 知识库相关 props
                         knowledgeBases: selectedKnowledgeBasesDetail,
                         onShowKnowledgeBaseSelector: handleShowKnowledgeBaseSelector,

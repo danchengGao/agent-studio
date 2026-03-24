@@ -5,7 +5,8 @@
  */
 
 import React from 'react'
-import { Check, Loader2, Plus, Trash2, AlertCircle } from 'lucide-react'
+import { Check, Loader2, Plus, Trash2, AlertCircle, RefreshCw, Play } from 'lucide-react'
+import { Tooltip, IconButton } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import { ConfigTabProps } from '../ConfigRegistry'
 import { ConfigSection } from '../ConfigSection'
@@ -46,6 +47,8 @@ export interface SearchConfigTabProps extends ConfigTabProps {
   onEditEngine: (engineId: number) => void
   /** 显示搜索引擎配置对话框 */
   onShowEngineConfig: () => void
+  /** 测试搜索引擎 */
+  onTestEngine: (engineId: number) => void
   /** 知识库列表（用于显示已选知识库的详细信息）*/
   knowledgeBases: KnowledgeBaseDetail[]
   /** 显示知识库选择对话框 */
@@ -65,6 +68,7 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
   enginesLoading,
   onEditEngine,
   onShowEngineConfig,
+  onTestEngine,
   knowledgeBases,
   onShowKnowledgeBaseSelector,
   onRemoveKnowledgeBase,
@@ -171,11 +175,25 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
                       key={selectedEngine.web_search_engine_id}
                       className="px-3 py-2 border border-gray-200 rounded-xl bg-white hover:border-gray-300 transition-colors"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">🔍</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
+                          🔍
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{selectedEngine.search_engine_name}</p>
                         </div>
+                        <Tooltip title={t('apps.config.engine.action.test')} placement="top">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onTestEngine(selectedEngine.web_search_engine_id)
+                            }}
+                            className="text-gray-700 hover:text-blue-600 hover:bg-blue-50"
+                          >
+                            <Play className="w-4 h-4" />
+                          </IconButton>
+                        </Tooltip>
                       </div>
                     </div>
                   </div>
