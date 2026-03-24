@@ -1651,6 +1651,8 @@ def _create_plugin_and_tools(
 
         # 转换为字典并添加额外字段
         tool_dict = tool_info.model_dump(by_alias=True)
+        # 导入时写入工具 available：沿用导出字段，缺省为 True
+        tool_dict["available"] = bool(t.get("available", True))
 
         # 处理方法转换（字符串到枚举）
         if isinstance(tool_dict.get("method"), str):
@@ -1837,6 +1839,8 @@ def _import_plugin_tools(
 
         # 转换为字典并添加额外字段
         tool_dict = tool_info.model_dump(by_alias=True)
+        # 导入时写入工具 available：沿用导出字段，缺省为 True
+        tool_dict["available"] = bool(tool.get("available", True))
 
         # 处理方法转换（字符串到枚举）
         if isinstance(tool_dict.get("method"), str):
