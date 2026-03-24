@@ -102,3 +102,8 @@ scripts/ssl
 scripts/.ssl-dirs/*
 scripts/.envs/*
 scripts/conf/.nginx-files/*
+
+# deepsearch
+docker-compose.yml
+volumes/*
+backend/data/*

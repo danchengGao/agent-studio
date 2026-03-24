@@ -314,6 +314,8 @@ export const API_ENDPOINTS = {
     STATISTICS: '/knowledge-bases/statistics',
     UPLOAD: '/knowledge-base/upload',
     PROCESS: '/knowledge-base/process',
+    SYNC_UPLOAD: '/knowledge-base/sync/upload',
+    SYNC_PROCESS: '/knowledge-base/sync/process',
     STATUS: '/knowledge-base/documents/status',
     FILE_SETTINGS: '/knowledge-base/filesettings',
     DOCUMENTS_LIST: '/knowledge-base/documents/list',
@@ -323,6 +325,10 @@ export const API_ENDPOINTS = {
     EXPORT: '/knowledge-bases/:id/export',
     SHARE: '/knowledge-bases/:id/share',
     UNSHARE: '/knowledge-bases/:id/share/:userId',
+  },
+  DEEPSEARCH_KNOWLEDGE_BASES: {
+    LIST: '/deepsearch-knowledge-base/knowledge-base/list',
+    EMBEDDING_CONFIGS_LIST: '/deepsearch-knowledge-base/embedding-configs/list',
   },
   // 记忆库管理
   MEMORY_BASES: {

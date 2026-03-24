@@ -58,6 +58,9 @@ export interface DeepSearchConfig {
   selectedKnowledgeBaseIds: string[] // 选中的知识库ID列表
   recallThreshold: number // 最小匹配分数，范围: [0.0, 1.0]，默认 0.5
 
+  // DeepSearch 知识库（任务空间检索用）
+  selectedDeepSearchKnowledgeBaseId?: string
+
   // 模板配置
   enableTemplate: boolean // 是否启用模板
   selectedTemplateId?: number // 选中的模板ID
@@ -226,6 +229,10 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     desc?: string
   }>>([])
   const [embeddingModelError, setEmbeddingModelError] = useState<string | null>(null)
+
+  // DeepSearch 知识库列表（任务空间配置用）
+  const [deepSearchKnowledgeBases, setDeepSearchKnowledgeBases] = useState<Array<{ id: string; name: string; desc?: string; status?: string }>>([])
+  const [deepSearchKbLoading, setDeepSearchKbLoading] = useState(false)
 
   // 新增：当前激活的配置标签
   const [activeTab, setActiveTab] = useState<ConfigTabId>('general')
@@ -571,6 +578,42 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     updateConfig('selectedKnowledgeBaseIds', newIds)
   }, [config.selectedKnowledgeBaseIds, updateConfig])
 
+  // 获取 DeepSearch 知识库列表
+  const fetchDeepSearchKnowledgeBases = useCallback(async () => {
+    if (!spaceId) return
+    setDeepSearchKbLoading(true)
+    try {
+      const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
+      const res = await KnowledgeBaseService.getDeepSearchKnowledgeBasesList({
+        space_id: spaceId,
+        page: 1,
+        size: 100,
+      })
+      const items = res.data?.items ?? []
+      setDeepSearchKnowledgeBases(
+        items.map((item: { id: string; name: string; desc?: string; status?: string }) => ({
+          id: item.id,
+          name: item.name,
+          desc: item.desc,
+          status: item.status,
+        }))
+      )
+    } catch (e) {
+      console.error('Failed to fetch Deep Search knowledge bases:', e)
+      setDeepSearchKnowledgeBases([])
+    } finally {
+      setDeepSearchKbLoading(false)
+    }
+  }, [spaceId])
+
+  React.useEffect(() => {
+    if (open && spaceId && agent?.id === 'deepsearch') {
+      fetchDeepSearchKnowledgeBases()
+    } else if (!open) {
+      setDeepSearchKnowledgeBases([])
+    }
+  }, [open, spaceId, agent?.id, fetchDeepSearchKnowledgeBases])
+
   // 上传模板
   const handleUploadTemplate = async (file: File, templateName: string, templateDesc: string, isTemplate: boolean) => {
     if (!spaceId || modelConfigId === -1) {
@@ -845,6 +888,13 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                     onShowKnowledgeBaseSelector: handleShowKnowledgeBaseSelector,
                     onRemoveKnowledgeBase: handleRemoveKnowledgeBase,
                     embeddingModelError,
+                    // DeepSearch 知识库（任务空间配置）
+                    isDeepSearch: true,
+                    deepSearchKnowledgeBases,
+                    deepSearchKbLoading,
+                    onRefreshDeepSearchKnowledgeBases: fetchDeepSearchKnowledgeBases,
+                    selectedDeepSearchKnowledgeBaseId: config.selectedDeepSearchKnowledgeBaseId,
+                    onSelectDeepSearchKnowledgeBase: (id: string | undefined) => updateConfig('selectedDeepSearchKnowledgeBaseId', id),
                   } : activeTab === 'template' ? {
                     config,
                     updateConfig,

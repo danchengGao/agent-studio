@@ -924,7 +924,10 @@
         "clickToConfig": "Click \"Configure\" above to add online enhancement engine",
         "localKB": "Local Knowledge Base",
         "noKB": "No knowledge base configured",
-        "clickToAddKB": "Click \"Add Knowledge Base\" above to select"
+        "clickToAddKB": "Click \"Add Knowledge Base\" above to select",
+        "deepSearchKnowledgeBase": "Configure DeepSearch Knowledge Base",
+        "refresh": "Refresh",
+        "noDeepSearchKB": "No DeepSearch knowledge base. Sync a knowledge base to DeepSearch first."
       },
       "validation": {
         "chapterCountRange": "Chapter count must be between 1-10",
@@ -4304,6 +4307,8 @@
     }
   },
   "knowledgeBases": {
+    "syncedBadge": "Synced",
+    "syncedBadgeTitle": "Synced to DeepSearch",
     "title": "Knowledge Base Management",
     "description": "Manage and organize your knowledge bases with document upload, intelligent processing and efficient retrieval",
     "tabs": {
@@ -4328,6 +4333,7 @@
     },
     "types": {
       "document": "Document Knowledge Base",
+      "deepSearch": "DeepSearch Knowledge Base",
       "web": "Web Knowledge Base",
       "api": "API Knowledge Base",
       "database": "Database Knowledge Base"
@@ -4413,6 +4419,28 @@
       "documentAdded": "Document processing task submitted",
       "notFound": "Knowledge base not found",
       "fetchError": "Failed to fetch knowledge base information"
+    },
+    "syncToDeepSearch": {
+      "button": "Sync to Deep Search",
+      "title": "Sync to Deep Search",
+      "stepUpload": "File sync",
+      "stepProcess": "Document params & indexing",
+      "uploadDescription": "Sync this knowledge base files to Deep Search for retrieval.",
+      "processDescription": "Set parsing, segmentation and indexing strategy, then submit indexing task.",
+      "syncing": "Syncing...",
+      "uploadSuccess": "File sync completed",
+      "uploadFailed": "Sync upload failed",
+      "uploadedCount": "{{count}} file(s) synced",
+      "uploadRequired": "Please complete file sync first",
+      "noDocuments": "No documents in this knowledge base",
+      "processSuccess": "Indexing task submitted",
+      "processFailed": "Failed to submit indexing",
+      "complete": "Complete & submit indexing",
+      "success": "Sync and indexing task submitted",
+      "embedderLabel": "Deep Search embedder",
+      "selectEmbedder": "Please select a Deep Search embedder",
+      "selectEmbedderPlaceholder": "Select embedder",
+      "noEmbedder": "No embedder configured. Please add an embedding model in the Models page first, then sync."
     },
     "editor": {
       "loading": "Loading knowledge base information...",

@@ -168,6 +168,7 @@ class KnowledgeBaseListItem(BaseModel):
     created_at: str = Field(..., description="创建时间，格式：YYYY-MM-DD")
     updated_at: str = Field(..., description="更新时间，格式：YYYY-MM-DD")
     has_graph_enhancement: Optional[bool] = Field(None, description="是否有图增强构建的文档")
+    ds_kb_id: Optional[str] = Field(None, description="DeepSearch 知识库 ID，未同步则为 null")
 
 
 class KnowledgeBaseListResponse(BaseModel):
@@ -177,6 +178,28 @@ class KnowledgeBaseListResponse(BaseModel):
     total: int = Field(..., description="总记录数")
     page: int = Field(..., description="当前页码")
     size: int = Field(..., description="每页大小")
+
+
+class SyncUploadRequest(BaseModel):
+    """同步上传到 DeepSearch 请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="Studio 知识库ID")
+    deepsearch_embedding_model_config_id: Optional[int] = Field(
+        None,
+        description="DeepSearch 侧 Embedding 模型配置 ID，同步时在 Deep Search 创建知识库使用",
+    )
+
+
+class SyncProcessRequest(BaseModel):
+    """同步至 DeepSearch 处理/建索引请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    ds_kb_id: str = Field(..., min_length=1, max_length=100, description="DeepSearch 知识库 ID")
+    doc_id_list: list[str] = Field(..., min_length=1, description="文档ID列表")
+    parsing_strategy: Optional[Dict[str, Any]] = Field(None, description="解析策略")
+    segmentation_strategy: Optional[Dict[str, Any]] = Field(None, description="分段策略")
+    indexing_strategy: Optional[Dict[str, Any]] = Field(None, description="索引策略")
 
 
 class DocumentGetRequest(BaseModel):

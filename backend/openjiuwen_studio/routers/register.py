@@ -4,10 +4,29 @@ from openjiuwen.core.common.logging import set_session_id, logger
 from openjiuwen_studio.core.common.language_thread_context import (set_language, clear_language,
                                                                    get_highest_priority_language)
 from openjiuwen_studio.core.config import settings
-from openjiuwen_studio.routers import (auth, auth_new, models, users, agents, workflows, execution, space, deepsearch,
-                                       related_member, plugin, tags, knowledge_base, embedding_models, prompt_router,
-                                       prompt_debug_router, prompt_tuning_router, prompt_llm_router, system_model,
-                                       memory_base)
+from openjiuwen_studio.routers import (
+    auth,
+    auth_new,
+    models,
+    users,
+    agents,
+    workflows,
+    execution,
+    space,
+    deepsearch,
+    related_member,
+    plugin,
+    tags,
+    knowledge_base,
+    embedding_models,
+    prompt_router,
+    prompt_debug_router,
+    prompt_tuning_router,
+    prompt_llm_router,
+    system_model,
+    memory_base,
+    deepsearch_knowledge_base,
+)
 
 api_router = APIRouter()
 
@@ -33,6 +52,11 @@ def router_register(app: FastAPI):
     v1_router.include_router(plugin.plugin_router, prefix="/plugin", tags=["Plugin"])
     v1_router.include_router(tags.tags_router, prefix="/tags", tags=["Tags"])
     v1_router.include_router(knowledge_base.knowledge_base_router, prefix="/knowledge-base", tags=["Knowledge Base"])
+    v1_router.include_router(
+        deepsearch_knowledge_base.deepsearch_knowledge_base_router,
+        prefix="/deepsearch-knowledge-base",
+        tags=["DeepSearch Knowledge Base"],
+    )
     v1_router.include_router(system_model.system_router, prefix="/system", tags=["System"])
     v1_router.include_router(memory_base.memory_base_router, prefix="/memory", tags=["Memory Base"])
 

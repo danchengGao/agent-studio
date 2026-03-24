@@ -935,7 +935,10 @@
         "clickToConfig": "点击上方\"配置\"按钮添加联网增强引擎",
         "localKB": "本地知识库",
         "noKB": "暂无知识库配置",
-        "clickToAddKB": "点击上方\"添加知识库\"按钮选择"
+        "clickToAddKB": "点击上方\"添加知识库\"按钮选择",
+        "deepSearchKnowledgeBase": "配置 DeepSearch 知识库",
+        "refresh": "刷新",
+        "noDeepSearchKB": "暂无 DeepSearch 知识库，请先在知识库中同步至 Deep Search"
       },
       "validation": {
         "chapterCountRange": "规划章节数量必须在 1-10 之间",
@@ -4536,6 +4539,8 @@
     }
   },
   "knowledgeBases": {
+    "syncedBadge": "已同步",
+    "syncedBadgeTitle": "已同步到 DeepSearch",
     "title": "知识库管理",
     "description": "管理和组织您的知识库，支持文档上传、智能处理和高效检索",
     "tabs": {
@@ -4560,6 +4565,7 @@
     },
     "types": {
       "document": "文档知识库",
+      "deepSearch": "DeepSearch知识库",
       "web": "网页知识库",
       "api": "API知识库",
       "database": "数据库知识库"
@@ -4621,6 +4627,28 @@
       "documentAdded": "文档处理任务已提交",
       "notFound": "知识库不存在",
       "fetchError": "获取知识库信息失败"
+    },
+    "syncToDeepSearch": {
+      "button": "同步至 Deep Search",
+      "title": "同步至 Deep Search",
+      "stepUpload": "文件同步",
+      "stepProcess": "文档参数与建索引",
+      "uploadDescription": "将当前知识库的文件同步到 Deep Search，用于后续检索。",
+      "processDescription": "设置解析、分段与索引策略，并提交建索引任务。",
+      "syncing": "同步中...",
+      "uploadSuccess": "文件同步完成",
+      "uploadFailed": "同步上传失败",
+      "uploadedCount": "已同步 {{count}} 个文件",
+      "uploadRequired": "请先完成文件同步",
+      "noDocuments": "当前知识库无文档，无需建索引",
+      "processSuccess": "已提交建索引任务",
+      "processFailed": "建索引提交失败",
+      "complete": "完成并提交建索引",
+      "success": "同步与建索引任务已提交",
+      "embedderLabel": "Deep Search 嵌入模型",
+      "selectEmbedder": "请选择 Deep Search 嵌入模型",
+      "selectEmbedderPlaceholder": "请选择嵌入模型",
+      "noEmbedder": "暂无嵌入模型，请先在「模型」页签中配置嵌入模型后再同步。"
     },
     "editor": {
       "loading": "加载知识库信息...",

@@ -11,6 +11,34 @@ import {
 } from '@/types/knowledgeBase'
 import { KnowledgeBaseService } from '@test-agentstudio/api-client'
 
+const KB_RECENTLY_DELETED_KEY = 'kb_recently_deleted_ids'
+/** 刷新后仍能过滤已删除项：保留较长时间，避免列表合并 DS 等导致已删知识库复现 */
+const KB_RECENTLY_DELETED_TTL_MS = 5 * 60 * 1000
+
+function getRecentlyDeletedIdsFromStorage(): string[] {
+  try {
+    const raw = sessionStorage.getItem(KB_RECENTLY_DELETED_KEY)
+    if (!raw) return []
+    const { ids = [], at = 0 } = JSON.parse(raw) as { ids?: string[]; at?: number }
+    if (Date.now() - at > KB_RECENTLY_DELETED_TTL_MS) {
+      sessionStorage.removeItem(KB_RECENTLY_DELETED_KEY)
+      return []
+    }
+    return Array.isArray(ids) ? ids : []
+  } catch {
+    return []
+  }
+}
+
+function setRecentlyDeletedIdsToStorage(ids: string[]): void {
+  try {
+    if (ids.length === 0) return
+    sessionStorage.setItem(KB_RECENTLY_DELETED_KEY, JSON.stringify({ ids, at: Date.now() }))
+  } catch {
+    /* ignore */
+  }
+}
+
 interface KnowledgeBaseState {
   knowledgeBases: KnowledgeBase[]
   currentKnowledgeBase: KnowledgeBase | null
@@ -23,6 +51,8 @@ interface KnowledgeBaseState {
   total: number
   currentPage: number
   pageSize: number
+  /** 刚删除的 kb_id 列表，下一次 fetch/search 时会从结果中过滤掉，避免列表接口延迟导致已删项复现 */
+  lastDeletedKbIds: string[]
 }
 
 interface KnowledgeBaseActions {
@@ -58,6 +88,7 @@ const initialState: KnowledgeBaseState = {
   total: 0,
   currentPage: 1,
   pageSize: 20,
+  lastDeletedKbIds: [],
 }
 
 export const useKnowledgeBaseStore = create<KnowledgeBaseStore>()(
@@ -74,9 +105,14 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>()(
             size: size,
           }
           const response = await KnowledgeBaseService.getKnowledgeBases(request)
+          const fromMemory = get().lastDeletedKbIds
+          const fromStorage = getRecentlyDeletedIdsFromStorage()
+          const lastDeleted = fromMemory.length > 0 || fromStorage.length > 0
+            ? [...new Set([...fromMemory, ...fromStorage])]
+            : []
 
           // 转换API响应的KnowledgeBaseItem格式为前端使用的KnowledgeBase格式
-          const knowledgeBases: KnowledgeBase[] = response.data.items.map((item: KnowledgeBaseItem) => ({
+          let knowledgeBases: KnowledgeBase[] = response.data.items.map((item: KnowledgeBaseItem) => ({
             id: item.id,
             name: item.name || '未命名知识库',
             description: item.desc,
@@ -89,17 +125,23 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>()(
             created_by: '',
             documentCount: 0,
             size: 0,
+            ds_kb_id: item.ds_kb_id ?? undefined,
           }))
+          if (lastDeleted.length > 0) {
+            knowledgeBases = knowledgeBases.filter(kb => !lastDeleted.includes(kb.id))
+          }
 
-          const total = response.data.total
+          const total =
+            lastDeleted.length > 0 ? Math.max(0, response.data.total - lastDeleted.length) : response.data.total
           const totalPages = Math.max(1, Math.ceil(total / size))
           const safePage = Math.min(Math.max(1, response.data.page), totalPages)
           set({
             knowledgeBases,
             total,
             currentPage: safePage,
-            pageSize: size, // 使用请求参数，与分页器一致，避免被后端返回值覆盖
+            pageSize: size,
             isLoading: false,
+            lastDeletedKbIds: [],
           })
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to fetch knowledge bases'
@@ -117,24 +159,33 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>()(
             page_size: size,
           }
           const response = await KnowledgeBaseService.searchKnowledgeBase(request)
+          const fromMemory = get().lastDeletedKbIds
+          const fromStorage = getRecentlyDeletedIdsFromStorage()
+          const lastDeleted = fromMemory.length > 0 || fromStorage.length > 0
+            ? [...new Set([...fromMemory, ...fromStorage])]
+            : []
 
           // 转换搜索API响应的SearchKnowledgeBaseItem格式为前端使用的KnowledgeBase格式
-          const knowledgeBases: KnowledgeBase[] = response.data.knowledge_bases.map((item: SearchKnowledgeBaseItem) => ({
+          let knowledgeBases: KnowledgeBase[] = response.data.knowledge_bases.map((item: SearchKnowledgeBaseItem) => ({
             id: item.id,
             name: item.name || '未命名知识库',
             description: item.description,
-            type: 'document' as const, // 搜索接口返回的都是文档知识库
+            type: 'document' as const,
             status: 'active' as const,
             space_id: item.space_id,
             embedding_model_config_id: item.embedding_model_config_id,
-            created_at: new Date(item.create_time * 1000).toISOString(), // 时间戳转换为ISO字符串
+            created_at: new Date(item.create_time * 1000).toISOString(),
             updated_at: new Date(item.update_time * 1000).toISOString(),
             created_by: '',
             documentCount: 0,
             size: 0,
           }))
+          if (lastDeleted.length > 0) {
+            knowledgeBases = knowledgeBases.filter(kb => !lastDeleted.includes(kb.id))
+          }
 
-          const total = response.data.total
+          const total =
+            lastDeleted.length > 0 ? Math.max(0, response.data.total - lastDeleted.length) : response.data.total
           const totalPages = Math.max(1, Math.ceil(total / size))
           const safePage = Math.min(Math.max(1, response.data.page), totalPages)
           set({
@@ -143,6 +194,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>()(
             currentPage: safePage,
             pageSize: size,
             isSearching: false,
+            lastDeletedKbIds: lastDeleted.length > 0 ? [] : get().lastDeletedKbIds,
           })
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to search knowledge bases'
@@ -184,12 +236,19 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>()(
       deleteKnowledgeBase: async (id: string, spaceId: string) => {
         try {
           set({ isLoading: true, error: null })
-          await KnowledgeBaseService.deleteKnowledgeBase({ space_id: spaceId, kb_id: id })
+          const response = await KnowledgeBaseService.deleteKnowledgeBase({ space_id: spaceId, kb_id: id })
+          const idsToRemove = response.data?.deleted_kb_ids?.length
+            ? response.data.deleted_kb_ids
+            : [id]
+          setRecentlyDeletedIdsToStorage(idsToRemove)
           set(state => ({
-            knowledgeBases: state.knowledgeBases.filter(kb => kb.id !== id),
-            currentKnowledgeBase: state.currentKnowledgeBase?.id === id ? null : state.currentKnowledgeBase,
-            selectedKnowledgeBaseIds: state.selectedKnowledgeBaseIds.filter(kbId => kbId !== id),
+            knowledgeBases: state.knowledgeBases.filter(kb => !idsToRemove.includes(kb.id)),
+            currentKnowledgeBase: state.currentKnowledgeBase && !idsToRemove.includes(state.currentKnowledgeBase.id)
+              ? state.currentKnowledgeBase
+              : null,
+            selectedKnowledgeBaseIds: state.selectedKnowledgeBaseIds.filter(kbId => !idsToRemove.includes(kbId)),
             isLoading: false,
+            lastDeletedKbIds: idsToRemove,
           }))
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Failed to delete knowledge base'

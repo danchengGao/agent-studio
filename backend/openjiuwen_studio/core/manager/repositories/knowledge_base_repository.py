@@ -220,6 +220,78 @@ class KnowledgeBaseRepository:
                 return kb_db.update_dl_in_sql(find_id=find_id, update_dl=update_data)
 
     """
+    description: 仅更新知识库的 ds_kb_id（DeepSearch 知识库关联 ID）
+    """
+
+    @with_exception_handling
+    def knowledge_base_update_ds_kb_id(
+        self,
+        kb: KBDetails,
+        ds_kb_id: str,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            kb_db = JiuwenBaseRepository(db, kb_models.KnowledgeBaseDB)
+            find_id = {"space_id": kb.space_id, "kb_id": kb.kb_id}
+            if kb.index_manager_type:
+                find_id["index_manager_type"] = kb.index_manager_type
+            update_data = {"ds_kb_id": ds_kb_id, "update_time": milliseconds()}
+            return kb_db.update_dl_in_sql(find_id=find_id, update_dl=update_data)
+
+    """
+    description: 根据 space_id 与 kb_id 查询该知识库对应的 ds_kb_id
+    """
+
+    @with_exception_handling
+    def knowledge_base_get_ds_kb_id(
+        self,
+        space_id: str,
+        kb_id: str,
+        db_session: Session | None = None,
+    ) -> ResponseModel[str | None]:
+        with get_db_jw(db_session) as db:
+            row = (
+                db.query(kb_models.KnowledgeBaseDB)
+                .filter(
+                    kb_models.KnowledgeBaseDB.space_id == space_id,
+                    kb_models.KnowledgeBaseDB.kb_id == kb_id,
+                )
+                .first()
+            )
+            if not row:
+                return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Dl not found.", data=None)
+            ds_kb_id = getattr(row, "ds_kb_id", None)
+            return ResponseModel(code=status.HTTP_200_OK, message="Success", data=ds_kb_id)
+
+    """
+    description: 按 ds_kb_id 查找 Studio 行并将该行的 ds_kb_id 清空（用于仅删「同步知识库」时保留原始知识库并可再次同步）
+    """
+
+    @with_exception_handling
+    def knowledge_base_clear_ds_kb_id_by_ds_kb_id(
+        self,
+        space_id: str,
+        ds_kb_id: str,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        """按已删除的同步知识库 id 查找原始 Studio 行（该行 ds_kb_id=ds_kb_id）并清空其 ds_kb_id。"""
+        with get_db_jw(db_session) as db:
+            row = (
+                db.query(kb_models.KnowledgeBaseDB)
+                .filter(
+                    kb_models.KnowledgeBaseDB.space_id == space_id,
+                    kb_models.KnowledgeBaseDB.ds_kb_id == ds_kb_id,
+                )
+                .first()
+            )
+            if not row:
+                return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Dl not found.")
+            row.ds_kb_id = None
+            row.update_time = milliseconds()
+            db.commit()
+            return ResponseModel(code=status.HTTP_200_OK, message="Success.")
+
+    """
     description: 创建知识库文档
     param {dict} doc_data  待创建的文档数据
     return {*}
@@ -527,6 +599,7 @@ class KnowledgeBaseRepository:
                         "config": kb.config,
                         "create_time": kb.create_time,
                         "update_time": kb.update_time,
+                        "ds_kb_id": getattr(kb, "ds_kb_id", None),
                     }
                 )
 
@@ -622,6 +695,38 @@ class KnowledgeBaseRepository:
                 code=status.HTTP_200_OK,
                 message="Get document list success",
                 data={"items": items, "total": total, "page": page, "size": size},
+            )
+
+    """
+    description: 获取知识库下全部文档的 doc_id 与 file_path（用于同步到 DeepSearch，不分页）
+    """
+
+    @with_exception_handling
+    def document_list_all_for_sync(
+        self,
+        kbdoc: KBDocument,
+        db_session: Session | None = None,
+    ) -> ResponseModel[list]:
+        with get_db_jw(db_session) as db:
+            query = db.query(kb_doc_models.KnowledgeBaseDocumentDB).filter(
+                kb_doc_models.KnowledgeBaseDocumentDB.space_id == kbdoc.kb.space_id,
+                kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kbdoc.kb.kb_id,
+            )
+            if kbdoc.kb.index_manager_type:
+                query = query.filter(
+                    kb_doc_models.KnowledgeBaseDocumentDB.index_manager_type
+                    == kbdoc.kb.index_manager_type
+                )
+            query = query.order_by(kb_doc_models.KnowledgeBaseDocumentDB.create_time.asc())
+            doc_list = query.all()
+            items = [
+                {"doc_id": doc.doc_id, "file_path": doc.file_path, "name": doc.name}
+                for doc in doc_list
+            ]
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Get document list for sync success",
+                data=items,
             )
 
     """

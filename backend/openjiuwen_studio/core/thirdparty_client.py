@@ -1,7 +1,7 @@
 # clients/deepsearch_http.py
 import json
 import logging
-from typing import AsyncGenerator, Optional, Dict, Any
+from typing import AsyncGenerator, Optional, Dict, Any, List, Tuple
 import httpx
 from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.core.common.status_code import StatusCode
@@ -84,6 +84,28 @@ class LazyDeepSearchHttpClient:
             self._initialized = False
             raise RuntimeError(f"DeepSearch service call failed: {e}") from e
 
+    async def request_multipart(
+        self,
+        method: str,
+        url: str,
+        *,
+        data: Optional[Dict[str, Any]] = None,
+        files: Optional[List[Tuple[str, Tuple[str, bytes, str]]]] = None,
+    ):
+        """发送 multipart/form-data 请求（用于文件上传）"""
+        if not self._initialized or self._client is None:
+            await self._initialize()
+        try:
+            resp = await self._client.request(method, url, data=data, files=files)
+            resp.raise_for_status()
+            return resp
+        except httpx.HTTPStatusError:
+            raise
+        except Exception as e:
+            self._client = None
+            self._initialized = False
+            raise RuntimeError(f"DeepSearch service call failed: {e}") from e
+
     async def close(self):
         if self._client:
             await self._client.aclose()
@@ -108,7 +130,7 @@ class DeepSearchAgentClient:
 
     async def run_deepsearch_stream(self, payload: Dict[str, Any]) -> AsyncGenerator[str, None]:
         """流式运行深度搜索"""
-        async with (await self._http.stream("POST", "/api/v1/agent/deepsearch/run/", json=payload)) as resp:
+        async with (await self._http.stream("POST", "/api/v1/agent/deepsearch/run", json=payload)) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 yield line
@@ -175,4 +197,118 @@ class DeepSearchAgentClient:
     async def report_converts(self, payload: Dict[str, Any]) -> list:
         """列出模板"""
         resp = await self._http.request("POST", "/api/v1/agent/deepsearch/reports/convert", jsons=payload)
+        return resp.json()
+
+    # ---------- DeepSearch 知识库 API（/api/kb） ----------
+
+    async def create_knowledge_base(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """创建 DeepSearch 知识库，返回响应 body"""
+        resp = await self._http.request("POST", "/api/kb/create", jsons=payload)
+        return resp.json()
+
+    async def update_knowledge_base(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """更新 DeepSearch 知识库（含 embed_model_config、llm_config 等 config）"""
+        resp = await self._http.request("POST", "/api/kb/update", jsons=payload)
+        return resp.json()
+
+    async def delete_knowledge_base(self, space_id: str, ds_kb_id: str) -> Dict[str, Any]:
+        """删除 DeepSearch 知识库"""
+        resp = await self._http.request(
+            "POST", "/api/kb/delete", jsons={"space_id": space_id, "kb_id": ds_kb_id}
+        )
+        return resp.json()
+
+    async def upload_knowledge_base_files(
+        self,
+        space_id: str,
+        ds_kb_id: str,
+        files: List[Tuple[str, bytes, str]],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """上传文件到 DeepSearch 知识库。files: [(filename, file_bytes, content_type), ...]"""
+        data = {"space_id": space_id, "kb_id": ds_kb_id}
+        if metadata is not None:
+            data["metadata"] = json.dumps(metadata)
+        file_parts = [
+            ("files", (fn, content, ct)) for fn, content, ct in files
+        ]
+        resp = await self._http.request_multipart(
+            "POST", "/api/kb/upload", data=data, files=file_parts
+        )
+        return resp.json()
+
+    async def process_knowledge_base_documents(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """触发 DeepSearch 知识库文档处理/建索引"""
+        resp = await self._http.request("POST", "/api/kb/process", jsons=payload)
+        return resp.json()
+
+    async def list_knowledge_bases(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """查询 DeepSearch 知识库列表（含索引状态等）"""
+        resp = await self._http.request("POST", "/api/kb/list", jsons=payload)
+        return resp.json()
+
+    async def list_embedding_configs(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """查询 DeepSearch 侧当前空间可用的 Embedding 配置（供同步时选择嵌入模型）"""
+        resp = await self._http.request("POST", "/api/kb/embedding-configs/list", jsons=payload)
+        return resp.json()
+
+    async def list_documents(
+        self,
+        space_id: str,
+        kb_id: str,
+        page: int = 1,
+        size: int = 10,
+    ) -> Dict[str, Any]:
+        """查询 DeepSearch 知识库文档列表（用于仅存在于 DeepSearch 的知识库，如同步产生的 deepsearch_xxx）"""
+        resp = await self._http.request(
+            "POST",
+            "/api/kb/documents/list",
+            jsons={"space_id": space_id, "kb_id": kb_id, "page": page, "size": size},
+        )
+        return resp.json()
+
+    async def get_document_status(
+        self,
+        space_id: str,
+        kb_id: str,
+        doc_id_list: list,
+    ) -> Dict[str, Any]:
+        """批量查询 DeepSearch 知识库文档状态（用于同步后的知识库文档状态展示）"""
+        resp = await self._http.request(
+            "POST",
+            "/api/kb/documents/status",
+            jsons={
+                "space_id": space_id,
+                "kb_id": kb_id,
+                "doc_id_list": doc_id_list,
+            },
+        )
+        return resp.json()
+
+    async def delete_documents(
+        self,
+        space_id: str,
+        kb_id: str,
+        document_ids: list,
+    ) -> Dict[str, Any]:
+        """批量删除 DeepSearch 知识库文档（用于更新同步前清空 DS 侧文档以实现覆盖）"""
+        resp = await self._http.request(
+            "POST",
+            "/api/kb/documents/delete",
+            jsons={"space_id": space_id, "kb_id": kb_id, "document_ids": document_ids},
+        )
+        return resp.json()
+
+    async def task_progress(
+        self,
+        space_id: str,
+        kb_id: str,
+        task_id: str,
+    ) -> Dict[str, Any]:
+        """查询 DeepSearch 知识库文档处理任务进度"""
+        resp = await self._http.request(
+            "POST",
+            "/api/kb/task/progress",
+            jsons={"space_id": space_id, "kb_id": kb_id, "task_id": task_id},
+        )
         return resp.json()

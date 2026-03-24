@@ -17,7 +17,12 @@ const EMPTY_EDITING_STATE: EditingState = {
   isEditing: false,
 }
 
-function getTypeLabel(type: string, t: (k: string) => string): string {
+function getTypeLabel(
+  type: string,
+  t: (k: string) => string,
+  isDeepSearchKb?: boolean,
+): string {
+  if (isDeepSearchKb) return t('knowledgeBases.types.deepSearch')
   if (!type || type === 'unknown') return t('knowledgeBases.card.documentType')
   const key = `knowledgeBases.types.${type}` as const
   try {
@@ -186,7 +191,14 @@ export const KnowledgeBaseCardNew: React.FC<KnowledgeBaseCardNewProps> = ({ know
     },
   ]
   const icon = <Database className="w-6 h-6" />
-  const typeLabel = getTypeLabel(knowledgeBase.type || 'document', t)
+  const isDeepSearchKb = Boolean(
+    knowledgeBase.ds_kb_id && knowledgeBase.id === knowledgeBase.ds_kb_id,
+  )
+  const typeLabel = getTypeLabel(
+    knowledgeBase.type || 'document',
+    t,
+    isDeepSearchKb,
+  )
   const timeDisplay = formatRelativeTime(knowledgeBase.updated_at || knowledgeBase.created_at, t)
 
   const tags: Array<{ label: string; color?: string; variant?: 'default' | 'error' | 'loading'; tooltip?: React.ReactNode }> = [

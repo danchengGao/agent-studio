@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square, AlertCircle, CloudUpload } from 'lucide-react'
 import {
   KnowledgeBase,
   DocumentItem,
@@ -17,6 +17,7 @@ import { ENV_CONFIG } from '@/config/environment'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import AddDocumentDialog from './components/AddDocumentDialog'
+import SyncToDeepSearchDialog from './components/SyncToDeepSearchDialog'
 
 const KnowledgeBaseEditorPage: React.FC = () => {
   const { t } = useTranslation()
@@ -26,6 +27,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   const { user } = useAuthStore()
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showSyncDialog, setShowSyncDialog] = useState(false)
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -931,10 +933,21 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                 </h1>
               </div>
             </div>
-            <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
-              <Upload className="w-4 h-4 mr-2" />
-              {t('knowledgeBases.settings.addDocument')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
+                <Upload className="w-4 h-4 mr-2" />
+                {t('knowledgeBases.settings.addDocument')}
+              </button>
+              {!(knowledgeBase.ds_kb_id && knowledgeBase.id === knowledgeBase.ds_kb_id) && (
+                <button
+                  onClick={() => setShowSyncDialog(true)}
+                  className="px-4 py-2 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center"
+                >
+                  <CloudUpload className="w-4 h-4 mr-2" />
+                  {t('knowledgeBases.syncToDeepSearch.button')}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1006,13 +1019,24 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                   <span className="ml-2 text-gray-600">{t('knowledgeBases.editor.loadingDocuments')}</span>
                 </div>
               ) : documents.length === 0 ? (
-                <div className="text-center py-8">
+                  <div className="text-center py-8">
                   <FileText className="mx-auto w-12 h-12 text-gray-300 mb-4" />
                   <p className="text-gray-500 mb-4">{t('knowledgeBases.editor.noDocuments')}</p>
-                  <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center mx-auto">
-                    <Upload className="w-4 h-4 mr-2" />
-                    {t('knowledgeBases.editor.addDocument')}
-                  </button>
+                  <div className="flex items-center justify-center gap-2">
+                    <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
+                      <Upload className="w-4 h-4 mr-2" />
+                      {t('knowledgeBases.editor.addDocument')}
+                    </button>
+                    {!(knowledgeBase.ds_kb_id && knowledgeBase.id === knowledgeBase.ds_kb_id) && (
+                      <button
+                        onClick={() => setShowSyncDialog(true)}
+                        className="px-4 py-2 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center"
+                      >
+                        <CloudUpload className="w-4 h-4 mr-2" />
+                        {t('knowledgeBases.syncToDeepSearch.button')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -1269,6 +1293,21 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 同步至 Deep Search 对话框 */}
+      {showSyncDialog && knowledgeBase && (
+        <SyncToDeepSearchDialog
+          open={showSyncDialog}
+          knowledgeBase={knowledgeBase}
+          onClose={() => setShowSyncDialog(false)}
+          onSuccess={() => {
+            setShowSyncDialog(false)
+            showSuccess(t('knowledgeBases.syncToDeepSearch.success'))
+            setCurrentPage(1)
+            fetchDocuments(1).catch(console.error)
+          }}
+        />
+      )}
 
       {/* 添加文档对话框 */}
       {showAddDialog && knowledgeBase && (

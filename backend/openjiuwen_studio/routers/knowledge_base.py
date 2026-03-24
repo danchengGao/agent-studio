@@ -12,9 +12,21 @@ from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.routers.common import handle_response, validate_request
 import openjiuwen_studio.core.manager.knowledge_base as kb_mgr
-from openjiuwen_studio.schemas.knowledge_base import KnowledgeBaseCreate, KnowledgeBaseGet, KnowledgeBaseUpdateRequest, \
-    KnowledgeBaseSearchRequest, KnowledgeBaseListRequest, DocumentStatusRequest, DocumentProcessRequest, \
-    DocumentListRequest, DocumentUpdateRequest, DocumentDeleteRequest, TaskProgressRequest
+from openjiuwen_studio.schemas.knowledge_base import (
+    KnowledgeBaseCreate,
+    KnowledgeBaseGet,
+    KnowledgeBaseUpdateRequest,
+    KnowledgeBaseSearchRequest,
+    KnowledgeBaseListRequest,
+    DocumentStatusRequest,
+    DocumentProcessRequest,
+    DocumentListRequest,
+    DocumentUpdateRequest,
+    DocumentDeleteRequest,
+    TaskProgressRequest,
+    SyncUploadRequest,
+    SyncProcessRequest,
+)
 from openjiuwen_studio.schemas.common import ResponseModel
 
 knowledge_base_router = APIRouter()
@@ -378,6 +390,50 @@ async def knowledge_base_list(
     return res
 
 
+@knowledge_base_router.post("/sync/upload", response_model=ResponseModel[dict])
+async def knowledge_base_sync_upload(
+    request: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """文件同步到 DeepSearch 知识库：创建/复用 DS 知识库并上传文档"""
+    try:
+        req = validate_request(request, SyncUploadRequest)
+        res = await kb_mgr.knowledge_base_sync_upload(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            current_user=current_user,
+            deepsearch_embedding_model_config_id=req.deepsearch_embedding_model_config_id,
+        )
+        return handle_response(res)
+    except ValidationError as e:
+        logger.error(f"[KB_SYNC_UPLOAD] Validation failed - Errors: {e.errors()}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sync upload request validation failed",
+        ) from e
+
+
+@knowledge_base_router.post("/sync/process", response_model=ResponseModel[dict])
+async def knowledge_base_sync_process(
+    request: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """同步到 DeepSearch 知识库：文档参数设置/建索引"""
+    try:
+        req = validate_request(request, SyncProcessRequest)
+        payload = req.model_dump(exclude_none=True)
+        res = await kb_mgr.knowledge_base_sync_process(
+            payload=payload, current_user=current_user
+        )
+        return handle_response(res)
+    except ValidationError as e:
+        logger.error(f"[KB_SYNC_PROCESS] Validation failed - Errors: {e.errors()}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sync process request validation failed",
+        ) from e
+
+
 @knowledge_base_router.post("/documents/status", response_model=ResponseModel[dict])
 async def document_get_status(
         request: dict,
@@ -402,7 +458,7 @@ async def document_get_status(
     """
     try:
         req = validate_request(request, DocumentStatusRequest)
-        res = kb_mgr.document_get_status_batch(req, current_user)
+        res = await kb_mgr.document_get_status_batch(req, current_user)
         if res.code == status.HTTP_200_OK:
             items_count = len(res.data.get('items', [])) if res.data else 0
             logger.info(
@@ -536,7 +592,7 @@ async def document_list(
     """
     try:
         req = validate_request(request, DocumentListRequest)
-        res = kb_mgr.document_list(req, current_user)
+        res = await kb_mgr.document_list(req, current_user)
         if res.code == status.HTTP_200_OK:
             logger.info(
                 f"[DOC_LIST] Document list retrieved - Space ID: {req.space_id}, "

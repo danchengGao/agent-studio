@@ -50,6 +50,7 @@ from openjiuwen_studio.core.manager.repositories.knowledge_base_repository impor
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
     knowledge_base_repository,
 )
+from openjiuwen_studio.core.thirdparty_client import DeepSearchAgentClient
 from openjiuwen_studio.models.knowledge_base_document import DocumentStatus
 from openjiuwen_studio.ops.modules.llm.llm_manager import get_llm_client_by_protocol
 from openjiuwen_studio.schemas.common import ResponseModel
@@ -693,15 +694,73 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 4. 删除知识库
-    delete_result = knowledge_base_repository.knowledge_base_delete(req)
+    # 4. 删除知识库：删「同步后的知识库」仅删该条并调 DS 接口；删「Studio 知识库」时同时删 DS 同步后的知识库
+    ds_kb_id: Optional[str] = None
+    ds_kb_id_resp = knowledge_base_repository.knowledge_base_get_ds_kb_id(
+        space_id=req.space_id, kb_id=req.kb_id
+    )
+    if ds_kb_id_resp.code == status.HTTP_200_OK and ds_kb_id_resp.data is not None:
+        ds_kb_id = ds_kb_id_resp.data
+    is_studio_row = bool(ds_kb_id and ds_kb_id != req.kb_id)
+    logger.info(f"[KB_DELETE] is_studio_row: {is_studio_row}, ds_kb_id: {ds_kb_id}, req.kb_id: {req.kb_id}")
 
-    if delete_result.code != status.HTTP_200_OK:
-        logger.error(f"[KB_DELETE] Delete failed - ID: {req.kb_id}, Error: {delete_result.message}")
-        return ResponseModel(
-            code=delete_result.code,
-            message=delete_result.message,
+    ds_client = DeepSearchAgentClient()
+    deleted_kb_ids: List[str] = []
+
+    if is_studio_row:
+        # 删除的是 Studio 知识库：先调 DS 删除同步后的知识库，再删 Studio 行和共享表里的 DS 行
+        try:
+            await ds_client.delete_knowledge_base(space_id=req.space_id, ds_kb_id=ds_kb_id)
+            logger.info(f"[KB_DELETE] DeepSearch KB deleted (Studio delete) - ds_kb_id: {ds_kb_id}")
+        except Exception as e:
+            logger.warning(
+                f"[KB_DELETE] DeepSearch delete failed (ds_kb_id={ds_kb_id}), continuing - Error: {str(e)}",
+                exc_info=True,
+            )
+        delete_result = knowledge_base_repository.knowledge_base_delete(req)
+        if delete_result.code != status.HTTP_200_OK:
+            return ResponseModel(
+                code=delete_result.code,
+                message=delete_result.message,
+            )
+        # 同步删除共享表中 kb_id=ds_kb_id 的 DeepSearch 行
+        ds_row_get = KnowledgeBaseGet(
+            space_id=req.space_id,
+            kb_id=ds_kb_id,
+            index_manager_type=_CURR_INDEX_TYPE,
         )
+        knowledge_base_repository.knowledge_base_delete(ds_row_get)
+        deleted_kb_ids = [req.kb_id, ds_kb_id]
+        logger.info(f"[KB_DELETE] Deleted Studio row and DS-created row - kb_id: {req.kb_id}, ds_kb_id: {ds_kb_id}")
+    else:
+        # 删除的是同步后的知识库：调 DS 删除、删当前行，并清空原始 Studio 行的 ds_kb_id，以便用户可再次点击同步
+        try:
+            await ds_client.delete_knowledge_base(space_id=req.space_id, ds_kb_id=req.kb_id)
+            logger.info(f"[KB_DELETE] DeepSearch KB deleted (synced KB only) - kb_id: {req.kb_id}")
+        except Exception as e:
+            logger.warning(
+                f"[KB_DELETE] DeepSearch delete failed (kb_id={req.kb_id}), continuing - Error: {str(e)}",
+                exc_info=True,
+            )
+        delete_result = knowledge_base_repository.knowledge_base_delete(req)
+        if delete_result.code not in (status.HTTP_200_OK, status.HTTP_404_NOT_FOUND):
+            return ResponseModel(
+                code=delete_result.code,
+                message=delete_result.message,
+            )
+        if delete_result.code == status.HTTP_404_NOT_FOUND:
+            logger.info(
+                f"[KB_DELETE] Local row already removed (likely by DeepSearch) - kb_id: {req.kb_id}"
+            )
+        # 清空原始知识库的 ds_kb_id，使再次同步时可新建 DS 知识库
+        clear_resp = knowledge_base_repository.knowledge_base_clear_ds_kb_id_by_ds_kb_id(
+            space_id=req.space_id, ds_kb_id=req.kb_id
+        )
+        if clear_resp.code == status.HTTP_200_OK:
+            logger.info(
+                f"[KB_DELETE] Cleared ds_kb_id on original KB (synced kb_id={req.kb_id}) for re-sync"
+            )
+        deleted_kb_ids = [req.kb_id]
 
     logger.info(
         f"[KB_DELETE] Knowledge base deleted - ID: {req.kb_id}, User: {user_id}, "
@@ -750,9 +809,11 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 7. 返回删除结果
+    # 7. 返回删除结果（含 deleted_kb_ids 供前端从列表移除所有相关卡片）
     return ResponseModel(
-        code=status.HTTP_200_OK, message="delete knowledge base success", data=None
+        code=status.HTTP_200_OK,
+        message="delete knowledge base success",
+        data={"deleted_kb_ids": deleted_kb_ids},
     )
 
 
@@ -839,6 +900,376 @@ def knowledge_base_update(req: KnowledgeBaseUpdateRequest, current_user: dict) -
     return ResponseModel(
         code=status.HTTP_200_OK, message="update knowledge base message success", data=None
     )
+
+
+@with_exception_handling
+async def knowledge_base_sync_upload(
+    space_id: str,
+    kb_id: str,
+    current_user: dict,
+    deepsearch_embedding_model_config_id: Optional[int] = None,
+) -> ResponseModel:
+    """同步上传：在 DeepSearch 创建/复用知识库，并上传 Studio 当前知识库下全部文档。
+    deepsearch_embedding_model_config_id: 可选，DeepSearch 侧嵌入模型配置 ID。
+    """
+    # 1. 验证用户空间权限
+    _ = check_user_space(space_id, current_user)
+
+    # 2. 检查知识库是否存在
+    kb_get = KnowledgeBaseGet(
+        space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found"
+        )
+    kb_data = kb_result.data
+
+    # 3. 获取 ds_kb_id，判断首次同步或更新同步
+    ds_kb_id = kb_data.get("ds_kb_id")
+    ds_kb_id_resp = knowledge_base_repository.knowledge_base_get_ds_kb_id(
+        space_id=space_id, kb_id=kb_id
+    )
+    if ds_kb_id_resp.code == status.HTTP_200_OK and ds_kb_id_resp.data is not None:
+        ds_kb_id = ds_kb_id_resp.data
+
+    embed_id = (
+        deepsearch_embedding_model_config_id
+        if deepsearch_embedding_model_config_id is not None
+        else (kb_data.get("embedding_model_config_id") or 0)
+    )
+    ds_name = f"deepsearch_{kb_data.get('name', '') or 'kb'}"
+    ds_client = DeepSearchAgentClient()
+
+    if not ds_kb_id:
+        # 4a. 首次同步：验证 embedding、创建 DS 知识库、更新 Studio、创建同步记录
+        db = SessionLocal()
+        try:
+            embed_repo = EmbeddingModelConfigRepository(db)
+            embed_model = embed_repo.get_by_id(embed_id)
+            if not embed_model:
+                return ResponseModel(
+                    code=status.HTTP_404_NOT_FOUND,
+                    message=f"Embedding model config not found: {embed_id}",
+                )
+            if not embed_model.is_active:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Embedding model config is not active: {embed_id}",
+                )
+            embed_model_config, llm_config = _build_ds_embed_config_from_studio(
+                embed_model
+            )
+        finally:
+            db.close()
+
+        create_payload = {
+            "space_id": space_id,
+            "name": ds_name,
+            "description": kb_data.get("description") or "",
+            "embed_model_config": embed_model_config,
+            "llm_config": llm_config,
+            "config": kb_data.get("config") or {},
+            "index_manager_type": kb_data.get("index_manager_type") or _CURR_INDEX_TYPE,
+        }
+        try:
+            create_resp = await ds_client.create_knowledge_base(create_payload)
+        except Exception as e:
+            logger.error(
+                f"[KB_SYNC_UPLOAD] DeepSearch create KB failed - kb_id={kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch create knowledge base failed: {str(e)}",
+            )
+        data = create_resp.get("data") or create_resp
+        ds_kb_id = data.get("id")
+        if not ds_kb_id:
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message="DeepSearch did not return knowledge base id",
+            )
+
+        update_result = knowledge_base_repository.knowledge_base_update_ds_kb_id(
+            kb=KBDetails(
+                space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE
+            ),
+            ds_kb_id=ds_kb_id,
+        )
+        if update_result.code != status.HTTP_200_OK:
+            return ResponseModel(
+                code=update_result.code,
+                message=update_result.message or "Failed to save ds_kb_id",
+            )
+
+        synced_kb_data = {
+            "space_id": space_id,
+            "kb_id": ds_kb_id,
+            "ds_kb_id": ds_kb_id,
+            "name": ds_name,
+            "description": kb_data.get("description") or "",
+            "index_manager_type": kb_data.get("index_manager_type") or _CURR_INDEX_TYPE,
+            "embedding_model_config_id": embed_id,
+            "config": kb_data.get("config") or {},
+            "create_time": milliseconds(),
+            "update_time": milliseconds(),
+        }
+        create_synced_result = knowledge_base_repository.knowledge_base_create(
+            synced_kb_data
+        )
+        if create_synced_result.code != status.HTTP_200_OK:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] Failed to create synced KB row - ds_kb_id={ds_kb_id}, "
+                f"error={create_synced_result.message}"
+            )
+    else:
+        # 4b. 更新同步：更新 DS 知识库 config、清空 DS 侧文档
+        db = SessionLocal()
+        try:
+            embed_repo = EmbeddingModelConfigRepository(db)
+            embed_model = embed_repo.get_by_id(embed_id)
+            if embed_model and embed_model.is_active:
+                embed_model_config, llm_config = _build_ds_embed_config_from_studio(
+                    embed_model
+                )
+                update_payload = {
+                    "space_id": space_id,
+                    "kb_id": ds_kb_id,
+                    "name": ds_name,
+                    "desc": kb_data.get("description") or "",
+                    "embed_model_config": embed_model_config,
+                    "llm_config": llm_config,
+                    "config": kb_data.get("config") or {},
+                }
+                try:
+                    await ds_client.update_knowledge_base(update_payload)
+                    logger.info(
+                        f"[KB_SYNC_UPLOAD] Updated DS KB config for overwrite - ds_kb_id={ds_kb_id}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[KB_SYNC_UPLOAD] Failed to update DS KB config (continuing) - "
+                        f"ds_kb_id={ds_kb_id}, error={e}",
+                        exc_info=True,
+                    )
+            else:
+                logger.warning(
+                    f"[KB_SYNC_UPLOAD] Embedding not found/inactive (embed_id={embed_id}), "
+                    f"skip config update - ds_kb_id={ds_kb_id}"
+                )
+        finally:
+            db.close()
+
+        # 4b.2 清空 DS 侧文档（覆盖同步前需先清空）
+        try:
+            ds_doc_ids = []
+            page, size = 1, 100
+            while True:
+                ds_resp = await ds_client.list_documents(
+                    space_id=space_id, kb_id=ds_kb_id, page=page, size=size
+                )
+                ds_data = ds_resp.get("data") if isinstance(ds_resp, dict) else ds_resp or {}
+                items = ds_data.get("items") or []
+                total = ds_data.get("total") or 0
+                for doc in items:
+                    doc_id = doc.get("id") or doc.get("doc_id")
+                    if doc_id:
+                        ds_doc_ids.append(doc_id)
+                if len(ds_doc_ids) >= total or len(items) < size:
+                    break
+                page += 1
+            if ds_doc_ids:
+                await ds_client.delete_documents(
+                    space_id=space_id, kb_id=ds_kb_id, document_ids=ds_doc_ids
+                )
+                logger.info(
+                    f"[KB_SYNC_UPLOAD] Cleared {len(ds_doc_ids)} documents from DS KB - ds_kb_id={ds_kb_id}"
+                )
+        except Exception as e:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] Failed to clear DS KB documents (continuing) - "
+                f"ds_kb_id={ds_kb_id}, error={e}",
+                exc_info=True,
+            )
+
+    # 5. 获取待同步文档列表
+    kbdoc = KBDocument(
+        kb=KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=None)
+    )
+    docs_result = knowledge_base_repository.document_list_all_for_sync(kbdoc)
+    if docs_result.code != status.HTTP_200_OK:
+        return ResponseModel(
+            code=docs_result.code,
+            message=docs_result.message or "Failed to list documents",
+        )
+    doc_list = docs_result.data or []
+    if not doc_list:
+        logger.warning(
+            f"[KB_SYNC_UPLOAD] No documents to sync - kb_id={kb_id}, ds_kb_id={ds_kb_id}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync upload success",
+            data={"ds_kb_id": ds_kb_id, "uploaded_count": 0, "doc_id_list": []},
+        )
+
+    # 6. 准备文件并上传到 DeepSearch
+    files_for_ds = []
+    doc_id_list = []
+    storage_path = _get_storage_path(space_id, kb_id)
+    for doc in doc_list:
+        studio_doc_id = doc.get("doc_id")
+        file_path_str = doc.get("file_path")
+        name = doc.get("name") or studio_doc_id
+        if not file_path_str:
+            continue
+        path = Path(file_path_str)
+        if not path.is_absolute():
+            path = storage_path / path.name
+        if not path.exists():
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] File not found, skip - doc_id={studio_doc_id}, path={path}"
+            )
+            continue
+        try:
+            content = path.read_bytes()
+        except Exception as e:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] Failed to read file, skip - doc_id={studio_doc_id}, error={e}"
+            )
+            continue
+        ext = path.suffix.lower() or ".bin"
+        ct = _get_mime_type(ext.lstrip(".")) if ext != ".bin" else "application/octet-stream"
+        files_for_ds.append((name, content, ct))
+        doc_id_list.append(str(uuid.uuid4()))
+
+    logger.info(
+        f"[KB_SYNC_UPLOAD] Files prepared - kb_id={kb_id}, ds_kb_id={ds_kb_id}, "
+        f"doc_count={len(doc_list)}, uploaded_count={len(files_for_ds)}"
+    )
+    if not files_for_ds:
+        if doc_list:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] All {len(doc_list)} document(s) skipped - kb_id={kb_id}"
+            )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync upload success",
+            data={"ds_kb_id": ds_kb_id, "uploaded_count": 0, "doc_id_list": []},
+        )
+
+    try:
+        await ds_client.upload_knowledge_base_files(
+            space_id=space_id,
+            ds_kb_id=ds_kb_id,
+            files=files_for_ds,
+            metadata={"doc_list": doc_id_list},
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_SYNC_UPLOAD] DeepSearch upload failed - ds_kb_id={ds_kb_id}, error={e}",
+            exc_info=True,
+        )
+        return ResponseModel(
+            code=status.HTTP_502_BAD_GATEWAY,
+            message=f"DeepSearch upload failed: {str(e)}",
+        )
+
+    # 7. 返回结果
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="sync upload success",
+        data={
+            "ds_kb_id": ds_kb_id,
+            "uploaded_count": len(files_for_ds),
+            "doc_id_list": doc_id_list,
+        },
+    )
+
+
+@with_exception_handling
+async def knowledge_base_sync_process(
+    payload: Dict[str, Any], current_user: dict
+) -> ResponseModel:
+    """同步处理/建索引：透传请求到 DeepSearch /api/kb/process。"""
+    space_id = payload.get("space_id")
+    if space_id:
+        check_user_space(space_id, current_user)
+    # DeepSearch 接口要求 kb_id，前端传的是 ds_kb_id
+    process_payload = {k: v for k, v in payload.items() if k != "ds_kb_id"}
+    process_payload["kb_id"] = payload.get("ds_kb_id") or payload.get("kb_id", "")
+    ds_client = DeepSearchAgentClient()
+    try:
+        result = await ds_client.process_knowledge_base_documents(process_payload)
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync process success",
+            data=result.get("data") if isinstance(result, dict) else result,
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_SYNC_PROCESS] DeepSearch process failed - payload={payload}, error={e}",
+            exc_info=True,
+        )
+        return ResponseModel(
+            code=status.HTTP_502_BAD_GATEWAY,
+            message=f"DeepSearch process failed: {str(e)}",
+        )
+
+
+@with_exception_handling
+async def knowledge_base_ds_list(
+    space_id: str, page: int, size: int, current_user: dict
+) -> ResponseModel:
+    """DeepSearch 知识库列表，含索引状态；仅返回已同步到 DeepSearch 的项，不包含 Studio 原始知识库。"""
+    check_user_space(space_id, current_user)
+    ds_client = DeepSearchAgentClient()
+    try:
+        result = await ds_client.list_knowledge_bases(
+            {"space_id": space_id, "page": page, "size": size}
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get ds knowledge base list success",
+            data=result.get("data") if isinstance(result, dict) else result,
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_DS_LIST] DeepSearch list failed - space_id={space_id}, error={e}",
+            exc_info=True,
+        )
+        return ResponseModel(
+            code=status.HTTP_502_BAD_GATEWAY,
+            message=f"DeepSearch list failed: {str(e)}",
+        )
+
+
+def _build_ds_embed_config_from_studio(embed_model) -> Tuple[dict, dict]:
+    """从 Studio EmbeddingModelConfig 构建 DS 所需的 embed_model_config 与 llm_config。"""
+    security_utils = SecurityUtils()
+    api_key = ""
+    if embed_model.api_key:
+        try:
+            api_key = security_utils.decrypt_api_key(embed_model.api_key) or ""
+        except Exception as e:
+            logger.warning(f"[KB_SYNC] Failed to decrypt embedding api_key: {e}")
+    embed_model_config = {
+        "model_name": embed_model.model_id or embed_model.model_name or "",
+        "api_key": api_key,
+        "base_url": embed_model.api_base or "",
+        "max_batch_size": getattr(embed_model, "max_batch_size") or 8,
+    }
+    llm_config = {
+        "model_name": "",
+        "model_type": "openai",
+        "base_url": "",
+        "api_key": "",
+        "hyper_parameters": {},
+        "extension": {},
+    }
+    return embed_model_config, llm_config
 
 
 def _get_storage_path(space_id: str, kb_id: str) -> Path:
@@ -1971,12 +2402,80 @@ async def document_upload(
     # 1. 验证用户空间权限
     _ = check_user_space(space_id, current_user)
 
-    # 2. 验证知识库是否存在
+    # 2. 判断知识库来源：kb_id == ds_kb_id 时为 DeepSearch 知识库，转发到 DS 上传接口
     kb_get = KnowledgeBaseGet(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_UPLOAD] Knowledge base not found - KB ID: {kb_id}, User: {user_id}")
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
+    )
+    if not kb_data or is_ds_kb:
+        # DeepSearch 知识库：转发到 DeepSearch 上传接口
+        try:
+            file_parts: List[Tuple[str, bytes, str]] = []
+            for file in files:
+                content = await file.read()
+                fn = file.filename or "unnamed"
+                ct = file.content_type or "application/octet-stream"
+                file_parts.append((fn, content, ct))
+            if not file_parts:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message="No file content to upload",
+                )
+            ds_client = DeepSearchAgentClient()
+            ds_resp = await ds_client.upload_knowledge_base_files(
+                space_id=space_id,
+                ds_kb_id=kb_id,
+                files=file_parts,
+                metadata=metadata,
+            )
+            if not isinstance(ds_resp, dict):
+                return ResponseModel(
+                    code=status.HTTP_502_BAD_GATEWAY,
+                    message="DeepSearch upload returned invalid response",
+                )
+            if ds_resp.get("code") not in (None, status.HTTP_200_OK):
+                return ResponseModel(
+                    code=ds_resp.get("code", status.HTTP_502_BAD_GATEWAY),
+                    message=ds_resp.get("message", "DeepSearch upload failed"),
+                )
+            data = ds_resp.get("data") or {}
+            docs = data.get("documents") or []
+            uploaded_docs = [
+                DocumentUploadResponse(
+                    doc_id=d.get("id") or d.get("doc_id", ""),
+                    name=d.get("name", ""),
+                    file_size=int(d.get("file_size", 0)),
+                    status=d.get("status", DocumentStatus.UPLOADED.value),
+                )
+                for d in docs
+            ]
+            response_data = DocumentUploadBatchResponse(
+                success_count=data.get("success_count", len(uploaded_docs)),
+                failed_count=data.get("failed_count", 0),
+                documents=uploaded_docs,
+            )
+            logger.info(
+                f"[DOC_UPLOAD] Upload (DeepSearch) - KB ID: {kb_id}, "
+                f"Success: {response_data.success_count}, Failed: {response_data.failed_count}, User: {user_id}"
+            )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Upload completed: {response_data.success_count} success, {response_data.failed_count} failed",
+                data=response_data.model_dump(by_alias=False),
+            )
+        except Exception as e:
+            logger.warning(
+                f"[DOC_UPLOAD] DeepSearch upload failed - KB ID: {kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch upload failed: {str(e)}",
+            )
 
     # 3. 获取存储路径
     storage_path = _get_storage_path(space_id, kb_id)
@@ -2293,6 +2792,7 @@ def knowledge_base_list(req: KnowledgeBaseListRequest, current_user: dict) -> Re
                 created_at=_timestamp_to_date_str(kb_data.get("create_time")),
                 updated_at=_timestamp_to_date_str(kb_data.get("update_time")),
                 has_graph_enhancement=has_graph_enhancement,
+                ds_kb_id=kb_data.get("ds_kb_id"),
             )
         )
 
@@ -2319,8 +2819,8 @@ def knowledge_base_list(req: KnowledgeBaseListRequest, current_user: dict) -> Re
 
 
 @with_exception_handling
-def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel:
-    """获取知识库文档列表（支持分页）"""
+async def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel:
+    """获取知识库文档列表（支持分页）。Studio 知识库从 Studio 表取；DeepSearch 知识库从 DeepSearch 接口取。"""
     start_time = time.time()
     user_id = current_user.get("user_id", "unknown")
 
@@ -2332,58 +2832,133 @@ def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 验证知识库是否存在
+    # 2. 验证知识库是否存在且判断来源：kb_id == ds_kb_id 时为 DS 知识库，文档从 DS 接口拉取；否则从 Studio 表获取
     kb_get = KnowledgeBaseGet(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_LIST] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
-
-    # 3. 从数据库获取文档列表
-    list_result = knowledge_base_repository.document_list(
-        KBDocument(
-            KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE),
-        ),
-        page=req.page,
-        size=req.size,
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
     )
 
-    if list_result.code != status.HTTP_200_OK:
-        logger.error(
-            f"[DOC_LIST] Database query failed - Space ID: {req.space_id}, "
-            f"KB ID: {req.kb_id}, Error: {list_result.message}"
+    if kb_data and not is_ds_kb:
+        # Studio 知识库：从 Studio 数据库获取文档列表
+        list_result = knowledge_base_repository.document_list(
+            KBDocument(
+                KBDetails(
+                    space_id=req.space_id,
+                    kb_id=req.kb_id,
+                    index_manager_type=_CURR_INDEX_TYPE,
+                ),
+            ),
+            page=req.page,
+            size=req.size,
+        )
+        if list_result.code != status.HTTP_200_OK:
+            logger.error(
+                f"[DOC_LIST] Studio document list failed - Space ID: {req.space_id}, "
+                f"KB ID: {req.kb_id}, Error: {list_result.message}"
+            )
+            return ResponseModel(
+                code=list_result.code,
+                message=list_result.message,
+                data={"items": [], "total": 0, "page": req.page, "size": req.size},
+            )
+
+        # 转换数据格式
+        items = []
+        for doc_data in list_result.data.get("items", []):
+            items.append(
+                DocumentListItem(
+                    name=doc_data.get("name", ""),
+                    id=doc_data.get("doc_id", ""),
+                    created_at=_timestamp_to_date_str(doc_data.get("create_time")),
+                    updated_at=_timestamp_to_date_str(doc_data.get("update_time")),
+                )
+            )
+        total = list_result.data.get("total", 0)
+        response_data = DocumentListResponse(
+            items=items, total=total, page=req.page, size=req.size
+        )
+        logger.info(
+            f"[DOC_LIST] Document list (Studio) - Space ID: {req.space_id}, "
+            f"KB ID: {req.kb_id}, Count: {len(items)}/{total}, User: {user_id}, "
+            f"Duration: {time.time() - start_time:.3f}s"
         )
         return ResponseModel(
-            code=list_result.code,
-            message=list_result.message,
-            data={"items": [], "total": 0, "page": req.page, "size": req.size},
+            code=status.HTTP_200_OK,
+            message="get documents success",
+            data=response_data.model_dump(by_alias=False),
         )
 
-    # 4. 转换数据格式
+    # 3. DeepSearch 知识库（kb_id == ds_kb_id 或未在 Studio 找到）：从 DeepSearch 接口拉取文档列表
+    try:
+        ds_client = DeepSearchAgentClient()
+        ds_resp = await ds_client.list_documents(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            page=req.page,
+            size=req.size,
+        )
+    except Exception as e:
+        logger.warning(
+            f"[DOC_LIST] DeepSearch document list failed - space_id={req.space_id}, "
+            f"kb_id={req.kb_id}, error={e}"
+        )
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message="Knowledge base not found or document list unavailable",
+        )
+
+    if not isinstance(ds_resp, dict):
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message="Knowledge base not found or document list unavailable",
+        )
+    if ds_resp.get("code") not in (None, status.HTTP_200_OK):
+        return ResponseModel(
+            code=ds_resp.get("code", status.HTTP_404_NOT_FOUND),
+            message=ds_resp.get("message", "Knowledge base not found or document list unavailable"),
+        )
+    data = ds_resp.get("data")
+    if not isinstance(data, dict):
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message="Knowledge base not found or document list unavailable",
+        )
+
+    ds_items = data.get("items") or []
+    total = data.get("total", 0)
     items = []
-    for doc_data in list_result.data.get("items", []):
+    for doc in ds_items:
+        doc_id = doc.get("id") or doc.get("doc_id") or ""
+        created_at = doc.get("created_at") or ""
+        updated_at = doc.get("updated_at") or ""
+        if not created_at and doc.get("create_time") is not None:
+            created_at = _timestamp_to_date_str(doc.get("create_time"))
+        if not updated_at and doc.get("update_time") is not None:
+            updated_at = _timestamp_to_date_str(doc.get("update_time"))
         items.append(
             DocumentListItem(
-                name=doc_data.get("name", ""),
-                id=doc_data.get("doc_id", ""),
-                created_at=_timestamp_to_date_str(doc_data.get("create_time")),
-                updated_at=_timestamp_to_date_str(doc_data.get("update_time")),
+                name=doc.get("name", ""),
+                id=doc_id,
+                created_at=created_at,
+                updated_at=updated_at,
             )
         )
 
-    # 5. 构建响应数据
-    total = list_result.data.get("total", 0)
-    response_data = DocumentListResponse(items=items, total=total, page=req.page, size=req.size)
-
-    logger.info(
-        f"[DOC_LIST] Document list retrieved - Space ID: {req.space_id}, "
-        f"KB ID: {req.kb_id}, Count: {len(items)}/{total}, "
-        f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    response_data = DocumentListResponse(
+        items=items, total=total, page=req.page, size=req.size
     )
-
-    # 6. 返回列表结果
+    logger.info(
+        f"[DOC_LIST] Document list (DeepSearch) - Space ID: {req.space_id}, "
+        f"KB ID: {req.kb_id}, Count: {len(items)}/{total}, User: {user_id}, "
+        f"Duration: {time.time() - start_time:.3f}s"
+    )
+    # 4. 返回列表结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get documents success",
@@ -2469,16 +3044,54 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 验证知识库是否存在
+    # 2. 判断知识库来源：kb_id == ds_kb_id 时为 DeepSearch 知识库，转发到 DS 删除接口
     kb_get = KnowledgeBaseGet(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(
-            f"[DOC_DELETE] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
-        )
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
+    )
+    if not kb_data or is_ds_kb:
+        # DeepSearch 知识库：转发到 DeepSearch 删除接口
+        try:
+            ds_client = DeepSearchAgentClient()
+            ds_resp = await ds_client.delete_documents(
+                space_id=req.space_id,
+                kb_id=req.kb_id,
+                document_ids=req.document_ids,
+            )
+            if not isinstance(ds_resp, dict):
+                return ResponseModel(
+                    code=status.HTTP_502_BAD_GATEWAY,
+                    message="DeepSearch delete returned invalid response",
+                )
+            if ds_resp.get("code") not in (None, status.HTTP_200_OK):
+                return ResponseModel(
+                    code=ds_resp.get("code", status.HTTP_502_BAD_GATEWAY),
+                    message=ds_resp.get("message", "DeepSearch delete failed"),
+                )
+            logger.info(
+                f"[DOC_DELETE] Delete (DeepSearch) - KB ID: {req.kb_id}, "
+                f"Doc IDs: {len(req.document_ids)}, User: {user_id}"
+            )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Documents deleted successfully",
+                data=None,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[DOC_DELETE] DeepSearch delete failed - KB ID: {req.kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch delete failed: {str(e)}",
+            )
 
     # 3. 批量删除文档
     success_count = 0
@@ -2609,8 +3222,8 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
 
 
 @with_exception_handling
-def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) -> ResponseModel:
-    """批量查询文档状态"""
+async def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) -> ResponseModel:
+    """批量查询文档状态。Studio 知识库查 Studio 表；DeepSearch 知识库调 DeepSearch 接口。"""
     start_time = time.time()
     user_id = current_user.get("user_id", "unknown")
     logger.info(
@@ -2621,74 +3234,119 @@ def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) ->
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 批量查询文档状态
-    status_items = []
-    for doc_id in req.doc_id_list:
-        doc_result = knowledge_base_repository.document_get(
-            KBDocument(
-                KBDetails(
-                    space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
-                ),
-                doc_id=doc_id,
-            )
-        )
+    # 2. 判断是否为 Studio 知识库
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
 
-        if doc_result.code == status.HTTP_200_OK and doc_result.data:
-            doc_data = doc_result.data
-            status_value = doc_data.get("status", DocumentStatus.UPLOADING.value)
-            doc_name = doc_data.get("name")
-
-            # 从 process_info 中提取错误信息和图增强标识
-            error_msg = None
-            enable_graph_enhancement = None
-            process_info = doc_data.get("process_info")
-            if isinstance(process_info, dict):
-                # 优先查找 "error" 字段（文档处理失败时设置），如果没有则查找 "message" 字段（导入时设置）
-                error_msg = process_info.get("error") or process_info.get("message")
-                # 从 indexing_strategy 中提取 enable_graph_enhancement
-                indexing_strategy = process_info.get("indexing_strategy")
-                if isinstance(indexing_strategy, dict):
-                    enable_graph_enhancement = indexing_strategy.get(
-                        "enable_graph_enhancement", False
-                    )
-
-            # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
-            if status_value == DocumentStatus.FAILED.value and not error_msg:
-                error_msg = "Processing failed with unknown error"
-
-            # 格式化错误信息供前端显示
-            if error_msg:
-                error_msg = _format_error_message_for_frontend(error_msg)
-
-            status_items.append(
-                DocumentStatusResponse(
-                    id=doc_id,
-                    status=status_value,
-                    name=doc_name,
-                    error_msg=error_msg,
-                    enable_graph_enhancement=enable_graph_enhancement,
-                )
-            )
-        else:
-            # 文档不存在，仍然返回但状态为空或标记为不存在
-            logger.warning(
-                f"[DOC_STATUS] Document not found - Space ID: {req.space_id}, "
-                f"KB ID: {req.kb_id}, Doc ID: {doc_id}, User: {user_id}"
-            )
-            # 可以选择跳过不存在的文档，或者返回一个标记状态
-            # 这里选择跳过，只返回存在的文档
-
-    # 3. 构建响应数据
-    response_data = DocumentStatusListResponse(items=status_items)
-
-    logger.info(
-        f"[DOC_STATUS] Document status batch retrieved - Space ID: {req.space_id}, "
-        f"KB ID: {req.kb_id}, Requested: {len(req.doc_id_list)}, "
-        f"Found: {len(status_items)}, User: {user_id}, "
-        f"Duration: {time.time() - start_time:.3f}s"
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
     )
 
-    # 4. 返回查询结果
+    if kb_data and not is_ds_kb:
+        # Studio 知识库：从 Studio 文档表查状态
+        status_items = []
+        for doc_id in req.doc_id_list:
+            doc_result = knowledge_base_repository.document_get(
+                KBDocument(
+                    KBDetails(
+                        space_id=req.space_id,
+                        kb_id=req.kb_id,
+                        index_manager_type=_CURR_INDEX_TYPE,
+                    ),
+                    doc_id=doc_id,
+                )
+            )
+            if doc_result.code == status.HTTP_200_OK and doc_result.data:
+                doc_data = doc_result.data
+                status_value = doc_data.get("status", DocumentStatus.UPLOADING.value)
+                doc_name = doc_data.get("name")
+                error_msg = None
+                enable_graph_enhancement = None
+                process_info = doc_data.get("process_info")
+                if isinstance(process_info, dict):
+                    error_msg = process_info.get("error") or process_info.get("message")
+                    indexing_strategy = process_info.get("indexing_strategy")
+                    if isinstance(indexing_strategy, dict):
+                        enable_graph_enhancement = indexing_strategy.get(
+                            "enable_graph_enhancement", False
+                        )
+                if status_value == DocumentStatus.FAILED.value and not error_msg:
+                    error_msg = "Processing failed with unknown error"
+                if error_msg:
+                    error_msg = _format_error_message_for_frontend(error_msg)
+                status_items.append(
+                    DocumentStatusResponse(
+                        id=doc_id,
+                        status=status_value,
+                        name=doc_name,
+                        error_msg=error_msg,
+                        enable_graph_enhancement=enable_graph_enhancement,
+                    )
+                )
+        response_data = DocumentStatusListResponse(items=status_items)
+        logger.info(
+            f"[DOC_STATUS] Document status (Studio) - Space ID: {req.space_id}, "
+            f"KB ID: {req.kb_id}, Requested: {len(req.doc_id_list)}, Found: {len(status_items)}, "
+            f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get document status success",
+            data=response_data.model_dump(by_alias=False),
+        )
+
+    # 3. DeepSearch 知识库：调 DeepSearch 文档状态接口
+    try:
+        ds_client = DeepSearchAgentClient()
+        ds_resp = await ds_client.get_document_status(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            doc_id_list=req.doc_id_list,
+        )
+    except Exception as e:
+        logger.warning(
+            f"[DOC_STATUS] DeepSearch document status failed - space_id={req.space_id}, "
+            f"kb_id={req.kb_id}, error={e}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get document status success",
+            data=DocumentStatusListResponse(items=[]).model_dump(by_alias=False),
+        )
+
+    if not isinstance(ds_resp, dict) or ds_resp.get("code") not in (None, status.HTTP_200_OK):
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get document status success",
+            data=DocumentStatusListResponse(items=[]).model_dump(by_alias=False),
+        )
+    data = ds_resp.get("data")
+    if not isinstance(data, dict):
+        data = {}
+    ds_items = data.get("items") or []
+    status_items = []
+    for item in ds_items:
+        doc_id = item.get("id") or item.get("doc_id") or ""
+        status_items.append(
+            DocumentStatusResponse(
+                id=doc_id,
+                status=item.get("status", DocumentStatus.UPLOADING.value),
+                name=item.get("name"),
+                error_msg=item.get("error_msg"),
+                enable_graph_enhancement=item.get("enable_graph_enhancement"),
+            )
+        )
+    response_data = DocumentStatusListResponse(items=status_items)
+    logger.info(
+        f"[DOC_STATUS] Document status (DeepSearch) - Space ID: {req.space_id}, "
+        f"KB ID: {req.kb_id}, Requested: {len(req.doc_id_list)}, Found: {len(status_items)}, "
+        f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    )
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get document status success",
@@ -2698,7 +3356,7 @@ def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) ->
 
 @with_exception_handling
 async def document_process(req: DocumentProcessRequest, current_user: dict) -> ResponseModel:
-    """启动文档处理流程，使用 agentcore 的解析/分段/索引能力"""
+    """启动文档处理流程。Studio 知识库走本地 _process_documents_sequentially；DeepSearch 知识库转发到 DeepSearch /api/kb/process 建索引。"""
     start_time = time.time()
     user_id = current_user.get("user_id", "unknown")
 
@@ -2709,15 +3367,65 @@ async def document_process(req: DocumentProcessRequest, current_user: dict) -> R
 
     _ = check_user_space(req.space_id, current_user)
 
+    # 判断知识库来源：kb_id == ds_kb_id 时为 DeepSearch 知识库，转发到 DS 建索引接口
     kb_get = KnowledgeBaseGet(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(
-            f"[DOC_PROCESS] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
-        )
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
+    )
+    if not kb_data or is_ds_kb:
+        # DeepSearch 知识库：转发到 DeepSearch 建索引接口
+        try:
+            process_payload = {
+                "space_id": req.space_id,
+                "kb_id": req.kb_id,
+                "doc_id_list": req.doc_id_list,
+                "parsing_strategy": req.parsing_strategy.model_dump()
+                if hasattr(req.parsing_strategy, "model_dump")
+                else (req.parsing_strategy or {}),
+                "segmentation_strategy": req.segmentation_strategy.model_dump()
+                if hasattr(req.segmentation_strategy, "model_dump")
+                else (req.segmentation_strategy or {}),
+                "indexing_strategy": req.indexing_strategy.model_dump()
+                if hasattr(req.indexing_strategy, "model_dump")
+                else (req.indexing_strategy or {}),
+            }
+            ds_client = DeepSearchAgentClient()
+            result = await ds_client.process_knowledge_base_documents(process_payload)
+            if not isinstance(result, dict):
+                return ResponseModel(
+                    code=status.HTTP_502_BAD_GATEWAY,
+                    message="DeepSearch process returned invalid response",
+                )
+            if result.get("code") not in (None, status.HTTP_200_OK):
+                return ResponseModel(
+                    code=result.get("code", status.HTTP_502_BAD_GATEWAY),
+                    message=result.get("message", "DeepSearch process failed"),
+                )
+            data = result.get("data") or {}
+            logger.info(
+                f"[DOC_PROCESS] DeepSearch process submitted - KB ID: {req.kb_id}, "
+                f"task_id: {data.get('task_id')}, User: {user_id}"
+            )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Document process submitted",
+                data=data,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[DOC_PROCESS] DeepSearch process failed - KB ID: {req.kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch process failed: {str(e)}",
+            )
 
     processed_count = 0
     failed_count = 0

@@ -8,7 +8,6 @@ import { useKnowledgeBaseStore } from '@/stores/useKnowledgeBaseStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { ENV_CONFIG } from '@/config/environment'
 import { useEmbeddingModels, useTestEmbeddingModel, useToggleEmbeddingModelStatus } from '@test-agentstudio/api-client'
-import { KnowledgeBaseService } from '@test-agentstudio/api-client'
 import { validateKnowledgeBaseName } from '../utils/validation'
 
 // 自定义输入组件 - 移到主组件外部以避免重新创建导致失焦
@@ -122,7 +121,6 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
   })
 
   const { createKnowledgeBase, updateKnowledgeBase, total } = useKnowledgeBaseStore()
-  const [existingNames, setExistingNames] = useState<string[]>([])
   const MAX_KNOWLEDGE_BASES = 100
   const isAtLimit = !knowledgeBase && total >= MAX_KNOWLEDGE_BASES
 
@@ -163,61 +161,14 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
     }
   }, [open, user?.spaceId, knowledgeBase, queryClient, refetchEmbeddingModels])
 
-  // 获取所有知识库名称用于重复检查
-  useEffect(() => {
-    if (open && user?.spaceId) {
-      const fetchAllKnowledgeBaseNames = async () => {
-        try {
-          const allNames: string[] = []
-          let page = 1
-          const pageSize = 100
-          let hasMore = true
-
-          while (hasMore) {
-            const response = await KnowledgeBaseService.getKnowledgeBases({
-              space_id: user.spaceId,
-              page: page,
-              size: pageSize,
-            })
-            if (response.code === 200 && response.data?.items) {
-              const names = response.data.items.map((item: any) => item.name).filter((name: string) => name && (!knowledgeBase || name !== knowledgeBase.name)) // 更新模式时排除当前知识库
-              allNames.push(...names)
-
-              // 检查是否还有更多数据
-              const total = response.data.total || 0
-              const fetched = page * pageSize
-              hasMore = fetched < total
-              page++
-            } else {
-              hasMore = false
-            }
-          }
-
-          setExistingNames(allNames)
-        } catch (error) {
-          console.error('Failed to fetch knowledge base names:', error)
-        }
-      }
-      fetchAllKnowledgeBaseNames()
-    }
-  }, [open, user?.spaceId, knowledgeBase])
-
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newName = e.target.value
     setFormData(prev => ({ ...prev, name: newName }))
 
     let nameError: string | null = null
 
-    // 先检查基本验证（特殊字符、长度等）
+    // 仅做基本验证（特殊字符、长度等）；重名以后端创建接口返回为准，避免与删除后列表不同步导致误报「已存在」
     nameError = validateKnowledgeBaseName(newName, t, 'knowledgeBases.form.nameRequired')
-
-    // 如果基本验证通过，检查重复名称
-    if (!nameError && newName.trim()) {
-      const isDuplicate = existingNames.some(existingName => existingName === newName)
-      if (isDuplicate) {
-        nameError = t('knowledgeBases.form.nameExists')
-      }
-    }
 
     setErrors(prev => ({
       ...prev,
@@ -253,13 +204,8 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
     const nameError = validateKnowledgeBaseName(formData.name, t, 'knowledgeBases.form.nameRequired')
     if (nameError) {
       newErrors.name = nameError
-    } else if (formData.name.trim()) {
-      // 如果基本验证通过，检查重复名称
-      const isDuplicate = existingNames.some(existingName => existingName === formData.name)
-      if (isDuplicate) {
-        newErrors.name = t('knowledgeBases.form.nameExists')
-      }
     }
+    // 重名以后端创建/更新接口返回为准，不再用前端缓存的名称列表判重
 
     // 检查是否有可用的 embedding 模型（仅在创建时检查）
     if (!knowledgeBase) {
