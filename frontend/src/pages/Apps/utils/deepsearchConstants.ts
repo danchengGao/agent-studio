@@ -16,7 +16,6 @@ export const DEFAULT_DEEPSEARCH_CONFIG: DeepSearchConfig = {
   localSearchResultCount: 5,
   selectedKnowledgeBaseIds: [], // 本地知识库ID列表
   recallThreshold: 0.5, // 最小匹配分数，默认 0.5
-  selectedDeepSearchKnowledgeBaseId: undefined, // DeepSearch 知识库 ID
   enableTemplate: false,
   selectedTemplateId: undefined,
   execution_method: "parallel",   // "parallel", "dependency_driving", 默认平行模式

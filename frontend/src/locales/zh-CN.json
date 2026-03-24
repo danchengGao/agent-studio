@@ -935,7 +935,7 @@
         "clickToConfig": "点击上方\"配置\"按钮添加联网增强引擎",
         "localKB": "本地知识库",
         "noKB": "暂无知识库配置",
-        "clickToAddKB": "点击上方\"添加知识库\"按钮选择",
+        "clickToAddKB": "点击上方\"配置\"按钮添加知识库",
         "deepSearchKnowledgeBase": "配置 DeepSearch 知识库",
         "refresh": "刷新",
         "noDeepSearchKB": "暂无 DeepSearch 知识库，请先在知识库中同步至 Deep Search"
@@ -1038,6 +1038,12 @@
         "loading": "加载中...",
         "confirm": "确认 ({{count}})",
         "cancel": "取消",
+        "refresh": "刷新",
+        "status": {
+          "ready": "已就绪",
+          "processing": "处理中",
+          "failed": "处理失败"
+        },
         "error": {
           "loadFailed": "获取知识库列表失败",
           "loadError": "加载知识库列表时出错",

@@ -924,7 +924,7 @@
         "clickToConfig": "Click \"Configure\" above to add online enhancement engine",
         "localKB": "Local Knowledge Base",
         "noKB": "No knowledge base configured",
-        "clickToAddKB": "Click \"Add Knowledge Base\" above to select",
+        "clickToAddKB": "Click \"Configure\" above to add knowledge",
         "deepSearchKnowledgeBase": "Configure DeepSearch Knowledge Base",
         "refresh": "Refresh",
         "noDeepSearchKB": "No DeepSearch knowledge base. Sync a knowledge base to DeepSearch first."
@@ -1027,6 +1027,12 @@
         "loading": "Loading...",
         "confirm": "Confirm ({{count}})",
         "cancel": "Cancel",
+        "refresh": "Refresh",
+        "status": {
+          "ready": "Ready",
+          "processing": "Processing",
+          "failed": "Failed"
+        },
         "error": {
           "loadFailed": "Failed to load knowledge bases",
           "loadError": "Error loading knowledge bases",

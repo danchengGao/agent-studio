@@ -32,6 +32,8 @@ export interface KnowledgeBaseItem {
   updated_at: string
   // DeepSearch 知识库 ID，未同步则为 null
   ds_kb_id?: string | null
+  // 知识库状态：indexed=已就绪，其他=处理中/失败
+  status?: string
 }
 
 // 搜索结果知识库项

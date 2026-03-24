@@ -1,21 +1,22 @@
 /**
  * Search Config Tab Component
  * 搜索配置标签内容组件
- * 包含搜索方式、搜索来源（搜索引擎+本地知识库）和搜索结果设置
+ * 包含搜索方式、搜索来源（搜索引擎 + 本地知识库）和搜索结果设置
  */
 
 import React from 'react'
-import { Check, Loader2, Plus, Trash2, AlertCircle, Edit, RefreshCw } from 'lucide-react'
+import { Check, Loader2, Plus, Trash2, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { ConfigTabProps } from '../ConfigRegistry'
 import { ConfigSection } from '../ConfigSection'
 import { RADIUS_BUTTON } from '../../../constants/styles'
 
-// 知识库详情类型
+// 知识库详情类型（带状态支持）
 export interface KnowledgeBaseDetail {
   id: string
   name: string
   desc?: string
+  status?: string
 }
 
 // 从父组件传入的控件和数据类型
@@ -51,20 +52,6 @@ export interface SearchConfigTabProps extends ConfigTabProps {
   onShowKnowledgeBaseSelector: () => void
   /** 删除知识库 */
   onRemoveKnowledgeBase: (kbId: string) => void
-  /** Embedding模型不一致错误信息 */
-  embeddingModelError: string | null
-  /** 是否为 DeepSearch 智能体（显示 DeepSearch 知识库配置） */
-  isDeepSearch?: boolean
-  /** DeepSearch 知识库列表 */
-  deepSearchKnowledgeBases?: Array<{ id: string; name: string; desc?: string; status?: string }>
-  /** DeepSearch 知识库列表加载中 */
-  deepSearchKbLoading?: boolean
-  /** 刷新 DeepSearch 知识库列表 */
-  onRefreshDeepSearchKnowledgeBases?: () => void
-  /** 当前选中的 DeepSearch 知识库 ID */
-  selectedDeepSearchKnowledgeBaseId?: string
-  /** 选择 DeepSearch 知识库 */
-  onSelectDeepSearchKnowledgeBase?: (id: string | undefined) => void
 }
 
 /**
@@ -81,16 +68,26 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
   knowledgeBases,
   onShowKnowledgeBaseSelector,
   onRemoveKnowledgeBase,
-  embeddingModelError,
-  isDeepSearch,
-  deepSearchKnowledgeBases = [],
-  deepSearchKbLoading = false,
-  onRefreshDeepSearchKnowledgeBases,
-  selectedDeepSearchKnowledgeBaseId,
-  onSelectDeepSearchKnowledgeBase,
 }) => {
   const { t } = useTranslation()
-  const isIndexing = (status?: string) => (status || '').toLowerCase() === 'indexing' || (status || '').toLowerCase() === '索引中'
+
+  // 获取状态显示信息
+  const getStatusDisplay = (status?: string): { text: string; color: string } | null => {
+    if (!status) return null
+    if (status === 'indexed') {
+      return { text: t('apps.config.knowledge.status.ready'), color: 'bg-green-100 text-green-700' }
+    }
+    if (status === 'failed') {
+      return { text: t('apps.config.knowledge.status.failed'), color: 'bg-red-100 text-red-700' }
+    }
+    // 其他所有状态统一显示"处理中"
+    return { text: t('apps.config.knowledge.status.processing'), color: 'bg-gray-100 text-gray-700' }
+  }
+
+  // 判断知识库是否可用（只有 indexed 状态可用）
+  const isAvailable = (status?: string): boolean => {
+    return status === 'indexed'
+  }
 
   // 根据搜索模式决定显示哪些搜索来源
   const showWebSearch = config.searchMode === 'web' || config.searchMode === 'all'
@@ -100,7 +97,7 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
   const searchModeOptions = [
     { value: 'local' as const, label: t('apps.config.search.local'), desc: t('apps.config.search.localDesc') },
     { value: 'web' as const, label: t('apps.config.search.web'), desc: t('apps.config.search.webDesc') },
-    { value: 'all' as const, label: t('apps.config.search.all'), desc: t('apps.config.search.allDesc') }
+    { value: 'all' as const, label: t('apps.config.search.all'), desc: t('apps.config.search.allDesc') },
   ]
 
   return (
@@ -108,18 +105,16 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
       {/* 搜索方式 */}
       <ConfigSection title={t('apps.config.search.mode')}>
         <div className="flex flex-col gap-2">
-          {/* 暂时屏蔽本地搜索和综合搜索选项，只保留网络搜索 */}
-          {searchModeOptions
-            .filter(option => option.value !== 'local' && option.value !== 'all')
-            .map(option => (
+          {searchModeOptions.map(option => (
             <button
               key={option.value}
               onClick={() => updateConfig('searchMode', option.value)}
               className={`
                 px-4 py-3 ${RADIUS_BUTTON} text-sm font-medium transition-all duration-200 border text-left
-                ${config.searchMode === option.value
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                ${
+                  config.searchMode === option.value
+                    ? 'bg-blue-50 border-blue-200 text-blue-700'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                 }
               `}
             >
@@ -128,9 +123,7 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
                   <span className="block font-medium">{option.label}</span>
                   <span className="text-xs text-gray-500">{option.desc}</span>
                 </div>
-                {config.searchMode === option.value && (
-                  <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                )}
+                {config.searchMode === option.value && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
               </div>
             </button>
           ))}
@@ -160,105 +153,36 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
               </div>
-            ) : !config.selectedWebSearchEngineId ? (
-              <div className="p-3 bg-gray-50 rounded-xl text-center">
-                <p className="text-sm text-gray-500 mb-1">{t('apps.config.search.noEngine')}</p>
-                <p className="text-xs text-gray-400">{t('apps.config.search.clickToConfig')}</p>
-              </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                {engines
-                  .filter(engine => engine.web_search_engine_id === config.selectedWebSearchEngineId)
-                  .map(engine => (
+              (() => {
+                // 检查选中的引擎是否存在于列表中
+                const selectedEngine = engines.find(e => e.web_search_engine_id === config.selectedWebSearchEngineId)
+                if (!config.selectedWebSearchEngineId || !selectedEngine) {
+                  return (
+                    <div className="p-3 bg-gray-50 rounded-xl text-center">
+                      <p className="text-sm text-gray-500 mb-1">{t('apps.config.search.noEngine')}</p>
+                      <p className="text-xs text-gray-400">{t('apps.config.search.clickToConfig')}</p>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="flex flex-col gap-2">
                     <div
-                      key={engine.web_search_engine_id}
+                      key={selectedEngine.web_search_engine_id}
                       className="px-3 py-2 border border-gray-200 rounded-xl bg-white hover:border-gray-300 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
-                          🔍
-                        </div>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">🔍</div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {engine.search_engine_name}
-                          </p>
+                          <p className="text-sm font-medium text-gray-900 truncate">{selectedEngine.search_engine_name}</p>
                         </div>
                       </div>
                     </div>
-                  ))}
-              </div>
+                  </div>
+                )
+              })()
             )}
           </div>
-        )}
-
-        {/* DeepSearch 知识库（仅 DeepSearch 智能体） */}
-        {isDeepSearch && onRefreshDeepSearchKnowledgeBases && onSelectDeepSearchKnowledgeBase && (
-          <div className={showWebSearch || showLocalSearch ? 'mt-4' : ''}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">📚</span>
-                <span className="text-sm font-medium text-gray-900">{t('apps.config.search.deepSearchKnowledgeBase')}</span>
-              </div>
-              <button
-                type="button"
-                onClick={onRefreshDeepSearchKnowledgeBases}
-                disabled={deepSearchKbLoading}
-                className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg border border-gray-200 flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${deepSearchKbLoading ? 'animate-spin' : ''}`} />
-                {t('apps.config.search.refresh')}
-              </button>
-            </div>
-            {deepSearchKbLoading ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-              </div>
-            ) : deepSearchKnowledgeBases.length === 0 ? (
-              <div className="p-3 bg-gray-50 rounded-xl text-center">
-                <p className="text-sm text-gray-500">{t('apps.config.search.noDeepSearchKB')}</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {deepSearchKnowledgeBases.map(kb => {
-                  const indexing = isIndexing(kb.status)
-                  return (
-                    <button
-                      key={kb.id}
-                      type="button"
-                      onClick={() => !indexing && onSelectDeepSearchKnowledgeBase(selectedDeepSearchKnowledgeBaseId === kb.id ? undefined : kb.id)}
-                      disabled={indexing}
-                      className={`
-                        px-3 py-2 rounded-xl border text-left transition-all duration-200 flex items-center justify-between
-                        ${indexing ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-70' : 'bg-white border-gray-200 hover:border-gray-300'}
-                        ${selectedDeepSearchKnowledgeBaseId === kb.id ? 'ring-2 ring-blue-500 border-blue-300' : ''}
-                      `}
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">📚</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{kb.name}</p>
-                          {kb.desc && <p className="text-xs text-gray-500 truncate">{kb.desc}</p>}
-                          {kb.status && (
-                            <p className={`text-xs mt-0.5 ${indexing ? 'text-amber-600' : 'text-gray-500'}`}>
-                              {kb.status}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {selectedDeepSearchKnowledgeBaseId === kb.id && !indexing && (
-                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0 ml-2" />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 分割线（综合搜索模式时显示） */}
-        {showWebSearch && showLocalSearch && (
-          <div className="my-4 border-t border-gray-200" />
         )}
 
         {/* 本地知识库 */}
@@ -269,22 +193,11 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
                 <span className="text-lg">📚</span>
                 <span className="text-sm font-medium text-gray-900">{t('apps.config.search.localKB')}</span>
               </div>
-              <button
-                onClick={onShowKnowledgeBaseSelector}
-                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-              >
+              <button onClick={onShowKnowledgeBaseSelector} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
                 <Plus className="w-3 h-3" />
                 {t('apps.config.search.configure')}
               </button>
             </div>
-
-            {/* Embedding 错误提示 */}
-            {embeddingModelError && (
-              <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700">{embeddingModelError}</p>
-              </div>
-            )}
 
             {/* 已选知识库列表 */}
             {knowledgeBases.length === 0 ? (
@@ -294,35 +207,41 @@ export const SearchConfigTab: React.FC<SearchConfigTabProps> = ({
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {knowledgeBases.map(kb => (
-                  <div
-                    key={kb.id}
-                    className={`
-                      px-3 py-2 ${RADIUS_BUTTON} border transition-all duration-200
-                      bg-white border-gray-200 hover:border-gray-300
-                    `}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">
-                          📚
+                {knowledgeBases.map(kb => {
+                  const available = isAvailable(kb.status)
+                  const statusDisplay = getStatusDisplay(kb.status)
+                  return (
+                    <div
+                      key={kb.id}
+                      className={`
+                        px-3 py-2 ${RADIUS_BUTTON} border transition-all duration-200
+                        ${!available ? 'bg-gray-100 border-gray-200 opacity-70' : 'bg-white border-gray-200 hover:border-gray-300'}
+                      `}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 flex-shrink-0">📚</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-medium truncate ${!available ? 'text-gray-500' : 'text-gray-900'}`}>{kb.name}</p>
+                              {kb.status && statusDisplay && (
+                                <span className={`px-1.5 py-0.5 text-xs rounded-full flex-shrink-0 ${statusDisplay.color}`}>{statusDisplay.text}</span>
+                              )}
+                            </div>
+                            {kb.desc && <p className={`text-xs truncate ${!available ? 'text-gray-400' : 'text-gray-500'}`}>{kb.desc}</p>}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{kb.name}</p>
-                          {kb.desc && (
-                            <p className="text-xs text-gray-500 truncate">{kb.desc}</p>
-                          )}
-                        </div>
+                        <button
+                          onClick={() => onRemoveKnowledgeBase(kb.id)}
+                          disabled={!available}
+                          className="p-1 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => onRemoveKnowledgeBase(kb.id)}
-                        className="p-1 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors flex-shrink-0"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

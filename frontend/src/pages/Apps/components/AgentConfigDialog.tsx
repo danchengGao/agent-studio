@@ -58,9 +58,6 @@ export interface DeepSearchConfig {
   selectedKnowledgeBaseIds: string[] // 选中的知识库ID列表
   recallThreshold: number // 最小匹配分数，范围: [0.0, 1.0]，默认 0.5
 
-  // DeepSearch 知识库（任务空间检索用）
-  selectedDeepSearchKnowledgeBaseId?: string
-
   // 模板配置
   enableTemplate: boolean // 是否启用模板
   selectedTemplateId?: number // 选中的模板ID
@@ -223,18 +220,16 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
   // ===== 新增：知识库相关状态 =====
   const [showKnowledgeBaseSelector, setShowKnowledgeBaseSelector] = useState(false)
-  const [selectedKnowledgeBasesDetail, setSelectedKnowledgeBasesDetail] = useState<Array<{
-    id: string
-    name: string
-    desc?: string
-  }>>([])
-  const [embeddingModelError, setEmbeddingModelError] = useState<string | null>(null)
+  const [selectedKnowledgeBasesDetail, setSelectedKnowledgeBasesDetail] = useState<
+    Array<{
+      id: string
+      name: string
+      desc?: string
+      status?: string
+    }>
+  >([])
 
-  // DeepSearch 知识库列表（任务空间配置用）
-  const [deepSearchKnowledgeBases, setDeepSearchKnowledgeBases] = useState<Array<{ id: string; name: string; desc?: string; status?: string }>>([])
-  const [deepSearchKbLoading, setDeepSearchKbLoading] = useState(false)
-
-  // 新增：当前激活的配置标签
+  // 当前激活的配置标签
   const [activeTab, setActiveTab] = useState<ConfigTabId>('general')
 
   // 删除确认对话框状态
@@ -388,16 +383,11 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
       errors.push(t('apps.config.validation.localResultCountRange'))
     }
 
-    // Embedding模型一致性验证
-    if (embeddingModelError) {
-      errors.push(embeddingModelError)
-    }
-
     return {
       valid: errors.length === 0,
       errors
     }
-  }, [config, embeddingModelError, t])
+  }, [config, t])
 
   const { valid, errors } = validateConfig()
 
@@ -448,102 +438,56 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
   // 选择搜索引擎（单选）
   const handleSelectEngine = useCallback((engineId: number | undefined) => {
-    updateConfig('selectedWebSearchEngineId', engineId)
+      updateConfig('selectedWebSearchEngineId', engineId)
   }, [updateConfig])
 
   // 选择模板（支持取消选中）
   const handleSelectTemplate = useCallback((templateId: number | undefined) => {
-    updateConfig('selectedTemplateId', templateId)
-    updateConfig('enableTemplate', templateId !== undefined)
+      updateConfig('selectedTemplateId', templateId)
+      updateConfig('enableTemplate', templateId !== undefined)
   }, [updateConfig])
 
   // ===== 新增：知识库相关回调函数 =====
 
   // 加载知识库详细信息
   const loadKnowledgeBasesDetail = useCallback(async (kbIds: string[]) => {
-    if (!spaceId || kbIds.length === 0) {
-      setSelectedKnowledgeBasesDetail([])
-      setEmbeddingModelError(null)
-      return
-    }
+      if (!spaceId || kbIds.length === 0) {
+        setSelectedKnowledgeBasesDetail([])
+        return
+      }
 
-    try {
-      const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
+      try {
+        const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
 
-      const response = await KnowledgeBaseService.getKnowledgeBases({
-        space_id: spaceId,
-        page: 1,
-        size: 100,
-      })
+        const response = await KnowledgeBaseService.getDeepSearchKnowledgeBasesList({
+          space_id: spaceId,
+          page: 1,
+          size: 100,
+        })
 
-      if (response.code === 200 && response.data) {
-        const details = kbIds
+        if (response.code === 200 && response.data) {
+          const details = kbIds
           .map((kbId) => {
-            const kb = response.data.items.find((item: any) => item.id === kbId)
-            if (!kb) return null
+              const kb = response.data.items.find((item: any) => item.id === kbId)
+              if (!kb) return null
 
-            return {
-              id: kb.id,
-              name: kb.name,
-              desc: kb.desc,
-            }
-          })
+              return {
+                id: kb.id,
+                name: kb.name,
+                desc: kb.desc,
+                status: kb.status,
+              }
+            })
           .filter((d) => d !== null)
 
-        setSelectedKnowledgeBasesDetail(details)
-
-        // 验证embedding模型一致性（使用原始知识库数据）
-        const kbsWithEmbeddingId = response.data.items
-          .filter((item: any) => kbIds.includes(item.id))
-          .map((item: any) => ({
-            embedding_model_config_id: item.embedding_model_config_id,
-          }))
-        await validateEmbeddingModels(kbsWithEmbeddingId)
-      }
-    } catch (err) {
-      console.error('Failed to load knowledge bases details:', err)
-    }
-  }, [spaceId])
-
-  // 验证embedding模型一致性
-  const validateEmbeddingModels = useCallback(async (kbs: Array<{ embedding_model_config_id?: number }>) => {
-    if (!spaceId || kbs.length <= 1) {
-      setEmbeddingModelError(null)
-      return
-    }
-
-    try {
-      const { embeddingModelService } = await import('@test-agentstudio/api-client')
-
-      const modelKeys: string[] = []
-      const modelNames: string[] = []
-
-      for (const kb of kbs) {
-        if (!kb.embedding_model_config_id) {
-          setEmbeddingModelError(t('apps.config.knowledge.error.noConfig', { name: '' }))
-          return
+          setSelectedKnowledgeBasesDetail(details)
         }
-
-        const model = await embeddingModelService.getEmbeddingModelConfig(
-          kb.embedding_model_config_id.toString(),
-          spaceId
-        )
-
-        modelKeys.push(`${model.modelId}-${model.protocol}`)
-        modelNames.push(`${model.name} (${model.modelId})`)
+      } catch (err) {
+        console.error('Failed to load knowledge bases details:', err)
       }
-
-      const uniqueKeys = Array.from(new Set(modelKeys))
-      if (uniqueKeys.length > 1) {
-        setEmbeddingModelError(t('apps.config.knowledge.error.inconsistent', { models: modelNames.join('、') }))
-      } else {
-        setEmbeddingModelError(null)
-      }
-    } catch (err) {
-      console.error('Failed to validate embedding models:', err)
-      setEmbeddingModelError(t('apps.config.knowledge.error.validateError'))
-    }
-  }, [spaceId, t])
+    },
+    [spaceId],
+  )
 
   // 当对话框打开或知识库 ID 变化时，加载详细信息
   React.useEffect(() => {
@@ -552,12 +496,10 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
         loadKnowledgeBasesDetail(config.selectedKnowledgeBaseIds)
       } else {
         setSelectedKnowledgeBasesDetail([])
-        setEmbeddingModelError(null)
       }
     } else if (!open) {
       // 对话框关闭时清空
       setSelectedKnowledgeBasesDetail([])
-      setEmbeddingModelError(null)
     }
   }, [open, spaceId, config.selectedKnowledgeBaseIds, loadKnowledgeBasesDetail])
 
@@ -568,51 +510,20 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
 
   // 确认选择知识库
   const handleConfirmKnowledgeBases = useCallback((kbIds: string[]) => {
-    updateConfig('selectedKnowledgeBaseIds', kbIds)
-    setShowKnowledgeBaseSelector(false)
+      updateConfig('selectedKnowledgeBaseIds', kbIds)
+      setShowKnowledgeBaseSelector(false)
   }, [updateConfig])
 
   // 删除知识库
-  const handleRemoveKnowledgeBase = useCallback((kbId: string) => {
-    const newIds = config.selectedKnowledgeBaseIds.filter(id => id !== kbId)
-    updateConfig('selectedKnowledgeBaseIds', newIds)
-  }, [config.selectedKnowledgeBaseIds, updateConfig])
-
-  // 获取 DeepSearch 知识库列表
-  const fetchDeepSearchKnowledgeBases = useCallback(async () => {
-    if (!spaceId) return
-    setDeepSearchKbLoading(true)
-    try {
-      const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
-      const res = await KnowledgeBaseService.getDeepSearchKnowledgeBasesList({
-        space_id: spaceId,
-        page: 1,
-        size: 100,
-      })
-      const items = res.data?.items ?? []
-      setDeepSearchKnowledgeBases(
-        items.map((item: { id: string; name: string; desc?: string; status?: string }) => ({
-          id: item.id,
-          name: item.name,
-          desc: item.desc,
-          status: item.status,
-        }))
-      )
-    } catch (e) {
-      console.error('Failed to fetch Deep Search knowledge bases:', e)
-      setDeepSearchKnowledgeBases([])
-    } finally {
-      setDeepSearchKbLoading(false)
-    }
-  }, [spaceId])
-
-  React.useEffect(() => {
-    if (open && spaceId && agent?.id === 'deepsearch') {
-      fetchDeepSearchKnowledgeBases()
-    } else if (!open) {
-      setDeepSearchKnowledgeBases([])
-    }
-  }, [open, spaceId, agent?.id, fetchDeepSearchKnowledgeBases])
+  const handleRemoveKnowledgeBase = useCallback(
+    (kbId: string) => {
+      const newIds = config.selectedKnowledgeBaseIds.filter(id => id !== kbId)
+      updateConfig('selectedKnowledgeBaseIds', newIds)
+      // 同时更新详情列表
+      setSelectedKnowledgeBasesDetail(prev => prev.filter(kb => kb.id !== kbId))
+    },
+    [config.selectedKnowledgeBaseIds, updateConfig],
+  )
 
   // 上传模板
   const handleUploadTemplate = async (file: File, templateName: string, templateDesc: string, isTemplate: boolean) => {
@@ -683,7 +594,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     })
   }
 
-    // 切换搜索引擎启用/禁用状态
+  // 切换搜索引擎启用/禁用状态
   const handleToggleEngineStatus = async (engineId: number, currentStatus: boolean) => {
     if (!spaceId) return
 
@@ -808,7 +719,6 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   }
 
   // 只有deepsearch显示完整配置
-  const isDeepSearch = agent?.id === 'deepsearch'
 
   // 获取排序后的标签列表
   const tabs = registry.getAllTabs()
@@ -835,99 +745,80 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                 <span className="text-blue-600 font-semibold text-sm">⚙</span>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {isFirstConfig ? t('apps.config.title') : t('apps.config.titleEdit')}
-                </h2>
+                <h2 className="text-lg font-semibold text-gray-900">{isFirstConfig ? t('apps.config.title') : t('apps.config.titleEdit')}</h2>
                 <p className="text-xs text-gray-500">
                   {agent.name}
                   {isFirstConfig ? ` · ${t('apps.config.subtitle')}` : ` · ${t('apps.config.subtitleEdit')}`}
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className={`p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 ${RADIUS_BUTTON} transition-colors`}
-            >
+            <button onClick={onClose} className={`p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 ${RADIUS_BUTTON} transition-colors`}>
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* 内容区 - 左右分栏布局 */}
-          {isDeepSearch ? (
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-              {/* 左侧菜单 */}
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            {/* 左侧菜单 */}
               <ConfigSidebar
                 tabs={tabs}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
               />
 
-              {/* 右侧内容 */}
-              <ConfigTabPanel
-                activeTab={registry.getTab(activeTab)!}
-                tabProps={
+            {/* 右侧内容 */}
+            <ConfigTabPanel
+              activeTab={registry.getTab(activeTab)!}
+              tabProps={
                   activeTab === 'general' ? {
-                    config,
-                    updateConfig,
-                    errors,
-                    disabled: false,
-                    ToggleSwitch,
-                    RangeSlider,
+                      config,
+                      updateConfig,
+                      errors,
+                      disabled: false,
+                      ToggleSwitch,
+                      RangeSlider,
                   } : activeTab === 'search' ? {
-                    config,
-                    updateConfig,
-                    errors,
-                    disabled: false,
-                    RangeSlider,
-                    engines,
-                    enginesLoading,
-                    onEditEngine: handleEditEngine,
-                    onShowEngineConfig: () => setShowEngineConfig(true),
-                    // 知识库相关 props
-                    knowledgeBases: selectedKnowledgeBasesDetail,
-                    onShowKnowledgeBaseSelector: handleShowKnowledgeBaseSelector,
-                    onRemoveKnowledgeBase: handleRemoveKnowledgeBase,
-                    embeddingModelError,
-                    // DeepSearch 知识库（任务空间配置）
-                    isDeepSearch: true,
-                    deepSearchKnowledgeBases,
-                    deepSearchKbLoading,
-                    onRefreshDeepSearchKnowledgeBases: fetchDeepSearchKnowledgeBases,
-                    selectedDeepSearchKnowledgeBaseId: config.selectedDeepSearchKnowledgeBaseId,
-                    onSelectDeepSearchKnowledgeBase: (id: string | undefined) => updateConfig('selectedDeepSearchKnowledgeBaseId', id),
-                  } : activeTab === 'template' ? {
-                    config,
-                    updateConfig,
-                    errors,
-                    disabled: false,
-                    templates,
-                    templatesLoading,
-                    uploading,
-                    uploadError,
-                    onSelectTemplate: handleSelectTemplate,
-                    onDeleteTemplate: handleDeleteTemplate,
-                    onShowUploadDialog: () => setShowUploadDialog(true),
-                    onViewTemplate: handleViewTemplate,
+                        config,
+                        updateConfig,
+                        errors,
+                        disabled: false,
+                        RangeSlider,
+                        engines,
+                        enginesLoading,
+                        onEditEngine: handleEditEngine,
+                        onShowEngineConfig: () => setShowEngineConfig(true),
+                        // 知识库相关 props
+                        knowledgeBases: selectedKnowledgeBasesDetail,
+                        onShowKnowledgeBaseSelector: handleShowKnowledgeBaseSelector,
+                        onRemoveKnowledgeBase: handleRemoveKnowledgeBase,
+                      }
+                    : activeTab === 'template'
+                      ? {
+                          config,
+                          updateConfig,
+                          errors,
+                          disabled: false,
+                          templates,
+                          templatesLoading,
+                          uploading,
+                          uploadError,
+                          onSelectTemplate: handleSelectTemplate,
+                          onDeleteTemplate: handleDeleteTemplate,
+                          onShowUploadDialog: () => setShowUploadDialog(true),
+                          onViewTemplate: handleViewTemplate,
                   } : {
-                    // model tab
-                    config,
-                    updateConfig,
-                    errors,
-                    disabled: false,
-                    availableModels,
-                    modelsLoading,
-                    spaceId: spaceId || '',
-                  }
-                }
-              />
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="text-center py-8">
-                <p className="text-sm text-gray-500">{t('apps.config.noConfig')}</p>
-              </div>
-            </div>
-          )}
+                          // model tab
+                          config,
+                          updateConfig,
+                          errors,
+                          disabled: false,
+                          availableModels,
+                          modelsLoading,
+                          spaceId: spaceId || '',
+                        }
+              }
+            />
+          </div>
 
           {/* 底部按钮 */}
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
@@ -943,10 +834,10 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
               className={`
                 px-6 py-2 text-sm font-medium ${RADIUS_BUTTON} transition-all duration-200 flex items-center gap-2
                 ${!valid
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : showSaved
-                    ? 'bg-green-600 text-white shadow-sm'
-                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : showSaved
+                      ? 'bg-green-600 text-white shadow-sm'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
                 }
               `}
               title={!valid ? errors.join('; ') : undefined}
@@ -1060,8 +951,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
         itemName={deleteDialog.itemName}
         title={deleteDialog.itemType === 'engine' ? t('apps.config.engine.delete') : t('apps.config.template.delete')}
         message={deleteDialog.itemType === 'engine'
-          ? t('apps.config.engine.deleteConfirm', { name: deleteDialog.itemName })
-          : t('apps.config.template.deleteConfirm', { name: deleteDialog.itemName })
+            ? t('apps.config.engine.deleteConfirm', { name: deleteDialog.itemName })
+            : t('apps.config.template.deleteConfirm', { name: deleteDialog.itemName })
         }
         confirmButtonText={deleteDialog.itemType === 'engine' ? t('apps.config.engine.delete') : t('apps.config.template.confirmDelete')}
       />
@@ -1170,8 +1061,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                   className={`
                     px-4 py-2 text-sm font-medium ${RADIUS_BUTTON} transition-all duration-200 flex items-center gap-2
                     ${!testQuery.trim() || isTesting
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
                     }
                   `}
                 >
@@ -1300,8 +1191,8 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
       const { webSearchEngineService } = await import('@test-agentstudio/api-client')
       const response = await webSearchEngineService.listEngines(spaceId)
       setEngines(response.map(e => ({
-        id: e.web_search_engine_id,
-        name: e.search_engine_name,
+          id: e.web_search_engine_id,
+          name: e.search_engine_name,
         isActive: e.is_active ?? true
       })))
     } catch (err) {
@@ -1423,16 +1314,16 @@ const WebSearchEngineSelectorDialog: React.FC<WebSearchEngineSelectorDialogProps
                             </Tooltip>
                           )}
                           <Tooltip title={t('apps.config.engine.action.edit')}>
-                              <IconButton
-                                size="small"
+                            <IconButton
+                              size="small"
                                 onClick={(e) => {
-                                  e.stopPropagation()
-                                  onEditEngine(engine.id)
-                                }}
-                                className={`text-gray-700 hover:text-blue-600 hover:bg-blue-50 ${isDisabled ? 'opacity-60' : ''}`}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </IconButton>
+                                e.stopPropagation()
+                                onEditEngine(engine.id)
+                              }}
+                              className={`text-gray-700 hover:text-blue-600 hover:bg-blue-50 ${isDisabled ? 'opacity-60' : ''}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </IconButton>
                           </Tooltip>
                           {onToggleEngineStatus && (
                             <Tooltip title={engine.isActive ? t('apps.config.engine.action.disable') : t('apps.config.engine.action.enable')}>
@@ -1708,8 +1599,8 @@ const WebSearchEngineConfigDialog: React.FC<WebSearchEngineConfigDialogProps> = 
                       className={`
                         px-3 py-2 ${RADIUS_BUTTON} text-xs font-medium whitespace-pre-line leading-tight transition-all duration-200 border
                         ${engineName === preset.name
-                          ? 'bg-blue-50 border-blue-200 text-blue-700'
-                          : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                         }
                       `}
                     >
