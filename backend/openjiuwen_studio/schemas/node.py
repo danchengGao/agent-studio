@@ -125,6 +125,17 @@ class PluginParam(BaseModel):
     plugin_version: Optional[str] = Field("draft", alias="pluginVersion")
 
 
+class KnowledgeRetrievalParam(BaseModel):
+    kb_ids: list[str] = Field(default_factory=list, alias="kbIds")
+    max_recall_count: Optional[int] = Field(5, alias="maxRecallCount")
+    min_match_score: Optional[float] = Field(0.5, alias="minMatchScore")
+    use_graph: Optional[bool] = Field(False, alias="useGraph")
+    agentic: Optional[bool] = Field(False, alias="agentic")
+
+    class Config:
+        populate_by_name = True
+
+
 class Inputs(BaseModel):
     input_parameters: Optional[Dict[str, BaseValue]] = Field(None, alias="inputParameters")
     llm_param: Optional[LLMParam] = Field(None, alias="llmParam")
@@ -137,6 +148,7 @@ class Inputs(BaseModel):
     code: Optional[str] = Field("", alias="code")
     variable_merge: Optional[list[VariableMerge]] = Field(None, alias="variableMerge")
     plugin_param: Optional[PluginParam] = Field(None, alias="pluginParam")
+    knowledge_retrieval_param: Optional[KnowledgeRetrievalParam] = Field(None, alias="knowledgeRetrievalParam")
     streaming: Optional[bool] = Field(False)
     max_response: Optional[int] = Field(3, alias="max_response")
     enable_history: Optional[bool] = Field(False, alias="historyEnable")

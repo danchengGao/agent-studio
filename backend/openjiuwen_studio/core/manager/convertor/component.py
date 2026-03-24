@@ -16,6 +16,7 @@ from openjiuwen_studio.core.manager.convertor.components.loop import loop_conver
     loop_break_convert
 from openjiuwen_studio.core.manager.convertor.components.output import output_convert
 from openjiuwen_studio.core.manager.convertor.components.plugin import plugin_convert
+from openjiuwen_studio.core.manager.convertor.components.knowledge_retrieval import knowledge_retrieval_convert
 from openjiuwen_studio.core.manager.convertor.components.questioner import questioner_convert
 from openjiuwen_studio.core.manager.convertor.components.set_variable import set_variable_convert
 from openjiuwen_studio.core.manager.convertor.components.start import start_convert
@@ -98,6 +99,7 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             dsl.ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: lambda n, s, sub: variable_merge_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_SET_VARIABLE: lambda n, s, sub: set_variable_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_PLUGIN: lambda n, s, sub: plugin_convert(n, s),
+            dsl.ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: lambda n, s, sub: knowledge_retrieval_convert(n, s),
         }
 
         error_code_map: Dict[int, int] = {
@@ -120,6 +122,9 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             dsl.ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
             dsl.ComponentType.COMPONENT_TYPE_SET_VARIABLE: StatusCode.SET_VARIABLE_COMPONENT_CONVERT_FAILED.code,
             dsl.ComponentType.COMPONENT_TYPE_PLUGIN: StatusCode.PLUGIN_COMPONENT_CONVERT_FAILED.code,
+            dsl.ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: (
+                StatusCode.KNOWLEDGE_RETRIEVAL_COMPONENT_CONVERT_FAILED.code
+            ),
         }
 
         for node in nodes:

@@ -146,6 +146,8 @@ class StatusCode(Enum):
                                              "Set variable component convert failed: {msg}")
     PLUGIN_COMPONENT_CONVERT_FAILED = (BASE_CODE + 3044, "插件节点转换失败: {msg}",
                                        "Plugin component convert failed: {msg}")
+    KNOWLEDGE_RETRIEVAL_COMPONENT_CONVERT_FAILED = (BASE_CODE + 3046, "知识检索节点转换失败: {msg}",
+                                                    "Knowledge retrieval component convert failed: {msg}")
     BRANCH_COMPONENT_COMPILE_FAILED = (BASE_CODE + 3045, "选择器节点 {msg} 编译失败: 没有设置分支",
                                        "The branches in component id: {msg} is empty, please check!")
 
@@ -170,6 +172,8 @@ class StatusCode(Enum):
                                           "Variable merge component compiler failed: {msg}")
     BRANCH_COMPONENT_COMPILE_ERROR = (BASE_CODE + 3059, "选择器组件编译失败: {msg}",
                                       "Branch component compiler failed: {msg}")
+    KNOWLEDGE_RETRIEVAL_COMP_COMPILER_ERROR = (BASE_CODE + 3062, "知识检索组件编译失败: {msg}",
+                                               "Knowledge retrieval component compiler failed: {msg}")
 
     # 单组建执行报错
     COMPONENT_RUN_ERROR = (BASE_CODE + 3060, "组件执行失败: {msg}",

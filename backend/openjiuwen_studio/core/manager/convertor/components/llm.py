@@ -33,6 +33,35 @@ def get_model_config(model_id: int, space_id: str) -> ModelConfig:
     return model
 
 
+def build_dsl_model_config(model_id: int, space_id: str) -> dsl.ModelConfig:
+    """Build a complete dsl.ModelConfig from model_id and space_id.
+
+    Fetches the model from DB, decrypts the API key, and returns a ready-to-use
+    DSL model config.
+    """
+    model = get_model_config(model_id, space_id)
+    if model.parameters:
+        if isinstance(model.parameters, dict):
+            param = ModelParameters(**model.parameters)
+        else:
+            param = model.parameters
+    else:
+        param = ModelParameters()
+    return dsl.ModelConfig(
+        model_client_config=dsl.ModelClientConfig(
+            client_provider=model.provider,
+            api_key=model.api_key,
+            api_base=model.base_url,
+            timeout=model.timeout or 30,
+        ),
+        request_config=dsl.ModelRequestConfig(
+            model_name=model.model_type,
+            temperature=param.temperature,
+            top_p=param.top_p,
+        ),
+    )
+
+
 def _llm_output_config_object_convert(is_first: bool, outputs: Outputs):
     result: Dict[str, Any] = {}
     if outputs.type != "object":

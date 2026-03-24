@@ -33,7 +33,8 @@ from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponseType, ExecuteResponse
 
 CAN_SINGLE_COMP_RUN = [ComponentType.COMPONENT_TYPE_LLM, ComponentType.COMPONENT_TYPE_PLUGIN,
-                       ComponentType.COMPONENT_TYPE_TEXT_EDITOR, ComponentType.COMPONENT_TYPE_CODE]
+                       ComponentType.COMPONENT_TYPE_TEXT_EDITOR, ComponentType.COMPONENT_TYPE_CODE,
+                       ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL]
 
 
 class ComponentExecutor(WorkflowRunner):

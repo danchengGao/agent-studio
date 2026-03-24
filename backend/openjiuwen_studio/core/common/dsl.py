@@ -41,6 +41,7 @@ class ComponentType(IntEnum):
     COMPONENT_TYPE_SET_VARIABLE = 17,
     COMPONENT_TYPE_VARIABLE_MERGE = 18,
     COMPONENT_TYPE_PLUGIN = 19,
+    COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL = 20,
 
 
 class LLMResponseFormatType(StrEnum):
@@ -373,6 +374,14 @@ class ToolCompConfig(BaseModel):
     type: Optional[str] = Field("")
     tool: Optional[Dict[str, Any]] = Field(default_factory=dict)
     exception_config: ExceptConfig = Field(default_factory=ExceptConfig)
+
+
+class KnowledgeRetrievalConfig(BaseModel):
+    kb_ids: List[str] = Field(default_factory=list)
+    retrieval_config: Dict[str, Any] = Field(default_factory=dict)
+    model: Optional[ModelConfig] = Field(default=None)
+    result_separator: str = Field(default="\n\n")
+    include_metadata: bool = Field(default=False)
 
 
 def encode_to_json(m: BaseModel) -> str:

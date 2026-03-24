@@ -453,7 +453,74 @@ def _create_embed_model(kb_id: str, space_id: str) -> OpenAIEmbedding:
         db.close()
 
 
-# ==================== 异常处理装饰器 ====================
+def get_embed_model_config(kb_id: str, space_id: str) -> EmbeddingConfig:
+    """Return the EmbeddingConfig for a knowledge base.
+
+    Args:
+        kb_id: Knowledge base ID used to look up the embedding model config.
+        space_id: Space ID for scoping the database query.
+
+    Returns:
+        EmbeddingConfig instance.
+
+    Raises:
+        ValueError: If the knowledge base or embedding model config is not found.
+    """
+    db = SessionLocal()
+    try:
+        # 1. Query the knowledge base to obtain embedding_model_config_id
+        kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
+        kb_get = KnowledgeBaseGet(**asdict(kb_details))
+        kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+
+        if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+            raise ValueError(f"Knowledge base not found (KB: {kb_id}, Space: {space_id})")
+
+        embedding_model_config_id = kb_result.data.get("embedding_model_config_id")
+        if not embedding_model_config_id:
+            raise ValueError(f"Knowledge base {kb_id} has no embedding_model_config_id")
+
+        # 2. Query the embedding model configuration
+        embed_repo = EmbeddingModelConfigRepository(db)
+        embed_model_config = embed_repo.get_by_id(embedding_model_config_id)
+
+        if not embed_model_config:
+            raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
+
+        if not embed_model_config.is_active:
+            raise ValueError(
+                f"Embedding model config is not active (ID: {embedding_model_config_id})"
+            )
+
+        # 3. Decrypt the API key
+        security_utils = SecurityUtils()
+        api_key = None
+        if embed_model_config.api_key:
+            try:
+                api_key = security_utils.decrypt_api_key(embed_model_config.api_key)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to decrypt API key for model {embed_model_config.id}: {str(e)}"
+                ) from e
+
+        # 4. Build and return the EmbeddingConfig
+        embed_config = EmbeddingConfig(
+            model_name=embed_model_config.model_id,
+            api_key=api_key,
+            base_url=embed_model_config.api_base,
+        )
+
+        logger.debug(
+            f"[EMBED_CONFIG] Built EmbeddingConfig from database - "
+            f"KB: {kb_id}, Model: {embed_model_config.model_name} (ID: {embed_model_config.id})"
+        )
+        return embed_config
+
+    finally:
+        db.close()
+
+
+# ==================== 异常处理装饰器 ==
 
 
 def with_exception_handling(func):
@@ -1811,6 +1878,56 @@ def _create_vector_store(
             milvus_token=milvus_token,
             milvus_alias=alias,
         )
+
+    else:
+        raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
+
+
+def get_vector_store_configs(collection_name: str) -> Tuple[VectorStoreConfig, Dict[str, Any]]:
+    """Return the VectorStoreConfig and additional connection parameters
+    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+
+    Args:
+        collection_name: Collection name
+
+    Returns:
+        A tuple of (VectorStoreConfig, additional_config) where
+        *additional_config* contains backend-specific connection parameters
+
+    Raises:
+        ValueError: If the configured INDEX_MANAGER_TYPE is not supported.
+    """
+    index_manager_type = _CURR_INDEX_TYPE
+
+    if index_manager_type == "chroma":
+        data_dir = _get_chroma_data_dir()
+        vector_store_config = VectorStoreConfig(
+            store_provider="chroma",
+            collection_name=collection_name,
+        )
+        additional_config = {
+            "chroma_path": str(data_dir),
+        }
+        return vector_store_config, additional_config
+
+    elif index_manager_type == "milvus":
+        milvus_host = os.getenv("MILVUS_HOST", "localhost")
+        milvus_port = os.getenv("MILVUS_PORT", "19530")
+        milvus_token = SecurityUtils.get_decrypted_secret(
+            "MILVUS_TOKEN",
+            os.getenv("MILVUS_TOKEN", None),
+        )
+        milvus_uri = f"http://{milvus_host}:{milvus_port}"
+
+        vector_store_config = VectorStoreConfig(
+            store_provider="milvus",
+            collection_name=collection_name,
+        )
+        additional_config = {
+            "milvus_uri": milvus_uri,
+            "milvus_token": milvus_token,
+        }
+        return vector_store_config, additional_config
 
     else:
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")

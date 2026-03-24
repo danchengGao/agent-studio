@@ -38,6 +38,7 @@ const nodeTypeKeyNames: Record<WorkflowNodeType, string> = {
   [WorkflowNodeType.Workflow]: 'Workflow',
   [WorkflowNodeType.Variable]: 'Variable',
   [WorkflowNodeType.Plugin]: 'Plugin',
+  [WorkflowNodeType.KnowledgeRetrieval]: 'KnowledgeRetrieval',
 }
 
 // Node type to i18n key mapping
@@ -62,6 +63,7 @@ const nodeTypeI18nKeys: Record<WorkflowNodeType, string> = {
   [WorkflowNodeType.Workflow]: 'workflowCanvas.node.Workflow',
   [WorkflowNodeType.Variable]: 'workflowCanvas.node.Variable',
   [WorkflowNodeType.Plugin]: 'workflowCanvas.node.Plugin',
+  [WorkflowNodeType.KnowledgeRetrieval]: 'workflowCanvas.node.KnowledgeRetrieval',
 }
 
 // Get translated node name (moved to component to use useTranslation hook)
@@ -92,6 +94,10 @@ const nodeCategories = {
   components: {
     nameKey: 'workflowCanvas.category.components',
     nodes: [WorkflowNodeType.Questioner, WorkflowNodeType.TextEditor],
+  },
+  data: {
+    nameKey: 'workflowCanvas.category.data',
+    nodes: [WorkflowNodeType.KnowledgeRetrieval],
   },
 }
 

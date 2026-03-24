@@ -30,6 +30,9 @@ from openjiuwen_studio.core.executor.component.compile.user_input_comp_compiler 
 from openjiuwen_studio.core.executor.component.compile.user_output_comp_compiler import UserOutputCompCompiler, \
     find_llm_to_stream_out, change_stream_input
 from openjiuwen_studio.core.executor.component.compile.variable_merge_comp_compiler import VariableMergeCompCompiler
+from openjiuwen_studio.core.executor.component.compile.knowledge_retrieval_comp_compiler import (
+    KnowledgeRetrievalCompCompiler,
+)
 from openjiuwen_studio.core.executor.plugin.plugin_tools import ServiceTool, CodeTool
 from openjiuwen_studio.core.executor.workflow.context import Context
 from openjiuwen_studio.core.executor.workflow.pregel_graph_adapter import PregelGraphAdapter
@@ -108,6 +111,7 @@ class Workflow:
         ComponentType.COMPONENT_TYPE_TEXT_EDITOR: '_compile_text_editor_component',
         ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: '_compile_variable_merge_component',
         ComponentType.COMPONENT_TYPE_CODE: '_compile_code_component',
+        ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: '_compile_knowledge_retrieval_component',
     }
 
     # 特殊组件类型（需要异步处理或特殊参数）
@@ -302,6 +306,11 @@ class Workflow:
         """编译代码组件"""
         code_compiler = CodeCompCompiler(comp.id, comp.configs, workflow_dl.connections)
         return code_compiler.compile()
+
+    async def _compile_knowledge_retrieval_component(self, comp: Component, workflow_dl: BaseFlow):
+        """编译知识检索组件"""
+        kr_compiler = KnowledgeRetrievalCompCompiler(comp.id, comp.configs, self.space_id)
+        return kr_compiler.compile()
 
     async def _compile_special_component(self, context: Context, workflow_dl: BaseFlow, comp: Component, loader):
         """处理特殊组件（保持原有逻辑）"""

@@ -40,7 +40,8 @@
     "Node": "节点",
     "Unknown": "未知",
     "Plugin": "插件",
-    "Workflow": "工作流"
+    "Workflow": "工作流",
+    "KnowledgeRetrieval": "知识检索"
   },
   "validators": {
     "workflowMustContainPath": "工作流必须包含从开始节点到结束节点的完整路径",
@@ -96,7 +97,8 @@
     "llmAndWorkflow": "LLM与工作流",
     "businessLogic": "业务逻辑",
     "inputOutput": "输入&输出",
-    "components": "组件"
+    "components": "组件",
+    "data": "数据"
   },
   "nodePanel": {
     "searchPlaceholder": "搜索节点..."

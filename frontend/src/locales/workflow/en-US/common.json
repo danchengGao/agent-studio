@@ -40,7 +40,8 @@
     "Node": "Node",
     "Unknown": "Unknown",
     "Plugin": "Plugin",
-    "Workflow": "Workflow"
+    "Workflow": "Workflow",
+    "KnowledgeRetrieval": "Knowledge Retrieval"
   },
   "validators": {
     "workflowMustContainPath": "Workflow must contain a complete path from start node to end node",
@@ -96,7 +97,8 @@
     "llmAndWorkflow": "LLM & Workflow",
     "businessLogic": "Business Logic",
     "inputOutput": "Input & Output",
-    "components": "Components"
+    "components": "Components",
+    "data": "Data"
   },
   "nodePanel": {
     "searchPlaceholder": "Search nodes..."
