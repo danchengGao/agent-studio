@@ -33,12 +33,12 @@ export const validateToolPath = (path: string): { isValid: boolean; error: strin
     }
   }
 
-  // 检查是否只包含英文、数字、下划线、连字符和斜杠
-  const validPathRegex = /^\/[a-zA-Z0-9\-_/]*$/
+  // 检查是否只包含英文、数字、下划线、连字符、斜杠和花括号（用于路径参数）
+  const validPathRegex = /^\/[a-zA-Z0-9\-_/{}]*$/
   if (!validPathRegex.test(path)) {
     return {
       isValid: false,
-      error: '工具路径只能包含英文、数字、下划线(_)、连字符(-)和斜杠(/)',
+      error: '工具路径只能包含英文、数字、下划线(_)、连字符(-)、斜杠(/)和花括号({}，用于路径参数)',
     }
   }
 
@@ -77,14 +77,14 @@ export const validateToolPathRealtime = (path: string): string => {
 /**
  * 常见路径示例（用于帮助提示）
  */
-export const TOOL_PATH_EXAMPLES = ['/api/users', '/weather/query', '/user/profile', '/data/search', '/v1/auth/login', '/files/upload', '/notifications/send']
+export const TOOL_PATH_EXAMPLES = ['/api/users', '/api/users/{id}', '/api/v1/Activities/{id}', '/weather/query', '/user/{userId}/profile', '/data/search', '/v1/auth/login', '/files/{fileId}/download']
 
 /**
  * 生成路径提示信息
  * @returns 路径格式说明
  */
 export const getPathHelpText = (): string => {
-  return '路径必须以"/"开头，只能包含英文、数字、下划线(_)、连字符(-)和斜杠(/)，例如：/api/users'
+  return '路径必须以"/"开头，只能包含英文、数字、下划线(_)、连字符(-)、斜杠(/)和花括号({}，用于路径参数)，例如：/api/users 或 /api/users/{id}'
 }
 
 /**
@@ -167,4 +167,32 @@ export const validateHttpUrlRealtime = (url: string): string => {
  */
 export const getHttpUrlHelpText = (): string => {
   return '服务地址必须以http://或https://开头，例如：http://api.example.com'
+}
+
+/**
+ * 校验文件路径是否合法（仅格式校验，不检查文件是否存在）
+ * @param path 待校验的路径
+ * @returns 是否合法
+ */
+export const isFilePathValid = (path: string): boolean => {
+  if (!path || path.trim() === '') return false
+  const trimmed = path.trim()
+  // Must not be a URL
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return false
+  // Must not contain null bytes
+  if (trimmed.includes('\0')) return false
+  // Max length 4096 (typical OS max)
+  if (trimmed.length > 4096) return false
+  return true
+}
+
+/**
+ * 实时校验文件路径（用于输入时的即时反馈）
+ * @param path 待校验的路径
+ * @returns 错误信息字符串，如果校验通过返回空字符串
+ */
+export const validateFilePathRealtime = (path: string): string => {
+  if (!path || path.trim() === '') return ''
+  if (!isFilePathValid(path)) return 'Please enter a valid file path'
+  return ''
 }

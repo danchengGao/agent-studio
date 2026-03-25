@@ -1783,36 +1783,42 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
         chunk_index = f"kb_{kb_id}_chunks"
         triple_index = f"kb_{kb_id}_triples"
 
-        # 循环删除每个文档的索引
-        for doc in documents:
-            doc_id = doc.get("doc_id") or doc.get("id")
-            if not doc_id:
-                continue
+        try:
+            # 循环删除每个文档的索引
+            for doc in documents:
+                doc_id = doc.get("doc_id") or doc.get("id")
+                if not doc_id:
+                    continue
 
+                try:
+                    # 删除 chunks 索引
+                    await _delete_document_from_index(
+                        index_manager=index_manager,
+                        index_name=chunk_index,
+                        doc_id=doc_id,
+                        kb_id=kb_id,
+                        index_type="chunks",
+                    )
+
+                    # 删除 triples 索引（如果有图增强）
+                    await _delete_document_from_index(
+                        index_manager=index_manager,
+                        index_name=triple_index,
+                        doc_id=doc_id,
+                        kb_id=kb_id,
+                        index_type="triples",
+                    )
+
+                    result["success_count"] += 1
+                except Exception as e:
+                    result["failed_count"] += 1
+                    result["errors"].append(f"Doc {doc_id}: {str(e)}")
+                    logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
+        finally:
             try:
-                # 删除 chunks 索引
-                await _delete_document_from_index(
-                    index_manager=index_manager,
-                    index_name=chunk_index,
-                    doc_id=doc_id,
-                    kb_id=kb_id,
-                    index_type="chunks",
-                )
-
-                # 删除 triples 索引（如果有图增强）
-                await _delete_document_from_index(
-                    index_manager=index_manager,
-                    index_name=triple_index,
-                    doc_id=doc_id,
-                    kb_id=kb_id,
-                    index_type="triples",
-                )
-
-                result["success_count"] += 1
+                index_manager.close()
             except Exception as e:
-                result["failed_count"] += 1
-                result["errors"].append(f"Doc {doc_id}: {str(e)}")
-                logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
+                logger.warning(f"[KB_DELETE] Failed to close index manager: {e}")
 
         logger.info(
             f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "

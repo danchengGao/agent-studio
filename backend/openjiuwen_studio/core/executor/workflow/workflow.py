@@ -13,6 +13,7 @@ from openjiuwen.core.workflow.workflow import Workflow as InvokableWorkflow
 from openjiuwen.core.workflow import WorkflowCard
 from openjiuwen.core.workflow import ComponentAbility
 
+from openjiuwen_studio.core.common.dsl import McpConfig as DlMcpConfig
 from openjiuwen_studio.core.common.dsl import PluginCodeConfig as DlPluginCodeConfig
 from openjiuwen_studio.core.common.dsl import PluginType
 from openjiuwen_studio.core.common.dsl import RestfulApiSchema as DlRestfulApiSchema
@@ -22,14 +23,17 @@ from openjiuwen_studio.core.common.dsl import Workflow as DlWorkflow, Component,
 from openjiuwen_studio.core.executor.component.compile.intent_detection_comp_compiler import IntentDetectionCompCompiler
 from openjiuwen_studio.core.executor.component.compile.llm_comp_compiler import LLMCompCompiler
 from openjiuwen_studio.core.executor.component.compile.questioner_comp_compiler import QuestionerCompCompiler
+from openjiuwen_studio.core.executor.component.compile.react_agent_comp_compiler import ReactAgentCompCompiler
 from openjiuwen_studio.core.executor.component.compile.branch_comp_compiler import BranchCompCompiler
 from openjiuwen_studio.core.executor.component.compile.code_comp_compiler import CodeCompCompiler
+from openjiuwen_studio.core.executor.component.compile.http_request_comp_compiler import HttpRequestCompCompiler
 from openjiuwen_studio.core.executor.component.component_impl.empty_comp import EmptyComponent
 from openjiuwen_studio.core.executor.component.compile.text_editor_comp_compiler import TextEditorCompCompiler
 from openjiuwen_studio.core.executor.component.compile.user_input_comp_compiler import UserInputCompCompiler
 from openjiuwen_studio.core.executor.component.compile.user_output_comp_compiler import UserOutputCompCompiler, \
     find_llm_to_stream_out, change_stream_input
 from openjiuwen_studio.core.executor.component.compile.variable_merge_comp_compiler import VariableMergeCompCompiler
+from openjiuwen_studio.core.executor.plugin.plugin_tools import ServiceTool, CodeTool, McpTool
 from openjiuwen_studio.core.executor.component.compile.knowledge_retrieval_comp_compiler import (
     KnowledgeRetrievalCompCompiler,
 )
@@ -111,6 +115,8 @@ class Workflow:
         ComponentType.COMPONENT_TYPE_TEXT_EDITOR: '_compile_text_editor_component',
         ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: '_compile_variable_merge_component',
         ComponentType.COMPONENT_TYPE_CODE: '_compile_code_component',
+        ComponentType.COMPONENT_TYPE_HTTP_REQUEST: '_compile_http_request_component',
+        ComponentType.COMPONENT_TYPE_REACT_AGENT: '_compile_react_agent_component',
         ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: '_compile_knowledge_retrieval_component',
     }
 
@@ -307,6 +313,16 @@ class Workflow:
         code_compiler = CodeCompCompiler(comp.id, comp.configs, workflow_dl.connections)
         return code_compiler.compile()
 
+    async def _compile_http_request_component(self, comp: Component, workflow_dl: BaseFlow):
+        """编译HTTP请求组件"""
+        http_request_compiler = HttpRequestCompCompiler(comp.id, comp.configs, workflow_dl.connections)
+        return http_request_compiler.compile()
+
+    async def _compile_react_agent_component(self, comp: Component, workflow_dl: BaseFlow):
+        """编译React智能体组件"""
+        compiler = ReactAgentCompCompiler(comp.configs)
+        return compiler.compile()
+
     async def _compile_knowledge_retrieval_component(self, comp: Component, workflow_dl: BaseFlow):
         """编译知识检索组件"""
         kr_compiler = KnowledgeRetrievalCompCompiler(comp.id, comp.configs, self.space_id)
@@ -334,6 +350,8 @@ class Workflow:
         tool_config = ToolCompConfig.model_validate(comp.configs)
         if tool_config.type == PluginType.SERVICE:
             plugin_tool = ServiceTool(DlRestfulApiSchema.model_validate(tool_config.tool)).compile()
+        elif tool_config.type == PluginType.MCP:
+            plugin_tool = McpTool(DlMcpConfig.model_validate(tool_config.tool)).compile()
         else:
             plugin_tool = CodeTool(DlPluginCodeConfig.model_validate(tool_config.tool)).compile()
         tool_config = ToolComponentConfig(tool_id=comp.id)

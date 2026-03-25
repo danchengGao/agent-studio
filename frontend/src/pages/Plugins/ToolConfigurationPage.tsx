@@ -38,6 +38,7 @@ import {
   usePluginUpdateApi,
   usePluginUpdateCode,
   usePluginGetApi,
+  usePluginGetMcpTool,
   usePluginDeleteApi,
   usePluginGetCode,
   usePluginDeleteCode,
@@ -177,7 +178,7 @@ const ToolConfigurationPage: React.FC = () => {
   const fromPublishVersion = location.state?.fromPublishVersion || false
   const publishVersion = location.state?.publishVersion || null
   const toolsData = location.state?.toolsData || null // Tools data from publish info
-  const isReadOnly = fromPublishVersion // Disable editing when from published version
+  const isReadOnly = fromPublishVersion || pluginType === 'mcp' // Disable editing when from published version or MCP plugin
 
   // Parameter dialogs
   const [isInputDialogOpen, setIsInputDialogOpen] = useState(false)
@@ -229,7 +230,7 @@ const ToolConfigurationPage: React.FC = () => {
       return null
     }
 
-    const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+    const dataKey = pluginType === 'code' ? 'code_info' : pluginType === 'mcp' ? 'mcp_info' : 'api_info'
 
     return {
       code: 200,
@@ -244,7 +245,9 @@ const ToolConfigurationPage: React.FC = () => {
   const shouldFetchApi = !toolsData && !!apiRequest
   const { data: apiData, isLoading: isLoadingApi, error: apiError } = pluginType === 'code'
     ? usePluginGetCode(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
-    : usePluginGetApi(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
+    : pluginType === 'mcp'
+      ? usePluginGetMcpTool(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
+      : usePluginGetApi(shouldFetchApi ? apiRequest! : ({} as any), { enabled: shouldFetchApi })
 
   // Use mock data if available, otherwise use API data
   const effectiveApiData = mockApiData || apiData
@@ -262,7 +265,7 @@ const ToolConfigurationPage: React.FC = () => {
 
   // Transform API data to Tool interface when data is loaded
   useEffect(() => {
-    const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+    const dataKey = pluginType === 'code' ? 'code_info' : pluginType === 'mcp' ? 'mcp_info' : 'api_info'
 
     if (effectiveApiData?.code === 200 && effectiveApiData?.data?.[dataKey] && Array.isArray(effectiveApiData.data[dataKey])) {
       const infoArray = effectiveApiData.data[dataKey]
@@ -402,8 +405,12 @@ const ToolConfigurationPage: React.FC = () => {
   }
 
   const convertParameterToCorrectType = (value: string, type: string): ParameterValue => {
+    // For array types, return empty array if value is empty
+    const isArrayType = type === 'array' || type === 'array_string' || type === 'array_int' || type === 'array_float' || type === 'array_boolean'
+
     if (value === '' || value === null || value === undefined) {
-      return undefined
+      // Return empty array for array types, undefined for other types
+      return isArrayType ? [] : undefined
     }
 
     switch (type) {
@@ -602,6 +609,8 @@ const ToolConfigurationPage: React.FC = () => {
         return 'Query'
       case 3:
         return 'Body'
+      case 4:
+        return 'Path'
       default:
         return 'None'
     }
@@ -1214,7 +1223,7 @@ const ToolConfigurationPage: React.FC = () => {
                 queryClient.setQueryData(queryKey, (oldData: any) => {
                   if (!oldData || oldData.code !== 200) return oldData
 
-                  const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+                  const dataKey = pluginType === 'code' ? 'code_info' : pluginType === 'mcp' ? 'mcp_info' : 'api_info'
                   const updatedList = oldData.data[dataKey].map((item: any) =>
                     item.tool_id === tool_id ? { ...item, available: true } : item
                   )
@@ -1233,7 +1242,7 @@ const ToolConfigurationPage: React.FC = () => {
                 queryClient.setQueryData(singleQueryKey, (oldData: any) => {
                   if (!oldData || oldData.code !== 200) return oldData
 
-                  const dataKey = pluginType === 'code' ? 'code_info' : 'api_info'
+                  const dataKey = pluginType === 'code' ? 'code_info' : pluginType === 'mcp' ? 'mcp_info' : 'api_info'
                   return {
                     ...oldData,
                     data: {
@@ -1366,7 +1375,8 @@ const ToolConfigurationPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-4">
-            <Button variant="outlined" startIcon={<ArrowLeft className="w-4 h-4" />} onClick={handleBackNavigation} className="mb-4">
+            <Button variant="outlined" startIcon={<ArrowLeft className="w-4 h-4" />} onClick={handleBackNavigation} className="mb-4 text-gray-700 text-gray-300 border-gray-300 border-gray-600">
+
               {source === 'agent' ? t('plugins.toolConfig.returnAgentConfig', '返回智能体配置') : t('plugins.toolConfig.returnPluginConfig', '返回插件配置')}
             </Button>
           </div>
@@ -1395,9 +1405,11 @@ const ToolConfigurationPage: React.FC = () => {
                   <>
                     <Chip label={`${t('plugins.toolConfig.method', '方法')}: ${getMethodString(tool.method || 1)}`} size="small" />
                     <Chip
-                      label={`${t('plugins.toolConfig.path', '路径')}: ${tool.path || ''}`}
+                      label={`${t('plugins.toolConfig.path', '路径')}: ${pluginData?.data?.plugin_info?.url || ''}${tool.path || ''}`}
                       size="small"
                       variant="outlined"
+                      title={`${pluginData?.data?.plugin_info?.url || ''}${tool.path || ''}`}
+                      className="text-gray-700 text-gray-300 border-gray-300 border-gray-600"
                       sx={{
                         maxWidth: '80ch',
                         '& .MuiChip-label': {
@@ -1484,6 +1496,9 @@ const ToolConfigurationPage: React.FC = () => {
                       <Select value={tool.method} onChange={e => setTool({ ...tool, method: e.target.value as number })} disabled={isReadOnly}>
                         <MenuItem value={1}>GET</MenuItem>
                         <MenuItem value={2}>POST</MenuItem>
+                        <MenuItem value={3}>PUT</MenuItem>
+                        <MenuItem value={4}>DELETE</MenuItem>
+                        <MenuItem value={5}>PATCH</MenuItem>
                       </Select>
                     </FormControl>
                   </div>
@@ -1594,7 +1609,7 @@ const ToolConfigurationPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {tool.input_parameters.map(param => (
+                  {tool.input_parameters.filter(param => param.method !== 1).map(param => (
                     <Card key={param.id} className="p-4 border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -1709,15 +1724,6 @@ const ToolConfigurationPage: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {/* Header Row */}
-                {tool.headers.length > 0 && (
-                  <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-gray-50 rounded-lg border-b">
-                    <div className="col-span-5 text-sm font-medium text-gray-700">Key</div>
-                    <div className="col-span-5 text-sm font-medium text-gray-700">Value</div>
-                    <div className="col-span-2 text-sm font-medium text-gray-700">操作</div>
-                  </div>
-                )}
-
                 {tool.headers.length === 0 ? (
                   <div className="bg-gray-50 rounded-lg p-6 text-center">
                     <Typography variant="body2" color="text.secondary" className="mb-2">
@@ -1729,48 +1735,63 @@ const ToolConfigurationPage: React.FC = () => {
                   </div>
                 ) : (
                   tool.headers.map((header, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-center p-4 border border-gray-200 rounded-lg">
-                    <div className="col-span-5">
-                      <TextField
-                        value={header.key}
-                        onChange={e => handleHeaderChange(index, 'key', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder={t('plugins.tools.headers.keyPlaceholder')}
-                        disabled={isReadOnly}
-                      />
+                  <Card key={index} className="p-4 border border-gray-200">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Typography variant="subtitle1" className="font-medium">
+                          {header.name || header.key || 'Header'}
+                        </Typography>
+                        <div className="flex gap-1">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleSaveSingleHeader(index)}
+                            title="保存此行"
+                            disabled={isReadOnly || updatePluginApiMutation.isLoading}
+                            color="success"
+                          >
+                            <Check className="w-4 h-4" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleRemoveHeader(index)}
+                            color="error"
+                            title="删除此行"
+                            disabled={isReadOnly}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </IconButton>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        <TextField
+                          label="Header Name"
+                          value={header.name || header.key || ''}
+                          onChange={e => handleHeaderChange(index, 'name', e.target.value)}
+                          size="small"
+                          fullWidth
+                          placeholder="e.g., Authorization"
+                          disabled={isReadOnly}
+                        />
+
+                        <TextField
+                          label="Value"
+                          value={header.value || ''}
+                          onChange={e => handleHeaderChange(index, 'value', e.target.value)}
+                          size="small"
+                          fullWidth
+                          placeholder="Header value"
+                          disabled={isReadOnly}
+                        />
+
+                        {header.description && (
+                          <Typography variant="caption" color="text.secondary">
+                            {header.description}
+                          </Typography>
+                        )}
+                      </div>
                     </div>
-                    <div className="col-span-5">
-                      <TextField
-                        value={header.value}
-                        onChange={e => handleHeaderChange(index, 'value', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder={t('plugins.tools.headers.valuePlaceholder')}
-                        disabled={isReadOnly}
-                      />
-                    </div>
-                    <div className="col-span-2 flex justify-center gap-1">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleSaveSingleHeader(index)}
-                        title="保存此行"
-                        disabled={isReadOnly || updatePluginApiMutation.isLoading}
-                        color="success"
-                      >
-                        <Check className="w-4 h-4" />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleRemoveHeader(index)}
-                        color="error"
-                        title="删除此行"
-                        disabled={isReadOnly}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </IconButton>
-                    </div>
-                  </div>
+                  </Card>
                 ))
                 )}
               </div>
@@ -1982,9 +2003,11 @@ const ToolConfigurationPage: React.FC = () => {
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                               maxWidth: '70ch',
+                              fontFamily: 'monospace',
                             }}
+                            title={`${pluginData?.data?.plugin_info?.url || ''}${tool.path || ''}`}
                           >
-                            {t('plugins.toolConfig.apiPath', 'API路径')}: {tool.path}
+                            {t('plugins.toolConfig.apiPath', 'API路径')}: {pluginData?.data?.plugin_info?.url && <span style={{ color: '#2563eb' }}>{pluginData.data.plugin_info.url}</span>}{tool.path}
                           </Typography>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -2107,9 +2130,11 @@ const ToolConfigurationPage: React.FC = () => {
                     </Typography>
                     <FormControl fullWidth>
                       <Select value={parameterForm.method} onChange={e => handleParameterFormChange('method', e.target.value)}>
+                        <MenuItem value={0}>{t('plugins.toolConfig.noneParam')}</MenuItem>
                         <MenuItem value={1}>{t('plugins.toolConfig.headerParam')}</MenuItem>
                         <MenuItem value={2}>{t('plugins.toolConfig.queryParameter')}</MenuItem>
                         {tool.method !== 1 && <MenuItem value={3}>{t('plugins.toolConfig.bodyParameter')}</MenuItem>}
+                        <MenuItem value={4}>{t('plugins.toolConfig.pathParam')}</MenuItem>
                       </Select>
                     </FormControl>
                   </div>
@@ -2235,7 +2260,7 @@ const ToolConfigurationPage: React.FC = () => {
           sx: { minHeight: '600px' },
         }}
       >
-        <DialogTitle>
+        <DialogTitle className="bg-white bg-gray-800 text-gray-900 text-gray-100">
           <div className="flex items-center justify-between">
             <span>
               {t('plugins.toolConfig.testTool', '测试工具')}: {tool?.name}
@@ -2358,6 +2383,7 @@ const ToolConfigurationPage: React.FC = () => {
                                 {param.is_required && <span className="text-red-500 ml-1">*</span>}
                               </Typography>
                               <Chip label={param.type} size="small" variant="outlined" color="success" />
+                              {pluginType === 'api' && <Chip label={getMethodLabel(param.method)} size="small" variant="outlined" color="primary" />}
                               {param.is_required && <Chip label={t('plugins.toolConfig.required')} size="small" color="error" variant="outlined" />}
                             </div>
                             <Typography variant="body2" color="text.secondary" className="text-sm">
@@ -2615,8 +2641,12 @@ const ToolConfigurationPage: React.FC = () => {
                       whiteSpace: 'nowrap',
                       maxWidth: '70ch',
                     }}
+                    title={`${pluginData?.data?.plugin_info?.url || ''}${tool?.path || ''}`}
                   >
-                    {t('plugins.tools.test.apiPath', 'API路径')}: {tool?.path}
+                    {t('plugins.tools.test.apiPath', 'API路径')}: <span style={{ fontFamily: 'monospace' }}>
+                      {pluginData?.data?.plugin_info?.url && <span style={{ color: '#2563eb' }}>{pluginData.data.plugin_info.url}</span>}
+                      {tool?.path}
+                    </span>
                   </Typography>
                   <div>
                     {t('plugins.tools.test.requestMethod', '请求方法')}: {tool && getMethodString(tool.method)}

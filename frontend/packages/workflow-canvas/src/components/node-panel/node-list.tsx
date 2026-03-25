@@ -38,6 +38,8 @@ const nodeTypeKeyNames: Record<WorkflowNodeType, string> = {
   [WorkflowNodeType.Workflow]: 'Workflow',
   [WorkflowNodeType.Variable]: 'Variable',
   [WorkflowNodeType.Plugin]: 'Plugin',
+  [WorkflowNodeType.HttpRequest]: 'HttpRequest',
+  [WorkflowNodeType.ReactAgent]: 'ReactAgent',
   [WorkflowNodeType.KnowledgeRetrieval]: 'KnowledgeRetrieval',
 }
 
@@ -63,6 +65,8 @@ const nodeTypeI18nKeys: Record<WorkflowNodeType, string> = {
   [WorkflowNodeType.Workflow]: 'workflowCanvas.node.Workflow',
   [WorkflowNodeType.Variable]: 'workflowCanvas.node.Variable',
   [WorkflowNodeType.Plugin]: 'workflowCanvas.node.Plugin',
+  [WorkflowNodeType.HttpRequest]: 'workflowCanvas.node.HttpRequest',
+  [WorkflowNodeType.ReactAgent]: 'workflowCanvas.node.ReactAgent',
   [WorkflowNodeType.KnowledgeRetrieval]: 'workflowCanvas.node.KnowledgeRetrieval',
 }
 
@@ -72,7 +76,7 @@ const nodeTypeI18nKeys: Record<WorkflowNodeType, string> = {
 const nodeCategories = {
   llmAndWorkflow: {
     nameKey: 'workflowCanvas.category.llmAndWorkflow',
-    nodes: [WorkflowNodeType.LLM, WorkflowNodeType.Workflow, WorkflowNodeType.Plugin],
+    nodes: [WorkflowNodeType.LLM, WorkflowNodeType.Workflow, WorkflowNodeType.Plugin, WorkflowNodeType.ReactAgent],
   },
   businessLogic: {
     nameKey: 'workflowCanvas.category.businessLogic',
@@ -93,7 +97,7 @@ const nodeCategories = {
   },
   components: {
     nameKey: 'workflowCanvas.category.components',
-    nodes: [WorkflowNodeType.Questioner, WorkflowNodeType.TextEditor],
+    nodes: [WorkflowNodeType.Questioner, WorkflowNodeType.TextEditor, WorkflowNodeType.HttpRequest],
   },
   data: {
     nameKey: 'workflowCanvas.category.data',

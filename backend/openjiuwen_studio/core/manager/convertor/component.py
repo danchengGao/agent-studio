@@ -9,6 +9,7 @@ from openjiuwen_studio.core.common import dsl
 from openjiuwen_studio.core.manager.convertor.components.code import code_convert
 from openjiuwen_studio.core.manager.convertor.components.empty import empty_convert
 from openjiuwen_studio.core.manager.convertor.components.end import end_convert
+from openjiuwen_studio.core.manager.convertor.components.http_request import http_request_convert
 from openjiuwen_studio.core.manager.convertor.components.input import input_convert
 from openjiuwen_studio.core.manager.convertor.components.intent import intent_convert
 from openjiuwen_studio.core.manager.convertor.components.llm import llm_convert
@@ -18,6 +19,7 @@ from openjiuwen_studio.core.manager.convertor.components.output import output_co
 from openjiuwen_studio.core.manager.convertor.components.plugin import plugin_convert
 from openjiuwen_studio.core.manager.convertor.components.knowledge_retrieval import knowledge_retrieval_convert
 from openjiuwen_studio.core.manager.convertor.components.questioner import questioner_convert
+from openjiuwen_studio.core.manager.convertor.components.react_agent import react_agent_convert
 from openjiuwen_studio.core.manager.convertor.components.set_variable import set_variable_convert
 from openjiuwen_studio.core.manager.convertor.components.start import start_convert
 from openjiuwen_studio.core.manager.convertor.components.sub_workflow import sub_workflow_convert
@@ -99,6 +101,8 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             dsl.ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: lambda n, s, sub: variable_merge_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_SET_VARIABLE: lambda n, s, sub: set_variable_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_PLUGIN: lambda n, s, sub: plugin_convert(n, s),
+            dsl.ComponentType.COMPONENT_TYPE_HTTP_REQUEST: lambda n, s, sub: http_request_convert(n),
+            dsl.ComponentType.COMPONENT_TYPE_REACT_AGENT: lambda n, s, sub: react_agent_convert(n, s),
             dsl.ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: lambda n, s, sub: knowledge_retrieval_convert(n, s),
         }
 
@@ -122,6 +126,8 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             dsl.ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
             dsl.ComponentType.COMPONENT_TYPE_SET_VARIABLE: StatusCode.SET_VARIABLE_COMPONENT_CONVERT_FAILED.code,
             dsl.ComponentType.COMPONENT_TYPE_PLUGIN: StatusCode.PLUGIN_COMPONENT_CONVERT_FAILED.code,
+            dsl.ComponentType.COMPONENT_TYPE_HTTP_REQUEST: StatusCode.HTTP_REQUEST_COMPONENT_CONVERT_FAILED.code,
+            dsl.ComponentType.COMPONENT_TYPE_REACT_AGENT: StatusCode.REACT_AGENT_COMPONENT_CONVERT_FAILED.code,
             dsl.ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: (
                 StatusCode.KNOWLEDGE_RETRIEVAL_COMPONENT_CONVERT_FAILED.code
             ),

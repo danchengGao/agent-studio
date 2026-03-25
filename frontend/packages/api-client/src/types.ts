@@ -1699,6 +1699,7 @@ export enum ParamSendMethod {
   HEADER = 1,
   QUERY = 2,
   BODY = 3,
+  PATH = 4,
 }
 
 // 插件参数类型枚举
@@ -1728,6 +1729,7 @@ export interface PluginCreateRequest {
   plugin_type: PluginType | number
   url?: string
   icon_uri?: string
+  mcp_transport?: number
 }
 
 export interface PluginCreateResponse {
@@ -1756,6 +1758,7 @@ export interface PluginInfo {
   url?: string
   icon_uri?: string
   request_params?: PluginRequestParam[]
+  mcp_transport?: number
 }
 
 export interface PluginGetResponse {
@@ -1868,6 +1871,7 @@ export interface PluginApiParam {
 export interface PluginApiHeader {
   name: string
   value: string
+  description?: string
 }
 
 export interface PluginApiInfo extends PluginApiBase {
@@ -2132,6 +2136,56 @@ export interface PluginGetCodeResponse {
 }
 
 export interface PluginListCodeResponse extends PluginCodeInfoResponse {}
+
+// Plugin MCP 相关类型
+export interface PluginMcpInfo {
+  tool_id: string
+  space_id: string
+  plugin_id: string
+  name: string
+  desc: string
+  transport?: number | string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  url?: string
+  headers?: Record<string, string>
+  mcp_tool_name?: string
+  request_params?: PluginApiParam[]
+  response_params?: PluginApiParam[]
+  available?: boolean
+  plugin_version?: string
+}
+
+export interface PluginMcpInfoResponse {
+  code: number
+  message: string
+  data: {
+    mcp_info: PluginMcpInfo[]
+    total: number
+  }
+}
+
+export interface PluginListMcpToolsRequest {
+  space_id: string
+  plugin_id: string
+  page?: number
+  size?: number
+  plugin_version?: string
+}
+
+export interface PluginDiscoverMcpToolsRequest {
+  space_id: string
+  plugin_id: string
+}
+
+export interface PluginDiscoverMcpToolsResponse {
+  code: number
+  message: string
+  data: {
+    tool_ids: string[]
+  }
+}
 
 // Plugin Publish 相关类型
 export interface PluginPublishRequest {

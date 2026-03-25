@@ -19,6 +19,95 @@
     "plugin": {
       "description": "Tool node for calling specific plugin tools to perform tasks."
     },
+    "httpRequest": {
+      "titlePrefix": "HTTP Request",
+      "description": "Make HTTP/HTTPS requests to external APIs with authentication, retry logic, and response handling.",
+      "urlSection": {
+        "title": "URL Configuration",
+        "description": "Configure the request URL and HTTP method"
+      },
+      "headersSection": {
+        "title": "Headers"
+      },
+      "queryParamsSection": {
+        "title": "Query Parameters"
+      },
+      "bodySection": {
+        "title": "Request Body"
+      },
+      "authSection": {
+        "title": "Authentication"
+      },
+      "responseSection": {
+        "title": "Response Handling"
+      },
+      "advancedSection": {
+        "title": "Advanced Options"
+      },
+      "errorSection": {
+        "title": "Error Handling"
+      },
+      "url": {
+        "label": "URL"
+      },
+      "method": {
+        "label": "HTTP Method"
+      },
+      "body": {
+        "contentType": "Content Type",
+        "content": "Body Content"
+      },
+      "auth": {
+        "type": "Authentication Type",
+        "username": "Username",
+        "password": "Password",
+        "token": "Bearer Token",
+        "apiKey": "API Key",
+        "location": "API Key Location",
+        "paramName": "Parameter Name"
+      },
+      "response": {
+        "format": "Response Format",
+        "mode": "Response Mode"
+      },
+      "advanced": {
+        "timeout": "Timeout (seconds)",
+        "followRedirects": "Follow Redirects",
+        "ignoreSsl": "Ignore SSL Issues",
+        "retry": {
+          "enabled": "Enable Retry",
+          "maxRetries": "Max Retries",
+          "backoffType": "Backoff Strategy"
+        },
+        "rateLimit": {
+          "enabled": "Enable Rate Limiting",
+          "requestsPerUnit": "Requests Per Unit",
+          "unit": "Time Unit"
+        }
+      },
+      "error": {
+        "processType": "Error Handling Type",
+        "timeout": "Timeout"
+      },
+      "output": {
+        "errorCode": "Error code (0 for success)",
+        "errorMsg": "Error message (empty for success)",
+        "data": "Response data (JSON object for 200 OK)"
+      }
+    },
+    "reactAgent": {
+      "ReactAgent": "ReAct Agent",
+      "titlePrefix": "React Agent",
+      "description": "A ReAct agent node.",
+      "maxIterations": "Max Iterations",
+      "maxIterationsDescription": "Set maximum number of iterations for the agent, range 1-20",
+      "skills": "Skills",
+      "skillsDescription": "Select plugins and workflows as tools for the ReAct agent",
+      "plugins": "Plugins",
+      "pluginsPlaceholder": "Select plugins",
+      "workflows": "Workflows",
+      "workflowsPlaceholder": "Select workflows"
+    },
     "knowledgeRetrieval": {
       "titlePrefix": "Knowledge Retrieval",
       "description": "Retrieve relevant documents from knowledge bases based on input queries.",
@@ -427,7 +516,8 @@
     "modelNotExists": "Model does not exist, please reselect"
   },
   "formInput": {
-    "input": "Input"
+    "input": "Input",
+    "method": "Method"
   },
   "formOutput": {
     "output": "Output"

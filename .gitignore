@@ -101,9 +101,20 @@ scripts/examples
 scripts/ssl
 scripts/.ssl-dirs/*
 scripts/.envs/*
+scripts/conf/.nginx-files/*backend/openjiuwen_studio/core/dsl_converter/experimental/
 scripts/conf/.nginx-files/*
 
 # deepsearch
 docker-compose.yml
 volumes/*
 backend/data/*
+# Code assist
+.qwenignore
+.qwen
+QWEN.md
+.clinerules
+.claudeignore
+CLAUDE.md
+AGENTS.md
+
+/backend/openjiuwen_studio/memory-data/chroma.sqlite3

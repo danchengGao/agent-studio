@@ -128,13 +128,23 @@ export class WorkflowService {
 
   // 删除工作流版本
   static async deleteWorkflowVersion(request: {
-    workflow_id: string;
-    space_id: string;
-    workflow_version: string;
+    workflow_id: string
+    space_id: string
+    workflow_version: string
   }): Promise<{ code: number; message: string; data?: any }> {
     const apiClient = getApiClient()
     const response = await apiClient.post(API_ENDPOINTS.WORKFLOWS.DELETE_PUBLISH_VERSION, request)
     return response.data
+  }
+
+  // 导出工作流为 Python 脚本
+  static async exportWorkflowPy(workflowId: string, spaceId?: string): Promise<{ workflow_id: string; python_code: string }> {
+    const apiClient = getApiClient()
+    const queryParams = spaceId ? `?space_id=${encodeURIComponent(spaceId)}` : ''
+    const response = await apiClient.get<{ code: number; message: string; data: { workflow_id: string; python_code: string } }>(
+      `${API_ENDPOINTS.WORKFLOWS.EXPORT_PY}/${workflowId}${queryParams}`
+    )
+    return response.data.data
   }
 
   // 获取文件上传URL
@@ -156,6 +166,17 @@ export class WorkflowService {
     const response = await apiClient.get<GetDownloadUrlResponse>(
       `${API_ENDPOINTS.WORKFLOWS.GET_DOWNLOAD_URL}/${object_key || ''}${queryParams}`
     )
+    return response.data
+  }
+
+  // 导入工作流
+  static async importWorkflow(formData: FormData): Promise<{ code: number; message: string; data?: any }> {
+    const apiClient = getApiClient()
+    const response = await apiClient.post<{ code: number; message: string; data?: any }>(API_ENDPOINTS.WORKFLOWS.IMPORT, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   }
 }

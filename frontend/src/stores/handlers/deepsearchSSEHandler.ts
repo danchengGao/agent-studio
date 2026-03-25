@@ -1469,6 +1469,7 @@ export class DeepsearchSSEHandler {
     saveConversationToDB(this.conversationId);
   }
 
+
   /**
    * 处理 user_input_ended 事件
    * 当大纲交互达到最大修改次数时触发，创建 TASK 消息显示大纲并继续流程
@@ -1514,6 +1515,7 @@ export class DeepsearchSSEHandler {
    * 处理 error 事件
    * error 事件包含 exception_info，需要更新到最终报告
    */
+
   private handleError(sseData: SSEData, sectionIdx?: number, planIdx?: number, stepIdx?: number): void {
     const { updateMessage, addSystemMessage, getMessageItemsIsUser } = this.store;
     const lastMessageItems = this.store.getCurrentMessageItems();

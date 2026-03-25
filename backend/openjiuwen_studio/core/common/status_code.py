@@ -88,6 +88,14 @@ class StatusCode(Enum):
                                          "工作流图中存在非开始类型的孤立起始节点",
                                          "Workflow graph contains non-start type isolated source node")
 
+    # React Agent组件错误 2150~2159
+    REACT_AGENT_COMPONENT_CONVERT_FAILED = (BASE_CODE + 2150, "React智能体组件转换失败: {msg}",
+                                             "React agent component convert failed: {msg}")
+    REACT_AGENT_COMPONENT_COMPILE_ERROR = (BASE_CODE + 2151, "React智能体组件编译失败: {msg}",
+                                            "React agent component compile failed: {msg}")
+    REACT_AGENT_COMPONENT_RUN_ERROR = (BASE_CODE + 2152, "React智能体组件运行失败: {msg}",
+                                        "React agent component run failed: {msg}")
+
     # Component模块 3001~3999
     COMPONENT_UNSUPPORT_RUN_ERROR = (BASE_CODE + 3001, "不支持该组件单独运行",
                                      "Unsupported component type for single component run")
@@ -102,7 +110,9 @@ class StatusCode(Enum):
                                           "User output component invoke error: {msg}")
     VARIABLE_MERGE_COMPONENT_INVOKE_ERROR = (BASE_CODE + 3006, "变量聚合组件执行异常",
                                              "Variable merge component invoke error")
-    EMPTY_COMPONENT_INVOKE_ERROR = (BASE_CODE + 3007, "空组件执行异常",
+    HTTP_REQUEST_COMPONENT_INVOKE_ERROR = (BASE_CODE + 3007, "HTTP请求组件执行异常: {msg}",
+                                            "HTTP request component invoke error: {msg}")
+    EMPTY_COMPONENT_INVOKE_ERROR = (BASE_CODE + 3008, "空组件执行异常",
                                     "Empty component invoke error")
 
     # 组件转换报错
@@ -146,10 +156,12 @@ class StatusCode(Enum):
                                              "Set variable component convert failed: {msg}")
     PLUGIN_COMPONENT_CONVERT_FAILED = (BASE_CODE + 3044, "插件节点转换失败: {msg}",
                                        "Plugin component convert failed: {msg}")
-    KNOWLEDGE_RETRIEVAL_COMPONENT_CONVERT_FAILED = (BASE_CODE + 3046, "知识检索节点转换失败: {msg}",
+    HTTP_REQUEST_COMPONENT_CONVERT_FAILED = (BASE_CODE + 3045, "HTTP请求节点转换失败: {msg}",
+                                              "HTTP request component convert failed: {msg}")
+    BRANCH_COMPONENT_COMPILE_FAILED = (BASE_CODE + 3046, "选择器节点 {msg} 编译失败: 没有设置分支"),
+    KNOWLEDGE_RETRIEVAL_COMPONENT_CONVERT_FAILED = (BASE_CODE + 3047, "知识检索节点转换失败: {msg}",
                                                     "Knowledge retrieval component convert failed: {msg}")
-    BRANCH_COMPONENT_COMPILE_FAILED = (BASE_CODE + 3045, "选择器节点 {msg} 编译失败: 没有设置分支",
-                                       "The branches in component id: {msg} is empty, please check!")
+
 
     # 组件编译错误
     COMPONENT_COMPILE_ERROR = (BASE_CODE + 3050, "组件编译失败: {msg}",
@@ -170,7 +182,9 @@ class StatusCode(Enum):
                                        "User output component compiler failed: {msg}")
     VARIABLE_MERGE_COMP_COMPILER_ERROR = (BASE_CODE + 3058, "变量聚合组件编译失败: {msg}",
                                           "Variable merge component compiler failed: {msg}")
-    BRANCH_COMPONENT_COMPILE_ERROR = (BASE_CODE + 3059, "选择器组件编译失败: {msg}",
+    HTTP_REQUEST_COMP_COMPILER_ERROR = (BASE_CODE + 3059, "HTTP请求组件编译失败: {msg}",
+                                         "HTTP request component compiler failed: {msg}")
+    BRANCH_COMPONENT_COMPILE_ERROR = (BASE_CODE + 3060, "选择器组件编译失败: {msg}",
                                       "Branch component compiler failed: {msg}")
     KNOWLEDGE_RETRIEVAL_COMP_COMPILER_ERROR = (BASE_CODE + 3062, "知识检索组件编译失败: {msg}",
                                                "Knowledge retrieval component compiler failed: {msg}")
