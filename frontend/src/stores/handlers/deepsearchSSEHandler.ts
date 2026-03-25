@@ -1509,46 +1509,6 @@ export class DeepsearchSSEHandler {
     }
   }
 
-  /**
-   * 处理 user_input_ended 事件
-   * 当大纲交互达到最大修改次数时触发，创建 TASK 消息显示大纲并继续流程
-   */
-  private handleUserInputEnded(sseData: SSEData): void {
-    const { getCurrentMessageItems } = this.store;
-    const lastMessageItems = getCurrentMessageItems();
-
-    // 检查当前 MessageItems 状态
-    if (lastMessageItems && lastMessageItems.status === TaskStatus.CANCELLED) {
-      return;
-    }
-
-    // 从缓存中获取大纲内容
-    const outlineContent = this.getOutlineContentFromCache();
-    if (!outlineContent) {
-      console.warn('[DeepsearchSSEHandler] No outline content stored in cache');
-      return;
-    }
-
-    if (!lastMessageItems) {
-      console.warn('[DeepsearchSSEHandler] No lastMessageItems found');
-      return;
-    }
-
-    try {
-      const taskMessage = this.createRootTaskFromOutline(lastMessageItems.id, outlineContent);
-      if (!taskMessage) {
-        return;
-      }
-
-      // 给 SESSION_CONVERSATION_ID 赋值
-      if (sseData.conversation_id) {
-        this.store.setSessionConversationId(sseData.conversation_id);
-      }
-    } catch (e) {
-      console.error('[DeepsearchSSEHandler] Failed to process outline content:', e);
-    }
-  }
-
 
   /**
    * 处理 error 事件

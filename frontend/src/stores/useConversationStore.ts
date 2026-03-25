@@ -1171,6 +1171,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
     // 如果最后一个MessageItems是用户消息，或者不存在，创建新的系统MessageItems
     if (!lastMessageItems || get().getMessageItemsIsUser(lastMessageItems)) {
+      // 在创建新的 MessageItems 之前，检查是否存在已取消的非用户 MessageItems
+      // 如果存在，说明用户已取消对话，不应该继续添加消息
+      const prevMessageItems = currentMessageItemsList[currentMessageItemsList.length - 2];
+      if (prevMessageItems && !get().getMessageItemsIsUser(prevMessageItems) && prevMessageItems.status === TaskStatus.CANCELLED) {
+        console.log('[addSystemMessage] Previous MessageItems is cancelled, skipping adding new message');
+        return null;
+      }
       messageItemsId = get().generateMessageItemsId();
       lastMessageItems = {
         id: messageItemsId,
