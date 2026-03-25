@@ -1025,9 +1025,7 @@ async def knowledge_base_sync_upload(
                     code=status.HTTP_400_BAD_REQUEST,
                     message=f"Embedding model config is not active: {embed_id}",
                 )
-            embed_model_config, llm_config = _build_ds_embed_config_from_studio(
-                embed_model
-            )
+            embed_model_config, llm_config = _build_ds_stored_kb_model_configs(embed_model)
         finally:
             db.close()
 
@@ -1098,7 +1096,7 @@ async def knowledge_base_sync_upload(
             embed_repo = EmbeddingModelConfigRepository(db)
             embed_model = embed_repo.get_by_id(embed_id)
             if embed_model and embed_model.is_active:
-                embed_model_config, llm_config = _build_ds_embed_config_from_studio(
+                embed_model_config, llm_config = _build_ds_stored_kb_model_configs(
                     embed_model
                 )
                 update_payload = {
@@ -1267,6 +1265,13 @@ async def knowledge_base_sync_process(
     # DeepSearch 接口要求 kb_id，前端传的是 ds_kb_id
     process_payload = {k: v for k, v in payload.items() if k != "ds_kb_id"}
     process_payload["kb_id"] = payload.get("ds_kb_id") or payload.get("kb_id", "")
+    try:
+        _apply_ds_process_llm_config(process_payload, space_id)
+    except ValueError as e:
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=str(e),
+        )
     ds_client = DeepSearchAgentClient()
     try:
         result = await ds_client.process_knowledge_base_documents(process_payload)
@@ -1313,22 +1318,9 @@ async def knowledge_base_ds_list(
         )
 
 
-def _build_ds_embed_config_from_studio(embed_model) -> Tuple[dict, dict]:
-    """从 Studio EmbeddingModelConfig 构建 DS 所需的 embed_model_config 与 llm_config。"""
-    security_utils = SecurityUtils()
-    api_key = ""
-    if embed_model.api_key:
-        try:
-            api_key = security_utils.decrypt_api_key(embed_model.api_key) or ""
-        except Exception as e:
-            logger.warning(f"[KB_SYNC] Failed to decrypt embedding api_key: {e}")
-    embed_model_config = {
-        "model_name": embed_model.model_id or embed_model.model_name or "",
-        "api_key": api_key,
-        "base_url": embed_model.api_base or "",
-        "max_batch_size": getattr(embed_model, "max_batch_size") or 8,
-    }
-    llm_config = {
+def _ds_stored_llm_config_placeholder() -> dict:
+    """DeepSearch 知识库落库用的 llm_config 占位（空密钥，仅占结构）。"""
+    return {
         "model_name": "",
         "model_type": "openai",
         "base_url": "",
@@ -1336,7 +1328,97 @@ def _build_ds_embed_config_from_studio(embed_model) -> Tuple[dict, dict]:
         "hyper_parameters": {},
         "extension": {},
     }
-    return embed_model_config, llm_config
+
+
+def _build_ds_stored_embed_config_dict(embed_model) -> dict:
+    """从 Studio EmbeddingModelConfig 构建写入 DeepSearch 知识库的 embed_model_config。"""
+    security_utils = SecurityUtils()
+    api_key = ""
+    if embed_model.api_key:
+        try:
+            api_key = security_utils.decrypt_api_key(embed_model.api_key) or ""
+        except Exception as e:
+            logger.warning(f"[KB_SYNC] Failed to decrypt embedding api_key: {e}")
+    return {
+        "model_name": embed_model.model_id or embed_model.model_name or "",
+        "api_key": api_key,
+        "base_url": embed_model.api_base or "",
+        "max_batch_size": getattr(embed_model, "max_batch_size") or 8,
+    }
+
+
+def _build_ds_stored_kb_model_configs(embed_model) -> Tuple[dict, dict]:
+    """供 DeepSearch 建库/更新接口使用的 (embed_model_config, llm_config)。
+
+    llm_config 恒为占位；真实 LLM 仅出现在 process 请求体（见 _apply_ds_process_llm_config）。
+    """
+    return (
+        _build_ds_stored_embed_config_dict(embed_model),
+        _ds_stored_llm_config_placeholder(),
+    )
+
+
+def _build_ds_process_llm_config_dict(llm_model_id: int, space_id: str) -> dict:
+    """从 Studio model_configs 构建 DeepSearch /api/kb/process 请求体中的 llm_config（含解密 api_key）。"""
+    with get_db_jw() as db:
+        manager = ModelConfigManager(db)
+        model_config = manager.get_config_by_id(int(llm_model_id), space_id)
+    if not model_config.is_active:
+        raise ValueError(
+            f"LLM 模型未激活（id={llm_model_id}），请先在模型管理中启用后再进行图增强建索引。"
+        )
+    security_utils = SecurityUtils()
+    api_key = ""
+    if model_config.api_key:
+        try:
+            api_key = security_utils.decrypt_api_key(model_config.api_key) or ""
+        except Exception as e:
+            raise ValueError(
+                f"解密 LLM API Key 失败（model_id={llm_model_id}）: {e}"
+            ) from e
+    if not str(api_key).strip():
+        raise ValueError(
+            f"图增强建索引需要可用的 LLM API Key；请在模型管理中为模型（id={llm_model_id}）配置密钥。"
+        )
+    params = model_config.parameters if isinstance(model_config.parameters, dict) else {}
+    hyper_parameters: Dict[str, Any] = {}
+    for key in ("temperature", "top_p", "max_tokens"):
+        if key in params and params[key] is not None:
+            hyper_parameters[key] = params[key]
+    provider = (model_config.provider or "openai").strip().lower()
+    ds_model_type = "siliconflow" if provider == "siliconflow" else "openai"
+    deployment_name = (model_config.model_type or "").strip()
+    if not deployment_name:
+        raise ValueError(
+            f"LLM 未配置模型部署名（model_type 为空），无法在图增强中调用。请在模型管理中补全 model_id={llm_model_id} 的实际模型名。"
+        )
+    return {
+        "model_name": deployment_name,
+        "model_type": ds_model_type,
+        "base_url": model_config.base_url or "",
+        "api_key": api_key,
+        "hyper_parameters": hyper_parameters,
+        "extension": {},
+    }
+
+
+def _apply_ds_process_llm_config(
+    process_payload: dict, space_id: str
+) -> None:
+    """转发 DeepSearch process 前：若启用图增强，则写入解密后的 llm_config（与知识库存储占位无关）。"""
+    idx = process_payload.get("indexing_strategy")
+    if not isinstance(idx, dict):
+        return
+    if not idx.get("enable_graph_enhancement"):
+        return
+    llm_mid = idx.get("llm_model_id")
+    if llm_mid is None:
+        raise ValueError("已启用图增强建索引，但未提供 llm_model_id。")
+    try:
+        mid = int(llm_mid)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"无效的 llm_model_id: {llm_mid}") from e
+    process_payload["llm_config"] = _build_ds_process_llm_config_dict(mid, space_id)
 
 
 def _get_storage_path(space_id: str, kb_id: str) -> Path:
@@ -3518,6 +3600,15 @@ async def document_process(req: DocumentProcessRequest, current_user: dict) -> R
                 if hasattr(req.indexing_strategy, "model_dump")
                 else (req.indexing_strategy or {}),
             }
+            try:
+                _apply_ds_process_llm_config(
+                    process_payload, req.space_id
+                )
+            except ValueError as e:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message=str(e),
+                )
             ds_client = DeepSearchAgentClient()
             result = await ds_client.process_knowledge_base_documents(process_payload)
             if not isinstance(result, dict):
