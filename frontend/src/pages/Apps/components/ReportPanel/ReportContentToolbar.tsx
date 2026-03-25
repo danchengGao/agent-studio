@@ -19,6 +19,12 @@ import { GRADIENT_BUTTON } from '../../constants/styles'
 export interface ReportContentToolbarProps {
   /** 报告数据 */
   report: Report
+  /** 是否处于编辑模式 */
+  isEditing?: boolean
+  /** 进入编辑模式 */
+  onEnterEdit?: () => void
+  /** 退出编辑模式 */
+  onExitEdit?: () => void
 }
 
 /**
@@ -26,6 +32,9 @@ export interface ReportContentToolbarProps {
  */
 export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
   report,
+  isEditing = false,
+  onEnterEdit,
+  onExitEdit,
 }) => {
   const { t } = useTranslation()
   const clipboard = useClipboard()
@@ -40,6 +49,14 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
 
   const handleCopy = () => {
     clipboard.copy(content)
+  }
+
+  const handleEditClick = () => {
+    if (isEditing && onExitEdit) {
+      onExitEdit()
+    } else if (!isEditing && onEnterEdit) {
+      onEnterEdit()
+    }
   }
 
   return (
@@ -83,14 +100,17 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
       </Root>
 
       {/* 编辑按钮 */}
-      <button
-        className="w-[88px] h-8 flex items-center justify-center gap-1.5 rounded-[4px] text-white text-sm font-medium transition-all duration-200 hover:opacity-90"
-        style={{ background: GRADIENT_BUTTON }}
-        aria-label={t('apps.report.edit')}
-      >
-        <Edit className="w-4 h-4" />
-        <span>{t('apps.report.edit')}</span>
-      </button>
+      {onEnterEdit && onExitEdit && (
+        <button
+          onClick={handleEditClick}
+          className="w-[88px] h-8 flex items-center justify-center gap-1.5 rounded-[4px] text-white text-sm font-medium transition-all duration-200 hover:opacity-90"
+          style={{ background: GRADIENT_BUTTON }}
+          aria-label={isEditing ? t('apps.report.exitEdit') : t('apps.report.edit')}
+        >
+          <Edit className="w-4 h-4" />
+          <span>{isEditing ? t('apps.report.exitEdit') : t('apps.report.edit')}</span>
+        </button>
+      )}
     </div>
   )
 }

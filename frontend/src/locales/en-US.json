@@ -829,7 +829,16 @@
         "ariaLabel": "View toggle",
         "comingSoon": "Feature coming soon..."
       },
-      "edit": "Edit"
+      "edit": "Edit",
+      "exitEdit": "Exit Edit",
+      "aiRewrite": "AI Rewrite",
+      "aiPolish": "Polish",
+      "aiExpand": "Expand",
+      "aiShrink": "Shrink",
+      "howToRewrite": "How would you like to rewrite?",
+      "send": "Send",
+      "thinking": "Thinking...",
+      "writing": "Writing..."
     },
     "user": {
       "defaultUsername": "User"

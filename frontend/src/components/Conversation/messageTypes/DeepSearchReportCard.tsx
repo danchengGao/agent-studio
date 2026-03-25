@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import ReportCard from '@/pages/Apps/components/ReportCard';
 import { buildReportFromDeepSearch } from '@/utils/reportUtils';
 import type { DeepSearchResult } from '@/pages/Apps/types';
-import type { Message } from '@/stores/useConversationStore';
+import { type Message } from '@/stores/useConversationStore';
 import { TaskStatus } from '@/stores/useConversationStore';
 import { AlertCircle, FileText, Loader2 } from 'lucide-react';
 

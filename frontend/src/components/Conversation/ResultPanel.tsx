@@ -5,9 +5,12 @@ import { ReportMarkdown } from '@/pages/Apps/components/Markdown';
 import { X } from 'lucide-react';
 import { ReportPanel } from '@/pages/Apps/components/ReportPanel';
 import { buildReportFromDeepSearch, cleanReportContent } from '@/utils/reportUtils';
+import type { ReportRewriteParams } from '@/pages/Apps/types';
 
 interface ResultPanelProps {
   className?: string;
+  /** 报告局部改写回调 */
+  onReportRewrite?: (params: ReportRewriteParams) => Promise<void>;
 }
 
 /**
@@ -19,13 +22,18 @@ interface ResultPanelProps {
  * 3. 支持实时更新（isStreaming 状态）
  * 4. 支持关闭面板
  */
-const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
+const ResultPanel: React.FC<ResultPanelProps> = ({ className = '', onReportRewrite }) => {
   // 从store获取选中的消息ID
   const selectedResultMessageId = useConversationStore(
     (state) => state.selectedResultMessageId
   );
   const setSelectedResultMessageId = useConversationStore(
     (state) => state.setSelectedResultMessageId
+  );
+
+  // 获取当前会话 ID
+  const currentConversationId = useConversationStore(
+    (state) => state.currentConversationId
   );
 
   // 获取messagesMap以监听message内容变化（用于流式更新）
@@ -113,9 +121,9 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
       return {
         id: selectedMessage.id,
         title: selectedMessage.title || '报告',
-        response_content: contentString,
-        citation_messages: null, // 非最终报告没有citations
-        infer_messages: [], // 非最终报告没有推理图谱
+        content: contentString,
+        citations: null, // 非最终报告没有citations
+        inferMessages: [], // 非最终报告没有推理图谱
         createdAt: new Date(selectedMessage.createdAt || Date.now()).toISOString(),
       };
     }
@@ -146,6 +154,8 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
         <ReportPanel
           report={report}
           className={className}
+          conversationId={currentConversationId || undefined}
+          onReportRewrite={onReportRewrite}
         />
       );
     }

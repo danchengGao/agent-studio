@@ -10,12 +10,16 @@ import {
   Ban,
   FileText,
   Clock,
+  Pencil,
 } from 'lucide-react';
 import DeepSearchReportCard from './DeepSearchReportCard';
 import { TextContentCard } from './TextContentCard';
 import { formatDuration } from '../utils/formatDuration';
 import { IosSpinnerSmallStyles, LoadingDotStyles, SpinnerDots } from '../utils/spinnerStyles';
 import { formatReportTitleForDisplay } from '@/utils/reportUtils';
+
+/** 每层深度缩进的像素值 */
+const DEPTH_INDENT_PX = 16;
 
 interface ReportMessageProps {
   message: Message;
@@ -302,10 +306,16 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
 }) => {
   const { t } = useTranslation();
   const getChildMessages = useConversationStore((state) => state.getChildMessages);
+  const messageItemsMap = useConversationStore((state) => state.messageItemsMap);
 
   const [currentTime, setCurrentTime] = useState(Date.now());
   const isRootNode = !message.parentMessageId;
   const [isExpanded, setIsExpanded] = useState(isRootNode);
+
+  // 获取剩余改写次数
+  const messageItems = messageItemsMap.get(message.messageItemsId);
+  const remainingRewriteRounds = messageItems?.remainingRewriteRounds;
+  const maxRewriteRounds = messageItems?.maxRewriteRounds;
 
   useEffect(() => {
     if (message.status !== TaskStatus.IN_PROGRESS) {
@@ -363,11 +373,33 @@ const ReportMessage: React.FC<ReportMessageProps> = ({
   const isFinalReport = isFinalReportMessage(message);
   if (isFinalReport) {
     return (
-      <DeepSearchReportCard
-        message={message}
-        depth={depth}
-        onTaskClick={onTaskClick}
-      />
+      <div className="report-message">
+        <DeepSearchReportCard
+          message={message}
+          depth={depth}
+          onTaskClick={onTaskClick}
+        />
+        {/* 显示剩余改写次数提示 */}
+        {remainingRewriteRounds !== undefined && remainingRewriteRounds >= 0 && (
+          <div
+            className="flex items-center gap-1.5 mt-1 ml-1 text-xs text-gray-500"
+            style={{ marginLeft: `${(depth + 1) * DEPTH_INDENT_PX}px` }}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            {remainingRewriteRounds > 0 ? (
+              <span>
+                {t('apps.deepSearch.remainingRewriteRounds')}{' '}
+                <span className="font-semibold text-gray-700">
+                  {remainingRewriteRounds}/{maxRewriteRounds ?? remainingRewriteRounds}
+                </span>{' '}
+                {t('apps.deepSearch.times')}
+              </span>
+            ) : (
+              <span>{t('apps.deepSearch.noRewriteRoundsLeft')}</span>
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 

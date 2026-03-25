@@ -840,7 +840,16 @@
         "ariaLabel": "视图切换",
         "comingSoon": "功能开发中，敬请期待..."
       },
-      "edit": "编辑"
+      "edit": "编辑",
+      "exitEdit": "退出编辑",
+      "aiRewrite": "AI改写",
+      "aiPolish": "润色",
+      "aiExpand": "扩写",
+      "aiShrink": "缩写",
+      "howToRewrite": "你想如何改写？",
+      "send": "发送",
+      "thinking": "正在思考...",
+      "writing": "正在撰写..."
     },
     "user": {
       "defaultUsername": "用户"
@@ -1155,6 +1164,9 @@
       "conversationCancelledTip": "DeepSearch 对话已被手动中断",
       "collapseContent": "折叠内容",
       "expandContent": "展开内容",
+      "remainingRewriteRounds": "还可改写",
+      "times": "次",
+      "noRewriteRoundsLeft": "改写次数已用完",
       "status": {
         "pending": "待开始",
         "inProgress": "进行中",

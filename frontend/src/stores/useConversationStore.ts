@@ -1958,8 +1958,27 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return;
       }
 
-      // 获取对话的完整数据
-      const conversationData = state.getConversationData(conversationId);
+      // 将 SESSION_CONVERSATION_ID 持久化到 conversation.lastSessionConversationId
+      const sessionConversationId = state.SESSION_CONVERSATION_ID;
+      const shouldUpdateSessionId = sessionConversationId && sessionConversationId !== conversation.lastSessionConversationId;
+
+      if (shouldUpdateSessionId) {
+        // Zustand 的 set 是同步的，更新后 get() 立即返回新状态
+        set((s) => {
+          const existingConversation = s.conversationsMap.get(conversationId);
+          if (!existingConversation) return s;
+
+          const newConversationsMap = new Map(s.conversationsMap);
+          newConversationsMap.set(conversationId, {
+            ...existingConversation,
+            lastSessionConversationId: sessionConversationId,
+          });
+          return { conversationsMap: newConversationsMap };
+        });
+        console.log('[saveConversationToDB] Saved SESSION_CONVERSATION_ID to lastSessionConversationId:', sessionConversationId);
+      }
+
+      const conversationData = get().getConversationData(conversationId);
 
       if (!conversationData) {
         console.warn('[saveConversationToDB] Failed to get conversation data:', conversationId);
@@ -1968,6 +1987,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       // 保存到 IndexDB
       await conversationDB.saveConversation(conversationData);
+      console.log('[saveConversationToDB] Saved to IndexDB, lastSessionConversationId:',
+        conversationData.conversation.lastSessionConversationId);
     } catch (error) {
       console.error('[saveConversationToDB] Failed to save conversation:', error);
     }
@@ -2127,6 +2148,17 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             newMindMapManagersMap.set(messageItemsId, managers);
           });
           console.log(`[loadConversationFullData] Restored ${Object.keys(doc.thoughtGraphs).length} mind map manager collections`);
+        }
+
+        // 恢复 SESSION_CONVERSATION_ID（用于 AI 改写功能）
+        // 注意：lastSessionConversationId 在 ConversationDocument 顶层，不是在 conversation 中
+        const sessionConversationId = doc.lastSessionConversationId;
+        if (sessionConversationId) {
+          console.log('[loadConversationFullData] Restored SESSION_CONVERSATION_ID:', sessionConversationId);
+          // 使用 setTimeout 避免在 reducer 中直接调用 set
+          setTimeout(() => {
+            get().setSessionConversationId(sessionConversationId);
+          }, 0);
         }
 
         return {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Copy, Trash2, RefreshCw, History } from 'lucide-react'
+import { Copy, Trash2, RefreshCw, History, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/MentionPicker'
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
@@ -7,7 +7,7 @@ import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
 import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS } from '../../stores/useConversationStore'
+import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import SSERecorder from '../../utils/sseRecorder'
 import PlaybackPanel from '../../components/Conversation/PlaybackPanel'
@@ -19,7 +19,7 @@ import { copyToClipboard, STORAGE_KEYS, storage, getAgentConfigKeys } from './ut
 import { DEFAULT_DEEPSEARCH_CONFIG } from './utils/deepsearchConstants'
 import { getSuggestionsByAgent } from './constants/suggestions'
 import { TEXT_BASE, TEXT_SMALL, FONT_FAMILY } from './constants/styles'
-import type { Message } from './types'
+import type { Message, ReportRewriteParams } from './types'
 import { SystemMessageItem } from '../../components/Conversation'
 import ResultPanel from '../../components/Conversation/ResultPanel'
 import ConversationHistorySidebar from './components/ConversationHistorySidebar'
@@ -30,6 +30,13 @@ import { TopToolbar, ViewType } from '../../components/Conversation'
 // 从环境变量读取，默认为 false（生产环境）
 // 在 .env 中设置 VITE_ENABLE_SSE_DEBUG=true 来启用
 const ENABLE_SSE_DEBUG = import.meta.env.VITE_ENABLE_SSE_DEBUG === 'true'
+
+// AI 改写操作标签映射
+const REWRITE_ACTION_LABELS: Record<string, string> = {
+  polish: '润色',
+  expand: '扩写',
+  shorten: '缩写',
+}
 
 // ==================== 主页面组件 ====================
 
@@ -704,6 +711,247 @@ const AppsPage: React.FC = () => {
     chatInputRef.current?.focus()
   }
 
+  /**
+   * 报告局部改写处理函数
+   * 复用 DeepSearch 配置，通过 SSE 流处理改写结果
+   * 将改写请求和结果集成到对话流中
+   */
+  const handleReportRewrite = async (params: ReportRewriteParams) => {
+    const { action, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
+
+    // 获取配置
+    const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
+    const token = getToken()
+
+    if (!token) {
+      onError('无法获取认证信息，请重新登录')
+      return
+    }
+
+    // 获取带 session 的 conversation_id（与主 DeepSearch 流程一致）
+    const sessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID
+    const backendConversationId = sessionConversationId || conversationId
+
+    // 【重要】在处理 rewrite 之前，先获取当前报告的剩余改写次数
+    // 这样才能正确计算递减，而不是每次都从新消息的 undefined 开始
+    const currentSelectedResultMessageId = useConversationStore.getState().selectedResultMessageId
+    const currentMessagesMap = useConversationStore.getState().messagesMap
+    const currentMessageItemsMap = useConversationStore.getState().messageItemsMap
+
+    let originalRemainingRewriteRounds: number | undefined = undefined
+    let originalMaxRewriteRounds: number | undefined = undefined
+
+    if (currentSelectedResultMessageId) {
+      const currentMessage = currentMessagesMap.get(currentSelectedResultMessageId)
+      if (currentMessage?.messageItemsId) {
+        const currentMessageItems = currentMessageItemsMap.get(currentMessage.messageItemsId)
+        originalRemainingRewriteRounds = currentMessageItems?.remainingRewriteRounds
+        originalMaxRewriteRounds = currentMessageItems?.maxRewriteRounds
+      }
+    }
+
+    // 1. 添加用户消息到对话流
+    const actionLabel = REWRITE_ACTION_LABELS[action] || action
+    const userMessageContent = userInstruction
+      ? `请帮我${actionLabel}这段文字：\n\n"${selectedText.slice(0, 100)}${selectedText.length > 100 ? '...' : ''}"\n\n${userInstruction}`
+      : `请帮我${actionLabel}这段文字：\n\n"${selectedText.slice(0, 100)}${selectedText.length > 100 ? '...' : ''}"`
+
+    addUserMessage(conversationId, userMessageContent)
+
+    // 构建改写消息 payload（参考 test_feedback1.py 格式）
+    const messagePayload = {
+      action,
+      selected_text: selectedText,
+      start_offset: startOffset,
+      end_offset: endOffset,
+      user_instruction: userInstruction || '',
+    }
+
+    // 构建 local_search_config
+    const local_search_config = (config.searchMode === 'local' || config.searchMode === 'all')
+      ? {
+          local_search_config_ids: config.selectedKnowledgeBaseIds || [],
+          max_local_search_results: config.localSearchResultCount,
+          recall_threshold: config.recallThreshold,
+        }
+      : undefined
+
+    // 构建 web_search_config
+    const web_search_config = (config.searchMode === 'web' || config.searchMode === 'all')
+      ? {
+          web_search_config_id: config.selectedWebSearchEngineId!,
+          max_web_search_results: config.webSearchResultCount,
+        }
+      : undefined
+
+    // 续写请求：复用 DeepSearch 配置，message 为 JSON 格式的改写指令
+    // 参考 test_feedback1.py 的 build_next_payload，续写时保留所有基础配置
+    try {
+      const response = await fetch('/api/v1/agent/deepsearch/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          space_id: user?.spaceId || getDefaultSpaceId(),
+          general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
+          message: JSON.stringify(messagePayload),
+          conversation_id: backendConversationId,
+          // 保留搜索配置（续写时后端会根据 conversation_id 恢复 workflow 状态）
+          search_mode: 'research',
+          web_search_config,
+          local_search_config,
+          // 报告局部改写配置
+          user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
+          user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // 处理 SSE 流
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      const FEEDBACK_AGENT = 'user_feedback_processor'
+      let finalResultMessageId: string | null = null
+      let hasReceivedContent = false  // 用于追踪是否已收到内容
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          onEnd()
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+
+          const raw = line.slice(6)
+          try {
+            const data = JSON.parse(raw)
+
+            // 处理 ALL END
+            if (data.agent === 'end' && data.content === 'ALL END') {
+              onStatusChange?.('idle')
+              onEnd()
+              return
+            }
+
+            // 处理 agent 响应
+            if (data.agent === FEEDBACK_AGENT && typeof data.content === 'string') {
+              try {
+                const content = JSON.parse(data.content)
+
+                // 处理错误信息
+                if (content.error) {
+                  console.error('[handleReportRewrite] Backend error:', content.error)
+                  onStatusChange?.('error')
+                  onError(content.error)
+                  return
+                }
+
+                // 后端同时返回 rewritten_text（增量）和 final_result.response_content（完整快照）
+                // 参考: user_feedback_processor.py 构建的 content_payload
+
+                // 1. 处理增量 delta（选中文本的改写结果）
+                if (typeof content.rewritten_text === 'string') {
+                  // 第一次收到内容时，切换状态为 writing
+                  if (!hasReceivedContent) {
+                    hasReceivedContent = true
+                    onStatusChange?.('writing')
+                  }
+
+                  onDelta({
+                    rewritten_text: content.rewritten_text,
+                    original_start_offset: content.original_start_offset,
+                    original_end_offset: content.original_end_offset,
+                  })
+                }
+
+                // 2. 处理完整快照（在 final_result 中），添加到对话流
+                if (content.final_result && typeof content.final_result.response_content === 'string') {
+                  onSnapshot({ response_content: content.final_result.response_content })
+
+                  // 添加 REPORT 消息到对话流（FINAL_REPORT 类型）
+                  const reportContent = {
+                    response_content: content.final_result.response_content,
+                    citation_messages: content.final_result.citation_messages || null,
+                    infer_messages: content.final_result.infer_messages || [],
+                  }
+
+                  // 如果还没有创建过 final_result 消息，创建一个新的
+                  if (!finalResultMessageId) {
+                    const newMessage = addSystemMessage(
+                      conversationId,
+                      MessageType.REPORT,
+                      JSON.stringify(reportContent),
+                      undefined,
+                      MESSAGE_TITLES.FINAL_REPORT,
+                      'deepsearch'
+                    )
+                    if (newMessage) {
+                      finalResultMessageId = newMessage.id
+                      // 自动选中新创建的报告
+                      setSelectedResultMessageId(newMessage.id)
+
+                      // user_feedback_processor 返回 final_result 后可能还会等待用户下一次输入
+                      // 所以需要在这里就更新状态为 COMPLETED，而不是等 ALL END
+
+                      // 计算剩余改写次数
+                      // 逻辑：最大3次时，第一次完成显示2/3，第二次显示1/3，第三次显示0/3（已用完）
+                      // 【重要】使用函数开头捕获的原始报告的 remainingRewriteRounds
+                      // 而不是新消息的值（新消息始终是 undefined）
+                      const maxInteractions = config.userFeedbackProcessorMaxInteractions ?? 3
+
+                      // 第一次改写时 originalRemainingRewriteRounds 为 undefined
+                      const isFirstRewrite = originalRemainingRewriteRounds === undefined
+                      const newRemaining = isFirstRewrite
+                        ? maxInteractions - 1  // 第一次完成后剩余 max-1
+                        : Math.max(0, (originalRemainingRewriteRounds ?? 0) - 1)
+
+                      useConversationStore.getState().updateMessage(
+                        newMessage.messageItemsId,
+                        newMessage.id,
+                        { status: TaskStatus.COMPLETED, isStreaming: false }
+                      )
+                      useConversationStore.getState().updateMessageItems(
+                        newMessage.messageItemsId,
+                        {
+                          status: TaskStatus.COMPLETED,
+                          remainingRewriteRounds: newRemaining,
+                          // 保持原始的最大次数，如果是第一次则使用配置值
+                          maxRewriteRounds: originalMaxRewriteRounds ?? maxInteractions
+                        }
+                      )
+                    }
+                  }
+                }
+              } catch {
+                // content 不是 JSON，忽略
+              }
+            }
+          } catch {
+            // JSON 解析失败，忽略
+          }
+        }
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '请求失败')
+    }
+  }
+
   // 处理智能体选择（首次配置弹出配置弹窗，非首次配置直接选中）
   const handleAgentSelect = (agent: MentionItem) => {
     // 如果是 DeepSearch 智能体，总是检查服务状态
@@ -1333,7 +1581,7 @@ const AppsPage: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ ...agentConfig, message: messageToBackend,}),
+        body: JSON.stringify({ ...agentConfig, message: messageToBackend }),
         signal: controller.signal,
       })
 
@@ -1736,7 +1984,7 @@ const AppsPage: React.FC = () => {
                     onGraphTypeChange={setCurrentGraphType}
                   />
                 ) : (
-                  <ResultPanel />
+                  <ResultPanel onReportRewrite={handleReportRewrite} />
                 )}
               </div>
             )}

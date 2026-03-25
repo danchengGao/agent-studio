@@ -166,6 +166,10 @@ export interface MessageItems {
   agentType?: AgentType;       // Agent类型，用于HITL场景判断agent匹配
   llm?: string;                // 大模型名称
   agentConfig?: { [key: string]: any }; // agent的参数配置项
+
+  // ===== AI 改写相关 =====
+  remainingRewriteRounds?: number;  // 剩余 AI 改写次数（用于显示提示）
+  maxRewriteRounds?: number;        // 最大 AI 改写次数（用于显示提示）
 }
 
 /**
