@@ -146,7 +146,10 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
   };
 
   const handleDeleteSection = (index: number) => {
-    setEditableSections(prev => prev.filter((_, sectionIndex) => sectionIndex !== index));
+    setEditableSections(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, sectionIndex) => sectionIndex !== index);
+    });
   };
 
   const handleSubmitOutlineEdit = () => {
@@ -281,7 +284,8 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
                     </span>
                     <button
                       onClick={() => handleDeleteSection(index)}
-                      className="w-8 h-8 inline-flex items-center justify-center text-gray-500 rounded-md hover:bg-gray-100"
+                      disabled={editableSections.length <= 1}
+                      className="w-8 h-8 inline-flex items-center justify-center text-gray-500 rounded-md hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Trash2 size={15} />
                     </button>
