@@ -1192,6 +1192,14 @@
           "writingCompleted": "Generated at: {{time}}",
           "writingException": "Writing exception",
           "cancelled": "Cancelled"
+        },
+        "edge": {
+          "frameworkSupport": "Framework Support",
+          "basicDependence": "Basic Dependence",
+          "theoreticalGuidance": "Theoretical Guidance",
+          "conclusionExtension": "Conclusion Extension",
+          "informationIntegration": "Information Integration",
+          "problemOriented": "Problem-Oriented"
         }
       },
       "loading": "Loading...",

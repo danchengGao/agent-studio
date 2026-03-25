@@ -150,7 +150,7 @@ export async function performElkLayout(
     });
 
     // 应用后处理对齐优化
-    const optimizedNodes = postProcessLayout(layoutedNodes, edges, graphType, LAYER_HEIGHT);
+    const optimizedNodes = postProcessLayout(layoutedNodes, edges, LAYER_HEIGHT);
 
     return optimizedNodes;
   } catch (error) {
@@ -316,7 +316,7 @@ export async function performElkLayoutWithWorker(
           worker.terminate();
 
           // 应用后处理对齐优化，使用动态计算的层高
-          const optimizedNodes = postProcessLayout(result, edges, graphType, LAYER_HEIGHT);
+          const optimizedNodes = postProcessLayout(result, edges, LAYER_HEIGHT);
 
           resolve(optimizedNodes);
         } else if (type === 'error') {

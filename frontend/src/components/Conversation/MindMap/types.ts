@@ -5,12 +5,23 @@ import {
   ThoughtNodeType,
   EdgeRelationType,
   LayoutDirection,
+  NODE_DIMENSIONS,
+  LayoutOptions,
+  DEFAULT_LAYOUT_OPTIONS,
+  getNodeWidth,
+  getNodeHeight
 } from '../../../stores/handlers/deepsearchMindMapHandler';
 import { Message, TaskStatus } from '../../../stores/useConversationStore';
 
+// 重新导出思维链核心类型，保持向后兼容
 export type { ThoughtNode, ThoughtEdge };
 export { ThoughtNodeType, EdgeRelationType };
 export type { LayoutDirection };
+export { NODE_DIMENSIONS };
+
+// 重新导出布局相关类型和工具函数
+export type { LayoutOptions };
+export { DEFAULT_LAYOUT_OPTIONS, getNodeWidth, getNodeHeight };
 
 export interface NodeData {
   messageId: string;
@@ -34,38 +45,4 @@ export type ThoughtFlowEdge = Edge<{
 export interface MindMapFlowProps {
   messageItemsId: string;
   className?: string;
-}
-
-export interface LayoutOptions {
-  direction: LayoutDirection;
-  nodeSpacing: number;
-  levelSpacing: number;
-}
-
-export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
-  direction: 'TB',
-  nodeSpacing: 40,
-  levelSpacing: 40, // 楼层间距
-};
-
-export const NODE_DIMENSIONS: Record<ThoughtNodeType, { width: number; height: number }> = {
-  [ThoughtNodeType.OUTLINE]: { width: 248, height: 50 },
-  [ThoughtNodeType.SECTION]: { width: 360, height: 160 },
-  [ThoughtNodeType.PLAN]: { width: 260, height: 140 },
-  [ThoughtNodeType.SUB_REPORT]: { width: 300, height: 60 },
-  [ThoughtNodeType.FINAL_REPORT]: { width: 340, height: 128 },
-};
-
-/**
- * 获取节点宽度 - 从 NODE_DIMENSIONS 单一数据源获取
- */
-export function getNodeWidth(type: string): number {
-  return NODE_DIMENSIONS[type as keyof typeof NODE_DIMENSIONS]?.width || 200;
-}
-
-/**
- * 获取节点高度 - 从 NODE_DIMENSIONS 单一数据源获取
- */
-export function getNodeHeight(type: string): number {
-  return NODE_DIMENSIONS[type as keyof typeof NODE_DIMENSIONS]?.height || 100;
 }

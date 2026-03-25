@@ -2283,7 +2283,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   /**
-   * 检查并标记当前对话中未完成的MessageItems为FAILED
+   * 检查并标记当前对话中未完成的MessageItems为FAILED 或 CANCELLED
    */
   checkAndMarkIncompleteAsFailed: () => {
     const { currentConversationId } = get();

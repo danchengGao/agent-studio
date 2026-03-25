@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Network, ListTree } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   ReactFlow,
   Background,
@@ -11,6 +12,7 @@ import {
   Panel,
   Node,
   Edge,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -22,6 +24,7 @@ import {
   DEFAULT_LAYOUT_OPTIONS,
   NODE_DIMENSIONS,
 } from './types';
+import { getEdgeLabelI18n } from '../../../utils/deepsearchMindMapUtils';
 import {
   OutlineNode,
   SectionNode,
@@ -54,6 +57,7 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
   graphType: propsGraphType = 'sectionGraph',
   onGraphTypeChange,
 }) => {
+  const { t } = useTranslation();
   const getMindMapManager = useConversationStore(state => state.getMindMapManager);
   const getMessageById = useConversationStore(state => state.getMessageById);
   const getChildMessages = useConversationStore(state => state.getChildMessages);
@@ -70,6 +74,9 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
   const [needLayout, setNeedLayout] = useState(false);
   const [graphType, setGraphType] = useState<'sectionGraph' | 'taskGraph'>(propsGraphType);
   const reactFlowRef = useRef<any>(null);
+  const fitViewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nodesRef = useRef<Node[]>([]); // 用于存储最新的 nodes，避免闭包陷阱
+  const { fitView } = useReactFlow(); // 获取 fitView 方法
 
   // 用于缓存之前的edges数据，避免不必要的更新
   const previousEdgesRef = useRef<string>('');
@@ -145,7 +152,39 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
   useEffect(() => {
     setGraphType(propsGraphType);
   }, [propsGraphType]);
-  
+
+  // 统一的 fitView 调用函数（带防抖）
+  const triggerFitView = () => {
+    // 清除之前的定时器
+    if (fitViewTimeoutRef.current) {
+      clearTimeout(fitViewTimeoutRef.current);
+    }
+
+    // 设置新的定时器（防抖500ms）
+    fitViewTimeoutRef.current = setTimeout(() => {
+      const currentNodes = nodesRef.current;
+      if (currentNodes.length > 0 && typeof fitView === 'function') {
+        fitView({ padding: 0.2 });
+      }
+    }, 500);
+  };
+
+  // 清理定时器
+  useEffect(() => {
+    return () => {
+      if (fitViewTimeoutRef.current) {
+        clearTimeout(fitViewTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 当messageItemsId变化时（切换思维链），强制调用 fitView
+  useEffect(() => {
+    setTimeout(() => {
+      triggerFitView();
+    }, 100);
+  }, [messageItemsId]);
+
   // 当内部graphType变化时，通知父组件
   useEffect(() => {
     if (onGraphTypeChange) {
@@ -265,7 +304,7 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
             animated: false,
             style,
             data,
-            label: edge.label || undefined, // 显示边的标签
+            label: getEdgeLabelI18n(edge.label, t) || undefined, // 显示边的标签（已国际化）
             labelStyle: {
               fontSize: 12,
               fontWeight: 500,
@@ -279,7 +318,7 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
           };
         });
     },
-    [graph, getEdgeStatus, edgeStyleCache, edgeDataCache, EDGE_STYLES]
+    [graph, getEdgeStatus, edgeStyleCache, edgeDataCache, EDGE_STYLES, t, getEdgeLabelI18n]
   );
 
   // 获取消息项状态，用于判断是否需要继续更新
@@ -404,9 +443,7 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
 
       // 布局完成后适应视图
       setTimeout(() => {
-        if (reactFlowRef.current) {
-          reactFlowRef.current.fitView({ padding: 0.2 });
-        }
+        fitView({ padding: 0.2 });
       }, 100);
     } catch (error) {
       console.error('Layout failed:', error);
@@ -433,9 +470,7 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
 
       // 布局完成后适应视图
       setTimeout(() => {
-        if (reactFlowRef.current) {
-          reactFlowRef.current.fitView({ padding: 0.2 });
-        }
+        fitView({ padding: 0.2 });
       }, 100);
     }
   }, [graph, direction, graphType, convertToFlowNodes, setNodes, saveConversationToDB]);
@@ -448,15 +483,13 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
 
   // 当节点或边变化时，自动适应视图
   useEffect(() => {
-    if (nodes.length > 0 && reactFlowRef.current) {
-      // 增加延迟时间，确保布局和数据完全加载
-      const timer = setTimeout(() => {
-        reactFlowRef.current.fitView({ padding: 0.2 });
-      }, 300);
+    // 同步最新的 nodes 到 ref
+    nodesRef.current = nodes;
 
-      return () => clearTimeout(timer);
+    if (nodes.length > 0) {
+      triggerFitView();
     }
-  }, [nodes, edges]);
+  }, [nodes.length, edges.length]); // 只依赖长度，避免引用变化导致的循环
 
   // 当思维图类型变化时，强制触发布局和适应视图
   useEffect(() => {
@@ -466,6 +499,11 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
         // 强制设置需要布局
         graph.setNeedLayout(true);
         setNeedLayout(true);
+
+        // 延迟调用 fitView，确保节点已更新
+        setTimeout(() => {
+          triggerFitView();
+        }, 500);
       }
     }, 100);
 
@@ -494,8 +532,6 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
         maxZoom={2}
         defaultEdgeOptions={{

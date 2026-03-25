@@ -1,4 +1,4 @@
-import { ThoughtNode, ThoughtEdge } from '../../../stores/handlers/deepsearchMindMapHandler';
+import { ThoughtNode, ThoughtEdge } from '../../../stores/handlers/deepsearchMindMapTypes';
 import { DEFAULT_LAYOUT_OPTIONS, getNodeWidth } from './types';
 
 /**
@@ -105,10 +105,10 @@ function alignNodesInSameLayer(nodes: ThoughtNode[]): void {
  * @param nodeSpace 节点间距
  * @param addNodeId 新增节点ID，用于定位新增节点。如果提供，且其他节点都已布局，则仅处理新增节点的父节点对齐。
  */
-function alignParentChildNodes(
-  nodes: ThoughtNode[], 
-  edges: ThoughtEdge[], 
-  nodeSpace: number, 
+export function alignParentChildNodes(
+  nodes: ThoughtNode[],
+  edges: ThoughtEdge[],
+  nodeSpace: number,
   addNodeId?: string
 ): void {
   let depth = 1; // 当前的深度层
@@ -286,14 +286,15 @@ function alignGraphCenter(nodes: ThoughtNode[]): void {
  * 后处理对齐优化
  * @param nodes 布局后的节点
  * @param edges 边数据
- * @param graphType 图类型
+ * @param layerHeight 层高（默认140×1.5=210，但保持兼容性）
+ * @param addNodeId 新增节点ID，用于定位新增节点。如果提供，可以减少一些计算量，避免重复计算
  * @returns 优化后的节点
  */
 export function postProcessLayout(
   nodes: ThoughtNode[],
   edges: ThoughtEdge[],
-  graphType?: 'sectionGraph' | 'taskGraph',
-  layerHeight: number = 210 //  改为更准确的参数名：层高（默认140×1.5=210，但保持兼容性）
+  layerHeight: number = 210, //  改为更准确的参数名：层高（默认140×1.5=210，但保持兼容性）
+  addNodeId?: string
 ): ThoughtNode[] {
   // 深拷贝节点，避免修改原数据
   const optimizedNodes = nodes.map(node => ({ ...node }));
@@ -307,10 +308,10 @@ export function postProcessLayout(
   // alignNodesInSameLayer(optimizedNodes);
 
   // 2. 强制恢复Y坐标为 depth * 层高（覆盖所有之前的Y坐标修改）
-  enforceDepthBasedYPositions(optimizedNodes, layerHeight);
+  enforceDepthBasedYPositions(optimizedNodes, layerHeight, addNodeId);
 
   // 3. 调整节点x坐标，实现父子节点水平居中对齐
-  alignParentChildNodes(optimizedNodes, edges, DEFAULT_LAYOUT_OPTIONS.nodeSpacing);
+  alignParentChildNodes(optimizedNodes, edges, DEFAULT_LAYOUT_OPTIONS.nodeSpacing, addNodeId);
 
   // 4. 调整节点x坐标，实现整个图的水平中心对齐（在特殊节点对齐之前）
   alignGraphCenter(optimizedNodes);
@@ -331,8 +332,13 @@ export function postProcessLayout(
  *  强制恢复Y坐标为 depth × 层高
  * 这个函数必须在所有其他后处理步骤之后调用，以确保Y坐标被强制设置为depth计算的值
  */
-function enforceDepthBasedYPositions(nodes: ThoughtNode[], layerHeight: number): void {
+export function enforceDepthBasedYPositions(nodes: ThoughtNode[], layerHeight: number, addNodeId?: string): void {
   nodes.forEach(node => {
+    // 如果提供了addNodeId，则只处理该节点
+    if (addNodeId && node.messageId !== addNodeId) {
+      return;
+    }
+
     if (node.position && node.depth !== undefined) {
       const targetY = node.depth * layerHeight;
       const oldY = node.position.y;

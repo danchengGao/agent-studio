@@ -271,9 +271,8 @@ export class DeepsearchSSEHandler {
 
         // 【步骤1】更新上一个 planTask (task_1_x_(n-1))
         if (planIdx > 1 && sectionTask) {
-          const prevPlanTitle = i18n.t('apps.deepSearch.informationCollection', { sectionId: sectionIdx, planIndex: planIdx - 1 });
           const prevPlanTask = this.store.getChildMessages(sectionTask.id).find(task =>
-            task.title?.includes(prevPlanTitle)
+            task.indexPath === `${sectionIdx}-${planIdx - 1}-0`
           );
 
           if (prevPlanTask && isTaskOngoing(prevPlanTask.status)) {
@@ -908,7 +907,7 @@ export class DeepsearchSSEHandler {
       });
 
       // 如果是 collector_summary，更新 step 状态
-      if (sseData.agent === 'collector_summary') {
+      if (sseData.agent === 'collector_summary' && stepTask.status != TaskStatus.FAILED) {
         updateMessage(lastMessageItems.id, stepTask.id, {
           status: TaskStatus.COMPLETED,
         });
@@ -1726,8 +1725,29 @@ export class DeepsearchSSEHandler {
 
       // 只更新进行中状态的任务
       if (isTaskOngoing(currentTask.status)) {
+        let finalStatus = updateStatus; // 默认使用传入的 updateStatus
+
+        /// 如果当前updateMessage是step的任务，作特殊处理
+        if (currentTask.type === MessageType.TASK && currentTask.indexPath) {
+          // 1. 判断是否是 step 任务：type 是 TASK，indexPath 符合 "x-y-z" 格式，x,y,z >= 1
+          // 检查 indexPath 的三个部分是否都 >= 1（排除 "0-1-1" 等情况）
+          const [section, plan, step] = currentTask.indexPath.split('-').map(Number);
+          const isValidStepTask = section >= 1 && plan >= 1 && step >= 1;
+          if (isValidStepTask) {
+            // 2. 检查子消息条件：有 summary（TEXT）但没有 link（LINK）
+            const childMessages = this.store.getChildMessages(currentTask.id);
+            const hasLink = childMessages.some(msg => msg.type === MessageType.LINK);
+            // const hasSummary = childMessages.some(msg => msg.type === MessageType.TEXT);
+            // 3. 如果满足条件，状态更新为失败；
+            // if (hasSummary && !hasLink) {
+            if (!hasLink) {
+              finalStatus = TaskStatus.FAILED;
+            }
+          }
+        }
+
         this.store.updateMessage(messageItemsId, currentTask.id, {
-          status: updateStatus,
+          status: finalStatus,
           updatedAt: now,
         });
         count++;
@@ -2225,7 +2245,7 @@ export class DeepsearchSSEHandler {
 
     if (outlineContent.sections && Array.isArray(outlineContent.sections)) {
       outlineContent.sections.forEach((section: any, index: number) => {
-        const sectionTitle = section.title || i18n.t('deepResearch.handler.chapter', { index: index + 1 });
+        const sectionTitle = section.title ? `${index + 1}. ${section.title}` : i18n.t('deepResearch.handler.chapter', { index: index + 1 });
         const sectionDescription = section.description || '';
 
         // ===== 依赖项解析 =====

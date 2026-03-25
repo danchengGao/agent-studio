@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
+import { ReactFlowProvider } from '@xyflow/react';
 import { MindMapFlow } from './index';
 import { useConversationStore } from '../../../stores/useConversationStore';
 
@@ -26,12 +27,14 @@ const MindMapPanel: React.FC<MindMapPanelProps> = ({
   return (
     <div className={`w-full h-full flex flex-col bg-gray-50 ${className}`}>
       <div className="flex-1 min-h-0 relative">
-        <MindMapFlow
-          messageItemsId={messageItemsId}
-          className="w-full h-full"
-          graphType={graphType}
-          onGraphTypeChange={onGraphTypeChange}
-        />
+        <ReactFlowProvider>
+          <MindMapFlow
+            messageItemsId={messageItemsId}
+            className="w-full h-full"
+            graphType={graphType}
+            onGraphTypeChange={onGraphTypeChange}
+          />
+        </ReactFlowProvider>
       </div>
     </div>
   );

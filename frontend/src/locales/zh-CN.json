@@ -1205,6 +1205,14 @@
           "writingCompleted": "生成时间: {{time}}",
           "writingException": "撰写异常",
           "cancelled": "已取消"
+        },
+        "edge": {
+          "frameworkSupport": "框架支撑",
+          "basicDependence": "基础依赖",
+          "theoreticalGuidance": "理论指导",
+          "conclusionExtension": "结论延伸",
+          "informationIntegration": "信息整合",
+          "problemOriented": "问题导向"
         }
       },
       "loading": "加载中...",
