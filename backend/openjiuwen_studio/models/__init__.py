@@ -18,6 +18,7 @@ from .user import SpaceDB, SpaceUserDB, UserDB
 from .workflow import WorkflowBaseDB, WorkflowPublishDB
 from .workflow_execution import WorkflowExecutionDB, WorkflowExecutionDetailsDB
 from .memory_base import MemoryBaseDB
+from .runtime_info import RuntimeInfoDB
 
 __all__ = [
     "ModelConfig",
@@ -49,4 +50,5 @@ __all__ = [
     "SystemEmbeddingModelDB",
     "SystemLLMModelDB",
     "MemoryBaseDB",
+    "RuntimeInfoDB"
 ]

@@ -14,6 +14,11 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@ag-ui/client": "^0.0.47",
+    "@assistant-ui/react": "^0.12.17",
+    "@assistant-ui/react-ag-ui": "^0.0.21",
+    "@assistant-ui/react-markdown": "^0.12.6",
+    "@assistant-ui/react-ui": "^0.2.1",
     "@blocknote/core": "^0.47.1",
     "@blocknote/mantine": "^0.47.1",
     "@blocknote/react": "^0.47.1",
@@ -61,6 +66,7 @@
     "dompurify": "^3.3.1",
     "elkjs": "^0.11.1",
     "framer-motion": "^12.6.5",
+    "handlebars": "^4.7.8",
     "i18next": "^25.6.0",
     "i18next-browser-languagedetector": "^8.2.0",
     "jszip": "^3.10.1",
