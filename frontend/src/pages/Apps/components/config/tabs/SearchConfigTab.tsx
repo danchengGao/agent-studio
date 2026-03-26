@@ -39,7 +39,7 @@ interface RangeSliderProps {
 /**
  * QPS 输入框组件
  * - 支持任意浮点数输入
- * - 聚焦时值为0则清空，方便用户输入
+ * - 用户输入时实时显示
  * - 隐藏number input的上下箭头按钮
  */
 const QpsInput: React.FC<{
@@ -48,15 +48,42 @@ const QpsInput: React.FC<{
   placeholder?: string
   suffix?: string
 }> = ({ value, onChange, placeholder, suffix }) => {
+  const [inputValue, setInputValue] = React.useState('')
   const [isFocused, setIsFocused] = React.useState(false)
-  const displayValue = isFocused && value === 0 ? '' : String(value)
+
+  const handleFocus = () => {
+    setIsFocused(true)
+    if (value === 0) {
+      setInputValue('')
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value
-    if (inputValue === '') { onChange(0); return }
-    const parsedValue = parseFloat(inputValue)
-    if (!isNaN(parsedValue) && parsedValue >= 0) { onChange(parsedValue) }
+    const v = e.target.value
+    if (v === '') {
+      setInputValue('')
+      onChange(0)
+      return
+    }
+    // 允许：空字符串、正浮点数（小数点前可无数字）
+    // 不允许：abc、+、-、? 等非法字符，以及 0.5abc 等尾部非法字符
+    if (!/^\d*\.?\d*$/.test(v)) return
+    const parsedValue = parseFloat(v)
+    if (!isNaN(parsedValue) && parsedValue >= 0) {
+      setInputValue(v)
+      onChange(parsedValue)
+    }
   }
+
+  const handleBlur = () => {
+    setIsFocused(false)
+    setInputValue('')
+  }
+
+  // 聚焦时优先显示用户正在输入的内容，如果用户还没输入且原值为0则显示空白
+  const displayValue = isFocused
+    ? (inputValue || (value === 0 ? '' : String(value)))
+    : String(value)
 
   return (
     <div className="flex items-center gap-2">
@@ -64,10 +91,11 @@ const QpsInput: React.FC<{
         type="number"
         value={displayValue}
         onChange={handleChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         placeholder={placeholder}
         step="any"
+        min="0"
         className="w-28 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-auto"
       />
       {suffix && <span className="text-sm text-gray-500">{suffix}</span>}
