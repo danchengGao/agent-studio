@@ -217,7 +217,7 @@ export const KnowledgeBaseConfigDialog: React.FC<KnowledgeBaseConfigDialogProps>
               <button
                 onClick={() => {
                   // 打开知识库管理页面（在新标签页中）
-                  window.open('/knowledge-bases', '_blank')
+                  window.open('/dashboard/knowledge-bases', '_blank')
                 }}
                 className="inline-flex items-center gap-1 px-4 py-2 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
               >
