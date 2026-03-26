@@ -171,10 +171,11 @@ Fill in Redis parameters (create them if missing in the file):
 
 ### 4.4 Configure OBS (Huawei Cloud OBS integration)
 
-Fill in the following 4 parameters in `values-prod.yaml`:
+Fill in the following parameters in `values-prod.yaml`:
 
 - `OBS_BUCKET`: bucket name, e.g. `openjiuwen-bucket1`
 - `OBS_SERVER`: OBS endpoint (server), e.g. `obs.cn-north-4.myhuaweicloud.com`
+- `OBS_REGION`: region name for S3-compatible clients (e.g. aioboto3) signing; must match the endpoint, e.g. `cn-north-4` for `obs.cn-north-4.myhuaweicloud.com`
 - `OBS_ACCESS_KEY_ID`: Access Key ID with bucket permissions
 - `OBS_SECRET_ACCESS_KEY`: Secret Access Key
 

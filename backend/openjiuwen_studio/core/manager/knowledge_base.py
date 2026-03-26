@@ -98,9 +98,10 @@ class OBSDocumentManager:
             logger.warning("[OBS] OBS_BUCKET not set, skipping upload_document")
 
         server = os.getenv("OBS_SERVER")
+        region_name = os.getenv("OBS_REGION")
         access_key_id = SecurityUtils.get_decrypted_secret(
             "OBS_ACCESS_KEY_ID",
-            os.getenv("OBS_SECRET_KEY", None)
+            os.getenv("OBS_ACCESS_KEY_ID", None)
         )
         secret_access_key = SecurityUtils.get_decrypted_secret(
             "OBS_SECRET_ACCESS_KEY",
@@ -110,6 +111,7 @@ class OBSDocumentManager:
             server=server,
             access_key_id=access_key_id,
             secret_access_key=secret_access_key,
+            region_name=region_name,
         )
 
     @staticmethod
