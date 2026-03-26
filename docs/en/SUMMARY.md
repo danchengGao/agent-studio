@@ -27,6 +27,8 @@
     - [Overview](4.Development%20Guide/Development%20Agent/README.md)
     - [Building Custom Agents](4.Development%20Guide/Development%20Agent/Building%20Autonomous%20Planning%20Agent.md)
     - [Building Multi-workflow Agents](4.Development%20Guide/Development%20Agent/Building%20Multi-workflow%20Agent.md)
+    - [Agent Import and Export](4.Development%20Guide/Development%20Agent/agent_import_export.md)
+    - [Publishing Agent](4.Development%20Guide/Development%20Agent/Publishing%20Agent.md)
   - [Development Workflow](4.Development%20Guide/Development%20Workflow/README.md)
     - [Overview](4.Development%20Guide/Development%20Workflow/Overview.md)
     - [Building Workflow](4.Development%20Guide/Development%20Workflow/Building%20Workflow.md)
