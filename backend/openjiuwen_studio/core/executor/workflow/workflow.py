@@ -366,10 +366,10 @@ class Workflow:
 
             if isinstance(target_id, list):
                 for tid in target_id:
-                    logger.debug(f"add_stream_connection source_id: {source_id}, target_id: {tid}")
+                    logger.info(f"add_stream_connection source_id: {source_id}, target_id: {tid}")
                     flow.add_stream_connection(source_id, tid)
             else:
-                logger.debug(f"add_stream_connection source_id: {source_id}, target_id: {target_id}")
+                logger.info(f"add_stream_connection source_id: {source_id}, target_id: {target_id}")
                 flow.add_stream_connection(source_id, target_id)
 
         return flow
@@ -381,7 +381,7 @@ class Workflow:
                 skip_connection = True
                 break
         if not skip_connection:
-            logger.debug(f"add_connection source: {source}, target: {target}")
+            logger.info(f"add_connection source: {source}, target: {target}")
             flow.add_connection(source, target)
         return flow
 
@@ -409,7 +409,7 @@ class Workflow:
                     flow = await self.do_add_connection(flow, conn.source, conn.target)
             else:
                 # 如果 source 不在 need_stream_output_comp 中，直接添加连接
-                logger.debug(f"add_connection source: {conn.source}, target: {conn.target}")
+                logger.info(f"add_connection source: {conn.source}, target: {conn.target}")
                 flow.add_connection(conn.source, conn.target)
         return flow
 
@@ -424,7 +424,7 @@ class Workflow:
         sub_version = sub_wf_info.version
         sub_workflow = await loader.get_compiled_workflow(Context(context),
                                                           sub_id, sub_version, self.space_id, self.current_user)
-        return SubWorkflowComponent(sub_workflow)
+        return SubWorkflowComponent(sub_workflow, cache_stream=True)
 
     async def _create_loop_component(
             self,
