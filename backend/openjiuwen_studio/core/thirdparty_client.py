@@ -465,6 +465,9 @@ class RuntimeAgentClient:
 
         if payload.get("port") is not None:
             params["port"] = str(payload.get("port"))
+
+        if payload.get("userdata") is not None:
+            params["userdata"] = json.dumps(payload.get("userdata"))
         try:
             resp = await self._http.request(
                 "POST",

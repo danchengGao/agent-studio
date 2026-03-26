@@ -50,12 +50,14 @@ async def deploy(
 
         _ = check_user_space(space_id, current_user)
         # 接前端入参，导出agent ir
-        agent_ir = await rtm.get_agent_ir(agent_id, agent_version, space_id, current_user)
+        ir_file = await rtm.get_agent_ir(agent_id, agent_version, space_id, current_user)
+        model_info = await rtm.get_model_info(agent_id, agent_version, space_id, current_user)
 
         # 调用runtime接口，把ir传给runtime,接收从runtime返回的status和id
         data = current_user.get("data", {})
         user_id = data.get("user_id_str", "")
-        payload = {"file": agent_ir, "name": agent_name, "deployer_type": deployer_type, "port": port}
+        payload = {"file": ir_file, "name": agent_name,
+                   "api_keys": model_info, "deployer_type": deployer_type, "port": port}
         # 将整个部署流程放到后台执行
         background_tasks.add_task(
             _background_deploy_and_save,

@@ -38,6 +38,7 @@ from openjiuwen_studio.core.manager.internal.agent import (
     AgentWorkflowListNode,
     SingleAgentData,
 )
+from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.model_manager.managers import ModelConfigManager
 from openjiuwen_studio.core.manager.reference_extractor import extract_agent_references
@@ -4309,3 +4310,164 @@ def _update_node_model_recursive(node: dict, model_id_map: dict, wf_id: str):
                 _update_node_model_recursive(sub_node, model_id_map, wf_id)
         except Exception as e:
             logger.warning(f"[AGENT_IMPORT] Failed to update sub-workflow node {node_id}: {e}")
+
+
+async def agent_get_model_api_keys(
+        req: AgentExportRequest, current_user: dict
+) -> dict:
+    """获取智能体关联的所有大模型的 model_type 和 api_key
+
+    复用 agent_export 的依赖收集逻辑，仅提取大模型相关数据
+    返回格式：{model_type: api_key}
+    """
+    data = current_user.get("data", {})
+    user_id = (
+        data.get("user_id_str", "unknown") if isinstance(data, dict) else "unknown"
+    )
+
+    logger.info(f"[AGENT_GET_MODEL_API_KEYS] Getting model API keys - User: {user_id}, ID: {req.agent_id}")
+
+    # 2. 获取 Agent 基础配置
+    agent_query = AgentId(
+        space_id=req.space_id, agent_id=req.agent_id, agent_version=req.agent_version
+    )
+    get_result = agent_repository.get_agent_db(agent_query)
+
+    if get_result.code != status.HTTP_200_OK:
+        return ResponseModel(code=get_result.code, message=get_result.message)
+
+    if not get_result.data:
+        return {}
+
+    agent_data = get_result.data
+
+    # 3. 递归获取依赖项（仅 workflows，其他依赖忽略）
+    workflows = []
+
+    try:
+        processed_workflow_ids: Set[str] = set()
+        processed_plugin_ids: Set[str] = set()
+
+        # 3.1 处理直接依赖的 Workflows
+        agent_workflows = agent_data.get("workflows", []) or []
+        for wf in agent_workflows:
+            wf_id = wf.get("id") or wf.get("workflow_id")
+            if wf_id and wf_id not in processed_workflow_ids:
+                _collect_workflow_dependencies(
+                    wf_id,
+                    req.space_id,
+                    workflows,
+                    processed_workflow_ids,
+                    plugins=[],
+                    processed_plugin_ids=processed_plugin_ids,
+                )
+    except Exception as e:
+        logger.error(f"[AGENT_GET_MODEL_API_KEYS] Dependency collection failed: {e}", exc_info=True)
+
+    # 4. 收集模型引用信息并解密 API Key
+    model_api_keys: Dict[str, str] = {}
+    processed_model_ids: Set[int] = set()
+
+    # 初始化 SecurityUtils 用于解密 API Key
+    security_utils = SecurityUtils()
+
+    def _collect_and_decrypt_model_from_config(model_config):
+        """收集模型配置并解密 API Key"""
+        if not model_config:
+            return
+
+        model_id = getattr(model_config, 'id', None)
+        if model_id and model_id in processed_model_ids:
+            return
+
+        # 解密 API Key
+        api_key = None
+        if hasattr(model_config, 'api_key') and model_config.api_key:
+            try:
+                api_key = security_utils.decrypt_api_key(model_config.api_key)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to decrypt API key for model {model_id}: {e}")
+                api_key = model_config.api_key
+
+        # 以 model_type 作为 key，如果存在多个相同 model_type 的模型，使用第一个
+        model_type = model_config.model_type
+        if model_type and model_type not in model_api_keys:
+            model_api_keys[model_type] = api_key or ""
+            logger.info(
+                f"[AGENT_GET_MODEL_API_KEYS] Collected model: {model_type} -> API Key: {'*' * len(api_key) if api_key else 'None'}")
+
+        if model_id:
+            processed_model_ids.add(int(model_id))
+
+    def _collect_and_decrypt_model_from_node(node: dict, wf_id: str, parent_path: str = ""):
+        """从节点中收集模型引用并解密 API Key（递归处理嵌套节点）"""
+        node_id = node.get("id", "unknown")
+        node_type = str(node.get("type", ""))
+        current_path = f"{parent_path}/{node_id}" if parent_path else node_id
+
+        # 处理使用模型的节点类型
+        # 节点类型："3"=LLM 大模型，"6"=Intent 意图识别，"7"=Questioner 提问器
+        if node_type in ["3", "6", "7"]:
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                llm_param = inputs.get("llmParam", {})
+                model_info = llm_param.get("model", {})
+                model_id = model_info.get("id")
+
+                if model_id:
+                    model_id_int = int(model_id)
+                    if model_id_int in processed_model_ids:
+                        return
+
+                    with get_db_agent_session() as db:
+                        model_mgr = ModelConfigManager(db)
+                        model_config = model_mgr.get_config_by_id(model_id_int, req.space_id)
+                        _collect_and_decrypt_model_from_config(model_config)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to get model reference for node {node_id}: {e}")
+
+        # 递归处理循环组件内的子节点 (type="8" 表示循环组件)
+        if node_type == "8":
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                loop_children = inputs.get("loopChildren", [])
+                for child_node in loop_children:
+                    _collect_and_decrypt_model_from_node(child_node, wf_id, current_path)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to process loop node {node_id}: {e}")
+
+        # 递归处理子工作流 (type="10" 表示子工作流)
+        if node_type == "10":
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                sub_wf_schema = inputs.get("subWorkflow", {})
+                sub_wf_nodes = sub_wf_schema.get("nodes", [])
+                for sub_node in sub_wf_nodes:
+                    _collect_and_decrypt_model_from_node(sub_node, wf_id, current_path)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to process sub-workflow node {node_id}: {e}")
+
+    # 5.1 收集 Agent 主模型引用并解密 API Key
+    if agent_data.get("model_id"):
+        try:
+            with get_db_agent_session() as db:
+                model_mgr = ModelConfigManager(db)
+                model_config = model_mgr.get_config_by_id(agent_data["model_id"], req.space_id)
+                _collect_and_decrypt_model_from_config(model_config)
+        except Exception as e:
+            logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to get model reference for agent: {e}")
+
+    # 5.2 收集所有 Workflow 节点模型引用并解密 API Key（包括嵌套节点）
+    for wf in workflows:
+        try:
+            wf_id = wf.get("workflow_id") or wf.get("id", "unknown")
+            schema = json.loads(wf.get("schema", "{}"))
+            nodes = schema.get("nodes", [])
+
+            for node in nodes:
+                _collect_and_decrypt_model_from_node(node, wf_id)
+
+        except Exception as e:
+            logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to process workflow schema: {e}")
+
+    return model_api_keys

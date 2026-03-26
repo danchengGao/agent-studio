@@ -2,7 +2,9 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
+import io
 import json
+import zipfile
 import datetime
 from typing import AsyncIterator, Optional
 from urllib.parse import urlparse
@@ -11,7 +13,6 @@ from fastapi import HTTPException, status
 
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.schemas.common import ResponseModel
-from openjiuwen_studio.schemas.agent import AgentGetVersion
 from openjiuwen_studio.core.thirdparty_client import RuntimeAgentClient
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw, JiuwenBaseRepository
 from openjiuwen_studio.models.runtime_info import RuntimeInfoDB
@@ -53,6 +54,25 @@ def _normalize_runtime_port(port: object, url: object = None) -> int | None:
     return p
 
 
+async def get_model_info(
+        agent_id: str,
+        agent_version: str,
+        space_id: str,
+        current_user: dict
+) -> dict:
+    import openjiuwen_studio.core.manager.agent as mgr
+    from openjiuwen_studio.schemas.agent import AgentExportRequest
+
+    # 构建请求参数
+    req = AgentExportRequest(
+        agent_id=agent_id,
+        space_id=space_id,
+        agent_version=agent_version if agent_version else None
+    )
+    model_info = await mgr.agent_get_model_api_keys(req, current_user)
+    return model_info
+
+
 async def get_agent_ir(
         agent_id: str,
         agent_version: str,
@@ -69,7 +89,7 @@ async def get_agent_ir(
         current_user: 当前用户信息
 
     Returns:
-        ResponseModel: 包含 agent_ir 数据的响应
+        ResponseModel: 包含 agent_ir 数据和模型 API Key 的响应
     """
     # 延迟导入，避免与 agent 模块循环依赖（agent 会引用本模块的 get_deploy_info 等）
     import openjiuwen_studio.core.manager.agent as mgr
@@ -86,9 +106,6 @@ async def get_agent_ir(
     # 处理返回值：可能是 ResponseModel 或 (BytesIO, filename) 元组
     if isinstance(res, tuple) and len(res) == 2:
         # ZIP 文件情况：需要解压并解析 JSON
-        import zipfile
-        import io
-
         zip_buffer, _ = res
         with zipfile.ZipFile(zip_buffer, 'r') as zf:
             json_files = [f for f in zf.namelist() if f.endswith('.json')]
@@ -97,12 +114,11 @@ async def get_agent_ir(
 
             main_config_file = json_files[0]
             with zf.open(main_config_file) as f:
-                export_data = json.loads(f.read().decode('utf-8'))
-
-        return export_data
+                ir_file = json.loads(f.read().decode('utf-8'))
     else:
         # ResponseModel 情况：直接提取 data 字段
-        return res.data
+        ir_file = res.data
+    return ir_file
 
 
 async def deploy_to_runtime(
@@ -117,6 +133,7 @@ async def deploy_to_runtime(
         "file": payload.get('file'),
         "deployer_type": payload.get('deployer_type', ""),
         "port": payload.get('port', ""),
+        "userdata": {'api_keys': payload.get('api_keys', "")}
     }
 
     # 调用 runtime 接口进行部署
