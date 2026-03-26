@@ -65,7 +65,7 @@ export interface KnowledgeBase {
   id: string
   name: string
   description?: string
-  type: 'document' | 'web' | 'api' | 'database'
+  type: 'document' | 'weblink' | 'web' | 'api' | 'database'
   status: 'active' | 'processing' | 'error' | 'inactive'
   documentCount: number
   size: number
@@ -302,6 +302,89 @@ export interface SearchKnowledgeBaseResponse {
   }
 }
 
+// Weblink 相关类型
+export interface WeblinkItem {
+  name: string
+  id: string
+  url: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AddWeblinksRequest {
+  space_id: string
+  kb_id: string
+  urls: string[]
+}
+
+export interface AddWeblinksResponse {
+  code: number
+  message: string
+  data: {
+    success_count: number
+    failed_count: number
+    links: Array<{ id: string; url: string; name: string; status: string }>
+  }
+}
+
+export interface GetWeblinksListRequest {
+  space_id: string
+  kb_id: string
+  page: number
+  size: number
+}
+
+export interface GetWeblinksListResponse {
+  code: number
+  message: string
+  data: {
+    items: WeblinkItem[]
+    total: number
+    page: number
+    size: number
+  }
+}
+
+export interface ProcessWeblinksRequest {
+  space_id: string
+  kb_id: string
+  weblink_id_list: string[]
+  parsing_strategy: ParsingStrategy
+  segmentation_strategy: SegmentationStrategy
+  indexing_strategy: IndexingStrategy
+}
+
+export interface ProcessWeblinksResponse {
+  code: number
+  message: string
+  data: {
+    task_id: string
+    processed_count: number
+    failed_count: number
+    failed_links: string[]
+  }
+}
+
+export interface UpdateWeblinkRequest {
+  space_id: string
+  kb_id: string
+  weblink_id: string
+  weblink_name: string
+}
+
+export interface DeleteWeblinksRequest {
+  space_id: string
+  kb_id: string
+  weblink_ids: string[]
+}
+
+export interface GetWeblinkStatusRequest {
+  space_id: string
+  kb_id: string
+  weblink_id_list: string[]
+  refresh_names?: boolean
+}
+
 // 同步至 DeepSearch - 上传请求/响应
 export interface SyncUploadRequest {
   space_id: string
@@ -381,4 +464,3 @@ export interface DeepSearchEmbeddingConfigListResponse {
     size?: number
   }
 }
-

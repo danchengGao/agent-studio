@@ -13,6 +13,7 @@ from openjiuwen_studio.core.manager.repositories import JiuwenBaseRepository
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import escape_like, get_db_jw
 from openjiuwen_studio.models import knowledge_base as kb_models
 from openjiuwen_studio.models import knowledge_base_document as kb_doc_models
+from openjiuwen_studio.models import knowledge_base_weblink as kb_weblink_models
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.knowledge_base import KnowledgeBaseGet
 from openjiuwen_studio.core.config import settings
@@ -29,6 +30,16 @@ class KBDetails:
 class KBDocument:
     kb: KBDetails  # Knowledge Base details
     doc_id: str | None = None  # 文档ID
+    doc_status: str = None  # 新状态
+    process_info: dict | None = None  # 处理信息（可选）
+    index_name: str | None = None  #
+    chunk_count: int | None = None  #
+
+
+@dataclass
+class KBWeblink:
+    kb: KBDetails  # Knowledge Base details
+    weblink_id: str | None = None  # 链接ID
     doc_status: str = None  # 新状态
     process_info: dict | None = None  # 处理信息（可选）
     index_name: str | None = None  #
@@ -696,6 +707,370 @@ class KnowledgeBaseRepository:
                 message="Get document list success",
                 data={"items": items, "total": total, "page": page, "size": size},
             )
+
+    """
+    description: 获取知识库下所有文档的 doc_id（用于 KB 删除时删索引）
+    param {str} space_id  空间ID
+    param {str} kb_id  知识库ID
+    param {str | None} index_manager_type  可选
+    return {list[str]} doc_id 列表
+    """
+
+    @with_exception_handling
+    def get_all_doc_ids_for_kb(
+        self,
+        space_id: str,
+        kb_id: str,
+        index_manager_type: str | None = None,
+        db_session: Session | None = None,
+    ) -> ResponseModel[list[str]]:
+        with get_db_jw(db_session) as db:
+            query = db.query(kb_doc_models.KnowledgeBaseDocumentDB.doc_id).filter(
+                kb_doc_models.KnowledgeBaseDocumentDB.space_id == space_id,
+                kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kb_id,
+            )
+            if index_manager_type:
+                query = query.filter(
+                    kb_doc_models.KnowledgeBaseDocumentDB.index_manager_type
+                    == index_manager_type
+                )
+            rows = query.all()
+            doc_ids = [r[0] for r in rows] if rows else []
+            return ResponseModel(code=status.HTTP_200_OK, message="OK", data=doc_ids)
+
+    """
+    description: 获取知识库下所有链接的 weblink_id（用于 KB 删除时删索引）
+    """
+
+    @with_exception_handling
+    def get_all_weblink_ids_for_kb(
+        self,
+        space_id: str,
+        kb_id: str,
+        index_manager_type: str | None = None,
+        db_session: Session | None = None,
+    ) -> ResponseModel[list[str]]:
+        with get_db_jw(db_session) as db:
+            query = db.query(kb_weblink_models.KnowledgeBaseWeblinkDB.weblink_id).filter(
+                kb_weblink_models.KnowledgeBaseWeblinkDB.space_id == space_id,
+                kb_weblink_models.KnowledgeBaseWeblinkDB.kb_id == kb_id,
+            )
+            if index_manager_type:
+                query = query.filter(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.index_manager_type
+                    == index_manager_type
+                )
+            rows = query.all()
+            weblink_ids = [r[0] for r in rows] if rows else []
+            return ResponseModel(code=status.HTTP_200_OK, message="OK", data=weblink_ids)
+
+    """
+    description: KB 删除时删除该知识库下所有 document 行
+    """
+
+    @with_exception_handling
+    def delete_documents_by_kb_id(
+        self,
+        space_id: str,
+        kb_id: str,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            deleted = (
+                db.query(kb_doc_models.KnowledgeBaseDocumentDB)
+                .filter(
+                    kb_doc_models.KnowledgeBaseDocumentDB.space_id == space_id,
+                    kb_doc_models.KnowledgeBaseDocumentDB.kb_id == kb_id,
+                )
+                .delete()
+            )
+            db.commit()
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Deleted {deleted} document rows",
+            )
+
+    """
+    description: KB 删除时删除该知识库下所有 weblink 行
+    """
+
+    @with_exception_handling
+    def delete_weblinks_by_kb_id(
+        self,
+        space_id: str,
+        kb_id: str,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            deleted = (
+                db.query(kb_weblink_models.KnowledgeBaseWeblinkDB)
+                .filter(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.space_id == space_id,
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.kb_id == kb_id,
+                )
+                .delete()
+            )
+            db.commit()
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Deleted {deleted} weblink rows",
+            )
+
+    """
+    description: 创建知识库链接
+    """
+
+    @with_exception_handling
+    def weblink_create(
+        self, weblink_data: dict, db_session: Session | None = None
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            wb_db = JiuwenBaseRepository(db, kb_weblink_models.KnowledgeBaseWeblinkDB)
+            if not weblink_data:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message="No weblink data to register",
+                )
+            find_id = {"weblink_id": weblink_data["weblink_id"]}
+            timestamp = milliseconds()
+            if "create_time" not in weblink_data or not weblink_data["create_time"]:
+                weblink_data["create_time"] = timestamp
+            if "update_time" not in weblink_data or not weblink_data["update_time"]:
+                weblink_data["update_time"] = timestamp
+            return wb_db.register_dl_in_sql(find_id=find_id, dl=weblink_data)
+
+    """
+    description: 获取知识库链接
+    """
+
+    @with_exception_handling
+    def weblink_get(
+        self,
+        kb_weblink: KBWeblink,
+        db_session: Session | None = None,
+    ) -> ResponseModel[dict | None]:
+        with get_db_jw(db_session) as db:
+            wb_db = JiuwenBaseRepository(db, kb_weblink_models.KnowledgeBaseWeblinkDB)
+            find_id = {
+                "space_id": kb_weblink.kb.space_id,
+                "kb_id": kb_weblink.kb.kb_id,
+                "weblink_id": kb_weblink.weblink_id,
+            }
+            if kb_weblink.kb.index_manager_type:
+                find_id["index_manager_type"] = kb_weblink.kb.index_manager_type
+            return wb_db.get_dl_in_sql(find_id=find_id, return_first_item=True)
+
+    """
+    description: 删除知识库链接（单条或批量）
+    """
+
+    @with_exception_handling
+    def weblink_delete(
+        self,
+        kb_weblink: KBWeblink,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            wb_db = JiuwenBaseRepository(db, kb_weblink_models.KnowledgeBaseWeblinkDB)
+            find_id = {
+                "space_id": kb_weblink.kb.space_id,
+                "kb_id": kb_weblink.kb.kb_id,
+                "weblink_id": kb_weblink.weblink_id,
+            }
+            if kb_weblink.kb.index_manager_type:
+                find_id["index_manager_type"] = kb_weblink.kb.index_manager_type
+            return wb_db.unregister_dl_in_sql(find_id=find_id)
+
+    """
+    description: 批量删除知识库链接
+    """
+
+    @with_exception_handling
+    def weblink_delete_batch(
+        self,
+        space_id: str,
+        kb_id: str,
+        weblink_ids: list[str],
+        index_manager_type: str | None = None,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            query = (
+                db.query(kb_weblink_models.KnowledgeBaseWeblinkDB)
+                .filter(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.space_id == space_id,
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.kb_id == kb_id,
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.weblink_id.in_(weblink_ids),
+                )
+            )
+            if index_manager_type:
+                query = query.filter(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.index_manager_type
+                    == index_manager_type
+                )
+            deleted = query.delete(synchronize_session=False)
+            db.commit()
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Deleted {deleted} weblink(s)",
+            )
+
+    """
+    description: 更新链接状态
+    """
+
+    @with_exception_handling
+    def weblink_update_status(
+        self, kb_weblink: KBWeblink, db_session: Session | None = None
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            wb_db = JiuwenBaseRepository(db, kb_weblink_models.KnowledgeBaseWeblinkDB)
+            find_id = {
+                "space_id": kb_weblink.kb.space_id,
+                "kb_id": kb_weblink.kb.kb_id,
+                "weblink_id": kb_weblink.weblink_id,
+            }
+            if kb_weblink.kb.index_manager_type:
+                find_id["index_manager_type"] = kb_weblink.kb.index_manager_type
+            update_data = {
+                "status": kb_weblink.doc_status,
+                "update_time": milliseconds(),
+            }
+            if kb_weblink.process_info is not None:
+                update_data["process_info"] = kb_weblink.process_info
+            if kb_weblink.index_name is not None:
+                update_data["index_id"] = None
+                update_data["index_name"] = kb_weblink.index_name
+                update_data["indexed_time"] = milliseconds()
+            if kb_weblink.chunk_count is not None:
+                update_data["chunk_count"] = kb_weblink.chunk_count
+            return wb_db.update_dl_in_sql(find_id=find_id, update_dl=update_data)
+
+    """
+    description: 更新链接名称
+    """
+
+    @with_exception_handling
+    def weblink_update(
+        self,
+        kb_weblink: KBWeblink,
+        name: str,
+        db_session: Session | None = None,
+    ) -> ResponseModel[None]:
+        with get_db_jw(db_session) as db:
+            wb_db = JiuwenBaseRepository(db, kb_weblink_models.KnowledgeBaseWeblinkDB)
+            find_id = {
+                "space_id": kb_weblink.kb.space_id,
+                "kb_id": kb_weblink.kb.kb_id,
+                "weblink_id": kb_weblink.weblink_id,
+            }
+            if kb_weblink.kb.index_manager_type:
+                find_id["index_manager_type"] = kb_weblink.kb.index_manager_type
+            return wb_db.update_dl_in_sql(
+                find_id=find_id,
+                update_dl={"name": name, "update_time": milliseconds()},
+            )
+
+    """
+    description: 获取知识库链接列表（支持分页）
+    """
+
+    @with_exception_handling
+    def weblink_list(
+        self,
+        kb_weblink: KBWeblink,
+        page: int = 1,
+        size: int = 10,
+        db_session: Session | None = None,
+    ) -> ResponseModel[dict]:
+        with get_db_jw(db_session) as db:
+            find_id = {
+                "space_id": kb_weblink.kb.space_id,
+                "kb_id": kb_weblink.kb.kb_id,
+            }
+            if kb_weblink.kb.index_manager_type:
+                find_id["index_manager_type"] = kb_weblink.kb.index_manager_type
+
+            wb_db = JiuwenBaseRepository(db, kb_weblink_models.KnowledgeBaseWeblinkDB)
+            offset = (page - 1) * size
+
+            count_result = wb_db.get_dl_in_sql(find_id=find_id, return_first_item=False)
+            if count_result.code == status.HTTP_404_NOT_FOUND:
+                return ResponseModel(
+                    code=status.HTTP_200_OK,
+                    message="Get weblink list success",
+                    data={"items": [], "total": 0, "page": page, "size": size},
+                )
+            elif count_result.code != status.HTTP_200_OK:
+                return ResponseModel(
+                    code=count_result.code,
+                    message=count_result.message,
+                    data={"items": [], "total": 0, "page": page, "size": size},
+                )
+            total = len(count_result.data) if count_result.data else 0
+
+            query = db.query(kb_weblink_models.KnowledgeBaseWeblinkDB).filter(
+                kb_weblink_models.KnowledgeBaseWeblinkDB.space_id == kb_weblink.kb.space_id,
+                kb_weblink_models.KnowledgeBaseWeblinkDB.kb_id == kb_weblink.kb.kb_id,
+            )
+            if kb_weblink.kb.index_manager_type:
+                query = query.filter(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.index_manager_type
+                    == kb_weblink.kb.index_manager_type
+                )
+            query = (
+                query.order_by(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.create_time.desc()
+                )
+                .offset(offset)
+                .limit(size)
+            )
+            weblink_list_result = query.all()
+
+            items = []
+            for w in weblink_list_result:
+                items.append(
+                    {
+                        "weblink_id": w.weblink_id,
+                        "name": w.name,
+                        "url": w.url,
+                        "status": w.status,
+                        "process_info": w.process_info if w.process_info else {},
+                        "create_time": w.create_time,
+                        "update_time": w.update_time,
+                    }
+                )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Get weblink list success",
+                data={"items": items, "total": total, "page": page, "size": size},
+            )
+
+    """
+    description: 检查知识库是否有图增强构建的链接
+    """
+
+    @with_exception_handling
+    def has_graph_enhancement_weblinks(
+        self, space_id: str, kb_id: str, db_session: Session | None = None
+    ) -> bool:
+        with get_db_jw(db_session) as db:
+            weblinks = (
+                db.query(kb_weblink_models.KnowledgeBaseWeblinkDB)
+                .filter(
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.space_id == space_id,
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.kb_id == kb_id,
+                    kb_weblink_models.KnowledgeBaseWeblinkDB.status == "indexed",
+                )
+                .all()
+            )
+            for w in weblinks:
+                if w.process_info and isinstance(w.process_info, dict):
+                    indexing_strategy = w.process_info.get("indexing_strategy")
+                    if isinstance(indexing_strategy, dict):
+                        if indexing_strategy.get("enable_graph_enhancement", False):
+                            return True
+            return False
 
     """
     description: 获取知识库下全部文档的 doc_id 与 file_path（用于同步到 DeepSearch，不分页）

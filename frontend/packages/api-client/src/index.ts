@@ -354,6 +354,16 @@ export type {
   SearchKnowledgeBaseRequest,
   SearchKnowledgeBaseResponse,
   SearchKnowledgeBaseItem,
+  WeblinkItem,
+  AddWeblinksRequest,
+  AddWeblinksResponse,
+  GetWeblinksListRequest,
+  GetWeblinksListResponse,
+  ProcessWeblinksRequest,
+  ProcessWeblinksResponse,
+  UpdateWeblinkRequest,
+  DeleteWeblinksRequest,
+  GetWeblinkStatusRequest,
 } from './types/knowledgeBase'
 
 export type {

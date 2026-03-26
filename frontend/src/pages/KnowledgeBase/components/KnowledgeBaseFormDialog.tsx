@@ -418,7 +418,10 @@ const KnowledgeBaseFormDialog: React.FC<KnowledgeBaseFormDialogProps> = ({ open,
                   label={t('knowledgeBases.form.type')}
                   value={formData.type}
                   onChange={e => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
-                  options={[{ value: 'document', label: t('knowledgeBases.types.document') }]}
+                  options={[
+                    { value: 'document', label: t('knowledgeBases.types.document') },
+                    { value: 'weblink', label: t('knowledgeBases.types.weblink') },
+                  ]}
                 />
               </div>
 

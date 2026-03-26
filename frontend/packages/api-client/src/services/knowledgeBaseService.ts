@@ -27,6 +27,15 @@ import {
   GetDocumentStatusResponse,
   SearchKnowledgeBaseRequest,
   SearchKnowledgeBaseResponse,
+  AddWeblinksRequest,
+  AddWeblinksResponse,
+  GetWeblinksListRequest,
+  GetWeblinksListResponse,
+  ProcessWeblinksRequest,
+  ProcessWeblinksResponse,
+  UpdateWeblinkRequest,
+  DeleteWeblinksRequest,
+  GetWeblinkStatusRequest,
   SyncUploadRequest,
   SyncUploadResponse,
   SyncProcessRequest,
@@ -228,6 +237,78 @@ export class KnowledgeBaseService {
     } catch (error) {
       console.error('搜索知识库API调用失败:', error)
       throw new Error(`搜索知识库失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 添加链接
+  static async addWeblinks(request: AddWeblinksRequest): Promise<AddWeblinksResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<AddWeblinksResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_ADD, request)
+      return response.data
+    } catch (error) {
+      console.error('添加链接API调用失败:', error)
+      throw new Error(`添加链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 获取链接列表
+  static async getWeblinksList(request: GetWeblinksListRequest): Promise<GetWeblinksListResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<GetWeblinksListResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_LIST, request)
+      return response.data
+    } catch (error) {
+      console.error('获取链接列表API调用失败:', error)
+      throw new Error(`获取链接列表失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 处理链接
+  static async processWeblinks(request: ProcessWeblinksRequest): Promise<ProcessWeblinksResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<ProcessWeblinksResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_PROCESS, request)
+      return response.data
+    } catch (error) {
+      console.error('处理链接API调用失败:', error)
+      throw new Error(`处理链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 查询链接状态
+  static async getWeblinkStatus(request: GetWeblinkStatusRequest): Promise<GetDocumentStatusResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<GetDocumentStatusResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_STATUS, request)
+      return response.data
+    } catch (error) {
+      console.error('查询链接状态API调用失败:', error)
+      throw new Error(`查询链接状态失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 更新链接
+  static async updateWeblink(request: UpdateWeblinkRequest): Promise<UpdateDocumentResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<UpdateDocumentResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_UPDATE, request)
+      return response.data
+    } catch (error) {
+      console.error('更新链接API调用失败:', error)
+      throw new Error(`更新链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 删除链接
+  static async deleteWeblinks(request: DeleteWeblinksRequest): Promise<DeleteDocumentsResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<DeleteDocumentsResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_DELETE, request)
+      return response.data
+    } catch (error) {
+      console.error('删除链接API调用失败:', error)
+      throw new Error(`删除链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 

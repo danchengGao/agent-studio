@@ -8,7 +8,7 @@ import os
 import re
 import time
 import uuid
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Union, Tuple, Optional
@@ -30,6 +30,7 @@ from openjiuwen.core.retrieval.indexing.indexer.milvus_indexer import MilvusInde
 from openjiuwen.core.retrieval.indexing.processor.chunker.chunking import TextChunker
 from openjiuwen.core.retrieval.indexing.processor.extractor.triple_extractor import TripleExtractor
 from openjiuwen.core.retrieval.indexing.processor.parser.auto_file_parser import AutoFileParser
+from openjiuwen.core.retrieval.indexing.processor.parser.auto_link_parser import AutoLinkParser
 from openjiuwen.core.retrieval.simple_knowledge_base import SimpleKnowledgeBase
 from openjiuwen.core.retrieval.vector_store.chroma_store import ChromaVectorStore
 from openjiuwen.core.retrieval.vector_store.milvus_store import MilvusVectorStore
@@ -46,6 +47,7 @@ from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import g
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
     KBDetails,
     KBDocument,
+    KBWeblink,
 )
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
     knowledge_base_repository,
@@ -80,9 +82,36 @@ from openjiuwen_studio.schemas.knowledge_base import (
     TaskProgressRequest,
     TaskProgressResponse,
     TaskProgressItem,
+    WeblinkAddRequest,
+    WeblinkAddBatchResponse,
+    WeblinkAddItem,
+    WeblinkListRequest,
+    WeblinkListResponse,
+    WeblinkListItem,
+    WeblinkStatusRequest,
+    WeblinkProcessRequest,
+    WeblinkProcessResponse,
+    WeblinkUpdateRequest,
+    WeblinkDeleteRequest,
 )
 
 _CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "milvus")
+
+
+@dataclass
+class WeblinkProcessContext:
+    space_id: str
+    kb_id: str
+    parsing_strategy: Any
+    segmentation_strategy: Any
+    indexing_strategy: Any
+
+
+@dataclass
+class WeblinkProcessTask:
+    weblink_id: str
+    url: str
+    process_info: dict
 
 
 class OBSDocumentManager:
@@ -256,6 +285,8 @@ def _format_error_message_for_frontend(error_msg: str) -> str:
         "Document validation failed",
         "Processing failed with unknown error",
         "Failed to update status to INDEXED",
+        "Not found",  # weblink 状态查询时链接不存在
+        "Weblink status invalid",  # weblink 处理时状态无效
     }
 
     # 如果是固定错误消息，直接返回（首字母已大写）
@@ -858,7 +889,7 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 6. 删除 Milvus | Chroma 向量索引（循环删除每个文档的索引）
+    # 6. 删除 Milvus | Chroma 向量索引（document + weblink，需在删 document/weblink 行之前）
     try:
         index_result = await _delete_kb_indices(req.kb_id, req.space_id)
         if index_result["success_count"] > 0:
@@ -878,7 +909,20 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 7. 返回删除结果（含 deleted_kb_ids 供前端从列表移除所有相关卡片）
+    # 7. 删除 knowledge_base_document 和 knowledge_base_weblink 行（索引已删，避免孤儿数据）
+    try:
+        knowledge_base_repository.delete_documents_by_kb_id(req.space_id, req.kb_id)
+        knowledge_base_repository.delete_weblinks_by_kb_id(req.space_id, req.kb_id)
+        logger.info(
+            f"[KB_DELETE] Document and weblink rows cleaned - KB ID: {req.kb_id}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_DELETE] Failed to clean document/weblink rows - KB ID: {req.kb_id}, Error: {str(e)}",
+            exc_info=True,
+        )
+
+    # 8. 返回删除结果（含 deleted_kb_ids 供前端从列表移除所有相关卡片）
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="delete knowledge base success",
@@ -1587,6 +1631,24 @@ async def _parse_file(
                 )
 
 
+async def _parse_url(url: str, doc_id: str) -> List[Document]:
+    """解析 URL 为 Document 列表（weblink KB）"""
+    logger.debug(f"[PARSE] Parsing URL - url: {url}, doc_id: {doc_id}")
+    if not url or not url.strip():
+        raise ValueError("URL is empty")
+    url = url.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://")
+    parser = AutoLinkParser()
+    if not parser.supports(url):
+        raise ValueError(f"Parser does not support URL: {url}")
+    documents = await parser.parse(doc=url, doc_id=doc_id)
+    if not documents:
+        raise ValueError(f"No content parsed from URL: {url}")
+    logger.debug(f"[PARSE] Parsed URL - url: {url}, documents: {len(documents)}")
+    return documents
+
+
 def _resolve_chunking_config(segmentation_strategy) -> tuple[int, float, Dict[str, bool]]:
     """提取分段配置，兼容前端字段命名"""
     cfg = segmentation_strategy.strategy_config or {}
@@ -1744,11 +1806,9 @@ def _get_chroma_data_dir() -> Path:
 
 def _default_index_config() -> VectorStoreConfig:
     """Default VectorStoreConfig for index manager."""
-    store_provider = StoreType.Milvus if _CURR_INDEX_TYPE == "milvus" else StoreType.Chroma
+    store_provider = StoreType.Chroma if _CURR_INDEX_TYPE == "chroma" else StoreType.Milvus
     return VectorStoreConfig(
-        store_provider=store_provider,
-        collection_name="default",
-        database_name="",
+        store_provider=store_provider, collection_name="default", database_name=""
     )
 
 
@@ -1816,66 +1876,47 @@ def ensure_milvus_connection_for_indexing() -> None:
 
 
 async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
-    """删除知识库下所有文档的 chunks 和 triples 索引
-
-    获取知识库下的所有文档，然后循环删除每个文档的 chunks 和 triples 索引数据
+    """删除知识库下所有文档和链接的 chunks 和 triples 索引
+    从 DB 拉取 knowledge_base_document 的 doc_id 与 knowledge_base_weblink 的 weblink_id，
+    去重后逐条删除向量索引（chunks + triples）。须在删除 document / weblink 表行之前调用。
     """
     result = {"success_count": 0, "failed_count": 0, "errors": []}
 
     try:
-        # 获取知识库下的所有文档（分页获取，每页最多100条）
-        all_documents = []
-        page = 1
-        page_size = 100
+        index_manager_type = _CURR_INDEX_TYPE
+        doc_ids_result = knowledge_base_repository.get_all_doc_ids_for_kb(
+            space_id=space_id, kb_id=kb_id, index_manager_type=index_manager_type
+        )
+        weblink_ids_result = knowledge_base_repository.get_all_weblink_ids_for_kb(
+            space_id=space_id, kb_id=kb_id, index_manager_type=index_manager_type
+        )
+        doc_ids = doc_ids_result.data or [] if doc_ids_result.code == status.HTTP_200_OK else []
+        weblink_ids = (
+            weblink_ids_result.data or []
+            if weblink_ids_result.code == status.HTTP_200_OK
+            else []
+        )
+        # 与分页 document_list 覆盖范围一致（全表 doc_id），并包含 weblink；sorted 便于日志稳定
+        all_ids = sorted(set(doc_ids + weblink_ids))
 
-        while True:
-            doc_list_result = knowledge_base_repository.document_list(
-                KBDocument(
-                    KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE),
-                    doc_id=None,
-                    doc_status=None,
-                    process_info=None,
-                    index_name=None,
-                    chunk_count=None,
-                )
-            )
-
-            if doc_list_result.code != status.HTTP_200_OK or not doc_list_result.data:
-                break
-
-            items = doc_list_result.data.get("items", [])
-            if not items:
-                break
-
-            all_documents.extend(items)
-
-            # 如果返回的数量小于 page_size，说明已经是最后一页
-            if len(items) < page_size:
-                break
-
-            page += 1
-
-        if not all_documents:
-            logger.debug(f"[KB_DELETE] No documents to delete indices for KB {kb_id}")
+        if not all_ids:
+            logger.debug(f"[KB_DELETE] No documents/weblinks to delete indices for KB {kb_id}")
             return result
 
-        documents = all_documents
-        logger.info(f"[KB_DELETE] Deleting indices for {len(documents)} documents in KB {kb_id}")
+        logger.info(
+            f"[KB_DELETE] Deleting indices for {len(all_ids)} items "
+            f"(doc: {len(doc_ids)}, weblink: {len(weblink_ids)}) in KB {kb_id}"
+        )
 
-        # 创建索引管理器
         index_manager = _create_index_manager(kb_id=kb_id)
         chunk_index = f"kb_{kb_id}_chunks"
         triple_index = f"kb_{kb_id}_triples"
 
         try:
-            # 循环删除每个文档的索引
-            for doc in documents:
-                doc_id = doc.get("doc_id") or doc.get("id")
+            for doc_id in all_ids:
                 if not doc_id:
                     continue
-
                 try:
-                    # 删除 chunks 索引
                     await _delete_document_from_index(
                         index_manager=index_manager,
                         index_name=chunk_index,
@@ -1883,8 +1924,6 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
                         kb_id=kb_id,
                         index_type="chunks",
                     )
-
-                    # 删除 triples 索引（如果有图增强）
                     await _delete_document_from_index(
                         index_manager=index_manager,
                         index_name=triple_index,
@@ -1892,7 +1931,6 @@ async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
                         kb_id=kb_id,
                         index_type="triples",
                     )
-
                     result["success_count"] += 1
                 except Exception as e:
                     result["failed_count"] += 1
@@ -2191,21 +2229,37 @@ async def _index_documents(
     kb_id: str,
     doc_id: str,
     process_info: dict,
+    is_weblink: bool = False,
 ) -> dict:
+    kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
 
     # 1. 更新状态为INDEXING
-    update_indexing_result = knowledge_base_repository.document_update_status(
-        KBDocument(
-            kb=KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE),
-            doc_id=doc_id,
-            doc_status=DocumentStatus.INDEXING.value,
-            process_info={
-                **process_info,
-                "parsing_completed": True,
-                "document_count": len(documents),
-            },
+    if is_weblink:
+        update_indexing_result = knowledge_base_repository.weblink_update_status(
+            KBWeblink(
+                kb=kb_details,
+                weblink_id=doc_id,
+                doc_status=DocumentStatus.INDEXING.value,
+                process_info={
+                    **process_info,
+                    "parsing_completed": True,
+                    "document_count": len(documents),
+                },
+            )
         )
-    )
+    else:
+        update_indexing_result = knowledge_base_repository.document_update_status(
+            KBDocument(
+                kb=kb_details,
+                doc_id=doc_id,
+                doc_status=DocumentStatus.INDEXING.value,
+                process_info={
+                    **process_info,
+                    "parsing_completed": True,
+                    "document_count": len(documents),
+                },
+            )
+        )
 
     if update_indexing_result.code != status.HTTP_200_OK:
         raise Exception(f"Failed to update status to INDEXING: {update_indexing_result.message}")
@@ -2586,6 +2640,141 @@ async def _process_documents_sequentially(
         f"[DOC_PROCESS_SEQ] Sequential processing completed - Task ID: {task_id}, "
         f"KB ID: {kb_id}, Total documents: {len(documents)}"
     )
+
+
+async def process_single_weblink(context: WeblinkProcessContext, task: WeblinkProcessTask):
+    """在后台异步处理单个链接"""
+    space_id = context.space_id
+    kb_id = context.kb_id
+    weblink_id = task.weblink_id
+    url = task.url
+    segmentation_strategy = context.segmentation_strategy
+    indexing_strategy = context.indexing_strategy
+    process_info = task.process_info
+    kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    parsed_name = None
+    try:
+        logger.info(
+            f"[WEBLINK_PROCESS_BG] Starting - Weblink ID: {weblink_id}, KB ID: {kb_id}"
+        )
+        documents = await _parse_url(url, weblink_id)
+        for d in documents:
+            if d.metadata and isinstance(d.metadata, dict):
+                t = d.metadata.get("title")
+                if t and isinstance(t, str) and t.strip():
+                    parsed_name = t.strip()
+                    break
+
+        index_result = await _index_documents(
+            documents=documents,
+            indexing_strategy=indexing_strategy,
+            segmentation_strategy=segmentation_strategy,
+            space_id=space_id,
+            kb_id=kb_id,
+            doc_id=weblink_id,
+            process_info=process_info,
+            is_weblink=True,
+        )
+        final_process_info = {
+            **process_info,
+            "chunking_completed": True,
+            "indexing_completed": True,
+            "index_result": index_result,
+        }
+        update_data = {
+            "doc_status": DocumentStatus.INDEXED.value,
+            "process_info": final_process_info,
+            "index_name": index_result.get("chunk_index"),
+            "chunk_count": index_result.get("chunk_count"),
+        }
+        update_result = knowledge_base_repository.weblink_update_status(
+            KBWeblink(
+                kb=kb_details,
+                weblink_id=weblink_id,
+                doc_status=DocumentStatus.INDEXED.value,
+                process_info=final_process_info,
+                index_name=index_result.get("chunk_index"),
+                chunk_count=index_result.get("chunk_count"),
+            )
+        )
+        if update_result.code != status.HTTP_200_OK:
+            raise Exception("Failed to update status to INDEXED")
+        if parsed_name:
+            knowledge_base_repository.weblink_update(
+                KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                name=parsed_name,
+            )
+        logger.info(
+            f"[WEBLINK_PROCESS_BG] Completed - Weblink ID: {weblink_id}, KB ID: {kb_id}"
+        )
+    except Exception as e:
+        error_message = str(e)
+        logger.error(
+            f"[WEBLINK_PROCESS_BG] Failed - Weblink ID: {weblink_id}, KB ID: {kb_id}, Error: {error_message}",
+            exc_info=True,
+        )
+        try:
+            knowledge_base_repository.weblink_update_status(
+                KBWeblink(
+                    kb=kb_details,
+                    weblink_id=weblink_id,
+                    doc_status=DocumentStatus.FAILED.value,
+                    process_info={
+                        **process_info,
+                        "error": error_message,
+                        "failed_time": milliseconds(),
+                    },
+                )
+            )
+            # 即使索引失败，若解析阶段已提取到标题，也更新名称便于列表展示
+            if parsed_name:
+                try:
+                    knowledge_base_repository.weblink_update(
+                        KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                        name=parsed_name,
+                    )
+                except Exception:
+                    pass
+        except Exception as update_error:
+            logger.error(
+                f"[WEBLINK_PROCESS_BG] Failed to update FAILED status - Weblink ID: {weblink_id}, Error: {update_error}"
+            )
+
+
+async def _process_weblinks_sequentially(
+    context: WeblinkProcessContext,
+    weblinks: list[dict],
+    task_id: str,
+    process_info_base: dict,
+):
+    """串行处理多个链接"""
+    kb_id = context.kb_id
+    logger.info(
+        f"[WEBLINK_PROCESS_SEQ] Starting - Task ID: {task_id}, KB ID: {kb_id}, Total: {len(weblinks)}"
+    )
+    for idx, w in enumerate(weblinks, 1):
+        weblink_id = w.get("weblink_id")
+        url = w.get("url")
+        try:
+            process_info = {
+                **process_info_base,
+                "task_id": task_id,
+                "current_index": idx,
+                "total_count": len(weblinks),
+            }
+            await process_single_weblink(
+                context=context,
+                task=WeblinkProcessTask(
+                    weblink_id=weblink_id,
+                    url=url,
+                    process_info=process_info,
+                ),
+            )
+        except Exception as e:
+            logger.error(
+                f"[WEBLINK_PROCESS_SEQ] Failed - Weblink ID: {weblink_id}, Error: {str(e)}",
+                exc_info=True,
+            )
 
 
 async def document_upload(
@@ -2980,21 +3169,28 @@ def knowledge_base_list(req: KnowledgeBaseListRequest, current_user: dict) -> Re
             ).model_dump(by_alias=False),
         )
 
-    # 3. 转换数据格式，并检查是否有图增强文档
+    # 3. 转换数据格式，并检查是否有图增强
     items = []
     for kb_data in list_result.data.get("items", []):
         kb_id = kb_data.get("kb_id", "")
-        # 检查是否有图增强文档
-        has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
-            space_id=req.space_id, kb_id=kb_id
-        )
+        config = kb_data.get("config") or {}
+        kb_type = config.get("type", "document")
+        # 按 KB 类型检查图增强：weblink 查 weblink 表，document 查 document 表
+        if kb_type == "weblink":
+            has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_weblinks(
+                space_id=req.space_id, kb_id=kb_id
+            )
+        else:
+            has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
+                space_id=req.space_id, kb_id=kb_id
+            )
 
         items.append(
             KnowledgeBaseListItem(
                 name=kb_data.get("name", ""),
                 desc=kb_data.get("description"),
                 id=kb_id,
-                type="text",
+                type=kb_type,
                 embedding_model_config_id=kb_data.get("embedding_model_config_id"),
                 created_at=_timestamp_to_date_str(kb_data.get("create_time")),
                 updated_at=_timestamp_to_date_str(kb_data.get("update_time")),
@@ -3902,12 +4098,23 @@ def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel
     kb_details = KBDetails(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
-    # 3. 查询该任务ID下的所有文档
-    list_result = knowledge_base_repository.document_list(
-        kbdoc=KBDocument(kb=kb_details),
-        page=1,
-        size=1000,
-    )  # 假设一个任务不会超过1000个文档
+    # 3. 按 KB 类型查询：weblink 查 weblink_list，否则查 document_list
+    config = kb_result.data.get("config") or {}
+    kb_type = config.get("type", "document")
+    if kb_type == "weblink":
+        list_result = knowledge_base_repository.weblink_list(
+            kb_weblink=KBWeblink(kb=kb_details),
+            page=1,
+            size=1000,
+        )
+        id_key = "weblink_id"
+    else:
+        list_result = knowledge_base_repository.document_list(
+            kbdoc=KBDocument(kb=kb_details),
+            page=1,
+            size=1000,
+        )
+        id_key = "doc_id"
 
     if list_result.code != status.HTTP_200_OK:
         logger.error(
@@ -3930,7 +4137,7 @@ def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel
         process_info = doc_data.get("process_info", {})
         if isinstance(process_info, dict) and process_info.get("task_id") == req.task_id:
             total_count += 1
-            doc_id = doc_data.get("doc_id", "")
+            doc_id = doc_data.get(id_key, doc_data.get("doc_id", ""))
             doc_name = doc_data.get("name", "")
             doc_status = doc_data.get("status", "")
 
@@ -3977,4 +4184,424 @@ def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel
         code=status.HTTP_200_OK,
         message="get task progress success",
         data=response_data.model_dump(by_alias=False),
+    )
+
+
+# ==================== Weblink Manager ====================
+
+
+@with_exception_handling
+def weblink_add(req: WeblinkAddRequest, current_user: dict) -> ResponseModel:
+    """添加链接到知识库"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_ADD] Adding weblinks - User: {user_id}, KB ID: {req.kb_id}, URLs: {len(req.urls)}"
+    )
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    config = kb_result.data.get("config") or {}
+    if config.get("type") != "weblink":
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Knowledge base is not a weblink type",
+        )
+    max_urls = 50
+    if len(req.urls) > max_urls:
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=f"URLs count exceeds limit ({max_urls})",
+        )
+    links = []
+    success_count = 0
+    failed_count = 0
+    for url in req.urls:
+        url = (url or "").strip()
+        if not url:
+            failed_count += 1
+            continue
+        if not url.lower().startswith(("http://", "https://")):
+            failed_count += 1
+            continue
+        weblink_id = str(uuid.uuid4())
+        weblink_data = {
+            "space_id": req.space_id,
+            "kb_id": req.kb_id,
+            "weblink_id": weblink_id,
+            "url": url,
+            "name": url,
+            "status": DocumentStatus.UPLOADED.value,
+            "index_manager_type": _CURR_INDEX_TYPE,
+        }
+        create_result = knowledge_base_repository.weblink_create(weblink_data)
+        if create_result.code == status.HTTP_200_OK:
+            success_count += 1
+            links.append(
+                WeblinkAddItem(
+                    id=weblink_id,
+                    url=url,
+                    name=url,
+                    status=DocumentStatus.UPLOADED.value,
+                )
+            )
+        else:
+            failed_count += 1
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="add weblinks success",
+        data=WeblinkAddBatchResponse(
+            success_count=success_count,
+            failed_count=failed_count,
+            links=links,
+        ).model_dump(by_alias=False),
+    )
+
+
+@with_exception_handling
+def weblink_list(req: WeblinkListRequest, current_user: dict) -> ResponseModel:
+    """获取链接列表"""
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    list_result = knowledge_base_repository.weblink_list(
+        KBWeblink(kb=KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)),
+        page=req.page,
+        size=req.size,
+    )
+    if list_result.code != status.HTTP_200_OK:
+        return ResponseModel(
+            code=list_result.code,
+            message=list_result.message,
+            data={"items": [], "total": 0, "page": req.page, "size": req.size},
+        )
+    data = list_result.data
+    items = [
+        WeblinkListItem(
+            name=w.get("name", ""),
+            id=w.get("weblink_id", ""),
+            url=w.get("url", ""),
+            created_at=_timestamp_to_date_str(w.get("create_time")),
+            updated_at=_timestamp_to_date_str(w.get("update_time")),
+        )
+        for w in data.get("items", [])
+    ]
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="get weblink list success",
+        data=WeblinkListResponse(
+            items=items,
+            total=data.get("total", 0),
+            page=data.get("page", req.page),
+            size=data.get("size", req.size),
+        ).model_dump(by_alias=False),
+    )
+
+
+@with_exception_handling
+async def weblink_process(req: WeblinkProcessRequest, current_user: dict) -> ResponseModel:
+    """处理链接（解析并索引）"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_PROCESS] Starting weblink processing - User: {user_id}, "
+        f"KB ID: {req.kb_id}, Links: {len(req.weblink_id_list)}"
+    )
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    config = kb_result.data.get("config") or {}
+    if config.get("type") != "weblink":
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Knowledge base is not a weblink type",
+        )
+    task_id = str(uuid.uuid4())
+    process_info_base = {
+        "task_id": task_id,
+        "parsing_strategy": req.parsing_strategy.model_dump(),
+        "segmentation_strategy": req.segmentation_strategy.model_dump(),
+        "indexing_strategy": req.indexing_strategy.model_dump(),
+        "start_time": milliseconds(),
+    }
+    valid_weblinks = []
+    failed_count = 0
+    failed_links = []
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    for weblink_id in req.weblink_id_list:
+        get_result = knowledge_base_repository.weblink_get(KBWeblink(kb=kb_details, weblink_id=weblink_id))
+        if get_result.code != status.HTTP_200_OK or not get_result.data:
+            failed_count += 1
+            failed_links.append(weblink_id)
+            continue
+        w = get_result.data
+        if w.get("status") != DocumentStatus.UPLOADED.value:
+            failed_count += 1
+            failed_links.append(weblink_id)
+            # 状态无效时更新为 FAILED
+            try:
+                knowledge_base_repository.weblink_update_status(
+                    KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                    doc_status=DocumentStatus.FAILED.value,
+                    process_info={
+                        **process_info_base,
+                        "error": "Weblink status invalid",
+                        "failed_time": milliseconds(),
+                    },
+                )
+            except Exception:
+                pass
+            continue
+        knowledge_base_repository.weblink_update_status(
+            KBWeblink(
+                kb=kb_details,
+                weblink_id=weblink_id,
+                doc_status=DocumentStatus.PROCESSING.value,
+                process_info=process_info_base,
+            )
+        )
+        valid_weblinks.append({"weblink_id": weblink_id, "url": w.get("url", "")})
+    asyncio.create_task(
+        _process_weblinks_sequentially(
+            context=WeblinkProcessContext(
+                space_id=req.space_id,
+                kb_id=req.kb_id,
+                parsing_strategy=req.parsing_strategy,
+                segmentation_strategy=req.segmentation_strategy,
+                indexing_strategy=req.indexing_strategy,
+            ),
+            weblinks=valid_weblinks,
+            task_id=task_id,
+            process_info_base=process_info_base,
+        )
+    )
+    logger.info(
+        f"[WEBLINK_PROCESS] Weblink processing tasks started - Task ID: {task_id}, "
+        f"KB ID: {req.kb_id}, User: {user_id}, "
+        f"Processed: {len(valid_weblinks)}, Failed: {failed_count}, "
+        f"Duration: {time.time() - start_time:.3f}s"
+    )
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Weblink processing started",
+        data=WeblinkProcessResponse(
+            task_id=task_id,
+            processed_count=len(valid_weblinks),
+            failed_count=failed_count,
+            failed_links=failed_links,
+        ).model_dump(by_alias=False),
+    )
+
+
+def _name_needs_refresh(name: str, url: str) -> bool:
+    """判断链接名称是否需要从 URL 重新解析（当前仍是 URL 或空）"""
+    if not name or not name.strip():
+        return True
+    n, u = (name or "").strip(), (url or "").strip()
+    if n == u:
+        return True
+    if n.lower().startswith(("http://", "https://")):
+        return True
+    return False
+
+
+@with_exception_handling
+async def weblink_get_status_batch(req: WeblinkStatusRequest, current_user: dict) -> ResponseModel:
+    """批量查询链接状态"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_STATUS] Getting weblink status batch - User: {user_id}, "
+        f"Space ID: {req.space_id}, KB ID: {req.kb_id}, Weblink IDs: {len(req.weblink_id_list)}"
+    )
+    _ = check_user_space(req.space_id, current_user)
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    items = []
+    for weblink_id in req.weblink_id_list:
+        get_result = knowledge_base_repository.weblink_get(
+            KBWeblink(kb=kb_details, weblink_id=weblink_id)
+        )
+        if get_result.code == status.HTTP_200_OK and get_result.data:
+            w = get_result.data
+            display_name = w.get("name") or ""
+
+            # 仅当用户点击刷新且名称仍为 URL 时，从 URL 解析标题
+            if req.refresh_names:
+                url = w.get("url", "")
+                if url and _name_needs_refresh(display_name, url):
+                    try:
+                        documents = await asyncio.wait_for(
+                            _parse_url(url, weblink_id),
+                            timeout=10.0,
+                        )
+                        for d in documents:
+                            if d.metadata and isinstance(d.metadata, dict):
+                                t = d.metadata.get("title")
+                                if t and isinstance(t, str) and t.strip():
+                                    display_name = t.strip()
+                                    knowledge_base_repository.weblink_update(
+                                        KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                                        name=display_name,
+                                    )
+                                    break
+                    except Exception as e:
+                        logger.debug(f"[WEBLINK_STATUS] Failed to refresh name for {weblink_id}: {e}")
+                    if not display_name:
+                        display_name = url
+            if not display_name:
+                display_name = w.get("url", "")
+
+            process_info = w.get("process_info") or {}
+            error_msg = (
+                process_info.get("error") or process_info.get("message")
+                if isinstance(process_info, dict)
+                else None
+            )
+            status_value = w.get("status", "")
+            # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
+            if status_value == DocumentStatus.FAILED.value and not error_msg:
+                error_msg = "Processing failed with unknown error"
+            # 格式化错误信息供前端显示
+            if error_msg:
+                error_msg = _format_error_message_for_frontend(error_msg)
+            # 从 indexing_strategy 中提取图增强标识
+            enable_graph_enhancement = None
+            if isinstance(process_info, dict):
+                indexing_strategy = process_info.get("indexing_strategy")
+                if isinstance(indexing_strategy, dict):
+                    enable_graph_enhancement = indexing_strategy.get("enable_graph_enhancement", False)
+            items.append(
+                DocumentStatusResponse(
+                    id=weblink_id,
+                    status=status_value,
+                    name=display_name,
+                    error_msg=error_msg,
+                    enable_graph_enhancement=enable_graph_enhancement,
+                )
+            )
+        else:
+            items.append(
+                DocumentStatusResponse(
+                    id=weblink_id,
+                    status=DocumentStatus.FAILED.value,
+                    error_msg=_format_error_message_for_frontend("Not found"),
+                )
+            )
+    logger.info(
+        f"[WEBLINK_STATUS] Weblink status batch retrieved - Space ID: {req.space_id}, "
+        f"KB ID: {req.kb_id}, Requested: {len(req.weblink_id_list)}, "
+        f"Found: {len(items)}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    )
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="get weblink status success",
+        data=DocumentStatusListResponse(items=items).model_dump(by_alias=False),
+    )
+
+
+@with_exception_handling
+def weblink_update(req: WeblinkUpdateRequest, current_user: dict) -> ResponseModel:
+    """更新链接名称"""
+    _ = check_user_space(req.space_id, current_user)
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    update_result = knowledge_base_repository.weblink_update(
+        KBWeblink(kb=kb_details, weblink_id=req.weblink_id),
+        name=req.weblink_name,
+    )
+    if update_result.code != status.HTTP_200_OK:
+        return ResponseModel(code=update_result.code, message=update_result.message)
+    return ResponseModel(code=status.HTTP_200_OK, message="update weblink success")
+
+
+@with_exception_handling
+async def weblink_delete(req: WeblinkDeleteRequest, current_user: dict) -> ResponseModel:
+    """批量删除链接"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_DELETE] Deleting weblinks - User: {user_id}, "
+        f"Space ID: {req.space_id}, KB ID: {req.kb_id}, Weblink IDs: {req.weblink_ids}"
+    )
+
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    success_count = 0
+    failed_count = 0
+    failed_weblink_ids = []
+    index_manager = _create_index_manager()
+    chunk_index = f"kb_{req.kb_id}_chunks"
+    triple_index = f"kb_{req.kb_id}_triples"
+    for weblink_id in req.weblink_ids:
+        get_result = knowledge_base_repository.weblink_get(
+            KBWeblink(kb=kb_details, weblink_id=weblink_id)
+        )
+        if get_result.code != status.HTTP_200_OK or not get_result.data:
+            failed_count += 1
+            failed_weblink_ids.append(weblink_id)
+            continue
+        w = get_result.data
+        process_info = w.get("process_info") or {}
+        indexing_strategy = (
+            process_info.get("indexing_strategy", {}) if isinstance(process_info, dict) else {}
+        )
+        use_graph = (
+            indexing_strategy.get("enable_graph_enhancement", False)
+            if isinstance(indexing_strategy, dict)
+            else False
+        )
+        try:
+            await _delete_document_from_index(
+                index_manager=index_manager,
+                index_name=chunk_index,
+                doc_id=weblink_id,
+                kb_id=req.kb_id,
+                index_type="chunks",
+            )
+            if use_graph:
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=triple_index,
+                    doc_id=weblink_id,
+                    kb_id=req.kb_id,
+                    index_type="triples",
+                )
+        except Exception as e:
+            logger.warning(f"[WEBLINK_DELETE] Index delete failed - Weblink ID: {weblink_id}, Error: {e}")
+        knowledge_base_repository.weblink_delete_batch(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            weblink_ids=[weblink_id],
+            index_manager_type=_CURR_INDEX_TYPE,
+        )
+        success_count += 1
+
+    logger.info(
+        f"[WEBLINK_DELETE] Weblink deletion completed - KB ID: {req.kb_id}, "
+        f"Success: {success_count}, Failed: {failed_count}, "
+        f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    )
+    if success_count > 0:
+        return ResponseModel(code=status.HTTP_200_OK, message="delete weblinks success")
+    return ResponseModel(
+        code=status.HTTP_400_BAD_REQUEST,
+        message=f"Failed to delete weblinks: {failed_weblink_ids}",
+        data=None,
     )
