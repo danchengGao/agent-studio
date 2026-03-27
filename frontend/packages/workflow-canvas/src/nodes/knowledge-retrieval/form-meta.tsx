@@ -89,8 +89,12 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
   const kbIdsKey = JSON.stringify(kbIds)
   useEffect(() => {
     if (storedKbInfo.length > 0) {
-      // Use stored info (has names/descriptions)
+      // Use stored info for immediate display, but always refresh from API on first load
+      // to pick up changes to has_graph_enhancement and other KB metadata
       setKbList(storedKbInfo)
+      if (!initializedRef.current) {
+        fetchKnowledgeBases(true)
+      }
     } else if (kbIds.length > 0) {
       // Fallback: use IDs as names and fetch real names
       setKbList(kbIds.map(id => ({ id, name: id })))
@@ -103,7 +107,7 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
     initializedRef.current = true
   }, [kbIdsKey])
 
-  const fetchKnowledgeBases = useCallback(async () => {
+  const fetchKnowledgeBases = useCallback(async (notifyChange = false) => {
     setLoading(true)
     try {
       // Dynamically import spaceUtils to get the current space ID
@@ -133,6 +137,9 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
           updateKnowledgeRetrievalParam(formModel, {
             kbInfo: updatedList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement })),
           })
+          if (notifyChange) {
+            onKBChange?.()
+          }
         }
       }
     } catch (error) {
@@ -140,7 +147,7 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
     } finally {
       setLoading(false)
     }
-  }, [kbIds])
+  }, [kbIds, onKBChange])
 
   const handleAdd = () => {
     fetchKnowledgeBases()
