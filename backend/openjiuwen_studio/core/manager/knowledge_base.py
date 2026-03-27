@@ -264,7 +264,7 @@ def _format_error_message_for_frontend(error_msg: str) -> str:
     改写规则：
     1. 固定错误消息保持不变
     2. 带前缀的错误：去掉前缀、状态码、箭头（替换为分号）
-    3. 在 "reason" 之前截断（如果存在）
+    3. 若含 ", reason:" 且其后有内容，保留其后（具体原因）；否则去掉 reason 段
     4. 确保首字母大写
 
     Args:
@@ -313,12 +313,18 @@ def _format_error_message_for_frontend(error_msg: str) -> str:
     # 3. 去掉箭头 -> 和前后空格，用分号替换
     result = re.sub(r"\s*->\s*", "; ", result)
 
-    # 4. 在 "reason" 之前截断（如果存在）
-    # 匹配 ", reason:" 或 ",reason:" 或 " reason:" 等变体
-    reason_pattern = r",\s*reason\s*:"
+    # 4. StatusCode / LLM 错误模板多为 "... , reason: {具体原因}"，具体原因在 reason 之后；
+    #    若截断丢弃 reason 之后的内容，前端只能看到泛化前缀（用户无法排查限流、API 报错等）。
+    #    因此：若存在 ", reason:" 且其后有非空内容，优先展示其后内容；否则保留原逻辑。
+    reason_pattern = r",\s*reason\s*:\s*"
     match = re.search(reason_pattern, result, re.IGNORECASE)
     if match:
-        result = result[: match.start()].strip()
+        after_reason = result[match.end():].strip()
+        before_reason = result[:match.start()].strip()
+        if after_reason:
+            result = after_reason
+        else:
+            result = before_reason
 
     # 5. 清理多余的空格
     result = " ".join(result.split())

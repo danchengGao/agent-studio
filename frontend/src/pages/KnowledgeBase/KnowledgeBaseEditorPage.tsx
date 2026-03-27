@@ -19,6 +19,7 @@ import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDial
 import AddDocumentDialog from './components/AddDocumentDialog'
 import AddWeblinkDialog from './components/AddWeblinkDialog'
 import SyncToDeepSearchDialog from './components/SyncToDeepSearchDialog'
+import { DocumentErrorMessageCell, getStatusErrorMessage } from './components/DocumentErrorMessageCell'
 
 const KnowledgeBaseEditorPage: React.FC = () => {
   const { t } = useTranslation()
@@ -1311,24 +1312,9 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                               {doc.created_at || '-'}
                             </td>
                             <td className="px-6 py-4 text-sm">
-                              {documentStatuses[doc.id]?.error_msg ? (
-                                <span 
-                                  className="text-red-600 cursor-help break-words" 
-                                  title={documentStatuses[doc.id]?.error_msg}
-                                  style={{ 
-                                    maxWidth: '400px',
-                                    display: 'inline-block',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word'
-                                  }}
-                                >
-                                  {documentStatuses[doc.id]?.error_msg.length > 100 
-                                    ? `${documentStatuses[doc.id]?.error_msg.substring(0, 100)}...` 
-                                    : documentStatuses[doc.id]?.error_msg}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
+                              <DocumentErrorMessageCell
+                                message={getStatusErrorMessage(documentStatuses[doc.id])}
+                              />
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                               <div className="flex items-center space-x-2">
