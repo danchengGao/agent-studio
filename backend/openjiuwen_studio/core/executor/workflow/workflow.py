@@ -424,7 +424,7 @@ class Workflow:
         sub_version = sub_wf_info.version
         sub_workflow = await loader.get_compiled_workflow(Context(context),
                                                           sub_id, sub_version, self.space_id, self.current_user)
-        return SubWorkflowComponent(sub_workflow, cache_stream=True)
+        return SubWorkflowComponent(sub_workflow)
 
     async def _create_loop_component(
             self,
