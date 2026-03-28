@@ -61,7 +61,7 @@ interface ToolParameter {
 }
 
 interface HeaderConfig {
-  key: string
+  name: string
   value: string
 }
 
@@ -317,7 +317,7 @@ const ToolConfigurationPage: React.FC = () => {
           })) || [],
         headers:
           targetApiInfo.headers?.map(header => ({
-            key: header.name,
+            name: header.name,
             value: header.value,
           })) || [],
         available: targetApiInfo.available,
@@ -642,9 +642,9 @@ const ToolConfigurationPage: React.FC = () => {
         request_params: convertParams(tool.input_parameters),
         response_params: convertParams(tool.output_parameters),
         headers: tool.headers
-          .filter(header => header.key.trim() !== '' || header.value.trim() !== '')
+          .filter(header => header.name.trim() !== '' || header.value.trim() !== '')
           .map(header => ({
-            name: header.key,
+            name: header.name,
             value: header.value,
           })),
       }
@@ -661,9 +661,9 @@ const ToolConfigurationPage: React.FC = () => {
         request_params: convertParams(tool.input_parameters),
         response_params: convertParams(tool.output_parameters),
         headers: tool.headers
-          .filter(header => header.key.trim() !== '' || header.value.trim() !== '')
+          .filter(header => header.name.trim() !== '' || header.value.trim() !== '')
           .map(header => ({
-            name: header.key,
+            name: header.name,
             value: header.value,
           })),
       }
@@ -870,7 +870,7 @@ const ToolConfigurationPage: React.FC = () => {
     }
   }
 
-  const handleHeaderChange = (index: number, field: 'key' | 'value', value: string) => {
+  const handleHeaderChange = (index: number, field: 'name' | 'value', value: string) => {
     if (tool) {
       const updatedTool = { ...tool }
       updatedTool.headers[index] = { ...updatedTool.headers[index], [field]: value }
@@ -881,7 +881,7 @@ const ToolConfigurationPage: React.FC = () => {
   const handleAddHeader = () => {
     if (tool) {
       const updatedTool = { ...tool }
-      updatedTool.headers = [...updatedTool.headers, { key: '', value: '' }]
+      updatedTool.headers = [...updatedTool.headers, { name: '', value: '' }]
       setTool(updatedTool)
     }
   }
@@ -1739,7 +1739,7 @@ const ToolConfigurationPage: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Typography variant="subtitle1" className="font-medium">
-                          {header.name || header.key || 'Header'}
+                          {header.name || 'Header'}
                         </Typography>
                         <div className="flex gap-1">
                           <IconButton
@@ -1766,7 +1766,7 @@ const ToolConfigurationPage: React.FC = () => {
                       <div className="grid grid-cols-1 gap-3">
                         <TextField
                           label="Header Name"
-                          value={header.name || header.key || ''}
+                          value={header.name || ''}
                           onChange={e => handleHeaderChange(index, 'name', e.target.value)}
                           size="small"
                           fullWidth
@@ -1784,11 +1784,6 @@ const ToolConfigurationPage: React.FC = () => {
                           disabled={isReadOnly}
                         />
 
-                        {header.description && (
-                          <Typography variant="caption" color="text.secondary">
-                            {header.description}
-                          </Typography>
-                        )}
                       </div>
                     </div>
                   </Card>
