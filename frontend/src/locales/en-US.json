@@ -2412,7 +2412,7 @@
         "apiKey": "API Key",
         "apiKeyHint": "API Key for authenticating requests to the Model API Service",
         "baseUrl": "Base URL",
-        "baseUrlHint": "Base URL of the Model API Service",
+        "baseUrlHint": "Base URL of the Model API Service（e.g., \"https://api.modelarts-maas.com/openai/v1\"）",
         "endpoint": "Endpoint URL",
         "endpointError": "Base URL must start with http:// or https://",
         "maxTokens": "Max Tokens",
