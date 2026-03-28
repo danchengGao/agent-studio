@@ -109,7 +109,9 @@ const LinkSet: React.FC<{
             onClick={(e) => {
               e.stopPropagation();
               if (isLocalDataset) {
-                onLinkClick(link);
+                // 知识库链接：暂不可点击，不打开右侧面板
+                // onLinkClick(link);
+                return;
               } else {
                 window.open(url, '_blank');
               }
