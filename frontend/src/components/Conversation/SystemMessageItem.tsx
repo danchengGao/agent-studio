@@ -10,7 +10,6 @@ import ReportMessage from './messageTypes/ReportMessage';
 import { ErrorMessage } from './messageTypes/ErrorMessage';
 import { InterruptMessage } from './messageTypes/InterruptMessage';
 import OutlineInteractionMessage from './messageTypes/OutlineInteractionMessage';
-import { FileText } from 'lucide-react';
 
 interface SystemMessageItemProps {
   messageItems: MessageItems;
@@ -128,35 +127,6 @@ export const SystemMessageItem: React.FC<SystemMessageItemProps> = ({ messageIte
               </div>
             );
           })}
-
-        {/* 状态指示器 */}
-        <div className="flex items-center justify-between mt-2">
-          {(isInProgress || isReporting) && (
-            <div className={`flex items-center gap-2 text-sm ${isReporting ? 'text-purple-600' : 'text-gray-500'}`}>
-              {isReporting ? (
-                // REPORTING 状态：紫色跳动文档图标
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-purple-500 animate-bounce" />
-                  <span className="font-medium">
-                    {t('apps.deepSearch.status.reporting')}
-                  </span>
-                </div>
-              ) : (
-                // IN_PROGRESS 状态：蓝色脉冲点动画
-                <>
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-75"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-150"></div>
-                  </div>
-                  <span>
-                    {t('apps.chat.generating')}
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
       </div>
     </div>
     );

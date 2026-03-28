@@ -72,8 +72,8 @@
       "executionFailed": "Sorry, an error occurred while processing your request. Please try again later",
       "sse": {
         "timeoutError": {
-          "title": "Connection Timeout",
-          "content": "The request timed out because no data was received for an extended period. Please check your network connection and try again."
+          "title": "Conversation Timeout",
+          "content": "The conversation has been cancelled due to inactivity or no data received for an extended period. Please check your network connection and ask your question again."
         }
       }
     },

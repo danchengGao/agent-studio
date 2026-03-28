@@ -826,8 +826,10 @@ export class DeepsearchSSEHandler {
         return;
       }
 
-      // 【步骤0】更新上一个 stepTask (task_1_x_n_(k-1))，只在存在上一个stepTask且当前retrieval是本step的第1个retrieval时才更新
-      if (stepIdx > 1 && (!stepTask.childMessageIds || stepTask.childMessageIds.length === 0)) {
+      // 【步骤0】更新上一个 stepTask (task_1_x_n_(k-1))，只在平行模式，且存在上一个stepTask且当前retrieval是本step的第1个retrieval时才更新
+      const executionMethod = lastMessageItems.agentConfig?.execution_method as string | undefined;
+      if (executionMethod === DeepsearchExecutionMethod.PARALLEL && 
+        stepIdx > 1 && (!stepTask.childMessageIds || stepTask.childMessageIds.length === 0)) {
         const prevStepTask = planChildren[stepIdx - 2];
 
         if (prevStepTask && isTaskOngoing(prevStepTask.status)) {
@@ -869,8 +871,8 @@ export class DeepsearchSSEHandler {
           buildIndexPath(sectionIdx, planIdx, stepIdx)
         );
 
-        /// 更新本step状态为正在进行中（只有PENDING状态才更新）
-        if (stepTask.status === TaskStatus.PENDING) {
+        /// 更新本step状态为正在进行中（非IN_PROGRESS状态才更新）
+        if (stepTask.status != TaskStatus.IN_PROGRESS) {
           const now = Date.now();
           updateMessage(lastMessageItems.id, stepTask.id, {
             status: TaskStatus.IN_PROGRESS,
@@ -1030,7 +1032,9 @@ export class DeepsearchSSEHandler {
 
               /// 依赖模式下，lastChildMessage非子报告的话，说明是信息收集类型，状态设置为准完成
               if (executionMethod === DeepsearchExecutionMethod.DEPENDENCY_DRIVING) {
-                // 1. 将信息收集类型任务状态设置为已完成
+              // 无论平行/依赖模式，没有报告都创建一下章节报告
+              // if (1) {
+                // 1. 将信息收集类型任务状态设置为准完成
                 this.updateUnfinishedTasksRecursively(
                   lastChildMessage.id,
                   lastMessageItems.id,
@@ -1136,6 +1140,7 @@ export class DeepsearchSSEHandler {
       }
 
       // 最终报告+溯源信息 (第7点)
+      /// 先将sseData.content转换为json对象
       let endData = null;
       if (typeof sseData.content === 'string' && sseData.content.trim().startsWith('{')) {
         try {
@@ -1252,7 +1257,10 @@ export class DeepsearchSSEHandler {
         }
 
         // 2. 根据最终报告状态标记未完成的消息
-        this.markAllIncompleteMessages(lastMessageItems, isReportSuccess);
+        this.markAllIncompleteMessages(
+          lastMessageItems,
+          isReportSuccess ? TaskStatus.COMPLETED : TaskStatus.FAILED
+        );
 
         // 3. 如果最终报告失败且为空，设置默认异常信息
         if (finalReportMessage && !isReportSuccess) {
@@ -1392,7 +1400,7 @@ export class DeepsearchSSEHandler {
   /** 处理 waiting_user_input 事件
    */
   private handleWaitingUserInput(sseData: SSEData): void {
-    const { addSystemMessage, updateMessage, getCurrentMessageItems, saveConversationToDB } = this.store;
+    const { addSystemMessage, getCurrentMessageItems, saveConversationToDB } = this.store;
 
     // 检查当前 MessageItems 状态，如果已经是 CANCELLED，说明用户已手动取消，不需要再创建消息
     const lastMessageItems = getCurrentMessageItems();
@@ -1454,7 +1462,7 @@ export class DeepsearchSSEHandler {
 
     // 更新消息状态
     if(lastMessageItems){
-      updateMessage(lastMessageItems.id, message.id, {
+      this.store.updateMessage(lastMessageItems.id, message.id, {
         status: TaskStatus.IN_PROGRESS,
         isStreaming: false,
       });
@@ -1686,7 +1694,7 @@ export class DeepsearchSSEHandler {
     // 如果是 end agent 的 error, 更新 lastMessageItems的状态为COMPLETED，所有未完成的Message标志为FAILED
     if (sseData.agent === 'end') {
       // 先将所有未完成的消息标记为 FAILED
-      this.markAllIncompleteMessages(lastMessageItems, false);
+      this.markAllIncompleteMessages(lastMessageItems, TaskStatus.FAILED);
       // 再更新 MessageItems 的状态
       this.store.updateMessageItems(lastMessageItems.id, { status: TaskStatus.COMPLETED });
     }
@@ -2374,12 +2382,13 @@ export class DeepsearchSSEHandler {
   /**
    * 递归标记所有未完成的消息（公共方法）
    * @param messageItems MessageItems 对象
-   * @param markAsCompleted true=标记为 COMPLETED, false=标记为 FAILED
-   * 注意：不包括用户手动停止的 CANCELLED 状态
+   * @param targetStatus 目标状态：COMPLETED/FAILED/CANCELLED
    */
-  public markAllIncompleteMessages(messageItems: MessageItems, markAsCompleted: boolean): void {
+  public markAllIncompleteMessages(
+    messageItems: MessageItems,
+    targetStatus: TaskStatus.COMPLETED | TaskStatus.FAILED | TaskStatus.CANCELLED
+  ): void {
     const { updateMessage, getChildMessages } = this.store;
-    const targetStatus = markAsCompleted ? TaskStatus.COMPLETED : TaskStatus.FAILED;
     let count = 0;
 
     const markRecursively = (message: Message) => {
@@ -2387,9 +2396,15 @@ export class DeepsearchSSEHandler {
       const children = getChildMessages(message.id);
       children.forEach(child => markRecursively(child));
 
-      // 只标记非 COMPLETED/CANCELLED（用户手动停止）/UNKNOWN / FAILED 的消息
-      if (message.status !== TaskStatus.COMPLETED && message.status !== TaskStatus.CANCELLED && 
-        message.status !== TaskStatus.FAILED && (/*markAsCompleted ||*/ message.status !== TaskStatus.UNKNOWN)) {
+      // 只标记非最终状态的消息（不包括 COMPLETED/CANCELLED/FAILED/UNKNOWN）
+      const finalStatuses = [
+        TaskStatus.COMPLETED,
+        TaskStatus.CANCELLED,
+        TaskStatus.FAILED,
+        TaskStatus.UNKNOWN
+      ];
+
+      if (!finalStatuses.includes(message.status)) {
         updateMessage(messageItems.id, message.id, {
           status: targetStatus,
         });

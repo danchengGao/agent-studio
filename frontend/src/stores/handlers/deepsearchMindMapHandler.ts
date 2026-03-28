@@ -34,7 +34,7 @@ export {
 };
 
 // ===== 操作函数类型定义 =====
-
+// todo: 将 MindMap 均改成 ThoughtGraph; deepsearchMindMapHandler.ts 改成 thoughtGraphHandler.ts，然后作为普适性的思维链图操作接口； 
 /**
  * 思维链图操作接口
  */

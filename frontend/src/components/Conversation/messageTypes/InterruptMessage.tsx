@@ -28,6 +28,7 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
     switch (message.status) {
       case TaskStatus.PENDING:
       case TaskStatus.IN_PROGRESS:
+      case TaskStatus.REPORTING:
         return {
           bg: 'bg-yellow-50',
           border: 'border-yellow-200',
@@ -105,15 +106,19 @@ export const InterruptMessage: React.FC<InterruptMessageProps> = ({ message }) =
   const theme = getStatusTheme();
   const Icon = theme.icon;
 
+  // 如果 message 存在 title，则使用 message 的 title 和 content
+  const displayTitle = message.title || theme.title;
+  const displayContent = message.title ? (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)) : theme.tip;
+
   // 所有状态使用统一的简单样式
   return (
     <div className={`interrupt-message ${theme.bg} border ${theme.border} rounded-lg ${theme.padding}`}>
       <div className="flex items-start gap-2">
         <Icon size={18} className={`${theme.iconColor} flex-shrink-0 mt-0.5`} />
         <div className="flex-1">
-          <h4 className={`text-sm font-semibold ${theme.titleColor} mb-1`}>{theme.title}</h4>
+          <h4 className={`text-sm font-semibold ${theme.titleColor} mb-1`}>{displayTitle}</h4>
           <div className={`mt-2 text-sm ${theme.tipColor}`}>
-            {theme.tip}
+            {displayContent}
           </div>
         </div>
       </div>

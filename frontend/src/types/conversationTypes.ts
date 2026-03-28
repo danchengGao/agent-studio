@@ -69,17 +69,18 @@ export enum ThoughtGraphType {
  * 用于管理一个messageItems的多个思维链图
  */
 export interface MindMapManagers {
-  sectionGraph: any;   // 章节图管理器 (MindMapManager)
-  taskGraph: any;      // 任务图管理器 (MindMapManager)
+  sectionGraph?: any;   // 章节图管理器 (MindMapManager)
+  taskGraph?: any;      // 任务图管理器 (MindMapManager)
 }
 
 /**
- * 错误消息配置接口
- * 用于在消息处理失败时添加错误提示
+ * 中止消息配置接口
+ * 用于在消息中止时添加提示，支持失败和取消两种类型
  */
-export interface ErrorMessageConfig {
+export interface AbortMessageConfig {
   title: string;
   content: string;
+  abortType: TaskStatus.FAILED | TaskStatus.CANCELLED;  // 区分中止类型
 }
 
 // ===== 消息相关类型 =====
@@ -140,7 +141,7 @@ export interface Message {
   isStreaming?: boolean;       // 是否正在接收
 
   // TASK类型数据相关 - 位置索引
-  sectionIdx?: number;         // 作用于task类型消息中，用于章节索引：0=主任务, 1-10=章节，用于标识任务在层级结构中的位置
+  sectionIdx?: number;         // 作用于task类型消息中，用于章节索引：0=主任务, 1-10=章节，用于标识任务在层级结构中的位置； todo: 后续增加studio后端存储时，删除此字段，相应的功能使用indexPath
   indexPath?: string;          // 位置索引路径，格式："section-plan-step"，如 "0-1-2" 表示 section=0, plan=1, step=2
 }
 
@@ -165,9 +166,19 @@ export interface MessageItems {
   isUser: boolean;             // 是否用户消息
   agentType?: AgentType;       // Agent类型，用于HITL场景判断agent匹配
   llm?: string;                // 大模型名称
-  agentConfig?: { [key: string]: any }; // agent的参数配置项
+  agentConfig?: { 
+    remainingRewriteRounds?: number;  // 剩余 AI 改写次数（用于显示提示）
+    maxRewriteRounds?: number;        // 最大 AI 改写次数（用于显示提示）
+    [key: string]: any
+  }; // agent的参数配置项
 
-  // ===== AI 改写相关 =====
+  /// 思维图数据； todo: 后续增加studio后端存储时，图数据直接保存于 messageItems数据结构中
+  thoughtGraphs?: {
+    sectionGraph?: any;  // 章节图 ThoughtGraph
+    taskGraph?: any;     // 任务图 ThoughtGraph
+  };  // { sectionGraph, taskGraph }，用于保存思维链数据
+
+  // ===== AI 改写相关 =====  todo: 后续增加studio后端存储时，将下面2个数据挪至agentConfig中
   remainingRewriteRounds?: number;  // 剩余 AI 改写次数（用于显示提示）
   maxRewriteRounds?: number;        // 最大 AI 改写次数（用于显示提示）
 }
@@ -198,8 +209,8 @@ export interface ConversationData {
   messageItems: MessageItems[];
   messages: Record<string, Message>;  // Map转对象以便序列化
   thoughtGraphs?: Record<string, {
-    sectionGraph: any;  // 章节图 ThoughtGraph
-    taskGraph: any;     // 任务图 ThoughtGraph
+    sectionGraph?: any;  // 章节图 ThoughtGraph
+    taskGraph?: any;     // 任务图 ThoughtGraph
   }>;  // messageItemsId -> { sectionGraph, taskGraph }，用于持久化思维链数据
 }
 

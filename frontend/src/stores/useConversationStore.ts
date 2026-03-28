@@ -9,7 +9,7 @@ import {
   AgentType,
   DeepsearchExecutionMethod,
   // 基础接口
-  ErrorMessageConfig,
+  AbortMessageConfig,
   // 消息相关类型
   LinkContent,
   JSONObject,
@@ -40,7 +40,7 @@ export {
 
 export type {
   // 基础接口
-  ErrorMessageConfig,
+  AbortMessageConfig,
   // 消息相关类型
   LinkContent,
   JSONObject,
@@ -497,13 +497,13 @@ export interface ConversationStore {
    * 检查并标记当前对话中未完成的MessageItems为FAILED
    * @returns 是否标记了失败的消息
    */
-  checkAndMarkIncompleteAsFailed: () => boolean;
+  checkAndMarkIncompleteAsAbort: () => boolean;
 
   /**
-   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为FAILED
-   * @param errorMessage 可选的错误消息配置，如果提供则添加错误消息到MessageItems中
+   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为中止状态
+   * @param abortMessage 可选的中止消息配置，如果提供则添加中止消息到MessageItems中
    */
-  markCurrentConversationIncompleteAsFailed: (errorMessage?: ErrorMessageConfig | null) => void;
+  markCurrentConversationIncompleteAsAbort: (abortMessage?: AbortMessageConfig | null) => void;
 
   /**
    * 设置 SESSION_CONVERSATION_ID
@@ -2244,10 +2244,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       // 检查是否超时
       if (lastSSEEventTime && timeSinceLastEvent > timeoutMs) {
-        // 标记未完成消息为失败，并添加超时错误消息
-        get().markCurrentConversationIncompleteAsFailed({
+        // 标记未完成消息为取消，并添加超时取消消息
+        get().markCurrentConversationIncompleteAsAbort({
           title: i18n.t('common.messages.sse.timeoutError.title'),
           content: i18n.t('common.messages.sse.timeoutError.content'),
+          abortType: TaskStatus.CANCELLED,  // 超时取消
         });
         // 停止监控
         get().stopSSETimeoutMonitor();
@@ -2278,7 +2279,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   /**
    * 检查并标记当前对话中未完成的MessageItems为FAILED 或 CANCELLED
    */
-  checkAndMarkIncompleteAsFailed: () => {
+  checkAndMarkIncompleteAsAbort: () => {
     const { currentConversationId } = get();
     if (!currentConversationId) {
       return false;
@@ -2310,8 +2311,12 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return true;
       }
 
-      console.warn('[SSE Timeout] 检测到超时的未完成消息，标记为FAILED');
-      get().markCurrentConversationIncompleteAsFailed();
+      console.warn('[SSE Timeout] 检测到超时的未完成消息，标记为CANCELLED');
+      get().markCurrentConversationIncompleteAsAbort({
+        title: i18n.t('common.messages.sse.timeoutError.title'),
+        content: i18n.t('common.messages.sse.timeoutError.content'),
+        abortType: TaskStatus.CANCELLED,  // 页面刷新/切换会话导致的超时取消
+      });
       return true;
     }
 
@@ -2319,10 +2324,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   /**
-   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为FAILED
-   * @param errorMessage 可选的错误消息配置，如果提供则添加错误消息到MessageItems中
+   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为中止状态
+   * @param abortMessage 可选的中止消息配置，如果提供则添加中止消息到MessageItems中
    */
-  markCurrentConversationIncompleteAsFailed: (errorMessage?: ErrorMessageConfig | null) => {
+  markCurrentConversationIncompleteAsAbort: (abortMessage?: AbortMessageConfig | null) => {
     const { currentConversationId } = get();
     if (!currentConversationId) {
       return;
@@ -2335,7 +2340,62 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
     const lastMessageItems = messageItemsList[messageItemsList.length - 1];
 
-    // 动态导入 handler
+    // 【新增】发送取消请求到后端（不阻塞 UI 更新）
+    // 立即调用 API，异步处理，不等待响应
+    const cancelAbortController = new AbortController();
+    const sessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID || currentConversationId;
+    import('@/pages/Apps/components/services/deepsearchApi').then(({ DeepSearchApiService }) => {
+      DeepSearchApiService.cancelConversation(sessionConversationId, cancelAbortController.signal);
+    }).catch((error) => {
+      console.error('[markCurrentConversationIncompleteAsAbort] Failed to load deepsearchApi:', error);
+    });
+
+    // 根据 abortType 决定目标状态
+    const targetStatus = abortMessage?.abortType ?? TaskStatus.CANCELLED;
+
+    // ========== 辅助函数：添加中止消息 ==========
+    const addAbortMessage = () => {
+      if (!abortMessage) return;
+
+      // 如果是取消状态，尝试复用已有的 INTERRUPT 消息
+      if (abortMessage.abortType === TaskStatus.CANCELLED) {
+        const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
+        const lastMessage = get().getMessageById(lastMessageId);
+
+        if (lastMessage && lastMessage.type === MessageType.INTERRUPT) {
+          // 复用：直接更新 title 和 content
+          get().updateMessage(lastMessageItems.id, lastMessage.id, {
+            title: abortMessage.title,
+            content: abortMessage.content,
+            status: TaskStatus.CANCELLED,
+            updatedAt: Date.now(),
+          });
+          // 手动保存到 IndexDB
+          get().saveConversationToDB(lastMessageItems.conversationId);
+          return;
+        }
+      }
+
+      // 没有可复用的 INTERRUPT 消息，创建新的
+      const abortMsg: Message = {
+        id: get().generateMessageId(),
+        type: abortMessage.abortType === TaskStatus.FAILED
+          ? MessageType.ERROR      // 错误用 ERROR 类型
+          : MessageType.INTERRUPT, // 取消用 INTERRUPT 类型
+        status: abortMessage.abortType,
+        content: abortMessage.content,
+        title: abortMessage.title,
+        messageItemsId: lastMessageItems.id,
+        conversationId: lastMessageItems.conversationId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      get().addMessage(lastMessageItems.id, abortMsg, true);
+      // 手动保存到 IndexDB
+      get().saveConversationToDB(lastMessageItems.conversationId);
+    };
+
+    // ========== 动态导入 handler ==========
     import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
       const handler = new DeepsearchSSEHandler(
         // 传入空的 dependencies，我们只使用 markAllIncompleteMessages 方法
@@ -2343,28 +2403,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         {} as any,
         lastMessageItems.conversationId
       );
-      // 调用公共方法标记为失败
-      handler.markAllIncompleteMessages(lastMessageItems, false);  // false = 标记为 FAILED
+      // 调用公共方法标记为中止状态
+      handler.markAllIncompleteMessages(lastMessageItems, targetStatus);
 
-      // 添加错误消息（如果提供）
-      if (errorMessage) {
-        const errorMsg: Message = {
-          id: get().generateMessageId(),
-          type: MessageType.ERROR,
-          status: TaskStatus.FAILED,
-          content: errorMessage.content,
-          title: errorMessage.title,
-          messageItemsId: lastMessageItems.id,
-          conversationId: lastMessageItems.conversationId,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        get().addMessage(lastMessageItems.id, errorMsg, true);
-        // 手动保存到 IndexDB
-        get().saveConversationToDB(lastMessageItems.conversationId);
-      }
+      // 添加中止消息
+      addAbortMessage();
     }).catch((error) => {
-      console.error('[markCurrentConversationIncompleteAsFailed] Failed to load handler:', error);
+      console.error('[markCurrentConversationIncompleteAsAbort] Failed to load handler:', error);
 
       // 降级处理: 直接遍历所有消息并标记
       const markRecursively = (messageId: string) => {
@@ -2378,32 +2423,17 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
         // 标记未完成的消息
         if (isTaskOngoing(msg.status)) {
-          get().updateMessage(lastMessageItems.id, msg.id, { status: TaskStatus.FAILED });
+          get().updateMessage(lastMessageItems.id, msg.id, { status: targetStatus });
         }
       };
 
       lastMessageItems.messagesIds.forEach(msgId => markRecursively(msgId));
 
       // 更新 MessageItems 状态
-      get().updateMessageItems(lastMessageItems.id, { status: TaskStatus.FAILED });
+      get().updateMessageItems(lastMessageItems.id, { status: targetStatus });
 
-      // 添加错误消息（如果提供）
-      if (errorMessage) {
-        const errorMsg: Message = {
-          id: get().generateMessageId(),
-          type: MessageType.ERROR,
-          status: TaskStatus.FAILED,
-          content: errorMessage.content,
-          title: errorMessage.title,
-          messageItemsId: lastMessageItems.id,
-          conversationId: lastMessageItems.conversationId,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        get().addMessage(lastMessageItems.id, errorMsg, true);
-        // 手动保存到 IndexDB
-        get().saveConversationToDB(lastMessageItems.conversationId);
-      }
+      // 添加中止消息
+      addAbortMessage();
     });
   },
 

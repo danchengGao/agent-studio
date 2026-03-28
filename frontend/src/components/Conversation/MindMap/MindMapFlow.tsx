@@ -315,6 +315,12 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
               fillOpacity: styleConfig.labelBgOpacity,
             },
             labelShowBg: true,
+            markerEnd: {
+              type: 'arrowclosed',
+              color: styleConfig.stroke,
+              width: 20,
+              height: 20,
+            },
           };
         });
     },
@@ -541,7 +547,12 @@ const MindMapFlow: React.FC<MindMapFlowComponentProps> = ({
             strokeWidth: EDGE_STYLES.NOT_STARTED.strokeWidth,
             strokeDasharray: '5,5',   // 虚线
           },
-          markerEnd: { type: 'arrowclosed', color: EDGE_STYLES.NOT_STARTED.stroke },
+          markerEnd: {
+            type: 'arrowclosed',
+            color: EDGE_STYLES.NOT_STARTED.stroke,
+            width: 20,
+            height: 20,
+          },
           animated: false,
         }}
         proOptions={{ hideAttribution: true }}

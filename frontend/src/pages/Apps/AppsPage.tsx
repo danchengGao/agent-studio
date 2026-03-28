@@ -7,7 +7,8 @@ import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
 import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
+import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, isTaskOngoing,
+  type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import SSERecorder from '../../utils/sseRecorder'
 import PlaybackPanel from '../../components/Conversation/PlaybackPanel'
@@ -614,7 +615,7 @@ const AppsPage: React.FC = () => {
   // ===== SSE超时检测: 页面加载时检查未完成消息 =====
   useEffect(() => {
     if (currentConversationId && isDeepSearchMode) {
-      const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsFailed()
+      const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsAbort()
       if (hasIncomplete) {
         console.log('[AppsPage] Marked incomplete messages as FAILED on page load')
       }
@@ -1318,7 +1319,7 @@ const AppsPage: React.FC = () => {
     if (conversation?.config?.agentType === 'deepsearch') {
       // 等待一帧，确保数据已加载
       requestAnimationFrame(() => {
-        const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsFailed()
+        const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsAbort()
         if (hasIncomplete) {
           console.log('[AppsPage] Marked incomplete messages as FAILED on conversation switch')
         }
@@ -1447,7 +1448,7 @@ const AppsPage: React.FC = () => {
           // 判断是否是 HITL interrupt 消息（包括 INTERRUPT 和 OUTLINE_INTERACTION 类型）
           if (lastMessage &&
               (lastMessage.type === MessageType.INTERRUPT || lastMessage.type === MessageType.OUTLINE_INTERACTION) &&
-              (lastMessage.status === TaskStatus.IN_PROGRESS || lastMessage.status === TaskStatus.PENDING || lastMessage.status === TaskStatus.UNKNOWN)) {
+              (isTaskOngoing(lastMessage.status) || lastMessage.status === TaskStatus.UNKNOWN)) {
             // 说明本次提问是 HITL 的第1次回复的再次提问，判断 agent 是否匹配
             const hitlAgent = lastSystemMessageItems.agentType  // 从 MessageItems 获取 agentType
 

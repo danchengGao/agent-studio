@@ -1,15 +1,15 @@
 // ===== 枚举定义 =====
-
+// todo: deepsearchMindMapTypes.ts 改成 thoughtGraphTypes.ts，然后作为普适性的思维链图类型定义，放到types文件夹中
 /**
  * 思维链节点类型
  * 用于决定节点的样式渲染
  */
 export enum ThoughtNodeType {
-  OUTLINE = 'OUTLINE',       // 总框架节点，也是开始节点
-  SECTION = 'SECTION',       // 分段节点
-  PLAN = 'PLAN',              // 任务节点
-  SUB_REPORT = 'SUB_REPORT', // 子报告节点
-  FINAL_REPORT = 'FINAL_REPORT' // 最终报告节点
+  OUTLINE = 'OUTLINE',       // 总框架节点，0级节点；其中的一个开始节点；
+  SECTION = 'SECTION',       // 章节节点，1级节点；
+  PLAN = 'PLAN',              // 任务节点，2级节点；
+  SUB_REPORT = 'SUB_REPORT', // 子报告节点，2级节点；
+  FINAL_REPORT = 'FINAL_REPORT' // 最终报告节点，0级节点；其中的一个结束节点
 }
 
 /**

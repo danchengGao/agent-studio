@@ -35,6 +35,12 @@ from openjiuwen_studio.schemas.deepsearch import (
     ReportConvertReq,
     ReportConvertRes,
 )
+from openjiuwen_studio.routers.deepsearch_logger import (
+    cleanup_logs_async,
+    log_deepsearch_request,
+    log_deepsearch_sse,
+    DeepSearchLogger,
+)
 
 deepsearch_router = APIRouter()
 
@@ -144,10 +150,31 @@ async def run(
 
     _ = check_user_space(payload["space_id"], current_user)
 
+    # 获取 conversation_id
+    conversation_id = payload.get("conversation_id", "")
+
+    # 清理过期日志（使用默认的 10 天过期时间）
+    try:
+        await cleanup_logs_async(DeepSearchLogger.DEFAULT_LOG_EXPIRE_DAYS)
+    except Exception as e:
+        logger.warning(f"Failed to cleanup old logs: {e}")
+
+    # 记录请求数据到日志
+    try:
+        await log_deepsearch_request(conversation_id, payload, DeepSearchLogger.DEFAULT_LOG_EXPIRE_DAYS)
+    except Exception as e:
+        logger.warning(f"Failed to log request data: {e}")
+
     async def stream():
         try:
             async for line in client.run_deepsearch_stream(payload):
                 if line:
+                    # 记录 SSE 数据到日志
+                    try:
+                        await log_deepsearch_sse(conversation_id, line, DeepSearchLogger.DEFAULT_LOG_EXPIRE_DAYS)
+                    except Exception as e:
+                        logger.warning(f"Failed to log SSE data: {e}")
+
                     yield line + "\n\n"
         except Exception as e:
             # 记录原始错误详情到服务器日志
@@ -159,7 +186,6 @@ async def run(
                     error_code="CLIENT_INIT_ERROR",
                     message="Failed to connect to DeepSearch service"
                 )
-            conversation_id = payload.get("conversation_id", "")
             for event_str in error.generate_error_stream(conversation_id):
                 yield event_str
 
