@@ -722,6 +722,13 @@ const AppsPage: React.FC = () => {
 
     // 获取配置
     const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
+
+    if (config.userFeedbackProcessorEnable === false) {
+      onStatusChange?.('error')
+      onError?.('用户反馈优化已关闭，当前报告不可编辑')
+      return
+    }
+
     const token = getToken()
 
     if (!token) {
@@ -1991,7 +1998,10 @@ const AppsPage: React.FC = () => {
                     onGraphTypeChange={setCurrentGraphType}
                   />
                 ) : (
-                  <ResultPanel onReportRewrite={handleReportRewrite} />
+                  <ResultPanel
+                    feedbackOptimizationEnabled={agentConfigs['deepsearch']?.userFeedbackProcessorEnable ?? DEFAULT_DEEPSEARCH_CONFIG.userFeedbackProcessorEnable}
+                    onReportRewrite={handleReportRewrite}
+                  />
                 )}
               </div>
             )}

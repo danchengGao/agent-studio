@@ -9,6 +9,8 @@ import type { ReportRewriteParams } from '@/pages/Apps/types';
 
 interface ResultPanelProps {
   className?: string;
+  /** 是否允许用户反馈优化/编辑 */
+  feedbackOptimizationEnabled?: boolean;
   /** 报告局部改写回调 */
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>;
 }
@@ -22,7 +24,11 @@ interface ResultPanelProps {
  * 3. 支持实时更新（isStreaming 状态）
  * 4. 支持关闭面板
  */
-const ResultPanel: React.FC<ResultPanelProps> = ({ className = '', onReportRewrite }) => {
+const ResultPanel: React.FC<ResultPanelProps> = ({
+  className = '',
+  feedbackOptimizationEnabled = true,
+  onReportRewrite
+}) => {
   // 从store获取选中的消息ID
   const selectedResultMessageId = useConversationStore(
     (state) => state.selectedResultMessageId
@@ -156,6 +162,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '', onReportRewri
           reportMessageId={selectedResultMessageId || undefined}
           className={className}
           conversationId={currentConversationId || undefined}
+          feedbackOptimizationEnabled={feedbackOptimizationEnabled}
           onReportRewrite={onReportRewrite}
         />
       );

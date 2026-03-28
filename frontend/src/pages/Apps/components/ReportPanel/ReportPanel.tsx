@@ -8,7 +8,7 @@
  * - ReportEditView: 报告编辑器（编辑模式）
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { Report, ReportRewriteParams } from '@/pages/Apps/types'
 import { ReportContentToolbar } from './ReportContentToolbar'
 import { ReportView } from './ReportView'
@@ -24,6 +24,8 @@ interface ReportPanelProps {
   className?: string
   /** 会话 ID（用于 AI 改写） */
   conversationId?: string
+  /** 是否允许用户反馈优化/编辑 */
+  feedbackOptimizationEnabled?: boolean
   /** 报告局部改写回调 */
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
 }
@@ -36,6 +38,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   reportMessageId,
   className = '',
   conversationId,
+  feedbackOptimizationEnabled = true,
   onReportRewrite,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
@@ -49,13 +52,21 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   }, [reportMessageId, messagesMap])
 
   const handleEnterEdit = useCallback(() => {
-    if (!isFinalReport) return // 子报告不允许进入编辑
+    if (!isFinalReport || !feedbackOptimizationEnabled) return
     setIsEditing(true)
-  }, [isFinalReport])
+  }, [isFinalReport, feedbackOptimizationEnabled])
 
   const handleExitEdit = useCallback(() => {
     setIsEditing(false)
   }, [])
+
+  const canEditReport = isFinalReport && feedbackOptimizationEnabled
+
+  useEffect(() => {
+    if (!canEditReport && isEditing) {
+      setIsEditing(false)
+    }
+  }, [canEditReport, isEditing])
 
   return (
     <div className={`w-full h-full flex flex-col bg-gradient-to-br from-slate-50 to-blue-50/30 ${className}`}>
@@ -63,6 +74,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
       <ReportContentToolbar
         report={report}
         isEditing={isEditing}
+        editingEnabled={canEditReport}
         onEnterEdit={handleEnterEdit}
         onExitEdit={handleExitEdit}
         isFinalReport={isFinalReport}
@@ -70,7 +82,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
 
       {/* 报告内容 */}
       <div className="flex-1 overflow-auto px-2 pb-2">
-        {isEditing ? (
+        {isEditing && canEditReport ? (
           <ReportEditView
             report={report}
             conversationId={conversationId}

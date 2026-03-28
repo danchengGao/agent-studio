@@ -21,6 +21,8 @@ export interface ReportContentToolbarProps {
   report: Report
   /** 是否处于编辑模式 */
   isEditing?: boolean
+  /** 是否允许编辑 */
+  editingEnabled?: boolean
   /** 进入编辑模式 */
   onEnterEdit?: () => void
   /** 退出编辑模式 */
@@ -35,6 +37,7 @@ export interface ReportContentToolbarProps {
 export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
   report,
   isEditing = false,
+  editingEnabled = true,
   onEnterEdit,
   onExitEdit,
   isFinalReport = true,
@@ -103,7 +106,7 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
       </Root>
 
       {/* 编辑按钮 - 只有最终报告才显示 */}
-      {onEnterEdit && onExitEdit && isFinalReport && (
+      {editingEnabled && onEnterEdit && onExitEdit && isFinalReport && (
         <button
           onClick={handleEditClick}
           className="w-[88px] h-8 flex items-center justify-center gap-1.5 rounded-[4px] text-white text-sm font-medium transition-all duration-200 hover:opacity-90"
