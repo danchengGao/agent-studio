@@ -470,7 +470,7 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
       >
         <SideMenuController
           sideMenu={() => (
-            showRewritePanel ? null : (
+            (showRewritePanel || isRewriting) ? null : (
               <CustomSideMenu onOpenRewritePanel={handleOpenRewritePanel} />
             )
           )}

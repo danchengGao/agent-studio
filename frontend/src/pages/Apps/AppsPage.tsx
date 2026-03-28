@@ -1277,18 +1277,24 @@ const AppsPage: React.FC = () => {
     const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
     if (!currentId) return { show: false, disabledViews: [] as ViewType[] }
 
-    const hasMindMap = mindMapManagersMap.has(currentId)
-    if (!hasMindMap) return { show: false, disabledViews: [] as ViewType[] }
-
     const messageItems = messageItemsMap.get(currentId)
     const hasReport = messageItems?.messagesIds.some(id => {
       const message = getMessageById(id)
       return message && message.type === MessageType.REPORT
     })
+    const hasMindMap = mindMapManagersMap.has(currentId)
+
+    // 显示 TopToolbar 的条件：有报告或有思维链
+    // 注意：AI 改写产生的报告没有 mindMap，所以不能只检查 hasMindMap
+    if (!hasReport && !hasMindMap) return { show: false, disabledViews: [] as ViewType[] }
 
     return {
       show: true,
-      disabledViews: hasReport ? [] : ['report'] as ViewType[]
+      // 如果没有报告，禁用报告视图；如果没有思维链，禁用思维链视图
+      disabledViews: [
+        ...(hasReport ? [] : ['report'] as ViewType[]),
+        ...(hasMindMap ? [] : ['thinking'] as ViewType[]),
+      ]
     }
   }, [mindMapMessageItemsId, currentMessageItemsId, getCurrentMessageItemsId, mindMapManagersMap, messageItemsMap, getMessageById])
 
