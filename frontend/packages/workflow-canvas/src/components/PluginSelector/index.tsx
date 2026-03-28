@@ -24,7 +24,7 @@ interface PluginVersion {
   description?: string
 }
 
-const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfirm }) => {
+const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfirm, allowDuplicate = false }) => {
   const { t } = useTranslation()
   const [pluginList, setPluginList] = useState<PluginInfo[]>([])
   const [pluginLoading, setPluginLoading] = useState(false)
@@ -421,7 +421,19 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
 
   const handleToolSelect = (pluginId: string, tool: PluginApiInfo) => {
     // Prevent selection if tool is disabled
-    if (tool.available === false) {
+    if (tool.available !== true) {
+      return
+    }
+
+    if (!allowDuplicate) {
+      setSelectedTools(prev => {
+        const currentTools = prev.get(pluginId)
+        const alreadySelected = currentTools?.has(tool.tool_id)
+        if (alreadySelected) {
+          return new Map()
+        }
+        return new Map([[pluginId, new Set([tool.tool_id])]])
+      })
       return
     }
 
@@ -448,7 +460,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" translate="no">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style={{ zIndex: 2000 }} translate="no">
       <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col notranslate">
         <div className="flex justify-between items-center mb-4">
           <div>
@@ -539,7 +551,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                   disabled={loadingVersions.has(plugin.plugin_id)}
                                   className="notranslate"
                                   MenuProps={{
-                                    disablePortal: false,
+                                    disablePortal: true,
                                     anchorOrigin: {
                                       vertical: 'bottom',
                                       horizontal: 'left',
@@ -551,7 +563,6 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                     PaperProps: {
                                       sx: {
                                         translate: 'no',
-                                        position: 'relative',
                                         zIndex: 9999,
                                         maxWidth: 250,
                                       },
@@ -606,7 +617,7 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
                                           <div className="space-y-1">
                                             {tools.map(tool => {
                                               const isSelected = selectedTools.get(plugin.plugin_id)?.has(tool.tool_id)
-                                              const isDisabled = tool.available === false
+                                              const isDisabled = tool.available !== true
                                               return (
                                                 <div
                                                   key={tool.tool_id}

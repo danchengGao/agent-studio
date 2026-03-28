@@ -12,7 +12,7 @@ import { useClientContext, WorkflowNodeEntity, WorkflowPortEntity } from '@flowg
 import { FlowNodeRegistry } from '../../typings'
 import { nodeRegistries } from '../../nodes'
 import { WorkflowNodeType } from '../../nodes/constants'
-import { canContainNode } from '../../utils'
+import { canContainNode, dragStateManager } from '../../utils'
 import { NodesContainer, SearchContainer, CategoriesContainer, CategoryTitle, NodesGrid, NodeWrap, NodeLabel } from './styled'
 import { useTranslation } from '../../i18n'
 
@@ -154,15 +154,18 @@ export const NodeList: FC<NodeListProps> = props => {
     // 插件节点和工作流节点需要异步处理
     if (registry.type === WorkflowNodeType.Plugin || registry.type === WorkflowNodeType.Workflow) {
       e.stopPropagation()
-
-      // 打开插件选择器前关闭节点面板
-      onClose?.()
+      const isConnectionAdd = !!fromPort
+      if (isConnectionAdd) {
+        dragStateManager.startDrag()
+      }
 
       try {
         // 调用onAdd添加节点，等待异步完成
         const result = await registry.onAdd?.(context)
+        let hasSelected = false
         // 使用工具函数处理节点选择
-        if (Array.isArray(result)) {
+        if (Array.isArray(result) && result.length > 0) {
+          hasSelected = true
           // 直接遍历数组处理多节点
           result.forEach(nodeJSON => {
             onSelect({
@@ -172,6 +175,7 @@ export const NodeList: FC<NodeListProps> = props => {
             })
           })
         } else if (result) {
+          hasSelected = true
           // 处理返回单个节点的情况
           onSelect({
             nodeType: registry.type as string,
@@ -179,8 +183,16 @@ export const NodeList: FC<NodeListProps> = props => {
             nodeJSON: result,
           })
         }
+        if (!hasSelected) {
+          onClose?.()
+        }
       } catch (error) {
         console.error('添加节点时出错:', error)
+        onClose?.()
+      } finally {
+        if (isConnectionAdd) {
+          dragStateManager.endDrag()
+        }
       }
     } else {
       // 其他类型节点使用原来的同步处理
@@ -311,7 +323,6 @@ export const NodeList: FC<NodeListProps> = props => {
     return categorized
   }, [searchQuery, containerNode, t, getNodeTypeName])
 
-  console.log('>>> fromNode', fromPort?.node)
   return (
     <NodesContainer>
       {/* 搜索框 */}
