@@ -31,6 +31,7 @@ async def _background_deploy_and_save(
         await rtm.update_deploy_info(deploy_result_str, agent_version, agent_id, space_id)
         logger.info(f"Deployment completed in background: agent_id={agent_id}")
     except Exception as e:
+        await rtm.update_deploy_info("", agent_version, agent_id, space_id)
         logger.error(f"Background deployment failed: agent_id={agent_id}, error={e}")
 
 

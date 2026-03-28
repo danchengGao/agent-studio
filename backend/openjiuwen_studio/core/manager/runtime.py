@@ -241,9 +241,25 @@ async def update_deploy_info(
         agent_version: str,
         agent_id,
         space_id,
-) -> str:
-    deploy_result = json.loads(deploy_result_str)
-    deploy_url = deploy_result.get("url") or ""
+):
+    now_beijing = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
+    if deploy_result_str:
+        deploy_result = json.loads(deploy_result_str)
+        deploy_url = deploy_result.get("url") or ""
+        update_data = {
+            "deployment_id": deploy_result.get("deployment_id", ""),
+            "type": deploy_result.get("type", ""),
+            "name": deploy_result.get("name", ""),
+            "status": deploy_result.get("status", ""),
+            "url": deploy_url,
+            "port": _normalize_runtime_port(deploy_result.get("port"), deploy_url),
+            "update_at": now_beijing
+        }
+    else:
+        update_data = {
+            "status": "failed",
+            "update_at": now_beijing
+        }
 
     # 存到新deployment表里
     with get_db_jw() as db:
@@ -264,17 +280,6 @@ async def update_deploy_info(
             logger.warning(f"Deployment info not found for source_id={agent_id}")
             return status.HTTP_404_NOT_FOUND
 
-        now_beijing = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
-        update_data = {
-            "deployment_id": deploy_result.get("deployment_id", ""),
-            "type": deploy_result.get("type", ""),
-            "name": deploy_result.get("name", ""),
-            "status": deploy_result.get("status", ""),
-            "url": deploy_url,
-            "port": _normalize_runtime_port(deploy_result.get("port"), deploy_url),
-            "update_at": now_beijing
-        }
-
         # 注册到数据库
         save_result = runtime_db.update_dl_in_sql(
             find_id=find_id,
@@ -282,7 +287,6 @@ async def update_deploy_info(
         )
     if save_result.code != status.HTTP_200_OK:
         logger.error(f"Failed to update deploy runtime info: {save_result.message}")
-    return json.dumps(deploy_result)
 
 
 async def get_deploy_info(
