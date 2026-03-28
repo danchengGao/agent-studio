@@ -934,7 +934,7 @@
         "enableSourceTracerInfer": "启用溯源推理",
         "enableSourceTracerInferDesc": "生成溯源推理图谱",
         "userFeedbackProcessorEnable": "启用用户反馈优化",
-        "userFeedbackProcessorEnableDesc": "生成报告后支持基于用户反馈的 AI 优化",
+        "userFeedbackProcessorEnableDesc": "生成报告后支持基于用户反馈的 AI 优化，关闭则报告不可编辑",
         "chapterCount": "章节数量",
         "chapterCountDesc": "控制报告最大章节数量"
       },

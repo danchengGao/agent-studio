@@ -311,6 +311,7 @@ const AppsPage: React.FC = () => {
   }, [])
 
   // 从 localStorage 恢复智能体配置（按 spaceId 隔离）
+  // 加载时合并默认值，确保未保存的字段使用最新的默认值
   useEffect(() => {
     const spaceId = user?.spaceId
     if (!spaceId) return
@@ -318,7 +319,15 @@ const AppsPage: React.FC = () => {
     const configKey = STORAGE_KEYS.AGENT_CONFIGS(spaceId)
     const savedConfigs = storage.get<Record<string, DeepSearchConfig>>(configKey)
     if (savedConfigs) {
-      setAgentConfigs(savedConfigs)
+      // 合并默认值：用户保存的字段覆盖默认值，未保存的字段使用默认值
+      const mergedConfigs = Object.keys(savedConfigs).reduce((acc, agentId) => {
+        acc[agentId] = {
+          ...DEFAULT_DEEPSEARCH_CONFIG,  // 先用默认值打底
+          ...savedConfigs[agentId],       // 再用保存的值覆盖
+        }
+        return acc
+      }, {} as Record<string, DeepSearchConfig>)
+      setAgentConfigs(mergedConfigs)
     } else {
       // 如果没有保存的配置，使用空配置
       setAgentConfigs({})
@@ -358,12 +367,29 @@ const AppsPage: React.FC = () => {
   }, [messages, inputValue, hasConversation, selectedAgent])
 
   // 保存智能体配置到 localStorage（按 spaceId 隔离）
+  // 只保存与默认值不同的字段，避免保存非用户配置的默认值
   useEffect(() => {
     const spaceId = user?.spaceId
     if (!spaceId) return
 
     const configKey = STORAGE_KEYS.AGENT_CONFIGS(spaceId)
-    storage.set(configKey, agentConfigs)
+    // 过滤：只保留与默认值不同的字段
+    const filteredConfigs = Object.keys(agentConfigs).reduce((acc, agentId) => {
+      const config = agentConfigs[agentId]
+      const defaultConfig = DEFAULT_DEEPSEARCH_CONFIG
+      const diffConfig = Object.keys(config).reduce((configAcc, key) => {
+        const k = key as keyof DeepSearchConfig
+        if (config[k] !== defaultConfig[k]) {
+          configAcc[k] = config[k]
+        }
+        return configAcc
+      }, {} as Partial<DeepSearchConfig>)
+      if (Object.keys(diffConfig).length > 0) {
+        acc[agentId] = diffConfig
+      }
+      return acc
+    }, {} as Record<string, Partial<DeepSearchConfig>>)
+    storage.set(configKey, filteredConfigs)
   }, [agentConfigs, user?.spaceId])
 
   // 当模型列表加载完成后，设置默认选中第一个模型

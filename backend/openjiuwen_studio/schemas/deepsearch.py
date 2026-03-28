@@ -56,17 +56,9 @@ class DeepSearchRequest(BaseModel):
                                                                          description="执行方法："
                                                                                      "parallel: 并行工作流执行"
                                                                                      "dependency_driving: 依赖驱动工作流执行")
-    # 报告局部改写配置（可选）
-    user_feedback_processor_enable: Optional[bool] = Field(
-        default=False,
-        description="是否启用报告后局部优化"
-    )
-    user_feedback_processor_max_interactions: Optional[int] = Field(
-        default=3,
-        ge=1,
-        le=10,
-        description="最大交互轮次 (1-10)"
-    )
+    # 报告局部改写配置
+    user_feedback_processor_enable: Optional[bool] = Field(default=None, description="是否启用报告后局部优化")
+    user_feedback_processor_max_interactions: Optional[int] = Field(default=None, description="最大交互轮次")
 
 
 class TemplateImportRequest(BaseModel):
