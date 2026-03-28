@@ -153,6 +153,13 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             if component:
                 components.append(component)
 
+        components.sort(
+            key=lambda component: (
+                0 if component.type == dsl.ComponentType.COMPONENT_TYPE_START
+                else 1 if component.type == dsl.ComponentType.COMPONENT_TYPE_END
+                else 2
+            )
+        )
         return components
     except (TypeError, ValueError, AttributeError) as e:
         log_exception(e)

@@ -335,7 +335,7 @@ class Workflow:
             return branch_compiler.compile()
 
         elif comp.type == ComponentType.COMPONENT_TYPE_SUB_WORKFLOW:
-            return await self._create_exec_sub_workflow_component(context, comp.configs, loader)
+            return await self._create_exec_sub_workflow_component(context, comp.configs, loader, comp.id)
 
         elif comp.type == ComponentType.COMPONENT_TYPE_LOOP:
             return await self._create_loop_component(context, comp.configs, comp.outputs, loader)
@@ -417,14 +417,21 @@ class Workflow:
             self,
             context: Context,
             configs: Any,
-            loader: Optional[IWorkflowLoader]
+            loader: Optional[IWorkflowLoader],
+            comp_id: str,
     ) -> Any:
         sub_wf_info = ExecSubWfConfig.model_validate(configs).sub_workflow_info
         sub_id = sub_wf_info.id
         sub_version = sub_wf_info.version
         sub_workflow = await loader.get_compiled_workflow(Context(context),
                                                           sub_id, sub_version, self.space_id, self.current_user)
-        return SubWorkflowComponent(sub_workflow)
+        cache_stream = False
+        if self.need_stream_output_comp:
+            if comp_id in self.need_stream_output_comp.keys():
+                cache_stream = True
+                logger.info(f"sub workflow cache stream : comp_id: {comp_id}, cache_stream: {cache_stream}")
+
+        return SubWorkflowComponent(sub_workflow, cache_stream=cache_stream)
 
     async def _create_loop_component(
             self,
