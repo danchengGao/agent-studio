@@ -137,6 +137,25 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
     return ts
   }
 
+  // 添加一个新的函数，用于创建输出组件的独立消息
+  const appendOutputComponentMessage = (content: string, nodeId?: string, nodeName?: string) => {
+    const ts = Date.now()
+    const msg: ChatMessage = {
+      role: 'assistant',
+      content,
+      timestamp: ts,
+      kind: 'normal',
+      detailInfo: { 
+        streaming: false,
+        isOutputComponent: true,
+        nodeId,
+        nodeName
+      },
+    }
+    setChatHistory(prev => [...prev, msg])
+    return ts
+  }
+
   const normalizeStreamEvent = (
     raw: any,
   ): {
@@ -150,8 +169,10 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
 
     const event = raw as any
     const eventType = typeof event.type === 'string' ? event.type : undefined
+    console.log('[DEBUG] normalizeStreamEvent eventType:', eventType)
 
     const streamPayload = (event as any)._streamPayload
+    console.log('[DEBUG] normalizeStreamEvent streamPayload:', JSON.stringify(streamPayload))
     if (streamPayload) {
       const nodeIdRaw = streamPayload?.node_id ?? streamPayload?.nodeId
       const nodeId = nodeIdRaw != null && String(nodeIdRaw).trim() ? String(nodeIdRaw) : undefined
@@ -159,8 +180,14 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
       const nodeName = nodeNameRaw != null && String(nodeNameRaw).trim() ? String(nodeNameRaw) : undefined
       const index = typeof streamPayload?.index === 'number' ? streamPayload.index : undefined
       const text = extractTextFromOutput(streamPayload?.output ?? streamPayload?.answer ?? streamPayload?.output_text)
+      console.log('[DEBUG] normalizeStreamEvent text:', text)
       if (!text) return null
-      return { text, type: eventType || 'workflow', nodeId, nodeName, index }
+      // 检查是否为输出组件，如果是，使用特殊的 type
+      const componentType = streamPayload?.component_type
+      console.log('[DEBUG] normalizeStreamEvent componentType:', componentType)
+      const finalType = componentType === 'output' ? 'output' : (eventType || 'workflow')
+      console.log('[DEBUG] normalizeStreamEvent finalType:', finalType)
+      return { text, type: finalType, nodeId, nodeName, index }
     }
 
     const outputText = event.output_text
@@ -323,6 +350,7 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
   }
 
   const handleStreamEvent = (event: any) => {
+    console.log('[DEBUG] handleStreamEvent event:', JSON.stringify(event))
     const rawData = event && typeof event === 'object' && 'data' in event && (event as any).data ? (event as any).data : event
     const payloadFromTyped = rawData && typeof rawData === 'object' && (rawData as any).type === 'interaction' ? (rawData as any).payload : null
     const interactionPayload = payloadFromTyped || (rawData && typeof rawData === 'object' && 'interaction_node' in rawData ? rawData : null)
@@ -338,15 +366,24 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
       return { error: true }
     }
     const normalized = normalizeStreamEvent(rawData)
+    console.log('[DEBUG] normalized:', JSON.stringify(normalized))
     if (!normalized) return {}
     const ignoreTokens = ['tool_call']
     if (normalized.text && !ignoreTokens.some(t => normalized.text.includes(t))) {
-      updateAssistantStreamingContent(streamingMsgTsRef.current, normalized.text, {
-        type: normalized.type,
-        nodeId: normalized.nodeId,
-        nodeName: normalized.nodeName,
-        index: normalized.index,
-      })
+      // 如果是输出组件的内容，单独创建一个消息气泡
+      console.log('[DEBUG] Checking normalized.type:', normalized.type)
+      if (normalized.type === 'output') {
+        console.log('[DEBUG] Creating output component message:', normalized.text)
+        appendOutputComponentMessage(normalized.text, normalized.nodeId, normalized.nodeName)
+      } else {
+        console.log('[DEBUG] Updating streaming content:', normalized.text)
+        updateAssistantStreamingContent(streamingMsgTsRef.current, normalized.text, {
+          type: normalized.type,
+          nodeId: normalized.nodeId,
+          nodeName: normalized.nodeName,
+          index: normalized.index,
+        })
+      }
     }
     return {}
   }
@@ -928,10 +965,12 @@ const ChatMessageItem = memo(
     agentName?: string
   }) => {
     const { t } = useScopedTranslation('agents.agentEditor.previewDebug.agentDebugChat')
+    // 检查是否为输出组件的消息，如果是则不显示 AI 头像和名称
+    const isOutputComponent = message.detailInfo?.isOutputComponent
     return (
       <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
         <div className={`${message.kind === 'interaction' ? 'w-[85%]' : 'max-w-[85%]'} min-w-0 ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-          {message.role === 'assistant' && (
+          {message.role === 'assistant' && !isOutputComponent && (
             <div className="flex items-center space-x-2 mb-2">
               <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">AI</span>

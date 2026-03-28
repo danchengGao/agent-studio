@@ -91,12 +91,25 @@ export function NormalMessage({ message }: { message: ChatMessage }) {
     return <MessageContent message={message} />
   }
 
+  // 检查是否为输出组件的消息
+  const isOutputComponent = message.detailInfo?.isOutputComponent
+
   return (
     <div
       className={`p-3 rounded-xl shadow-sm overflow-x-hidden ${
-        message.role === 'user' ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
+        message.role === 'user' 
+          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white' 
+          : 'bg-white border border-gray-200 text-gray-800'
       }`}
     >
+      {isOutputComponent && (
+        <div className="text-xs text-gray-400 mb-1 flex items-center gap-1 select-none">
+          <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-medium scale-90 origin-left">输出</span>
+          {message.detailInfo?.nodeName && (
+            <span className="font-mono text-gray-400 scale-90 origin-left">#{message.detailInfo.nodeName}</span>
+          )}
+        </div>
+      )}
       <MessageContent message={message} />
     </div>
   )

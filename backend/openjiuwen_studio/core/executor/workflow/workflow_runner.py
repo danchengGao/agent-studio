@@ -172,7 +172,7 @@ async def _fetch_workflow_dl(
             code=StatusCode.WORKFLOW_DL_FETCH_FAILED.code,
             message=StatusCode.WORKFLOW_DL_FETCH_FAILED.errmsg.format(msg=str("fetch workflow failed"))
         )
-    logger.info(f"fetch workflow dl: {workflow_dl.model_dump_json()}")
+    logger.info(f"Successfully fetched workflow dl for workflow_id={workflow_id}, version={version}")
     return workflow_dl
 
 

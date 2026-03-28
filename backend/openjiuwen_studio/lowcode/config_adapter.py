@@ -208,9 +208,12 @@ class ConfigAdapter:
         workflow_cards = []
         for wf in workflows:
             if isinstance(wf, dict):
+                version = wf.get("workflow_version", wf.get("version", "draft"))
+                workflow_id = wf.get("workflow_id", wf.get("id", ""))
+                
                 workflow_card = WorkflowCard(
-                    id=wf.get("workflow_id", wf.get("id", "")),
-                    version=wf.get("workflow_version", wf.get("version", "draft")),
+                    id=workflow_id,
+                    version=version,
                     name=wf.get("workflow_name", wf.get("name", "")),
                     description=wf.get("description", ""),
                     input_params=wf.get("input_params", {}),

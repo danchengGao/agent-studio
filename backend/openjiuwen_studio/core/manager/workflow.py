@@ -464,7 +464,6 @@ def workflow_convert(
 
     canvas_result = workflow_repository.workflow_canvas(req)
     logger.debug(f"get workflow info from db result: {canvas_result}")
-    logger.info(f"Retrieved workflow canvas: {req.workflow_id}")
     if canvas_result.code != status.HTTP_200_OK:
         return ResponseModel(
             code=canvas_result.code,
@@ -473,7 +472,6 @@ def workflow_convert(
 
     workflow = convert.workflow_convert(WorkflowBase(**canvas_result.data), skip_validation=skip_validation)
     logger.debug(f"workflow info convert dl: {workflow}")
-    logger.info(f"Converted workflow to data list format: {req.workflow_id}")
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="convert workflow success",
