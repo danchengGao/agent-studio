@@ -153,6 +153,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '', onReportRewri
       return (
         <ReportPanel
           report={report}
+          reportMessageId={selectedResultMessageId || undefined}
           className={className}
           conversationId={currentConversationId || undefined}
           onReportRewrite={onReportRewrite}

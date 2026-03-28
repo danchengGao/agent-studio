@@ -25,6 +25,8 @@ export interface ReportContentToolbarProps {
   onEnterEdit?: () => void
   /** 退出编辑模式 */
   onExitEdit?: () => void
+  /** 是否为最终报告（子报告不能编辑） */
+  isFinalReport?: boolean
 }
 
 /**
@@ -35,6 +37,7 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
   isEditing = false,
   onEnterEdit,
   onExitEdit,
+  isFinalReport = true,
 }) => {
   const { t } = useTranslation()
   const clipboard = useClipboard()
@@ -99,8 +102,8 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
         />
       </Root>
 
-      {/* 编辑按钮 */}
-      {onEnterEdit && onExitEdit && (
+      {/* 编辑按钮 - 只有最终报告才显示 */}
+      {onEnterEdit && onExitEdit && isFinalReport && (
         <button
           onClick={handleEditClick}
           className="w-[88px] h-8 flex items-center justify-center gap-1.5 rounded-[4px] text-white text-sm font-medium transition-all duration-200 hover:opacity-90"
