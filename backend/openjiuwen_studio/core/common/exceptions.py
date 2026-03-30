@@ -31,8 +31,10 @@ class BaseError(FrameworkBaseError):
 
 
 class JiuWenComponentException(BaseError):
-    def __init__(self, code: int, message: str, component_id: str, component_type: int,
-                 error_stage: str = "convert") -> None:
+    def __init__(self, code: int = None, message: str = None, component_id: str = "",
+                 component_type: int = 0, error_stage: str = "convert", **kwargs) -> None:
+        if code is None and 'msg' in kwargs:
+            message = kwargs.pop('msg', message)
         super().__init__(code=code, message=message)
         self._component_id = component_id
         self._component_type = component_type
@@ -55,7 +57,7 @@ class ErrorNodeInfo(BaseModel):
     node_id: str = Field(default="")
     connection: Connection = Field(default_factory=Connection)
     error_message: str = Field(default="")
-    error_code: int = Field(default=int)
+    error_code: int = Field(default=0)
 
 
 class WorkflowErrorData(BaseModel):
@@ -72,7 +74,12 @@ class WorkflowFailedResponse(BaseModel):
 class JiuWenExecuteException(BaseError):
     """workflow图异常"""
 
-    def __init__(self, code: int, message: str, workflow_id="", node_id="", connection=None):
+    def __init__(self, code: int = None, message: str = None, workflow_id="", node_id="",
+                 connection=None, **kwargs):
+        # Accept **kwargs for compatibility with framework BaseError._reconstruct
+        # which passes msg=, details=, cause= etc.
+        if code is None and 'msg' in kwargs:
+            message = kwargs.pop('msg', message)
         super().__init__(code=code, message=message)
         self._workflow_id = workflow_id
         self._node_id = node_id

@@ -29,7 +29,7 @@ export function MethodSelector() {
   ]
 
   return (
-    <Field<{ type: string; content: string }> name="inputs.inputParameters.method">
+    <Field<{ type: string; content: string }> name="inputs.method">
       {({ field }) => {
         const currentMethod = field.value?.content || 'GET'
 

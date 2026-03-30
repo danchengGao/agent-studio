@@ -3,35 +3,32 @@
  * SPDX-License-Identifier: MIT
  */
 
+import { Field } from '@flowgram.ai/free-layout-editor'
+
+import { useIsSidebar } from '../../../hooks'
 import { FormItem } from '../../../form-components'
-import { InjectDynamicValueInput } from '../../../form-materials'
-import { t } from '../../../i18n'
+import { DynamicValueInput, IFlowConstantRefValue } from '../../../form-materials'
+import { useTranslation } from '../../../i18n'
 
-export const UrlConfig = () => {
+export function UrlConfig() {
+  const isSidebar = useIsSidebar()
+  const { t } = useTranslation()
+
+  if (!isSidebar) {
+    return null
+  }
+
   return (
-    <>
-      <FormItem name={t('workflowCanvas.nodes.httpRequest.url.label')}>
-        <InjectDynamicValueInput
-          path="inputs.httpRequestParam.url"
-          placeholder="https://api.example.com/endpoint"
-        />
-      </FormItem>
-
-      <FormItem name={t('workflowCanvas.nodes.httpRequest.method.label')}>
-        <InjectDynamicValueInput
-          path="inputs.httpRequestParam.method"
-          type="select"
-          options={[
-            { label: 'GET', value: 'GET' },
-            { label: 'POST', value: 'POST' },
-            { label: 'PUT', value: 'PUT' },
-            { label: 'DELETE', value: 'DELETE' },
-            { label: 'PATCH', value: 'PATCH' },
-            { label: 'HEAD', value: 'HEAD' },
-            { label: 'OPTIONS', value: 'OPTIONS' },
-          ]}
-        />
-      </FormItem>
-    </>
+    <Field<IFlowConstantRefValue> name="inputs.inputParameters.url">
+      {({ field }) => (
+        <FormItem name={t('workflowCanvas.nodes.httpRequest.url.label') || 'URL'}>
+          <DynamicValueInput
+            value={field.value}
+            onChange={(val) => field.onChange(val as IFlowConstantRefValue)}
+            schema={{ type: 'string' }}
+          />
+        </FormItem>
+      )}
+    </Field>
   )
 }

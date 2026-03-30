@@ -4,3 +4,8 @@
  */
 
 export { MethodSelector } from './method-selector'
+export { UrlConfig } from './url-config'
+export { HeadersConfig } from './headers-config'
+export { QueryParamsConfig } from './query-params-config'
+export { BodyConfig } from './body-config'
+export { AuthConfig } from './auth-config'

@@ -13,20 +13,28 @@ import {
 } from '../../form-materials'
 import { FormHeader, FormContent, FormInput, FormOutput } from '../../form-components'
 import { HttpRequestNodeData } from './types'
-import { MethodSelector } from './components'
+import { MethodSelector, UrlConfig, HeadersConfig, QueryParamsConfig, BodyConfig, AuthConfig } from './components'
+import { useIsSidebar } from '../../hooks'
 
 export const FormRender = () => {
+  const isSidebar = useIsSidebar()
+
   return (
     <>
       <FormHeader />
       <FormContent>
-        <MethodSelector />
-        <FormInput
-          showAddButton={false}
-          deleteable={false}
-          nameEditable={false}
-          useFieldSchema={true}
-        />
+        {isSidebar ? (
+          <>
+            <MethodSelector />
+            <UrlConfig />
+            <HeadersConfig />
+            <QueryParamsConfig />
+            <BodyConfig />
+            <AuthConfig />
+          </>
+        ) : (
+          <FormInput showAddButton={false} deleteable={false} nameEditable={false} />
+        )}
         <FormOutput showAddButton={false} readonly={true} />
       </FormContent>
     </>
@@ -36,24 +44,11 @@ export const FormRender = () => {
 export const formMeta: FormMeta<HttpRequestNodeData> = {
   render: () => <FormRender />,
   validateTrigger: ValidateTrigger.onChange,
-  validate: async () => ({ errors: [], warnings: [] }),
+  validate: {},
   plugins: [],
   effect: {
     title: syncVariableTitle,
     outputs: provideJsonSchemaOutputs,
     'inputs.inputParameters.*': [...autoRenameRefEffect, ...validateWhenVariableSync({ scope: 'public' })],
-    // Conditionally show/hide body field based on method
-    'inputs.method.content': [
-      (value, { setFieldState }) => {
-        const methodValue = value as string
-        const shouldShowBody = ['POST', 'PUT', 'PATCH'].includes(methodValue)
-
-        setFieldState('inputs.inputParameters.body', (state) => ({
-          ...state,
-          hidden: !shouldShowBody,
-          disabled: !shouldShowBody,
-        }))
-      },
-    ],
   },
 }

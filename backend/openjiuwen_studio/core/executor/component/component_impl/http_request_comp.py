@@ -2,6 +2,9 @@
 # coding: utf-8
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved
 
+import json
+import re
+import traceback
 from typing import Any, Callable, Dict, List, Union
 
 from openjiuwen.core.workflow import BranchRouter, WorkflowComponent, Input, Output
@@ -86,14 +89,22 @@ class HttpRequestComponent(WorkflowComponent):
             # Validate URL before making request
             logger.info(
                 f"HTTP Request Component - URL: {core_config.request_params.url}, "
-                f"Method: {core_config.request_params.method}"
+                f"Method: {core_config.request_params.method}, "
+                f"Query: {core_config.request_params.query_parameters}, "
+                f"Headers: {core_config.request_params.headers}"
             )
             if not core_config.request_params.url or not isinstance(core_config.request_params.url, str):
                 raise ValueError(f"Invalid URL: {core_config.request_params.url}")
 
+            # Filter out body from inputs for methods that don't support it
+            # to prevent agent-core from treating raw body string as HttpRequestBodyConfig
+            core_inputs = dict(inputs)
+            if core_config.request_params.method.upper() not in ('POST', 'PUT', 'PATCH'):
+                core_inputs.pop('body', None)
+
             # Create and invoke agent-core's HTTPRequestComponent
             core_component = CoreHTTPRequestComponent(core_config)
-            response = await core_component.to_executable().invoke(inputs, session, context)
+            response = await core_component.to_executable().invoke(core_inputs, session, context)
 
             # Process successful response
             final_result = self._process_response(response)
@@ -107,6 +118,10 @@ class HttpRequestComponent(WorkflowComponent):
             return final_result
         except Exception as e:
             # Handle all other exceptions based on exception_config
+            logger.error(
+                f"HTTP Request Component [{self.node_id}] error: "
+                f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             error_msg = str(e) if str(e) else "HTTP request failed"
             error_body = ErrorBody(error_message=error_msg, error_code=1)
             final_result = self._process_error(error_body, exception_config)
@@ -114,7 +129,7 @@ class HttpRequestComponent(WorkflowComponent):
 
     def _convert_to_core_config(self, inputs: Input) -> CoreHttpComponentConfig:
         """Convert studio HttpRequestConfig to agent-core HttpComponentConfig"""
-        from openjiuwen.core.workflow.components.http.http_request_component import (
+        from openjiuwen.core.workflow.components.tool.http.http_request_component import (
             HttpAuthConfig,
             HttpRequestBodyConfig,
             HttpRetryConfig,
@@ -124,26 +139,33 @@ class HttpRequestComponent(WorkflowComponent):
             HttpContentType
         )
 
-        method = inputs["method"]
+        # Method comes from configs (self.conf), not from inputs
+        method = self.conf.method.value if hasattr(self.conf.method, 'value') else str(self.conf.method)
 
-        url = inputs["url"]
-        # url = self._replace_variables(self.conf.url, inputs)
+        url = inputs.get("url", self.conf.url)
 
-        # Convert headers
-        headers = inputs["headers"]
-        # headers =  {}
-        # for header in self.conf.headers:
-        #     key = header.key
-        #     value = self._replace_variables(str(header.value), inputs)
-        #     headers[key] = value
+        # Convert headers: merge static config with runtime inputs
+        headers = inputs.get("headers", {})
+        if not isinstance(headers, dict):
+            headers = {}
+        # Add static headers from config (UI sidebar key-value pairs)
+        for h in self.conf.headers:
+            if h.key and h.key not in headers:
+                headers[h.key] = str(h.value) if h.value is not None else ""
 
-        # Convert query params
-        query_params = inputs["query"]
+        # Convert query params: merge static config with runtime inputs
+        query_params = inputs.get("query", {})
+        if not isinstance(query_params, dict):
+            query_params = {}
+        # Add static query params from config (UI sidebar key-value pairs)
+        for q in self.conf.query_params:
+            if q.key and q.key not in query_params:
+                query_params[q.key] = str(q.value) if q.value is not None else ""
  
-        # Convert body
+        # Convert body (only for methods that support a body)
         body_config = None
-        body_content = inputs["body"]
-        if body_content is not None:
+        body_content = inputs.get("body")
+        if body_content and body_content != {} and method.upper() in ('POST', 'PUT', 'PATCH'):
             body_config = HttpRequestBodyConfig(
                 content_type=HttpContentType.JSON,
                 json_data=self.parse_body_content(body_content)
@@ -151,22 +173,22 @@ class HttpRequestComponent(WorkflowComponent):
 
         # Convert auth config
         auth_config = HttpAuthConfig(
-            auth_type=self.conf.auth.auth_type,
+            type=self.conf.auth.auth_type,
             username=self.conf.auth.username,
             password=self.conf.auth.password,
             token=self.conf.auth.token,
             api_key=self.conf.auth.api_key,
-            api_key_location=self.conf.auth.api_key_location,
-            api_key_param_name=self.conf.auth.api_key_param_name,
+            in_location=self.conf.auth.api_key_location or "header",
+            name=self.conf.auth.api_key_param_name or "Authorization",
         )
 
         # Convert response handling
         response_handling = HttpResponseHandlingConfig(
             response_format=self.conf.response_handling.response_format,
-            success_status_codes=self.conf.response_handling.success_status_codes,
-            failure_status_codes=self.conf.response_handling.failure_status_codes,
+            response_code_success_codes=self.conf.response_handling.success_status_codes,
+            response_code_failure_codes=self.conf.response_handling.failure_status_codes,
             response_mode=self.conf.response_handling.response_mode,
-            data_property=self.conf.response_handling.data_property,
+            response_data_property=self.conf.response_handling.data_property,
         )
 
         # Convert retry config
@@ -174,7 +196,7 @@ class HttpRequestComponent(WorkflowComponent):
             enabled=self.conf.retry.enabled,
             max_retries=self.conf.retry.max_retries,
             retry_on_status_codes=self.conf.retry.retry_on_status_codes,
-            retry_delay_ms=self.conf.retry.retry_delay_ms,
+            retry_delay=self.conf.retry.retry_delay_ms,
             backoff_type=self.conf.retry.backoff_type,
         )
 
@@ -187,9 +209,9 @@ class HttpRequestComponent(WorkflowComponent):
 
         # Convert advanced options
         advanced_options = HttpAdvancedOptionsConfig(
-            follow_redirects=self.conf.advanced.follow_redirects,
+            follow_redirect=self.conf.advanced.follow_redirects,
             ignore_ssl_issues=self.conf.advanced.ignore_ssl_issues,
-            proxy_url=self.conf.advanced.proxy_url,
+            proxy=self.conf.advanced.proxy_url,
             timeout=self.conf.advanced.timeout,
         )
 
@@ -199,7 +221,7 @@ class HttpRequestComponent(WorkflowComponent):
                 url=url,
                 method=method,
                 headers=headers,
-                query_params=query_params,
+                query_parameters=query_params,
                 body=body_config,
                 authentication=auth_config,
                 response_handling=response_handling,
@@ -214,22 +236,19 @@ class HttpRequestComponent(WorkflowComponent):
             # advanced=advanced_options,
         )
 
-    def parse_body_content(self, body_content):
+    @staticmethod
+    def parse_body_content(body_content):
         '''Parse body content, if it's a JSON string, convert to dict, otherwise return as is'''
         if isinstance(body_content, str):
-            import json
-
             try:
                 body_content = json.loads(body_content)
             except json.JSONDecodeError:
-                # Not a JSON string, keep as is
                 pass
         return body_content
 
-    def _replace_variables(self, text: str, inputs: Input) -> str:
+    @staticmethod
+    def _replace_variables(text: str, inputs: Input) -> str:
         """Replace {{variable}} placeholders with values from inputs"""
-        import re
-
         if not isinstance(text, str):
             return text
 
@@ -237,17 +256,15 @@ class HttpRequestComponent(WorkflowComponent):
         pattern = r'\$\{(?:[^}.]+\.)?([^}.]+)\}'
         matches = re.findall(pattern, text)
 
-        for var_name in matches:
-            var_name = var_name.strip()
-            # Get value from inputs
-            value = inputs.get(var_name, f"{{{{{var_name}}}}}")
-            # Replace placeholder with value
+        for match in matches:
+            name = match.strip()
+            value = inputs.get(name, f"{{{{{name}}}}}")
             text = value if isinstance(value, str) else str(value)
-            # text = text.replace(f"{{{{{var_name}}}}}", str(value))
 
         return text
 
-    def _process_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _process_response(response: Dict[str, Any]) -> Dict[str, Any]:
         """Process successful response"""
         # The response from agent-core HTTPRequestComponent has the format:
         # {
