@@ -15,7 +15,7 @@ import {
 import { validation } from './validation'
 import { FormContent, FormHeader, FormInput, FormModel, FormPrompt } from '../../form-components'
 import { FormData } from './type'
-import { LLMFormOutput } from '../llm/llm-form-output'
+import { ReactAgentFormOutput } from './react-agent-form-output'
 import { ReactAgentFormIterations } from './react-agent-form-iterations'
 import { ReactAgentFormSkills } from './react-agent-form-skills'
 import { IsSidebarContext } from '../../context'
@@ -36,7 +36,7 @@ export const renderForm = () => {
             <ReactAgentFormSkills />
           </>
         )}
-        <LLMFormOutput />
+        <ReactAgentFormOutput />
       </FormContent>
     </>
   )
