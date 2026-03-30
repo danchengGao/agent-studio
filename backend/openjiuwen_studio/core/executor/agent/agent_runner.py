@@ -713,4 +713,5 @@ class AgentRunner:
 
 # 全局Agent管理器实例
 # 作为单例使用，负责整个系统的Agent执行管理
-agent_mgr = AgentRunner(WorkflowRunner(), PluginManager())
+plugin_manager = PluginManager()
+agent_mgr = AgentRunner(WorkflowRunner(plugin_manager), plugin_manager)

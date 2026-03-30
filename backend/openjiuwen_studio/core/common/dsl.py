@@ -212,8 +212,8 @@ class ReactAgentConfig(BaseModel):
     max_iterations: int = Field(default=5)
     mem_scope_id: Optional[str] = Field(default=None)
     sys_operation_id: Optional[str] = Field(default=None)
-    selected_plugins: List[str] = Field(default_factory=list)
-    selected_workflows: List[str] = Field(default_factory=list)
+    selected_plugins: List[PluginSchema] = Field(default_factory=list)
+    selected_workflows: List[WorkflowSchema] = Field(default_factory=list)
     max_context_message_num: Optional[int] = Field(default=None)
     default_window_round_num: Optional[int] = Field(default=None)
 

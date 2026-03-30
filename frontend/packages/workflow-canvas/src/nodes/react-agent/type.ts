@@ -7,6 +7,8 @@ import { JsonSchema } from '../../types'
 
 export interface SkillItem {
   id: string
+  plugin_id?: string  // For plugins: the actual plugin ID
+  version?: string    // Version for both plugins and workflows
   name: string
   type: 'plugin' | 'workflow'
 }

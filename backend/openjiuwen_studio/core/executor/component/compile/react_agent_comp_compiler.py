@@ -2,13 +2,20 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 
-from typing import Any, Dict
-from openjiuwen.core.workflow.components.llm.react import ReActAgentComp, ReActAgentCompConfig
+from typing import Any, Dict, Optional, List, TYPE_CHECKING
+from openjiuwen.core.workflow.components.llm.react import ReActAgentCompConfig
 from openjiuwen.core.foundation.llm import ModelRequestConfig, ModelClientConfig, SystemMessage, UserMessage
 from openjiuwen.core.context_engine import ContextEngineConfig
+from openjiuwen.core.runner import Runner
+from openjiuwen.core.common.logging import logger
 
-from openjiuwen_studio.core.common.dsl import ReactAgentConfig as ReactAgentConfigDL
+from openjiuwen_studio.core.common.dsl import ReactAgentConfig as ReactAgentConfigDL, PluginSchema, WorkflowSchema
 from openjiuwen_studio.core.executor.component.compile.base_comp_compiler import BaseCompCompiler
+from openjiuwen_studio.core.executor.component.component_impl.react_agent_comp import ReActAgentCompWithTools
+
+if TYPE_CHECKING:
+    from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
+    from openjiuwen_studio.core.executor.workflow.workflow_runner import WorkflowRunner
 
 client_provider_mapping = {
     'siliconflow': "SiliconFlow",
@@ -79,17 +86,180 @@ def parse_template_content(template_content: list) -> tuple[SystemMessage, UserM
 
 
 class ReactAgentCompCompiler(BaseCompCompiler):
-    def __init__(self, react_agent_config_dict: Dict[str, Any]) -> None:
+    def __init__(
+        self, 
+        react_agent_config_dict: Dict[str, Any],
+        plugin_mgr: Optional["PluginManager"] = None,
+        workflow_mgr: Optional["WorkflowRunner"] = None,
+        space_id: Optional[str] = None,
+        current_user: Optional[Dict[str, Any]] = None
+    ) -> None:
         super().__init__()
         self.config_dict = react_agent_config_dict
         self.config = ReactAgentConfigDL.model_validate(react_agent_config_dict)
+        self.plugin_mgr = plugin_mgr
+        self.workflow_mgr = workflow_mgr
+        self.space_id = space_id
+        self.current_user = current_user
 
-    def compile(self) -> ReActAgentComp:
+    async def _compile_plugin_tools(self) -> List[Any]:
         """
-        Compile the React Agent component configuration into a ReActAgentComp instance
+        Compile selected plugins to Tool instances
         Returns:
-            ReActAgentComp: The compiled React Agent workflow component
+            List of compiled Tool instances
         """
+        plugin_count = len(self.config.selected_plugins) if self.config.selected_plugins else 0
+        logger.debug(
+            f"_compile_plugin_tools called: plugin_mgr={self.plugin_mgr is not None}, "
+            f"selected_plugins={plugin_count}"
+        )
+        if not self.plugin_mgr or not self.config.selected_plugins:
+            logger.debug(
+                f"_compile_plugin_tools skipping: plugin_mgr={self.plugin_mgr is not None}, "
+                f"has_plugins={bool(self.config.selected_plugins)}"
+            )
+            return []
+
+        compiled_tools = []
+        for plugin_schema in self.config.selected_plugins:
+            try:
+                logger.debug(
+                    f"Attempting to compile plugin: id={plugin_schema.id}, "
+                    f"plugin_id={plugin_schema.plugin_id}, version={plugin_schema.version}"
+                )
+                # Get the compiled tool from plugin manager
+                compiled_tool = await self.plugin_mgr.get_compiled_tool(
+                    plugin_id=plugin_schema.plugin_id,
+                    tool_id=plugin_schema.id,
+                    space_id=self.space_id,
+                    version=plugin_schema.version,
+                    current_user=self.current_user
+                )
+                compiled_tools.append(compiled_tool)
+                tool_name = compiled_tool.card.name if hasattr(compiled_tool, 'card') else 'unknown'
+                logger.debug(f"Compiled tool: {tool_name}")
+            except Exception as e:
+                logger.error(f"Failed to compile plugin tool {plugin_schema.id}: {e}", exc_info=True)
+
+        return compiled_tools
+
+    async def _register_plugins(self) -> List[str]:
+        """
+        Register selected plugins with Runner.resource_mgr
+        Returns:
+            List of registered tool IDs
+        """
+        plugin_count = len(self.config.selected_plugins) if self.config.selected_plugins else 0
+        logger.debug(
+            f"_register_plugins called: plugin_mgr={self.plugin_mgr is not None}, "
+            f"selected_plugins={plugin_count}"
+        )
+        if not self.plugin_mgr or not self.config.selected_plugins:
+            logger.debug(
+                f"_register_plugins skipping: plugin_mgr={self.plugin_mgr is not None}, "
+                f"has_plugins={bool(self.config.selected_plugins)}"
+            )
+            return []
+
+        registered_tool_ids = []
+        for plugin_schema in self.config.selected_plugins:
+            try:
+                logger.debug(
+                    f"Attempting to register plugin: id={plugin_schema.id}, "
+                    f"plugin_id={plugin_schema.plugin_id}, version={plugin_schema.version}"
+                )
+                # Get the compiled tool from plugin manager
+                compiled_tool = await self.plugin_mgr.get_compiled_tool(
+                    plugin_id=plugin_schema.plugin_id,
+                    tool_id=plugin_schema.id,
+                    space_id=self.space_id,
+                    version=plugin_schema.version,
+                    current_user=self.current_user
+                )
+
+                # Register with Runner.resource_mgr
+                tool_id = plugin_schema.id
+                Runner.resource_mgr.add_tool(compiled_tool)
+                registered_tool_ids.append(tool_id)
+                logger.debug(f"Registered tool: {tool_id}")
+            except Exception as e:
+                logger.error(f"Failed to register plugin tool {plugin_schema.id}: {e}", exc_info=True)
+
+        return registered_tool_ids
+
+    async def _register_workflows(self) -> List[str]:
+        """
+        Register selected workflows with Runner.resource_mgr
+        Returns:
+            List of registered workflow IDs
+        """
+        if not self.workflow_mgr or not self.config.selected_workflows:
+            return []
+
+        registered_workflow_ids = []
+        for workflow_schema in self.config.selected_workflows:
+            try:
+                # Get the compiled workflow
+                workflow = await self.workflow_mgr.get_compiled_workflow(
+                    id=workflow_schema.id,
+                    version=workflow_schema.version,
+                    space_id=self.space_id,
+                    current_user=self.current_user
+                )
+
+                # Register with Runner.resource_mgr
+                Runner.resource_mgr.add_workflow(workflow)
+                registered_workflow_ids.append(workflow_schema.id)
+                logger.debug(f"Registered workflow: {workflow_schema.id}")
+            except Exception as e:
+                logger.error(f"Failed to register workflow {workflow_schema.id}: {e}")
+
+        return registered_workflow_ids
+
+    async def compile(self) -> ReActAgentCompWithTools:
+        """
+        Compile the React Agent component configuration into a ReActAgentCompWithTools instance
+        Returns:
+            ReActAgentCompWithTools: The compiled React Agent workflow component with tools
+        """
+        # Log compilation start with diagnostic info
+        logger.debug(f"ReActAgentCompCompiler.compile() called")
+        logger.debug(f"  plugin_mgr: {self.plugin_mgr}")
+        logger.debug(f"  workflow_mgr: {self.workflow_mgr}")
+        logger.debug(f"  space_id: {self.space_id}")
+        
+        plugin_count = len(self.config.selected_plugins) if self.config.selected_plugins else 0
+        workflow_count = len(self.config.selected_workflows) if self.config.selected_workflows else 0
+        logger.debug(f"  selected_plugins count: {plugin_count}")
+        logger.debug(f"  selected_workflows count: {workflow_count}")
+        
+        if self.config.selected_plugins:
+            for p in self.config.selected_plugins:
+                logger.debug(
+                    f"    Plugin: id={p.id}, plugin_id={p.plugin_id}, version={p.version}"
+                )
+        if self.config.selected_workflows:
+            for w in self.config.selected_workflows:
+                logger.debug(
+                    f"    Workflow: id={w.id}, version={w.version}"
+                )
+
+        # Compile plugin tools
+        compiled_tools = await self._compile_plugin_tools()
+        registered_workflow_ids = await self._register_workflows()
+
+        # Log compiled tools
+        workflow_count_log = len(registered_workflow_ids) if registered_workflow_ids else 0
+        logger.debug(
+            f"ReAct Agent Component: compiled {len(compiled_tools)} tools, "
+            f"registered {workflow_count_log} workflows"
+        )
+        if compiled_tools:
+            tool_names = [t.card.name for t in compiled_tools]
+            logger.debug(f"  Tool names: {tool_names}")
+        if registered_workflow_ids:
+            logger.debug(f"  Registered workflow IDs: {registered_workflow_ids}")
+
         # Parse model configuration
         model_request_config, model_client_config, model_id = parse_model_config(self.config_dict)
 
@@ -114,9 +284,10 @@ class ReactAgentCompCompiler(BaseCompCompiler):
             max_iterations=self.config.max_iterations,
             model_client_config=model_client_config,
             model_config_obj=model_request_config,
-            sys_operation_id=self.config.sys_operation_id,
+            sys_operation_id=None,  # Not needed for plugin tools
             context_engine_config=context_engine_config,
         )
 
-        # Create and return the ReActAgentComp component
-        return ReActAgentComp(react_agent_workflow_config)
+        # Create and return the ReActAgentCompWithTools component with compiled tools
+        logger.debug(f"Creating ReActAgentCompWithTools with {len(compiled_tools)} tools")
+        return ReActAgentCompWithTools(react_agent_workflow_config, compiled_tools)

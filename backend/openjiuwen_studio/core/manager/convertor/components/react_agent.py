@@ -100,20 +100,62 @@ def react_agent_convert(node: Node, space_id: str) -> dsl.Component:
         max_iterations = getattr(data, 'max_iterations', 5)
 
         # Extract skills (plugins and workflows)
+        # Frontend sends skillsParam (camelCase), but we also check skills_param (snake_case) for compatibility
+        # skills_param is now a Dict, so we access it like a dictionary, not with getattr
         skills_param = getattr(inputs, 'skills_param', None)
+        if skills_param is None:
+            # Try accessing as dictionary if inputs.skills_param didn't work
+            skills_param_dict = inputs.__dict__.get('skills_param') if hasattr(inputs, '__dict__') else None
+            if skills_param_dict is None:
+                # Last resort: check if inputs is a dict itself
+                skills_param_dict = inputs.get('skills_param') if isinstance(inputs, dict) else None
+            skills_param = skills_param_dict
+        
+        # Also check camelCase version
+        if skills_param is None:
+            skills_param = getattr(inputs, 'skillsParam', None)
+        if skills_param is None:
+            skills_param_dict = inputs.__dict__.get('skillsParam') if hasattr(inputs, '__dict__') else None
+            if skills_param_dict is None:
+                skills_param_dict = inputs.get('skillsParam') if isinstance(inputs, dict) else None
+            skills_param = skills_param_dict
+        
         selected_plugins = []
         selected_workflows = []
 
         if skills_param:
-            # Extract plugin IDs
-            plugins = getattr(skills_param, 'plugins', [])
+            # skills_param is a Dict, so access plugins/workflows as dictionary keys
+            plugins = skills_param.get('plugins', [])
             if plugins:
-                selected_plugins = [plugin.get('id', '') for plugin in plugins if isinstance(plugin, dict)]
+                for plugin in plugins:
+                    if isinstance(plugin, dict):
+                        plugin_schema = dsl.PluginSchema(
+                            id=plugin.get('id', ''),
+                            plugin_id=plugin.get('plugin_id', plugin.get('id', '')),  # Prefer plugin_id if available
+                            version=plugin.get('version', 'v1.0.0'),
+                            name=plugin.get('name', ''),
+                            description=plugin.get('description', ''),
+                            inputs={},
+                            outputs={},
+                            configs={}
+                        )
+                        selected_plugins.append(plugin_schema)
 
-            # Extract workflow IDs
-            workflows = getattr(skills_param, 'workflows', [])
+            # Extract workflow information
+            workflows = skills_param.get('workflows', [])
             if workflows:
-                selected_workflows = [workflow.get('id', '') for workflow in workflows if isinstance(workflow, dict)]
+                for workflow in workflows:
+                    if isinstance(workflow, dict):
+                        workflow_schema = dsl.WorkflowSchema(
+                            id=workflow.get('id', ''),
+                            version=workflow.get('version', 'v1.0.0'),
+                            name=workflow.get('name', ''),
+                            description=workflow.get('description', ''),
+                            inputs={},
+                            outputs={},
+                            configs={}
+                        )
+                        selected_workflows.append(workflow_schema)
 
         # Build ReactAgentConfig
         react_agent_config = dsl.ReactAgentConfig(

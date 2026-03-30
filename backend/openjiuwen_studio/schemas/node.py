@@ -212,6 +212,7 @@ class Inputs(BaseModel):
     streaming: Optional[bool] = Field(False)
     max_response: Optional[int] = Field(3, alias="max_response")
     enable_history: Optional[bool] = Field(False, alias="historyEnable")
+    skills_param: Optional[Dict[str, Any]] = Field(None, alias="skillsParam")
 
 
     class Config:

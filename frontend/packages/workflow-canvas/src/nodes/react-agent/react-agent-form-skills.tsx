@@ -125,6 +125,7 @@ export function ReactAgentFormSkills() {
   const { t } = useTranslation()
   const [isAddingPlugin, setIsAddingPlugin] = useState(false)
   const [isAddingWorkflow, setIsAddingWorkflow] = useState(false)
+  const workflowsEnabled = false
 
   return (
     <FormItem
@@ -161,11 +162,18 @@ export function ReactAgentFormSkills() {
                     try {
                       const selectedPlugins = await showPluginSelector()
                       if (selectedPlugins && selectedPlugins.length > 0) {
-                        const newPlugins: SkillItem[] = selectedPlugins.map(plugin => ({
-                          id: plugin.plugin_id,
-                          name: plugin.name || plugin.plugin_id,
-                          type: 'plugin' as const,
-                        }))
+                        const newPlugins: SkillItem[] = selectedPlugins.map(plugin => {
+                          // Get the first selected tool's ID (this is what PluginManager.get_tool expects)
+                          const firstToolId = plugin.selectedTools?.[0]?.tool_id || plugin.plugin_id
+                          
+                          return {
+                            id: firstToolId,  // The tool_id that PluginManager.get_tool expects
+                            plugin_id: plugin.plugin_id,  // The plugin definition ID
+                            version: plugin.selectedVersion || plugin.plugin_version || 'draft',  // Add version
+                            name: plugin.name || plugin.plugin_id,
+                            type: 'plugin' as const,
+                          }
+                        })
                         field.onChange([...(field.value || []), ...newPlugins])
                       }
                     } finally {
@@ -204,6 +212,7 @@ export function ReactAgentFormSkills() {
         </Field>
 
         {/* Workflows section */}
+        {workflowsEnabled && (
         <Field name="inputs.skillsParam.workflows" defaultValue={[]}>
           {({ field }) => (
             <div>
@@ -230,6 +239,7 @@ export function ReactAgentFormSkills() {
                       if (selectedWorkflows && selectedWorkflows.length > 0) {
                         const newWorkflows: SkillItem[] = selectedWorkflows.map(workflow => ({
                           id: workflow.workflow_id,
+                          version: workflow.version || 'v1.0.0',  // Add version
                           name: workflow.name || workflow.workflow_id,
                           type: 'workflow' as const,
                         }))
@@ -269,6 +279,7 @@ export function ReactAgentFormSkills() {
             </div>
           )}
         </Field>
+        )}
       </div>
     </FormItem>
   )

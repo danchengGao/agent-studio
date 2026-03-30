@@ -140,7 +140,9 @@ class Workflow:
             self,
             dl_workflow: DlWorkflow,
             space_id: str,
-            current_user: Dict[str, Any]
+            current_user: Dict[str, Any],
+            plugin_mgr=None,
+            workflow_mgr=None
     ) -> None:
         logger.info(f"first dsl: {dl_workflow.model_dump_json()}")
         for component in dl_workflow.components:
@@ -159,6 +161,8 @@ class Workflow:
         self.space_id = space_id
         self.current_user = current_user
         self.need_stream_output_comp = {}
+        self.plugin_mgr = plugin_mgr
+        self.workflow_mgr = workflow_mgr
 
     async def process_components(
             self,
@@ -320,8 +324,21 @@ class Workflow:
 
     async def _compile_react_agent_component(self, comp: Component, workflow_dl: BaseFlow):
         """编译React智能体组件"""
-        compiler = ReactAgentCompCompiler(comp.configs)
-        return compiler.compile()
+        logger.warning(f"_compile_react_agent_component called for: {comp.id}")
+        logger.warning(f"  self.plugin_mgr: {self.plugin_mgr is not None}")
+        logger.warning(f"  self.workflow_mgr: {self.workflow_mgr is not None}")
+        logger.warning(f"  self.space_id: {self.space_id}")
+        compiler = ReactAgentCompCompiler(
+            comp.configs,
+            plugin_mgr=self.plugin_mgr,
+            workflow_mgr=self.workflow_mgr,
+            space_id=self.space_id,
+            current_user=self.current_user
+        )
+        logger.warning(f"Calling compiler.compile()...")
+        result = await compiler.compile()
+        logger.warning(f"compiler.compile() completed successfully")
+        return result
 
     async def _compile_knowledge_retrieval_component(self, comp: Component, workflow_dl: BaseFlow):
         """编译知识检索组件"""

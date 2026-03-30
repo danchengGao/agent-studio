@@ -1,0 +1,146 @@
+# coding: utf-8
+# Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
+
+"""
+Custom ReActAgentComp that supports plugin tools.
+
+This extends the base ReActAgentComp to add support for registering and using
+plugin tools in workflow contexts.
+"""
+
+from typing import List, Any
+from openjiuwen.core.workflow.components.component import ComponentComposable
+from openjiuwen.core.graph.base import Graph
+from openjiuwen.core.workflow.components.llm.react import ReActAgentCompConfig, ReActAgentCompExecutable
+from openjiuwen.core.single_agent.schema.agent_card import AgentCard
+from openjiuwen.core.foundation.tool import Tool
+from openjiuwen.core.common.logging import logger
+
+
+class ReActAgentCompWithTools(ComponentComposable):
+    """
+    ReAct Agent component with plugin tool support.
+    
+    This component extends the standard ReActAgentComp to support plugin tools
+    by adding them to the ability_manager during initialization.
+    """
+    
+    def __init__(self, config: ReActAgentCompConfig, tools: List[Tool] = None):
+        super().__init__()
+        self._config = config
+        self._tools = tools or []
+        self._executable = None
+
+    @property
+    def executable(self) -> 'ReActAgentCompWithToolsExecutable':
+        if self._executable is None:
+            self._executable = self.to_executable()
+        return self._executable
+
+    def to_executable(self) -> 'ReActAgentCompWithToolsExecutable':
+        return ReActAgentCompWithToolsExecutable(self._config, self._tools)
+
+    def add_component(self, graph: Graph, node_id: str, wait_for_all: bool = False) -> None:
+        """Add this component to a workflow graph."""
+        graph.add_node(node_id, self.to_executable(), wait_for_all=wait_for_all)
+
+
+class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
+    """
+    ReAct Agent executable with plugin tool support.
+    
+    This extends the base ReActAgentCompExecutable to add plugin tools to the
+    ability_manager so they are available to the ReAct agent.
+    """
+    
+    def __init__(self, config: ReActAgentCompConfig, tools: List[Tool] = None):
+        # Create the ReAct agent
+        self._config = config
+        self._tools = tools or []
+        
+        # Create a ReActAgent instance
+        from openjiuwen.core.single_agent.agents.react_agent import ReActAgent
+        self._react_agent = ReActAgent(
+            card=AgentCard(
+                id="react_agent_workflow_executable",
+                name="ReAct Agent Workflow Executable",
+                description="ReAct agent for workflow execution with plugin tools"
+            )
+        )
+        
+        # Configure the agent
+        self._react_agent.configure(config)
+        
+        # Add tools to both ability_manager AND Runner.resource_mgr
+        if self._tools:
+            logger.warning(f"Adding {len(self._tools)} tools to ReAct agent")
+            for tool in self._tools:
+                try:
+                    # 1. Add tool card to ability_manager's _tools dictionary
+                    self._react_agent._ability_manager._tools[tool.card.name] = tool.card
+                    logger.warning(f"Added tool card to ability_manager: {tool.card.name}")
+                    
+                    # 2. Register tool instance with Runner.resource_mgr
+                    # This is needed for tool execution
+                    from openjiuwen.core.runner import Runner
+                    Runner.resource_mgr.add_tool(tool)
+                    logger.warning(f"Registered tool instance with Runner.resource_mgr: {tool.card.name}")
+                except Exception as e:
+                    logger.error(f"Failed to add tool {tool.card.name}: {e}")
+    
+    async def invoke(self, inputs, session, context):
+        """Execute ReAct loop with the configured agent."""
+        try:
+            result = await self._react_agent.invoke(inputs, session)
+            return result
+        except Exception as e:
+            return {
+                "output": f"Error in ReAct execution: {str(e)}",
+                "result_type": "error"
+            }
+
+    async def stream(self, inputs, session, context):
+        """Execute ReAct loop with streaming output."""
+        try:
+            async for chunk in self._react_agent.stream(inputs, session):
+                yield chunk
+        except Exception as e:
+            yield {
+                "type": "error",
+                "payload": {"output": f"Error in ReAct streaming: {str(e)}", "result_type": "error"}
+            }
+
+    async def collect(self, inputs, session, context):
+        """Execute ReAct loop with streaming input aggregated to batch output."""
+        try:
+            if hasattr(inputs, '__aiter__'):
+                collected_inputs = []
+                async for input_chunk in inputs:
+                    collected_inputs.append(input_chunk)
+                
+                if len(collected_inputs) == 1:
+                    final_inputs = collected_inputs[0]
+                else:
+                    final_inputs = collected_inputs[-1]
+            else:
+                final_inputs = inputs
+                
+            result = await self._react_agent.invoke(final_inputs, session)
+            return result
+        except Exception as e:
+            return {
+                "output": f"Error in ReAct collect: {str(e)}",
+                "result_type": "error"
+            }
+
+    async def transform(self, inputs, session, context):
+        """Execute ReAct loop with streaming input/output."""
+        try:
+            async for input_chunk in inputs:
+                result = await self._react_agent.invoke(input_chunk, session)
+                yield result
+        except Exception as e:
+            yield {
+                "type": "error",
+                "payload": {"output": f"Error in ReAct transform: {str(e)}", "result_type": "error"}
+            }

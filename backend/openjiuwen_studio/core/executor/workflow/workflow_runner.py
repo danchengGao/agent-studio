@@ -29,6 +29,7 @@ from openjiuwen_studio.core.common.exceptions import JiuWenComponentException, J
 from openjiuwen_studio.core.manager.repositories.workflow_repository import workflow_repository
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager, \
     WorkflowExecutionRegistration
+from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
 
 
 def extract_component_names(schema_part, name_map, parent_path="", parent_component_ids=None):
@@ -177,8 +178,8 @@ async def _fetch_workflow_dl(
 
 
 class WorkflowRunner(IWorkflowLoader):
-    def __init__(self) -> None:
-        pass
+    def __init__(self, plugin_mgr=None) -> None:
+        self.plugin_mgr = plugin_mgr
 
     def generate_component_name_map(self, workflow_dl: Any) -> Optional[Dict[str, str]]:
         """
@@ -200,7 +201,13 @@ class WorkflowRunner(IWorkflowLoader):
     async def get_flow(
             self, id: str, version: str, space_id: str, current_user: Dict[str, Any]
     ) -> Workflow:
-        flow = Workflow(await _fetch_workflow_dl(id, version, space_id, current_user), space_id, current_user)
+        flow = Workflow(
+            await _fetch_workflow_dl(id, version, space_id, current_user), 
+            space_id, 
+            current_user,
+            plugin_mgr=self.plugin_mgr,
+            workflow_mgr=self
+        )
         return flow
 
     async def get_compiled_workflow(
@@ -359,4 +366,4 @@ class WorkflowRunner(IWorkflowLoader):
         return True
 
 
-flow_mgr = WorkflowRunner()
+flow_mgr = WorkflowRunner(PluginManager())
