@@ -411,16 +411,39 @@ async def get_deploy_details(
     if result:
         for deploy_info in result:
             deployment_id = deploy_info.get("deployment_id", "")
-            deploy_detail = await client.get_deploy_detail(deployment_id, user_id, space_id)
-            if isinstance(deploy_detail, dict) and deploy_detail:
-                logger.info(f"Get deploy detail successfully: deployment_id={deployment_id}")
-                if deploy_status and deploy_detail.get("status") == deploy_status:
-                    deploy_details.append(deploy_detail)
-                elif not deploy_status:
-                    deploy_details.append(deploy_detail)
-            elif deploy_detail.status_code == 202:
-                _ = await unregister_deploy_info(deployment_id, space_id)
-                logger.info(f"Delete deploy detail for runtime server not found: deployment_id={deployment_id}")
+            if deployment_id:
+                deploy_detail = await client.get_deploy_detail(deployment_id, user_id, space_id)
+                if isinstance(deploy_detail, dict) and deploy_detail:
+                    logger.info(f"Get deploy detail successfully: deployment_id={deployment_id}")
+                    deploy_detail['status_code'] = '200'
+                    deploy_detail['message'] = 'Get deploy info success'
+                    if deploy_status and deploy_detail.get("status") == deploy_status:
+                        deploy_details.append(deploy_detail)
+                    elif not deploy_status:
+                        deploy_details.append(deploy_detail)
+                elif deploy_detail.status_code == 202:
+                    _ = await unregister_deploy_info(deployment_id, space_id)
+                    deploy_info['status_code'] = '202'
+                    deploy_info['message'] = f"Not found {agent_id} in runtime server"
+                    deploy_info['status'] = 'stoped'
+                    deploy_details.append(deploy_info)
+                    logger.info(f"Delete deploy detail for runtime server not found: deployment_id={deployment_id}")
+                elif deploy_detail.status_code == 400:
+                    # 库里状态是成功，但没连上runtime
+                    deploy_info['status_code'] = '400'
+                    deploy_info['message'] = f"Runtime service unreachable: All connection attempts failed"
+                    deploy_details.append(deploy_info)
+            else:
+                deploy_info['status_code'] = '404'
+                deploy_info['message'] = f"{agent_id} have no deployment_id"
+                deploy_details.append(deploy_info)
+        # 筛选出 updated_at 最晚的那条数据
+        if deploy_details:
+            latest_detail = max(
+                deploy_details,
+                key=lambda x: x.get('updated_at', '') or x.get('update_at', '') or ''
+            )
+            deploy_details = [latest_detail]
         return {"deploy_details": deploy_details}
     else:
         return {"deploy_details": []}

@@ -550,6 +550,13 @@ class RuntimeAgentClient:
                 else:
                     logger.error(f"[GET_DEPLOY_DETAIL] 404 but unexpected error: {e.response.text}")
                     raise httpx.HTTPStatusError(f"[GET_DEPLOY_DETAIL] 404 but unexpected error: {e}") from e
-            else:
-                logger.error(f"[GET_DEPLOY_DETAIL] HTTP error: {e.response.status_code}, body={e.response.text}")
-                raise RuntimeError(f"Failed to get deploy detail: {e}") from e
+
+        except DeepSearchClientError as e:
+            if e.error_code == 205002:
+                return Response(
+                    status_code=400,
+                    text=f"Runtime service unreachable: All connection attempts failed",
+                )
+        except Exception as e:
+            logger.error(f"[GET_DEPLOY_DETAIL] HTTP error: {e.response.status_code}, body={e.response.text}")
+            raise RuntimeError(f"Failed to get deploy detail: {e}") from e
