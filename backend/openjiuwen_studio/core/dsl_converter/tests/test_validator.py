@@ -399,3 +399,168 @@ class TestWorkflowValidator:
         assert hasattr(result, "warnings")
         assert isinstance(result.errors, list)
         assert isinstance(result.warnings, list)
+
+    @pytest.mark.asyncio
+    @staticmethod
+    async def test_validate_plugin_node_with_missing_plugin(validator, valid_workflow_data):
+        """Test validation fails when plugin node references non-existent plugin"""
+        schema = json.loads(valid_workflow_data["schema"])
+        # Add plugin node (type=19) with non-existent plugin
+        schema["nodes"].append({
+            "id": "plugin_1",
+            "type": "19",
+            "data": {
+                "title": "Missing Plugin",
+                "inputs": {
+                    "pluginParam": {
+                        "pluginID": "non-existent-plugin-id",
+                        "toolID": "tool-123",
+                        "pluginName": "Missing Plugin",
+                        "pluginVersion": "draft"
+                    }
+                }
+            },
+            "meta": {"position": {"x": 200, "y": 100}}
+        })
+        # Update edges to connect plugin node
+        schema["edges"] = [
+            {"id": "edge1", "sourceNodeID": "start_1", "targetNodeID": "plugin_1"},
+            {"id": "edge2", "sourceNodeID": "plugin_1", "targetNodeID": "end_1"}
+        ]
+        valid_workflow_data["schema"] = json.dumps(schema)
+
+        # Mock plugin_repository to return plugin not found
+        with patch('openjiuwen_studio.core.dsl_converter.converter.validator.plugin_repository') as mock_plugin_repo:
+            mock_plugin_repo.plugin_get.return_value = (
+                {"code": 404, "message": "Plugin not found"},
+                []
+            )
+
+            result = await validator.validate(
+                workflow_data=valid_workflow_data,
+                space_id="space-123",
+                current_user={"user_id": "user123"},
+                strict=False
+            )
+
+            assert result.is_valid is False
+            assert any("plugin" in err.lower() and "not installed" in err.lower() for err in result.errors)
+            assert any("non-existent-plugin-id" in err for err in result.errors)
+
+    @pytest.mark.asyncio
+    @staticmethod
+    async def test_validate_plugin_node_with_existing_plugin(validator, valid_workflow_data):
+        """Test validation succeeds when plugin exists"""
+        schema = json.loads(valid_workflow_data["schema"])
+        # Add plugin node (type=19) with existing plugin
+        schema["nodes"].append({
+            "id": "plugin_1",
+            "type": "19",
+            "data": {
+                "title": "Existing Plugin",
+                "inputs": {
+                    "pluginParam": {
+                        "pluginID": "existing-plugin-id",
+                        "toolID": "tool-123",
+                        "pluginName": "Existing Plugin",
+                        "pluginVersion": "draft"
+                    }
+                }
+            },
+            "meta": {"position": {"x": 200, "y": 100}}
+        })
+        # Update edges to connect plugin node
+        schema["edges"] = [
+            {"id": "edge1", "sourceNodeID": "start_1", "targetNodeID": "plugin_1"},
+            {"id": "edge2", "sourceNodeID": "plugin_1", "targetNodeID": "end_1"}
+        ]
+        valid_workflow_data["schema"] = json.dumps(schema)
+
+        # Mock plugin_repository to return plugin found
+        with patch('openjiuwen_studio.core.dsl_converter.converter.validator.plugin_repository') as mock_plugin_repo:
+            mock_plugin_repo.plugin_get.return_value = (
+                {"code": 200, "data": {"plugin_id": "existing-plugin-id"}},
+                []
+            )
+
+            result = await validator.validate(
+                workflow_data=valid_workflow_data,
+                space_id="space-123",
+                current_user={"user_id": "user123"},
+                strict=False
+            )
+
+            assert result.is_valid is True
+            assert not any("plugin" in err.lower() for err in result.errors)
+
+    @pytest.mark.asyncio
+    @staticmethod
+    async def test_validate_multiple_plugin_nodes_with_mixed_existence(validator, valid_workflow_data):
+        """Test validation fails when some plugins exist and some don't"""
+        schema = json.loads(valid_workflow_data["schema"])
+        # Add two plugin nodes
+        schema["nodes"].extend([
+            {
+                "id": "plugin_1",
+                "type": "19",
+                "data": {
+                    "title": "Existing Plugin",
+                    "inputs": {
+                        "pluginParam": {
+                            "pluginID": "existing-plugin-id",
+                            "toolID": "tool-123",
+                            "pluginName": "Existing Plugin",
+                            "pluginVersion": "draft"
+                        }
+                    }
+                },
+                "meta": {"position": {"x": 200, "y": 100}}
+            },
+            {
+                "id": "plugin_2",
+                "type": "19",
+                "data": {
+                    "title": "Missing Plugin",
+                    "inputs": {
+                        "pluginParam": {
+                            "pluginID": "missing-plugin-id",
+                            "toolID": "tool-456",
+                            "pluginName": "Missing Plugin",
+                            "pluginVersion": "draft"
+                        }
+                    }
+                },
+                "meta": {"position": {"x": 400, "y": 100}}
+            }
+        ])
+        # Update edges to connect all nodes
+        schema["edges"] = [
+            {"id": "edge1", "sourceNodeID": "start_1", "targetNodeID": "plugin_1"},
+            {"id": "edge2", "sourceNodeID": "plugin_1", "targetNodeID": "plugin_2"},
+            {"id": "edge3", "sourceNodeID": "plugin_2", "targetNodeID": "end_1"}
+        ]
+        valid_workflow_data["schema"] = json.dumps(schema)
+
+        # Mock plugin_repository to return different results for different plugins
+        def mock_plugin_get(query_body):
+            plugin_id = query_body.get("plugin_id")
+            if plugin_id == "existing-plugin-id":
+                return ({"code": 200, "data": {"plugin_id": "existing-plugin-id"}}, [])
+            else:
+                return ({"code": 404, "message": "Plugin not found"}, [])
+
+        with patch('openjiuwen_studio.core.dsl_converter.converter.validator.plugin_repository') as mock_plugin_repo:
+            mock_plugin_repo.plugin_get.side_effect = mock_plugin_get
+
+            result = await validator.validate(
+                workflow_data=valid_workflow_data,
+                space_id="space-123",
+                current_user={"user_id": "user123"},
+                strict=False
+            )
+
+            assert result.is_valid is False
+            # Should have error about missing plugin
+            assert any("missing-plugin-id" in err for err in result.errors)
+            # Should not have error about existing plugin
+            assert not any("existing-plugin-id" in err for err in result.errors)

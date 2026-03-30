@@ -198,7 +198,8 @@ class TestReporter:
         trace = reporter.log_trace()
         assert len(trace) == 1
         assert "Initialize" in trace[0]
-        assert "[success]" in trace[0]
+        assert "✅" in trace[0]
+        assert "success" in trace[0]
 
     @staticmethod
     def test_log_trace_single_failure():
@@ -209,7 +210,8 @@ class TestReporter:
         trace = reporter.log_trace()
         assert len(trace) == 1
         assert "Connect" in trace[0]
-        assert "[failed]" in trace[0]
+        assert "❌" in trace[0]
+        assert "failed" in trace[0]
         assert "Connection refused" in trace[0]
 
     @staticmethod
@@ -223,10 +225,10 @@ class TestReporter:
 
         trace = reporter.log_trace()
         assert len(trace) == 4
-        assert "[success]" in trace[0]
-        assert "[failed]" in trace[1]
-        assert "[success]" in trace[2]
-        assert "[failed]" in trace[3]
+        assert "✅" in trace[0]
+        assert "❌" in trace[1]
+        assert "✅" in trace[2]
+        assert "❌" in trace[3]
         assert "Error 1" in trace[1]
         assert "Error 2" in trace[3]
 
@@ -260,7 +262,7 @@ class TestReporter:
     def test_full_workflow_simulation():
         """Simulate a complete workflow with multiple steps"""
         reporter = Reporter()
-        
+
         # Simulate a workflow import process
         reporter.add_step("Starting import workflow", True)
         reporter.add_step("Validate workflow JSON structure", True)
@@ -277,20 +279,21 @@ class TestReporter:
 
         trace = reporter.log_trace()
         assert len(trace) == 9
-        assert all("[success]" in t for t in trace)
+        assert all("✅" in t for t in trace)
 
     @staticmethod
     def test_workflow_with_failures():
         """Simulate a workflow that fails at some step"""
         reporter = Reporter()
-        
+
         reporter.add_step("Starting import workflow", True)
         reporter.add_step("Validate workflow JSON structure", True)
         reporter.add_step("Detect workflow format", False, "Unsupported format")
-        
+
         trace = reporter.log_trace()
         assert len(trace) == 3
-        assert trace[2].endswith("[failed]: Unsupported format")
+        assert "❌" in trace[2]
+        assert "Unsupported format" in trace[2]
 
     @staticmethod
     def test_error_propagation_through_trace():

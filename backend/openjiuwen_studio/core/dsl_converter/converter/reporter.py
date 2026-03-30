@@ -44,7 +44,11 @@ class Reporter:
             error = entry.get("error", "")
 
             status = "success" if success else "failed"
-            formatted = f"{step_name} [{status}]: {error}"
+            
+            # Use emoji indicators for universal compatibility
+            icon = "✅" if success else "❌"
+
+            formatted = f"{step_name} [{icon} {status}]: {error}"
 
             result.append(formatted)
 

@@ -10,13 +10,14 @@ Validates converted workflows before import.
 
 import json
 from dataclasses import dataclass, field
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set, Tuple
 
 from openjiuwen.core.common.logging import logger
 from pydantic import ValidationError
 
 from openjiuwen_studio.schemas.workflow import WorkflowBase
 from openjiuwen_studio.core.manager.internal.workflow import WorkflowCanvas
+from openjiuwen_studio.core.manager.repositories.plugin_repository import plugin_repository
 
 
 @dataclass
@@ -129,7 +130,12 @@ class WorkflowValidator:
             if disconnected:
                 warnings.append(f"Disconnected nodes found: {', '.join(disconnected)}")
 
-        # Layer 3: Strict validation (Compilation)
+        # Layer 3: Plugin existence validation
+        if not errors:
+            plugin_errors = await self._validate_plugins_exist(schema, space_id)
+            errors.extend(plugin_errors)
+
+        # Layer 4: Strict validation (Compilation)
         if strict and not errors:
             try:
                 import openjiuwen_studio.core.manager.convertor.workflow as convert
@@ -142,6 +148,81 @@ class WorkflowValidator:
                 logger.error(f"DSL validation failed: {e}")
 
         return ValidationResult(is_valid=(len(errors) == 0), errors=errors, warnings=warnings)
+
+    async def _validate_plugins_exist(self, schema: Dict[str, Any], space_id: str) -> List[str]:
+        """
+        Validate that all plugins referenced in the workflow exist in the database.
+        
+        Args:
+            schema: Canvas schema containing nodes
+            space_id: Space ID to check plugin existence
+            
+        Returns:
+            List of error messages for missing plugins
+        """
+        errors = []
+        if not schema:
+            return errors
+        
+        nodes = schema.get("nodes", [])
+        
+        # Collect all plugin IDs from plugin nodes (type=19)
+        plugin_ids_to_check: Set[Tuple[str, str]] = set()  # (plugin_id, plugin_name)
+        
+        for node in nodes:
+            node_type = str(node.get("type", ""))
+            # ComponentType.COMPONENT_TYPE_PLUGIN = "19"
+            if node_type == "19":
+                inputs = node.get("data", {}).get("inputs", {})
+                plugin_param = inputs.get("pluginParam", {})
+                
+                if plugin_param:
+                    plugin_id = plugin_param.get("pluginID") or plugin_param.get("plugin_id")
+                    plugin_name = plugin_param.get("pluginName", "Unknown")
+                    
+                    if plugin_id:
+                        plugin_ids_to_check.add((plugin_id, plugin_name))
+        
+        # Check if each plugin exists in the database
+        for plugin_id, plugin_name in plugin_ids_to_check:
+            if not self._plugin_exists(plugin_id, space_id):
+                errors.append(
+                    f"Plugin '{plugin_name}' (ID: {plugin_id}) is not installed. "
+                    "Please install the plugin before importing this workflow."
+                )
+                logger.error(
+                    f"Plugin validation failed: Plugin '{plugin_name}' "
+                    f"(ID: {plugin_id}) not found in space {space_id}"
+                )
+
+        return errors
+
+    @staticmethod
+    def _plugin_exists(plugin_id: str, space_id: str) -> bool:
+        """
+        Check if a plugin exists in the database.
+
+        Args:
+            plugin_id: Plugin ID to check
+            space_id: Space ID to check in
+
+        Returns:
+            True if plugin exists, False otherwise
+        """
+        try:
+            query_body = {
+                "plugin_id": plugin_id,
+                "space_id": space_id
+            }
+            res, _ = plugin_repository.plugin_get(query_body)
+
+            # Check if the response indicates success and plugin was found
+            if res.get("code") == 200 and res.get("data"):
+                return True
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking plugin existence for {plugin_id}: {e}")
+            return False
 
     def validate_sync(
         self,

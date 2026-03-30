@@ -645,8 +645,12 @@ class N8nWorkflowConverter(WorkflowConverter):
                         self.first_main_node = node_name
                     
                     x_pos += 460
+            except NotImplementedError:
+                # Hard failure: propagate to the caller so it is never silently
+                # swallowed as a warning.  PLUGIN nodes currently raise this.
+                raise
             except Exception as e:
-                # Fallback for conversion errors
+                # Soft failure: use a fallback node and continue conversion.
                 error_msg = f"Failed to convert node '{node_name}': {e}"
                 self.report.add_warning(error_msg)
                 logger.warning(error_msg)
@@ -688,7 +692,11 @@ class N8nWorkflowConverter(WorkflowConverter):
         elif component_type == ComponentType.COMPONENT_TYPE_CODE:
             return self._convert_code_node(n8n_node, node_id, x_pos)
         elif component_type == ComponentType.COMPONENT_TYPE_PLUGIN:
-            return self._convert_plugin_node(n8n_node, node_id, x_pos)
+            node_name = n8n_node.get("name", "unknown")
+            raise NotImplementedError(
+                f"Conversion of PLUGIN nodes is not supported. "
+                f"Node '{node_name}' (id: {node_id}) cannot be converted."
+            )
         elif component_type == ComponentType.COMPONENT_TYPE_VARIABLE_MERGE:
             return self._convert_merge_node(n8n_node, node_id, x_pos)
         elif component_type == ComponentType.COMPONENT_TYPE_SUB_WORKFLOW:

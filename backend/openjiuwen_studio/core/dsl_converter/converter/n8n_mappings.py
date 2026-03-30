@@ -34,8 +34,11 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "n8n-nodes-base.errorTrigger": ComponentType.COMPONENT_TYPE_START,
     "n8n-nodes-base.emailTrigger": ComponentType.COMPONENT_TYPE_START,
     "n8n-nodes-base.cron": ComponentType.COMPONENT_TYPE_START,
+    "n8n-nodes-base.activationTrigger": ComponentType.COMPONENT_TYPE_START,
     "n8n-nodes-langchain.chatTrigger": ComponentType.COMPONENT_TYPE_START,
     "@n8n/n8n-nodes-langchain.chatTrigger": ComponentType.COMPONENT_TYPE_START,
+    "n8n-nodes-langchain.mcpTrigger": ComponentType.COMPONENT_TYPE_START,
+    "@n8n/n8n-nodes-langchain.mcpTrigger": ComponentType.COMPONENT_TYPE_START,
 
     # =========================================================================
     # AI/LLM NODES → LLM
@@ -54,6 +57,9 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "@n8n/n8n-nodes-langchain.textClassifier": ComponentType.COMPONENT_TYPE_LLM,
     "n8n-nodes-langchain.sentimentAnalysis": ComponentType.COMPONENT_TYPE_LLM,
     "@n8n/n8n-nodes-langchain.sentimentAnalysis": ComponentType.COMPONENT_TYPE_LLM,
+    "n8n-nodes-langchain.openAiAssistant": ComponentType.COMPONENT_TYPE_LLM,
+    "@n8n/n8n-nodes-langchain.openAiAssistant": ComponentType.COMPONENT_TYPE_LLM,
+    "n8n-nodes-base.aiTransform": ComponentType.COMPONENT_TYPE_LLM,
     # Vector stores also use LLM infrastructure
     "n8n-nodes-langchain.vectorStoreInMemory": ComponentType.COMPONENT_TYPE_LLM,
     "@n8n/n8n-nodes-langchain.vectorStoreInMemory": ComponentType.COMPONENT_TYPE_LLM,
@@ -65,6 +71,8 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "@n8n/n8n-nodes-langchain.vectorStoreQdrant": ComponentType.COMPONENT_TYPE_LLM,
     "n8n-nodes-langchain.vectorStorePgVector": ComponentType.COMPONENT_TYPE_LLM,
     "@n8n/n8n-nodes-langchain.vectorStorePgVector": ComponentType.COMPONENT_TYPE_LLM,
+    "n8n-nodes-langchain.vectorStoreWeaviate": ComponentType.COMPONENT_TYPE_LLM,
+    "@n8n/n8n-nodes-langchain.vectorStoreWeaviate": ComponentType.COMPONENT_TYPE_LLM,
 
     # =========================================================================
     # CONDITIONALS → IF/Selector
@@ -111,9 +119,19 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "n8n-nodes-base.extractFromFile": ComponentType.COMPONENT_TYPE_CODE,
 
     # =========================================================================
+    # LANGCHAIN CODE → Code
+    # =========================================================================
+    "n8n-nodes-langchain.code": ComponentType.COMPONENT_TYPE_CODE,
+    "@n8n/n8n-nodes-langchain.code": ComponentType.COMPONENT_TYPE_CODE,
+
+    # =========================================================================
     # HTTP/API → Plugin
     # =========================================================================
     "n8n-nodes-base.httpRequest": ComponentType.COMPONENT_TYPE_PLUGIN,
+    "n8n-nodes-langchain.openAi": ComponentType.COMPONENT_TYPE_PLUGIN,
+    "@n8n/n8n-nodes-langchain.openAi": ComponentType.COMPONENT_TYPE_PLUGIN,
+    "n8n-nodes-langchain.mcpClient": ComponentType.COMPONENT_TYPE_PLUGIN,
+    "@n8n/n8n-nodes-langchain.mcpClient": ComponentType.COMPONENT_TYPE_PLUGIN,
 
     # =========================================================================
     # MERGE → Variable Merge
@@ -158,14 +176,24 @@ AI_SUBNODES: Dict[str, Tuple[str, str]] = {
     "@n8n/n8n-nodes-langchain.lmChatGoogleVertex": ("ai_languageModel", "google-vertex"),
     "n8n-nodes-langchain.lmChatOpenRouter": ("ai_languageModel", "openrouter"),
     "@n8n/n8n-nodes-langchain.lmChatOpenRouter": ("ai_languageModel", "openrouter"),
+    "n8n-nodes-langchain.lmChatXAiGrok": ("ai_languageModel", "xai"),
+    "@n8n/n8n-nodes-langchain.lmChatXAiGrok": ("ai_languageModel", "xai"),
     # Basic LLMs
     "n8n-nodes-langchain.lmCohere": ("ai_languageModel", "cohere"),
     "@n8n/n8n-nodes-langchain.lmCohere": ("ai_languageModel", "cohere"),
     "n8n-nodes-langchain.lmOllama": ("ai_languageModel", "ollama"),
     "@n8n/n8n-nodes-langchain.lmOllama": ("ai_languageModel", "ollama"),
+    "n8n-nodes-langchain.lmLemonade": ("ai_languageModel", "lemonade"),
+    "@n8n/n8n-nodes-langchain.lmLemonade": ("ai_languageModel", "lemonade"),
+    "n8n-nodes-langchain.lmOpenHuggingFaceInference": ("ai_languageModel", "huggingface"),
+    "@n8n/n8n-nodes-langchain.lmOpenHuggingFaceInference": ("ai_languageModel", "huggingface"),
     # Memory
     "n8n-nodes-langchain.memoryBufferWindow": ("ai_memory", "buffer"),
     "@n8n/n8n-nodes-langchain.memoryBufferWindow": ("ai_memory", "buffer"),
+    "n8n-nodes-langchain.memoryMotorhead": ("ai_memory", "motorhead"),
+    "@n8n/n8n-nodes-langchain.memoryMotorhead": ("ai_memory", "motorhead"),
+    "n8n-nodes-langchain.memoryManager": ("ai_memory", "manager"),
+    "@n8n/n8n-nodes-langchain.memoryManager": ("ai_memory", "manager"),
     "n8n-nodes-langchain.memoryRedisChat": ("ai_memory", "redis"),
     "@n8n/n8n-nodes-langchain.memoryRedisChat": ("ai_memory", "redis"),
     "n8n-nodes-langchain.memoryPostgresChat": ("ai_memory", "postgres"),
