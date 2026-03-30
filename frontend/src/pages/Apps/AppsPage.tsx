@@ -1461,7 +1461,7 @@ const AppsPage: React.FC = () => {
       // ===== HITL 判断逻辑：判断是否是回复 HITL interrupt 消息 =====
       let interrupt_feedback = options?.interrupt_feedback ?? ''  // 默认为空
 
-      const messageItemsList = useConversationStore.getState().getCurrentMessageItems()
+      const messageItemsList = useConversationStore.getState().getCurrentMessageItemsList()
 
       // ===== 判断是否是新的 deepsearch 运行 =====
       // 用于确定是否需要使用新的 session ID

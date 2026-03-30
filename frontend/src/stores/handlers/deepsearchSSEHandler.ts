@@ -34,7 +34,7 @@ export interface SSEData {
 }
 
 interface StoreDependencies {
-  getCurrentMessageItems: () => MessageItems | undefined;
+  getLastMessageItems: () => MessageItems | undefined;
   addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string, indexPath?: string) => Message | null;
   addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string, indexPath?: string) => Message;
   updateMessage: (messageItemsId: string, messageId: string, updates: Partial<Message>) => void;
@@ -159,7 +159,7 @@ export class DeepsearchSSEHandler {
    * 主入口：处理 SSE 消息
    */
   public handleSSEMessage(sseData: SSEData): void {
-    const lastMessageItems = this.store.getCurrentMessageItems();
+    const lastMessageItems = this.store.getLastMessageItems();
 
     // 如果对话已被取消，忽略所有后续 SSE 事件
     // 这发生在用户点击取消按钮后，但 SSE 事件仍在队列中或继续到达的情况
@@ -236,7 +236,7 @@ export class DeepsearchSSEHandler {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.streamCache.set(streamKey, [content]);
 
-      let lastMessageItems = this.store.getCurrentMessageItems();
+      let lastMessageItems = this.store.getLastMessageItems();
       if (lastMessageItems && sectionIdx !== undefined && planIdx !== undefined) {
 
         // 检查是否存在根 TASK 消息（sectionIdx=0），如果不存在则从缓存创建
@@ -306,7 +306,7 @@ export class DeepsearchSSEHandler {
       // 重置流缓存
       this.streamCache.set(streamKey, [content]);
 
-      const lastMessageItems = this.store.getCurrentMessageItems();
+      const lastMessageItems = this.store.getLastMessageItems();
       if (!lastMessageItems) return;
 
       // 使用 indexPath 查找 sectionTask
@@ -380,7 +380,7 @@ export class DeepsearchSSEHandler {
     if (sseData.agent === 'entry' || sseData.agent === 'generate_questions') {
       const lastMessage = addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), '', undefined, undefined, 'deepsearch', buildIndexPath(sectionIdx, planIdx, stepIdx));
 
-      const lastMessageItems = this.store.getCurrentMessageItems();
+      const lastMessageItems = this.store.getLastMessageItems();
       if (lastMessageItems && lastMessage) {
         updateMessage(lastMessageItems.id, lastMessage.id, {
           content: sseData.content || '',
@@ -433,7 +433,7 @@ export class DeepsearchSSEHandler {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.addToCache(streamKey, content);
 
-      const lastMessageItems = this.store.getCurrentMessageItems();
+      const lastMessageItems = this.store.getLastMessageItems();
       if (!lastMessageItems) return;
 
       // 使用 indexPath 查找 sectionTask
@@ -457,7 +457,7 @@ export class DeepsearchSSEHandler {
     }
 
     // 其他消息(如entry, generate_questions)：追加内容
-    const lastMessageItems = this.store.getCurrentMessageItems();
+    const lastMessageItems = this.store.getLastMessageItems();
     if (lastMessageItems && !this.store.getMessageItemsIsUser(lastMessageItems)) {
       const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
       const lastMessage = lastMessageId ? this.store.getMessageById(lastMessageId) : undefined;
@@ -474,7 +474,7 @@ export class DeepsearchSSEHandler {
   private handleDone(sseData: SSEData, sectionIdx?: number, planIdx?: number, stepIdx?: number): void {
     const { updateMessage, getMessageItemsIsUser } = this.store;
     const streamKey = this.generateStreamKey(sseData.agent, sectionIdx, planIdx, stepIdx);
-    const lastMessageItems = this.store.getCurrentMessageItems();
+    const lastMessageItems = this.store.getLastMessageItems();
 
 
     if (sseData.agent === 'outline') {
@@ -785,7 +785,7 @@ export class DeepsearchSSEHandler {
    */
   private handleSummaryResponse(sseData: SSEData, sectionIdx?: number, planIdx?: number, stepIdx?: number): void {
     const { updateMessage, updateMessageItems, addSystemMessage } = this.store;
-    const lastMessageItems = this.store.getCurrentMessageItems();
+    const lastMessageItems = this.store.getLastMessageItems();
     if (!lastMessageItems) return;
 
     // collector_info_retrieval 和 collector_summary
@@ -1172,8 +1172,8 @@ export class DeepsearchSSEHandler {
             status: TaskStatus.COMPLETED,
           });
         } else {
-          // 只有在存在 outline 任务时才创建最终报告
-          // 如果没有 outline 任务，说明这不是真正的研究请求，不需要创建最终报告
+          // 只有在存在 outline 任务 或存在错误信息时 才创建最终报告
+          // 如果没有 outline 任务，说明这不是真正的研究请求，不需要创建最终报告；或者存在错误信息，则显示有错误的最终报告
           if (outlineTask || endData.exception_info) {
             console.warn('[DeepsearchSSEHandler] No pending REPORT message found, creating new one');
             const finalReportMessage = addSystemMessage(
@@ -1303,7 +1303,7 @@ export class DeepsearchSSEHandler {
    */
   private handleUserFeedbackProcessorMessage(sseData: SSEData): void {
     const { addSystemMessage, updateMessage, updateMessageItems } = this.store;
-    const lastMessageItems = this.store.getCurrentMessageItems();
+    const lastMessageItems = this.store.getLastMessageItems();
     if (!lastMessageItems) return;
 
     // 使用工具函数解析 final_result
@@ -1400,10 +1400,10 @@ export class DeepsearchSSEHandler {
   /** 处理 waiting_user_input 事件
    */
   private handleWaitingUserInput(sseData: SSEData): void {
-    const { addSystemMessage, getCurrentMessageItems, saveConversationToDB } = this.store;
+    const { addSystemMessage, getLastMessageItems, saveConversationToDB } = this.store;
 
     // 检查当前 MessageItems 状态，如果已经是 CANCELLED，说明用户已手动取消，不需要再创建消息
-    const lastMessageItems = getCurrentMessageItems();
+    const lastMessageItems = getLastMessageItems();
 
     if (lastMessageItems && lastMessageItems.status === TaskStatus.CANCELLED) {
       console.log('[DeepsearchSSEHandler] MessageItems already cancelled, skipping waiting_user_input event');
@@ -1482,8 +1482,8 @@ export class DeepsearchSSEHandler {
    * 当大纲交互达到最大修改次数时触发，创建 TASK 消息显示大纲并继续流程
    */
   private handleUserInputEnded(sseData: SSEData): void {
-    const { getCurrentMessageItems } = this.store;
-    const lastMessageItems = getCurrentMessageItems();
+    const { getLastMessageItems } = this.store;
+    const lastMessageItems = getLastMessageItems();
 
     // 检查当前 MessageItems 状态
     if (lastMessageItems && lastMessageItems.status === TaskStatus.CANCELLED) {
@@ -1525,9 +1525,10 @@ export class DeepsearchSSEHandler {
 
   private handleError(sseData: SSEData, sectionIdx?: number, planIdx?: number, stepIdx?: number): void {
     const { updateMessage, addSystemMessage, getMessageItemsIsUser } = this.store;
-    const lastMessageItems = this.store.getCurrentMessageItems();
+    const lastMessageItems = this.store.getLastMessageItems();
 
-    if (!lastMessageItems || getMessageItemsIsUser(lastMessageItems)) return;
+    // 如果不存在 lastMessageItems 或 不是用户消息且非end， 跳过处理
+    if (!lastMessageItems || (getMessageItemsIsUser(lastMessageItems) && sseData.agent != 'end')) return;
 
     // 解析 error content
     let errorData = null;

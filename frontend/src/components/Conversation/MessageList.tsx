@@ -13,7 +13,7 @@ import { ErrorBoundary } from './ErrorBoundary';
  * 3. 监听父容器滚动，自动滚动到底部
  */
 export const MessageList: React.FC = () => {
-  const messageItemsList = useConversationStore(state => state.getCurrentMessageItems());
+  const messageItemsList = useConversationStore(state => state.getCurrentMessageItemsList());
   const getMessageItemsIsUser = useConversationStore(state => state.getMessageItemsIsUser);
   const containerRef = useRef<HTMLDivElement>(null);
 

@@ -186,7 +186,12 @@ export interface ConversationStore {
   /**
    * 获取当前 Conversation 的所有 MessageItems
    */
-  getCurrentMessageItems: () => MessageItems[];
+  getCurrentMessageItemsList: () => MessageItems[];
+
+  /**
+   * 获取当前 Conversation 的最后一个 MessageItems
+   */
+  getLastMessageItems: () => MessageItems | undefined;
 
   /**
    * 获取当前对话的完整数据（用于序列化保存）
@@ -592,10 +597,15 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       .filter((conv): conv is Conversation => conv !== undefined);
   },
 
-  getCurrentMessageItems: () => {
+  getCurrentMessageItemsList: () => {
     const { currentConversationId } = get();
     if (!currentConversationId) return [];
     return get().getMessageItemsByConversationId(currentConversationId);
+  },
+
+  getLastMessageItems: () => {
+    const list = get().getCurrentMessageItemsList();
+    return list[list.length - 1];
   },
 
   getCurrentConversationData: () => {
@@ -1165,7 +1175,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     const agentConfig = get().getConversationConfig(conversationId);
 
     // 查找当前正在进行中的MessageItems，如果没有则创建新的
-    const currentMessageItemsList = get().getCurrentMessageItems();
+    const currentMessageItemsList = get().getCurrentMessageItemsList();
     let lastMessageItems = currentMessageItemsList[currentMessageItemsList.length - 1];
     let messageItemsId: string;
 
@@ -1578,17 +1588,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return;
       }
 
-      // 获取当前 MessageItems
-      const getCurrentMessageItems = () => {
-        const currentList = get().getCurrentMessageItems();
-        return currentList[currentList.length - 1];
-      };
-
       // 动态导入 deepsearch 处理器
       import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
         const handler = new DeepsearchSSEHandler(
           {
-            getCurrentMessageItems: getCurrentMessageItems,
+            getLastMessageItems: get().getLastMessageItems,
             addSystemMessage: get().addSystemMessage,
             addMessageAsChild: get().addMessageAsChild,
             updateMessage: get().updateMessage,
@@ -1627,7 +1631,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         // 批量处理事件
         eventsToProcess.forEach(event => {
           // 在处理每个事件之前，检查是否已取消
-          const currentMessageItems = getCurrentMessageItems();
+          const currentMessageItems = get().getLastMessageItems();
           if (currentMessageItems && currentMessageItems.status === TaskStatus.CANCELLED) {
             console.log('[SSE Processor] MessageItems cancelled during processing, skipping event');
             return;  // 跳过此事件
@@ -2285,7 +2289,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       return false;
     }
 
-    const messageItemsList = get().getCurrentMessageItems();
+    const messageItemsList = get().getCurrentMessageItemsList();
     if (messageItemsList.length === 0) {
       return false;
     }
@@ -2333,7 +2337,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       return;
     }
 
-    const messageItemsList = get().getCurrentMessageItems();
+    const messageItemsList = get().getCurrentMessageItemsList();
     if (messageItemsList.length === 0) {
       return;
     }
@@ -2459,14 +2463,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
    * 如果没有 INTERRUPT 消息，会创建一个 CANCELLED 状态的 INTERRUPT 消息用于显示取消提示
    */
   updateMessageItemsStatusToCancelled: () => {
-    const { getCurrentMessageItems, updateMessageItems, updateMessage, getMessageById, getChildMessages, getCurrentConversation, saveConversationToDB, addMessageItems } = get();
-    const messageItems = getCurrentMessageItems();
+    const { getCurrentMessageItemsList, updateMessageItems, updateMessage, getMessageById, getChildMessages, getCurrentConversation, saveConversationToDB, addMessageItems } = get();
+    const messageItemsList = getCurrentMessageItemsList();
 
     // 清空 SSE 队列，防止取消后仍有事件被处理
     set({ sseEventQueue: [] });
 
     // 场景 1：没有任何 MessageItems（SSE 还未返回数据）
-    if (!messageItems || messageItems.length === 0) {
+    if (!messageItemsList || messageItemsList.length === 0) {
       const currentConversation = getCurrentConversation();
       if (currentConversation) {
         // 创建新的 MessageItems
@@ -2535,7 +2539,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
 
     // 场景 2：已有 MessageItems（SSE 已返回数据，可能已经有消息）
-    const lastMessageItems = messageItems[messageItems.length - 1];
+    const lastMessageItems = messageItemsList[messageItemsList.length - 1];
 
     // 检查最后一个 MessageItems 是否是用户消息
     // 如果是用户消息，需要创建一个新的系统 MessageItems 来显示取消状态
@@ -2703,8 +2707,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
 
     // 4. 确保保存到 IndexDB
-    const finalMessageItems = getCurrentMessageItems();
-    if (finalMessageItems && finalMessageItems.length > 0) {
+    const finalMessageItemsList = get().getCurrentMessageItemsList();
+    if (finalMessageItemsList && finalMessageItemsList.length > 0) {
       saveConversationToDB(lastMessageItems.conversationId);
     }
   },

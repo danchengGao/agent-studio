@@ -36,7 +36,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
   const [editableSections, setEditableSections] = useState<OutlineSection[]>([]);
   const updateMessage = useConversationStore(state => state.updateMessage);
   const updateMessageItems = useConversationStore(state => state.updateMessageItems);
-  const getCurrentMessageItems = useConversationStore(state => state.getCurrentMessageItems);
+  const getCurrentMessageItemsList = useConversationStore(state => state.getCurrentMessageItemsList);
 
   const outlineContent: OutlineContent =
     typeof message.content === 'string'
@@ -76,7 +76,7 @@ export const OutlineInteractionMessage: React.FC<OutlineInteractionMessageProps>
     backendMessage?: string,
     updatedOutlineContent?: OutlineContent,
   ) => {
-    const messageItemsList = getCurrentMessageItems();
+    const messageItemsList = getCurrentMessageItemsList();
     if (!messageItemsList || messageItemsList.length === 0) return;
 
     const lastMessageItems = messageItemsList[messageItemsList.length - 1];

@@ -117,7 +117,7 @@ export default function PlaybackPanel({ onClose, onPlaybackStart }: PlaybackPane
       // 添加用户消息后，检查 outlineTask 是否存在
       // 注意：messageItems 是在 store 级别管理的，不是 conversation 的属性
       const currentStateAfter = useConversationStore.getState()
-      const messageItemsList = currentStateAfter.getCurrentMessageItems()
+      const messageItemsList = currentStateAfter.getCurrentMessageItemsList()
       const lastMessageItems = messageItemsList[messageItemsList.length - 1]
 
       if (lastMessageItems && lastMessageItems.conversationId === playbackConversationId) {
