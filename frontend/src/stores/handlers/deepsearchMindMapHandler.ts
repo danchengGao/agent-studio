@@ -1,4 +1,5 @@
 import { postProcessLayout, enforceDepthBasedYPositions, alignParentChildNodes } from '../../components/Conversation/MindMap/postProcessLayout';
+import { v4 as uuidv4 } from 'uuid';
 import {
   ThoughtNode,
   ThoughtEdge,
@@ -170,10 +171,12 @@ export interface MindMapOperations {
 // ===== 工具函数 =====
 
 /**
- * 生成唯一的边 ID
+ * 生成唯一的 UUID
+ * 优先使用浏览器原生 crypto.randomUUID()，失败时降级到 uuid 包
  */
-export const generateEdgeId = (): string => {
-  return crypto.randomUUID();
+const generateUUID = (): string => {
+  const id = crypto?.randomUUID?.();
+  return id ?? uuidv4();
 };
 
 /**
@@ -230,7 +233,7 @@ export const createEmptyThoughtGraph = (
   conversationId: string
 ): ThoughtGraph => {
   return {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     messageItemsId,
     conversationId,
     nodes: [],
@@ -366,7 +369,7 @@ export class MindMapManager implements MindMapOperations {
     const now = Date.now();
     const newEdge: ThoughtEdge = {
       ...edge,
-      id: generateEdgeId(),
+      id: generateUUID(),
       createdAt: now,
       updatedAt: now,
     };
@@ -509,7 +512,7 @@ export class MindMapManager implements MindMapOperations {
     const now = Date.now();
     const newEdges: ThoughtEdge[] = edges.map(edge => ({
       ...edge,
-      id: generateEdgeId(),
+      id: generateUUID(),
       createdAt: now,
       updatedAt: now,
     }));
