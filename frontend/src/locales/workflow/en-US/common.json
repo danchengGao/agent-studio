@@ -79,6 +79,19 @@
     "fetchHistoryVersionFailed": "Failed to fetch history version",
     "versionHistory": "Version History"
   },
+  "exportChoice": {
+    "title": "Export workflow",
+    "intro": "Download the workflow as a JSON file. Pick the format that fits your use case.",
+    "canvasTitle": "Canvas data",
+    "canvasDesc": "Nodes, edges, and layout—the same as the toolbar export; restore via Import in this product.",
+    "canvasNotice": "Import supported",
+    "dslTitle": "Executable configuration",
+    "dslDesc": "Structured workflow definition (JSON) for the runtime—use for external integration or backup; not the same as canvas data.",
+    "dslNotice": "Import not supported yet",
+    "hint": "For backup or moving the canvas, choose Canvas data.",
+    "confirm": "Download",
+    "cancel": "Cancel"
+  },
   "ui": {
     "draft": "Draft",
     "switchedToVersion": "Switched to version {{version}}",

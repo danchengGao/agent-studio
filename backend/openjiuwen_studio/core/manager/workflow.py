@@ -5,7 +5,7 @@ import json
 import uuid
 import time
 import random
-from typing import Callable
+from typing import Any, Callable
 from minio import Minio
 
 from fastapi import status
@@ -38,6 +38,9 @@ from openjiuwen_studio.core.manager.repositories.prompt_relation_repository impo
 from openjiuwen_studio.core.common.exceptions import BaseError
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.manager.model_manager.managers.model_config_manager import ModelConfigManager
+from openjiuwen_studio.core.database import SessionLocal
+from openjiuwen_studio.schemas.model_config import ModelParameters
+from openjiuwen_studio.core.executor.workflow.workflow import Workflow as ExecutableWorkflow
 
 # 生成随机字符串用于节点ID
 random_id = ''.join(random.choice('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_') for _ in range(5))
@@ -504,6 +507,261 @@ def workflow_export_py(
         code=status.HTTP_200_OK,
         message="export workflow python success",
         data={"workflow_id": req.workflow_id, "python_code": python_code}
+    )
+
+
+@with_exception_handling
+def workflow_export(
+        req: WorkflowId,
+        current_user: dict
+) -> ResponseModel:
+    """Export a workflow as executable DSL JSON with dependencies."""
+
+    def _canvas_schema_dict(canvas_data: dict | None) -> dict:
+        if not canvas_data or not isinstance(canvas_data, dict):
+            return {}
+        raw = canvas_data.get("schema") or canvas_data.get("workflow_schema")
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw or "{}")
+            except json.JSONDecodeError:
+                return {}
+        if isinstance(raw, dict):
+            return raw
+        return {}
+
+    def _node_id_to_llm_model_id(canvas_data: dict | None) -> dict[str, str]:
+        """画布节点 id -> 模型配置表 id（llmParam.model.id）。"""
+        out: dict[str, str] = {}
+        for node in _canvas_schema_dict(canvas_data).get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            nid = node.get("id")
+            data = node.get("data")
+            if not nid or not isinstance(data, dict):
+                continue
+            inputs = data.get("inputs")
+            if not isinstance(inputs, dict):
+                continue
+            llm = inputs.get("llm_param") or inputs.get("llmParam")
+            if not isinstance(llm, dict):
+                continue
+            model = llm.get("model")
+            if not isinstance(model, dict):
+                continue
+            mid = model.get("id")
+            if mid is None or mid == "":
+                continue
+            out[str(nid)] = str(mid)
+        return out
+
+    def _patch_export_model_fields(export_root: dict, canvas_data: dict | None, space_id: str) -> None:
+        """导出 DSL 中补全 configs.model.model_id，同步 model_name，并在 model_client_config 中写入 parameters；导出文件中不包含真实 api_key。"""
+        id_map = _node_id_to_llm_model_id(canvas_data)
+        db_params_by_model_id: dict[str, dict | None] = {}
+
+        def _db_parameters_for_model(model_id_str: str) -> dict | None:
+            if model_id_str in db_params_by_model_id:
+                return db_params_by_model_id[model_id_str]
+            out: dict | None = None
+            try:
+                mid_int = int(model_id_str)
+            except (ValueError, TypeError):
+                db_params_by_model_id[model_id_str] = None
+                return None
+            try:
+                db = SessionLocal()
+                try:
+                    mgr = ModelConfigManager(db)
+                    mc = mgr.get_config_by_id(mid_int, space_id)
+                    p = mc.parameters
+                    out = dict(p) if isinstance(p, dict) else {}
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.debug(
+                    "[WORKFLOW_EXPORT] Skip model parameters lookup for model_id=%s: %s",
+                    model_id_str,
+                    e,
+                )
+                out = None
+            db_params_by_model_id[model_id_str] = out
+            return out
+
+        def _patch_one_model(m: dict, comp_id: str | None) -> None:
+            if not isinstance(m, dict):
+                return
+            rc = m.get("request_config")
+            if not isinstance(rc, dict):
+                return
+            mcc = m.get("model_client_config")
+            if mcc is None:
+                mcc = {}
+                m["model_client_config"] = mcc
+            elif not isinstance(mcc, dict):
+                return
+            mn = rc.get("model_name") or ""
+            if mn and not (mcc.get("model_name") or "").strip():
+                mcc["model_name"] = mn
+            if comp_id and not (m.get("model_id") or "").strip():
+                mid = id_map.get(str(comp_id))
+                if mid:
+                    m["model_id"] = mid
+
+            resolved_mid = (m.get("model_id") or "").strip()
+            if not resolved_mid and comp_id:
+                resolved_mid = id_map.get(str(comp_id)) or ""
+
+            defaults = ModelParameters()
+            dbp = _db_parameters_for_model(resolved_mid) if resolved_mid else None
+
+            temperature = rc.get("temperature")
+            if temperature is None:
+                temperature = (dbp or {}).get("temperature") if dbp else None
+            if temperature is None:
+                temperature = defaults.temperature
+            top_p = rc.get("top_p")
+            if top_p is None:
+                top_p = (dbp or {}).get("top_p") if dbp else None
+            if top_p is None:
+                top_p = defaults.top_p
+            max_tokens = rc.get("max_tokens")
+            if max_tokens is None and dbp is not None:
+                max_tokens = dbp.get("max_tokens")
+            if max_tokens is None:
+                max_tokens = defaults.max_tokens
+
+            mcc["parameters"] = {
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "top_p": top_p,
+            }
+
+        def _walk(obj: Any) -> None:
+            if isinstance(obj, dict):
+                mcc_any = obj.get("model_client_config")
+                if isinstance(mcc_any, dict):
+                    mcc_any["api_key"] = None
+                cid = obj.get("id")
+                cfg = obj.get("configs")
+                if isinstance(cfg, dict) and isinstance(cfg.get("model"), dict):
+                    _patch_one_model(cfg["model"], str(cid) if cid is not None else None)
+                for v in obj.values():
+                    _walk(v)
+            elif isinstance(obj, list):
+                for item in obj:
+                    _walk(item)
+
+        _walk(export_root)
+
+    def _extract_sub_workflow_refs(payload) -> list[tuple[str, str]]:
+        refs: list[tuple[str, str]] = []
+        seen_refs: set[tuple[str, str]] = set()
+
+        def _normalize_sub_info(sub_info: dict) -> tuple[str, str]:
+            if "id" in sub_info:
+                sub_id = sub_info.get("id", "")
+                sub_version = sub_info.get("version", "draft") or "draft"
+                return sub_id, sub_version
+            sub_id = sub_info.get("workflowId", "")
+            sub_version = sub_info.get("workflowVersion", "draft") or "draft"
+            return sub_id, sub_version
+
+        def _add_ref(sub_info: dict):
+            sub_id, sub_version = _normalize_sub_info(sub_info)
+            if not sub_id:
+                return
+            key = (sub_id, sub_version)
+            if key in seen_refs:
+                return
+            seen_refs.add(key)
+            refs.append(key)
+
+        def _walk_payload(node):
+            if node is None:
+                return
+            if isinstance(node, list):
+                for item in node:
+                    _walk_payload(item)
+                return
+            if not isinstance(node, dict):
+                return
+
+            sub_info = (
+                node.get("sub_workflow_info")
+                or node.get("subWorkflowInfo")
+                or node.get("subWorkflow")
+            )
+            if isinstance(sub_info, dict):
+                _add_ref(sub_info)
+
+            for value in node.values():
+                _walk_payload(value)
+
+        _walk_payload(payload)
+        return refs
+
+    def _build_workflow_dsl(workflow_id: str, workflow_version: str) -> dict | None:
+        wf_req = WorkflowId(
+            workflow_id=workflow_id,
+            space_id=req.space_id,
+            workflow_version=workflow_version,
+        )
+        sub_canvas_result = workflow_repository.workflow_canvas(wf_req)
+        if sub_canvas_result.code != status.HTTP_200_OK:
+            logger.warning(
+                f"[WORKFLOW_EXPORT] Skip sub workflow {workflow_id}:{workflow_version}, "
+                f"canvas fetch failed: {sub_canvas_result.message}"
+            )
+            return None
+
+        sub_dl_workflow = convert.workflow_convert(WorkflowBase(**sub_canvas_result.data), skip_validation=True)
+        sub_executable_workflow = ExecutableWorkflow(sub_dl_workflow, req.space_id, current_user)
+        sub_export = sub_executable_workflow.dl_workflow.model_dump()
+        _patch_export_model_fields(sub_export, sub_canvas_result.data, req.space_id)
+        return sub_export
+
+    _ = check_user_space(req.space_id, current_user)
+
+    canvas_result = workflow_repository.workflow_canvas(req)
+    if canvas_result.code != status.HTTP_200_OK:
+        return ResponseModel(
+            code=canvas_result.code,
+            message=canvas_result.message,
+        )
+
+    dl_workflow = convert.workflow_convert(WorkflowBase(**canvas_result.data), skip_validation=True)
+    executable_workflow = ExecutableWorkflow(dl_workflow, req.space_id, current_user)
+
+    export_data = executable_workflow.dl_workflow.model_dump()
+    _patch_export_model_fields(export_data, canvas_result.data, req.space_id)
+
+    dependency_workflows: list[dict] = []
+    processed: set[tuple[str, str]] = {(req.workflow_id, req.workflow_version or "draft")}
+    pending = _extract_sub_workflow_refs(export_data)
+
+    while pending:
+        sub_id, sub_version = pending.pop(0)
+        key = (sub_id, sub_version)
+        if key in processed:
+            continue
+        processed.add(key)
+
+        sub_dsl = _build_workflow_dsl(sub_id, sub_version)
+        if not sub_dsl:
+            continue
+
+        dependency_workflows.append(sub_dsl)
+        pending.extend(_extract_sub_workflow_refs(sub_dsl))
+
+    export_data["dependencies"] = {"workflows": dependency_workflows}
+    logger.info(f"[WORKFLOW_EXPORT] Collected sub workflow DSL count: {len(dependency_workflows)}")
+
+    logger.info(f"Exported workflow DSL JSON: {req.workflow_id}")
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="export workflow success",
+        data=export_data
     )
 
 

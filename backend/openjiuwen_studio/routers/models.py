@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
@@ -150,7 +150,7 @@ async def get_model_configs(
 
 @models_router.get("/", response_model=ResponseModel[ModelConfigResponse])
 async def get_model_config(
-    model_request: ModelConfigRequest,
+    model_request: Annotated[ModelConfigRequest, Query()],
     manager: ModelConfigManager = Depends(get_model_config_manager),
     current_user: dict = Depends(get_current_user)
 ):
@@ -249,7 +249,7 @@ async def update_model_config(
 
 @models_router.delete("/", response_model=ResponseModel[dict])
 async def delete_model_config(
-    model_request: ModelConfigRequest,
+    model_request: Annotated[ModelConfigRequest, Query()],
     manager: ModelConfigManager = Depends(get_model_config_manager),
     current_user: dict = Depends(get_current_user)
 ):

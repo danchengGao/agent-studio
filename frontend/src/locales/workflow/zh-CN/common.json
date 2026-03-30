@@ -79,6 +79,19 @@
     "fetchHistoryVersionFailed": "获取历史版本失败",
     "versionHistory": "版本历史"
   },
+  "exportChoice": {
+    "title": "导出工作流",
+    "intro": "将工作流下载为 JSON 文件，请按使用场景选择格式。",
+    "canvasTitle": "画布数据",
+    "canvasDesc": "包含节点、连线与布局；与编辑器工具栏导出一致，可在本系统内通过「导入」恢复。",
+    "canvasNotice": "支持本系统导入",
+    "dslTitle": "可执行配置",
+    "dslDesc": "供运行引擎使用的结构化工作流定义（JSON），适合对接外部系统或离线备份；与「画布数据」不是同一种文件。",
+    "dslNotice": "暂不支持本系统导入",
+    "hint": "备份或迁移画布时，建议选择「画布数据」。",
+    "confirm": "下载",
+    "cancel": "取消"
+  },
   "ui": {
     "draft": "草稿",
     "switchedToVersion": "已切换到版本 {{version}}",

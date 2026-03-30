@@ -1,6 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Copy, Edit, Trash2 } from 'lucide-react'
+import { Clock, Copy, Download, Edit, Trash2 } from 'lucide-react'
 import { ConfigCard, ConfigCardAction, ConfigCardTag, EditingState } from '../../../components/Common/common-grid'
 import { CardFooterRow } from '../../../components/Common/common-grid'
 import WorkflowIcon from '@/assets/icons/workflow.svg?react'
@@ -28,6 +28,7 @@ interface WorkflowCardProps {
   onSaveEdit: () => void
   onCancelEdit: () => void
   onCopy: () => void
+  onExport?: () => void
   onDelete: () => void
   isUpdating?: boolean
 }
@@ -62,6 +63,7 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
   onSaveEdit,
   onCancelEdit,
   onCopy,
+  onExport,
   onDelete,
   isUpdating = false,
 }) => {
@@ -90,6 +92,16 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
       icon: <Copy className="w-4 h-4" />,
       onClick: onCopy,
     },
+    ...(onExport
+      ? [
+          {
+            key: 'export',
+            label: t('common.buttons.export'),
+            icon: <Download className="w-4 h-4" />,
+            onClick: onExport,
+          } as ConfigCardAction,
+        ]
+      : []),
     {
       key: 'delete',
       label: t('common.buttons.delete'),

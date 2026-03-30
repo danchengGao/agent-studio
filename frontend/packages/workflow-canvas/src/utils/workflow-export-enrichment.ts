@@ -323,15 +323,25 @@ export async function fetchPluginExportLikeAgentDeps(
   spaceId: string,
   spec: WorkflowPluginUsageSpec,
 ): Promise<Record<string, unknown> | null> {
-  const preferVersion = spec.versions.find(v => v && v.toLowerCase() !== 'draft') ?? spec.versions[0]
-  const plugin_version = preferVersion && preferVersion.trim() !== '' ? preferVersion.trim() : undefined
+  const sid = String(spaceId ?? '').trim()
+  const pid = String(spec.plugin_id ?? '').trim()
+  if (!sid || !pid) {
+    return null
+  }
+
+  const preferRaw = spec.versions.find(v => {
+    if (v == null || v === '') return false
+    return String(v).toLowerCase() !== 'draft'
+  }) ?? spec.versions[0]
+  const plugin_version =
+    preferRaw != null && String(preferRaw).trim() !== '' ? String(preferRaw).trim() : undefined
 
   try {
     const [getRes, listRes] = await Promise.all([
-      PluginService.getPlugin({ space_id: spaceId, plugin_id: spec.plugin_id, plugin_version }),
+      PluginService.getPlugin({ space_id: sid, plugin_id: pid, plugin_version }),
       PluginService.getPluginApiList({
-        space_id: spaceId,
-        plugin_id: spec.plugin_id,
+        space_id: sid,
+        plugin_id: pid,
         plugin_version,
         page: 1,
         size: 500,

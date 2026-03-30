@@ -58,3 +58,35 @@ target: "Target Node ID"
    ![image](../images/64699c06-ac98-405e-b6c2-c603d122272f.png)
 
 6. Click "Open" to complete the import. After the import is complete, you will see the imported workflow on the workflow editor page.
+
+## Exporting Workflow DSL (Executable Configuration)
+
+In addition to canvas JSON export, the platform supports exporting a workflow as **executable configuration** (structured DSL in JSON) for the runtime engine or external systems. This format is **not** the same as **Canvas Data** in the workflow editor export flow and **cannot** be restored to the editor canvas via **Import** in this product.
+
+### Canvas Data vs Executable Configuration
+
+| Export mode | Purpose | Import in this product |
+| --- | --- | --- |
+| Canvas Data | Nodes, edges, and layout; matches the editor | Supported |
+| Executable Configuration (DSL) | Structured definition for the execution engine; integration or offline backup | Not supported |
+
+### Steps
+
+1. Log in to the openJiuwen platform.
+2. In the left navigation, open **Application Development** → **Workflow Orchestration** to view the workflow list.
+3. On the target workflow card, click the **"···"** (more) menu in the lower-right corner and choose **Export**.
+
+   ![image](../images/f0570b8431cf401abd8b0c1f63bf45bb.png)
+
+4. In the **Export Workflow** dialog, select **Executable Configuration**.
+
+   - **Canvas Data**: Use when you need to restore the canvas via **Import** in this system.
+   - **Executable Configuration**: This is the DSL, for engine execution, external integration, or offline archiving.
+
+   ![image](../images/c938fdf150c54461915a92efdd412792.png)
+
+5. Click **Download** to save the JSON file locally. The default filename is typically `{workflow-name}-dsl-export-{timestamp}.json` (actual name may vary).
+
+### Notes
+
+* Do not mix **Executable Configuration** with **Canvas Data**; use canvas export/import when you need to restore editable content in this system.

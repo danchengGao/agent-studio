@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Copy, Edit, Trash2 } from 'lucide-react'
+import { Copy, Download, Edit, Trash2 } from 'lucide-react'
 import { ConfigTable } from '@/components/Common/common-table'
 import { type SortState, type TableColumn, type RemoteQueryParams } from '@/components/Common/common-table'
 import { Empty } from '@/components/Common/Empty'
@@ -15,6 +15,7 @@ interface WorkflowTableViewProps {
   loading?: boolean
   searchTerm?: string
   onCopy: (workflowId: string, spaceId: string, workflowName: string) => void
+  onExport: (workflowId: string, spaceId: string, workflowName: string, workflowVersion?: string) => void
   onDelete: (workflowId: string, workflowName: string, workflowVersion?: string) => void
   onFetchData?: (params: RemoteQueryParams) => void
   onSortChange?: (sort: SortState) => void
@@ -26,6 +27,7 @@ export const WorkflowTableView: React.FC<WorkflowTableViewProps> = ({
   loading = false,
   searchTerm = '',
   onCopy,
+  onExport,
   onDelete,
   onFetchData,
   onSortChange,
@@ -133,6 +135,13 @@ export const WorkflowTableView: React.FC<WorkflowTableViewProps> = ({
             onClick: row => onCopy(row.workflow_id, row.space_id, row.name),
           },
           {
+            key: 'export',
+            icon: <Download className="w-4 h-4" />,
+            label: t('common.buttons.export'),
+            tooltip: t('common.buttons.export'),
+            onClick: row => onExport(row.workflow_id, row.space_id, row.name, row.workflow_version),
+          },
+          {
             key: 'delete',
             icon: <Trash2 className="w-4 h-4" />,
             label: t('workflows.workflowList.deleteWorkflow'),
@@ -142,7 +151,7 @@ export const WorkflowTableView: React.FC<WorkflowTableViewProps> = ({
         ],
       },
     ],
-    [navigate, onCopy, onDelete, t],
+    [navigate, onCopy, onDelete, onExport, t],
   )
 
   const tableData = useMemo(() => ({ columns, rows: workflows }), [columns, workflows])

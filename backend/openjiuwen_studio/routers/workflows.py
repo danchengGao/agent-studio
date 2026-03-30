@@ -435,6 +435,23 @@ async def workflow_export_py(
         ) from e
 
 
+@workflows_router.post("/export", response_model=ResponseModel[dict])
+async def workflow_export(
+    request: Dict, current_user: dict = Depends(get_current_user)
+):
+    """
+    导出工作流 JSON（OpenJiuwen native format）。
+    """
+    try:
+        req = validate_request(request, WorkflowId)
+        res = mgr.workflow_export(req, current_user)
+        return handle_response(res)
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed"
+        ) from e
+
+
 @workflows_router.post(
     "/get_execution_logs_create_list",
     response_model=ResponseModel[ExecutionLogsCreateList],

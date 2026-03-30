@@ -179,6 +179,17 @@ export class WorkflowService {
     })
     return response.data
   }
+
+  // 导出工作流
+  static async exportWorkflow(request: {
+    workflow_id: string
+    space_id: string
+    workflow_version?: string
+  }): Promise<{ code: number; message: string; data?: any }> {
+    const apiClient = getApiClient()
+    const response = await apiClient.post<{ code: number; message: string; data?: any }>(API_ENDPOINTS.WORKFLOWS.EXPORT, request)
+    return response.data
+  }
 }
 
 // 导出工作流服务实例

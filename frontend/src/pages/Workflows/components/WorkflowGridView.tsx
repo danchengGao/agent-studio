@@ -13,6 +13,7 @@ interface WorkflowGridViewProps {
   onSaveEdit: (workflowId: string) => void
   onCancelEdit: () => void
   onCopy: (workflowId: string, spaceId: string, workflowName: string) => void
+  onExport: (workflowId: string, spaceId: string, workflowName: string, workflowVersion?: string) => void
   onDelete: (workflowId: string, workflowName: string, workflowVersion?: string) => void
   savingWorkflowId?: string | null
 }
@@ -26,6 +27,7 @@ export const WorkflowGridView: React.FC<WorkflowGridViewProps> = ({
   onSaveEdit,
   onCancelEdit,
   onCopy,
+  onExport,
   onDelete,
   savingWorkflowId = null,
 }) => {
@@ -48,6 +50,7 @@ export const WorkflowGridView: React.FC<WorkflowGridViewProps> = ({
             onSaveEdit={() => onSaveEdit(workflow.workflow_id)}
             onCancelEdit={onCancelEdit}
             onCopy={() => onCopy(workflow.workflow_id, workflow.space_id, workflow.name)}
+            onExport={() => onExport(workflow.workflow_id, workflow.space_id, workflow.name, workflow.workflow_version)}
             onDelete={() => onDelete(workflow.workflow_id, workflow.name, workflow.workflow_version)}
             isUpdating={isUpdatingThis}
           />

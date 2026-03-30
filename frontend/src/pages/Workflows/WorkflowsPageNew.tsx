@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { Plus, Upload } from 'lucide-react'
 
 import {
+  WorkflowService,
   useCopyWorkflow,
   useDeleteWorkflow,
   useSearchWorkflows,
@@ -12,6 +13,12 @@ import {
   WorkflowSortBy,
   WorkflowSortOrder,
 } from '@test-agentstudio/api-client'
+import {
+  WorkflowExportChoiceDialog,
+  type WorkflowExportChoiceMode,
+  buildWorkflowExportEnrichment,
+  mergeWorkflowExportDocument,
+} from '@test-agentstudio/workflow-canvas'
 import ImportWorkflowDialog from '../../components/Workflows/ImportWorkflowDialog'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../Common/UnifiedSnackbar'
 import DeleteConfirmationDialog from '../../components/Common/DeleteConfirmationDialog'
@@ -65,6 +72,12 @@ const WorkflowsPage: React.FC = () => {
     workflowVersion: defaultWorkflowVersion,
   })
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+
+  type WorkflowExportChoiceState =
+    | { open: false }
+    | { open: true; workflowId: string; spaceId: string; workflowName: string; workflowVersion?: string }
+  const [workflowExportChoice, setWorkflowExportChoice] = useState<WorkflowExportChoiceState>({ open: false })
+  const [workflowExportChoiceLoading, setWorkflowExportChoiceLoading] = useState(false)
 
   const deleteWorkflow = useDeleteWorkflow()
   const updateWorkflow = useUpdateWorkflow()
@@ -347,6 +360,134 @@ const WorkflowsPage: React.FC = () => {
     )
   }
 
+  const openWorkflowExportChoice = useCallback((workflowId: string, spaceId: string, workflowName: string, workflowVersion?: string) => {
+    setWorkflowExportChoice({
+      open: true,
+      workflowId,
+      spaceId,
+      workflowName,
+      workflowVersion,
+    })
+  }, [])
+
+  const closeWorkflowExportChoice = useCallback(() => {
+    setWorkflowExportChoice({ open: false })
+  }, [])
+
+  const downloadDslExportJson = useCallback(
+    async (workflowId: string, spaceId: string, workflowName: string, workflowVersion?: string): Promise<boolean> => {
+      const response = await WorkflowService.exportWorkflow({
+        workflow_id: workflowId,
+        space_id: spaceId || user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID,
+        workflow_version: workflowVersion || defaultWorkflowVersion,
+      })
+
+      if (response.code !== 200 || !response.data) {
+        showError(response.message || t('workflows.workflowList.exportFailed'))
+        return false
+      }
+
+      const now = new Date()
+      const timestamp =
+        now.getFullYear().toString() +
+        (now.getMonth() + 1).toString().padStart(2, '0') +
+        now.getDate().toString().padStart(2, '0') +
+        now.getHours().toString().padStart(2, '0') +
+        now.getMinutes().toString().padStart(2, '0') +
+        now.getSeconds().toString().padStart(2, '0')
+
+      const exportName = workflowName || response.data.name || 'workflow'
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${exportName}-export-${timestamp}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      showSuccess(t('workflows.workflowList.exportSuccess'))
+      return true
+    },
+    [defaultWorkflowVersion, showError, showSuccess, t, user?.spaceId],
+  )
+
+  const downloadCanvasExportFromServer = useCallback(
+    async (workflowId: string, spaceId: string, workflowName: string, workflowVersion?: string): Promise<boolean> => {
+      const sid = spaceId || user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
+      const canvasRes = await WorkflowService.getWorkflowCanvas({
+        workflow_id: workflowId,
+        space_id: sid,
+        version: workflowVersion || defaultWorkflowVersion,
+      })
+
+      if (canvasRes.code !== 200 || !canvasRes.data?.workflow) {
+        showError(canvasRes.msg || t('workflows.workflowList.exportFailed'))
+        return false
+      }
+
+      let documentJson: unknown = {}
+      const rawSchema = canvasRes.data.workflow.schema ?? ''
+      if (typeof rawSchema === 'string' && rawSchema.trim()) {
+        try {
+          documentJson = JSON.parse(rawSchema) as unknown
+        } catch {
+          showError(t('workflows.workflowList.exportFailed'))
+          return false
+        }
+      }
+
+      const enrichment = await buildWorkflowExportEnrichment(documentJson, sid)
+      const payload = mergeWorkflowExportDocument(documentJson, enrichment)
+      const dataStr = JSON.stringify(payload, null, 2)
+      const blob = new Blob([dataStr], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const name = workflowName || canvasRes.data.workflow.name || 'workflow'
+      a.download = `${name}-export-${Date.now()}.json`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      showSuccess(t('workflows.workflowList.exportSuccess'))
+      return true
+    },
+    [defaultWorkflowVersion, showError, showSuccess, t, user?.spaceId],
+  )
+
+  const handleWorkflowExportChoiceConfirm = useCallback(
+    async (mode: WorkflowExportChoiceMode) => {
+      if (!workflowExportChoice.open) {
+        return
+      }
+      const { workflowId, spaceId, workflowName, workflowVersion } = workflowExportChoice
+      setWorkflowExportChoiceLoading(true)
+      try {
+        const ok =
+          mode === 'dsl'
+            ? await downloadDslExportJson(workflowId, spaceId, workflowName, workflowVersion)
+            : await downloadCanvasExportFromServer(workflowId, spaceId, workflowName, workflowVersion)
+        if (ok) {
+          closeWorkflowExportChoice()
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : t('common.messages.unknownError')
+        showError(t('workflows.workflowList.exportError', { name: workflowName, error: errorMessage }))
+      } finally {
+        setWorkflowExportChoiceLoading(false)
+      }
+    },
+    [
+      workflowExportChoice,
+      downloadDslExportJson,
+      downloadCanvasExportFromServer,
+      closeWorkflowExportChoice,
+      showError,
+      t,
+    ],
+  )
+
   const handleImportSuccess = () => {
     showSuccess(t('workflows.import.success'))
     refetch() // Refresh workflow list
@@ -435,11 +576,12 @@ const WorkflowsPage: React.FC = () => {
         onSaveEdit={handleSaveEditing}
         onCancelEdit={handleCancelEditing}
         onCopy={handleCopyWorkflow}
+        onExport={openWorkflowExportChoice}
         onDelete={handleDeleteWorkflow}
         savingWorkflowId={savingWorkflowId}
       />
     ),
-    [processedWorkflows, editingState, savingWorkflowId, searchOptimization.debouncedSearchTerm, handleStartEditing, handleUpdateValue, handleSaveEditing, handleCancelEditing, handleCopyWorkflow, handleDeleteWorkflow],
+    [processedWorkflows, editingState, savingWorkflowId, searchOptimization.debouncedSearchTerm, handleStartEditing, handleUpdateValue, handleSaveEditing, handleCancelEditing, handleCopyWorkflow, openWorkflowExportChoice, handleDeleteWorkflow],
   )
 
   // 处理表格数据获取和排序变化
@@ -466,13 +608,14 @@ const WorkflowsPage: React.FC = () => {
         loading={isLoading}
         searchTerm={searchOptimization.debouncedSearchTerm}
         onCopy={handleCopyWorkflow}
+        onExport={openWorkflowExportChoice}
         onDelete={handleDeleteWorkflow}
         onFetchData={handleFetchTableData}
         onSortChange={handleFetchTableData}
         defaultSort={sortBy && sortOrder ? { field: sortBy, order: sortOrder } : { field: WorkflowSortBy.update_time, order: WorkflowSortOrder.desc }}
       />
     ),
-    [processedWorkflows, isLoading, searchOptimization.debouncedSearchTerm, handleCopyWorkflow, handleDeleteWorkflow, handleFetchTableData, sortBy, sortOrder],
+    [processedWorkflows, isLoading, searchOptimization.debouncedSearchTerm, handleCopyWorkflow, openWorkflowExportChoice, handleDeleteWorkflow, handleFetchTableData, sortBy, sortOrder],
   )
 
   // 处理错误信息
@@ -533,6 +676,14 @@ const WorkflowsPage: React.FC = () => {
         onClose={() => setImportDialogOpen(false)}
         onSuccess={handleImportSuccess}
         spaceId={user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID}
+      />
+
+      <WorkflowExportChoiceDialog
+        visible={workflowExportChoice.open}
+        defaultMode="dsl"
+        onCancel={closeWorkflowExportChoice}
+        onConfirm={handleWorkflowExportChoiceConfirm}
+        confirmLoading={workflowExportChoiceLoading}
       />
 
       {/* Unified Snackbar */}
