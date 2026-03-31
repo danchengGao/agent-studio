@@ -97,4 +97,5 @@ process_all_services() {
     process_service "JIUWEN" "BACKEND"
     upgrade_sqlite
     process_service "JIUWEN" "FRONTEND"
+    process_services "RUNTIME"
 }

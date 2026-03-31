@@ -112,6 +112,7 @@ create_all_dbs() {
         "${RUNTIME_VARS["AGENT_DB_NAME"]}"
         "${RUNTIME_VARS["OPS_DB_NAME"]}"
         "${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
+        "${DEPLOY_VARS["RUNTIME_DB_NAME"]}"
     )
 
     for db_name in "${db_names[@]}"; do

@@ -168,6 +168,14 @@ configure_module_env() {
                 DEPLOY_VARS["IS_UP_DEEPSEARCH"]="true"
                 RUNTIME_VARS["DEEPSEARCH_AGENT_HOST"]=${DEPLOY_VARS["DEEPSEARCH_SERVICE"]}
                 RUNTIME_VARS["DEEPSEARCH_AGENT_PORT"]="8000"
+                ;;
+            RUNTIME)
+                DEPLOY_VARS["HAS_RUNTIME"]="true"
+                DEPLOY_VARS["IS_UP_RUNTIME"]="true"
+                if [ -z "${DEPLOY_VARS["IP"]:-}" ]; then
+                    error "Please define IP in .env.custom"
+                fi
+                ;;
         esac
     done
 }

@@ -407,6 +407,11 @@ upgrade_mysql() {
         && ! version_is_less_than "${DEPLOY_VARS["VERSION"]}" "0.1.4"; then
         create_db "${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
     fi
+
+    if version_is_less_than "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" "0.1.7" \
+        && ! version_is_less_than "${DEPLOY_VARS["VERSION"]}" "0.1.7"; then
+        create_db "${DEPLOY_VARS["RUNTIME_DB_NAME"]}"
+    fi
     success "[UPGRADING] MySQL upgrade process Done!"
 }
 

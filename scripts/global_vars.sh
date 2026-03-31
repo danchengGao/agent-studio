@@ -56,6 +56,8 @@ declare -A NAMES=(
     ["SANDBOX_GATEWAY_DOCKER"]="jiuwen-sandbox-gateway"
     ["SANDBOX_SERVER_SERVICE"]="sandbox-server"
     ["SANDBOX_SERVER_DOCKER"]="jiuwen-sandbox-server"
+    ["RUNTIME_SERVICE"]="runtime-server"
+    ["RUNTIME_DOCKER"]="jiuwen-runtime-server"
 )
 
 # ===== Host port variables to allocate for services (dynamic assignment) =====
@@ -72,6 +74,7 @@ declare -ga PORTS=(
     SANDBOX_GATEWAY_HOST_PORT
     SANDBOX_SERVER_HOST_PORT
     DEEPSEARCH_HOST_PORT
+    RUNTIME_HOST_PORT
 )
 
 # ===== Container/service name variables for network address resolution =====
@@ -96,6 +99,8 @@ declare -ga CONTAINERS_ADDRS=(
     SANDBOX_SERVER_DOCKER
     DEEPSEARCH_SERVICE
     DEEPSEARCH_DOCKER
+    RUNTIME_SERVICE
+    RUNTIME_DOCKER
 )
 
 # ==== Global deploy associative array ====
@@ -107,6 +112,7 @@ declare -A DEPLOY_VARS=(
     ["HAS_DEEPSEARCH"]="false"
     ["HAS_JIUWEN"]="false"
     ["HAS_UPGRADE"]="false"
+    ["HAS_RUNTIME"]="false"
     ["IS_UP_MYSQL"]="false"
     ["IS_UP_ETCD"]="false"
     ["IS_UP_MINIO"]="false"
@@ -118,6 +124,7 @@ declare -A DEPLOY_VARS=(
     ["IS_UP_BACKEND"]="false"
     ["IS_UP_FRONTEND"]="false"
     ["IS_UP_UPGRADE_TOOL"]="false"
+    ["IS_UP_RUNTIME"]="false"
     ["IS_UPGRADE_MYSQL"]="false"
     ["IS_UPGRADE_MILVUS"]="false"
 
@@ -150,7 +157,7 @@ declare -ga AVAILABLE_PORTS=()
 declare -ga ALLOCATED_PORTS=()
 
 # ==== All available modules ====
-declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN")
+declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN" "RUNTIME")
 
 # ==== components of module ====
 declare -A COMPONENTS=(
@@ -161,6 +168,7 @@ declare -A COMPONENTS=(
     ["SANDBOX"]="SANDBOX_SERVER SANDBOX_GATEWAY"
     ["DEEPSEARCH"]="DEEPSEARCH"
     ["JIUWEN"]="BACKEND FRONTEND"
+    ["RUNTIME"]="RUNTIME"
 )
 
 
@@ -173,6 +181,7 @@ declare -A COMPOSE_TEMPLATE_FILES=(
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.template.yml"
     ["DEEPSEARCH"]="${SCRIPT_DIR}/conf/docker-deepsearch.template.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.template.yml"
+    ["RUNTIME"]="${SCRIPT_DIR}/conf/docker-runtime.template.yml"
 )
 
 # ==== Paths to final generated Docker Compose files per module ==== 
@@ -184,6 +193,7 @@ declare -A COMPOSE_FILES=(
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.yml"
     ["DEEPSEARCH"]="${SCRIPT_DIR}/conf/docker-deepsearch.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.yml"
+    ["RUNTIME"]="${SCRIPT_DIR}/conf/docker-runtime.yml"
 )
 
 

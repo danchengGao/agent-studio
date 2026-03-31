@@ -105,7 +105,7 @@ process_module_args(){
     info "ARGS_MODULES: ${ARGS_MODULES[*]}"
 
     if [ ${#ARGS_MODULES[@]} -eq 0 ]; then
-        for module in "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN"
+        for module in "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN" "RUNTIME"
         do
             DEPLOY_VARS["HAS_${module}"]="true"
         done
