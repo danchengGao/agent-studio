@@ -289,7 +289,23 @@ class AgentRunner:
             # 配置未变更，直接返回缓存实例
             return catch_instance
 
-        # 配置已变更或首次创建，重新编译Agent
+        # 配置已变更或首次创建，需要重新编译Agent
+        # 在重新编译之前，先清理旧实例的工作流（如果存在）
+        if (catch_instance
+                and hasattr(catch_instance, 'agent_config')
+                and hasattr(catch_instance.agent_config, 'workflows')):
+            old_workflows = [
+                (w.id, w.version) 
+                for w in catch_instance.agent_config.workflows
+            ]
+            if old_workflows:
+                logger.info(
+                    f"[AGENT_CACHE] Removing {len(old_workflows)} old workflows from cached agent "
+                    f"before recompilation - Agent: {agent_id}, Version: {agent_version}"
+                )
+                catch_instance.remove_workflows(old_workflows)
+
+        # 重新编译Agent
         invokable_agent = await self.create_new_agent(agent_config, space_id, current_user)
         if catch_instance:
             invokable_agent._context_engine._context_pool = catch_instance._context_engine._context_pool
@@ -323,6 +339,60 @@ class AgentRunner:
                 del self._agent_instances[conversation_id][agent_key]
                 return True
         return False
+
+    def clear_agent_cache_for_all_conversations(
+            self,
+            agent_id: str,
+            agent_version: str = "draft"
+    ) -> int:
+        """
+        清除所有会话中的指定Agent缓存
+        
+        当Agent配置变更时（如工作流内容更新），需要调用此方法清除所有缓存，
+        确保下次运行时使用最新的配置。
+        
+        Args:
+            agent_id: Agent ID
+            agent_version: Agent版本号，默认为draft
+        
+        Returns:
+            int: 清除的缓存数量
+        """
+        agent_key = f"{agent_id}_{agent_version}"
+        cleared_count = 0
+        
+        for conversation_id in list(self._agent_instances.keys()):
+            if agent_key in self._agent_instances[conversation_id]:
+                try:
+                    (_, catch_instance) = self._agent_instances[conversation_id][agent_key]
+                    # 清理工作流资源
+                    if hasattr(catch_instance, 'agent_config') and hasattr(catch_instance.agent_config, 'workflows'):
+                        old_workflows = [
+                            (w.id, w.version) 
+                            for w in catch_instance.agent_config.workflows
+                        ]
+                        if old_workflows:
+                            logger.info(
+                                f"[AGENT_CACHE_CLEAR] Removing {len(old_workflows)} workflows from agent "
+                                f"{agent_id} (conversation: {conversation_id})"
+                            )
+                            catch_instance.remove_workflows(old_workflows)
+                    
+                    del self._agent_instances[conversation_id][agent_key]
+                    cleared_count += 1
+                    logger.info(
+                        f"[AGENT_CACHE_CLEAR] Cleared agent cache - Agent: {agent_id}, "
+                        f"Version: {agent_version}, Conversation: {conversation_id}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"[AGENT_CACHE_CLEAR] Failed to clear agent cache for conversation {conversation_id}: {e}"
+                    )
+        
+        logger.info(
+            f"[AGENT_CACHE_CLEAR] Total cleared {cleared_count} cache entries for agent {agent_id}"
+        )
+        return cleared_count
         
     async def _create_mapping_table(self, agent_config: Union[ReActAgentConfig, WorkflowAgentConfig], space_id: str) -> Dict[str, str]:
 

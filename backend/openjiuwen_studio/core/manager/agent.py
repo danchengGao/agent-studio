@@ -752,7 +752,23 @@ def agent_save(
         f"[AGENT_SAVE] Agent saved - ID: {req.agent_id}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 6. 返回保存结果
+    # 6. 清除agent实例缓存，确保下次运行时使用最新配置
+    try:
+        from openjiuwen_studio.core.executor.agent.agent_runner import agent_mgr
+        cleared_count = agent_mgr.clear_agent_cache_for_all_conversations(
+            agent_id=req.agent_id,
+            agent_version="draft"  # 保存时总是draft版本
+        )
+        logger.info(
+            f"[AGENT_SAVE] Cleared {cleared_count} cached agent instances for agent {req.agent_id}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[AGENT_SAVE] Failed to clear agent cache for agent {req.agent_id}: {e}"
+        )
+        # 缓存清除失败不影响保存结果
+
+    # 7. 返回保存结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="save agent success",
