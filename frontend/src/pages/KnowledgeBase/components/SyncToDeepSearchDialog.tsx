@@ -438,29 +438,6 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({
                     </select>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleStep1Next}
-                  disabled={
-                    isLoading ||
-                    deepSearchEmbeddingConfigsLoading ||
-                    deepSearchEmbeddingConfigs.length === 0 ||
-                    selectedDeepSearchEmbeddingConfigId == null
-                  }
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {t('knowledgeBases.syncToDeepSearch.syncing') || '同步中...'}
-                    </>
-                  ) : (
-                    <>
-                      {t('common.buttons.next')}
-                      <ArrowRight className="w-4 h-4 ml-1" />
-                    </>
-                  )}
-                </button>
                 {uploadedCount > 0 && (
                   <p className="mt-2 text-sm text-green-600">
                     {t('knowledgeBases.syncToDeepSearch.uploadedCount', { count: uploadedCount }) ||
@@ -650,15 +627,25 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({
                 <button
                   type="button"
                   onClick={handleStep1Next}
-                  disabled={isLoading}
+                  disabled={
+                    isLoading ||
+                    deepSearchEmbeddingConfigsLoading ||
+                    deepSearchEmbeddingConfigs.length === 0 ||
+                    selectedDeepSearchEmbeddingConfigId == null
+                  }
                   className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center"
                 >
                   {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {t('knowledgeBases.syncToDeepSearch.syncing') || '同步中...'}
+                    </>
                   ) : (
-                    <ArrowRight className="w-4 h-4 mr-1" />
+                    <>
+                      {t('common.buttons.next')}
+                      <ArrowRight className="w-4 h-4 ml-1" />
+                    </>
                   )}
-                  {t('common.buttons.next')}
                 </button>
               ) : (
                 <button
