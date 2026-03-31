@@ -1443,6 +1443,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
         <AddWeblinkDialog
           open={showAddDialog}
           knowledgeBase={knowledgeBase}
+          existingWeblinkCount={totalDocuments}
           onClose={() => setShowAddDialog(false)}
           onWeblinksAdded={() => {
             setCurrentPage(1)

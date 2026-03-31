@@ -96,6 +96,8 @@ from openjiuwen_studio.schemas.knowledge_base import (
 )
 
 _CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "milvus")
+# 每个 weblink 类型知识库允许的最大链接条数（含已存在 + 本次提交）
+WEBLINK_KB_MAX_LINKS = 50
 
 
 @dataclass
@@ -1648,7 +1650,7 @@ async def _parse_url(url: str, doc_id: str) -> List[Document]:
     parser = AutoLinkParser()
     if not parser.supports(url):
         raise ValueError(f"Parser does not support URL: {url}")
-    documents = await parser.parse(doc=url, doc_id=doc_id)
+    documents = await parser.parse(doc=url, doc_id=doc_id, verify=False)
     if not documents:
         raise ValueError(f"No content parsed from URL: {url}")
     logger.debug(f"[PARSE] Parsed URL - url: {url}, documents: {len(documents)}")
@@ -4217,12 +4219,43 @@ def weblink_add(req: WeblinkAddRequest, current_user: dict) -> ResponseModel:
             code=status.HTTP_400_BAD_REQUEST,
             message="Knowledge base is not a weblink type",
         )
-    max_urls = 50
-    if len(req.urls) > max_urls:
+    if len(req.urls) > WEBLINK_KB_MAX_LINKS:
         return ResponseModel(
             code=status.HTTP_400_BAD_REQUEST,
-            message=f"URLs count exceeds limit ({max_urls})",
+            message=(
+                f"At most {WEBLINK_KB_MAX_LINKS} URL lines per request "
+                f"(received {len(req.urls)})"
+            ),
         )
+    valid_urls: list[str] = []
+    for url in req.urls:
+        u = (url or "").strip()
+        if not u or not u.lower().startswith(("http://", "https://")):
+            continue
+        valid_urls.append(u)
+    if valid_urls:
+        list_result = knowledge_base_repository.weblink_list(
+            KBWeblink(
+                kb=KBDetails(
+                    space_id=req.space_id,
+                    kb_id=req.kb_id,
+                    index_manager_type=_CURR_INDEX_TYPE,
+                )
+            ),
+            page=1,
+            size=1,
+        )
+        existing = 0
+        if list_result.code == status.HTTP_200_OK and list_result.data:
+            existing = int(list_result.data.get("total") or 0)
+        if existing + len(valid_urls) > WEBLINK_KB_MAX_LINKS:
+            return ResponseModel(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=(
+                    f"Weblink knowledge base allows at most {WEBLINK_KB_MAX_LINKS} links "
+                    f"({existing} existing; cannot add {len(valid_urls)} in this batch)"
+                ),
+            )
     links = []
     success_count = 0
     failed_count = 0

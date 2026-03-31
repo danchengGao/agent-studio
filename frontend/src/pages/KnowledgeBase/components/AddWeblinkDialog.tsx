@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, ArrowLeft, ArrowRight, Check, Info, HelpCircle, Play, Loader2, CheckCircle, Link2 } from 'lucide-react'
-import { Tooltip } from '@mui/material'
+import { Tooltip, Alert } from '@mui/material'
 import { KnowledgeBase } from '@/types/knowledgeBase'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { ENV_CONFIG } from '@/config/environment'
@@ -13,9 +13,19 @@ import type {
   IndexingStrategy,
 } from '@test-agentstudio/api-client'
 
+/** 与后端 WEBLINK_KB_MAX_LINKS 一致：每个 weblink 知识库链接总数上限 */
+const WEBLINK_KB_MAX_LINKS = 50
+
+function urlsMatchLastAdded(valid: string[], lastAddedUrls: string[], addedWeblinkIds: string[]): boolean {
+  if (addedWeblinkIds.length === 0 || valid.length !== lastAddedUrls.length) return false
+  return valid.every((u, i) => u === lastAddedUrls[i])
+}
+
 interface AddWeblinkDialogProps {
   open: boolean
   knowledgeBase: KnowledgeBase
+  /** 当前知识库已有链接数（用于总数 50 条上限校验） */
+  existingWeblinkCount?: number
   onClose: () => void
   onSuccess: (processingWeblinkIds?: string[]) => void
   onWeblinksAdded?: () => void
@@ -33,6 +43,7 @@ interface FormData {
 const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
   open,
   knowledgeBase,
+  existingWeblinkCount = 0,
   onClose,
   onSuccess,
   onWeblinksAdded,
@@ -47,6 +58,9 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
   const [urlText, setUrlText] = useState('')
   const [addedWeblinkIds, setAddedWeblinkIds] = useState<string[]>([])
   const [addedUrls, setAddedUrls] = useState<string[]>([])
+  /** 第一步校验错误：对话框内展示，避免全屏层挡住 Toast 时「点了没反应」 */
+  const [step1Error, setStep1Error] = useState('')
+  const prevOpenRef = useRef(false)
   const [formData, setFormData] = useState<FormData>({
     parsingStrategy: '1',
     segmentationStrategy: '1',
@@ -141,11 +155,12 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
     })
   }
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setCurrentStep(1)
     setUrlText('')
     setAddedWeblinkIds([])
     setAddedUrls([])
+    setStep1Error('')
     setModelTestPassed(false)
     setTestedModelId(null)
     setFormData({
@@ -156,7 +171,14 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
       enableGraphEnhancement: false,
       llmModelId: null,
     })
-  }
+  }, [])
+
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      resetForm()
+    }
+    prevOpenRef.current = open
+  }, [open, resetForm])
 
   const handleClose = () => {
     resetForm()
@@ -164,25 +186,38 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
   }
 
   const handleAddUrls = async () => {
+    const existingCount = Number(existingWeblinkCount) || 0
     const urls = parseUrls(urlText)
     if (urls.length === 0) {
-      showError(t('knowledgeBases.addWeblink.noUrls') || '请输入至少一个URL')
+      const msg = t('knowledgeBases.addWeblink.noUrls') || '请输入至少一个URL'
+      setStep1Error(msg)
+      showError(msg)
       return false
     }
     const { valid, invalid } = validateUrls(urls)
     if (invalid.length > 0) {
-      showError(
+      const msg =
         t('knowledgeBases.addWeblink.invalidUrls') ||
-          `以下URL无效（需以 http:// 或 https:// 开头）: ${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`
-      )
+        `以下URL无效（需以 http:// 或 https:// 开头）: ${invalid.slice(0, 3).join(', ')}${invalid.length > 3 ? '...' : ''}`
+      setStep1Error(msg)
+      showError(msg)
       return false
     }
-    if (valid.length > 50) {
-      showError(t('knowledgeBases.addWeblink.tooManyUrls') || '单次最多添加50个URL')
+    if (existingCount + valid.length > WEBLINK_KB_MAX_LINKS) {
+      const msg =
+        t('knowledgeBases.addWeblink.exceedsKbLimit', {
+          max: WEBLINK_KB_MAX_LINKS,
+          existing: existingCount,
+          adding: valid.length,
+        }) ||
+        `超过上限：最多 ${WEBLINK_KB_MAX_LINKS} 条，当前知识库已有 ${existingCount} 条，本次 ${valid.length} 条。`
+      setStep1Error(msg)
+      showError(msg)
       return false
     }
 
     setIsLoading(true)
+    setStep1Error('')
     try {
       const response = await KnowledgeBaseService.addWeblinks({
         space_id: spaceId,
@@ -200,14 +235,17 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
         if (onWeblinksAdded) onWeblinksAdded()
         return ids
       } else {
-        showError(response.message || t('knowledgeBases.addWeblink.addFailed') || '添加失败')
+        const msg = response.message || t('knowledgeBases.addWeblink.addFailed') || '添加失败'
+        setStep1Error(msg)
+        showError(msg)
         return []
       }
     } catch (error) {
-      showError(
-        t('knowledgeBases.addWeblink.addFailed') ||
-          `添加失败: ${error instanceof Error ? error.message : String(error)}`
-      )
+      const errMsg = error instanceof Error ? error.message : String(error)
+      const msg =
+        (t('knowledgeBases.addWeblink.addFailed') || '添加失败') + (errMsg ? `: ${errMsg}` : '')
+      setStep1Error(msg)
+      showError(msg)
       return []
     } finally {
       setIsLoading(false)
@@ -273,38 +311,62 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
     }
   }
 
+  const goToStep2 = () => {
+    setIsTransitioning(true)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setCurrentStep(2)
+        setTimeout(() => setIsTransitioning(false), 100)
+      })
+    })
+  }
+
   const handleNext = async () => {
     if (isLoading || isTransitioning) return
     try {
       if (currentStep === 1) {
+        const existingCount = Number(existingWeblinkCount) || 0
         const urls = parseUrls(urlText)
         if (urls.length === 0) {
-          showError(t('knowledgeBases.addWeblink.noUrls') || '请输入至少一个URL')
+          if (addedWeblinkIds.length > 0) {
+            setStep1Error('')
+            goToStep2()
+            return
+          }
+          const msg = t('knowledgeBases.addWeblink.noUrls') || '请输入至少一个URL'
+          setStep1Error(msg)
+          showError(msg)
           return
         }
         const { valid, invalid } = validateUrls(urls)
         if (invalid.length > 0) {
-          showError(t('knowledgeBases.addWeblink.invalidUrls') || '请确保所有URL以 http:// 或 https:// 开头')
+          const msg =
+            t('knowledgeBases.addWeblink.invalidUrls') || '请确保所有URL以 http:// 或 https:// 开头'
+          setStep1Error(msg)
+          showError(msg)
           return
         }
-        if (addedWeblinkIds.length > 0) {
-          setIsTransitioning(true)
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setCurrentStep(2)
-              setTimeout(() => setIsTransitioning(false), 100)
-            })
-          })
+        if (existingCount + valid.length > WEBLINK_KB_MAX_LINKS) {
+          const msg =
+            t('knowledgeBases.addWeblink.exceedsKbLimit', {
+              max: WEBLINK_KB_MAX_LINKS,
+              existing: existingCount,
+              adding: valid.length,
+            }) ||
+            `超过上限：最多 ${WEBLINK_KB_MAX_LINKS} 条，当前知识库已有 ${existingCount} 条，本次 ${valid.length} 条。`
+          setStep1Error(msg)
+          showError(msg)
+          return
+        }
+        const alreadyAddedSame = urlsMatchLastAdded(valid, addedUrls, addedWeblinkIds)
+        if (alreadyAddedSame) {
+          setStep1Error('')
+          goToStep2()
         } else {
           const ids = await handleAddUrls()
           if (Array.isArray(ids) && ids.length > 0) {
-            setIsTransitioning(true)
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                setCurrentStep(2)
-                setTimeout(() => setIsTransitioning(false), 100)
-              })
-            })
+            setStep1Error('')
+            goToStep2()
           }
         }
       } else if (currentStep === 2) {
@@ -540,15 +602,23 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
                   {t('knowledgeBases.addWeblink.urlDescription') ||
                     '每行输入一个URL，支持 http:// 和 https:// 链接（如网页、微信公众号文章等）'}
                 </p>
+                {step1Error ? (
+                  <Alert severity="error" className="mb-4" onClose={() => setStep1Error('')}>
+                    {step1Error}
+                  </Alert>
+                ) : null}
                 <textarea
                   value={urlText}
-                  onChange={e => setUrlText(e.target.value)}
+                  onChange={e => {
+                    setStep1Error('')
+                    setUrlText(e.target.value)
+                  }}
                   placeholder={t('knowledgeBases.addWeblink.urlPlaceholder') || 'https://example.com/page\nhttps://mp.weixin.qq.com/...'}
                   rows={8}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-2">
-                  {t('knowledgeBases.addWeblink.urlHint') || '单次最多50个URL'}
+                  {t('knowledgeBases.addWeblink.urlHint', { max: WEBLINK_KB_MAX_LINKS })}
                 </p>
                 {addedUrls.length > 0 && (
                   <div className="mt-4">

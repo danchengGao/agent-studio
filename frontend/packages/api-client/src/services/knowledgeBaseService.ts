@@ -248,7 +248,10 @@ export class KnowledgeBaseService {
       return response.data
     } catch (error) {
       console.error('添加链接API调用失败:', error)
-      throw new Error(`添加链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+      if (error instanceof Error && error.message) {
+        throw error
+      }
+      throw new Error(`添加链接失败: ${String(error)}`)
     }
   }
 
