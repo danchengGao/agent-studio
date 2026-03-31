@@ -2,7 +2,7 @@
 
 The openJiuwen platform supports publishing configured agents to the runtime environment. On the Publish Management page, you can chat with the published agent and view how to call the runtime agent through APIs. You can also integrate the agent into your own business systems through APIs.
 
----
+>Note: In this version, the published agent does not support the invocation of knowledge bases and memories.
 
 ## Publish an Agent
 

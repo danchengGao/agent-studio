@@ -32,12 +32,12 @@
   * `check_python.sh`：检查 Python 是否安装，未安装则安装 Python
   * `check_mysql.sh`：检查 MySQL 是否安装，未安装则安装 MySQL
   * `config_mysql.sh`：配置 MySQL（创建数据库、用户等）
-  * `fetch_codes.sh`：克隆 agent-studio 代码仓库（支持指定分支）
-  * `user_config.sh`：用户配置文件（可选，包含代理、NVM 镜像、pip 源、npm 源配置）
+  * `manage_service.sh`：服务管理，管理 Runtime、后端与前端的启动、停止、重启与状态
+  * `user_config.sh`：用户配置文件（可选，包含代理、uv 源、NVM 镜像、npm 源配置）
 
-#### 2. 配置代理、pip 源、NVM 镜像和 npm 源（可选）
+#### 2. 配置代理、uv 源、NVM 镜像和 npm 源（可选）
 
-如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 pip 源、NVM Node.js 镜像或 npm 源，可以在 `user_config.sh` 文件中进行配置：
+如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 uv 源、NVM Node.js 镜像或 npm 源，可以在 `user_config.sh` 文件中进行配置：
 
 * 打开 `user_config.sh` 文件，修改以下变量：
 
@@ -47,9 +47,9 @@
   HTTPS_PROXY=""  # HTTPS 代理地址，例如 http://127.0.0.1:7890
   SSL_VERIFY=""   # 可选：true/false（对应 git http.sslVerify）
 
-  # pip 源配置（可选）
-  PIP_INDEX_URL=""      # pip 源地址，例如 https://pypi.tuna.tsinghua.edu.cn/simple
-  PIP_TRUSTED_HOST=""   # 信任的主机地址，例如 pypi.tuna.tsinghua.edu.cn
+  # uv 源配置（可选）
+  UV_INDEX=""          # uv 源地址，例如 https://pypi.tuna.tsinghua.edu.cn/simple
+  UV_TRUSTED_HOST=""   # 信任的主机地址，例如 pypi.tuna.tsinghua.edu.cn
 
   # NVM Node.js 下载镜像（可选，安装 Node.js 时使用）
   NVM_NODEJS_ORG_MIRROR=""  # 例如 https://npmmirror.com/mirrors/node
@@ -64,9 +64,9 @@
   * **带认证的代理**：支持用户名密码，例如 `http://user:pass@proxy.example.com:8080`
   * **SSL 验证**：`SSL_VERIFY` 设置为 `true` 或 `false`，`true` 表示开启 Git 的 SSL 证书验证，`false` 为不开启。
 
-* pip 源配置说明：
-  * **不需要配置 pip 源**：保持 `PIP_INDEX_URL` 和 `PIP_TRUSTED_HOST` 为空即可（脚本会自动跳过 pip 源配置，使用默认源）
-  * **需要配置 pip 源**：必须同时设置 `PIP_INDEX_URL` 和 `PIP_TRUSTED_HOST` 两个参数
+* uv 源配置说明：
+  * **不需要配置 uv 源**：保持 `UV_INDEX` 和 `UV_TRUSTED_HOST` 为空即可（脚本会使用 uv 默认源）
+  * **需要配置 uv 源**：建议同时设置 `UV_INDEX` 和 `UV_TRUSTED_HOST` 两个参数
   * **常用国内镜像源示例**：
     * 清华大学：`https://pypi.tuna.tsinghua.edu.cn/simple`，信任主机：`pypi.tuna.tsinghua.edu.cn`
     * 阿里云：`https://mirrors.aliyun.com/pypi/simple/`，信任主机：`mirrors.aliyun.com`
@@ -135,13 +135,32 @@
 
 #### 1. 安装依赖（以下以 Ubuntu 22.04 为例）
 
-##### 1.1. 安装 Git
+##### 1.1. 安装与配置 Git
 
-* 运行以下命令安装Git：
+* 运行以下命令安装 Git：
 
   ```bash
   sudo apt update
   sudo apt install git
+  ```
+
+* 请确认已获取 <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer"> openJiuwen 代码仓</a> 的访问权限，若无权限请及时申请。
+
+* 在 gitcode 代码仓按照图示步骤 2 获取 Git 的全局配置，输入以下命令配置 Git：
+
+  ```bash
+  git config --global user.name your_username
+  git config --global user.email your_useremail
+  ```
+
+  ![image](../images/gitcode-token.png)
+
+* 按照图示步骤 3 获取个人访问令牌，克隆代码时需要输入 gitcode 账号以及个人访问令牌。
+
+* 安装过程需要多次 git 操作，建议配置凭证存储，避免认证错误：
+
+  ```bash
+  git config --global credential.helper store
   ```
 
 ##### 1.2. 安装 Node.js 和 npm
@@ -178,7 +197,7 @@
   > **注意**：若安装失败，请参考 <a href="https://uv.doczh.com/getting-started/installation/#_1" target="_blank" rel="nofollow noopener noreferrer"> uv 官方指导</a> 。
   
 
-##### 1.4. 安装 MySQL（可选组件）
+##### 1.4. 安装数据库
 
 * **SQLite vs MySQL**：
   * SQLite 无需额外安装和配置，适合开发和测试环境，但功能受限（如不支持高并发写入、无用户权限管理等）。
@@ -213,11 +232,14 @@
   # 新建数据库
   CREATE DATABASE openjiuwen_agent;
   CREATE DATABASE openjiuwen_ops;
+  # Runtime（agent-runtime）使用的数据库，库名以该仓库 .env.example 为准（常见为 jiuwen_runtime）
+  CREATE DATABASE jiuwen_runtime;
   # 新建 MySQL 用户
   CREATE USER 'your_user_name'@'localhost' IDENTIFIED BY 'your_password';
   # 用户授权并刷新
   GRANT ALL PRIVILEGES ON openjiuwen_agent.* TO 'your_user_name'@'localhost';
   GRANT ALL PRIVILEGES ON openjiuwen_ops.* TO 'your_user_name'@'localhost';
+  GRANT ALL PRIVILEGES ON jiuwen_runtime.* TO 'your_user_name'@'localhost';
   FLUSH PRIVILEGES;
   ```
 
@@ -229,34 +251,100 @@
   * Chroma 无需额外安装，配置简单，只需要获取向量模型，适合快速体验，适合开发和测试环境。 向量模型的获取可参考 [如何获取向量模型](#linux-embed-model)。
   * Milvus 功能更完善，能够满足复杂场景的需求，因此在实际工程和生产环境中更推荐使用。
 
-#### 2. openJiuwen 安装
+#### 2. 部署 Runtime 服务
 
-##### 2.1. 获取源码
+Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
 
-* 请确认已获取 <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer"> openJiuwen 代码仓</a> 的访问权限，若无权限请及时申请。
+##### 2.1. 获取 Runtime 源码
 
-* 在 gitcode 代码仓按照图示步骤 2 获取 Git 的全局配置，输入以下命令配置 Git：
+* 在终端执行以下命令克隆源码并进入源码根目录：
 
   ```bash
-  git config --global user.name your_username
-  git config --global user.email your_useremail
+  git clone -b main https://gitcode.com/openJiuwen/agent-runtime.git
+  cd agent-runtime
   ```
 
-  ![image](../images/gitcode-token.png)
+##### 2.2. 配置 `server` 目录下的环境
 
-* 按照图示步骤 3 获取个人访问令牌，克隆代码时需要输入 gitcode 账号以及个人访问令牌。
+* 进入 **`agent-runtime/server`** 目录。
+
+* 复制 *.env* 文件：
+
+  ```bash
+  cp .env.example .env
+  ```
+
+* 使用文本编辑器打开 *.env* 文件，请根据实际情况修改文件中以下变量的值（勿覆盖其他变量）：
+
+  > **说明**：`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 可替换为实际数据库信息，与上文 MySQL 步骤中新建的用户、密码等保持一致。若密码中包含特殊字符，可参考 [特殊字符转义表](#linux-special-char) 将特殊字符替换为 URL 编码。
+  
+
+  配置样例：
+
+  ```env
+   # 数据库类型（支持 mysql、sqlite）
+   DB_TYPE=mysql
+
+   # 配置数据库（样例）
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=root
+   DB_NAME=jiuwen_runtime
+
+   # 运行网络与路径（样例）
+   IP=127.0.0.1
+   LOWCODE_IMAGE=swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8
+   DEPLOY_DIR=/app/deploys
+   DIST_DIR=/app/dist
+   HOST=0.0.0.0
+   PORT=8186
+   ```
+
+  变量说明可参考如下表格。
+
+   | 变量名              | 变量说明                                                                 | 配置样例                                      |
+   |---------------------|--------------------------------------------------------------------------|-----------------------------------------------|
+   | **DB_TYPE**         | 数据库类型（支持 `mysql`、`sqlite`）                                     | `mysql`                                       |
+   | **DB_HOST**         | 数据库主机地址                                                           | `localhost`                                   |
+   | **DB_PORT**         | MySQL 服务监听端口                                                       | `3306`                                        |
+   | **DB_USER**         | 数据库登录用户名                                                         | `root`                                        |
+   | **DB_PASSWORD**     | 数据库登录密码                                                           | `root`                                        |
+   | **DB_NAME**         | 要连接的数据库名称                                                       | `jiuwen_runtime`                              |
+   | **IP**              | 低码 agent 与 runtime-server 运行主机 IP                                 | `127.0.0.1`                                   |
+   | **LOWCODE_IMAGE**   | 低码 agent 的容器镜像地址                                                | `swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8` |
+   | **DEPLOY_DIR**      | 部署目录（存放部署过程产物）                                             | `/app/deploys`                                |
+   | **DIST_DIR**        | 依赖包目录（存放运行低码 agent 所需 `.whl`）                             | `/app/dist`                                   |
+   | **HOST**            | 服务监听主机（`0.0.0.0` 表示允许所有网络地址访问）                       | `0.0.0.0`                                     |
+   | **PORT**            | 服务启动端口号                                                           | `8186`                                        |
+
+##### 2.3. 运行 `deploy.sh` 安装依赖并启动服务
+
+
+
+* **前置条件**：已安装 **Python 3.11**、**Git**，且可在终端执行 **`uv`**。`deploy.sh` 通常依赖 **`uv`** 创建虚拟环境并同步依赖。
+
+* 在 **`server`** 目录执行部署脚本（路径按你的克隆位置替换）：
+
+  ```bash
+  cd /path/to/agent-runtime/server
+  chmod +x deploy.sh
+  ./deploy.sh
+  ```
+
+
+#### 3. openJiuwen 安装
+
+##### 3.1. 获取源码
 
 * 执行以下命令克隆源码并进入源码根目录：
 
   ```bash
-  # 安装过程需要多次 git 操作，建议配置凭证存储，避免认证错误。
-  git config --global credential.helper store
-
   git clone https://gitcode.com/openJiuwen/agent-studio.git
   cd agent-studio
   ```
 
-##### 2.2. 生成 AES 密钥（可选）
+##### 3.2. 生成 AES 密钥（可选）
 
 * 如果不需要对关键字段加密存储，可跳过当前步骤
 * 运行以下命令生成密钥：
@@ -271,7 +359,7 @@
   ```
 * 注意，AES密钥需要保持稳定，中途更换密钥会导致已加密数据无法解密。
 
-##### 2.3. 启动 openJiuwen
+##### 3.3. 启动 openJiuwen
 
 * 进入源码根目录；
 
@@ -310,6 +398,10 @@
    # 配置插件服务（样例，启动插件服务详情请见[问题三：如何启用插件服务]）
    VITE_PLUGIN_SERVICE_URL=http://localhost:8185
    VITE_PLUGIN_CONFIG_PATH=/config.json
+
+   # Runtime 服务配置（样例）
+   RUNTIME_HOST=localhost
+   RUNTIME_PORT=8100
    ```
 
   变量说明可参考如下表格，如需选择 Milvus 启用记忆功能，请参考 [如何启用记忆及知识库功能](#linux-memory)，如果选择 Chroma 启用记忆功能，只需要获取向量模型，可参考 [如何获取向量模型](#linux-embed-model)。
@@ -328,6 +420,8 @@
    | **CODE_SANDBOX_URL**                 | 代码沙箱服务地址                          | `http://localhost:8188/run`                                                                    |
    | **VITE_PLUGIN_SERVICE_URL**                 | 插件服务地址                            | `http://localhost:8185`                                                                    |
    | **VITE_PLUGIN_CONFIG_PATH**                 | 前端使用的插件服务配置文件                     | `/config.json`                                                                    |
+   | **RUNTIME_HOST**                 | Runtime 服务访问主机（通常为本机 `localhost`）                     | `localhost`                                                                    |
+   | **RUNTIME_PORT**                 | Runtime 服务端口（需与 Runtime server 实际监听端口一致）                     | `8100`                                                                    |
 
 * 在源码根目录下，运行以下命令启动后端服务，并耐心等待：
    
@@ -386,7 +480,7 @@
 
   Network：*网络访问地址*
 
-##### 2.4. 访问系统
+##### 3.4. 访问系统
 
   * 若在本地查看，ctrl+左键单击 *本地访问地址* 可在本地浏览器查看到 openJiuwen 的界面；或者复制上述 *本地访问地址* 到浏览器地址栏，按下“回车键”将看到 openJiuwen 的界面。
   

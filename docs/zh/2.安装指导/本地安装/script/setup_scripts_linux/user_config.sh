@@ -8,13 +8,13 @@ HTTP_PROXY=""
 HTTPS_PROXY=""
 SSL_VERIFY=""
 
-# pip index configuration (optional)
+# uv default package index, used by uv sync / uv pip / uv run
 # Usage:
-# - PIP_INDEX_URL: pip index URL, e.g. https://pypi.tuna.tsinghua.edu.cn/simple
-# - PIP_TRUSTED_HOST: trusted host, e.g. pypi.tuna.tsinghua.edu.cn
-# - Leave empty to skip pip index config (script will skip)
-PIP_INDEX_URL=""
-PIP_TRUSTED_HOST=""
+# - UV_INDEX: uv index URL, e.g. https://pypi.tuna.tsinghua.edu.cn/simple 
+# - UV_TRUSTED_HOST: trusted host for uv TLS verification bypass, e.g. pypi.tuna.tsinghua.edu.cn
+# - Leave empty to use uv default
+UV_INDEX=""
+UV_TRUSTED_HOST=""
 
 # NVM Node.js download mirror (optional)
 # Usage:

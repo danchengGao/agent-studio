@@ -11,6 +11,9 @@ param(
     
     [int]$FrontendPort = 3000,
     [int]$BackendPort = 8000,
+
+    [string]$AppDbUser = "openjiuwen",
+    [string]$AppDbPassword = "openjiuwen",
     
     [switch]$Help,
     [switch]$Status,
@@ -24,6 +27,7 @@ $ErrorActionPreference = "Stop"
 $WORK_HOME = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BACKEND_DIR = Join-Path $WORK_HOME "agent-studio\backend"
 $FRONTEND_DIR = Join-Path $WORK_HOME "agent-studio\frontend"
+$RUNTIME_DIR = Join-Path $WORK_HOME "agent-runtime"
 $TARGET_ENV_FILE = Join-Path $WORK_HOME "agent-studio\.env"
 $ENV_EXAMPLE_FILE = Join-Path $WORK_HOME "agent-studio\.env.example"
 $PROGRESS_FILE = Join-Path $WORK_HOME ".setup_progress"
@@ -35,16 +39,22 @@ $INSTALL_STEPS = @(
     "fetch_code",
     "config_aes",
     "config_env",
+    "fetch_runtime_code",
+    "config_runtime_env",
     "config_mysql",
-    "deploy_backend",
-    "deploy_frontend",
+    "install_runtime_dep",
+    "install_backend_dep",
+    "install_frontend_dep",
     "start_services"
 )
 
 # ===================== Load Utility Functions =====================
 $UtilsScript = Join-Path $WORK_HOME "utils.ps1"
 . $UtilsScript
-Apply-HttpProxy -WorkHome $WORK_HOME
+Apply-UserEnvironmentConfig -WorkHome $WORK_HOME
+
+$ManageServiceScript = Join-Path $WORK_HOME "manage_service.ps1"
+. $ManageServiceScript
 
 function Show-Help {
     Write-Host @"
@@ -55,13 +65,15 @@ Supported Parameters:
   -DbType type    Specify database type, optional values: mysql (default), sqlite
                   -DbType mysql: Set DB_TYPE to mysql in .env
                   -DbType sqlite: Set DB_TYPE to sqlite in .env
-  -Branch branch  Specify git branch to download code, default: main
+  -Branch branch  Git branch for agent-studio and agent-runtime, default: main
   -FrontendPort port  Frontend service port (default: 3000), written to .env FRONTEND_PORT
   -BackendPort port   Backend service port (default: 8000), written to .env BACKEND_PORT
-  -Status         Show frontend and backend service status and access URLs
-  -Stop           Gracefully stop frontend and backend services
-  -Start          Start frontend and backend services (without reinstalling dependencies)
-  -Restart        Restart frontend and backend services (without reinstalling dependencies)
+  -AppDbUser user     MySQL application user (default: openjiuwen)
+  -AppDbPassword pwd  MySQL application user password (default: openjiuwen)
+  -Status         Show runtime, frontend, and backend service status and access URLs
+  -Stop           Gracefully stop runtime, frontend, and backend services
+  -Start          Start runtime, frontend, and backend services (without reinstalling dependencies)
+  -Restart        Restart runtime, frontend, and backend services (without reinstalling dependencies)
   -Help           Show this help message and exit
 
 Examples:
@@ -71,1069 +83,14 @@ Examples:
   .\setup.ps1 -FrontendPort 3001 -BackendPort 8001  # Custom frontend/backend ports
   .\setup.ps1 -DbType sqlite -Branch develop  # Set DB_TYPE to sqlite, use develop branch
   .\setup.ps1 -Status             # Show service status and access URLs
-  .\setup.ps1 -Stop                # Gracefully stop frontend and backend services
-  .\setup.ps1 -Start               # Start frontend and backend services
-  .\setup.ps1 -Restart             # Restart frontend and backend services
+  .\setup.ps1 -Stop                # Gracefully stop runtime, frontend, and backend services
+  .\setup.ps1 -Start               # Start runtime, frontend, and backend services
+  .\setup.ps1 -Restart             # Restart runtime, frontend, and backend services
   .\setup.ps1 -Help                # View help
 
 Working Directory: $WORK_HOME
 "@
     exit 0
-}
-
-# ===================== Progress Management Functions =====================
-function Save-Progress {
-    param(
-        [string]$Step
-    )
-    try {
-        $Step | Out-File -FilePath $PROGRESS_FILE -Encoding utf8 -Force
-        Write-Log "INFO" "Progress saved: $Step"
-    } catch {
-        Write-Log "WARN" "Failed to save progress: $_"
-    }
-}
-
-function Read-Progress {
-    if (Test-Path $PROGRESS_FILE) {
-        try {
-            $Progress = Get-Content $PROGRESS_FILE -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\S+" }
-            if ($Progress) {
-                return $Progress.Trim()
-            }
-        } catch {
-            Write-Log "WARN" "Failed to read progress: $_"
-        }
-    }
-    return ""
-}
-
-function Clear-Progress {
-    if (Test-Path $PROGRESS_FILE) {
-        try {
-            Remove-Item $PROGRESS_FILE -Force -ErrorAction SilentlyContinue
-            Write-Log "INFO" "Progress file cleared"
-        } catch {
-            Write-Log "WARN" "Failed to clear progress file: $_"
-        }
-    }
-}
-
-function Test-SkipStep {
-    param(
-        [string]$CurrentStep,
-        [string]$LastProgress
-    )
-    
-    if ([string]::IsNullOrEmpty($LastProgress)) {
-        return $false
-    }
-    
-    $CurrentIndex = -1
-    $LastIndex = -1
-    
-    for ($i = 0; $i -lt $INSTALL_STEPS.Count; $i++) {
-        if ($INSTALL_STEPS[$i] -eq $CurrentStep) {
-            $CurrentIndex = $i
-        }
-        if ($INSTALL_STEPS[$i] -eq $LastProgress) {
-            $LastIndex = $i
-        }
-    }
-    
-    if ($CurrentIndex -eq -1 -or $LastIndex -eq -1) {
-        return $false
-    }
-    
-    if ($LastIndex -ge $CurrentIndex) {
-        return $true
-    } else {
-        return $false
-    }
-}
-
-function Get-BackendPort {
-    param(
-        [string]$LogFile,
-        [string]$PidFile = $null,
-        [int]$DefaultPort = 8000
-    )
-    $Port = $null
-    
-    # Priority 1: Try to get port from running process by PID
-    if ($PidFile -and (Test-Path $PidFile)) {
-        try {
-            $PidFromFile = Get-Content $PidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-            if ($PidFromFile) {
-                $PidValue = [int]$PidFromFile
-                $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-                if ($Process) {
-                    # Check if it's a Python process (backend)
-                    $ProcessPath = $Process.Path
-                    $CommandLine = ""
-                    $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                    if ($WmiProcess) {
-                        $CommandLine = $WmiProcess.CommandLine
-                    }
-                    if ($ProcessPath -like "*python*" -or $CommandLine -like "*main.py*") {
-                        # Find port by PID using netstat
-                        # netstat -ano output format: TCP    0.0.0.0:8000           0.0.0.0:0              LISTENING       12345
-                        $NetStatLines = netstat -ano | Where-Object { $_ -match "LISTENING" -and $_ -match "\s+$PidValue\s*$" }
-                        foreach ($Line in $NetStatLines) {
-                            # Match pattern: TCP/UDP    0.0.0.0:8000   ...   LISTENING   12345
-                            # Extract port from local address (first address:port pair)
-                            if ($Line -match "^\s*(?:TCP|UDP)\s+(?:0\.0\.0\.0|\[::\]|\*|127\.0\.0\.1|localhost):(\d+)\s+") {
-                                $FoundPort = [int]$Matches[1]
-                                if ($FoundPort -ge 1000 -and $FoundPort -le 65535) {
-                                    $Port = $FoundPort
-                                    break
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        } catch {
-            # Ignore errors
-        }
-    }
-    
-    # Priority 2: Read from .env (matches config_env BACKEND_PORT so Show-Status shows correct port right after start)
-    if (-not $Port -and (Test-Path $TARGET_ENV_FILE)) {
-        try {
-            $PortLine = Select-String -Path $TARGET_ENV_FILE -Pattern "^(BACKEND_PORT|SERVER_PORT|PORT)=" -ErrorAction SilentlyContinue
-            if ($PortLine) {
-                $PortValue = ($PortLine.Line -replace "^(BACKEND_PORT|SERVER_PORT|PORT)=", "").Trim() -replace '"', "" -replace "'", ""
-                if (-not [string]::IsNullOrEmpty($PortValue) -and $PortValue -match "^\d+$") {
-                    $Port = [int]$PortValue
-                }
-            }
-        } catch {
-            # Ignore errors
-        }
-    }
-    
-    # Fallback to default port
-    if (-not $Port) {
-        $Port = $DefaultPort
-    }
-    
-    return $Port
-}
-
-function Get-FrontendPort {
-    param(
-        [string]$LogFile,
-        [int]$DefaultPort = 3000
-    )
-    $Port = $DefaultPort
-    
-    # Try to read from .env file
-    if (Test-Path $TARGET_ENV_FILE) {
-        try {
-            $FrontendPortLine = Select-String -Path $TARGET_ENV_FILE -Pattern "^FRONTEND_PORT=" -ErrorAction SilentlyContinue
-            if ($FrontendPortLine) {
-                $PortValue = ($FrontendPortLine.Line -replace "FRONTEND_PORT=", "").Trim() -replace '"', "" -replace "'", ""
-                if (-not [string]::IsNullOrEmpty($PortValue) -and $PortValue -match "^\d+$") {
-                    $Port = [int]$PortValue
-                }
-            }
-        } catch {
-            # Ignore errors
-        }
-    }
-    
-    # Try to extract from log file
-    if (Test-Path $LogFile) {
-        try {
-            $LogContent = Get-Content $LogFile -Tail 50 -ErrorAction SilentlyContinue
-            foreach ($Line in $LogContent) {
-                # Match patterns like "Local: http://localhost:3000/" or "Network: http://192.168.1.1:3000/"
-                if ($Line -match "(?:Local|Network).*?http://[^:]+:(\d+)/?") {
-                    $LogPort = [int]$Matches[1]
-                    if ($LogPort -ge 1000 -and $LogPort -le 65535) {
-                        $Port = $LogPort
-                        break
-                    }
-                }
-                # Alternative pattern: just match port number after colon
-                elseif ($Line -match ":(\d{4,5})/") {
-                    $LogPort = [int]$Matches[1]
-                    if ($LogPort -ge 1000 -and $LogPort -le 65535) {
-                        $Port = $LogPort
-                        break
-                    }
-                }
-            }
-        } catch {
-            # Ignore errors
-        }
-    }
-    
-    return $Port
-}
-
-function Get-LocalIP {
-    try {
-        # Try to get local IP address
-        $LocalIP = $null
-        $Interfaces = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue
-        foreach ($Interface in $Interfaces) {
-            if ($Interface.IPAddress -notlike "127.*" -and $Interface.IPAddress -notlike "169.254.*") {
-                $LocalIP = $Interface.IPAddress
-                break
-            }
-        }
-        
-        if ([string]::IsNullOrEmpty($LocalIP)) {
-            $LocalIP = "localhost"
-        }
-    } catch {
-        $LocalIP = "localhost"
-    }
-    
-    return $LocalIP
-}
-
-function Show-Status {
-    param(
-        [switch]$NoExit  # When called from Start-Services/Restart/completion block do not exit; exit only when -Status is used alone
-    )
-    $BackendPidFile = Join-Path $WORK_HOME "backend.pid"
-    $FrontendPidFile = Join-Path $WORK_HOME "frontend.pid"
-    $BackendLog = Join-Path $WORK_HOME "backend.log"
-    $FrontendLog = Join-Path $WORK_HOME "frontend.log"
-    
-    $LocalIP = Get-LocalIP
-    
-    Write-Host "Frontend Service:" -ForegroundColor Yellow
-    $FrontendPid = $null
-    $FrontendPort = Get-FrontendPort -LogFile $FrontendLog -DefaultPort 3000
-    
-    if (Test-Path $FrontendPidFile) {
-        $PidFromFile = Get-Content $FrontendPidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-        if ($PidFromFile) {
-            $PidValue = [int]$PidFromFile
-            $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-            if ($Process) {
-                $ProcessName = $Process.ProcessName
-                $CommandLine = ""
-                $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                if ($WmiProcess) {
-                    $CommandLine = $WmiProcess.CommandLine
-                }
-                if ($ProcessName -eq "node" -or $CommandLine -like "*vite*" -or $CommandLine -like "*npm*dev*") {
-                    $FrontendPid = $PidValue
-                    Write-Host "  Status: Running" -ForegroundColor Green
-                    Write-Host "  PID: $FrontendPid"
-                }
-            }
-        }
-    }
-    
-    if (-not $FrontendPid) {
-        $NetStat = netstat -ano | Select-String ":$FrontendPort\s" -ErrorAction SilentlyContinue
-        if ($NetStat) {
-            $PortPid = ($NetStat -split '\s+')[-1]
-            if ($PortPid -match "^\d+$") {
-                $PidValue = [int]$PortPid
-                $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-                if ($Process -and $Process.ProcessName -eq "node") {
-                    $FrontendPid = $PidValue
-                    Write-Host "  Status: Running (detected by port)" -ForegroundColor Green
-                    Write-Host "  PID: $FrontendPid"
-                    Write-Host "  Warning: PID file not found or expired" -ForegroundColor Yellow
-                }
-            }
-        }
-    }
-    
-    if ($FrontendPid) {
-        Write-Host "  Local: http://localhost:${FrontendPort}" -ForegroundColor Blue
-        Write-Host "  Network: http://${LocalIP}:${FrontendPort}" -ForegroundColor Blue
-    }
-    else {
-        Write-Host "  Status: Not Running" -ForegroundColor Red
-        if (Test-Path $FrontendPidFile) {
-            $OldPid = Get-Content $FrontendPidFile -ErrorAction SilentlyContinue
-            if ($OldPid) {
-                Write-Host "  Note: PID file exists but process not found (PID: $OldPid)"
-            }
-        }
-        else {
-            Write-Host "  Note: PID file not found"
-        }
-    }
-    
-    $FrontendLog = Join-Path $WORK_HOME "frontend.log"
-    Write-Host "  Log File: $FrontendLog" -ForegroundColor Green
-    
-    Write-Host ""
-    
-    Write-Host "Backend Service:" -ForegroundColor Yellow
-    $BackendPid = $null
-    $BackendPort = Get-BackendPort -LogFile $BackendLog -PidFile $BackendPidFile -DefaultPort 8000
-    
-    if (Test-Path $BackendPidFile) {
-        $PidFromFile = Get-Content $BackendPidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-        if ($PidFromFile) {
-            $PidValue = [int]$PidFromFile
-            $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-            if ($Process) {
-                $ProcessPath = $Process.Path
-                $CommandLine = ""
-                $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                if ($WmiProcess) {
-                    $CommandLine = $WmiProcess.CommandLine
-                }
-                if ($ProcessPath -like "*python*" -or $CommandLine -like "*main.py*") {
-                    $BackendPid = $PidValue
-                    Write-Host "  Status: Running" -ForegroundColor Green
-                    Write-Host "  PID: $BackendPid"
-                }
-            }
-        }
-    }
-    
-    if (-not $BackendPid) {
-        $NetStat = netstat -ano | Select-String ":$BackendPort\s" -ErrorAction SilentlyContinue
-        if ($NetStat) {
-            $PortPid = ($NetStat -split '\s+')[-1]
-            if ($PortPid -match "^\d+$") {
-                $PidValue = [int]$PortPid
-                $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-                if ($Process) {
-                    $ProcessPath = $Process.Path
-                    $CommandLine = ""
-                    $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                    if ($WmiProcess) {
-                        $CommandLine = $WmiProcess.CommandLine
-                    }
-                    if ($ProcessPath -like "*python*" -or $CommandLine -like "*main.py*") {
-                        $BackendPid = $PidValue
-                        Write-Host "  Status: Running (detected by port)" -ForegroundColor Green
-                        Write-Host "  PID: $BackendPid"
-                        Write-Host "  Warning: PID file not found or expired" -ForegroundColor Yellow
-                    }
-                }
-            }
-        }
-    }
-    
-    if ($BackendPid) {
-        Write-Host "  Local: http://localhost:${BackendPort}" -ForegroundColor Green
-        Write-Host "  Network: http://${LocalIP}:${BackendPort}" -ForegroundColor Green
-        Write-Host "  API Docs: http://localhost:${BackendPort}/api/docs" -ForegroundColor Green
-        Write-Host "  Health: http://localhost:${BackendPort}/api/health" -ForegroundColor Green
-    }
-    else {
-        Write-Host "  Status: Not Running" -ForegroundColor Red
-        if (Test-Path $BackendPidFile) {
-            $OldPid = Get-Content $BackendPidFile -ErrorAction SilentlyContinue
-            if ($OldPid) {
-                Write-Host "  Note: PID file exists but process not found (PID: $OldPid)"
-            }
-        }
-        else {
-            Write-Host "  Note: PID file not found"
-        }
-    }
-    
-    $BackendLog = Join-Path $WORK_HOME "backend.log"
-    Write-Host "  Log File: $BackendLog" -ForegroundColor Green
-    
-    Write-Host ""
-    Write-Host "Manage Service:" -ForegroundColor Yellow
-    Write-Host "  Stop Services: .\setup.ps1 -Stop" -ForegroundColor Green
-    Write-Host "  Start Services: .\setup.ps1 -Start" -ForegroundColor Green
-    Write-Host "  Restart Services: .\setup.ps1 -Restart" -ForegroundColor Green
-    Write-Host "  Check Status: .\setup.ps1 -Status" -ForegroundColor Green
-    
-    if (-not $NoExit) {
-        exit 0
-    }
-}
-
-function Stop-ProcessTree {
-    param(
-        [int]$ProcessId,
-        [int]$MaxWait = 10
-    )
-    
-    $Stopped = $false
-    $Process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-    if (-not $Process) {
-        return $false
-    }
-    
-    try {
-        # Get all child processes
-        $ChildProcesses = @()
-        $AllProcesses = Get-WmiObject Win32_Process | Where-Object { $_.ParentProcessId -eq $ProcessId }
-        foreach ($ChildProc in $AllProcesses) {
-            $ChildProcesses += $ChildProc.ProcessId
-            # Recursively get grandchildren
-            $GrandChildren = Get-WmiObject Win32_Process | Where-Object { $_.ParentProcessId -eq $ChildProc.ProcessId }
-            foreach ($GrandChild in $GrandChildren) {
-                $ChildProcesses += $GrandChild.ProcessId
-            }
-        }
-        
-        # Stop child processes first
-        foreach ($ChildPid in $ChildProcesses) {
-            try {
-                $ChildProcess = Get-Process -Id $ChildPid -ErrorAction SilentlyContinue
-                if ($ChildProcess) {
-                    Stop-Process -Id $ChildPid -Force -ErrorAction SilentlyContinue
-                }
-            } catch {
-                # Ignore errors for child processes
-            }
-        }
-        
-        # Wait a bit for child processes to exit
-        Start-Sleep -Milliseconds 500
-        
-        # Stop the main process gracefully first
-        Stop-Process -Id $ProcessId -ErrorAction Stop
-        $WaitCount = 0
-        while ($WaitCount -lt $MaxWait) {
-            Start-Sleep -Seconds 1
-            $Process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-            if (-not $Process) {
-                $Stopped = $true
-                break
-            }
-            $WaitCount++
-        }
-        
-        # If still running, force stop
-        $Process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-        if ($Process) {
-            Stop-Process -Id $ProcessId -Force -ErrorAction Stop
-            $Stopped = $true
-        }
-    } catch {
-        # If graceful stop failed, try force stop
-        try {
-            Stop-Process -Id $ProcessId -Force -ErrorAction Stop
-            $Stopped = $true
-        } catch {
-            # Process may have already exited
-        }
-    }
-    
-    return $Stopped
-}
-
-function Stop-ProcessesByPort {
-    param(
-        [int]$Port
-    )
-    
-    $Stopped = $false
-    try {
-        $NetStat = netstat -ano | Select-String ":$Port\s" -ErrorAction SilentlyContinue
-        if ($NetStat) {
-            $Pids = @()
-            foreach ($Line in $NetStat) {
-                $PortPid = ($Line -split '\s+')[-1]
-                if ($PortPid -match "^\d+$") {
-                    $PidValue = [int]$PortPid
-                    if ($Pids -notcontains $PidValue) {
-                        $Pids += $PidValue
-                    }
-                }
-            }
-            
-            foreach ($ProcessId in $Pids) {
-                $Process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-                if ($Process) {
-                    Write-Host "  Stopping process on port $Port (PID: $ProcessId)..." -ForegroundColor Yellow
-                    $null = Stop-ProcessTree -ProcessId $ProcessId
-                    $Stopped = $true
-                }
-            }
-        }
-    } catch {
-        # Ignore errors
-    }
-    
-    return $Stopped
-}
-
-function Stop-Services {
-    param(
-        [switch]$NoExit
-    )
-    
-    $BackendPidFile = Join-Path $WORK_HOME "backend.pid"
-    $FrontendPidFile = Join-Path $WORK_HOME "frontend.pid"
-    $BackendLog = Join-Path $WORK_HOME "backend.log"
-    $FrontendLog = Join-Path $WORK_HOME "frontend.log"
-    
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Stopping Services" -ForegroundColor Cyan
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    $StoppedBackend = $false
-    $StoppedFrontend = $false
-    
-    # Stop Backend Service
-    Write-Host "Backend Service:" -ForegroundColor Yellow
-    $BackendPid = $null
-    $BackendPort = Get-BackendPort -LogFile $BackendLog -PidFile $BackendPidFile -DefaultPort 8000
-    
-    # Try to get PID from file
-    if (Test-Path $BackendPidFile) {
-        $PidFromFile = Get-Content $BackendPidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-        if ($PidFromFile) {
-            $PidValue = [int]$PidFromFile
-            $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-            if ($Process) {
-                $ProcessPath = $Process.Path
-                $CommandLine = ""
-                $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                if ($WmiProcess) {
-                    $CommandLine = $WmiProcess.CommandLine
-                }
-                if ($ProcessPath -like "*python*" -or $CommandLine -like "*main.py*") {
-                    $BackendPid = $PidValue
-                }
-            }
-        }
-    }
-    
-    # If not found in PID file, try to find by port
-    if (-not $BackendPid) {
-        $NetStat = netstat -ano | Select-String ":$BackendPort\s" -ErrorAction SilentlyContinue
-        if ($NetStat) {
-            $PortPid = ($NetStat -split '\s+')[-1]
-            if ($PortPid -match "^\d+$") {
-                $PidValue = [int]$PortPid
-                $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-                if ($Process) {
-                    $ProcessPath = $Process.Path
-                    $CommandLine = ""
-                    $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                    if ($WmiProcess) {
-                        $CommandLine = $WmiProcess.CommandLine
-                    }
-                    if ($ProcessPath -like "*python*" -or $CommandLine -like "*main.py*") {
-                        $BackendPid = $PidValue
-                    }
-                }
-            }
-        }
-    }
-    
-    if ($BackendPid) {
-        Write-Host "  Found backend process (PID: $BackendPid)" -ForegroundColor Green
-        Write-Host "  Stopping gracefully..." -ForegroundColor Yellow
-        try {
-            $Stopped = Stop-ProcessTree -ProcessId $BackendPid -MaxWait 10
-            if ($Stopped) {
-                $StoppedBackend = $true
-                Write-Host "  Backend service stopped successfully" -ForegroundColor Green
-            } else {
-                Write-Host "  Backend service may not have stopped completely" -ForegroundColor Yellow
-            }
-            
-            # Remove PID file
-            if (Test-Path $BackendPidFile) {
-                Remove-Item $BackendPidFile -Force -ErrorAction SilentlyContinue
-                Write-Host "  Removed PID file: $BackendPidFile" -ForegroundColor Green
-            }
-        } catch {
-            Write-Host "  Error stopping backend service: $_" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "  Backend service is not running" -ForegroundColor Yellow
-        # Clean up PID file if it exists
-        if (Test-Path $BackendPidFile) {
-            Remove-Item $BackendPidFile -Force -ErrorAction SilentlyContinue
-            Write-Host "  Removed stale PID file: $BackendPidFile" -ForegroundColor Yellow
-        }
-    }
-    
-    # Also check and stop any processes on backend port
-    $PortStopped = Stop-ProcessesByPort -Port $BackendPort
-    if ($PortStopped -and -not $StoppedBackend) {
-        $StoppedBackend = $true
-    }
-    
-    Write-Host ""
-    
-    # Stop Frontend Service
-    Write-Host "Frontend Service:" -ForegroundColor Yellow
-    $FrontendPort = Get-FrontendPort -LogFile $FrontendLog -DefaultPort 3000
-    
-    # Collect all frontend-related PIDs
-    $FrontendPids = @()
-    
-    # Try to get PID from file
-    if (Test-Path $FrontendPidFile) {
-        $PidFromFile = Get-Content $FrontendPidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-        if ($PidFromFile) {
-            $PidValue = [int]$PidFromFile
-            $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-            if ($Process) {
-                $ProcessName = $Process.ProcessName
-                $CommandLine = ""
-                $WmiProcess = Get-WmiObject Win32_Process -Filter "ProcessId = $PidValue" -ErrorAction SilentlyContinue
-                if ($WmiProcess) {
-                    $CommandLine = $WmiProcess.CommandLine
-                }
-                if ($ProcessName -eq "node" -or $ProcessName -eq "cmd" -or $CommandLine -like "*vite*" -or $CommandLine -like "*npm*dev*") {
-                    $FrontendPids += $PidValue
-                }
-            }
-        }
-    }
-    
-    # Find all node processes that might be related to frontend
-    $AllNodeProcesses = Get-WmiObject Win32_Process -Filter "Name = 'node.exe'" | Where-Object {
-        $Proc = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
-        if ($Proc) {
-            $CommandLine = $_.CommandLine
-            # Check if it's a vite or npm dev process
-            if ($CommandLine -like "*vite*" -or $CommandLine -like "*npm*dev*" -or $CommandLine -like "*frontend*") {
-                return $true
-            }
-            # Check if parent is cmd.exe (likely started by npm)
-            $Parent = Get-WmiObject Win32_Process -Filter "ProcessId = $($_.ParentProcessId)" -ErrorAction SilentlyContinue
-            if ($Parent -and $Parent.Name -eq "cmd.exe") {
-                return $true
-            }
-        }
-        return $false
-    }
-    
-    foreach ($NodeProc in $AllNodeProcesses) {
-        if ($FrontendPids -notcontains $NodeProc.ProcessId) {
-            $FrontendPids += $NodeProc.ProcessId
-        }
-    }
-    
-    # Find cmd.exe processes that might be running npm
-    $AllCmdProcesses = Get-WmiObject Win32_Process -Filter "Name = 'cmd.exe'" | Where-Object {
-        $CommandLine = $_.CommandLine
-        if ($CommandLine -like "*npm*dev*" -or $CommandLine -like "*vite*") {
-            return $true
-        }
-        return $false
-    }
-    
-    foreach ($CmdProc in $AllCmdProcesses) {
-        if ($FrontendPids -notcontains $CmdProc.ProcessId) {
-            $FrontendPids += $CmdProc.ProcessId
-        }
-    }
-    
-    # Also find processes by port
-    $NetStat = netstat -ano | Select-String ":$FrontendPort\s" -ErrorAction SilentlyContinue
-    if ($NetStat) {
-        foreach ($Line in $NetStat) {
-            $PortPid = ($Line -split '\s+')[-1]
-            if ($PortPid -match "^\d+$") {
-                $PidValue = [int]$PortPid
-                $Process = Get-Process -Id $PidValue -ErrorAction SilentlyContinue
-                if ($Process -and ($Process.ProcessName -eq "node" -or $Process.ProcessName -eq "cmd")) {
-                    if ($FrontendPids -notcontains $PidValue) {
-                        $FrontendPids += $PidValue
-                    }
-                }
-            }
-        }
-    }
-    
-    if ($FrontendPids.Count -gt 0) {
-        Write-Host "  Found $($FrontendPids.Count) frontend-related process(es)" -ForegroundColor Green
-        Write-Host "  Stopping all frontend processes and their children..." -ForegroundColor Yellow
-        
-        # Stop all processes, starting with the main one
-        foreach ($ProcessId in $FrontendPids) {
-            try {
-                $Process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-                if ($Process) {
-                    Write-Host "    Stopping process (PID: $ProcessId, Name: $($Process.ProcessName))..." -ForegroundColor Yellow
-                    $null = Stop-ProcessTree -ProcessId $ProcessId -MaxWait 5
-                }
-            } catch {
-                # Process may have already been stopped
-            }
-        }
-        
-        # Wait a bit for all processes to exit
-        Start-Sleep -Seconds 2
-        
-        # Also stop any processes still on the port
-        $PortStopped = Stop-ProcessesByPort -Port $FrontendPort
-        
-        $StoppedFrontend = $true
-        Write-Host "  Frontend service stopped successfully" -ForegroundColor Green
-        
-        # Remove PID file
-        if (Test-Path $FrontendPidFile) {
-            Remove-Item $FrontendPidFile -Force -ErrorAction SilentlyContinue
-            Write-Host "  Removed PID file: $FrontendPidFile" -ForegroundColor Green
-        }
-    } else {
-        Write-Host "  Frontend service is not running" -ForegroundColor Yellow
-        # Clean up PID file if it exists
-        if (Test-Path $FrontendPidFile) {
-            Remove-Item $FrontendPidFile -Force -ErrorAction SilentlyContinue
-            Write-Host "  Removed stale PID file: $FrontendPidFile" -ForegroundColor Yellow
-        }
-    }
-    
-    # Final check: stop any remaining processes on frontend port
-    $PortStopped = Stop-ProcessesByPort -Port $FrontendPort
-    if ($PortStopped -and -not $StoppedFrontend) {
-        $StoppedFrontend = $true
-    }
-    
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    if ($StoppedBackend -or $StoppedFrontend) {
-        Write-Host "Services stopped successfully" -ForegroundColor Green
-    } else {
-        Write-Host "No running services found" -ForegroundColor Yellow
-    }
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    if (-not $NoExit) {
-        exit 0
-    }
-}
-
-# Start backend service (used by Start-Services or main flow)
-function Start-BackendService {
-    # Check if backend directory and .env exist
-    if (-not (Test-Path $BACKEND_DIR)) {
-        Write-Log "ERROR" "Backend directory not found: $BACKEND_DIR"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    if (-not (Test-Path $TARGET_ENV_FILE)) {
-        Write-Log "ERROR" ".env file not found: $TARGET_ENV_FILE"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    
-    # Read AES key from .env file if exists
-    $AESKey = $null
-    if (Test-Path $TARGET_ENV_FILE) {
-        try {
-            $AESKeyLine = Select-String -Path $TARGET_ENV_FILE -Pattern "^SERVER_AES_MASTER_KEY=" -ErrorAction SilentlyContinue
-            if ($AESKeyLine) {
-                $AESKey = ($AESKeyLine.Line -replace "SERVER_AES_MASTER_KEY=", "").Trim() -replace '"', "" -replace "'", ""
-            }
-        } catch {
-            # Ignore errors
-        }
-    }
-    
-    # If AES key not found in .env, try to generate or use existing environment variable
-    if ([string]::IsNullOrEmpty($AESKey)) {
-        if ($env:SERVER_AES_MASTER_KEY_ENV) {
-            $AESKey = $env:SERVER_AES_MASTER_KEY_ENV
-            Write-Log "INFO" "Using existing AES key from environment variable"
-        } else {
-            Write-Log "WARN" "AES key not found in .env file or environment, generating new one"
-            $RandomBytes = New-Object byte[] 32
-            $Rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-            $Rng.GetBytes($RandomBytes)
-            $Rng.Dispose()
-            $AESKey = [Convert]::ToBase64String($RandomBytes)
-        }
-    }
-    
-    $env:SERVER_AES_MASTER_KEY_ENV = $AESKey
-    Write-Log "INFO" "AES key set: $($AESKey.Substring(0, [Math]::Min(8, $AESKey.Length)))**** (partially hidden)"
-    
-    # Find Python executable
-    $PythonExePath = $null
-    $PythonCheckScript = Join-Path $WORK_HOME "check_python.ps1"
-    if (Test-Path $PythonCheckScript) {
-        try {
-            $PythonOutput = & $PythonCheckScript 2>&1 | Out-String
-            if ($PythonOutput -match "PYTHON_EXE_PATH=(.+)") {
-                $PythonExePath = $Matches[1].Trim() -replace "[\r\n]+.*$", ""
-            }
-        } catch {
-            # Try to find Python in PATH
-            $PythonExePath = (Get-Command python -ErrorAction SilentlyContinue).Source
-            if (-not $PythonExePath) {
-                $PythonExePath = (Get-Command python3 -ErrorAction SilentlyContinue).Source
-            }
-        }
-    } else {
-        # Try to find Python in PATH
-        $PythonExePath = (Get-Command python -ErrorAction SilentlyContinue).Source
-        if (-not $PythonExePath) {
-            $PythonExePath = (Get-Command python3 -ErrorAction SilentlyContinue).Source
-        }
-    }
-    
-    if (-not $PythonExePath -or -not (Test-Path $PythonExePath)) {
-        Write-Log "ERROR" "Python executable not found. Please ensure Python is installed."
-        exit 1
-    }
-    
-    Write-Log "INFO" "Using Python executable at: $PythonExePath"
-    
-    # ===================== Start Backend =====================
-    Write-Log "INFO" "===== Starting Backend Service ====="
-    $PrevLocation = Get-Location
-    Set-Location $BACKEND_DIR
-    
-    # Check if virtual environment exists
-    $BackendVenv = Join-Path $BACKEND_DIR ".venv\Scripts\python.exe"
-    if (-not (Test-Path $BackendVenv)) {
-        Write-Log "ERROR" "Backend virtual environment not found: $BackendVenv"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    
-    # Create log directory
-    $LogDir = Join-Path $BACKEND_DIR "logs\run"
-    if (-not (Test-Path $LogDir)) {
-        New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
-    }
-    
-    # Start backend (background)
-    $BackendLog = Join-Path $WORK_HOME "backend.log"
-    $BackendPidFile = Join-Path $WORK_HOME "backend.pid"
-    
-    # Check if backend is already running
-    $BackendStarted = $true
-    if (Test-Path $BackendPidFile) {
-        $ExistingPid = Get-Content $BackendPidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-        if ($ExistingPid) {
-            $Process = Get-Process -Id $ExistingPid -ErrorAction SilentlyContinue
-            if ($Process) {
-                Write-Log "WARN" "Backend service is already running (PID: $ExistingPid)"
-                Write-Log "INFO" "Skipping backend start"
-                $BackendStarted = $false
-            } else {
-                Write-Log "INFO" "Removing stale PID file"
-                Remove-Item $BackendPidFile -Force -ErrorAction SilentlyContinue
-            }
-        }
-    }
-    
-    if ($BackendStarted) {
-        Write-Log "INFO" "Starting backend service, log file: $BackendLog"
-        
-        # Clear existing log file to ensure UTF-8 encoding
-        if (Test-Path $BackendLog) {
-            Remove-Item $BackendLog -Force -ErrorAction SilentlyContinue
-        }
-        "" | Out-File -FilePath $BackendLog -Encoding utf8 -NoNewline
-        
-        $BackendExe = $BackendVenv
-        if (-not (Test-Path $BackendExe)) {
-            $BackendExe = $PythonExePath
-        }
-        Write-Log "INFO" "Using backend executable: $BackendExe"
-        $BackendArgs = "$BACKEND_DIR\main.py"
-        
-        $null = Start-Job -ScriptBlock {
-            param($ExePath, $Arguments, $WorkDir, $LogFile)
-            Set-Location $WorkDir
-            $OutputEncoding = [System.Text.Encoding]::UTF8
-            [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-            & $ExePath $Arguments 2>&1 | Out-File -FilePath $LogFile -Encoding utf8 -Append
-        } -ArgumentList $BackendExe, $BackendArgs, $BACKEND_DIR, $BackendLog
-        
-        Start-Sleep -Seconds 2
-        $BackendProcesses = Get-WmiObject Win32_Process | Where-Object { 
-            $_.CommandLine -like "*$BackendArgs*" -and $_.ProcessName -eq "python.exe" 
-        } | Sort-Object CreationDate -Descending | Select-Object -First 1
-        
-        if ($BackendProcesses) {
-            $BackendPid = $BackendProcesses.ProcessId
-            $BackendPid | Out-File -FilePath $BackendPidFile -Encoding ascii
-            Write-Log "INFO" "Backend service started (PID: $BackendPid)"
-            $BackendProcess = @{ Id = $BackendPid }
-        } else {
-            Write-Log "ERROR" "Failed to find backend process"
-            exit 1
-        }
-        
-        Start-Sleep -Seconds 5
-        if ($BackendProcess -and $BackendProcess.Id -and (Get-Process -Id $BackendProcess.Id -ErrorAction SilentlyContinue)) {
-            Write-Log "SUCCESS" "Backend service is running successfully"
-            Get-Content $BackendLog -Tail 10 -ErrorAction SilentlyContinue
-        } else {
-            Write-Log "ERROR" "Backend service failed to start. Check log for details: $BackendLog"
-            Get-Content $BackendLog -Tail 30 -ErrorAction SilentlyContinue
-            exit 1
-        }
-    }
-    
-    Set-Location $PrevLocation
-}
-
-# Start frontend service (used by Start-Services or main flow)
-function Start-FrontendService {
-    if (-not (Test-Path $FRONTEND_DIR)) {
-        Write-Log "ERROR" "Frontend directory not found: $FRONTEND_DIR"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    
-    Write-Log "INFO" "===== Starting Frontend Service ====="
-    $PrevLocation = Get-Location
-    Set-Location $FRONTEND_DIR
-    
-    $NodeModules = Join-Path $FRONTEND_DIR "node_modules"
-    if (-not (Test-Path $NodeModules)) {
-        Write-Log "ERROR" "Frontend dependencies not found: $NodeModules"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        Set-Location $PrevLocation
-        exit 1
-    }
-    
-    $FrontendLog = Join-Path $WORK_HOME "frontend.log"
-    $FrontendPidFile = Join-Path $WORK_HOME "frontend.pid"
-    
-    $FrontendStarted = $true
-    if (Test-Path $FrontendPidFile) {
-        $ExistingPid = Get-Content $FrontendPidFile -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\d+$" }
-        if ($ExistingPid) {
-            $Process = Get-Process -Id $ExistingPid -ErrorAction SilentlyContinue
-            if ($Process) {
-                Write-Log "WARN" "Frontend service is already running (PID: $ExistingPid)"
-                Write-Log "INFO" "Skipping frontend start"
-                $FrontendStarted = $false
-            } else {
-                Write-Log "INFO" "Removing stale PID file"
-                Remove-Item $FrontendPidFile -Force -ErrorAction SilentlyContinue
-            }
-        }
-    }
-    
-    if ($FrontendStarted) {
-        Write-Log "INFO" "Starting frontend service, log file: $FrontendLog"
-        
-        if (Test-Path $FrontendLog) {
-            Remove-Item $FrontendLog -Force -ErrorAction SilentlyContinue
-        }
-        "" | Out-File -FilePath $FrontendLog -Encoding utf8 -NoNewline
-        
-        $FrontendJob = Start-Job -ScriptBlock {
-            param($WorkDir, $LogFile)
-            Set-Location $WorkDir
-            $OutputEncoding = [System.Text.Encoding]::UTF8
-            [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-            # Use 2>&1 in cmd to merge stderr so npm/vite warnings don't trigger NativeCommandError and exit under ErrorActionPreference=Stop
-            cmd /c "chcp 65001 >nul && npm run dev 2>&1" | Out-File -FilePath $LogFile -Encoding utf8 -Append
-        } -ArgumentList $FRONTEND_DIR, $FrontendLog
-        
-        Start-Sleep -Seconds 5
-        $NodeProcesses = Get-WmiObject Win32_Process | Where-Object { 
-            $_.ProcessName -eq "node.exe" -and $_.CommandLine -like "*vite*" 
-        } | Sort-Object CreationDate -Descending | Select-Object -First 1
-        
-        $ActualFrontendPid = $null
-        if ($NodeProcesses) {
-            $ActualFrontendPid = $NodeProcesses.ProcessId
-            $ActualFrontendPid | Out-File -FilePath $FrontendPidFile -Encoding ascii
-            Write-Log "INFO" "Frontend service started (Node PID: $ActualFrontendPid)"
-        } else {
-            Write-Log "WARN" "Could not find Node.js process, frontend may still be starting"
-            $FrontendJob.Id | Out-File -FilePath $FrontendPidFile -Encoding ascii
-            Write-Log "INFO" "Frontend job started (Job ID: $($FrontendJob.Id))"
-        }
-        
-        Start-Sleep -Seconds 5
-        Write-Log "INFO" "Latest frontend logs:"
-        if (Test-Path $FrontendLog) {
-            try {
-                $logLines = Get-Content $FrontendLog -Tail 20 -ErrorAction SilentlyContinue
-                if ($logLines) {
-                    $logLines | ForEach-Object { Write-Host $_ }
-                }
-            } catch {
-                Write-Log "WARN" "Could not read frontend log: $_"
-            }
-        }
-    }
-    
-    Set-Location $PrevLocation
-}
-
-function Start-Services {
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Starting Services" -ForegroundColor Cyan
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    # Check if directories exist
-    if (-not (Test-Path $BACKEND_DIR)) {
-        Write-Log "ERROR" "Backend directory not found: $BACKEND_DIR"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    
-    if (-not (Test-Path $FRONTEND_DIR)) {
-        Write-Log "ERROR" "Frontend directory not found: $FRONTEND_DIR"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    
-    # Check if .env file exists
-    if (-not (Test-Path $TARGET_ENV_FILE)) {
-        Write-Log "ERROR" ".env file not found: $TARGET_ENV_FILE"
-        Write-Log "ERROR" "Please run full installation first: .\setup.ps1"
-        exit 1
-    }
-    
-    Start-BackendService
-    Start-FrontendService
-    
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Services Started Successfully" -ForegroundColor Green
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    Show-Status -NoExit
-    return
-}
-
-function Restart-Services {
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Restarting Services" -ForegroundColor Cyan
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    # First, stop services
-    Write-Log "INFO" "Stopping services..."
-    Stop-Services -NoExit
-    
-    # Wait a bit before restarting
-    Write-Log "INFO" "Waiting 2 seconds before restarting services..."
-    Start-Sleep -Seconds 2
-    
-    # Now start services
-    Write-Log "INFO" "Starting services..."
-    Start-Services
-    
-    Write-Host ""
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "Services Restarted Successfully" -ForegroundColor Green
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    return
 }
 
 # ===================== Parameter Parsing =====================
@@ -1281,12 +238,38 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
 } else {
     Write-Log "INFO" "===== Fetching Code ====="
     Write-Log "INFO" "Using branch: $Branch"
-    $FetchScript = Join-Path $WORK_HOME "fetch_codes.ps1"
-    Test-File $FetchScript
-    & $FetchScript -Branch $Branch
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "ERROR" "Code fetching failed"
-        exit 1
+    $StudioRepoUrl = "https://gitcode.com/openJiuwen/agent-studio.git"
+    $StudioDir = Join-Path $WORK_HOME "agent-studio"
+    Write-Log "INFO" "Repository: $StudioRepoUrl"
+    Write-Log "INFO" "Target directory: $StudioDir"
+
+    if (Test-Path $StudioDir) {
+        Write-Log "INFO" "agent-studio directory already exists, updating code..."
+        Set-Location $StudioDir
+        git fetch origin --prune
+        git pull origin $Branch
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR" "Failed to update agent-studio code"
+            Write-Log "INFO" "Try manually: cd `"$StudioDir`" && git fetch origin --prune && git pull origin $Branch"
+            exit 1
+        }
+        Write-Log "SUCCESS" "agent-studio updated successfully"
+    } else {
+        Write-Log "INFO" "Cloning agent-studio repository..."
+        Set-Location $WORK_HOME
+        git clone -b $Branch $StudioRepoUrl "agent-studio"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR" "Failed to clone agent-studio repository"
+            Write-Log "INFO" "Check network and repository access: $StudioRepoUrl"
+            exit 1
+        }
+        Write-Log "SUCCESS" "agent-studio cloned successfully"
+    }
+
+    try {
+        Set-Location $WORK_HOME
+    } catch {
+        Write-Log "WARN" "Could not change directory to work home: $($_.Exception.Message)"
     }
 
     # Check code directories
@@ -1365,6 +348,20 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
     $Content = $Content -replace "BACKEND_PORT=\d+", "BACKEND_PORT=$BackendPort"
     $Content = $Content -replace "VITE_API_PROXY_TARGET=http://localhost:\d+/", "VITE_API_PROXY_TARGET=http://localhost:${BackendPort}/"
     $Content = $Content -replace 'ALLOWED_ORIGINS=\["http://localhost:\d+","http://127\.0\.0\.1:\d+"\]', "ALLOWED_ORIGINS=[`"http://localhost:${FrontendPort}`",`"http://127.0.0.1:${FrontendPort}`"]"
+    # MySQL 应用账号（与 config_mysql.ps1 创建的库用户一致；原在 config_mysql 的 Update-EnvFileDbCredentials 已合并至此）
+    Write-Log "INFO" "Setting DB_USER / DB_PASSWORD from -AppDbUser / -AppDbPassword"
+    if ($Content -match '(?m)^\s*DB_USER=') {
+        $Content = $Content -replace '(?m)^\s*DB_USER=.*$', ('DB_USER=' + $AppDbUser)
+    } else {
+        if (-not $Content.EndsWith("`n")) { $Content += "`n" }
+        $Content += 'DB_USER=' + $AppDbUser + "`n"
+    }
+    if ($Content -match '(?m)^\s*DB_PASSWORD=') {
+        $Content = $Content -replace '(?m)^\s*DB_PASSWORD=.*$', ('DB_PASSWORD=' + $AppDbPassword)
+    } else {
+        if (-not $Content.EndsWith("`n")) { $Content += "`n" }
+        $Content += 'DB_PASSWORD=' + $AppDbPassword + "`n"
+    }
     # 统一为 LF 换行并用 UTF-8 无 BOM 写回，避免 CRLF 导致配置解析/编码错误
     $Content = $Content -replace "`r`n", "`n" -replace "`r", "`n"
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -1380,71 +377,163 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
     $FrontendPortActual = (Select-String -Path $TARGET_ENV_FILE -Pattern "^FRONTEND_PORT=").Line -replace "FRONTEND_PORT=", ""
     $BackendPortActual = (Select-String -Path $TARGET_ENV_FILE -Pattern "^BACKEND_PORT=").Line -replace "BACKEND_PORT=", ""
     Write-Log "INFO" "FRONTEND_PORT configured: $FrontendPortActual, BACKEND_PORT configured: $BackendPortActual"
+    Write-Log "SUCCESS" ".env updated: DB_USER=$AppDbUser (DB_PASSWORD set)"
 
     Save-Progress -Step $STEP
 }
 
 
 
-# ===================== MySQL Database Configuration =====================
-if ($DbType -eq "mysql") {
-    $STEP = "config_mysql"
-    if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
-        Write-Log "INFO" "Skipping: MySQL database configuration (already completed)"
-    } else {
-        Write-Log "INFO" "===== MySQL Database Configuration ====="
-        
-        # Call config_mysql.ps1 to create databases
-        $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-        $ConfigMySQLPath = Join-Path $ScriptDir "config_mysql.ps1"
-        Write-Log "INFO" "Calling config_mysql.ps1 to create MySQL databases..."
-        # Set WORK_HOME environment variable so config_mysql.ps1 can find .env file
-        $env:WORK_HOME = $WORK_HOME
-        & $ConfigMySQLPath
-        if ($LASTEXITCODE -eq 0) {
-            Write-Log "SUCCESS" "MySQL databases configured successfully"
-        } else {
-            Write-Log "WARN" "MySQL database configuration may have failed (exit code: $LASTEXITCODE)"
-            Write-Log "INFO" "Please verify that databases are created correctly"
+# ===================== Download Runtime Code =====================
+$STEP = "fetch_runtime_code"
+if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
+    Write-Log "INFO" "Skipping: Runtime code download/update (already completed)"
+} else {
+    Write-Log "INFO" "===== Downloading Runtime Code ====="
+    $RuntimeRepoUrl = "https://gitcode.com/openJiuwen/agent-runtime.git"
+    Write-Log "INFO" "Runtime repository: $RuntimeRepoUrl"
+    Write-Log "INFO" "Runtime branch: $Branch (same as -Branch for agent-studio)"
+
+    if (Test-Path $RUNTIME_DIR) {
+        Write-Log "INFO" "Runtime directory already exists, updating code..."
+        Set-Location $RUNTIME_DIR
+        git fetch origin --prune
+        git pull origin $Branch
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR" "Failed to update runtime code"
+            exit 1
         }
-        
-        Write-Log "INFO" "Continuing with deployment..."
-        Save-Progress -Step $STEP
+    } else {
+        Write-Log "INFO" "Cloning runtime repository..."
+        Set-Location $WORK_HOME
+        git clone -b $Branch $RuntimeRepoUrl "agent-runtime"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "ERROR" "Failed to clone runtime repository"
+            exit 1
+        }
     }
+    Save-Progress -Step $STEP
 }
 
-# ===================== Deploy Backend =====================
-$STEP = "deploy_backend"
+# ===================== Configure Runtime .env =====================
+$STEP = "config_runtime_env"
 if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
-    Write-Log "INFO" "Skipping: Backend deployment (already completed)"
+    Write-Log "INFO" "Skipping: Runtime .env configuration (already completed)"
+} else {
+    Write-Log "INFO" "===== Configuring Runtime .env ====="
+    $RuntimeServerDir = Join-Path $RUNTIME_DIR "server"
+    $RuntimeEnvExample = Join-Path $RuntimeServerDir ".env.example"
+    $RuntimeEnvFile = Join-Path $RuntimeServerDir ".env"
+    Test-Directory $RuntimeServerDir
+    Test-File $RuntimeEnvExample
+
+    if (-not (Test-Path $RuntimeEnvFile)) {
+        Write-Log "INFO" "Runtime .env not found, copying from .env.example"
+        Copy-Item -Path $RuntimeEnvExample -Destination $RuntimeEnvFile -Force
+        if (-not (Test-Path $RuntimeEnvFile)) {
+            Write-Log "ERROR" "Failed to create runtime .env from .env.example"
+            exit 1
+        }
+    }
+
+    Write-Log "INFO" "Setting runtime DB_TYPE to: $DbType"
+    $RuntimeEnvContent = Get-Content -Path $RuntimeEnvFile -Raw -Encoding UTF8
+    if ($RuntimeEnvContent -match "(?m)^DB_TYPE=") {
+        $RuntimeEnvContent = [System.Text.RegularExpressions.Regex]::Replace($RuntimeEnvContent, "(?m)^DB_TYPE=.*$", "DB_TYPE=$DbType")
+    } else {
+        if (-not $RuntimeEnvContent.EndsWith("`n")) {
+            $RuntimeEnvContent += "`n"
+        }
+        $RuntimeEnvContent += "DB_TYPE=$DbType`n"
+    }
+
+    if ($DbType -eq "mysql") {
+        Write-Log "INFO" "Setting runtime DB_USER / DB_PASSWORD from -AppDbUser / -AppDbPassword"
+        $UserWritten = $false
+        $PasswordWritten = $false
+        $RuntimeLines = [System.Collections.ArrayList]@()
+        foreach ($Line in [regex]::Split($RuntimeEnvContent, '\r\n|\r|\n')) {
+            if ($Line -match "^\s*DB_USER=") {
+                [void]$RuntimeLines.Add("DB_USER=$AppDbUser")
+                $UserWritten = $true
+            } elseif ($Line -match "^\s*DB_PASSWORD=") {
+                [void]$RuntimeLines.Add("DB_PASSWORD=$AppDbPassword")
+                $PasswordWritten = $true
+            } else {
+                [void]$RuntimeLines.Add($Line)
+            }
+        }
+        if (-not $UserWritten) { [void]$RuntimeLines.Add("DB_USER=$AppDbUser") }
+        if (-not $PasswordWritten) { [void]$RuntimeLines.Add("DB_PASSWORD=$AppDbPassword") }
+        $RuntimeEnvContent = ($RuntimeLines -join "`n")
+        Write-Log "SUCCESS" "Runtime .env updated: DB_USER=$AppDbUser (DB_PASSWORD set)"
+    }
+
+    $RuntimeEnvContent = $RuntimeEnvContent -replace "`r`n", "`n" -replace "`r", "`n"
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($RuntimeEnvFile, $RuntimeEnvContent, $utf8NoBom)
+
+    $RuntimeDbTypeActual = (Select-String -Path $RuntimeEnvFile -Pattern "^DB_TYPE=").Line -replace "DB_TYPE=", ""
+    if ($RuntimeDbTypeActual -ne $DbType) {
+        Write-Log "WARN" "Runtime DB_TYPE configuration may not have taken effect, current value: $RuntimeDbTypeActual (expected: $DbType)"
+    } else {
+        Write-Log "INFO" "Runtime DB_TYPE configured successfully: $DbType"
+    }
+
+    Save-Progress -Step $STEP
+}
+
+# ===================== MySQL Database Configuration =====================
+$STEP = "config_mysql"
+if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
+    Write-Log "INFO" "Skipping: MySQL database configuration (already completed)"
+} elseif ($DbType -eq "mysql") {
+    Write-Log "INFO" "===== MySQL Database Configuration ====="
+
+    # Call config_mysql.ps1 to create databases
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $ConfigMySQLPath = Join-Path $ScriptDir "config_mysql.ps1"
+    Write-Log "INFO" "Calling config_mysql.ps1 to create MySQL databases..."
+    # Set WORK_HOME environment variable so config_mysql.ps1 can find .env file
+    $env:WORK_HOME = $WORK_HOME
+    & $ConfigMySQLPath -AppDbUser $AppDbUser -AppDbPassword $AppDbPassword
+    if ($LASTEXITCODE -eq 0) {
+        Write-Log "SUCCESS" "MySQL databases configured successfully"
+    } else {
+        Write-Log "WARN" "MySQL database configuration may have failed (exit code: $LASTEXITCODE)"
+        Write-Log "INFO" "Please verify that databases are created correctly"
+    }
+
+    Write-Log "INFO" "Continuing with deployment..."
+    Save-Progress -Step $STEP
+} else {
+    Write-Log "INFO" "Skipping: MySQL database configuration (not applicable, DbType=$DbType)"
+    Save-Progress -Step $STEP
+}
+
+# ===================== Install Runtime Dependencies =====================
+$STEP = "install_runtime_dep"
+if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
+    Write-Log "INFO" "Skipping: Runtime dependencies install (already completed)"
+} else {
+    Write-Log "INFO" "===== Installing Runtime Dependencies ====="
+    $RuntimeServerDirForInstall = Join-Path $RUNTIME_DIR "server"
+    if ((Test-Path $RuntimeServerDirForInstall) -and (Test-Path (Join-Path $RuntimeServerDirForInstall ".env"))) {
+        Install-RuntimeDependencies -RuntimeServerDir $RuntimeServerDirForInstall
+    } else {
+        Write-Log "INFO" "Skipping runtime uv/SDK setup (agent-runtime\server or server\.env not found)"
+    }
+    Save-Progress -Step $STEP
+}
+
+# ===================== Install Backend Dependencies =====================
+$STEP = "install_backend_dep"
+if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
+    Write-Log "INFO" "Skipping: Backend dependencies install (already completed)"
     Set-Location $BACKEND_DIR
 } else {
-    Write-Log "INFO" "===== Deploying Backend ====="
+    Write-Log "INFO" "===== Installing Backend Dependencies ====="
     Set-Location $BACKEND_DIR
-
-    # Install uv
-    Write-Log "INFO" "Installing uv tool"
-    if ($PythonExePath) {
-        Write-Log "INFO" "Using Python executable at: $PythonExePath"
-        & $PythonExePath -m pip install --user uv
-    } else {
-        Write-Log "INFO" "Using python command from PATH"
-        python -m pip install --user uv
-    }
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "ERROR" "Failed to install uv"
-        exit 1
-    }
-
-    # Ensure uv is in PATH
-    $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    $UvPath = Join-Path $env:USERPROFILE "AppData\Roaming\Python\Python311\Scripts"
-    if ($UserPath -notlike "*$UvPath*") {
-        [Environment]::SetEnvironmentVariable("Path", "$UserPath;$UvPath", "User")
-        $env:Path += ";$UvPath"
-    }
-    Test-Command "uv"
-
     Write-Log "INFO" "Creating/resetting uv virtual environment"
 
     # Ensure the virtual environment directory is clean before creating
@@ -1458,13 +547,6 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
             Write-Log "WARN" "Failed to remove existing virtual environment directory using robust methods"
             Write-Log "INFO" "Attempting to use uv venv --clear to recreate virtual environment..."
         }
-    }
-
-    # Use the found Python executable path (version already verified in check_python.ps1)
-    if (-not $PythonExePath -or -not (Test-Path $PythonExePath)) {
-        Write-Log "ERROR" "Python executable path not found or invalid: $PythonExePath"
-        Write-Log "ERROR" "Please ensure Python is installed and check_python.ps1 completed successfully"
-        exit 1
     }
 
     Write-Log "INFO" "Using Python executable at: $PythonExePath for virtual environment"
@@ -1493,17 +575,15 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
         }
     }
 
-    Write-Log "INFO" "Installing pip in virtual environment"
-    & "$BACKEND_DIR\.venv\Scripts\python.exe" -m ensurepip --upgrade
+    Write-Log "INFO" "Syncing dependencies with uv (editable project + default dependency groups, e.g. dev)"
+    $UvDiBackend = Get-UvDefaultIndexArgsFromUserConfig -WorkHome $WORK_HOME
+    $UvSyncArgs = @('sync', '--python', $PythonExePath) + $UvDiBackend
+    $UvSyncArgsLog = ($UvSyncArgs | ForEach-Object { "$_" }) -join ' '
+    $UvSyncArgsLog = $UvSyncArgsLog -replace '(https?://)([^/\s:@]+):([^/\s@]+)@', '$1***:***@'
+    Write-Log "INFO" "Running uv command: uv $UvSyncArgsLog"
+    uv @UvSyncArgs
     if ($LASTEXITCODE -ne 0) {
-        Write-Log "ERROR" "Failed to install pip in virtual environment"
-        exit 1
-    }
-
-    Write-Log "INFO" "Syncing dependencies using pip"
-    & "$BACKEND_DIR\.venv\Scripts\pip3.exe" install -e .[dev]
-    if ($LASTEXITCODE -ne 0) {
-        Write-Log "ERROR" "Failed to sync dependencies"
+        Write-Log "ERROR" "Failed to sync dependencies with uv"
         exit 1
     }
 
@@ -1516,13 +596,13 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
 }
 
 
-# ===================== Deploy Frontend =====================
-$STEP = "deploy_frontend"
+# ===================== Install Frontend Dependencies =====================
+$STEP = "install_frontend_dep"
 if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
-    Write-Log "INFO" "Skipping: Frontend deployment (already completed)"
+    Write-Log "INFO" "Skipping: Frontend dependencies install (already completed)"
     Set-Location $FRONTEND_DIR
 } else {
-    Write-Log "INFO" "===== Deploying Frontend ===="
+    Write-Log "INFO" "===== Installing Frontend Dependencies ====="
     Set-Location $FRONTEND_DIR
 
     Write-Log "INFO" "Installing frontend dependencies"
@@ -1545,7 +625,14 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
         Start-Services
         Save-Progress -Step $STEP
     } catch {
-        Write-Log "WARN" "Service startup reported an error (services may still be running): $_"
+        $ErrMsg = $_.Exception.Message
+        $ErrType = $_.Exception.GetType().FullName
+        $ErrStack = $_.ScriptStackTrace
+        Write-Log "WARN" "Service startup reported an error (services may still be running): $ErrMsg"
+        Write-Log "WARN" "Service startup error type: $ErrType"
+        if (-not [string]::IsNullOrWhiteSpace($ErrStack)) {
+            Write-Log "WARN" "Service startup script stack:`n$ErrStack"
+        }
         try { Save-Progress -Step $STEP } catch { }
     }
 }

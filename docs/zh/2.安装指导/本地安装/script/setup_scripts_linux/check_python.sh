@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script: install_and_check_python311.sh
-# Purpose: Check Python 3.11+ and pip; install via PPA if missing, minimal verification
+# Purpose: Check Python 3.11+ and uv; install via PPA if missing, minimal verification
 # Supported: Debian/Ubuntu (apt + PPA only)
 
 set -euo pipefail
@@ -55,15 +55,6 @@ discover_python_version() {
 # Check Python 3.11+ installed (uses discover version)
 check_python_installed() {
     if command -v python${PYTHON_VERSION} &> /dev/null; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Check pip installed (for Python3.11)
-check_pip_installed() {
-    if python${PYTHON_VERSION} -m pip --version &> /dev/null; then
         return 0
     else
         return 1
@@ -234,23 +225,13 @@ install_python_with_conda() {
         return 1
     fi
     
-    if ! "$PYTHON_PATH" -m pip --version &> /dev/null; then
-        echo -e "${YELLOW}Installing pip...${NC}"
-        "$PYTHON_PATH" -m ensurepip --upgrade || {
-            curl -sS https://bootstrap.pypa.io/get-pip.py | "$PYTHON_PATH" || {
-                echo -e "${RED}❌ pip installation failed${NC}"
-                return 1
-            }
-        }
-    fi
-    
     echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed with Conda${NC}"
     return 0
 }
 
-# Add PPA and install Python3.11 + pip
-install_python_pip() {
-    echo -e "${YELLOW}\nInstalling Python${PYTHON_VERSION} and pip...${NC}"
+# Add PPA and install Python3.11
+install_python_only() {
+    echo -e "${YELLOW}\nInstalling Python${PYTHON_VERSION}...${NC}"
     
     if ! sudo -v &> /dev/null; then
         echo -e "${RED}Error: sudo required to install. Run this script with a user that has sudo.${NC}"
@@ -291,8 +272,8 @@ install_python_pip() {
             
             if install_python_with_conda; then
                 echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed with Conda${NC}"
-                if check_python_installed && check_pip_installed; then
-                    echo -e "${GREEN}✅ Python${PYTHON_VERSION} and pip verified${NC}"
+                if check_python_installed; then
+                    echo -e "${GREEN}✅ Python${PYTHON_VERSION} verified${NC}"
                     rm -f "$INSTALL_OUTPUT"
                     echo -e "${YELLOW}Note: Script uses python${PYTHON_VERSION} (not python3) to avoid affecting system tools.${NC}"
                     return 0
@@ -325,27 +306,13 @@ install_python_pip() {
     fi
     grep -E "(Reading|Preparing|Unpacking|Setting|Selecting|Processing|Done|%|Err:|WARN|E:)" "$INSTALL_OUTPUT" || true
     rm -f "$INSTALL_OUTPUT"
-    echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed${NC}"
-    
-    echo -e "${YELLOW}Installing pip for Python${PYTHON_VERSION}...${NC}"
-    if ! python${PYTHON_VERSION} -m pip --version &> /dev/null; then
-        echo -e "${YELLOW}Trying ensurepip to install pip...${NC}"
-        python${PYTHON_VERSION} -m ensurepip --upgrade 2>&1 | grep -v "^$" || {
-            echo -e "${YELLOW}ensurepip not available, using get-pip.py...${NC}"
-            curl -sS https://bootstrap.pypa.io/get-pip.py | python${PYTHON_VERSION} 2>&1 | grep -v "^$" || {
-                echo -e "${RED}❌ pip installation failed. Install manually.${NC}"
-                exit 1
-            }
-        }
-    fi
-    
-    echo -e "${GREEN}✅ Python${PYTHON_VERSION} and pip installed.${NC}"
+    echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed.${NC}"
     echo -e "${YELLOW}Note: Script uses python${PYTHON_VERSION} (not python3) to avoid affecting system tools.${NC}"
 }
 
-# Minimal verification of Python and pip
-verify_python_pip() {
-    echo -e "${YELLOW}\nVerifying Python${PYTHON_VERSION} and pip...${NC}"
+# Minimal verification of Python
+verify_python() {
+    echo -e "${YELLOW}\nVerifying Python${PYTHON_VERSION}...${NC}"
     
     if check_python_installed; then
         PYTHON_FULL_VERSION=$(python${PYTHON_VERSION} --version 2>&1)
@@ -361,47 +328,71 @@ verify_python_pip() {
         exit 1
     fi
 
-    if check_pip_installed; then
-        PIP_FULL_VERSION=$(python${PYTHON_VERSION} -m pip --version 2>&1 | awk '{print $2}')
-        echo -e "${GREEN}✅ pip installed. Version: ${PIP_FULL_VERSION}${NC}"
-        
-        if python${PYTHON_VERSION} -m pip -V &> /dev/null; then
-            echo -e "${GREEN}✅ pip basic test passed${NC}"
-        else
-            echo -e "${YELLOW}⚠ pip installed but basic test failed${NC}"
-        fi
-    else
-        echo -e "${RED}❌ pip installation failed${NC}"
-        exit 1
-    fi
 }
 
-# Load and apply pip index config
-apply_pip_config() {
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROXY_CONFIG_PATH="${SCRIPT_DIR}/user_config.sh"
-    
-    if [ ! -f "$PROXY_CONFIG_PATH" ]; then
+# Install uv CLI (used by backend/runtime setup.sh and manage_service.sh).
+install_uv_cli() {
+    if [ -f "$HOME/.local/bin/uv" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+    if [ -f "$HOME/.cargo/bin/uv" ] && [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+        export PATH="$HOME/.cargo/bin:$PATH"
+    fi
+    if [ "$(id -u)" -eq 0 ] && [ -f "/root/.local/bin/uv" ] && [[ ":$PATH:" != *":/root/.local/bin:"* ]]; then
+        export PATH="/root/.local/bin:$PATH"
+    fi
+    if [ "$(id -u)" -eq 0 ] && [ -f "/root/.cargo/bin/uv" ] && [[ ":$PATH:" != *":/root/.cargo/bin:"* ]]; then
+        export PATH="/root/.cargo/bin:$PATH"
+    fi
+
+    if command -v uv &> /dev/null; then
+        echo -e "${GREEN}✅ uv already available: $(uv --version 2>&1 | head -n 1)${NC}"
         return 0
     fi
-    
-    if ! source "$PROXY_CONFIG_PATH" 2>/dev/null; then
-        echo -e "${YELLOW}⚠ Warning: Failed to load config: $PROXY_CONFIG_PATH${NC}"
-        return 1
+
+    echo -e "${YELLOW}Installing uv (official install.sh)...${NC}"
+    local attempt=1
+    local uv_install_ok=0
+    while [ "$attempt" -le 3 ]; do
+        if curl -LsSf https://astral.sh/uv/install.sh | sh; then
+            uv_install_ok=1
+            break
+        fi
+        echo -e "${YELLOW}Install uv failed, retrying in 10s (attempt ${attempt}/3)...${NC}"
+        if [ "$attempt" -lt 3 ]; then
+            sleep 10
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    if [ "$uv_install_ok" -ne 1 ]; then
+        echo -e "${RED}❌ uv installation failed after retries${NC}"
+        exit 1
     fi
-    
-    if [ -n "${PIP_INDEX_URL:-}" ] && [ -n "${PIP_TRUSTED_HOST:-}" ]; then
-        echo -e "${YELLOW}Configuring pip index: ${PIP_INDEX_URL}${NC}"
-        python${PYTHON_VERSION} -m pip config set global.index-url "$PIP_INDEX_URL" 2>/dev/null || true
-        python${PYTHON_VERSION} -m pip config set global.trusted-host "$PIP_TRUSTED_HOST" 2>/dev/null || true
-        echo -e "${GREEN}✅ pip index configured${NC}"
-    elif [ -n "${PIP_INDEX_URL:-}" ] || [ -n "${PIP_TRUSTED_HOST:-}" ]; then
-        echo -e "${YELLOW}⚠ Warning: Both PIP_INDEX_URL and PIP_TRUSTED_HOST must be set; skipping pip config${NC}"
+
+    if [ -f "$HOME/.local/bin/uv" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+        export PATH="$HOME/.local/bin:$PATH"
     fi
+    if [ -f "$HOME/.cargo/bin/uv" ] && [[ ":$PATH:" != *":$HOME/.cargo/bin:"* ]]; then
+        export PATH="$HOME/.cargo/bin:$PATH"
+    fi
+    if [ "$(id -u)" -eq 0 ] && [ -f "/root/.local/bin/uv" ] && [[ ":$PATH:" != *":/root/.local/bin:"* ]]; then
+        export PATH="/root/.local/bin:$PATH"
+    fi
+    if [ "$(id -u)" -eq 0 ] && [ -f "/root/.cargo/bin/uv" ] && [[ ":$PATH:" != *":/root/.cargo/bin:"* ]]; then
+        export PATH="/root/.cargo/bin:$PATH"
+    fi
+
+    if ! command -v uv &> /dev/null; then
+        echo -e "${RED}❌ uv not found on PATH after install. Try: curl -LsSf https://astral.sh/uv/install.sh | sh${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✅ uv installed: $(uv --version 2>&1 | head -n 1)${NC}"
 }
 
 # ===================== Main =====================
-echo -e "${YELLOW}=== Checking Python${PYTHON_VERSION} and pip ===${NC}"
+echo -e "${YELLOW}=== Checking Python${PYTHON_VERSION} and uv ===${NC}"
 
 check_apt_system
 
@@ -413,7 +404,6 @@ fi
 
 discover_python_version || true
 PYTHON_INSTALLED=false
-PIP_INSTALLED=false
 
 if check_python_installed; then
     PYTHON_FULL_VERSION=$(python${PYTHON_VERSION} --version 2>&1)
@@ -423,24 +413,16 @@ else
     echo -e "${RED}Python${PYTHON_VERSION} not installed${NC}"
 fi
 
-if check_pip_installed; then
-    PIP_FULL_VERSION=$(python${PYTHON_VERSION} -m pip --version 2>&1 | awk '{print $2}')
-    echo -e "${GREEN}pip installed. Version: ${PIP_FULL_VERSION}${NC}"
-    PIP_INSTALLED=true
-else
-    echo -e "${RED}pip not installed${NC}"
+if ! $PYTHON_INSTALLED; then
+    install_python_only
 fi
 
-if ! $PYTHON_INSTALLED || ! $PIP_INSTALLED; then
-    install_python_pip
-fi
-
-verify_python_pip
-apply_pip_config
+verify_python
+install_uv_cli
 
 echo -e "\n${GREEN}=== Done ===${NC}"
 echo -e "${YELLOW}Verify manually:${NC}"
 echo -e "${YELLOW}  python${PYTHON_VERSION} -V              # Python version${NC}"
-echo -e "${YELLOW}  python${PYTHON_VERSION} -m pip --version # pip version${NC}"
+echo -e "${YELLOW}  uv --version                             # uv (Agent-Studio backend/runtime)${NC}"
 echo -e "${YELLOW}Note: Script uses python${PYTHON_VERSION} (not python3) to avoid affecting system tools.${NC}"
 exit 0

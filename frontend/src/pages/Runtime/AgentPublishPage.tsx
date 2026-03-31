@@ -34,9 +34,6 @@ import {
 type PublishType = 'chat' | 'api'
 type RuntimeDeployStatus = 'running' | 'pending' | 'stopped' | 'failed' | 'unknown'
 
-/** 模拟 AI 回复（固定文案，用于对话体验演示） */
-// Mock 已切换为真实执行接口（8001）
-
 const AgentPublishPage: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()

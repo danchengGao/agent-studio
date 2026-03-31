@@ -1,8 +1,8 @@
 # PowerShell Utility Functions for Agent-Studio Deployment Scripts
 # This file contains shared utility functions used by setup scripts
 
-# Load optional per-user config and apply HTTP(S) proxy for current session
-function Apply-HttpProxy {
+# Load optional user_config.ps1 and apply session environment variables (proxy, uv index, etc.)
+function Apply-UserEnvironmentConfig {
     param(
         [string]$WorkHome
     )
@@ -17,23 +17,40 @@ function Apply-HttpProxy {
     }
 
     try {
-        . $UserConfig
+        $UserConfigContent = Get-Content -Path $UserConfig -Raw -Encoding UTF8
     } catch {
-        Write-Log "WARN" "Failed to load user_config.ps1: $($_.Exception.Message)"
+        Write-Log "WARN" "Failed to read user_config.ps1: $($_.Exception.Message)"
         return
     }
 
-    if (-not [string]::IsNullOrEmpty($HTTP_PROXY)) {
-        $env:HTTP_PROXY = $HTTP_PROXY
-        $env:http_proxy = $HTTP_PROXY
-        Write-Log "INFO" "HTTP proxy applied for this session: $HTTP_PROXY"
+    $HTTP_PROXY = ""
+    $HTTPS_PROXY = ""
+    $ENABLE_SESSION_ENV_PROXY = "true"
+    if ($UserConfigContent -match '(?m)^\s*\$HTTP_PROXY\s*=\s*["''](.*?)["'']\s*$') { $HTTP_PROXY = $Matches[1] }
+    if ($UserConfigContent -match '(?m)^\s*\$HTTPS_PROXY\s*=\s*["''](.*?)["'']\s*$') { $HTTPS_PROXY = $Matches[1] }
+    if ($UserConfigContent -match '(?m)^\s*\$ENABLE_SESSION_ENV_PROXY\s*=\s*["''](.*?)["'']\s*$') { $ENABLE_SESSION_ENV_PROXY = $Matches[1] }
+
+    $EnableSessionEnvProxy = $true
+    if (-not [string]::IsNullOrWhiteSpace($ENABLE_SESSION_ENV_PROXY) -and "$ENABLE_SESSION_ENV_PROXY".Trim() -match '^(?i:false|0|no)$') {
+        $EnableSessionEnvProxy = $false
     }
 
-    if (-not [string]::IsNullOrEmpty($HTTPS_PROXY)) {
-        $env:HTTPS_PROXY = $HTTPS_PROXY
-        $env:https_proxy = $HTTPS_PROXY
-        Write-Log "INFO" "HTTPS proxy applied for this session: $HTTPS_PROXY"
+    if ($EnableSessionEnvProxy) {
+        if (-not [string]::IsNullOrEmpty($HTTP_PROXY)) {
+            $env:HTTP_PROXY = $HTTP_PROXY
+            $env:http_proxy = $HTTP_PROXY
+            Write-Log "INFO" "HTTP proxy applied for this session: $HTTP_PROXY"
+        }
+
+        if (-not [string]::IsNullOrEmpty($HTTPS_PROXY)) {
+            $env:HTTPS_PROXY = $HTTPS_PROXY
+            $env:https_proxy = $HTTPS_PROXY
+            Write-Log "INFO" "HTTPS proxy applied for this session: $HTTPS_PROXY"
+        }
+    } else {
+        Write-Log "INFO" "Skip applying session proxy environment variables (ENABLE_SESSION_ENV_PROXY=$ENABLE_SESSION_ENV_PROXY)"
     }
+
 }
 
 # Max length for a single log line; longer messages are truncated to avoid Write-Host "index out of array" errors
@@ -84,6 +101,53 @@ function Write-Log {
             # Ignore log file write errors so main flow is not affected
         }
     }
+}
+
+function Get-UvDefaultIndexArgsFromUserConfig {
+    <#
+    .SYNOPSIS
+    Reads $UV_INDEX / $UV_TRUSTED_HOST from user_config.ps1 under WorkHome and returns uv CLI args.
+    Uses --index to prioritize the configured mirror over project-level [[tool.uv.index]],
+    and --allow-insecure-host for trusted hosts.
+    #>
+    param(
+        [string]$WorkHome
+    )
+
+    if ([string]::IsNullOrWhiteSpace($WorkHome)) {
+        return @()
+    }
+
+    $UserCfgForUv = Join-Path $WorkHome "user_config.ps1"
+    if (-not (Test-Path $UserCfgForUv)) {
+        return @()
+    }
+
+    try {
+        . $UserCfgForUv
+        $UvArgs = @()
+        if (-not [string]::IsNullOrWhiteSpace($UV_INDEX)) {
+            $UvIdx = $UV_INDEX.Trim()
+            Write-Log "INFO" "uv uses --index from user_config.ps1: $UvIdx"
+            $UvArgs += @('--index', $UvIdx)
+        }
+        if (-not [string]::IsNullOrWhiteSpace($UV_TRUSTED_HOST)) {
+            $TrustedHosts = $UV_TRUSTED_HOST -split ',' | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+            foreach ($TrustedHost in $TrustedHosts) {
+                $UvArgs += @('--allow-insecure-host', $TrustedHost)
+            }
+            if ($TrustedHosts.Count -gt 0) {
+                Write-Log "INFO" "uv uses --allow-insecure-host from user_config.ps1: $($TrustedHosts -join ',')"
+            }
+        }
+        if ($UvArgs.Count -gt 0) {
+            return $UvArgs
+        }
+    } catch {
+        Write-Log "WARN" "Failed to read user_config.ps1 for uv args: $($_.Exception.Message)"
+    }
+
+    return @()
 }
 
 function Remove-DirectoryRobust {
@@ -287,6 +351,77 @@ function Unblock-AllScripts {
     $UnblockedCount = $ScriptFiles.Count
     if ($UnblockedCount -gt 0) {
         Write-Log "INFO" "Unblocked $UnblockedCount PowerShell script(s)"
+    }
+}
+
+# Progress file path ($PROGRESS_FILE) and step order ($INSTALL_STEPS) are defined by the caller (e.g. setup.ps1) before dot-sourcing this file.
+function Save-Progress {
+    param(
+        [string]$Step
+    )
+    try {
+        $Step | Out-File -FilePath $PROGRESS_FILE -Encoding utf8 -Force
+        Write-Log "INFO" "Progress saved: $Step"
+    } catch {
+        Write-Log "WARN" "Failed to save progress: $_"
+    }
+}
+
+function Read-Progress {
+    if (Test-Path $PROGRESS_FILE) {
+        try {
+            $Progress = Get-Content $PROGRESS_FILE -ErrorAction SilentlyContinue | Where-Object { $_ -match "^\S+" }
+            if ($Progress) {
+                return $Progress.Trim()
+            }
+        } catch {
+            Write-Log "WARN" "Failed to read progress: $_"
+        }
+    }
+    return ""
+}
+
+function Clear-Progress {
+    if (Test-Path $PROGRESS_FILE) {
+        try {
+            Remove-Item $PROGRESS_FILE -Force -ErrorAction SilentlyContinue
+            Write-Log "INFO" "Progress file cleared"
+        } catch {
+            Write-Log "WARN" "Failed to clear progress file: $_"
+        }
+    }
+}
+
+function Test-SkipStep {
+    param(
+        [string]$CurrentStep,
+        [string]$LastProgress
+    )
+
+    if ([string]::IsNullOrEmpty($LastProgress)) {
+        return $false
+    }
+
+    $CurrentIndex = -1
+    $LastIndex = -1
+
+    for ($i = 0; $i -lt $INSTALL_STEPS.Count; $i++) {
+        if ($INSTALL_STEPS[$i] -eq $CurrentStep) {
+            $CurrentIndex = $i
+        }
+        if ($INSTALL_STEPS[$i] -eq $LastProgress) {
+            $LastIndex = $i
+        }
+    }
+
+    if ($CurrentIndex -eq -1 -or $LastIndex -eq -1) {
+        return $false
+    }
+
+    if ($LastIndex -ge $CurrentIndex) {
+        return $true
+    } else {
+        return $false
     }
 }
 

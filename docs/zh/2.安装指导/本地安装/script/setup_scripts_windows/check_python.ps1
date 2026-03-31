@@ -86,32 +86,6 @@ function Test-PythonInstalled {
     return $false
 }
 
-function Test-PipInstalled {
-    # First try direct path to Python executable (most reliable)
-    $PythonExePath = "C:\Program Files\Python$PythonVersion\python.exe"
-    if (Test-Path $PythonExePath) {
-        try {
-            $null = & $PythonExePath -m pip --version 2>&1
-            return $true
-        } catch {
-            # Direct path failed, try PATH
-        }
-    }
-    
-    # Try using python command from PATH
-    try {
-        $null = python -m pip --version 2>&1
-        # Check if output contains pip version (not Microsoft Store message)
-        if ($LASTEXITCODE -eq 0) {
-            return $true
-        }
-    } catch {
-        # Python command was intercepted by App Execution Aliases
-    }
-    
-    return $false
-}
-
 function Search-PythonExecutable {
     # Common Python installation paths
     $SearchPaths = @(
@@ -334,53 +308,44 @@ function Install-Python {
     }
 }
 
-function Verify-PythonPip {
-    if (Test-PythonInstalled) {
-        # Try to get Python version using direct path
-        $PythonExePath = "C:\Program Files\Python$PythonVersion\python.exe"
-        if (Test-Path $PythonExePath) {
-            try {
-                $PythonFullVersion = & $PythonExePath --version 2>&1
-                Write-Log "SUCCESS" "Python installed successfully! Version: $PythonFullVersion"
-            } catch {
-                # Fall back to PATH
-                $PythonFullVersion = python --version 2>&1
-                Write-Log "SUCCESS" "Python installed successfully! Version: $PythonFullVersion"
+function Install-UvIfNeeded {
+    try {
+        $UvCmd = Get-Command uv -ErrorAction Stop
+        Write-Log "INFO" "uv already installed: $($UvCmd.Source)"
+    } catch {
+        Write-Log "INFO" "uv not found, installing via official installer script..."
+        $UvInstallScriptUrl = "https://astral.sh/uv/install.ps1"
+        $UvInstallScriptPath = Join-Path $env:TEMP "install-uv.ps1"
+        try {
+            Invoke-WebRequest -Uri $UvInstallScriptUrl -OutFile $UvInstallScriptPath -UseBasicParsing
+            powershell -NoProfile -ExecutionPolicy Bypass -File $UvInstallScriptPath
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "ERROR" "uv installer exited with code: $LASTEXITCODE"
+                exit 1
             }
-        } else {
-            # Fall back to PATH
-            $PythonFullVersion = python --version 2>&1
-            Write-Log "SUCCESS" "Python installed successfully! Version: $PythonFullVersion"
+        } catch {
+            Write-Log "ERROR" "Failed to install uv: $($_.Exception.Message)"
+            exit 1
+        } finally {
+            Remove-Item -Path $UvInstallScriptPath -Force -ErrorAction SilentlyContinue
         }
-    } else {
-        Write-Log "ERROR" "Python $PythonVersion installation failed"
-        exit 1
     }
 
-    if (Test-PipInstalled) {
-        # Try to get pip version using direct path
-        $PythonExePath = "C:\Program Files\Python$PythonVersion\python.exe"
-        if (Test-Path $PythonExePath) {
-            try {
-                $PipFullVersion = (& $PythonExePath -m pip --version 2>&1) -split " " | Select-Object -Index 1
-                Write-Log "SUCCESS" "pip installed successfully! Version: $PipFullVersion"
-            } catch {
-                # Fall back to PATH
-                $PipFullVersion = (python -m pip --version 2>&1) -split " " | Select-Object -Index 1
-                Write-Log "SUCCESS" "pip installed successfully! Version: $PipFullVersion"
-            }
-        } else {
-            # Fall back to PATH
-            $PipFullVersion = (python -m pip --version 2>&1) -split " " | Select-Object -Index 1
-            Write-Log "SUCCESS" "pip installed successfully! Version: $PipFullVersion"
+    $UvPathCandidates = @(
+        (Join-Path $env:USERPROFILE ".local\bin"),
+        (Join-Path $env:USERPROFILE ".cargo\bin")
+    )
+    foreach ($UvCandidate in $UvPathCandidates) {
+        if ((Test-Path $UvCandidate) -and ($env:PATH -notlike "*$UvCandidate*")) {
+            $env:PATH = "$UvCandidate;$env:PATH"
         }
-    } else {
-        Write-Log "ERROR" "pip installation failed"
-        exit 1
     }
+
+    Test-Command "uv"
+    Write-Log "SUCCESS" "uv is available ($(uv --version 2>&1))"
 }
 
-# Load proxy and pip config
+# Load optional user config
 $ProxyConfigPath = Join-Path $PSScriptRoot "user_config.ps1"
 if (Test-Path $ProxyConfigPath) {
     try {
@@ -390,7 +355,7 @@ if (Test-Path $ProxyConfigPath) {
     }
 }
 
-Write-Log "INFO" "=== Checking Python $PythonFullVersion and pip Installation Status ==="
+Write-Log "INFO" "=== Checking Python $PythonFullVersion and uv Installation Status ==="
 
 # First search for Python executable
 $PythonExePath = Search-PythonExecutable
@@ -481,30 +446,6 @@ if (-not $PythonInstalled) {
     }
 }
 
-# Check pip installation
-$PipInstalled = $false
-if ($PythonInstalled) {
-    try {
-        $null = & $PythonExePath -m pip --version 2>&1
-        $PipInstalled = $true
-    } catch {
-        # pip not installed
-    }
-}
-
-if (-not $PipInstalled) {
-    Write-Log "WARN" "pip not installed"
-    # Install pip using direct path
-    try {
-        & $PythonExePath -m ensurepip --upgrade
-        Write-Log "SUCCESS" "pip installed successfully"
-        $PipInstalled = $true
-    } catch {
-        Write-Log "ERROR" "Failed to install pip: $($_.Exception.Message)"
-        exit 1
-    }
-}
-
 # Verify using direct path
 if ($PythonInstalled) {
     try {
@@ -516,30 +457,7 @@ if ($PythonInstalled) {
     }
 }
 
-if ($PipInstalled) {
-    try {
-        $PipVersionOutput = & $PythonExePath -m pip --version 2>&1
-        $PipVersion = $PipVersionOutput -split " " | Select-Object -Index 1
-        Write-Log "SUCCESS" "pip installed successfully! Version: $PipVersion"
-    } catch {
-        Write-Log "ERROR" "Failed to verify pip installation: $($_.Exception.Message)"
-        exit 1
-    }
-    
-    # Configure pip source if PIP_INDEX_URL and PIP_TRUSTED_HOST are set
-    if (-not [string]::IsNullOrWhiteSpace($PIP_INDEX_URL) -and -not [string]::IsNullOrWhiteSpace($PIP_TRUSTED_HOST)) {
-        Write-Log "INFO" "Configuring pip source: $PIP_INDEX_URL"
-        try {
-            & $PythonExePath -m pip config set global.index-url "$PIP_INDEX_URL" 2>&1 | Out-Null
-            & $PythonExePath -m pip config set global.trusted-host "$PIP_TRUSTED_HOST" 2>&1 | Out-Null
-            Write-Log "SUCCESS" "pip source configured successfully"
-        } catch {
-            Write-Log "WARN" "Failed to configure pip source: $($_.Exception.Message)"
-        }
-    } elseif (-not [string]::IsNullOrWhiteSpace($PIP_INDEX_URL) -or -not [string]::IsNullOrWhiteSpace($PIP_TRUSTED_HOST)) {
-        Write-Log "WARN" "PIP_INDEX_URL and PIP_TRUSTED_HOST must both be set to configure pip source. Skipping pip source configuration."
-    }
-}
+Install-UvIfNeeded
 
 # Ensure PythonExePath is set before output
 if (-not $PythonExePath) {

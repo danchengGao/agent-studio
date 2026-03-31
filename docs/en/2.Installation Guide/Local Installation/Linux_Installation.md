@@ -41,12 +41,12 @@ The one-click script automates tool checks, code fetch, environment setup, and s
   * `check_python.sh` – Check/install Python
   * `check_mysql.sh` – Check/install MySQL
   * `config_mysql.sh` – Configure MySQL (create database, user, etc.)
-  * `fetch_codes.sh` – Clone the agent-studio repository (supports specifying a branch)
-  * `user_config.sh` – User configuration (optional: proxy, NVM mirror, pip index, npm registry)
+  * `manage_service.sh` – Service management: start, stop, restart Runtime, backend, and frontend, and show status
+  * `user_config.sh` – User configuration (optional: proxy, uv index, NVM mirror, npm registry)
 
-#### 2. Configure Proxy, pip Index, NVM Mirror, and npm Registry (Optional)
+#### 2. Configure Proxy, uv Index, NVM Mirror, and npm Registry (Optional)
 
-If you need a proxy to access the internet or want to use a custom pip index, NVM Node.js mirror, or npm registry, edit `user_config.sh`:
+If you need a proxy to access the internet or want to use a custom uv index, NVM Node.js mirror, or npm registry, edit `user_config.sh`:
 
 * Open `user_config.sh` and set the following variables as needed:
 
@@ -56,9 +56,9 @@ If you need a proxy to access the internet or want to use a custom pip index, NV
   HTTPS_PROXY=""  # e.g. http://127.0.0.1:7890
   SSL_VERIFY=""   # optional: true/false (maps to git http.sslVerify)
 
-  # pip index (optional)
-  PIP_INDEX_URL=""      # e.g. https://pypi.tuna.tsinghua.edu.cn/simple
-  PIP_TRUSTED_HOST=""   # e.g. pypi.tuna.tsinghua.edu.cn
+  # uv index (optional)
+  UV_INDEX=""          # e.g. https://pypi.tuna.tsinghua.edu.cn/simple
+  UV_TRUSTED_HOST=""   # e.g. pypi.tuna.tsinghua.edu.cn
 
   # NVM Node.js download mirror (optional, used when installing Node.js)
   NVM_NODEJS_ORG_MIRROR=""  # e.g. https://npmmirror.com/mirrors/node
@@ -68,9 +68,15 @@ If you need a proxy to access the internet or want to use a custom pip index, NV
   ```
 
 * **Proxy**: Leave variables empty to skip proxy; set full URL (e.g. `http://127.0.0.1:7890`) when needed. Authenticated proxy is supported (e.g. `http://user:pass@proxy.example.com:8080`). `SSL_VERIFY`: `true` enables Git SSL verification, `false` disables it.
-* **pip**: Leave `PIP_INDEX_URL` and `PIP_TRUSTED_HOST` empty to use default index; when using a mirror, set both.
+* **uv**: Leave `UV_INDEX` and `UV_TRUSTED_HOST` empty to use the default uv index; when using a mirror, set both. Common mirror examples:
+  * Tsinghua: `https://pypi.tuna.tsinghua.edu.cn/simple`, trusted host: `pypi.tuna.tsinghua.edu.cn`
+  * Aliyun: `https://mirrors.aliyun.com/pypi/simple/`, trusted host: `mirrors.aliyun.com`
+  * USTC: `https://pypi.mirrors.ustc.edu.cn/simple/`, trusted host: `pypi.mirrors.ustc.edu.cn`
 * **NVM mirror**: Leave `NVM_NODEJS_ORG_MIRROR` empty for default (nodejs.org), or set e.g. `https://npmmirror.com/mirrors/node` for check_nodejs.sh.
-* **npm**: Leave `NPM_REGISTRY` empty to use default; set to your registry URL when needed.
+* **npm**: Leave `NPM_REGISTRY` empty to use default; set to your registry URL when needed. Common examples:
+  * npmmirror: `https://registry.npmmirror.com`
+  * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
+  * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
 
 #### 3. Run the Installation Script
 
@@ -121,13 +127,32 @@ Complete dependency installation first, then perform source retrieval and instal
 
 #### 1. Install Dependencies (Ubuntu 22.04 as an example)
 
-##### 1.1. Install Git
+##### 1.1. Install and Configure Git
 
 - Run the following commands to install Git:
 
   ```bash
   sudo apt update
   sudo apt install git
+  ```
+
+- Ensure you have access to the <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer">openJiuwen code repositories</a>. If not, request access.
+
+- In the GitCode repository, follow step 2 in the screenshot to configure global Git settings, then run:
+
+  ```bash
+  git config --global user.name your_username
+  git config --global user.email your_useremail
+  ```
+
+  ![image](../images/gitcode-token.png)
+
+- Follow step 3 in the screenshot to obtain a personal access token. When cloning, you will use your GitCode account and token.
+
+- You will run Git many times during installation; storing credentials helps avoid repeated authentication prompts:
+
+  ```bash
+  git config --global credential.helper store
   ```
 
 ##### 1.2. Install Node.js and npm
@@ -163,7 +188,7 @@ Complete dependency installation first, then perform source retrieval and instal
 
   > **Note**: If installation fails, please refer to the <a href="https://uv.doczh.com/getting-started/installation/#_1" target="_blank" rel="nofollow noopener noreferrer">uv official guide</a>.
 
-##### 1.4. Install MySQL (Optional Component)
+##### 1.4. Install Database
 
 * **SQLite vs MySQL**:
   * SQLite requires no extra setup and is suitable for development and testing, but it has limitations (e.g., no support for concurrent writes, no user permission management).
@@ -198,11 +223,14 @@ Complete dependency installation first, then perform source retrieval and instal
   -- Create databases
   CREATE DATABASE openjiuwen_agent;
   CREATE DATABASE openjiuwen_ops;
+  -- Runtime (agent-runtime) database; name must match that repo’s .env.example (commonly jiuwen_runtime)
+  CREATE DATABASE jiuwen_runtime;
   -- Create MySQL user
   CREATE USER 'your_user_name'@'localhost' IDENTIFIED BY 'your_password';
   -- Grant privileges and flush
   GRANT ALL PRIVILEGES ON openjiuwen_agent.* TO 'your_user_name'@'localhost';
   GRANT ALL PRIVILEGES ON openjiuwen_ops.* TO 'your_user_name'@'localhost';
+  GRANT ALL PRIVILEGES ON jiuwen_runtime.* TO 'your_user_name'@'localhost';
   FLUSH PRIVILEGES;
   ```
 
@@ -214,35 +242,96 @@ Complete dependency installation first, then perform source retrieval and instal
   * Chroma requires no additional installation and boasts a simple configuration. All you need to do is obtain the vector model, making it ideal for quick experimentation and suitable for development and testing environments. For obtaining the vector model, refer to [How to Obtain the Vector Model](#linux-embed-model).
   * Milvus has more comprehensive functions and can meet the needs of complex scenarios, so it is more recommended for use in practical engineering and production environments.
 
+#### 2. Deploy Runtime Service
 
-#### 2. openJiuwen Installation
+Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separate repository.
 
-##### 2.1. Get the Source Code
+##### 2.1. Get the Runtime Source Code
 
-- Make sure you have access to the <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer">openJiuwen code repositories</a>. If not, please request access promptly.
-
-- In the gitcode repository, follow the steps shown in the illustration (Step 2) to obtain the global Git configuration, then run:
+- In a terminal, clone the repository and enter its root:
 
   ```bash
-  git config --global user.name your_username
-  git config --global user.email your_useremail
+  git clone -b main https://gitcode.com/openJiuwen/agent-runtime.git
+  cd agent-runtime
   ```
 
-  ![image](../images/gitcode-token.png)
+##### 2.2. Configure the `server` Environment
 
-- Follow the illustration (Step 3) to obtain a personal access token. When cloning the code, you will need to enter your gitcode account and personal access token.
+- Go to the **`agent-runtime/server`** directory.
 
-- Run the following commands to clone the source code and enter the project root directory:
+- Copy the *.env* file:
 
   ```bash
-  # Multiple git operations are needed during installation; it is recommended to configure credential storage to avoid authentication errors.
-  git config --global credential.helper store
+  cp .env.example .env
+  ```
 
+- Open *.env* in a text editor and adjust the variables below as needed (do not overwrite unrelated entries):
+
+  > **Note**: Replace `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` with your actual database settings; keep them consistent with the MySQL user, password, and databases you created above. If the password contains special characters, see the [Special Character Escape Table](#linux-special-char) and replace them with URL encoding.
+
+  Example configuration:
+
+  ```env
+   # Database type (supports mysql, sqlite)
+   DB_TYPE=mysql
+
+   # Database connection (example)
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=root
+   DB_NAME=jiuwen_runtime
+
+   # Runtime network and paths (example)
+   IP=127.0.0.1
+   LOWCODE_IMAGE=swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8
+   DEPLOY_DIR=/app/deploys
+   DIST_DIR=/app/dist
+   HOST=0.0.0.0
+   PORT=8186
+   ```
+
+  See the table below for variable descriptions.
+
+   | Variable Name       | Description                                                                 | Example                                                                      |
+   |---------------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------------|
+   | **DB_TYPE**         | Database type (supports `mysql`, `sqlite`)                                 | `mysql`                                                                      |
+   | **DB_HOST**         | Database host                                                               | `localhost`                                                                  |
+   | **DB_PORT**         | MySQL service port                                                          | `3306`                                                                       |
+   | **DB_USER**         | Database login username                                                     | `root`                                                                       |
+   | **DB_PASSWORD**     | Database login password                                                     | `root`                                                                       |
+   | **DB_NAME**         | Database name used by Runtime                                               | `jiuwen_runtime`                                                             |
+   | **IP**              | Host IP where low-code agent and runtime-server run                         | `127.0.0.1`                                                                  |
+   | **LOWCODE_IMAGE**   | Container image for low-code agent                                          | `swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8` |
+   | **DEPLOY_DIR**      | Deployment directory for generated artifacts                                | `/app/deploys`                                                               |
+   | **DIST_DIR**        | Dependency package directory for low-code agent `.whl` files                | `/app/dist`                                                                  |
+   | **HOST**            | Service bind host (`0.0.0.0` allows all network addresses)                 | `0.0.0.0`                                                                    |
+   | **PORT**            | Service startup port                                                        | `8186`                                                                       |
+
+##### 2.3. Run `deploy.sh` to Install Dependencies and Start Services
+
+- **Prerequisites**: **Python 3.11**, **Git**, and **`uv`** available in the terminal. `deploy.sh` typically uses **`uv`** to create the virtual environment and sync dependencies.
+
+- In the **`server`** directory, run the deployment script (adjust the path to your clone):
+
+  ```bash
+  cd /path/to/agent-runtime/server
+  chmod +x deploy.sh
+  ./deploy.sh
+  ```
+
+#### 3. openJiuwen Installation
+
+##### 3.1. Get the Source Code
+
+- Clone the code and enter the project root:
+
+  ```bash
   git clone https://gitcode.com/openJiuwen/agent-studio.git
   cd agent-studio
   ```
 
-##### 2.2. Generate an AES Key (Optional)
+##### 3.2. Generate an AES Key (Optional)
 
 - If you do not need to encrypt critical fields for storage, you can skip this step.
 - Run the following commands to generate a key:
@@ -257,7 +346,7 @@ Complete dependency installation first, then perform source retrieval and instal
   ```
 - **Note**: the AES key must remain unchanged. Changing the key later will make previously encrypted data undecipherable.
 
-##### 2.3. Start openJiuwen
+##### 3.3. Start openJiuwen
 
 - Go to the project root directory.
 
@@ -296,6 +385,10 @@ Complete dependency installation first, then perform source retrieval and instal
    # Plugin server configuration (example, please see [Question 3: How to Enable the Plugin Server] to learn more)
    VITE_PLUGIN_SERVICE_URL=http://localhost:8185
    VITE_PLUGIN_CONFIG_PATH=/config.json
+
+   # Runtime service configuration (example)
+   RUNTIME_HOST=localhost
+   RUNTIME_PORT=8100
    ```
 
   For variable descriptions, please refer to the table below. If you choose to enable the memory function for Milvus, please refer to [How to Enable the Memory and Knowledge Base Functions](#linux-memory). If you choose to enable the memory function for Chroma, you only need to obtain the vector model. For details, please refer to [How to Obtain the Vector Model](#linux-embed-model).
@@ -314,6 +407,8 @@ Complete dependency installation first, then perform source retrieval and instal
    | **CODE_SANDBOX_URL**             | Code Sandbox url                                            | `http://localhost:8188/run`                                                                    |
    | **VITE_PLUGIN_SERVICE_URL**      | Plugin Server url                                           | `http://localhost:8185`                                                                    |
    | **VITE_PLUGIN_CONFIG_PATH**      | Plugin configuration file path for web                      | `/config.json`                                                                    |
+   | **RUNTIME_HOST**                 | Runtime service host (usually local `localhost`)            | `localhost`                                                                    |
+   | **RUNTIME_PORT**                 | Runtime service port (must match runtime server listen port) | `8100`                                                                    |
 
 - In the project root directory, run the following commands to start the backend service and wait patiently:
    
@@ -373,7 +468,7 @@ Complete dependency installation first, then perform source retrieval and instal
 
   Network: *network access URL*
 
-##### 2.4. Access the System
+##### 3.4. Access the System
 
   - For local viewing, Ctrl + left-click the *local access URL* to open openJiuwen in your browser; or copy the *local access URL* into the browser address bar and press Enter to view openJiuwen.
   

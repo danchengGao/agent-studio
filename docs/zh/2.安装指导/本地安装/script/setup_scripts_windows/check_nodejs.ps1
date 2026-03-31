@@ -159,10 +159,63 @@ function Apply-Config-ForNpm {
     }
 
     try {
-        . $ProxyConfigPath
+        $ProxyConfigContent = Get-Content -Path $ProxyConfigPath -Raw -Encoding UTF8
     } catch {
-        Write-Log "WARN" "Failed to load proxy config file: $ProxyConfigPath, Error: $($_.Exception.Message)"
+        Write-Log "WARN" "Failed to read proxy config file: $ProxyConfigPath, Error: $($_.Exception.Message)"
         return
+    }
+
+    $HTTP_PROXY = ""
+    $HTTPS_PROXY = ""
+    $SSL_VERIFY = ""
+    $NPM_REGISTRY = ""
+    $ENABLE_NPM_PROXY_CONFIG = "true"
+
+    if ($ProxyConfigContent -match '(?m)^\s*\$HTTP_PROXY\s*=\s*["''](.*?)["'']\s*$') { $HTTP_PROXY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$HTTPS_PROXY\s*=\s*["''](.*?)["'']\s*$') { $HTTPS_PROXY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$SSL_VERIFY\s*=\s*["''](.*?)["'']\s*$') { $SSL_VERIFY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$NPM_REGISTRY\s*=\s*["''](.*?)["'']\s*$') { $NPM_REGISTRY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$ENABLE_NPM_PROXY_CONFIG\s*=\s*["''](.*?)["'']\s*$') { $ENABLE_NPM_PROXY_CONFIG = $Matches[1] }
+
+    $EnableNpmProxy = $true
+    if (-not [string]::IsNullOrWhiteSpace($ENABLE_NPM_PROXY_CONFIG) -and "$ENABLE_NPM_PROXY_CONFIG".Trim() -match '^(?i:false|0|no)$') {
+        $EnableNpmProxy = $false
+    }
+
+    # Configure npm proxy from user config
+    if ($EnableNpmProxy) {
+        if (-not [string]::IsNullOrWhiteSpace($HTTP_PROXY)) {
+            Write-Log "INFO" "Configuring npm proxy: $HTTP_PROXY"
+            try {
+                & npm config set proxy "$HTTP_PROXY" | Out-Null
+                Write-Log "SUCCESS" "npm proxy configured successfully"
+            } catch {
+                Write-Log "WARN" "Failed to configure npm proxy: $($_.Exception.Message)"
+            }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($HTTPS_PROXY)) {
+            Write-Log "INFO" "Configuring npm https-proxy: $HTTPS_PROXY"
+            try {
+                & npm config set https-proxy "$HTTPS_PROXY" | Out-Null
+                Write-Log "SUCCESS" "npm https-proxy configured successfully"
+            } catch {
+                Write-Log "WARN" "Failed to configure npm https-proxy: $($_.Exception.Message)"
+            }
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($SSL_VERIFY)) {
+            $strictSsl = if ($SSL_VERIFY -match '^(?i:false|0|no)$') { "false" } else { "true" }
+            Write-Log "INFO" "Configuring npm strict-ssl: $strictSsl"
+            try {
+                & npm config set strict-ssl "$strictSsl" | Out-Null
+                Write-Log "SUCCESS" "npm strict-ssl configured successfully"
+            } catch {
+                Write-Log "WARN" "Failed to configure npm strict-ssl: $($_.Exception.Message)"
+            }
+        }
+    } else {
+        Write-Log "INFO" "Skip configuring npm proxy/strict-ssl (ENABLE_NPM_PROXY_CONFIG=$ENABLE_NPM_PROXY_CONFIG)"
     }
     
     # Configure npm registry if NPM_REGISTRY is set

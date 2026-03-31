@@ -87,9 +87,28 @@ function Apply-ProxyConfig-ForGit {
     }
 
     try {
-        . $ProxyConfigPath
+        $ProxyConfigContent = Get-Content -Path $ProxyConfigPath -Raw -Encoding UTF8
     } catch {
-        Write-Log "WARN" "Failed to load proxy config file: $ProxyConfigPath, Error: $($_.Exception.Message)"
+        Write-Log "WARN" "Failed to read proxy config file: $ProxyConfigPath, Error: $($_.Exception.Message)"
+        return
+    }
+
+    $HTTP_PROXY = ""
+    $HTTPS_PROXY = ""
+    $SSL_VERIFY = ""
+    $ENABLE_GIT_PROXY_CONFIG = "true"
+
+    if ($ProxyConfigContent -match '(?m)^\s*\$HTTP_PROXY\s*=\s*["''](.*?)["'']\s*$') { $HTTP_PROXY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$HTTPS_PROXY\s*=\s*["''](.*?)["'']\s*$') { $HTTPS_PROXY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$SSL_VERIFY\s*=\s*["''](.*?)["'']\s*$') { $SSL_VERIFY = $Matches[1] }
+    if ($ProxyConfigContent -match '(?m)^\s*\$ENABLE_GIT_PROXY_CONFIG\s*=\s*["''](.*?)["'']\s*$') { $ENABLE_GIT_PROXY_CONFIG = $Matches[1] }
+
+    $EnableGitProxyConfig = $true
+    if (-not [string]::IsNullOrWhiteSpace($ENABLE_GIT_PROXY_CONFIG) -and "$ENABLE_GIT_PROXY_CONFIG".Trim() -match '^(?i:false|0|no)$') {
+        $EnableGitProxyConfig = $false
+    }
+    if (-not $EnableGitProxyConfig) {
+        Write-Log "INFO" "Skip configuring git proxy (ENABLE_GIT_PROXY_CONFIG=$ENABLE_GIT_PROXY_CONFIG)"
         return
     }
 
