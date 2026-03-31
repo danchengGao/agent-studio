@@ -1206,8 +1206,27 @@ class N8nWorkflowConverter(WorkflowConverter):
 
         # Ensure at least one (placeholder) condition so the schema is valid
         if not jiuwen_conditions:
+            # Resolve the actual primary output field of the predecessor so the
+            # condition left-side ref points to a field that really exists.
+            # Fall back to "value" only when no predecessor is available.
+            placeholder_field = "value"
+            if predecessor_id:
+                resolved = self._get_primary_output_field(predecessor_id)
+                if resolved:
+                    placeholder_field = resolved
+
+            # Also register the field in inputParameters so the node knows
+            # where to read the value from (previously this dict was left empty,
+            # causing "input is undefined" in the target runtime).
+            if predecessor_id:
+                input_parameters[placeholder_field] = {
+                    "type": "ref",
+                    "content": [predecessor_id, placeholder_field],
+                    "extra": {"index": 0}
+                }
+
             jiuwen_conditions.append({
-                "left": {"type": "ref", "content": [predecessor_id or "", "value"]},
+                "left": {"type": "ref", "content": [predecessor_id or "", placeholder_field]},
                 "operator": "==",
                 "right": {"type": "constant", "content": True,
                              "schema": {"type": "boolean"}}
@@ -1755,10 +1774,21 @@ class N8nWorkflowConverter(WorkflowConverter):
             # Convert Set node to Python code with actual implementation
             language = "python"
             code = self._convert_set_to_code(n8n_node)
-        elif node_type == "n8n-nodes-base.readWriteFile":
-            # Convert Read/Write File node to Python code
+        elif node_type in ("n8n-nodes-base.readWriteFile", "n8n-nodes-base.readBinaryFile"):
+            # Convert Read/Write File node (and legacy binary-read) to Python code
             language = "python"
             code = self._convert_read_write_file_to_code(n8n_node)
+        elif node_type == "n8n-nodes-base.writeBinaryFile":
+            # Legacy binary write node — 'fileName' holds the destination path.
+            # Normalise to the shape _convert_read_write_file_to_code expects.
+            normalised = dict(n8n_node)
+            norm_params = dict(n8n_node.get("parameters", {}))
+            if "fileName" in norm_params and "filePath" not in norm_params:
+                norm_params["filePath"] = norm_params.pop("fileName")
+            norm_params["operation"] = "write"
+            normalised["parameters"] = norm_params
+            language = "python"
+            code = self._convert_read_write_file_to_code(normalised)
         else:
             # Fallback for other node types
             language = "python"
@@ -2416,10 +2446,71 @@ class N8nWorkflowConverter(WorkflowConverter):
     # MERGE NODE CONVERSION
     # =========================================================================
 
+    def _find_all_predecessor_ids(self, n8n_node_name: str) -> List[str]:
+        """
+        Return the Jiuwen IDs of ALL predecessors that feed into a given node,
+        ordered by their n8n input index (index 0 first, then index 1, etc.).
+
+        Unlike _find_predecessor_id which returns only one, this collects every
+        source node — needed for Merge nodes that have multiple distinct inputs.
+        """
+        # Build a dict of {input_index: jiuwen_id} so we preserve order
+        index_to_id: Dict[int, str] = {}
+        for source_name, conn_types in self.n8n_connections.items():
+            for conn_type, target_lists in conn_types.items():
+                if conn_type != "main":
+                    continue
+                for output_index, target_list in enumerate(target_lists):
+                    for target in target_list:
+                        if target.get("node") == n8n_node_name:
+                            pred_id = self.node_id_map.get(source_name)
+                            if pred_id:
+                                input_idx = target.get("index", output_index)
+                                index_to_id[input_idx] = pred_id
+        return [index_to_id[k] for k in sorted(index_to_id)]
+
     def _convert_merge_node(self, n8n_node: Dict, node_id: str, x_pos: int) -> Dict:
         """Convert n8n Merge to OpenJiuwen Variable Merge component."""
         position = n8n_node.get("position", [x_pos, 34])
-        
+        node_name = n8n_node.get("name", "")
+
+        # Gather all predecessors in input-index order.
+        # Each predecessor becomes one variable group so the runtime sees at
+        # least one group per connected input (fixes "At least one variable
+        # group must be added" error when groups was always left empty).
+        pred_ids = self._find_all_predecessor_ids(node_name)
+
+        # Build inputParameters and configs.groups together
+        input_parameters: Dict[str, Any] = {}
+        groups: List[Dict] = []
+
+        for idx, pred_id in enumerate(pred_ids):
+            output_field = self._get_primary_output_field(pred_id) or "result"
+            param_key = f"input_{idx}"
+
+            input_parameters[param_key] = {
+                "type": "ref",
+                "content": [pred_id, output_field],
+                "extra": {"index": idx}
+            }
+
+            groups.append({
+                "groupId": f"group_{uuid.uuid4().hex[:8]}",
+                "inputs": {
+                    param_key: {
+                        "type": "ref",
+                        "content": [pred_id, output_field]
+                    }
+                }
+            })
+
+        # Guarantee at least one group so the schema is always valid
+        if not groups:
+            groups.append({
+                "groupId": f"group_{uuid.uuid4().hex[:8]}",
+                "inputs": {}
+            })
+
         return {
             "id": node_id,
             "type": str(ComponentType.COMPONENT_TYPE_VARIABLE_MERGE),
@@ -2430,15 +2521,15 @@ class N8nWorkflowConverter(WorkflowConverter):
                 }
             },
             "data": {
-                "title": n8n_node.get("name", self.get_title("merge")),
-                "inputs": {"inputParameters": self._build_predecessor_input_ref(n8n_node.get("name", ""))},
+                "title": node_name or self.get_title("merge"),
+                "inputs": {"inputParameters": input_parameters},
                 "outputs": {
                     "type": "object",
                     "properties": {
                         "merged": {"type": "object", "extra": {"index": 1}}
                     }
                 },
-                "configs": {"groups": []}
+                "configs": {"groups": groups}
             }
         }
 
