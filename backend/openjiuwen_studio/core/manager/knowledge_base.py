@@ -1213,7 +1213,7 @@ async def knowledge_base_sync_upload(
                 exc_info=True,
             )
 
-    # 5. 获取待同步文档列表
+    # 5. 获取待同步文档列表（空知识库也允许完成第一步：已创建/更新 DS，上传数为 0）
     kbdoc = KBDocument(
         kb=KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=None)
     )
@@ -1319,6 +1319,17 @@ async def knowledge_base_sync_process(
     # DeepSearch 接口要求 kb_id，前端传的是 ds_kb_id
     process_payload = {k: v for k, v in payload.items() if k != "ds_kb_id"}
     process_payload["kb_id"] = payload.get("ds_kb_id") or payload.get("kb_id", "")
+    doc_ids = process_payload.get("doc_id_list") or []
+    if not doc_ids:
+        logger.info(
+            f"[KB_SYNC_PROCESS] No documents to process, skip DeepSearch - "
+            f"kb_id={process_payload.get('kb_id')}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync process skipped (no documents)",
+            data={"skipped": True, "processed_count": 0},
+        )
     try:
         _apply_ds_process_llm_config(process_payload, space_id)
     except ValueError as e:

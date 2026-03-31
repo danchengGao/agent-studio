@@ -1434,6 +1434,17 @@ const KnowledgeBaseEditorPage: React.FC = () => {
             setCurrentPage(1)
             fetchDocuments(1).catch(console.error)
           }}
+          onAbort={() => {
+            const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
+            if (!id) return
+            fetchKnowledgeBases(spaceId, 1, 100)
+              .then(() => {
+                const { knowledgeBases: list } = useKnowledgeBaseStore.getState()
+                const kb = list.find(k => k.id === id)
+                if (kb) setKnowledgeBase(kb)
+              })
+              .catch(console.error)
+          }}
         />
       )}
 

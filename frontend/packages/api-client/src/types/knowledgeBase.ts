@@ -403,6 +403,7 @@ export interface SyncUploadResponse {
 export interface SyncProcessRequest {
   space_id: string
   ds_kb_id: string
+  /** 可为空：无可索引文档时服务端跳过 DeepSearch process */
   doc_id_list: string[]
   parsing_strategy?: { strategy_type: string; strategy_config?: Record<string, unknown> }
   segmentation_strategy?: { strategy_type: string; strategy_config: Record<string, unknown> }
@@ -412,7 +413,13 @@ export interface SyncProcessRequest {
 export interface SyncProcessResponse {
   code: number
   message: string
-  data?: { task_id?: string; processed_count?: number; failed_count?: number; failed_docs?: string[] }
+  data?: {
+    task_id?: string
+    processed_count?: number
+    failed_count?: number
+    failed_docs?: string[]
+    skipped?: boolean
+  }
 }
 
 // DeepSearch 知识库列表请求

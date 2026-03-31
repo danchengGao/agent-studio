@@ -196,7 +196,10 @@ class SyncProcessRequest(BaseModel):
 
     space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
     ds_kb_id: str = Field(..., min_length=1, max_length=100, description="DeepSearch 知识库 ID")
-    doc_id_list: list[str] = Field(..., min_length=1, description="文档ID列表")
+    doc_id_list: list[str] = Field(
+        default_factory=list,
+        description="文档ID列表；为空时表示无可索引文档，服务端跳过调用 DeepSearch process",
+    )
     parsing_strategy: Optional[Dict[str, Any]] = Field(None, description="解析策略")
     segmentation_strategy: Optional[Dict[str, Any]] = Field(None, description="分段策略")
     indexing_strategy: Optional[Dict[str, Any]] = Field(None, description="索引策略")

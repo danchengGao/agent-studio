@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, ArrowLeft, ArrowRight, Check, HelpCircle, Play, Loader2, CheckCircle, Info } from 'lucide-react'
 import { Tooltip } from '@mui/material'
@@ -9,11 +9,23 @@ import { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import { KnowledgeBaseService, embeddingModelService } from '@test-agentstudio/api-client'
 import { useModels, useTestModel } from '@test-agentstudio/api-client'
 
+function getAxiosErrorMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === 'object' && 'response' in e) {
+    const data = (e as { response?: { data?: { detail?: string; message?: string } } }).response?.data
+    const msg = data?.detail ?? data?.message
+    if (typeof msg === 'string' && msg.trim()) return msg
+  }
+  return (e as Error)?.message || fallback
+}
+
 interface SyncToDeepSearchDialogProps {
   open: boolean
   knowledgeBase: KnowledgeBase
   onClose: () => void
+  /** 同步成功（第二步已提交创建索引） */
   onSuccess: () => void
+  /** 仅首次同步未完成即关闭且已删除 DS 镜像后，刷新 Studio 知识库状态 */
+  onAbort?: () => void
 }
 
 interface FormData {
@@ -27,7 +39,13 @@ interface FormData {
 
 const PAGE_SIZE = 100
 
-const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, knowledgeBase, onClose, onSuccess }) => {
+const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({
+  open,
+  knowledgeBase,
+  onClose,
+  onSuccess,
+  onAbort,
+}) => {
   const { t } = useTranslation()
   const { user } = useAuthStore()
   const { showSuccess, showError } = useUnifiedSnackbar()
@@ -42,6 +60,8 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
   const [deepSearchEmbeddingConfigs, setDeepSearchEmbeddingConfigs] = useState<Array<{ id: number; model_name: string }>>([])
   const [deepSearchEmbeddingConfigsLoading, setDeepSearchEmbeddingConfigsLoading] = useState(false)
   const [selectedDeepSearchEmbeddingConfigId, setSelectedDeepSearchEmbeddingConfigId] = useState<number | null>(null)
+  /** 第二步已成功提交创建索引，关闭对话框时不再调用撤销接口 */
+  const [syncFullyFinished, setSyncFullyFinished] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     parsingStrategy: '1',
     segmentationStrategy: '1',
@@ -51,24 +71,43 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
     llmModelId: null,
   })
 
-  const { data: modelsData, isLoading: modelsLoading, error: modelsError } = useModels({
+  const { data: modelsData, isLoading: modelsLoading } = useModels({
     spaceId,
     is_active: true,
     size: 100,
     sort_by: 'update_time',
     sort_order: 'desc',
   })
-  const modelsList = modelsData?.items?.map(m => ({ id: parseInt(m.id), name: String(m.name || '') })) || []
+  const modelsList =
+    (modelsData?.items ?? [])
+      .filter(m => m != null && m.id != null && String(m.id).trim() !== '')
+      .map(m => ({ id: parseInt(String(m.id), 10), name: String(m.name || '') }))
+      .filter(m => !Number.isNaN(m.id))
   const testModelMutation = useTestModel()
   const [isTestingModel, setIsTestingModel] = useState(false)
   const [modelTestPassed, setModelTestPassed] = useState(false)
   const [testedModelId, setTestedModelId] = useState<number | null>(null)
+
+  /** 打开对话框瞬间是否已有 ds_kb_id（再次同步取消时不得删已有 DeepSearch 知识库） */
+  const hadExistingDsKbAtOpenRef = useRef(false)
+  /** 打开时已有的 DeepSearch 知识库 id，用于二次同步推迟上传 */
+  const existingDsKbIdAtOpenRef = useRef<string | null>(null)
+  const prevOpenRef = useRef(false)
+  /** 二次同步：第一步不调用 sync_upload，待第二步提交时再上传，避免取消时已清空 DeepSearch */
+  const [deferUploadToStep2, setDeferUploadToStep2] = useState(false)
 
   useEffect(() => {
     if (formData.llmModelId !== testedModelId) setModelTestPassed(false)
   }, [formData.llmModelId, testedModelId])
 
   useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      const raw = knowledgeBase.ds_kb_id?.trim()
+      existingDsKbIdAtOpenRef.current = raw && raw !== '' ? raw : null
+      hadExistingDsKbAtOpenRef.current = Boolean(raw && raw !== '')
+    }
+    prevOpenRef.current = open
+
     if (!open) {
       setCurrentStep(1)
       setDeepSearchKbId(null)
@@ -86,8 +125,12 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
       })
       setModelTestPassed(false)
       setTestedModelId(null)
+      setSyncFullyFinished(false)
+      setDeferUploadToStep2(false)
+    } else {
+      setSyncFullyFinished(false)
     }
-  }, [open])
+  }, [open, knowledgeBase.ds_kb_id])
 
   // 使用 Studio 的嵌入模型列表（与 DeepSearch 共用库后，同步时直接使用 Studio 的 embedding 表）
   useEffect(() => {
@@ -152,14 +195,58 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
     return ids
   }
 
+  /** 关闭对话框：仅「首次同步」且已完成第一步、未完成第二步时，删除本次新建的 DeepSearch 镜像；再次同步取消不删已有知识库 */
+  const handleCloseAttempt = async () => {
+    if (isLoading) return
+    const dsKbIdForMirror = deepSearchKbId
+    const shouldRollbackIncompleteFirstSync =
+      Boolean(dsKbIdForMirror && !syncFullyFinished) && !hadExistingDsKbAtOpenRef.current
+    if (shouldRollbackIncompleteFirstSync && dsKbIdForMirror) {
+      setIsLoading(true)
+      try {
+        const delRes = await KnowledgeBaseService.deleteKnowledgeBase({
+          space_id: spaceId,
+          kb_id: dsKbIdForMirror,
+        })
+        if (delRes.code !== 200) {
+          showError(delRes.message || (t('knowledgeBases.syncToDeepSearch.abortFailed') || '撤销同步失败'))
+          return
+        }
+        onAbort?.()
+      } catch (e) {
+        showError(
+          getAxiosErrorMessage(e, t('knowledgeBases.syncToDeepSearch.abortFailed') || '撤销同步失败，请稍后重试'),
+        )
+        return
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    onClose()
+  }
+
   const handleStep1Next = async () => {
     setIsLoading(true)
     try {
       if (selectedDeepSearchEmbeddingConfigId == null) {
         showError(t('knowledgeBases.syncToDeepSearch.selectEmbedder') || '请选择 Deep Search 嵌入模型')
-        setIsLoading(false)
         return
       }
+      // 二次同步：不在此步调用 sync_upload（避免清空 DeepSearch），上传推迟到第二步「完成」时
+      if (hadExistingDsKbAtOpenRef.current && existingDsKbIdAtOpenRef.current) {
+        setDeferUploadToStep2(true)
+        setDeepSearchKbId(existingDsKbIdAtOpenRef.current)
+        setUploadedCount(0)
+        setUploadDocIdList(null)
+        showSuccess(
+          t('knowledgeBases.syncToDeepSearch.resyncStep1Ready') ||
+            '已选择嵌入模型；提交第二步时将把文件同步到 Deep Search（取消不会改动已有内容）',
+        )
+        setCurrentStep(2)
+        return
+      }
+
+      setDeferUploadToStep2(false)
       const res = await KnowledgeBaseService.syncUpload({
         space_id: spaceId,
         kb_id: knowledgeBase.id,
@@ -175,7 +262,7 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
         showError(res.message || (t('knowledgeBases.syncToDeepSearch.uploadFailed') || '同步上传失败'))
       }
     } catch (e) {
-      showError((e as Error)?.message || (t('knowledgeBases.syncToDeepSearch.uploadFailed') || '同步上传失败'))
+      showError(getAxiosErrorMessage(e, t('knowledgeBases.syncToDeepSearch.uploadFailed') || '同步上传失败'))
     } finally {
       setIsLoading(false)
     }
@@ -192,20 +279,35 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
     }
     setIsLoading(true)
     try {
-      // 覆盖同步时用上传接口返回的 DS 侧 doc_id_list，否则 process 找不到文档（DS 侧是新 UUID）
-      const docIdList =
-        uploadDocIdList && uploadDocIdList.length > 0
-          ? uploadDocIdList
-          : await fetchAllDocumentIds()
-      if (docIdList.length === 0) {
-        showError(t('knowledgeBases.syncToDeepSearch.noDocuments') || '当前知识库无文档，无需建索引')
-        setIsLoading(false)
-        return
+      let dsId = deepSearchKbId
+      let docIdsFromUpload = uploadDocIdList
+
+      if (deferUploadToStep2) {
+        if (selectedDeepSearchEmbeddingConfigId == null) {
+          showError(t('knowledgeBases.syncToDeepSearch.selectEmbedder') || '请选择 Deep Search 嵌入模型')
+          return
+        }
+        const up = await KnowledgeBaseService.syncUpload({
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          deepsearch_embedding_model_config_id: selectedDeepSearchEmbeddingConfigId,
+        })
+        if (up.code !== 200 || !up.data?.ds_kb_id) {
+          showError(up.message || (t('knowledgeBases.syncToDeepSearch.uploadFailed') || '同步上传失败'))
+          return
+        }
+        dsId = up.data.ds_kb_id
+        docIdsFromUpload = Array.isArray(up.data.doc_id_list) ? up.data.doc_id_list : null
       }
-      await KnowledgeBaseService.syncProcess({
+
+      const docIdList =
+        docIdsFromUpload && docIdsFromUpload.length > 0
+          ? docIdsFromUpload
+          : await fetchAllDocumentIds()
+      const res = await KnowledgeBaseService.syncProcess({
         space_id: spaceId,
-        ds_kb_id: deepSearchKbId,
-        doc_id_list: docIdList,
+        ds_kb_id: dsId,
+        doc_id_list: docIdList.length > 0 ? docIdList : [],
         parsing_strategy: { strategy_type: formData.parsingStrategy, strategy_config: {} },
         segmentation_strategy: {
           strategy_type: formData.segmentationStrategy,
@@ -219,11 +321,20 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
           llm_model_id: formData.enableGraphEnhancement && formData.llmModelId ? Number(formData.llmModelId) : undefined,
         },
       })
-      showSuccess(t('knowledgeBases.syncToDeepSearch.processSuccess') || '已提交建索引任务')
+      if (res.code !== 200) {
+        showError(res.message || (t('knowledgeBases.syncToDeepSearch.processFailed') || '创建索引提交失败'))
+        return
+      }
+      setSyncFullyFinished(true)
+      showSuccess(
+        res.data?.skipped
+          ? t('knowledgeBases.syncToDeepSearch.processSuccessNoDocs') || '同步流程已完成（当前无可索引文档）'
+          : t('knowledgeBases.syncToDeepSearch.processSuccess') || '已提交创建索引任务',
+      )
       onSuccess()
       onClose()
     } catch (e) {
-      showError((e as Error)?.message || (t('knowledgeBases.syncToDeepSearch.processFailed') || '建索引提交失败'))
+      showError(getAxiosErrorMessage(e, t('knowledgeBases.syncToDeepSearch.processFailed') || '创建索引提交失败'))
     } finally {
       setIsLoading(false)
     }
@@ -232,18 +343,20 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
   if (!open) return null
 
   const totalSteps = 2
+  const progressPct =
+    totalSteps > 1 ? ((currentStep - 1) / (totalSteps - 1)) * 100 : currentStep > 1 ? 100 : 0
   const step2Valid = !formData.enableGraphEnhancement || (!!formData.llmModelId && modelTestPassed)
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4">
-        <div className="fixed inset-0 bg-black opacity-25" onClick={onClose} />
+        <div className="fixed inset-0 bg-black opacity-25" onClick={() => void handleCloseAttempt()} />
         <div className="relative bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
           <div className="flex items-center justify-between p-6 border-b">
             <h2 className="text-xl font-semibold text-gray-900">
               {t('knowledgeBases.syncToDeepSearch.title') || '同步至 Deep Search'}
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+            <button type="button" onClick={() => void handleCloseAttempt()} className="text-gray-400 hover:text-gray-500">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -259,13 +372,13 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
                   {currentStep > 1 ? <Check className="w-4 h-4" /> : '1'}
                 </div>
                 <div className={`ml-3 ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-500'} font-medium`}>
-                  {t('knowledgeBases.syncToDeepSearch.stepUpload') || '文件同步'}
+                  {t('knowledgeBases.syncToDeepSearch.stepUpload') || '创建知识库并上传文档'}
                 </div>
               </div>
               <div className="flex-1 h-1 mx-4 bg-gray-200">
                 <div
                   className={`h-1 ${currentStep > 1 ? 'bg-blue-500' : 'bg-transparent'} transition-colors`}
-                  style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
+                  style={{ width: `${progressPct}%` }}
                 />
               </div>
               <div className="flex items-center">
@@ -277,7 +390,7 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
                   {currentStep > 2 ? <Check className="w-4 h-4" /> : '2'}
                 </div>
                 <div className={`ml-3 ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-500'} font-medium`}>
-                  {t('knowledgeBases.syncToDeepSearch.stepProcess') || '文档参数与建索引'}
+                  {t('knowledgeBases.syncToDeepSearch.stepProcess') || '创建索引'}
                 </div>
               </div>
             </div>
@@ -290,6 +403,12 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
                   {t('knowledgeBases.syncToDeepSearch.uploadDescription') ||
                     '将当前知识库的文件同步到 Deep Search，用于后续检索。'}
                 </p>
+                {knowledgeBase.ds_kb_id?.trim() ? (
+                  <p className="text-sm text-gray-500 mb-4">
+                    {t('knowledgeBases.syncToDeepSearch.resyncStep1Hint') ||
+                      '再次同步时，仅在最后提交「创建索引」时才会更新 Deep Search 中的文件；在此之前关闭不会改动远端已有内容。'}
+                  </p>
+                ) : null}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {t('knowledgeBases.syncToDeepSearch.embedderLabel') || 'Deep Search 嵌入模型'}
@@ -355,7 +474,7 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
               <div>
                 <p className="text-gray-600 mb-6">
                   {t('knowledgeBases.syncToDeepSearch.processDescription') ||
-                    '设置解析、分段与索引策略，并提交建索引任务。'}
+                    '设置解析、分段与索引策略，并提交创建索引任务。'}
                 </p>
                 <div className="space-y-6">
                   <div>
@@ -512,7 +631,7 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
           </div>
 
           <div className="flex items-center justify-between p-6 border-t bg-gray-50">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
+            <button type="button" onClick={() => void handleCloseAttempt()} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white">
               {t('common.cancel')}
             </button>
             <div className="flex items-center space-x-2">
@@ -520,7 +639,8 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
                 <button
                   type="button"
                   onClick={() => setCurrentStep(1)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white flex items-center"
+                  disabled={isLoading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-white flex items-center disabled:opacity-50"
                 >
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   {t('common.buttons.previous')}
@@ -550,7 +670,7 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({ open, k
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin mr-1" />
                   ) : null}
-                  {t('knowledgeBases.syncToDeepSearch.complete') || '完成并提交建索引'}
+                  {t('knowledgeBases.syncToDeepSearch.complete') || '完成并提交创建索引'}
                 </button>
               )}
             </div>
