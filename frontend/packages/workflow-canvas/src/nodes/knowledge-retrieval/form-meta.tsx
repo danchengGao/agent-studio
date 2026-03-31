@@ -68,6 +68,7 @@ interface KnowledgeBaseInfo {
   name: string
   description?: string
   has_graph_enhancement?: boolean
+  ds_kb_id?: string | null
 }
 
 function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = {}) {
@@ -126,16 +127,17 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
           name: item.name,
           description: item.desc || item.description || '',
           has_graph_enhancement: item.has_graph_enhancement || false,
+          ds_kb_id: item.ds_kb_id || null,
         }))
         setAvailableKBs(kbs)
 
         // Update names of already-selected KBs and persist to form model
         if (kbIds.length > 0) {
           const updatedList = kbIds
-            .map(id => kbs.find((kb: KnowledgeBaseInfo) => kb.id === id) || { id, name: id, description: '', has_graph_enhancement: false })
+            .map(id => kbs.find((kb: KnowledgeBaseInfo) => kb.id === id) || { id, name: id, description: '', has_graph_enhancement: false, ds_kb_id: null })
           setKbList(updatedList)
           updateKnowledgeRetrievalParam(formModel, {
-            kbInfo: updatedList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement })),
+            kbInfo: updatedList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement, ds_kb_id: k.ds_kb_id })),
           })
           if (notifyChange) {
             onKBChange?.()
@@ -166,7 +168,7 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
     const hasGraph = newList.length > 0 && newList[0].has_graph_enhancement
     updateKnowledgeRetrievalParam(formModel, {
       kbIds: newList.map(k => k.id),
-      kbInfo: newList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement })),
+      kbInfo: newList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement, ds_kb_id: k.ds_kb_id })),
       ...(!hasGraph ? { useGraph: false } : {}),
     })
     onKBChange?.()
@@ -177,7 +179,7 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
     setKbList(newList)
     updateKnowledgeRetrievalParam(formModel, {
       kbIds: newList.map(k => k.id),
-      kbInfo: newList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement })),
+      kbInfo: newList.map(k => ({ id: k.id, name: k.name, description: k.description, has_graph_enhancement: k.has_graph_enhancement, ds_kb_id: k.ds_kb_id })),
       useGraph: false,
     })
     onKBChange?.()
@@ -255,56 +257,62 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
       {/* Selected knowledge bases */}
       {kbList.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {kbList.map(kb => (
-            <div
-              key={kb.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 12px',
-                background: '#f2f3f5',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                <span style={{
+          {kbList.map(kb => {
+            // 判断是否为 DeepSearch 原生知识库
+            const isDeepSearchKb = !!(kb.ds_kb_id && kb.ds_kb_id === kb.id)
+            return (
+              <div
+                key={kb.id}
+                title={isDeepSearchKb ? '该知识库只支持在任务空间的 DeepSearch 智能体中使用' : undefined}
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 32,
-                  height: 32,
-                  borderRadius: 6,
-                  background: '#e8eafc',
-                  flexShrink: 0,
-                }}>
-                  📄
-                </span>
-                <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kb.name}</div>
-                  {kb.description && (
-                    <div style={{ fontSize: 11, color: '#86909c', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kb.description}</div>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => handleRemoveKB(kb.id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#86909c',
-                  fontSize: 14,
-                  padding: '0 4px',
-                  lineHeight: 1,
-                  flexShrink: 0,
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  background: isDeepSearchKb ? '#fff5f5' : '#f2f3f5',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  opacity: isDeepSearchKb ? 0.7 : 1,
                 }}
               >
-                ×
-              </button>
-            </div>
-          ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                    background: '#e8eafc',
+                    flexShrink: 0,
+                  }}>
+                    📄
+                  </span>
+                  <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kb.name}</div>
+                    {kb.description && (
+                      <div style={{ fontSize: 11, color: '#86909c', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{kb.description}</div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRemoveKB(kb.id)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#86909c',
+                    fontSize: 14,
+                    padding: '0 4px',
+                    lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
         </div>
       ) : (
         <div
@@ -390,16 +398,20 @@ function KnowledgeRetrievalKBList({ onKBChange }: { onKBChange?: () => void } = 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {availableKBs.map(kb => {
                   const isSelected = kbList.some(k => k.id === kb.id)
+                  // 判断是否为 DeepSearch 原生知识库（id == ds_kb_id），这类 KB 只支持在 DeepSearch 智能体中使用
+                  const isDeepSearchKb = !!(kb.ds_kb_id && kb.ds_kb_id === kb.id)
                   return (
                     <div
                       key={kb.id}
-                      onClick={() => handleToggleKB(kb)}
+                      onClick={isDeepSearchKb ? undefined : () => handleToggleKB(kb)}
+                      title={isDeepSearchKb ? '该知识库只支持在任务空间的 DeepSearch 智能体中使用' : undefined}
                       style={{
                         padding: '12px 16px',
                         borderRadius: 8,
                         border: `2px solid ${isSelected ? '#3b82f6' : '#e5e7eb'}`,
-                        background: isSelected ? '#eff6ff' : '#fff',
-                        cursor: 'pointer',
+                        background: isSelected ? '#eff6ff' : isDeepSearchKb ? '#f5f5f5' : '#fff',
+                        cursor: isDeepSearchKb ? 'not-allowed' : 'pointer',
+                        opacity: isDeepSearchKb ? 0.6 : 1,
                         transition: 'all 0.2s',
                       }}
                     >

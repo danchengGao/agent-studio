@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Typography, Button, Pagination, Box } from '@mui/material'
+import { Typography, Button, Pagination, Box, Tooltip } from '@mui/material'
 import { X, Cpu, AlertCircle } from 'lucide-react'
 import { KnowledgeBaseService, useEmbeddingModel, embeddingModelService } from '@test-agentstudio/api-client'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
@@ -22,12 +22,19 @@ const KnowledgeBaseItemComponent: React.FC<{
   const { t } = useScopedTranslation('agents.agentEditor.orchestration')
   const { data: embeddingModel } = useEmbeddingModel(kb.embedding_model_config_id?.toString() || '', spaceId)
 
-  return (
+  // 判断是否为 DeepSearch 原生知识库（id == ds_kb_id），这类 KB 只支持在 DeepSearch 智能体中使用
+  const isDeepSearchKb = !!(kb.ds_kb_id && kb.ds_kb_id === kb.id)
+
+  const itemContent = (
     <div
-      className={`p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
-        isSelected ? 'border-blue-400 bg-blue-50 shadow-lg' : 'border-gray-200 bg-white'
+      className={`p-4 rounded-xl border-2 transition-all duration-300 ${
+        isDeepSearchKb
+          ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+          : isSelected
+            ? 'border-blue-400 bg-blue-50 shadow-lg cursor-pointer'
+            : 'border-gray-200 bg-white cursor-pointer'
       }`}
-      onClick={onToggle}
+      onClick={isDeepSearchKb ? undefined : onToggle}
       aria-selected={isSelected}
       role="option"
     >
@@ -41,7 +48,7 @@ const KnowledgeBaseItemComponent: React.FC<{
             📚
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
-            <h4 
+            <h4
               className={`font-semibold text-base truncate ${isSelected ? 'text-blue-800' : 'text-gray-800'}`}
               title={kb.name}
             >
@@ -72,6 +79,21 @@ const KnowledgeBaseItemComponent: React.FC<{
       </div>
     </div>
   )
+
+  // DeepSearch 原生知识库显示禁用状态和 tooltip 提示
+  if (isDeepSearchKb) {
+    return (
+      <Tooltip
+        title="该知识库只支持在任务空间的 DeepSearch 智能体中使用"
+        arrow
+        placement="top"
+      >
+        {itemContent}
+      </Tooltip>
+    )
+  }
+
+  return itemContent
 }
 
 const KnowledgeBaseSelector: React.FC<KnowledgeBaseSelectorProps> = ({ open, onClose, onConfirm, initialSelected = [] }) => {
