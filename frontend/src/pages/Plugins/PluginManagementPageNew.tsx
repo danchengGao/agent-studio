@@ -757,6 +757,7 @@ const PluginManagementPageNew: React.FC = () => {
               </div>
             </Button>
             <Button
+              style={{ display: "none" }}
               variant="outlined"
               fullWidth
               startIcon={<Cpu className="w-4 h-4 text-gray-500" />}
