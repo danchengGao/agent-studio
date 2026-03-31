@@ -681,7 +681,7 @@ const PromptEditPage: React.FC = () => {
     return ''
   }
 
-  // FormattedPromptEditor的文本选中回调适配器
+  // AdvancedCodeMirrorEditor 的文本选中回调适配器
   const handleFormattedEditorTextSelection = (selectedText: string, position: { x: number; y: number }, messageId?: string) => {
     // 检查对话框是否在 DOM 中（使用 DOM 检查，因为状态更新可能有延迟）
     const dialogExistsInDOM = document.querySelector('[role="dialog"]') || document.querySelector('.MuiDialog-root')
@@ -728,7 +728,7 @@ const PromptEditPage: React.FC = () => {
     }
   }
 
-  // FormattedPromptEditor的光标位置回调适配器工厂
+  // AdvancedCodeMirrorEditor 的光标位置回调适配器工厂
   const createCursorPositionHandler = (messageId: string) => (position: { x: number; y: number }, cursorPos: number) => {
     // 如果正在忽略文本选中事件（例如点击全文反馈优化按钮时），则不处理光标位置变化
     // 优先使用 ref，因为 ref 是同步的，更可靠
@@ -803,7 +803,7 @@ const PromptEditPage: React.FC = () => {
       'textarea', // 文本域
       '[contenteditable]', // 可编辑内容
       '.message-content', // 消息内容区域
-      '.formatted-prompt-editor', // FormattedPromptEditor 组件
+      '.formatted-prompt-editor', // AdvancedCodeMirrorEditor
       // 优化按钮本身
       '[data-testid="selection-optimize-button"]',
       '[data-testid="cursor-optimize-button"]',

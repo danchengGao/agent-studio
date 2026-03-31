@@ -93,7 +93,7 @@ import DiffViewer from '@/components/Prompts/DiffViewer'
 import FieldEditor, { type FieldType } from '@/components/Prompts/FieldEditor'
 import TestCaseEditDrawer, { type TestCaseDetail } from '@/components/Prompts/TestCaseEditDrawer'
 import ConditionalTooltip from '@/components/Prompts/ConditionalTooltip'
-import { FormattedPromptEditor, ModelSelector, ModelParameterEditor } from '@/components/Prompts'
+import { AdvancedCodeMirrorEditor, ModelSelector, ModelParameterEditor } from '@/components/Prompts'
 import ToolSettingsPanel from '@/components/Prompts/ToolSettingsPanel'
 import ToolEditDialog, { type EditingTool } from '@/components/Prompts/ToolEditDialog'
 import { SliderField } from '@/components/Prompts/SliderField'
@@ -3311,7 +3311,7 @@ const PromptOptimizeEditPage: React.FC = () => {
                         minHeight: 'clamp(400px, 50vh, 660px)',
                       }}
                     >
-                      <FormattedPromptEditor
+                      <AdvancedCodeMirrorEditor
                         fullWidth
                         placeholder={t('prompts.optimizeEditPage.basicInfo.originalPromptPlaceholder')}
                         value={originalPrompt}

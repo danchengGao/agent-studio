@@ -1,20 +1,46 @@
 import React, { useCallback, useMemo, useRef } from 'react'
 import { Box, InputLabel } from '@mui/material'
 import { styled } from '@mui/material/styles'
-import CodeMirror from '@uiw/react-codemirror'
-import { EditorView } from '@codemirror/view'
-import { Extension, EditorState } from '@codemirror/state'
+import CodeMirror, { EditorView, type Extension, Prec } from '@uiw/react-codemirror'
 import { StreamLanguage, HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
 import { isValidVariableName } from '@/utils/prompts/promptEditPageUtils'
-import { ViewPlugin, Decoration, DecorationSet, ViewUpdate } from '@codemirror/view'
-import type { Range } from '@codemirror/state'
 import { createMaxLengthExtension } from '@/utils/codemirror/maxLengthExtension'
+
+const JINJA2_KEYWORDS = new Set([
+  'if',
+  'elif',
+  'else',
+  'endif',
+  'for',
+  'endfor',
+  'while',
+  'endwhile',
+  'macro',
+  'endmacro',
+  'set',
+  'block',
+  'endblock',
+  'include',
+  'extends',
+  'import',
+  'in',
+  'with',
+  'endwith',
+  'filter',
+  'endfilter',
+  'call',
+  'endcall',
+  'raw',
+  'endraw',
+])
 
 // 样式化的容器
 const EditorContainer = styled(Box)({
   position: 'relative',
   width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
   height: '100%',
   display: 'flex',
   flexDirection: 'column',
@@ -23,6 +49,9 @@ const EditorContainer = styled(Box)({
   '& .cm-editor': {
     border: '1px solid #d1d5db',
     borderRadius: '4px',
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     fontSize: '14px',
     fontFamily: '"SF Mono", Monaco, Inconsolata, "Roboto Mono", "Source Code Pro", monospace',
     height: '100%',
@@ -49,16 +78,6 @@ const EditorContainer = styled(Box)({
     overflow: 'auto',
   },
 
-  '& .cm-scroller': {
-    maxHeight: '100%',
-    overflow: 'auto',
-    fontFamily: 'inherit',
-  },
-
-  '& .cm-line': {
-    padding: '0',
-  },
-
   // 语法高亮样式 - 直接针对 CodeMirror 的类
   '& .tok-heading': {
     color: '#0891b2 !important',
@@ -67,6 +86,11 @@ const EditorContainer = styled(Box)({
 
   '& .tok-list': {
     color: '#2563eb !important',
+    fontWeight: '500 !important',
+  },
+
+  '& .tok-atom': {
+    color: '#e91e63 !important',
     fontWeight: '500 !important',
   },
 
@@ -113,253 +137,98 @@ const EditorContainer = styled(Box)({
 })
 
 // 创建自定义语言定义
-const promptLanguage = StreamLanguage.define({
-  name: 'prompt',
-  startState: () => ({
-    inVariable: false,
-    variableStart: false,
-    variableContent: '', // 用于累积变量内容
-    isValidVariable: false, // 标记当前变量是否有效
-    isVariableChecked: false, // 标记是否已经检查过变量有效性
-  }),
-  token: (stream, state) => {
-    // 处理标题 # 开头 - 必须在行首
-    if (stream.sol() && stream.match(/^#+/)) {
-      stream.skipToEnd()
-      return 'heading'
-    }
+const createPromptLanguage = (templateEngine: 'normal' | 'jinja2') =>
+  StreamLanguage.define({
+    name: 'prompt',
+    startState: () => ({
+      inVariable: false,
+      variableIsValid: false,
+      inJinjaControl: false,
+    }),
+    token: (stream, state) => {
+      // normal 模式下禁用 Jinja2 高亮
+      const enableJinjaHighlight = templateEngine === 'jinja2'
+      if (enableJinjaHighlight) {
+        // 使用 tokenizer 直接处理 Jinja2 控制结构，避免依赖 ViewPlugin 生命周期。
+        if (state.inJinjaControl) {
+          if (stream.eatSpace()) {
+            return null
+          }
 
-    // 处理列表项 1. 2. 3. a. b. c. - 必须在行首或前面有空格
-    if (stream.sol() || (stream.column() > 0 && stream.string.substring(0, stream.pos).match(/^\s+$/))) {
-      if (stream.match(/(\d+\.|[a-zA-Z]\.)/)) {
-        return 'strong' // 使用 strong 标签来应用蓝色样式
+          if (stream.match('%}')) {
+            state.inJinjaControl = false
+            return 'atom'
+          }
+
+          // 在 Jinja2 控制块中，白名单关键字都高亮（如 for/in/endfor）。
+          if (stream.match(/[a-zA-Z_][a-zA-Z0-9_]*/)) {
+            const keyword = stream.current().toLowerCase()
+            return JINJA2_KEYWORDS.has(keyword) ? 'keyword' : null
+          }
+
+          stream.next()
+          return null
+        }
+
+        if (stream.match(/\{%/)) {
+          state.inJinjaControl = true
+          return 'atom'
+        }
       }
-    }
 
-    // 处理变量 {{...}} - 现在由 variableHighlightPlugin 处理高亮，这里只标记为普通字符串
-    // 这样 StreamLanguage 不会干扰 variableHighlightPlugin 的装饰
-    if (stream.match(/\{\{/)) {
-      state.inVariable = true
-      state.variableStart = true
-      state.variableContent = ''
-      // 不返回任何 token，让 variableHighlightPlugin 处理高亮
-      return null
-    }
-
-    if (state.inVariable) {
-      if (stream.match(/\}\}/)) {
-        state.inVariable = false
-        state.variableStart = false
-        // 不返回任何 token，让 variableHighlightPlugin 处理高亮
-        return null
+      // 变量高亮：无效变量也高亮括号 {{ 和 }}，仅中间内容不高亮
+      if (state.inVariable) {
+        if (stream.match(/\}\}/)) {
+          state.inVariable = false
+          return 'bracket'
+        }
+        if (stream.eatWhile(/[^\}]/)) {
+          return state.variableIsValid ? 'variableName' : null
+        }
+        // 兜底推进，避免卡住
+        stream.next()
+        return state.variableIsValid ? 'variableName' : null
       }
+
+      if (stream.match(/\{\{/)) {
+        const allowSpaces = templateEngine === 'jinja2'
+        const closeIndex = stream.string.indexOf('}}', stream.pos)
+        const rawVariableName = closeIndex >= 0 ? stream.string.slice(stream.pos, closeIndex) : ''
+        state.variableIsValid = isValidVariableName(rawVariableName, allowSpaces)
+        state.inVariable = true
+        return 'bracket'
+      }
+
+      // 处理标题 # 开头 - 必须在行首
+      if (stream.sol() && stream.match(/^#+/)) {
+        stream.skipToEnd()
+        return 'heading'
+      }
+
+      // 处理列表项 1. 2. 3. a. b. c. - 必须在行首或前面有空格
+      if (stream.sol() || (stream.column() > 0 && stream.string.substring(0, stream.pos).match(/^\s+$/))) {
+        if (stream.match(/(\d+\.|[a-zA-Z]\.)/)) {
+          return 'strong' // 使用 strong 标签来应用蓝色样式
+        }
+      }
+
       stream.next()
-      // 变量内容也不返回 token，让 variableHighlightPlugin 处理高亮
       return null
-    }
-
-    stream.next()
-    return null
-  },
-  languageData: {
-    commentTokens: { line: '//' },
-  },
-})
+    },
+    languageData: {
+      commentTokens: { line: '//' },
+    },
+  })
 
 // 创建语法高亮样式
 const promptHighlightStyle = HighlightStyle.define([
   { tag: tags.heading, color: '#0891b2', fontWeight: 'bold' },
   { tag: tags.strong, color: '#2563eb', fontWeight: '500' },
+  { tag: tags.keyword, color: '#e91e63', fontWeight: '500' },
+  { tag: tags.atom, color: '#e91e63', fontWeight: '500' },
+  { tag: tags.bracket, color: '#16a34a', fontWeight: '500' },
+  { tag: tags.variableName, color: '#16a34a', fontWeight: '500' },
 ])
-
-// 创建变量高亮装饰插件（用于区分有效和无效变量）
-const createVariableHighlightPlugin = (templateEngine: 'normal' | 'jinja2' = 'normal') => {
-  return ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet
-      allowSpaces: boolean
-
-      constructor(view: EditorView) {
-        this.allowSpaces = templateEngine === 'jinja2'
-        this.decorations = this.buildDecorations(view)
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
-          this.decorations = this.buildDecorations(update.view)
-        }
-      }
-
-      buildDecorations(view: EditorView): DecorationSet {
-        const decorations: Range<Decoration>[] = []
-        const text = view.state.doc.toString()
-
-        // 匹配所有 {{...}} 格式的变量
-        const variableRegex = /\{\{([^}]+)\}\}/g
-        let match
-
-        while ((match = variableRegex.exec(text)) !== null) {
-          const from = match.index
-          const to = match.index + match[0].length
-          const rawVariableName = match[1]
-
-          // 检查变量是否有效（根据模板引擎模式决定是否允许前后空格）
-          const isValid = isValidVariableName(rawVariableName, this.allowSpaces)
-
-          if (isValid) {
-            // 有效变量：整个变量（包括 {{}} 和内容）都是绿色
-            decorations.push(
-              Decoration.mark({
-                class: 'cm-variable-valid',
-              }).range(from, to),
-            )
-          } else {
-            // 无效变量：只有 {{ 和 }} 是绿色，中间内容是普通颜色
-            const openBraceEnd = from + 2 // {{ 结束位置
-            const closeBraceStart = to - 2 // }} 开始位置
-
-            // 装饰开头的 {{
-            decorations.push(
-              Decoration.mark({
-                class: 'cm-variable-bracket',
-              }).range(from, openBraceEnd) as any,
-            )
-
-            // 装饰结尾的 }}
-            decorations.push(
-              Decoration.mark({
-                class: 'cm-variable-bracket',
-              }).range(closeBraceStart, to) as any,
-            )
-
-            // 中间的内容不添加装饰，保持普通颜色
-          }
-        }
-
-        return Decoration.set(decorations)
-      }
-    },
-    {
-      decorations: v => v.decorations,
-    },
-  )
-}
-
-// 创建 Jinja2 控制结构高亮插件（用于高亮 {% ... %} 语法）
-const createJinja2ControlPlugin = () => {
-  return ViewPlugin.fromClass(
-    class {
-      decorations: DecorationSet
-
-      constructor(view: EditorView) {
-        this.decorations = this.buildDecorations(view)
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
-          this.decorations = this.buildDecorations(update.view)
-        }
-      }
-
-      buildDecorations(view: EditorView): DecorationSet {
-        const decorations: Range<Decoration>[] = []
-        const text = view.state.doc.toString()
-
-        // Jinja2 关键字列表
-        const jinja2Keywords = [
-          'if',
-          'elif',
-          'else',
-          'endif',
-          'for',
-          'endfor',
-          'while',
-          'endwhile',
-          'macro',
-          'endmacro',
-          'set',
-          'block',
-          'endblock',
-          'include',
-          'extends',
-          'import',
-          'with',
-          'endwith',
-          'filter',
-          'endfilter',
-          'call',
-          'endcall',
-          'raw',
-          'endraw',
-        ]
-
-        // 匹配所有 {% ... %} 格式的 Jinja2 控制结构
-        // 包括 {% if %}, {% elif %}, {% else %}, {% endif %}, {% for %}, {% endfor %} 等
-        const jinja2ControlRegex = /\{%[\s\S]*?%\}/g
-        let match
-
-        while ((match = jinja2ControlRegex.exec(text)) !== null) {
-          const from = match.index
-          const to = match.index + match[0].length
-          const fullMatch = match[0]
-
-          // 提取中间的内容（去掉 {% 和 %}，保留原始空格）
-          const innerContent = fullMatch.slice(2, -2)
-
-          // 高亮开头的 {%
-          const openBraceEnd = from + 2
-          decorations.push(
-            Decoration.mark({
-              class: 'cm-jinja2-control',
-            }).range(from, openBraceEnd) as any,
-          )
-
-          // 检查中间内容是否包含 Jinja2 关键字
-          // 在 innerContent 中查找关键字（不区分大小写）
-          for (const keyword of jinja2Keywords) {
-            // 创建关键字匹配的正则表达式
-            // 匹配关键字，确保它是独立的词（前后是空格、%} 或字符串开始/结束）
-            const keywordRegex = new RegExp(`\\b${keyword}\\b`, 'gi')
-            let keywordMatch
-
-            // 使用 exec 循环查找所有匹配的关键字（虽然通常只有一个）
-            while ((keywordMatch = keywordRegex.exec(innerContent)) !== null) {
-              if (keywordMatch.index !== undefined) {
-                // 计算关键字在文档中的位置
-                const keywordStartInMatch = keywordMatch.index
-                const keywordEndInMatch = keywordStartInMatch + keywordMatch[0].length
-
-                // 关键字在完整匹配中的位置（需要考虑 {% 的2个字符）
-                const keywordStartInDoc = from + 2 + keywordStartInMatch
-                const keywordEndInDoc = from + 2 + keywordEndInMatch
-
-                // 高亮关键字
-                decorations.push(
-                  Decoration.mark({
-                    class: 'cm-jinja2-control',
-                  }).range(keywordStartInDoc, keywordEndInDoc) as any,
-                )
-              }
-            }
-          }
-
-          // 高亮结尾的 %}
-          const closeBraceStart = to - 2
-          decorations.push(
-            Decoration.mark({
-              class: 'cm-jinja2-control',
-            }).range(closeBraceStart, to) as any,
-          )
-        }
-
-        return Decoration.set(decorations)
-      }
-    },
-    {
-      decorations: v => v.decorations,
-    },
-  )
-}
 
 // 创建主题扩展
 const createPromptTheme = (): Extension[] => {
@@ -380,12 +249,10 @@ const createPromptTheme = (): Extension[] => {
       '.cm-scroller': {
         maxHeight: '100%',
         overflow: 'auto',
+        overflowX: 'hidden !important',
       },
       '.cm-focused': {
         outline: 'none',
-      },
-      '.cm-line': {
-        padding: '0',
       },
       '.cm-placeholder': {
         color: '#9ca3af',
@@ -405,6 +272,10 @@ const createPromptTheme = (): Extension[] => {
       },
       '.tok-list': {
         color: '#2563eb !important',
+        fontWeight: '500 !important',
+      },
+      '.tok-atom': {
+        color: '#e91e63 !important',
         fontWeight: '500 !important',
       },
       '.tok-variable': {
@@ -495,7 +366,6 @@ const AdvancedCodeMirrorEditor: React.FC<AdvancedCodeMirrorEditorProps> = ({
   sx,
   ...props
 }) => {
-  const editorRef = useRef<any>(null)
   const cursorTimerRef = useRef<NodeJS.Timeout | null>(null)
   const selectionTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -670,34 +540,32 @@ const AdvancedCodeMirrorEditor: React.FC<AdvancedCodeMirrorEditorProps> = ({
   // 创建扩展
   const extensions = useMemo(() => {
     const baseExtensions = [
-      promptLanguage,
+      createPromptLanguage(templateEngine),
       ...createPromptTheme(),
-      createVariableHighlightPlugin(templateEngine), // 添加变量高亮装饰插件（根据模板引擎模式）
-      EditorView.lineWrapping,
+      // 提高优先级，避免被其它扩展覆盖；flex 子项需配合 minWidth:0 才能正确测量换行宽度
+      Prec.high(EditorView.lineWrapping),
       ...eventExtensions, // 添加事件处理扩展
       ...createMaxLengthExtension(maxLength, onChange), // 添加最大长度限制扩展
     ]
-
-    // 当模板引擎为 jinja2 时，添加 Jinja2 控制结构高亮插件
-    if (templateEngine === 'jinja2') {
-      baseExtensions.push(createJinja2ControlPlugin())
-    }
 
     // 添加高度约束
     baseExtensions.push(
       EditorView.theme({
         '&': {
           height: '100%',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
           maxHeight: maxHeight ? `${maxHeight}px` : '100%',
         },
         '.cm-scroller': {
           maxHeight: maxHeight ? `${maxHeight}px` : '100%',
           height: '100%',
-          overflow: 'auto',
-        },
-        '.cm-content': {
-          maxHeight: '100%',
-          overflow: 'auto',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+          overflowX: 'hidden',
+          overflowY: 'auto',
         },
       }),
     )
@@ -731,13 +599,18 @@ const AdvancedCodeMirrorEditor: React.FC<AdvancedCodeMirrorEditorProps> = ({
         </InputLabel>
       )}
 
-      <Box sx={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+      <Box sx={{ flex: 1, height: '100%', width: '100%', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
         <CodeMirror
           value={value}
           onChange={handleChange}
           placeholder={placeholder}
           editable={!disabled}
           extensions={extensions}
+          width="100%"
+          minWidth="0"
+          maxWidth="100%"
+          height="100%"
+          {...(maxHeight != null ? { maxHeight: `${maxHeight}px` } : {})}
           basicSetup={{
             lineNumbers: false,
             foldGutter: false,
@@ -754,8 +627,10 @@ const AdvancedCodeMirrorEditor: React.FC<AdvancedCodeMirrorEditorProps> = ({
           }}
           theme="light"
           style={{
-            height: '100%',
-            maxHeight: '100%',
+            minHeight: 0,
+            width: '100%',
+            minWidth: 0,
+            maxWidth: '100%',
           }}
         />
       </Box>

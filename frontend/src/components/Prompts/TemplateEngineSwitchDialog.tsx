@@ -32,7 +32,7 @@ const TemplateEngineSwitchDialog: React.FC<TemplateEngineSwitchDialogProps> = ({
             {t('components.prompts.templateEngineSwitchDialog.warning')}
           </Typography>
           <Alert severity="warning">
-            <Typography variant="body2">
+            <Typography variant="body2" component="div">
               {pendingTemplateEngine === 'jinja2' ? (
                 <>
                   {t('components.prompts.templateEngineSwitchDialog.switchToJinja2.title')}

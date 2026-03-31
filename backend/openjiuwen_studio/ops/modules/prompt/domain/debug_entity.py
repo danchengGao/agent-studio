@@ -63,6 +63,10 @@ class Message(BaseModel):
 class VariableType(str, Enum):
     STRING = "string"
     PLACEHOLDER = "placeholder"
+    INTEGER = "integer"
+    FLOAT = "float"
+    BOOLEAN = "boolean"
+    OBJECT = "object"
 
 
 class VariableDef(BaseModel):
