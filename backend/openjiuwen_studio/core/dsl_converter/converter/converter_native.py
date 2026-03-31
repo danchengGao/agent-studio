@@ -21,6 +21,34 @@ from openjiuwen_studio.schemas.workflow import WorkflowBase
 from openjiuwen_studio.core.database import milliseconds
 
 
+# Mapping from numeric node type to a semantic ID prefix.
+# Using the numeric type directly as a prefix (e.g. "1_abc") causes the engine
+# to fail its completion check, because it identifies the End node by looking
+# for an "end_" prefix — not by the type field value.
+NODE_TYPE_PREFIX_MAP = {
+    "1": "start",
+    "2": "end",
+    "3": "llm",
+    "4": "condition",
+    "5": "code",
+    "6": "knowledge",
+    "7": "message",
+    "8": "variable",
+    "9": "http",
+    "10": "plugin",
+    "11": "loop",
+    "12": "batch",
+    "13": "intent",
+    "14": "subworkflow",
+    "15": "text",
+    "16": "image",
+    "17": "database",
+    "18": "email",
+    "19": "plugin",
+    "20": "timer",
+}
+
+
 class NativeWorkflowConverter(WorkflowConverter):
     """
     Converts OpenJiuwen native format workflows.
@@ -252,6 +280,12 @@ class NativeWorkflowConverter(WorkflowConverter):
         """
         Regenerate all node IDs in canvas to avoid conflicts.
 
+        Node IDs are prefixed with a semantic name derived from the node type
+        (e.g. type "1" → "start", type "2" → "end") rather than the raw numeric
+        type value. Using a numeric prefix (e.g. "1_abc123") caused the engine's
+        completion-detection logic to fail because it identifies the End node by
+        its "end_" ID prefix, not by the type field.
+
         Args:
             schema: Canvas schema dict
 
@@ -266,9 +300,13 @@ class NativeWorkflowConverter(WorkflowConverter):
             if not old_id:
                 continue
 
-            # Generate new ID based on node type
-            node_type = node.get("type", "node")
-            new_id = f"{node_type}_{uuid.uuid4().hex[:8]}"
+            # FIX: resolve a semantic prefix from the numeric type so generated IDs
+            # like "start_abc123" / "end_abc123" are produced instead of "1_abc123" /
+            # "2_abc123". The engine detects workflow completion by checking for an
+            # "end_" prefix on the End node ID; a numeric prefix breaks that check.
+            node_type = str(node.get("type", "node"))
+            prefix = NODE_TYPE_PREFIX_MAP.get(node_type, f"node{node_type}")
+            new_id = f"{prefix}_{uuid.uuid4().hex[:8]}"
             id_mapping[old_id] = new_id
             node["id"] = new_id
 
