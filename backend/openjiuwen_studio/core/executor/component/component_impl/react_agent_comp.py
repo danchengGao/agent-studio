@@ -48,16 +48,16 @@ class ReActAgentCompWithTools(ComponentComposable):
 class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
     """
     ReAct Agent executable with plugin tool support.
-    
+
     This extends the base ReActAgentCompExecutable to add plugin tools to the
     ability_manager so they are available to the ReAct agent.
     """
-    
+
     def __init__(self, config: ReActAgentCompConfig, tools: List[Tool] = None):
         # Create the ReAct agent
         self._config = config
         self._tools = tools or []
-        
+
         # Create a ReActAgent instance
         from openjiuwen.core.single_agent.agents.react_agent import ReActAgent
         self._react_agent = ReActAgent(
@@ -67,10 +67,10 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                 description="ReAct agent for workflow execution with plugin tools"
             )
         )
-        
+
         # Configure the agent
         self._react_agent.configure(config)
-        
+
         # Add tools to both ability_manager AND Runner.resource_mgr
         if self._tools:
             logger.warning(f"Adding {len(self._tools)} tools to ReAct agent")
@@ -79,7 +79,7 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                     # 1. Add tool card to ability_manager's _tools dictionary
                     self._react_agent._ability_manager._tools[tool.card.name] = tool.card
                     logger.warning(f"Added tool card to ability_manager: {tool.card.name}")
-                    
+
                     # 2. Register tool instance with Runner.resource_mgr
                     # This is needed for tool execution
                     from openjiuwen.core.runner import Runner
@@ -87,11 +87,33 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                     logger.warning(f"Registered tool instance with Runner.resource_mgr: {tool.card.name}")
                 except Exception as e:
                     logger.error(f"Failed to add tool {tool.card.name}: {e}")
+
+    @staticmethod
+    def _map_inputs_to_query(inputs):
+        """
+        Map inputs to 'query' key expected by the underlying ReActAgent.
+        
+        The underlying ReActAgent expects a 'query' key in inputs. This method
+        maps the first input value to 'query' if it doesn't already exist.
+        
+        Args:
+            inputs: Input dictionary or other type
+            
+        Returns:
+            Mapped inputs with 'query' key if inputs is a dict
+        """
+        if isinstance(inputs, dict) and 'query' not in inputs and len(inputs) > 0:
+            first_key = next(iter(inputs.keys()))
+            return {'query': inputs[first_key]}
+        elif isinstance(inputs, dict) and len(inputs) == 0:
+            return {'query': ''}
+        return inputs
     
     async def invoke(self, inputs, session, context):
         """Execute ReAct loop with the configured agent."""
         try:
-            result = await self._react_agent.invoke(inputs, session)
+            mapped_inputs = self._map_inputs_to_query(inputs)
+            result = await self._react_agent.invoke(mapped_inputs, session)
             return result
         except Exception as e:
             return {
@@ -102,7 +124,8 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
     async def stream(self, inputs, session, context):
         """Execute ReAct loop with streaming output."""
         try:
-            async for chunk in self._react_agent.stream(inputs, session):
+            mapped_inputs = self._map_inputs_to_query(inputs)
+            async for chunk in self._react_agent.stream(mapped_inputs, session):
                 yield chunk
         except Exception as e:
             yield {
@@ -117,15 +140,16 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                 collected_inputs = []
                 async for input_chunk in inputs:
                     collected_inputs.append(input_chunk)
-                
+
                 if len(collected_inputs) == 1:
                     final_inputs = collected_inputs[0]
                 else:
                     final_inputs = collected_inputs[-1]
             else:
                 final_inputs = inputs
-                
-            result = await self._react_agent.invoke(final_inputs, session)
+
+            mapped_inputs = self._map_inputs_to_query(final_inputs)
+            result = await self._react_agent.invoke(mapped_inputs, session)
             return result
         except Exception as e:
             return {
@@ -137,7 +161,8 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
         """Execute ReAct loop with streaming input/output."""
         try:
             async for input_chunk in inputs:
-                result = await self._react_agent.invoke(input_chunk, session)
+                mapped_inputs = self._map_inputs_to_query(input_chunk)
+                result = await self._react_agent.invoke(mapped_inputs, session)
                 yield result
         except Exception as e:
             yield {

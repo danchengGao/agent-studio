@@ -46,11 +46,11 @@ export const ReactAgentNodeRegistry: FlowNodeRegistry = {
             },
             prompt: {
               type: 'template',
-              content: '{{query}}',
+              content: '{{input}}',
             },
           },
           inputParameters: {
-            query: {
+            input: {
               type: 'constant',
               content: '',
               schema: {
