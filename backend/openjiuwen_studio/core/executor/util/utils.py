@@ -137,6 +137,7 @@ def get_trace_workflow_output(data):
             # 第二种格式: {'response': 'value'}
             elif isinstance(item, dict) and 'response' in item:
                 text_parts.append(str(item['response']))
+                output_key = "response"
             # 第三种格式: {'type': 'end node stream', 'index': 0, 'payload': {'response': 'value'}}
             # 第四种格式: {'type': 'output', 'index': 0, 'payload': {'output': '111', 'result_type': 'answer'}}
             elif isinstance(item, dict) and 'payload' in item:
