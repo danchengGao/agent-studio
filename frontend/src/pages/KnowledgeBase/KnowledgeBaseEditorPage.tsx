@@ -20,6 +20,7 @@ import AddDocumentDialog from './components/AddDocumentDialog'
 import AddWeblinkDialog from './components/AddWeblinkDialog'
 import SyncToDeepSearchDialog from './components/SyncToDeepSearchDialog'
 import { DocumentErrorMessageCell, getStatusErrorMessage } from './components/DocumentErrorMessageCell'
+import { KnowledgeBaseEditorCellTooltip } from './components/KnowledgeBaseEditorCellTooltip'
 
 const KnowledgeBaseEditorPage: React.FC = () => {
   const { t } = useTranslation()
@@ -743,8 +744,14 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     }
   }
 
-  // 开始编辑文档名称
+  // 开始编辑文档名称（weblink 名称常为完整 URL，含多个点号，不能按「扩展名」拆分）
   const handleEditDocument = (document: DocumentItem) => {
+    if (isWeblink) {
+      setEditingDocumentId(document.id)
+      setEditingDocumentName(document.name)
+      setEditingDocumentExtension('')
+      return
+    }
     const { name, extension } = splitFileName(document.name)
     setEditingDocumentId(document.id)
     setEditingDocumentName(name)
@@ -755,7 +762,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   const handleSaveDocumentName = async (documentId: string) => {
     if (!knowledgeBase || !editingDocumentName.trim()) return
 
-    // 验证文件名长度（不含后缀）
+    // 文档：主文件名长度；weblink：整段 URL
     if (editingDocumentName.trim().length > MAX_DOCUMENT_NAME_LENGTH) {
       showError(
         isWeblink
@@ -765,8 +772,10 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       return
     }
 
-    // 重新组合文件名和后缀
-    const fullName = editingDocumentName.trim() + editingDocumentExtension
+    // 文档类型：主名 + 扩展名；weblink：整段为显示名（常为 URL）
+    const fullName = isWeblink
+      ? editingDocumentName.trim()
+      : editingDocumentName.trim() + editingDocumentExtension
 
     setIsUpdating(true)
     try {
@@ -1181,11 +1190,11 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
+                  <div className="border border-gray-200 rounded-lg max-w-full overflow-x-auto">
+                    <table className="w-full min-w-[72rem] table-fixed divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 align-middle shrink-0">
                             <button
                               onClick={handleSelectAll}
                               className="flex items-center justify-center p-1 rounded hover:bg-gray-200 transition-colors"
@@ -1202,23 +1211,27 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                               )}
                             </button>
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0 w-[30%] align-middle">
                             {isWeblink ? t('knowledgeBases.editor.weblinkName') : t('knowledgeBases.editor.documentName')}
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40 align-middle">
                             {t('knowledgeBases.settings.status')}
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('knowledgeBases.editor.createdAt')}</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-44 whitespace-nowrap align-middle">
+                            {t('knowledgeBases.editor.createdAt')}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[12.5rem] w-[26%] align-top">
                             {t('knowledgeBases.settings.errorInfo')}
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('knowledgeBases.editor.actions')}</th>
+                          <th className="px-6 py-3 pr-7 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8.5rem] min-w-[8.5rem] whitespace-nowrap align-middle">
+                            {t('knowledgeBases.editor.actions')}
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {documents.map(doc => (
                           <tr key={doc.id} className={`hover:bg-gray-50 ${selectedDocumentIds.has(doc.id) ? 'bg-blue-50' : ''}`}>
-                            <td className="px-4 py-4 whitespace-nowrap w-12">
+                            <td className="px-4 py-4 whitespace-nowrap w-12 align-middle">
                               <button
                                 onClick={() => handleSelectDocument(doc.id)}
                                 className="flex items-center justify-center p-1 rounded hover:bg-gray-200 transition-colors"
@@ -1230,14 +1243,14 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                 )}
                               </button>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
+                            <td className="px-6 py-4 min-w-0 align-middle">
+                              <div className="flex items-center min-w-0">
                                 <FileText className="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
                                 {editingDocumentId === doc.id ? (
-                                  <div className="flex items-center space-x-2 flex-1">
-                                    <div className="flex-1 flex items-center space-x-2">
-                                      <div className="flex-1">
-                                        <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                    <div className="flex-1 flex items-center space-x-2 min-w-0">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center space-x-2 min-w-0">
                                           <input
                                             type="text"
                                             value={editingDocumentName}
@@ -1256,7 +1269,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                               }
                                             }}
                                             maxLength={MAX_DOCUMENT_NAME_LENGTH}
-                                            className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                            className={`min-w-0 flex-1 max-w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                               editingDocumentName.length >= MAX_DOCUMENT_NAME_LENGTH ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'
                                             }`}
                                             autoFocus
@@ -1291,33 +1304,34 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                     </button>
                                   </div>
                                 ) : (
-                                  <span
-                                    onClick={() => handleEditDocument(doc)}
-                                    className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 flex-1 block truncate max-w-xs md:max-w-sm lg:max-w-md"
-                                    title={doc.name}
-                                  >
-                                    {doc.name}
-                                  </span>
+                                  <KnowledgeBaseEditorCellTooltip title={doc.name}>
+                                    <span
+                                      onClick={() => handleEditDocument(doc)}
+                                      className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 min-w-0 flex-1 truncate block"
+                                    >
+                                      {doc.name}
+                                    </span>
+                                  </KnowledgeBaseEditorCellTooltip>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm align-middle">
                               <StatusBadge
                                 status={documentStatuses[doc.id]?.status || 'unknown'}
                                 documentId={doc.id}
                                 enableGraphEnhancement={documentStatuses[doc.id]?.enable_graph_enhancement}
                               />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 align-middle">
                               {doc.created_at || '-'}
                             </td>
-                            <td className="px-6 py-4 text-sm">
+                            <td className="px-6 py-4 text-sm min-w-[12.5rem] align-top">
                               <DocumentErrorMessageCell
                                 message={getStatusErrorMessage(documentStatuses[doc.id])}
                               />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <div className="flex items-center space-x-2">
+                            <td className="px-6 py-4 pr-7 whitespace-nowrap text-sm align-middle">
+                              <div className="flex items-center justify-start gap-2">
                                 <button
                                   onClick={() => handleEditDocument(doc)}
                                   className="text-blue-600 hover:text-blue-800 disabled:opacity-50"

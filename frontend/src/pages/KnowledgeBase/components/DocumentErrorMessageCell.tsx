@@ -1,5 +1,5 @@
 import React from 'react'
-import Tooltip from '@mui/material/Tooltip'
+import { KnowledgeBaseEditorCellTooltip } from './KnowledgeBaseEditorCellTooltip'
 
 const PREVIEW_MAX_LEN = 100
 
@@ -19,8 +19,7 @@ export function getStatusErrorMessage(item?: StatusErrorFields | null): string |
 }
 
 /**
- * 知识库编辑页「错误信息」列：列表内短预览，悬停浮层展示全文（可滚动）。
- * 文档型知识库与 weblink 知识库共用同一表格与此组件。
+ * 知识库编辑页「错误信息」列：列表内短预览；悬停展示全文（与名称列同一套 Tooltip，短延迟）。
  */
 export const DocumentErrorMessageCell: React.FC<{
   message?: string | null
@@ -33,38 +32,10 @@ export const DocumentErrorMessageCell: React.FC<{
   const preview = text.length > PREVIEW_MAX_LEN ? `${text.slice(0, PREVIEW_MAX_LEN)}...` : text
 
   return (
-    <Tooltip
-      title={text}
-      placement="top-start"
-      arrow
-      enterDelay={150}
-      slotProps={{
-        tooltip: {
-          sx: {
-            maxWidth: 'min(90vw, 560px)',
-            maxHeight: 'min(50vh, 420px)',
-            overflow: 'auto',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            fontSize: '0.8125rem',
-            lineHeight: 1.45,
-          },
-        },
-        popper: {
-          sx: { zIndex: (theme) => theme.zIndex.tooltip },
-        },
-      }}
-    >
-      <span
-        className="text-red-600 cursor-help break-words inline-block align-top"
-        style={{
-          maxWidth: '400px',
-          wordBreak: 'break-word',
-          overflowWrap: 'break-word',
-        }}
-      >
+    <KnowledgeBaseEditorCellTooltip title={text} longContent>
+      <span className="text-red-600 block w-full min-w-0 max-w-full break-words text-left align-top [overflow-wrap:anywhere]">
         {preview}
       </span>
-    </Tooltip>
+    </KnowledgeBaseEditorCellTooltip>
   )
 }
