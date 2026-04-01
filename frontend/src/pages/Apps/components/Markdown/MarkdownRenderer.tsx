@@ -18,6 +18,7 @@ import { CitationLink } from '../CitationPanel/CitationLink'
 import { InferenceLink } from '../InferenceGraph'
 import { SmartImage } from './SmartImage'
 import { MermaidChart } from './MermaidChart/index'
+import { normalizeProblematicStrongPercentForRender } from '@/utils/markdownCleaner'
 
 /**
  * Markdown 核心渲染器
@@ -27,7 +28,12 @@ export const MarkdownRenderer: React.FC<{
   content: string
   citations?: MarkdownProps['citations']
   inferMessages?: MarkdownProps['inferMessages']
-}> = ({ content, citations, instanceId, inferMessages }) => {
+}> = ({ content, citations, instanceId }) => {
+  const normalizedContent = useMemo(
+    () => normalizeProblematicStrongPercentForRender(content),
+    [content]
+  )
+
   // 构建默认组件映射
   const defaultComponents = useMemo(() => {
     const markdownComponents: Components = {
@@ -44,8 +50,8 @@ export const MarkdownRenderer: React.FC<{
           return (
             <InferenceLink
               key={`${instanceId || 'no-id'}-inference-${childrenText}`}
-              href={href}
-              instanceId={instanceId}
+              href={href ?? ''}
+              instanceId={instanceId ?? 'no-id'}
             >
               {children}
             </InferenceLink>
@@ -57,7 +63,7 @@ export const MarkdownRenderer: React.FC<{
           return (
             <CitationLink
               key={`${instanceId || 'no-id'}-citation-${childrenText}`}
-              href={href}
+              href={href ?? ''}
               citations={citations}
               markdownInstanceId={instanceId}
             >
@@ -127,7 +133,7 @@ export const MarkdownRenderer: React.FC<{
       rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
       components={defaultComponents}
     >
-      {content}
+      {normalizedContent}
     </ReactMarkdown>
   )
 }

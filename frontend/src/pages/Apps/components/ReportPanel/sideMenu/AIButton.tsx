@@ -1,9 +1,8 @@
 /**
- * AI Button 组件
+ * AI rewrite entry button shown in the BlockNote side menu.
  *
- * @description
- * 显示 Sparkles 图标
- * 悬停时高亮对应的块
+ * The button prevents default on mousedown so the current text selection stays
+ * alive when the user clicks the AI action.
  */
 
 import React from 'react'
@@ -16,9 +15,6 @@ export interface AIButtonProps {
   onClick?: () => void
 }
 
-/**
- * AI Button 组件
- */
 export const AIButton: React.FC<AIButtonProps> = ({
   onMouseEnter,
   onMouseLeave,
@@ -28,19 +24,22 @@ export const AIButton: React.FC<AIButtonProps> = ({
 
   return (
     <button
+      onMouseDown={(event) => {
+        event.preventDefault()
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onClick={onClick}
       className="
-        group w-7 h-7 flex items-center justify-center rounded-lg
-        transition-all duration-300 cursor-pointer outline-none
-        pointer-events-auto relative z-10
-        text-gray-400 hover:text-blue-500 hover:bg-gradient-to-r
-        hover:from-blue-50 hover:to-purple-50 hover:shadow-md hover:shadow-blue-200/50
+        group relative z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg
+        text-gray-400 outline-none transition-all duration-300
+        hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50
+        hover:text-blue-500 hover:shadow-md hover:shadow-blue-200/50
       "
       title={t('apps.report.aiRewrite') || 'AI改写'}
+      type="button"
     >
-      <Sparkles className="w-4 h-4 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12" />
+      <Sparkles className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
     </button>
   )
 }

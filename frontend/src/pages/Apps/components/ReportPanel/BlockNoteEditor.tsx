@@ -1,31 +1,57 @@
-/**
- * BlockNote 编辑器组件
- *
- * @description
- * 使用 BlockNote 提供 Notion 风格的块级编辑体验
- * - 支持 Markdown 导入（使用内置 API）
- * - 文本选区支持
- * - 块级 AI 悬停高亮
- * - AI 改写面板
- */
-
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BlockNoteEditor as BNEditor, type Block } from '@blocknote/core'
 import { BlockNoteView } from '@blocknote/mantine'
 import { SideMenuController } from '@blocknote/react'
 import '@blocknote/mantine/style.css'
+import rehypeRaw from 'rehype-raw'
+import rehypeStringify from 'rehype-stringify'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import { unified } from 'unified'
 import { CustomSideMenu, AIRewritePanel, AIRewriteStatusIndicator } from './sideMenu'
 import type { RewriteStatus } from '@/pages/Apps/types'
-import { PANEL_TOTAL_HEIGHT, HIGHLIGHT_STYLE_ID, HIGHLIGHT_CSS } from './constants'
+import { PANEL_TOTAL_HEIGHT, HIGHLIGHT_CSS, HIGHLIGHT_STYLE_ID } from './constants'
 import { useConversationStore } from '@/stores/useConversationStore'
-import { codePointIndexToUtf16Index, utf16IndexToCodePointIndex } from '@/utils/textOffset'
-import { mapCleanedOffsetToOriginal, preprocessMarkdown, type BlockOffset } from '@/utils/markdownCleaner'
-import type { ReportRewriteParams, ReportRewriteAction } from '@/pages/Apps/types'
+import { codePointIndexToUtf16Index, utf16IndexToCodePointIndex, findAllOccurrencesUtf16 } from '@/utils/textOffset'
+import {
+  buildVisibleProjection,
+  mapCleanedOffsetToOriginal,
+  normalizeProblematicStrongPercentForRender,
+  preprocessMarkdown,
+  type BlockOffset,
+  type VisibleProjectionResult,
+} from '@/utils/markdownCleaner'
+import type { ReportRewriteAction, ReportRewriteParams } from '@/pages/Apps/types'
 import './sideMenu/styles.css'
 
 type AnyBlock = Block<any, any, any>
 
-// 动画阶段到 CSS 类名的映射
+type SelectionSnapshot = {
+  text: string
+  range: Range | null
+  startBlockId: string | null
+  endBlockId: string | null
+  startOffsetInStartBlock: number
+  endOffsetInEndBlock: number
+}
+
+type BlockAlignment = {
+  blockId: string
+  text: string
+  visibleStart: number
+  visibleEnd: number
+}
+
+type ResolvedSelection = {
+  originalStart: number
+  originalEnd: number
+  originalText: string
+}
+
+const BLOCK_OUTER_SELECTOR = '[data-node-type="blockOuter"][data-id]'
+
 const PHASE_CLASS_MAP = {
   highlight: 'block-rewriting',
   fadeout: 'content-fade-out',
@@ -37,35 +63,418 @@ const PHASE_CLASS_MAP = {
 type AnimationPhase = keyof typeof PHASE_CLASS_MAP
 
 export interface BlockNoteEditorProps {
-  /** 预处理后的内容（用于显示） */
   content: string
-  /** 原始内容（含 citation 标记） */
   rawContent?: string
-  /** 偏移量映射 */
   offsetMap?: number[]
-  /** 块位置信息 */
   blockOffsets?: BlockOffset[]
-  /** 是否只读 */
   readonly?: boolean
-  /** 内容变化回调 */
   onChange?: (markdown: string) => void
-  /** 选区变化回调 */
   onSelectionChange?: (selectedText: string, range: Range | null) => void
-  /** 自定义类名 */
   className?: string
-  /** 滚动容器引用 */
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
-  /** 会话 ID（用于 AI 改写） */
   conversationId?: string
-  /** 报告局部改写回调（注入到原始对话流） */
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
+}
+
+const normalizeText = (text: string) =>
+  text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\u00A0/g, ' ')
+
+const getTextPreview = (text: string, maxLength = 120) => {
+  const escaped = normalizeText(text).replace(/\n/g, '\\n')
+  return escaped.length > maxLength ? `${escaped.slice(0, maxLength)}...` : escaped
+}
+
+const getEditorElement = (wrapper: HTMLDivElement | null) =>
+  wrapper?.querySelector('.bn-editor') as HTMLDivElement | null
+
+const getBlockElement = (blockId: string, root: ParentNode = document) =>
+  root.querySelector(
+    `[data-node-type="blockOuter"][data-id="${blockId}"]`
+  ) as HTMLElement | null
+
+const getEditorBlockElements = (editorElement: HTMLElement) =>
+  Array.from(editorElement.querySelectorAll<HTMLElement>(BLOCK_OUTER_SELECTOR))
+
+const getClosestBlockElement = (node: Node | null) => {
+  if (!node) {
+    return null
+  }
+
+  let current: Node | null = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode
+  while (current) {
+    if (
+      current instanceof HTMLElement &&
+      current.dataset.id &&
+      current.matches(BLOCK_OUTER_SELECTOR)
+    ) {
+      return current
+    }
+    current = current.parentNode
+  }
+
+  return null
+}
+
+const getBlockVisibleText = (blockElement: HTMLElement) =>
+  normalizeText(blockElement.innerText || blockElement.textContent || '').trim()
+
+const getVisibleOffsetFromBlockStart = (
+  blockElement: HTMLElement,
+  container: Node,
+  offset: number
+) => {
+  const range = document.createRange()
+  range.setStart(blockElement, 0)
+  range.setEnd(container, offset)
+  return normalizeText(range.toString()).length
+}
+
+const trimSelectionSnapshot = (snapshot: SelectionSnapshot): SelectionSnapshot | null => {
+  const leadingWhitespace = snapshot.text.match(/^\s+/)?.[0].length ?? 0
+  const trailingWhitespace = snapshot.text.match(/\s+$/)?.[0].length ?? 0
+  const trimmedText = snapshot.text.trim()
+
+  if (!trimmedText) {
+    return null
+  }
+
+  return {
+    ...snapshot,
+    text: trimmedText,
+    startOffsetInStartBlock: snapshot.startOffsetInStartBlock + leadingWhitespace,
+    endOffsetInEndBlock: snapshot.endOffsetInEndBlock - trailingWhitespace,
+  }
+}
+
+const createSelectionSnapshotFromRange = (range: Range): SelectionSnapshot | null => {
+  const rawText = normalizeText(range.toString())
+  if (!rawText.trim()) {
+    return null
+  }
+
+  const startBlockElement = getClosestBlockElement(range.startContainer)
+  const endBlockElement = getClosestBlockElement(range.endContainer)
+
+  if (!startBlockElement || !endBlockElement) {
+    return null
+  }
+
+  const snapshot: SelectionSnapshot = {
+    text: rawText,
+    range: range.cloneRange(),
+    startBlockId: startBlockElement.dataset.id || null,
+    endBlockId: endBlockElement.dataset.id || null,
+    startOffsetInStartBlock: getVisibleOffsetFromBlockStart(
+      startBlockElement,
+      range.startContainer,
+      range.startOffset
+    ),
+    endOffsetInEndBlock: getVisibleOffsetFromBlockStart(
+      endBlockElement,
+      range.endContainer,
+      range.endOffset
+    ),
+  }
+
+  return trimSelectionSnapshot(snapshot)
+}
+
+const createSelectionSnapshotFromBlock = (blockElement: HTMLElement): SelectionSnapshot | null => {
+  const text = getBlockVisibleText(blockElement)
+  if (!text) {
+    return null
+  }
+
+  return {
+    text,
+    range: null,
+    startBlockId: blockElement.dataset.id || null,
+    endBlockId: blockElement.dataset.id || null,
+    startOffsetInStartBlock: 0,
+    endOffsetInEndBlock: text.length,
+  }
+}
+
+const projectRawTextToVisible = (rawText: string) => {
+  const { cleaned, offsetMap } = preprocessMarkdown(rawText)
+  return buildVisibleProjection(cleaned, offsetMap).visibleText
+}
+
+const buildWhitespaceNormalizedProjection = (
+  projection: VisibleProjectionResult
+) => {
+  const textParts: string[] = []
+  const normalizedToOriginalMap: number[] = []
+  let pendingWhitespaceOffset: number | null = null
+
+  for (let i = 0; i < projection.visibleText.length; i++) {
+    const ch = projection.visibleText[i]
+    const originalOffset = projection.visibleToOriginalMap[i]
+
+    if (/\s/.test(ch)) {
+      if (textParts.length > 0 && pendingWhitespaceOffset === null) {
+        pendingWhitespaceOffset = originalOffset
+      }
+      continue
+    }
+
+    if (pendingWhitespaceOffset !== null) {
+      textParts.push(' ')
+      normalizedToOriginalMap.push(pendingWhitespaceOffset)
+      pendingWhitespaceOffset = null
+    }
+
+    textParts.push(ch)
+    normalizedToOriginalMap.push(originalOffset)
+  }
+
+  return {
+    text: textParts.join(''),
+    normalizedToOriginalMap,
+  }
+}
+
+const normalizeSearchText = (text: string) => normalizeText(text).replace(/\s+/g, ' ').trim()
+
+const renderMarkdownToHTML = (markdown: string) =>
+  String(
+    unified()
+      .use(remarkParse)
+      .use(remarkGfm)
+      .use(remarkMath, { singleDollarTextMath: true })
+      .use(remarkRehype, { allowDangerousHtml: true })
+      .use(rehypeRaw)
+      .use(rehypeStringify)
+      .processSync(normalizeProblematicStrongPercentForRender(markdown))
+  )
+
+const alignTargetBlocks = (
+  editorElement: HTMLElement,
+  projection: VisibleProjectionResult,
+  targetBlockIds: string[]
+) => {
+  const targetSet = new Set(targetBlockIds.filter(Boolean))
+  const alignments = new Map<string, BlockAlignment>()
+  let cursor = 0
+  let firstFailedBlockId: string | null = null
+  let firstFailedBlockText: string | null = null
+
+  for (const blockElement of getEditorBlockElements(editorElement)) {
+    const blockId = blockElement.dataset.id
+    const blockText = getBlockVisibleText(blockElement)
+
+    if (!blockId || !blockText) {
+      continue
+    }
+
+    const matchIndex = projection.visibleText.indexOf(blockText, cursor)
+    if (matchIndex === -1) {
+      if (!firstFailedBlockId) {
+        firstFailedBlockId = blockId
+        firstFailedBlockText = blockText
+      }
+      if (targetSet.has(blockId)) {
+        break
+      }
+      continue
+    }
+
+    alignments.set(blockId, {
+      blockId,
+      text: blockText,
+      visibleStart: matchIndex,
+      visibleEnd: matchIndex + blockText.length,
+    })
+    cursor = matchIndex + blockText.length
+
+    const foundAllTargets = Array.from(targetSet).every(targetId => alignments.has(targetId))
+    if (foundAllTargets) {
+      break
+    }
+  }
+
+  return {
+    alignments,
+    failedBlockId: firstFailedBlockId,
+    failedBlockText: firstFailedBlockText,
+  }
+}
+
+const resolveSelectionFromBlocks = (
+  editorElement: HTMLElement,
+  projection: VisibleProjectionResult,
+  snapshot: SelectionSnapshot,
+  rawContent: string
+): ResolvedSelection | null => {
+  const targetBlockIds = [snapshot.startBlockId, snapshot.endBlockId].filter(
+    (blockId): blockId is string => !!blockId
+  )
+
+  if (targetBlockIds.length === 0) {
+    return null
+  }
+
+  const { alignments, failedBlockId, failedBlockText } = alignTargetBlocks(
+    editorElement,
+    projection,
+    targetBlockIds
+  )
+  const startAlignment = snapshot.startBlockId ? alignments.get(snapshot.startBlockId) : undefined
+  const endAlignment = snapshot.endBlockId ? alignments.get(snapshot.endBlockId) : undefined
+
+  if (!startAlignment || !endAlignment) {
+    console.warn('[BlockNoteEditor] block 对齐未命中，继续尝试后续映射策略', {
+      startBlockId: snapshot.startBlockId,
+      endBlockId: snapshot.endBlockId,
+      failedBlockId,
+      failedBlockText: getTextPreview(failedBlockText || ''),
+    })
+    return null
+  }
+
+  const startLocalOffset = Math.max(0, Math.min(snapshot.startOffsetInStartBlock, startAlignment.text.length))
+  const endLocalOffset = Math.max(0, Math.min(snapshot.endOffsetInEndBlock, endAlignment.text.length))
+  const globalVisibleStart = startAlignment.visibleStart + startLocalOffset
+  const globalVisibleEnd = endAlignment.visibleStart + endLocalOffset
+
+  if (
+    globalVisibleStart < 0 ||
+    globalVisibleEnd <= globalVisibleStart ||
+    globalVisibleEnd > projection.visibleToOriginalMap.length
+  ) {
+    console.warn('[BlockNoteEditor] 基于 block 对齐后的 visible offset 非法', {
+      startBlockId: snapshot.startBlockId,
+      endBlockId: snapshot.endBlockId,
+      globalVisibleStart,
+      globalVisibleEnd,
+    })
+    return null
+  }
+
+  const originalStart = projection.visibleToOriginalMap[globalVisibleStart]
+  const originalEnd = projection.visibleToOriginalMap[globalVisibleEnd - 1] + 1
+  const originalText = rawContent.slice(originalStart, originalEnd)
+  const actualVisibleText = normalizeText(projectRawTextToVisible(originalText)).trim()
+  const expectedVisibleText = normalizeText(snapshot.text)
+
+  if (actualVisibleText !== expectedVisibleText) {
+    console.warn('[BlockNoteEditor] block 对齐后文本校验失败', {
+      expectedVisibleText: getTextPreview(expectedVisibleText),
+      actualVisibleText: getTextPreview(actualVisibleText),
+      expectedLength: expectedVisibleText.length,
+      actualLength: actualVisibleText.length,
+      startBlockId: snapshot.startBlockId,
+      endBlockId: snapshot.endBlockId,
+      globalVisibleStart,
+      globalVisibleEnd,
+    })
+    return null
+  }
+
+  return {
+    originalStart,
+    originalEnd,
+    originalText,
+  }
+}
+
+const resolveSelectionByUniqueVisibleText = (
+  projection: VisibleProjectionResult,
+  snapshot: SelectionSnapshot,
+  rawContent: string
+): ResolvedSelection | null => {
+  const occurrences = findAllOccurrencesUtf16(projection.visibleText, snapshot.text, false).map(o => o.startUtf16)
+  if (occurrences.length !== 1) {
+    return null
+  }
+
+  const visibleStart = occurrences[0]
+  const visibleEnd = visibleStart + snapshot.text.length
+  const originalStart = projection.visibleToOriginalMap[visibleStart]
+  const originalEnd = projection.visibleToOriginalMap[visibleEnd - 1] + 1
+  const originalText = rawContent.slice(originalStart, originalEnd)
+  const actualVisibleText = normalizeText(projectRawTextToVisible(originalText)).trim()
+  const expectedVisibleText = normalizeText(snapshot.text)
+
+  if (actualVisibleText !== expectedVisibleText) {
+    return null
+  }
+
+  return {
+    originalStart,
+    originalEnd,
+    originalText,
+  }
+}
+
+const resolveSelectionByNormalizedVisibleText = (
+  projection: VisibleProjectionResult,
+  snapshot: SelectionSnapshot,
+  rawContent: string
+): ResolvedSelection | null => {
+  const normalizedProjection = buildWhitespaceNormalizedProjection(projection)
+  const normalizedSelectionText = normalizeSearchText(snapshot.text)
+
+  if (!normalizedSelectionText) {
+    return null
+  }
+
+  const occurrences = findAllOccurrencesUtf16(normalizedProjection.text, normalizedSelectionText, false).map(o => o.startUtf16)
+  if (occurrences.length !== 1) {
+    return null
+  }
+
+  const normalizedStart = occurrences[0]
+  const normalizedEnd = normalizedStart + normalizedSelectionText.length
+  const originalStart = normalizedProjection.normalizedToOriginalMap[normalizedStart]
+  const originalEnd = normalizedProjection.normalizedToOriginalMap[normalizedEnd - 1] + 1
+  const originalText = rawContent.slice(originalStart, originalEnd)
+  const actualVisibleText = normalizeSearchText(projectRawTextToVisible(originalText))
+
+  if (actualVisibleText !== normalizedSelectionText) {
+    console.warn('[BlockNoteEditor] 空白归一化匹配命中后校验失败', {
+      expectedVisibleText: getTextPreview(normalizedSelectionText),
+      actualVisibleText: getTextPreview(actualVisibleText),
+      expectedLength: normalizedSelectionText.length,
+      actualLength: actualVisibleText.length,
+    })
+    return null
+  }
+
+  return {
+    originalStart,
+    originalEnd,
+    originalText,
+  }
+}
+
+const resolveSelectionByLegacyCleanedMatch = (
+  cleanedContent: string,
+  offsetMap: number[],
+  snapshot: SelectionSnapshot,
+  rawContent: string
+): ResolvedSelection | null => {
+  const cleanedStart = cleanedContent.indexOf(snapshot.text)
+  if (cleanedStart === -1) {
+    return null
+  }
+
+  const cleanedEnd = cleanedStart + snapshot.text.length
+  const { originalStart, originalEnd } = mapCleanedOffsetToOriginal(cleanedStart, cleanedEnd, offsetMap)
+  const originalText = rawContent.slice(originalStart, originalEnd)
+
+  return {
+    originalStart,
+    originalEnd,
+    originalText,
+  }
 }
 
 export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
   content,
   rawContent,
   offsetMap = [],
-  blockOffsets = [],
+  blockOffsets: _blockOffsets = [],
   readonly = false,
   onChange: _onChange,
   onSelectionChange,
@@ -74,74 +483,71 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
   conversationId: propConversationId,
   onReportRewrite,
 }) => {
-  const [isInitialized, setIsInitialized] = useState(false)
-
   const storeConversationId = useConversationStore(state => state.currentConversationId)
   const conversationId = propConversationId || storeConversationId
-
-  // 获取剩余改写次数
   const selectedResultMessageId = useConversationStore(state => state.selectedResultMessageId)
   const messagesMap = useConversationStore(state => state.messagesMap)
   const messageItemsMap = useConversationStore(state => state.messageItemsMap)
 
   const remainingRewriteRounds = useMemo(() => {
-    if (!selectedResultMessageId) return undefined
+    if (!selectedResultMessageId) {
+      return undefined
+    }
     const message = messagesMap.get(selectedResultMessageId)
-    if (!message?.messageItemsId) return undefined
+    if (!message?.messageItemsId) {
+      return undefined
+    }
     const messageItems = messageItemsMap.get(message.messageItemsId)
     return messageItems?.remainingRewriteRounds
   }, [selectedResultMessageId, messagesMap, messageItemsMap])
 
   const [showRewritePanel, setShowRewritePanel] = useState(false)
   const [selectedBlock, setSelectedBlock] = useState<AnyBlock | null>(null)
-  const [selectedText, setSelectedText] = useState<string>('')
-
-  // AI 改写状态
   const [rewriteStatus, setRewriteStatus] = useState<RewriteStatus>('idle')
   const [rewriteErrorMessage, setRewriteErrorMessage] = useState<string | undefined>()
+  const [baselineContent, setBaselineContent] = useState(content)
+  const [isRewriting, setIsRewriting] = useState(false)
 
-  /**
-   * 应用块过渡动画
-   */
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const styleElRef = useRef<HTMLStyleElement | null>(null)
+  const baselineContentRef = useRef(content)
+  const rawContentRef = useRef(rawContent || content)
+  const offsetMapRef = useRef<number[]>(offsetMap)
+  const cachedSelectionRef = useRef<SelectionSnapshot | null>(null)
+  const rewriteSelectionRef = useRef<SelectionSnapshot | null>(null)
+  const pendingContentRef = useRef<{ cleaned: string; raw: string; offsetMap: number[] } | null>(null)
+
   const applyBlockTransition = useCallback((blockId: string, phase: AnimationPhase) => {
-    const blockElement = document.querySelector(`[data-id="${blockId}"]`)
-    if (!blockElement) return
+    const blockElement = getBlockElement(blockId)
+    if (!blockElement) {
+      return
+    }
 
     blockElement.classList.remove(...Object.values(PHASE_CLASS_MAP))
     blockElement.classList.add(PHASE_CLASS_MAP[phase])
   }, [])
 
-  const [baselineContent, setBaselineContent] = useState(content)
-  const rawContentRef = useRef(rawContent || content)
-  const offsetMapRef = useRef<number[]>(offsetMap)
-  const blockOffsetsRef = useRef<BlockOffset[]>(blockOffsets)
-
-  // 改写过程中锁定内容，防止父组件更新导致的重新渲染
-  const [isRewriting, setIsRewriting] = useState(false)
-  const pendingContentRef = useRef<{ cleaned: string; raw: string; offsetMap: number[] } | null>(null)
+  useEffect(() => {
+    baselineContentRef.current = baselineContent
+  }, [baselineContent])
 
   useEffect(() => {
     rawContentRef.current = rawContent || content
     offsetMapRef.current = offsetMap
-    blockOffsetsRef.current = blockOffsets
-  }, [rawContent, content, offsetMap, blockOffsets])
+  }, [rawContent, content, offsetMap])
 
-  // 只有在非改写状态下才更新 baselineContent
   useEffect(() => {
     if (isRewriting) {
-      // 改写中，缓存新内容，等改写结束后再应用
       pendingContentRef.current = {
         cleaned: content,
         raw: rawContent || content,
-        offsetMap: offsetMap
+        offsetMap,
       }
       return
     }
 
     setBaselineContent(content)
   }, [content, rawContent, offsetMap, isRewriting])
-
-  const styleElRef = useRef<HTMLStyleElement | null>(null)
 
   useEffect(() => {
     if (selectedBlock?.id) {
@@ -151,12 +557,14 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
         styleEl.id = HIGHLIGHT_STYLE_ID
         document.head.appendChild(styleEl)
       }
+
       styleElRef.current = styleEl
-      styleElRef.current.innerHTML = `[data-node-type="blockOuter"][data-id="${selectedBlock.id}"] { ${HIGHLIGHT_CSS} }`
-    } else {
-      if (styleElRef.current) {
-        styleElRef.current.innerHTML = ''
-      }
+      styleEl.innerHTML = `[data-node-type="blockOuter"][data-id="${selectedBlock.id}"] { ${HIGHLIGHT_CSS} }`
+      return
+    }
+
+    if (styleElRef.current) {
+      styleElRef.current.innerHTML = ''
     }
   }, [selectedBlock?.id])
 
@@ -177,282 +585,280 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
         },
       ],
       codeBlock: {
-        createHighlighter: async () => {
-          return {
-            codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
-          }
-        },
+        createHighlighter: async () => ({
+          codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
+        }),
       },
     })
-    setIsInitialized(true)
+
     return instance
   }, [])
 
   useEffect(() => {
-    if (editor && baselineContent) {
-      try {
-        const blocks = editor.tryParseMarkdownToBlocks(baselineContent)
-        if (blocks && blocks.length > 0) {
-          editor.replaceBlocks(editor.document, blocks)
-        }
-      } catch (err) {
-        console.warn('[BlockNoteEditor] Failed to parse markdown:', err)
+    if (!editor || !baselineContent) {
+      return
+    }
+
+    try {
+      const blocks = editor.tryParseHTMLToBlocks(renderMarkdownToHTML(baselineContent))
+      if (blocks && blocks.length > 0) {
+        editor.replaceBlocks(editor.document, blocks)
       }
+    } catch (error) {
+      console.warn('[BlockNoteEditor] Failed to parse markdown:', error)
     }
   }, [editor, baselineContent])
 
-  useEffect(() => {
-    if (!onSelectionChange) return
+  const captureCurrentSelection = useCallback(() => {
+    const editorElement = getEditorElement(wrapperRef.current)
+    const selection = window.getSelection()
 
-    const handleMouseUp = () => {
-      setTimeout(() => {
-        const selection = window.getSelection()
-        if (selection && !selection.isCollapsed) {
-          const text = selection.toString().trim()
-          if (text) {
-            const range = selection.getRangeAt(0)
-            onSelectionChange(text, range)
-          }
-        }
-      }, 10)
+    if (!editorElement || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      return null
     }
 
-    document.addEventListener('mouseup', handleMouseUp)
-    return () => document.removeEventListener('mouseup', handleMouseUp)
+    const range = selection.getRangeAt(0)
+    if (!editorElement.contains(range.commonAncestorContainer)) {
+      return null
+    }
+
+    const snapshot = createSelectionSnapshotFromRange(range)
+    if (!snapshot) {
+      return null
+    }
+
+    cachedSelectionRef.current = snapshot
+    onSelectionChange?.(snapshot.text, snapshot.range)
+    return snapshot
   }, [onSelectionChange])
 
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      captureCurrentSelection()
+    }
+
+    document.addEventListener('mouseup', handleSelectionChange)
+    document.addEventListener('keyup', handleSelectionChange)
+
+    return () => {
+      document.removeEventListener('mouseup', handleSelectionChange)
+      document.removeEventListener('keyup', handleSelectionChange)
+    }
+  }, [captureCurrentSelection])
+
   const handleOpenRewritePanel = useCallback((block: AnyBlock) => {
-    /**
-     * 获取选中文本（带 Markdown 格式）
-     *
-     * 问题：window.getSelection().toString() 返回纯文本，不包含 Markdown 语法
-     * 例如：选中加粗的 "18.79万辆" 时，返回 "18.79万辆" 而不是 "**18.79万辆**"
-     *
-     * 解决方案：使用 BlockNote API 获取带格式的 Markdown
-     * 1. editor.getSelectionCutBlocks() 获取选中的部分块（支持部分选中）
-     * 2. editor.blocksToMarkdownLossy() 将块转换为 Markdown 格式
-     */
-    const domSelection = window.getSelection()
-    let plainText = domSelection?.toString().trim() || ''
-    let markdownText = plainText
+    const editorElement = getEditorElement(wrapperRef.current)
+    const blockElement = editorElement ? getBlockElement(block.id, editorElement) : null
 
-    // 使用 BlockNote API 获取带格式的选中文本
-    try {
-      const selectionCutBlocks = editor.getSelectionCutBlocks()
-      if (selectionCutBlocks?.blocks?.length > 0 && plainText) {
-        // 将选中的块转换为 Markdown（包含格式语法如 **粗体**）
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        markdownText = editor.blocksToMarkdownLossy(selectionCutBlocks.blocks as any).trim()
-      }
-    } catch (e) {
-      console.warn('[BlockNoteEditor] 获取 BlockNote 选区失败，回退到 DOM 选区:', e)
+    if (!editorElement || !blockElement) {
+      return
     }
 
-    // 如果没有选中文本，使用整个块的内容
-    if (!plainText) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      markdownText = editor.blocksToMarkdownLossy([block] as any).trim()
-      const blockElement = document.querySelector(`[data-id="${block.id}"]`)
-      plainText = blockElement?.textContent?.trim() || ''
+    const currentSelection = captureCurrentSelection()
+    const selectionInCurrentBlock = currentSelection?.range
+      ? currentSelection.range.intersectsNode(blockElement)
+      : false
+    let snapshot = selectionInCurrentBlock && currentSelection
+      ? currentSelection
+      : createSelectionSnapshotFromBlock(blockElement)
+
+    if (!snapshot) {
+      console.warn('[BlockNoteEditor] 未能捕获有效选区，无法打开改写面板', {
+        blockId: block.id,
+      })
+      return
     }
 
-    // 计算偏移量
-    const currentRawContent = rawContentRef.current
-    const currentOffsetMap = offsetMapRef.current
-
-    const cleanedStart = baselineContent.indexOf(markdownText)
-    if (cleanedStart === -1) {
-      console.warn('[BlockNoteEditor] 未找到文本匹配，无法计算偏移量')
-    }
-
+    rewriteSelectionRef.current = snapshot
     setSelectedBlock(block)
-    setSelectedText(markdownText)
     setShowRewritePanel(true)
 
     if (scrollContainerRef?.current) {
-      const blockElement = document.querySelector(`[data-id="${block.id}"]`) as HTMLElement
-      if (blockElement) {
-        const containerRect = scrollContainerRef.current.getBoundingClientRect()
-        const blockRect = blockElement.getBoundingClientRect()
-        const panelHeight = PANEL_TOTAL_HEIGHT
+      const containerRect = scrollContainerRef.current.getBoundingClientRect()
+      const blockRect = blockElement.getBoundingClientRect()
+      const spaceBelow = containerRect.bottom - blockRect.bottom
 
-        const spaceBelow = containerRect.bottom - blockRect.bottom
-
-        if (spaceBelow < panelHeight) {
-          const scrollNeeded = panelHeight - spaceBelow
-          scrollContainerRef.current.scrollTop += scrollNeeded
-        }
+      if (spaceBelow < PANEL_TOTAL_HEIGHT) {
+        scrollContainerRef.current.scrollTop += PANEL_TOTAL_HEIGHT - spaceBelow
       }
     }
-  }, [scrollContainerRef])
+  }, [captureCurrentSelection, scrollContainerRef])
 
   const handleCloseRewritePanel = useCallback(() => {
     setShowRewritePanel(false)
     setSelectedBlock(null)
-    setSelectedText('')
+    rewriteSelectionRef.current = null
   }, [])
 
-  const handleSubmitRewrite = useCallback(async (action: ReportRewriteAction, prompt?: string) => {
-    if (!selectedText) {
-      console.warn('[BlockNoteEditor] 没有选中文本，无法执行改写')
-      return
-    }
-
+  const runRewrite = useCallback(async (
+    action: ReportRewriteAction,
+    prompt: string | undefined,
+    currentBlockId: string | undefined,
+    selection: ResolvedSelection
+  ) => {
     if (!conversationId) {
       console.warn('[BlockNoteEditor] 没有 conversationId，无法执行改写')
+      setRewriteStatus('idle')
+      setIsRewriting(false)
       return
     }
 
-    // 保存当前块 ID 用于动画
+    if (!onReportRewrite) {
+      console.warn('[BlockNoteEditor] onReportRewrite 未提供，无法执行改写')
+      setRewriteStatus('idle')
+      setIsRewriting(false)
+      return
+    }
+
+    const currentRawContent = rawContentRef.current
+    const startCodePoint = utf16IndexToCodePointIndex(currentRawContent, selection.originalStart)
+    const endCodePoint = utf16IndexToCodePointIndex(currentRawContent, selection.originalEnd)
+    let currentContent = currentRawContent
+    let hasAppliedFirstDelta = false
+
+    await onReportRewrite({
+      action,
+      selectedText: selection.originalText,
+      startOffset: startCodePoint,
+      endOffset: endCodePoint,
+      userInstruction: prompt,
+      conversationId,
+      blockId: currentBlockId,
+      onStatusChange: (status) => {
+        setRewriteStatus(status)
+      },
+      onDelta: (delta) => {
+        if (!hasAppliedFirstDelta && currentBlockId) {
+          applyBlockTransition(currentBlockId, 'fadeout')
+          hasAppliedFirstDelta = true
+        }
+
+        const startUtf16 = codePointIndexToUtf16Index(currentContent, delta.original_start_offset)
+        const endUtf16 = codePointIndexToUtf16Index(currentContent, delta.original_end_offset)
+
+        currentContent =
+          currentContent.slice(0, startUtf16) +
+          delta.rewritten_text +
+          currentContent.slice(endUtf16)
+
+        rawContentRef.current = currentContent
+      },
+      onSnapshot: (snapshot) => {
+        currentContent = snapshot.response_content
+        rawContentRef.current = currentContent
+      },
+      onEnd: () => {
+        setIsRewriting(false)
+
+        if (pendingContentRef.current) {
+          rawContentRef.current = pendingContentRef.current.raw
+          offsetMapRef.current = pendingContentRef.current.offsetMap
+          setBaselineContent(pendingContentRef.current.cleaned)
+          pendingContentRef.current = null
+        } else {
+          const { cleaned: newCleaned, offsetMap: newOffsetMap } = preprocessMarkdown(rawContentRef.current)
+          offsetMapRef.current = newOffsetMap
+          setBaselineContent(newCleaned)
+        }
+
+        requestAnimationFrame(() => {
+          if (currentBlockId) {
+            applyBlockTransition(currentBlockId, 'fadein')
+          }
+
+          setTimeout(() => {
+            setRewriteStatus('idle')
+            if (currentBlockId) {
+              applyBlockTransition(currentBlockId, 'success')
+            }
+          }, 400)
+        })
+      },
+      onError: (error) => {
+        console.error('[BlockNoteEditor] 改写错误:', error)
+        setRewriteStatus('error')
+        setRewriteErrorMessage(error)
+        setIsRewriting(false)
+        pendingContentRef.current = null
+
+        if (currentBlockId) {
+          applyBlockTransition(currentBlockId, 'error')
+        }
+      },
+    })
+  }, [applyBlockTransition, conversationId, onReportRewrite])
+
+  const handleSubmitRewrite = useCallback(async (action: ReportRewriteAction, prompt?: string) => {
+    const currentSelection = rewriteSelectionRef.current
     const currentBlockId = selectedBlock?.id
 
-    // 立即关闭面板
-    handleCloseRewritePanel()
+    if (!currentSelection || !currentSelection.text) {
+      console.warn('[BlockNoteEditor] 没有有效选区，无法执行改写')
+      return
+    }
 
-    // 锁定编辑器，防止父组件更新导致的重新渲染
+    handleCloseRewritePanel()
     setIsRewriting(true)
     pendingContentRef.current = null
-
-    // 设置思考状态
     setRewriteStatus('thinking')
     setRewriteErrorMessage(undefined)
 
-    // 应用高亮动画
     if (currentBlockId) {
       applyBlockTransition(currentBlockId, 'highlight')
     }
 
     const currentRawContent = rawContentRef.current
-    const currentOffsetMap = offsetMapRef.current
+    const projection = buildVisibleProjection(baselineContentRef.current, offsetMapRef.current)
+    const editorElement = getEditorElement(wrapperRef.current)
 
-    const cleanedStart = baselineContent.indexOf(selectedText)
-    if (cleanedStart === -1) {
-      console.warn('[BlockNoteEditor] 未找到文本匹配')
+    const resolvedSelection =
+      (editorElement
+        ? resolveSelectionFromBlocks(editorElement, projection, currentSelection, currentRawContent)
+        : null) ??
+      resolveSelectionByNormalizedVisibleText(projection, currentSelection, currentRawContent) ??
+      resolveSelectionByUniqueVisibleText(projection, currentSelection, currentRawContent) ??
+      resolveSelectionByLegacyCleanedMatch(
+        baselineContentRef.current,
+        offsetMapRef.current,
+        currentSelection,
+        currentRawContent
+      )
+
+    if (!resolvedSelection) {
+      console.warn('[BlockNoteEditor] 未找到可靠的选区映射，无法计算偏移量', {
+        selectedTextPreview: getTextPreview(currentSelection.text),
+        startBlockId: currentSelection.startBlockId,
+        endBlockId: currentSelection.endBlockId,
+      })
       setRewriteStatus('error')
-      setRewriteErrorMessage('未找到文本匹配')
+      setRewriteErrorMessage('未找到可靠的选区映射')
       setIsRewriting(false)
       return
     }
-    const cleanedEnd = cleanedStart + selectedText.length
 
-    const { originalStart, originalEnd } = mapCleanedOffsetToOriginal(
-      cleanedStart,
-      cleanedEnd,
-      currentOffsetMap
+    await runRewrite(
+      action,
+      prompt,
+      currentBlockId,
+      resolvedSelection
     )
+  }, [applyBlockTransition, handleCloseRewritePanel, runRewrite, selectedBlock?.id])
 
-    const originalText = currentRawContent.slice(originalStart, originalEnd)
-
-    const startCodePoint = utf16IndexToCodePointIndex(currentRawContent, originalStart)
-    const endCodePoint = utf16IndexToCodePointIndex(currentRawContent, originalEnd)
-
-    if (onReportRewrite) {
-      let currentContent = currentRawContent
-      let hasAppliedFirstDelta = false
-
-      await onReportRewrite({
-        action,
-        selectedText: originalText,
-        startOffset: startCodePoint,
-        endOffset: endCodePoint,
-        userInstruction: prompt,
-        conversationId,
-        blockId: currentBlockId,
-        onStatusChange: (status) => {
-          setRewriteStatus(status)
-        },
-        onDelta: (delta) => {
-          // 第一次收到 delta 时应用淡出动画
-          if (!hasAppliedFirstDelta && currentBlockId) {
-            applyBlockTransition(currentBlockId, 'fadeout')
-            hasAppliedFirstDelta = true
-          }
-
-          const startUtf16 = codePointIndexToUtf16Index(currentContent, delta.original_start_offset)
-          const endUtf16 = codePointIndexToUtf16Index(currentContent, delta.original_end_offset)
-
-          // 更新本地内容
-          currentContent =
-            currentContent.slice(0, startUtf16) +
-            delta.rewritten_text +
-            currentContent.slice(endUtf16)
-
-          // 同步更新 rawContentRef
-          rawContentRef.current = currentContent
-        },
-        onSnapshot: (snapshot) => {
-          currentContent = snapshot.response_content
-          rawContentRef.current = currentContent
-        },
-        onEnd: () => {
-          // 1. 先解除锁定，让 useEffect 可以更新编辑器
-          setIsRewriting(false)
-
-          // 2. 如果有缓存的新内容（来自父组件），优先使用
-          if (pendingContentRef.current) {
-            rawContentRef.current = pendingContentRef.current.raw
-            offsetMapRef.current = pendingContentRef.current.offsetMap
-            setBaselineContent(pendingContentRef.current.cleaned)
-            pendingContentRef.current = null
-          } else {
-            // 3. 否则使用 onSnapshot 更新的 rawContentRef 重新计算 cleaned
-            const { cleaned: newCleaned, offsetMap: newOffsetMap } = preprocessMarkdown(rawContentRef.current)
-            offsetMapRef.current = newOffsetMap
-            setBaselineContent(newCleaned)
-          }
-
-          // 4. 等待 DOM 更新后应用动画
-          requestAnimationFrame(() => {
-            // 先应用淡入动画
-            if (currentBlockId) {
-              applyBlockTransition(currentBlockId, 'fadein')
-            }
-
-            // 延迟后应用成功闪烁动画
-            setTimeout(() => {
-              setRewriteStatus('idle')
-              if (currentBlockId) {
-                applyBlockTransition(currentBlockId, 'success')
-              }
-            }, 400) // fadein 动画持续时间
-          })
-        },
-        onError: (err) => {
-          console.error('[BlockNoteEditor] 改写错误:', err)
-          setRewriteStatus('error')
-          setRewriteErrorMessage(err)
-
-          // 解除锁定
-          setIsRewriting(false)
-          pendingContentRef.current = null
-
-          // 应用错误闪烁动画
-          if (currentBlockId) {
-            applyBlockTransition(currentBlockId, 'error')
-          }
-        },
-      })
-    } else {
-      console.warn('[BlockNoteEditor] onReportRewrite 未提供，无法执行改写')
-      setRewriteStatus('idle')
-      setIsRewriting(false)
-    }
-  }, [selectedBlock, selectedText, baselineContent, onReportRewrite, conversationId, handleCloseRewritePanel, applyBlockTransition, editor])
-
-  if (!isInitialized || !editor) {
+  if (!editor) {
     return (
       <div className={`animate-pulse space-y-3 ${className}`}>
-        <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-        <div className="h-4 bg-gray-200 rounded w-full"></div>
-        <div className="h-4 bg-gray-200 rounded w-11/12"></div>
-        <div className="h-4 bg-gray-200 rounded w-full"></div>
-        <div className="h-4 bg-gray-200 rounded w-4/5"></div>
+        <div className="h-8 w-1/2 rounded bg-gray-200"></div>
+        <div className="h-4 w-full rounded bg-gray-200"></div>
+        <div className="h-4 w-11/12 rounded bg-gray-200"></div>
+        <div className="h-4 w-full rounded bg-gray-200"></div>
+        <div className="h-4 w-4/5 rounded bg-gray-200"></div>
       </div>
     )
   }
 
   return (
     <div
+      ref={wrapperRef}
       className={`blocknote-editor-wrapper ${className}`}
       style={{
         width: '100%',
@@ -463,6 +869,7 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
         editor={editor}
         editable={!readonly}
         theme="light"
+        onSelectionChange={captureCurrentSelection}
         sideMenu={false}
         formattingToolbar={false}
         linkToolbar={false}
@@ -470,12 +877,13 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
       >
         <SideMenuController
           sideMenu={() => (
-            (showRewritePanel || isRewriting) ? null : (
-              <CustomSideMenu onOpenRewritePanel={handleOpenRewritePanel} />
-            )
+            showRewritePanel || isRewriting
+              ? null
+              : <CustomSideMenu onOpenRewritePanel={handleOpenRewritePanel} />
           )}
         />
       </BlockNoteView>
+
       {showRewritePanel && selectedBlock && (
         <AIRewritePanel
           block={selectedBlock}
@@ -486,7 +894,6 @@ export const BlockNoteEditor: React.FC<BlockNoteEditorProps> = ({
         />
       )}
 
-      {/* AI 改写状态指示器 */}
       <AIRewriteStatusIndicator
         status={rewriteStatus}
         visible={rewriteStatus !== 'idle'}

@@ -42,7 +42,7 @@ export function applyDeltaByCodePoints(
   return base.slice(0, startUtf16) + rewrittenText + base.slice(endUtf16)
 }
 
-export function findAllOccurrencesUtf16(base: string, needle: string): Occurrence[] {
+export function findAllOccurrencesUtf16(base: string, needle: string, allowOverlap = true): Occurrence[] {
   if (!needle) {
     return []
   }
@@ -61,7 +61,7 @@ export function findAllOccurrencesUtf16(base: string, needle: string): Occurrenc
       endUtf16: foundIndex + needle.length,
     })
 
-    searchPos = foundIndex + 1
+    searchPos = allowOverlap ? foundIndex + 1 : foundIndex + needle.length
   }
 
   return occurrences
