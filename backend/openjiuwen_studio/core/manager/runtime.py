@@ -328,12 +328,15 @@ async def delete_deploy_agent(
         space_id,
         client: RuntimeAgentClient = None,
 ) -> dict:
-    # 调用runtime接口执行删除
     if client is None:
         client = get_agent_client()
+
+    await client.runtime_health_check()
+
+    # 调用runtime接口执行删除
     delete_result = await client.delete_deploy_agent(deployment_id, user_id, space_id)
     if delete_result.status_code == 202:
-        _ = await unregister_deploy_info(deployment_id, space_id)
+        _ = await unregister_deploy_info(space_id=space_id, deployment_id=deployment_id)
         logger.info(f"Delete deploy detail for runtime server not found: deployment_id={deployment_id}")
     elif delete_result.status_code != status.HTTP_200_OK:
         logger.error(f"Failed to delete runtime info: {delete_result.content}")
@@ -342,24 +345,32 @@ async def delete_deploy_agent(
 
 
 async def unregister_deploy_info(
-        deployment_id,
-        space_id
+        space_id,
+        deployment_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
 ) -> int:
-    # 更新到deployment表里
+    # 根据 space_id + deployment_id 或 space_id + agent_id 逻辑删除 deployment 记录
+    if not deployment_id and not agent_id:
+        logger.warning("unregister_deploy_info missing identifier: deployment_id/agent_id")
+        return status.HTTP_400_BAD_REQUEST
+
     with get_db_jw() as db:
         runtime_db = JiuwenBaseRepository(db, RuntimeInfoDB)
 
-        # 使用 deployment_id 删除记录
-        delete_find_id = {
-            "deployment_id": deployment_id,
-            "space_id": space_id
-        }
+        find_id = {"space_id": space_id, "is_delete": False}
+        if deployment_id:
+            find_id["deployment_id"] = deployment_id
+        else:
+            find_id["source_id"] = agent_id
 
         # 先查询是否存在
-        deploy_info = runtime_db.get_dl_in_sql(find_id=delete_find_id, return_first_item=True)
+        deploy_info = runtime_db.get_dl_in_sql(find_id=find_id, return_first_item=True)
 
         if deploy_info.code != status.HTTP_200_OK or not deploy_info.data:
-            logger.warning(f"Deployment info not found for deployment_id={deployment_id}")
+            logger.warning(
+                f"Deployment info not found for space_id={space_id}, "
+                f"deployment_id={deployment_id}, agent_id={agent_id}"
+            )
             return status.HTTP_404_NOT_FOUND
 
         # 执行逻辑删除：更新 is_delete 字段为 True
@@ -370,14 +381,17 @@ async def unregister_deploy_info(
         }
 
         update_result = runtime_db.update_dl_in_sql(
-            find_id=delete_find_id,
+            find_id=find_id,
             update_dl=update_data
         )
 
         if update_result.code != status.HTTP_200_OK:
             logger.warning(f"Failed to delete deployment info from database: {update_result.message}")
         else:
-            logger.info(f"Deployment info deleted from database: deployment_id={deployment_id}")
+            logger.info(
+                f"Deployment info deleted from database: space_id={space_id}, "
+                f"deployment_id={deployment_id}, agent_id={agent_id}"
+            )
     return update_result.code
 
 
@@ -422,7 +436,7 @@ async def get_deploy_details(
                     elif not deploy_status:
                         deploy_details.append(deploy_detail)
                 elif deploy_detail.status_code == 202:
-                    _ = await unregister_deploy_info(deployment_id, space_id)
+                    _ = await unregister_deploy_info(space_id=space_id, deployment_id=deployment_id)
                     deploy_info['status_code'] = '202'
                     deploy_info['message'] = f"Not found {agent_id} in runtime server"
                     deploy_info['status'] = 'stoped'
@@ -437,11 +451,11 @@ async def get_deploy_details(
                 deploy_info['status_code'] = '404'
                 deploy_info['message'] = f"{agent_id} have no deployment_id"
                 deploy_details.append(deploy_info)
-        # 筛选出 updated_at 最晚的那条数据
+        # 筛选出 create_at 最晚的那条数据
         if deploy_details:
             latest_detail = max(
                 deploy_details,
-                key=lambda x: x.get('updated_at', '') or x.get('update_at', '') or ''
+                key=lambda x: x.get('create_at', '') or ''
             )
             deploy_details = [latest_detail]
         return {"deploy_details": deploy_details}
@@ -573,7 +587,7 @@ async def get_agent_deploy_detail(
             logger.info(f"Get deploy detail successfully: deployment_id={deployment_id}")
             return deploy_detail
         elif deploy_detail.status_code == 202:
-            _ = await unregister_deploy_info(deployment_id, space_id)
+            _ = await unregister_deploy_info(space_id=space_id, deployment_id=deployment_id)
             logger.info(f"Delete deploy detail for runtime server not found: deployment_id={deployment_id}")
     else:
         return {}

@@ -188,3 +188,10 @@ class DeepSearchClientError(Exception):
 
         events = [event_start, event_message, event_done, error_event, summary_event]
         return [f"data: {json.dumps(e, ensure_ascii=False)}\n\n" for e in events]
+
+
+class RuntimeClientError(BaseError):
+    """Generic runtime client exception."""
+
+    def __init__(self, code: int = None, message: str = None, **kwargs):
+        super().__init__(code=code, message=message, **kwargs)

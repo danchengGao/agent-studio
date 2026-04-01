@@ -7,7 +7,7 @@ import httpx
 from httpx._models import Response
 from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.core.common.status_code import StatusCode
-from openjiuwen_studio.core.common.exceptions import DeepSearchClientError
+from openjiuwen_studio.core.common.exceptions import DeepSearchClientError, RuntimeClientError
 
 logger = logging.getLogger(__name__)
 
@@ -362,9 +362,9 @@ class LazyRuntimeHttpClient:
             self._client = None
             self._initialized = False
             logger.error(f"Failed to initialize Runtime HTTP client: {e}")
-            raise DeepSearchClientError(
-                error_code=StatusCode.RUNTIME_THIRDPARTY_CLIENT_ERROR.code,
-                message=StatusCode.RUNTIME_THIRDPARTY_CLIENT_ERROR.errmsg.format(msg=str(e))
+            raise RuntimeClientError(
+                code=StatusCode.AGENT_RUNTIME_CLIENT_ERROR.code,
+                message=StatusCode.AGENT_RUNTIME_CLIENT_ERROR.errmsg
             ) from e
 
 
@@ -451,6 +451,27 @@ class RuntimeAgentClient:
 
     def __init__(self):
         self._http = LazyRuntimeHttpClient()
+
+
+    async def runtime_health_check(self) -> Dict[str, Any]:
+        """检查 runtime 服务健康状态"""
+        try:
+            resp = await self._http.request("GET", "/health")
+            data = resp.json()
+            if data.get("status") != "healthy":
+                logger.error(f"[RUNTIME_HEALTH_CHECK] Runtime health status is not healthy: {data}")
+                raise RuntimeClientError(
+                    code=StatusCode.AGENT_RUNTIME_CLIENT_ERROR.code,
+                    message=StatusCode.AGENT_RUNTIME_CLIENT_ERROR.errmsg
+                )
+            return data
+        except Exception as e:
+            logger.error(f"[RUNTIME_HEALTH_CHECK] Unexpected error: {e}")
+
+            raise RuntimeClientError(
+                code=StatusCode.AGENT_RUNTIME_CLIENT_ERROR.code,
+                message=StatusCode.AGENT_RUNTIME_CLIENT_ERROR.errmsg
+            ) from e
 
 
     async def deploy_agent(

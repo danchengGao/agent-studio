@@ -52,6 +52,10 @@ class StatusCode(Enum):
     AGENT_IMPORT_AGENT_CREATE_ERROR = (BASE_CODE + 1039, 
                                           "创建智能体失败: {msg}", 
                                           "failed to create agent from import data: {msg}")
+    
+    # Agent publish 1050~1100
+    AGENT_RUNTIME_CLIENT_ERROR = (BASE_CODE + 1050, "与RunTime服务端连接失败",
+                                    "Failed to connect RunTime server")
 
     # Workflow模块 2001~2999
     WORKFLOW_DL_FETCH_FAILED = (BASE_CODE + 2001, "获取工作流描述语言失败: {msg}",
@@ -212,8 +216,7 @@ class StatusCode(Enum):
     # 任务空间模块 5001~5999
     TASK_SPACE_THIRDPARTY_CLIENT_ERROR = (BASE_CODE + 5001, "与DeepSearch服务端连接失败: {msg}",
                                     "Failed to initialize DeepSearch HTTP client: {msg}")
-    RUNTIME_THIRDPARTY_CLIENT_ERROR = (BASE_CODE + 5002, "与RunTime服务端连接失败: {msg}",
-                                    "Failed to initialize RunTime HTTP client: {msg}")
+
 
     @property
     def code(self):

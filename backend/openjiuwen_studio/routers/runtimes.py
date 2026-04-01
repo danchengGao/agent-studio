@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from fastapi.responses import StreamingResponse
 from openjiuwen.core.common.logging import logger
 
+from openjiuwen_studio.core.common.exceptions import RuntimeClientError
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.routers.common import handle_response, validate_request
@@ -50,6 +51,7 @@ async def deploy(
         space_id = request.space_id
 
         _ = check_user_space(space_id, current_user)
+        await rtm.get_agent_client().runtime_health_check()
         # 接前端入参，导出agent ir
         ir_file = await rtm.get_agent_ir(agent_id, agent_version, space_id, current_user)
         model_info = await rtm.get_model_info(agent_id, agent_version, space_id, current_user)
@@ -81,6 +83,12 @@ async def deploy(
             },
         )
         return handle_response(res)
+    except RuntimeClientError as e:
+        logger.error(f"RuntimeClientError: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        ) from e
     except Exception as e:
         logger.error(f"Failed to deploy agent: {e}")
         raise HTTPException(
@@ -106,14 +114,22 @@ async def remove(
             user_id = data.get("user_id_str", "")
             _ = await rtm.delete_deploy_agent(deploy_info.get("deployment_id", ""), user_id, space_id)
 
-            # 更新到deployment表里
-            _ = await rtm.unregister_deploy_info(deploy_info.get("deployment_id", ""), space_id)
+        _ = await rtm.unregister_deploy_info(
+            space_id=space_id,
+            agent_id=agent_id
+        )
 
         res = ResponseModel(
             code=status.HTTP_200_OK,
             message="Delete deployment successful"
         )
         return handle_response(res)
+    except RuntimeClientError as e:
+        logger.error(f"Failed to delete deploy agent: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        ) from e
     except Exception as e:
         logger.error(f"Failed to delete deploy agent: {e}")
         raise HTTPException(
