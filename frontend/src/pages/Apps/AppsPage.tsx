@@ -839,6 +839,7 @@ const AppsPage: React.FC = () => {
           // 报告局部改写配置
           user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
           user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+          execution_method: config.execution_method ?? DEFAULT_DEEPSEARCH_CONFIG.execution_method,
         }),
       })
 
@@ -1534,7 +1535,7 @@ const AppsPage: React.FC = () => {
             useConversationStore.getState().setSessionConversationId(null)
           }
         }
-      } 
+      }
 
       // ===== 计算 DeepSearch 运行 Session ID =====
       // 因为已经添加了用户消息，所以用户消息数量就是应该用的 sessionId
@@ -1599,7 +1600,7 @@ const AppsPage: React.FC = () => {
         local_search_config,  // 新增：可能是undefined
         template_id: config.selectedTemplateId ?? -1,
         interrupt_feedback: interrupt_feedback,   // 中断反馈标识, 可填值: ['accepted', ''], 默认''
-        execution_method: config.execution_method || DeepsearchExecutionMethod.DEPENDENCY_DRIVING,
+        execution_method: config.execution_method ?? DEFAULT_DEEPSEARCH_CONFIG.execution_method,
         // 高级配置模型 ID（可选，仅在有值时传递）
         ...(config.planUnderstandingModelId && { plan_understanding_model_id: parseInt(config.planUnderstandingModelId) }),
         ...(config.infoCollectingModelId && { info_collecting_model_id: parseInt(config.infoCollectingModelId) }),
