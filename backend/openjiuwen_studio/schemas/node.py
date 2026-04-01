@@ -280,6 +280,9 @@ class NodeData(BaseModel):
     exception_config: Optional[ExceptionConfig] = Field(None, alias="exceptionConfig")
     assign: Optional[List[VariableAssign]] = Field([], alias="assign")
 
+    class Config:
+        extra = "allow"
+
 
 class Edge(BaseModel):
     source_node_id: str = Field(..., alias="sourceNodeID")
