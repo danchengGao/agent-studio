@@ -121,8 +121,20 @@ class ReactAgentCompCompiler(BaseCompCompiler):
             return []
 
         compiled_tools = []
+        seen_tool_names = set()  # Track tool names to avoid duplicates
+        seen_plugin_ids = set()  # Track plugin IDs to avoid duplicates
+
         for plugin_schema in self.config.selected_plugins:
             try:
+                # Create a unique key for this plugin
+                plugin_key = f"{plugin_schema.plugin_id}:{plugin_schema.id}:{plugin_schema.version}"
+
+                # Skip if this plugin has already been processed
+                if plugin_key in seen_plugin_ids:
+                    logger.warning(f"Skipping duplicate plugin in selected_plugins: {plugin_key}")
+                    continue
+                seen_plugin_ids.add(plugin_key)
+
                 logger.debug(
                     f"Attempting to compile plugin: id={plugin_schema.id}, "
                     f"plugin_id={plugin_schema.plugin_id}, version={plugin_schema.version}"
@@ -135,8 +147,16 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                     version=plugin_schema.version,
                     current_user=self.current_user
                 )
-                compiled_tools.append(compiled_tool)
+
                 tool_name = compiled_tool.card.name if hasattr(compiled_tool, 'card') else 'unknown'
+
+                # Skip if a tool with this name has already been compiled
+                if tool_name in seen_tool_names:
+                    logger.warning(f"Skipping tool with duplicate name: {tool_name}")
+                    continue
+                seen_tool_names.add(tool_name)
+
+                compiled_tools.append(compiled_tool)
                 logger.debug(f"Compiled tool: {tool_name}")
             except Exception as e:
                 logger.error(f"Failed to compile plugin tool {plugin_schema.id}: {e}", exc_info=True)
@@ -197,8 +217,19 @@ class ReactAgentCompCompiler(BaseCompCompiler):
             return []
 
         registered_workflow_ids = []
+        seen_workflow_keys = set()  # Track workflow keys to avoid duplicates
+
         for workflow_schema in self.config.selected_workflows:
             try:
+                # Create a unique key for this workflow
+                workflow_key = f"{workflow_schema.id}:{workflow_schema.version}"
+
+                # Skip if this workflow has already been processed
+                if workflow_key in seen_workflow_keys:
+                    logger.warning(f"Skipping duplicate workflow in selected_workflows: {workflow_key}")
+                    continue
+                seen_workflow_keys.add(workflow_key)
+
                 # Get the compiled workflow
                 workflow = await self.workflow_mgr.get_compiled_workflow(
                     id=workflow_schema.id,
@@ -208,9 +239,17 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                 )
 
                 # Register with Runner.resource_mgr
-                Runner.resource_mgr.add_workflow(workflow)
+                try:
+                    Runner.resource_mgr.add_workflow(workflow)
+                    logger.debug(f"Registered workflow: {workflow_schema.id}")
+                except Exception as e:
+                    # Workflow might already exist in resource_mgr, log warning but continue
+                    logger.warning(
+                        f"Workflow may already exist in Runner.resource_mgr: {workflow_schema.id}, "
+                        f"error: {e}"
+                    )
+
                 registered_workflow_ids.append(workflow_schema.id)
-                logger.debug(f"Registered workflow: {workflow_schema.id}")
             except Exception as e:
                 logger.error(f"Failed to register workflow {workflow_schema.id}: {e}")
 
@@ -245,20 +284,17 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                 )
 
         # Compile plugin tools
+        # Note: Workflows are registered in agent.py's compile() method via invokable_agent.add_workflows()
+        # to avoid duplicate registration. We only compile plugin tools here.
         compiled_tools = await self._compile_plugin_tools()
-        registered_workflow_ids = await self._register_workflows()
 
         # Log compiled tools
-        workflow_count_log = len(registered_workflow_ids) if registered_workflow_ids else 0
         logger.debug(
-            f"ReAct Agent Component: compiled {len(compiled_tools)} tools, "
-            f"registered {workflow_count_log} workflows"
+            f"ReAct Agent Component: compiled {len(compiled_tools)} tools"
         )
         if compiled_tools:
             tool_names = [t.card.name for t in compiled_tools]
             logger.debug(f"  Tool names: {tool_names}")
-        if registered_workflow_ids:
-            logger.debug(f"  Registered workflow IDs: {registered_workflow_ids}")
 
         # Parse model configuration
         model_request_config, model_client_config, model_id = parse_model_config(self.config_dict)

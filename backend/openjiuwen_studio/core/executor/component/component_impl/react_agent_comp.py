@@ -48,16 +48,16 @@ class ReActAgentCompWithTools(ComponentComposable):
 class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
     """
     ReAct Agent executable with plugin tool support.
-
+    
     This extends the base ReActAgentCompExecutable to add plugin tools to the
     ability_manager so they are available to the ReAct agent.
     """
-
+    
     def __init__(self, config: ReActAgentCompConfig, tools: List[Tool] = None):
         # Create the ReAct agent
         self._config = config
         self._tools = tools or []
-
+        
         # Create a ReActAgent instance
         from openjiuwen.core.single_agent.agents.react_agent import ReActAgent
         self._react_agent = ReActAgent(
@@ -67,24 +67,39 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                 description="ReAct agent for workflow execution with plugin tools"
             )
         )
-
+        
         # Configure the agent
         self._react_agent.configure(config)
-
+        
         # Add tools to both ability_manager AND Runner.resource_mgr
         if self._tools:
             logger.warning(f"Adding {len(self._tools)} tools to ReAct agent")
+            # Track added tool names to avoid duplicates within this batch
+            added_tool_names = set()
             for tool in self._tools:
                 try:
-                    # 1. Add tool card to ability_manager's _tools dictionary
-                    self._react_agent._ability_manager._tools[tool.card.name] = tool.card
-                    logger.warning(f"Added tool card to ability_manager: {tool.card.name}")
+                    tool_name = tool.card.name
 
-                    # 2. Register tool instance with Runner.resource_mgr
-                    # This is needed for tool execution
-                    from openjiuwen.core.runner import Runner
-                    Runner.resource_mgr.add_tool(tool)
-                    logger.warning(f"Registered tool instance with Runner.resource_mgr: {tool.card.name}")
+                    # Skip if already added in this batch
+                    if tool_name in added_tool_names:
+                        logger.warning(f"Skipping duplicate tool in batch: {tool_name}")
+                        continue
+
+                    # Add tool card to ability_manager using the proper add() method
+                    # This will check for duplicates and skip if already exists
+                    # Note: Runner.resource_mgr.add_tool() is called in agent.py's add_tools() method,
+                    # so we don't need to call it here to avoid duplicate registration
+                    from openjiuwen.core.foundation.tool import ToolCard
+                    result = self._react_agent._ability_manager.add(tool.card)
+                    if hasattr(result, 'added') and not result.added:
+                        logger.warning(
+                            f"Tool already exists in ability_manager: {tool_name}, "
+                            f"reason: {getattr(result, 'reason', 'unknown')}"
+                        )
+                    else:
+                        logger.warning(f"Added tool card to ability_manager: {tool_name}")
+
+                    added_tool_names.add(tool_name)
                 except Exception as e:
                     logger.error(f"Failed to add tool {tool.card.name}: {e}")
 
@@ -92,13 +107,13 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
     def _map_inputs_to_query(inputs):
         """
         Map inputs to 'query' key expected by the underlying ReActAgent.
-        
+
         The underlying ReActAgent expects a 'query' key in inputs. This method
         maps the first input value to 'query' if it doesn't already exist.
-        
+
         Args:
             inputs: Input dictionary or other type
-            
+
         Returns:
             Mapped inputs with 'query' key if inputs is a dict
         """
@@ -108,7 +123,7 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
         elif isinstance(inputs, dict) and len(inputs) == 0:
             return {'query': ''}
         return inputs
-    
+
     async def invoke(self, inputs, session, context):
         """Execute ReAct loop with the configured agent."""
         try:

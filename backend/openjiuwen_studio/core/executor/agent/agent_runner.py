@@ -284,8 +284,15 @@ class AgentRunner:
             self._agent_instances[user_id][agent_key] = ("", None)
 
         # 检查缓存
-        (cache_config, catch_instance) = self._agent_instances[user_id][agent_key]
-        if cache_config == agent_config:
+        # 使用 JSON 序列化来比较配置，避免 Pydantic 模型对象比较问题
+        (cache_config_json, catch_instance) = self._agent_instances[user_id][agent_key]
+        try:
+            current_config_json = agent_config.model_dump_json() if hasattr(agent_config, 'model_dump_json') else ""
+        except Exception as e:
+            logger.warning(f"Failed to serialize agent_config for cache comparison: {e}")
+            current_config_json = ""
+        
+        if cache_config_json == current_config_json and catch_instance is not None:
             # 配置未变更，直接返回缓存实例
             return catch_instance
 
@@ -310,8 +317,8 @@ class AgentRunner:
         if catch_instance:
             invokable_agent._context_engine._context_pool = catch_instance._context_engine._context_pool
 
-        # 更新缓存
-        self._agent_instances[user_id][agent_key] = (agent_config, invokable_agent)
+        # 更新缓存（存储 JSON 字符串用于比较）
+        self._agent_instances[user_id][agent_key] = (current_config_json, invokable_agent)
         return invokable_agent
 
     async def reset_agent_instance_cache(
