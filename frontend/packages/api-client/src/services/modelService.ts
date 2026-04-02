@@ -186,8 +186,7 @@ export class ModelService {
     try {
       const apiClient = getApiClient()
       // 构建请求体，包含config_id和space_id
-      const requestBody = { config_id: id, space_id: spaceId }
-      await apiClient.delete(this.basePath, { data: requestBody })
+      await apiClient.delete(this.basePath, { params: { config_id: id, space_id: spaceId } })
     } catch (error) {
       throw this.handleError(error)
     }
