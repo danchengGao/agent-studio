@@ -1,6 +1,6 @@
 {
   "name": "jiuwen-agent-studio",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "description": "Jiuwen Agent Studio - A comprehensive LLM agent development platform",
   "private": true,
   "scripts": {
