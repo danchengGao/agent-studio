@@ -2,7 +2,6 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import os
-import re
 import sys
 from typing import List, Dict, Any
 
@@ -21,32 +20,6 @@ TYPE = "type"
 OBJECT = "object"
 REQUIRED = "required"
 PROPERTIES = "properties"
-
-
-# OpenAPI工具函数名称验证正则表达式
-_FUNCTION_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
-
-
-def sanitize_tool_name(name: str) -> str:
-    """
-    清理工具名称，确保符合OpenAPI API的命名规范 ^[a-zA-Z0-9_-]+$
-    """
-    if not name:
-        return "unnamed_tool"
-
-    if _FUNCTION_NAME_PATTERN.match(name):
-        return name
-
-    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
-
-    if sanitized and sanitized[0].isdigit():
-        sanitized = 'tool_' + sanitized
-    if not sanitized:
-        sanitized = "unnamed_tool"
-    if len(sanitized) > 64:
-        sanitized = sanitized[:64]
-
-    return sanitized
 
 
 def convert_params_to_json_schema(params: List[Param]) -> Dict[str, Any]:
@@ -115,9 +88,7 @@ class ServiceTool:
         # The input_params schema includes location="" for path params, which tells RestfulApi
         # to substitute {param} placeholders with values from runtime inputs
 
-        # 验证和清理工具名称
-        raw_tool_name = self.restfulapischema.name or self.restfulapischema.tool_id
-        tool_name = sanitize_tool_name(raw_tool_name)
+        tool_name = self.restfulapischema.name or self.restfulapischema.tool_id
         input_params = convert_params_to_json_schema(self.restfulapischema.params)
         restfulapi_card = RestfulApiCard(name=tool_name,
                                          description=self.restfulapischema.description, input_params=input_params,
@@ -151,8 +122,7 @@ class PluginCodeTool(CodeComponent, Tool):
         self.tool_id: str = card.id
         self.node_id: str = card.id
         # Use the existing name field if available, otherwise fall back to tool_id
-        raw_name = conf.name or card.id
-        self.name: str = sanitize_tool_name(raw_name)
+        self.name: str = conf.name or card.id
         self.params = conf.input_params
         self.description = self.conf.description
 
@@ -163,10 +133,8 @@ class PluginCodeTool(CodeComponent, Tool):
         input_schema = convert_params_to_json_schema(conf.input_params)
 
         # 构建 ToolCard
-        raw_name = conf.name or conf.tool_id
-        sanitized_name = sanitize_tool_name(raw_name)
         card = PluginCodeCard(
-            name=sanitized_name,
+            name=conf.name,
             description=conf.description,
             input_params=input_schema
         )  # 不能配置id,否则会跑到Runner.get_tool
