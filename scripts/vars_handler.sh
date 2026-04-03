@@ -170,11 +170,17 @@ configure_module_env() {
                 RUNTIME_VARS["DEEPSEARCH_AGENT_PORT"]="8000"
                 ;;
             RUNTIME)
-                DEPLOY_VARS["HAS_RUNTIME"]="true"
-                DEPLOY_VARS["IS_UP_RUNTIME"]="true"
+                if [ -n "${RUNTIME_VARS["RUNTIME_HOST"]:-}" ]; then
+                    DEPLOY_VARS["HAS_RUNTIME"]="false"
+                    continue
+                fi
                 if [ -z "${DEPLOY_VARS["IP"]:-}" ]; then
                     error "Please define IP in .env.custom"
                 fi
+                DEPLOY_VARS["HAS_RUNTIME"]="true"
+                DEPLOY_VARS["IS_UP_RUNTIME"]="true"
+                RUNTIME_VARS["RUNTIME_HOST"]=${DEPLOY_VARS["RUNTIME_SERVICE"]}
+                RUNTIME_VARS["RUNTIME_PORT"]="8186"
                 ;;
         esac
     done
