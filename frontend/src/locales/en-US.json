@@ -917,7 +917,7 @@
         "outlineInteractionEnabled": "Enable Outline Interaction",
         "outlineInteractionEnabledDesc": "Allow users to modify during outline phase",
         "executionModeEnabled": "Enable Dependency Mode",
-        "executionModeEnabledDesc": "Choose deepsearch execution mode: Parallel/Dependency-driven",
+        "executionModeEnabledDesc": "Dependency mode can enhance report consistency but may increase generation time, please choose as needed",
         "enableTraceability": "Enable Traceability",
         "enableTraceabilityDesc": "Show information sources",
         "enableSourceTracerInfer": "Enable Traceability Inference",

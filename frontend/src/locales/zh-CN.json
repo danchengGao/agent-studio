@@ -928,7 +928,7 @@
         "outlineInteractionEnabled": "启用大纲交互",
         "outlineInteractionEnabledDesc": "允许用户在大纲阶段进行修改",
         "executionModeEnabled": "启用依赖模式",
-        "executionModeEnabledDesc": "选择deepsearch的运行模式：平行/依赖模式",
+        "executionModeEnabledDesc": "依赖模式可增强报告一致性，但会延长报告生成时间，请按需选择",
         "enableTraceability": "启用溯源",
         "enableTraceabilityDesc": "显示信息来源",
         "enableSourceTracerInfer": "启用溯源推理",
