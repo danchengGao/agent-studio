@@ -112,7 +112,10 @@ async def remove(
         for deploy_info in deploy_infos:
             data = current_user.get("data", {})
             user_id = data.get("user_id_str", "")
-            _ = await rtm.delete_deploy_agent(deploy_info.get("deployment_id", ""), user_id, space_id)
+            deployment_id = (deploy_info or {}).get("deployment_id", "")
+            if not deployment_id:
+                continue
+            _ = await rtm.delete_deploy_agent(deployment_id, user_id, space_id)
 
         _ = await rtm.unregister_deploy_info(
             space_id=space_id,

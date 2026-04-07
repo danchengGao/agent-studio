@@ -4,21 +4,26 @@
  * 父页面只需要提供 endpoint、鉴权 header 和请求体映射。
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActionBarPrimitive,
   AssistantRuntimeProvider,
   ComposerPrimitive,
   ThreadPrimitive,
-  useMessage,
-  useMessageRuntime,
-  useThread,
-  useThreadComposer,
-  useThreadRuntime,
 } from '@assistant-ui/react'
-import { useActionBarCopy } from '@assistant-ui/core/react'
-import { ExportedMessageRepository } from '@assistant-ui/core'
+import { useAui, useAuiState } from '@assistant-ui/store'
+import { useActionBarCopy, useMessageError } from '@assistant-ui/core/react'
+import { ExportedMessageRepository, type ThreadMessageLike } from '@assistant-ui/core'
 import { useAgUiRuntime } from '@assistant-ui/react-ag-ui'
 import { AssistantActionBar, AssistantMessage, BranchPicker, Thread, UserMessage, useThreadConfig } from '@assistant-ui/react-ui'
 import { HttpAgent } from '@ag-ui/client'
@@ -28,7 +33,59 @@ import { copyToClipboard } from '@/utils/prompts/utils'
 import newDialogIcon from '@/assets/icons/runtime-gen-new-dialog.svg'
 import './chat.css'
 
+
+/** react-ag-ui 在 RUN_ERROR 后仍会走 RUN_FINISHED，把消息标成 complete，导致 useMessageError() 为空；在此捕获 RUN_ERROR 供 UI 兜底展示 */
+export type AgUiStreamRunError = { message: string; code?: string }
+
+function wrapAgUiSubscriberCaptureRunError(
+  subscriber: unknown,
+  bridgeRef: {
+    current: {
+    onRunError: (message: string, code?: string) => void
+    onRunStarted: () => void
+    }
+  },
+): unknown {
+  if (subscriber == null || typeof subscriber !== 'object') return subscriber
+  const s = subscriber as { onEvent?: (payload: unknown) => unknown }
+  const origOnEvent = s.onEvent
+  if (typeof origOnEvent !== 'function') return subscriber
+  return {
+    ...s,
+    onEvent: (payload: unknown) => {
+      const ev =
+        payload && typeof payload === 'object' && 'event' in payload
+          ? (payload as { event?: unknown }).event
+          : undefined
+      if (ev && typeof ev === 'object') {
+        const o = ev as Record<string, unknown>
+        if (o.type === 'RUN_ERROR') {
+          const msg = typeof o.message === 'string' ? o.message : String(o.message ?? '')
+          const code = o.code != null ? String(o.code) : undefined
+          bridgeRef.current.onRunError(msg, code)
+        }
+        if (o.type === 'RUN_STARTED') {
+          bridgeRef.current.onRunStarted()
+        }
+      }
+      return origOnEvent.call(s, payload)
+    },
+  }
+}
+
 const NewChatActionContext = createContext<undefined | (() => Promise<boolean | void>)>(undefined)
+
+type AgUiRunErrorContextValue = {
+  latest: AgUiStreamRunError | null
+  pinnedByMessageId: Record<string, string>
+  pinForMessage: (messageId: string, text: string) => void
+}
+
+const AgUiStreamRunErrorContext = createContext<AgUiRunErrorContextValue>({
+  latest: null,
+  pinnedByMessageId: {},
+  pinForMessage: () => {},
+})
 
 function reseedThreadMessagesForReset(messages: readonly any[]): readonly any[] {
   // `thread.reset()` 会把传入的消息“当作新会话初始消息”重新建图。
@@ -87,6 +144,27 @@ function extractMessageText(content: unknown): string {
   return ''
 }
 
+/** 统一错误条文案：有 code 时为「错误 0101：说明」，否则为「错误：说明」 */
+function formatErrorBannerLine(code: string | undefined, message: string): string {
+  const m = (message ?? '').trim()
+  if (!m) return ''
+  const c = code != null ? String(code).trim() : ''
+  if (c) return `error ${c}：${m}`
+  return `error：${m}`
+}
+
+/** AG-UI RUN_ERROR 写入 message.status.error，不一定是 string；统一成可展示文案 */
+function formatAssistantRunError(error: unknown): string {
+  if (error == null) return ''
+  if (typeof error === 'string') return error
+  if (typeof error === 'number' || typeof error === 'boolean') return String(error)
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
 function normalizeAssistantStatusAfterCancel(message: any): any {
   if (message?.role !== 'assistant') return message
 
@@ -118,11 +196,14 @@ function normalizeAssistantStatusAfterCancel(message: any): any {
  * 否则流式更新时父组件反复 render 会导致消息组件被卸载/重挂，产生“内容闪烁”。
  */
 const ExtendedAssistantActionBar = () => {
+  const aui = useAui()
   const { t } = useTranslation()
-  const thread = useThreadRuntime()
-  const composer = useThreadComposer()
-  const message = useMessage()
-  const messageRuntime = useMessageRuntime()
+  const thread = aui.thread()
+  const composer = useAuiState((s) => s.thread.composer)
+  const message = useAuiState((s) => s.message)
+  const messageRuntime = aui.message()
+  const runError = useMessageError()
+  const { pinnedByMessageId } = useContext(AgUiStreamRunErrorContext)
 
   const setSnackbarGlobal = useCallback((snackbar: SnackbarMessage) => {
     // 通过全局事件让外层页面的 <UnifiedSnackbar /> 展示提示
@@ -144,8 +225,26 @@ const ExtendedAssistantActionBar = () => {
     copyToClipboard: (text: string) => copyToClipboard(text, setSnackbarGlobal),
   })
 
+  const runtimeCopyText = (messageRuntime.getCopyText?.() || '').trim()
+  const runErrorBody = runError !== undefined ? formatAssistantRunError(runError) : ''
+  const runErrorText = runErrorBody ? formatErrorBannerLine(undefined, runErrorBody) : ''
+  const pinnedErrorText = pinnedByMessageId[message.id] || ''
+  const fallbackErrorCopyText = pinnedErrorText || runErrorText
+  // useActionBarCopy 的 disabled 在无正文 text part 时为 true（错误气泡不算 parts），不能与错误回退复制一起 AND
+  const canCopy = (Boolean(runtimeCopyText) && !copyDisabled) || Boolean(fallbackErrorCopyText)
+
+  const handleCopy = () => {
+    if (runtimeCopyText) {
+      copyAction?.()
+      return
+    }
+    if (fallbackErrorCopyText) {
+      void copyToClipboard(fallbackErrorCopyText, setSnackbarGlobal)
+    }
+  }
+
   const handleFollowUp = () => {
-    const base = (messageRuntime.unstable_getCopyText?.() || '').trim()
+    const base = (messageRuntime.getCopyText?.() || '').trim()
     const nextText = base
       ? t('runtime.publish.chat.followUpWithReference', { reference: base })
       : t('runtime.publish.chat.followUp')
@@ -183,8 +282,8 @@ const ExtendedAssistantActionBar = () => {
       <button
         type="button"
         className="aui-button aui-button-ghost aui-button-icon"
-        onClick={() => copyAction?.()}
-        disabled={copyDisabled}
+        onClick={handleCopy}
+        disabled={!canCopy}
         title={t('common.buttons.copy')}
       >
         <CopyIcon />
@@ -201,12 +300,29 @@ const ExtendedAssistantActionBar = () => {
 
 const CustomAssistantMessage = () => {
   const { t } = useTranslation()
-  const message = useMessage()
-  if (message.role !== 'assistant') return null
+  const message = useAuiState((s) => s.message)
+  const runError = useMessageError()
+  const { latest: streamRunError, pinnedByMessageId, pinForMessage } = useContext(AgUiStreamRunErrorContext)
+  const isLastAssistantInThread = useAuiState((s) => {
+    const msgs = s.thread.messages
+    const idx = msgs.findIndex((m) => m.id === message.id)
+    if (idx < 0 || msgs[idx]?.role !== 'assistant') return false
+    for (let j = idx + 1; j < msgs.length; j++) {
+      if (msgs[j]?.role === 'assistant') return false
+    }
+    return true
+  })
 
   const dividerLabel = t('runtime.publish.chat.newChatDivider')
-  const messageText = extractMessageText(message.content).trim()
-  const isNewChatDivider = message?.metadata?.agentstudio?.type === 'new_chat_divider' || messageText === dividerLabel
+  const messageText =
+    message.role === 'assistant' ? extractMessageText(message.content).trim() : ''
+  const isNewChatDivider =
+    message.role === 'assistant' &&
+    ((message.metadata as { agentstudio?: { type?: string } } | undefined)?.agentstudio?.type === 'new_chat_divider' ||
+      messageText === dividerLabel)
+
+  if (message.role !== 'assistant') return null
+
   if (isNewChatDivider) {
     const label = messageText || dividerLabel
     return (
@@ -218,10 +334,45 @@ const CustomAssistantMessage = () => {
 
   const threadConfig = useThreadConfig()
   const assistantName = threadConfig.assistantAvatar?.alt ?? ''
+  const runErrorBody = runError !== undefined ? formatAssistantRunError(runError) : ''
+  const runErrorText = runErrorBody ? formatErrorBannerLine(undefined, runErrorBody) : ''
+  const statusType =
+    message.status && typeof message.status === 'object' && 'type' in message.status
+      ? String((message.status as { type?: string }).type ?? '')
+      : ''
+  const showStreamRunErrorFallback =
+    !!streamRunError &&
+    isLastAssistantInThread &&
+    messageText === '' &&
+    (statusType === 'complete' || statusType === 'incomplete' || statusType === 'running')
+  const streamFallbackText =
+    showStreamRunErrorFallback && streamRunError ? formatErrorBannerLine(streamRunError.code, streamRunError.message) : ''
+  const pinnedErrorText = pinnedByMessageId[message.id] || ''
+  const errorBannerText = pinnedErrorText || runErrorText || streamFallbackText
+
+  useEffect(() => {
+    if (!streamFallbackText || !message.id) return
+    if (pinnedByMessageId[message.id]) return
+    pinForMessage(message.id, streamFallbackText)
+  }, [message.id, streamFallbackText, pinnedByMessageId, pinForMessage])
+  const errorOnlyAssistantBubble = Boolean(errorBannerText && !messageText)
   return (
     <AssistantMessage.Root data-assistant-name={assistantName}>
       <AssistantMessage.Avatar />
-      <AssistantMessage.Content data-assistant-name={assistantName} />
+      <div
+        className={
+          errorOnlyAssistantBubble
+            ? 'agentstudio-assistant-message-stack agentstudio-assistant-message-stack--error-only'
+            : 'agentstudio-assistant-message-stack'
+        }
+      >
+        <AssistantMessage.Content data-assistant-name={assistantName} />
+        {errorBannerText ? (
+          <div className="agentstudio-assistant-run-error" role="alert">
+            {errorBannerText}
+          </div>
+        ) : null}
+      </div>
       <BranchPicker />
       <ExtendedAssistantActionBar />
     </AssistantMessage.Root>
@@ -229,7 +380,7 @@ const CustomAssistantMessage = () => {
 }
 
 const CustomUserMessage = () => {
-  const message = useMessage()
+  const message = useAuiState((s) => s.message)
   if (message.role !== 'user') return null
   return (
     <UserMessage.Root>
@@ -247,7 +398,8 @@ const EmptyStateHero = ({
   assistantName?: string
   message: string
 }) => {
-  const hasMessages = useThread((t) => (t.messages?.length ?? 0) > 0)
+  const { t } = useTranslation()
+  const hasMessages = useAuiState((s) => (s.thread.messages?.length ?? 0) > 0)
   if (hasMessages) return null
 
   const iconText = (assistantIcon || '').trim() || '🤖'
@@ -265,9 +417,10 @@ const EmptyStateHero = ({
 }
 
 const CustomComposer = () => {
+  const aui = useAui()
   const { t } = useTranslation()
-  const thread = useThreadRuntime()
-  const allowCancel = useThread((t) => t.capabilities.cancel)
+  const thread = aui.thread()
+  const allowCancel = useAuiState((s) => s.thread.capabilities.cancel)
   const onNewChat = useContext(NewChatActionContext)
 
   const [hasMessages, setHasMessages] = useState(() => (thread.getState()?.messages?.length ?? 0) > 0)
@@ -410,10 +563,28 @@ export function AssistantUiChat({
 }: AssistantUiChatProps) {
   const { t } = useTranslation()
   const agUiConfigRef = useRef(agUi)
+  const [agUiStreamRunError, setAgUiStreamRunError] = useState<AgUiStreamRunError | null>(null)
+  const [agUiPinnedRunErrors, setAgUiPinnedRunErrors] = useState<Record<string, string>>({})
+  const agUiStreamRunErrorBridgeRef = useRef({
+    onRunError: (_message: string, _code?: string) => {},
+    onRunStarted: () => {},
+  })
 
   useEffect(() => {
     agUiConfigRef.current = agUi
   }, [agUi])
+
+  useEffect(() => {
+    agUiStreamRunErrorBridgeRef.current = {
+      onRunError: (message, code) => {
+        setAgUiStreamRunError({ message, code })
+      },
+      onRunStarted: () => {
+        // 新一轮仅清理当前运行态错误，不影响历史消息已固定的错误展示
+        setAgUiStreamRunError(null)
+      },
+    }
+  }, [])
 
   const threadComponents = useMemo(
     () => ({ AssistantMessage: CustomAssistantMessage, UserMessage: CustomUserMessage, Composer: CustomComposer }),
@@ -421,6 +592,7 @@ export function AssistantUiChat({
   )
 
   const agUiAgent = useMemo(() => {
+    const bridgeRef = agUiStreamRunErrorBridgeRef
     class ExecutionHttpAgent extends HttpAgent {
       // react-ag-ui 当前实现会以第三个参数传入 { signal }，
       // 但 @ag-ui/client 的 runAgent 期望的是 parameters.abortController。
@@ -439,7 +611,8 @@ export function AssistantUiChat({
           params.abortController = abortController
         }
 
-        return super.runAgent(params, subscriber)
+        const captured = wrapAgUiSubscriberCaptureRunError(subscriber, bridgeRef)
+        return super.runAgent(params, captured as typeof subscriber)
       }
 
       protected requestInit(input: any): RequestInit {
@@ -477,6 +650,16 @@ export function AssistantUiChat({
 
   return (
     <AssistantRuntimeProvider runtime={agUiRuntime}>
+      <AgUiStreamRunErrorContext.Provider
+        value={{
+          latest: agUiStreamRunError,
+          pinnedByMessageId: agUiPinnedRunErrors,
+          pinForMessage: (messageId, text) => {
+            if (!messageId || !text) return
+            setAgUiPinnedRunErrors((prev) => (prev[messageId] ? prev : { ...prev, [messageId]: text }))
+          },
+        }}
+      >
       <NewChatActionContext.Provider value={onNewChat}>
         <div
           className={`agentstudio-chat ${className}`}
@@ -511,6 +694,7 @@ export function AssistantUiChat({
           </div>
         </div>
       </NewChatActionContext.Provider>
+      </AgUiStreamRunErrorContext.Provider>
     </AssistantRuntimeProvider>
   )
 }
