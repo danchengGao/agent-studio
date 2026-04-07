@@ -17,7 +17,7 @@ from openjiuwen.core.workflow import Session, create_workflow_session
 from openjiuwen.core.session.internal.workflow import WorkflowSession
 from openjiuwen.core.runner import Runner
 from openjiuwen.core.context_engine import ModelContext, ContextEngine, ContextEngineConfig
-
+from openjiuwen.core.context_engine.context.context import SessionModelContext
 import openjiuwen_studio.core.manager.workflow as mgr
 from openjiuwen_studio.core.executor.workflow.context import Context
 from openjiuwen_studio.core.common.status_code import StatusCode
@@ -285,11 +285,22 @@ class WorkflowRunner(IWorkflowLoader):
                 task=task
             )
             workflow_execution_manager.register_execution(registration)
+
+            # 共享 context：两次调用复用同一实例
+            context = SessionModelContext(
+                context_id=f"{id}_{version}",
+                session_id=conversation_id,
+                config=ContextEngineConfig(),
+                history_messages=[],
+                processors=[],
+            )
+
             # 使用 Runner.run_workflow_streaming() 执行工作流
             async for chunk in Runner.run_workflow_streaming(
                     workflow=flow,  # 传入已编译的 Workflow 实例
                     inputs=inputs,
                     session=session,
+                    context=context,
             ):
                 # 检查任务是否被取消
                 if task and task.cancelled():
