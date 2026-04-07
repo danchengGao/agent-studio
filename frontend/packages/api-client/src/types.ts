@@ -2430,6 +2430,24 @@ export interface RuntimeResetConversationResponse {
   }
 }
 
+// Runtime 已部署智能体详情请求类型
+export interface RuntimeAgentDetailRequest {
+  target_url: string
+  space_id: string
+}
+
+// Runtime 已部署智能体详情响应类型（透传 runtime 返回结构）
+export interface RuntimeAgentDetailResponse {
+  code: number
+  message?: string
+  msg?: string
+  data?: {
+    status?: string
+    message?: string
+    data?: Record<string, unknown>
+  } | Record<string, unknown>
+}
+
 // Agent版本列表请求类型
 export interface AgentVersionListRequest {
   agent_id: string

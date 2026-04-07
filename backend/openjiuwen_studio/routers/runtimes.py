@@ -271,3 +271,38 @@ async def proxy_deployed_agent_reset_conversation(
     )
     return handle_response(res)
 
+
+@runtime_router.post("/agent_detail", response_model=ResponseModel[dict])
+async def proxy_deployed_agent_detail(
+    http_request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    将发布页详情查询请求转发到已部署 Runtime 的 /agent_detail，避免浏览器直连 Runtime 触发 CORS。
+    请求体须包含 target_url、space_id。
+    """
+    try:
+        body = await http_request.json()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid JSON body",
+        ) from e
+
+    target_url = body.get("target_url")
+    space_id = body.get("space_id")
+    if not target_url or not space_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="target_url and space_id are required",
+        )
+
+    _ = check_user_space(space_id, current_user)
+    result = await rtm.get_deployed_agent_detail(str(target_url), space_id)
+    res = ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Get agent detail successful",
+        data=result,
+    )
+    return handle_response(res)
+

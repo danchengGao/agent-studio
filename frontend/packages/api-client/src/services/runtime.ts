@@ -1,6 +1,8 @@
 import { getApiClient } from '../utils/apiClientFactory'
 import { API_ENDPOINTS } from '../config'
 import {
+  RuntimeAgentDetailRequest,
+  RuntimeAgentDetailResponse,
   RuntimeDeployRequest,
   RuntimeDeployResponse,
   RuntimeDetailRequest,
@@ -68,6 +70,21 @@ export class RuntimeService {
       return response.data
     } catch (error) {
       console.error('重置会话API调用失败:', error)
+      throw error
+    }
+  }
+
+  // 查询已部署智能体详情
+  static async agentDetail(request: RuntimeAgentDetailRequest): Promise<RuntimeAgentDetailResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<RuntimeAgentDetailResponse>(API_ENDPOINTS.RUNTIME.AGENT_DETAIL, {
+        target_url: request.target_url,
+        space_id: request.space_id,
+      })
+      return response.data
+    } catch (error) {
+      console.error('查询已部署智能体详情API调用失败:', error)
       throw error
     }
   }

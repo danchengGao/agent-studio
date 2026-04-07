@@ -5,6 +5,7 @@ import { ChevronLeft } from 'lucide-react'
 import {
   AgentService,
   AgentDetailResponse,
+  useRuntimeAgentDetail,
   useRuntimeDetail,
   useRemoveRuntime,
   useResetConversation,
@@ -14,7 +15,7 @@ import {
 } from '@test-agentstudio/api-client'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton } from '@mui/material'
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton } from '@mui/material'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import { AssistantUiChat } from '@/components/Common/Chat/AssistantUiChat'
 import PublishStatusTag from '@/components/Runtime/PublishStatusTag'
@@ -42,7 +43,6 @@ const AgentPublishPage: React.FC = () => {
   const { user } = useAuthStore()
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
 
-  const [loading, setLoading] = useState(true)
   const [agentDetail, setAgentDetail] = useState<AgentDetailResponse | null>(null)
   const [publishType, setPublishType] = useState<PublishType>('chat')
   const [runtimeApiUrl, setRuntimeApiUrl] = useState<string>(DEMO_API_PUBLISH.url)
@@ -117,8 +117,22 @@ const AgentPublishPage: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchAgentDetail()
-  }, [agentId])
+    const fetchAgentDetail = async () => {
+      if (!agentId) return
+      try {
+        const response = await AgentService.getAgentDetail({
+          space_id: user?.spaceId || getDefaultSpaceId(),
+          agent_id: agentId,
+        })
+        if (response.code === 200) {
+          setAgentDetail(response)
+        }
+      } catch (error) {
+        console.error('Failed to fetch agent detail:', error)
+      }
+    }
+    void fetchAgentDetail()
+  }, [agentId, user?.spaceId])
 
   useEffect(() => {
     const deployUrl = primaryDeployDetail?.url
@@ -132,33 +146,6 @@ const AgentPublishPage: React.FC = () => {
       setPublishType('chat')
     }
   }, [isRuntimeReady, publishType])
-
-  const fetchAgentDetail = async () => {
-    if (!agentId) return
-
-    try {
-      setLoading(true)
-      const response = await AgentService.getAgentDetail({
-        space_id: user?.spaceId || getDefaultSpaceId(),
-        agent_id: agentId,
-      })
-
-      if (response.code === 200) {
-        setAgentDetail(response)
-      } else {
-        showError(`${t('common.messages.error')}: ${response.message || t('common.messages.unknownError')}`)
-      }
-    } catch (error) {
-      console.error('Failed to fetch agent detail:', error)
-      showError(
-        `${t('common.messages.error')}: ${
-          error instanceof Error ? error.message : t('common.messages.unknownError')
-        }`,
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const appendQueryPath = (url: string): string => {
     const trimmed = (url || '').trim()
@@ -175,6 +162,15 @@ const AgentPublishPage: React.FC = () => {
     if (normalized.endsWith('/reset_conversation')) return normalized
     if (normalized.endsWith('/query')) return normalized.replace(/\/query$/, '/reset_conversation')
     return `${normalized}/reset_conversation`
+  }
+
+  const appendAgentDetailPath = (url: string): string => {
+    const trimmed = (url || '').trim()
+    if (!trimmed) return ''
+    const normalized = trimmed.replace(/\/+$/, '')
+    if (normalized.endsWith('/agent_detail')) return normalized
+    if (normalized.endsWith('/query')) return normalized.replace(/\/query$/, '/agent_detail')
+    return `${normalized}/agent_detail`
   }
 
   const handleBack = () => {
@@ -243,28 +239,31 @@ const AgentPublishPage: React.FC = () => {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <CircularProgress />
-      </div>
-    )
-  }
-
-  if (!agentDetail) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">{t('runtime.publish.messages.agentNotFound')}</div>
-      </div>
-    )
-  }
-
-  const agent = agentDetail.data.agent_info
-
   const token = getToken()
   const baseUrl = API_CONFIG.BASE_URL || '/api/v1'
   /** 经中台转发到 Runtime /query，与页面同域，避免直连 localhost:port 触发 CORS */
   const runtimeProxyQueryUrl = `${String(baseUrl).replace(/\/$/, '')}${API_ENDPOINTS.RUNTIME.QUERY}`
+  const deployedAgentDetailTargetUrl = appendAgentDetailPath(String(primaryDeployDetail?.url || ''))
+  const runtimeAgentDetailQuery = useRuntimeAgentDetail(
+    {
+      target_url: deployedAgentDetailTargetUrl,
+      space_id: String(spaceId),
+    },
+    { enabled: isRuntimeReady && !!deployedAgentDetailTargetUrl && !!spaceId }
+  )
+  const runtimeAgentDetailData = runtimeAgentDetailQuery.data?.data as any
+  const runtimeAgent = runtimeAgentDetailData?.data?.agent as
+    | { agent_id?: string; agent_name?: string; icon?: string; description?: string; opening_remarks?: string; opening_remark?: string }
+    | undefined
+  const openingRemarkFromRuntime =
+    runtimeAgent?.opening_remark ||
+    runtimeAgent?.opening_remarks ||
+    ''
+  const chatEmptyStateText = openingRemarkFromRuntime || t('runtime.publish.chat.defaultGreeting')
+  const draftAgent = agentDetail?.data?.agent_info as any
+  const agentName = draftAgent?.agent_name || runtimeAgent?.agent_name || t('runtime.publish.messages.notPublished')
+  const agentIcon = draftAgent?.icon || runtimeAgent?.icon || '🤖'
+  const agentDesc = draftAgent?.description || runtimeAgent?.description || t('runtime.publish.noDescription')
 
   return (
     <div className="h-full flex flex-col bg-white">
@@ -279,15 +278,15 @@ const AgentPublishPage: React.FC = () => {
 
             <div className="flex items-center space-x-3 min-w-0">
               <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg flex-shrink-0">
-                {agent.icon || '🤖'}
+                {agentIcon}
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <h1 className="text-lg font-semibold text-gray-900 truncate">{agent.agent_name}</h1>
+                  <h1 className="text-lg font-semibold text-gray-900 truncate">{agentName}</h1>
                   <PublishStatusTag status={publishStatusKey} />
                 </div>
                 <p className="text-sm text-gray-500 truncate">
-                  {agent.description || t('runtime.publish.noDescription')}
+                  {agentDesc}
                 </p>
               </div>
             </div>
@@ -379,7 +378,7 @@ const AgentPublishPage: React.FC = () => {
                 buildBody: (input: any) => {
                   const messages = Array.isArray(input?.messages) ? input.messages : []
                   return {
-                    agent_id: String(agent.agent_id || agentId),
+                    agent_id: String(draftAgent?.agent_id || runtimeAgent?.agent_id || agentId),
                     target_url: runtimeApiUrl,
                     space_id: String(spaceId),
                     messages,
@@ -389,9 +388,9 @@ const AgentPublishPage: React.FC = () => {
                   }
                 },
               }}
-              assistantIcon={agent.icon}
-              assistantName={agent.agent_name}
-              emptyStateText={t('runtime.publish.chat.defaultGreeting')}
+              assistantIcon={agentIcon}
+              assistantName={agentName}
+              emptyStateText={chatEmptyStateText}
               userName={user?.username || user?.email || t('runtime.publish.chat.defaultUserName')}
               className="flex-1 min-h-0"
               onNewChat={handleResetConversation}

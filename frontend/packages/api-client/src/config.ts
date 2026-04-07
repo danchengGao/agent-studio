@@ -141,6 +141,8 @@ export const API_ENDPOINTS = {
     QUERY: '/runtime/query',
     /** 经中台转发至已部署 Runtime /reset_conversation，避免浏览器 CORS */
     RESET_CONVERSATION: '/runtime/reset_conversation',
+    /** 经中台转发至已部署 Runtime /agent_detail，避免浏览器 CORS */
+    AGENT_DETAIL: '/runtime/agent_detail',
   },
 
   // 代理管理

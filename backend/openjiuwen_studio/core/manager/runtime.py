@@ -572,6 +572,48 @@ async def reset_deployed_agent_conversation(
         ) from e
 
 
+async def get_deployed_agent_detail(
+        target_url: str,
+        space_id: str,
+) -> dict:
+    """
+    服务端转发详情查询请求到已部署 Runtime /agent_detail，避免浏览器直连 Runtime 触发 CORS。
+    """
+    target = (target_url or "").strip()
+    if not target:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment URL is empty",
+        )
+
+    timeout = httpx.Timeout(120.0, connect=30.0)
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as http:
+            resp = await http.get(
+                target,
+                params={"space_id": space_id},
+                headers={"Accept": "application/json"},
+            )
+            if resp.status_code >= 400:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        f"Runtime returned {resp.status_code}: "
+                        f"{resp.text[:2000]}"
+                    ),
+                )
+            try:
+                return resp.json()
+            except ValueError:
+                return {"status": "ok", "message": resp.text}
+    except httpx.RequestError as e:
+        logger.error(f"get_deployed_agent_detail: failed to reach {target}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to reach runtime: {e}",
+        ) from e
+
+
 async def get_agent_deploy_detail(
         deployment_id,
         user_id,

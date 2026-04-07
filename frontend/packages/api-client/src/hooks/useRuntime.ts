@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import RuntimeService from '../services/runtime'
-import { RuntimeDeployRequest, RuntimeDetailRequest, RuntimeRemoveRequest, RuntimeResetConversationRequest } from '../types'
+import {
+  RuntimeAgentDetailRequest,
+  RuntimeDeployRequest,
+  RuntimeDetailRequest,
+  RuntimeRemoveRequest,
+  RuntimeResetConversationRequest,
+} from '../types'
 
 // Runtime 相关的 React Query hooks
 const isSuccessCode = (code: unknown) => Number(code) === 200
@@ -91,9 +97,34 @@ export const useResetConversation = () => {
   })
 }
 
+// 查询已部署智能体详情
+export const useRuntimeAgentDetail = (request: RuntimeAgentDetailRequest, options?: { enabled?: boolean }) => {
+  return useQuery(
+    ['runtime', 'agent_detail', request.target_url, request.space_id],
+    async () => {
+      const response = await RuntimeService.agentDetail(request)
+      if (!isSuccessCode(response.code)) {
+        throw new Error(getResponseMessage(response))
+      }
+      return response
+    },
+    {
+      enabled: options?.enabled !== false && !!request.target_url && !!request.space_id,
+      staleTime: 0,
+      cacheTime: 0,
+      retry: 2,
+      retryDelay: 1000,
+      onError: error => {
+        console.error('获取已部署智能体详情失败:', error)
+      },
+    }
+  )
+}
+
 export default {
   useRuntimeDetail,
   useDeployRuntime,
   useRemoveRuntime,
   useResetConversation,
+  useRuntimeAgentDetail,
 }
