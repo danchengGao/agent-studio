@@ -517,7 +517,7 @@ def workflow_export(
 ) -> ResponseModel:
     """Export a workflow as executable DSL JSON with dependencies."""
 
-    _type_to_node_key: dict[int, str] = {
+    _type_prefix_to_key: dict[int, str] = {
         int(ComponentType.COMPONENT_TYPE_START): "Start",
         int(ComponentType.COMPONENT_TYPE_END): "End",
         int(ComponentType.COMPONENT_TYPE_LLM): "LLM",
@@ -542,14 +542,13 @@ def workflow_export(
         int(ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL): "KnowledgeRetrieval",
     }
 
-    def _normalize_dsl_type_and_ids(dsl_root: dict) -> dict:
-        """导出期把 components[].type / components[].id 数字编码转为前端节点 key，并同步替换所有引用到的组件 id。"""
+    def _rewrite_export_component_id_prefixes(dsl_root: dict) -> None:
         if not isinstance(dsl_root, dict):
-            return dsl_root
+            return
 
         id_map: dict[str, str] = {}
 
-        def _as_int(v: Any) -> int | None:
+        def _type_int(v: Any) -> int | None:
             if isinstance(v, int):
                 return v
             if isinstance(v, str):
@@ -558,63 +557,64 @@ def workflow_export(
                     return int(s)
             return None
 
-        def _rewrite_id(old_id: str, type_int: int) -> str:
-            key = _type_to_node_key.get(type_int)
+        def _new_id(cid: str, t: int) -> str | None:
+            key = _type_prefix_to_key.get(t)
             if not key:
-                return old_id
-            # 只处理形如 "3_xxx" 的前缀；其他格式保持不变
+                return None
             try:
-                prefix, rest = old_id.split("_", 1)
+                prefix, rest = cid.split("_", 1)
             except ValueError:
-                return old_id
-            if prefix.isdigit() and int(prefix) == type_int:
-                return f"{key}_{rest}"
-            return old_id
+                return None
+            if prefix.isdigit() and int(prefix) == t:
+                new = f"{key}_{rest}"
+                return new if new != cid else None
+            return None
 
-        def _walk(obj: Any) -> None:
+        def _collect(obj: Any) -> None:
             if isinstance(obj, dict):
                 comps = obj.get("components")
                 if isinstance(comps, list):
                     for c in comps:
                         if not isinstance(c, dict):
                             continue
-                        t_int = _as_int(c.get("type"))
-                        if t_int is None:
-                            continue
-                        key = _type_to_node_key.get(t_int)
-                        if key:
-                            c["type"] = key
+                        t = _type_int(c.get("type"))
                         cid = c.get("id")
-                        if isinstance(cid, str) and cid:
-                            new_id = _rewrite_id(cid, t_int)
-                            if new_id != cid:
-                                c["id"] = new_id
-                                id_map[cid] = new_id
+                        if t is None or not isinstance(cid, str) or not cid:
+                            continue
+                        new = _new_id(cid, t)
+                        if new:
+                            id_map[cid] = new
+                            c["id"] = new
                 for v in obj.values():
-                    _walk(v)
+                    _collect(v)
             elif isinstance(obj, list):
                 for it in obj:
-                    _walk(it)
+                    _collect(it)
 
-        def _replace_ids(obj: Any) -> Any:
+        def _sub_in_str(s: str) -> str:
+            for old in sorted(id_map.keys(), key=len, reverse=True):
+                if old in s:
+                    s = s.replace(old, id_map[old])
+            return s
+
+        def _replace(obj: Any) -> None:
             if not id_map:
-                return obj
+                return
             if isinstance(obj, dict):
                 for k, v in list(obj.items()):
-                    if isinstance(v, str) and v in id_map:
-                        obj[k] = id_map[v]
+                    if isinstance(v, str):
+                        obj[k] = _sub_in_str(v)
                     else:
-                        obj[k] = _replace_ids(v)
-                return obj
-            if isinstance(obj, list):
-                return [_replace_ids(x) for x in obj]
-            if isinstance(obj, str) and obj in id_map:
-                return id_map[obj]
-            return obj
+                        _replace(v)
+            elif isinstance(obj, list):
+                for i, item in enumerate(obj):
+                    if isinstance(item, str):
+                        obj[i] = _sub_in_str(item)
+                    else:
+                        _replace(item)
 
-        _walk(dsl_root)
-        _replace_ids(dsl_root)
-        return dsl_root
+        _collect(dsl_root)
+        _replace(dsl_root)
 
     def _canvas_schema_dict(canvas_data: dict | None) -> dict:
         if not canvas_data or not isinstance(canvas_data, dict):
@@ -818,7 +818,7 @@ def workflow_export(
         sub_executable_workflow = ExecutableWorkflow(sub_dl_workflow, req.space_id, current_user)
         sub_export = sub_executable_workflow.dl_workflow.model_dump()
         _patch_export_model_fields(sub_export, sub_canvas_result.data, req.space_id)
-        _normalize_dsl_type_and_ids(sub_export)
+        _rewrite_export_component_id_prefixes(sub_export)
         return sub_export
 
     _ = check_user_space(req.space_id, current_user)
@@ -835,7 +835,7 @@ def workflow_export(
 
     export_data = executable_workflow.dl_workflow.model_dump()
     _patch_export_model_fields(export_data, canvas_result.data, req.space_id)
-    _normalize_dsl_type_and_ids(export_data)
+    _rewrite_export_component_id_prefixes(export_data)
 
     dependency_workflows: list[dict] = []
     processed: set[tuple[str, str]] = {(req.workflow_id, req.workflow_version or "draft")}
