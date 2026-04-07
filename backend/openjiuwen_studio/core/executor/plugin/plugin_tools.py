@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 import os
+import re
 import sys
 from typing import List, Dict, Any
 
@@ -20,6 +21,28 @@ TYPE = "type"
 OBJECT = "object"
 REQUIRED = "required"
 PROPERTIES = "properties"
+
+
+def sanitize_tool_name(name: str) -> str:
+    """
+    清理工具名称，使其符合 OpenAI API 的命名规范。
+    OpenAI 要求工具名称必须匹配正则表达式: ^[a-zA-Z0-9_-]+$
+    
+    Args:
+        name: 原始工具名称
+        
+    Returns:
+        清理后的工具名称，只包含字母、数字、下划线和连字符
+    """
+    if not name:
+        return "unnamed_tool"
+    
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+    
+    if sanitized[0].isdigit():
+        sanitized = 'tool_' + sanitized
+    
+    return sanitized
 
 
 def convert_params_to_json_schema(params: List[Param]) -> Dict[str, Any]:
@@ -88,7 +111,8 @@ class ServiceTool:
         # The input_params schema includes location="" for path params, which tells RestfulApi
         # to substitute {param} placeholders with values from runtime inputs
 
-        tool_name = self.restfulapischema.name or self.restfulapischema.tool_id
+        raw_name = self.restfulapischema.name or self.restfulapischema.tool_id
+        tool_name = sanitize_tool_name(raw_name)
         input_params = convert_params_to_json_schema(self.restfulapischema.params)
         restfulapi_card = RestfulApiCard(name=tool_name,
                                          description=self.restfulapischema.description, input_params=input_params,
@@ -122,7 +146,8 @@ class PluginCodeTool(CodeComponent, Tool):
         self.tool_id: str = card.id
         self.node_id: str = card.id
         # Use the existing name field if available, otherwise fall back to tool_id
-        self.name: str = conf.name or card.id
+        raw_name = conf.name or card.id
+        self.name: str = sanitize_tool_name(raw_name)
         self.params = conf.input_params
         self.description = self.conf.description
 
@@ -132,9 +157,13 @@ class PluginCodeTool(CodeComponent, Tool):
         # 转换参数 schema
         input_schema = convert_params_to_json_schema(conf.input_params)
 
+        # 清理工具名称
+        raw_name = conf.name or conf.tool_id
+        sanitized_name = sanitize_tool_name(raw_name)
+        
         # 构建 ToolCard
         card = PluginCodeCard(
-            name=conf.name,
+            name=sanitized_name,
             description=conf.description,
             input_params=input_schema
         )  # 不能配置id,否则会跑到Runner.get_tool
@@ -162,7 +191,30 @@ class PluginCodeTool(CodeComponent, Tool):
                     node_id=self.tool_id
                 )
 
-        error_body, response = await self._run(language, code, inputs, exception_config, execute_type)
+        # Convert input types based on schema
+        converted_inputs = {}
+        for param in input_params:
+            value = inputs.get(param.name)
+            if value is not None:
+                param_type = param.type.lower() if param.type else "string"
+                try:
+                    if param_type == "integer":
+                        converted_inputs[param.name] = int(value)
+                    elif param_type == "number" or param_type == "float":
+                        converted_inputs[param.name] = float(value)
+                    elif param_type == "boolean" or param_type == "bool":
+                        if isinstance(value, str):
+                            converted_inputs[param.name] = value.lower() in ("true", "1", "yes")
+                        else:
+                            converted_inputs[param.name] = bool(value)
+                    else:
+                        converted_inputs[param.name] = value
+                except (ValueError, TypeError):
+                    converted_inputs[param.name] = value
+            else:
+                converted_inputs[param.name] = value
+
+        error_body, response = await self._run(language, code, converted_inputs, exception_config, execute_type)
         result = self._process_output(error_body, response, exception_config)
         if not error_body.error_code:
             err_code = 0

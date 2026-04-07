@@ -29,23 +29,29 @@ def get_database_url() -> str:
         db_path.mkdir(parents=True, exist_ok=True)
         return f"sqlite:///{db_path}/{settings.agent_sqlite_db}"
 
+    elif settings.db_type.lower() == "none":
+        return None
+
     else:
         raise ValueError(f"Unsupported database type: {settings.db_type.lower()}")
 
 database_url = get_database_url()
 
-# Create database engine
-engine = create_engine(
-    database_url,
-    connect_args={"check_same_thread": False} if "sqlite" in database_url else {}
-)
-
-# Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+if database_url:
+    engine = create_engine(
+        database_url,
+        connect_args={"check_same_thread": False} if "sqlite" in database_url else {}
+    )
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+else:
+    engine = None
+    SessionLocal = None
 
 
 # Dependency to get database session
 def get_db():
+    if SessionLocal is None:
+        raise RuntimeError("Database is not configured. Set DB_TYPE to 'mysql' or 'sqlite' to use database features.")
     db = SessionLocal()
     try:
         yield db

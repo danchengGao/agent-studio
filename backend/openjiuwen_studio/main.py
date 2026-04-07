@@ -13,7 +13,6 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 # Load environment variables from project root (上级目录)
 project_root = os.path.dirname(backend_dir)
 load_dotenv(os.path.join(project_root, '.env'))
@@ -164,43 +163,70 @@ app = FastAPI(
 )
 
 
-class LogMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+class LogMiddleware:
+    """
+    纯 ASGI 中间件，兼容 StreamingResponse
+    
+    不使用 BaseHTTPMiddleware，因为它与 StreamingResponse 有兼容性问题：
+    当流式响应过程中发生异常时，会抛出 RuntimeError: Caught handled exception, but response already started
+    """
+    def __init__(self, asgi_app):
+        self.app = asgi_app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         start_time = time.perf_counter()
+        request = Request(scope, receive=receive)
+        route_path = self._get_route_path(request)
+        endpoint_name = self._truncate_path(route_path, max_parts=3)
+        
+        status_code = None
+        error_occurred = False
+
+        async def send_wrapper(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            await send(message)
+
         try:
-            response = await call_next(request)
+            await self.app(scope, receive, send_wrapper)
         except Exception as e:
+            error_occurred = True
             interface_logger.error(
                 "Request failed",
                 event_type=CustomLogEventType.INTERFACE_SRV.value,
-                interface_name=request.url.path,
+                interface_name=endpoint_name,
                 execution_time_ms=round((time.perf_counter() - start_time) * 1000),
                 exception=str(e),
                 error_code=str(status.HTTP_500_INTERNAL_SERVER_ERROR),
                 metadata={
-                    "route_path": request.url.path
+                    "route_path": route_path
                 }
             )
             logger.error(f"Request failed: {e}")
             raise
 
-        route_path = self._get_route_path(request)
-        endpoint_name = self._truncate_path(route_path, max_parts=3)
+        if error_occurred:
+            return
 
         interface_logger.info(
             "",
             event_type=CustomLogEventType.INTERFACE_SRV.value,
             interface_name=endpoint_name,
             execution_time_ms=round((time.perf_counter() - start_time) * 1000),
-            error_code=str(response.status_code),
+            error_code=str(status_code or status.HTTP_200_OK),
             metadata={
                 "route_path": route_path
             }
         )
-        return response
 
 
-    def _truncate_path(self, path: str, max_parts: int = 3) -> str:
+    @staticmethod
+    def _truncate_path(path: str, max_parts: int = 3) -> str:
         if not path or path == "/":
             return "/"
         parts = path.strip("/").split("/")
@@ -208,7 +234,8 @@ class LogMiddleware(BaseHTTPMiddleware):
         return "/" + "/".join(truncated) if truncated else "/"
 
 
-    def _get_route_path(self, request: Request) -> str:
+    @staticmethod
+    def _get_route_path(request: Request) -> str:
         try:
             # route 在 request.scope 中，由 Starlette 路由器在匹配后注入
             route = request.scope.get("route")

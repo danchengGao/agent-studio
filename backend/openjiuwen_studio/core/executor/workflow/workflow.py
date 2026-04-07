@@ -173,6 +173,12 @@ class Workflow:
     ) -> None:
         dl_wf_components = workflow_dl.components
         for comp in dl_wf_components:
+            if comp.id in self.dl_workflow.end_id and comp.configs:
+                end_config = EndConfig.model_validate(comp.configs)
+                if end_config.stream_output:
+                    find_llm_to_stream_out(comp.id, comp.inputs, self.need_stream_output_comp)
+        logger.debug(f"need_stream_output_comp after pre-scan: {self.need_stream_output_comp}")
+        for comp in dl_wf_components:
             if comp.id in self.dl_workflow.start_id:
                 compiled_comp = Start()
                 flow.set_start_comp(comp.id, compiled_comp, comp.inputs)
@@ -224,7 +230,12 @@ class Workflow:
                         flow.set_comp_with_stream(comp.id, compiled_comp, inputs_schema=new_inputs,
                                                   stream_inputs_schema=stream_inputs, response_mode=response_mode)
                         continue
-                flow.add_workflow_comp(comp.id, compiled_comp, inputs_schema=comp.inputs)
+                if comp.id in self.need_stream_output_comp:
+                    logger.debug(f"LLM component {comp.id} needs stream output, setting INVOKE and STREAM abilities")
+                    flow.add_workflow_comp(comp.id, compiled_comp, inputs_schema=comp.inputs,
+                                          comp_ability=[ComponentAbility.INVOKE, ComponentAbility.STREAM])
+                else:
+                    flow.add_workflow_comp(comp.id, compiled_comp, inputs_schema=comp.inputs)
         return flow
 
     async def compile(

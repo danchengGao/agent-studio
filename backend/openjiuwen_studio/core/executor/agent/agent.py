@@ -219,9 +219,21 @@ class Agent:
 
         # 4. 编译并绑定所有Plugin工具
         tools: List[Tool] = []
+        seen_tool_names = set()  # 用于跟踪已添加的工具名称，避免重复
+
         for tool in self.plugins:
             # 编译单个Plugin工具
             compiled_tool = tool.compile()
+            tool_name = compiled_tool.card.name if hasattr(compiled_tool, 'card') else None
+
+            # 检查工具名称是否已存在（基于名称去重，避免OpenAI API报错）
+            if tool_name and tool_name in seen_tool_names:
+                logger.warning(f"Skipping tool with duplicate name in agent.py: {tool_name}")
+                continue
+
+            if tool_name:
+                seen_tool_names.add(tool_name)
+
             tools.append(compiled_tool)
 
         # 将所有编译后的工具绑定到Agent

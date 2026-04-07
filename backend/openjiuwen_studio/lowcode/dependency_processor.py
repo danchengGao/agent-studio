@@ -151,14 +151,24 @@ class DependencyProcessor:
             workflow_id = workflow_data.get("workflow_id") or workflow_data.get("id")
             workflow_name = workflow_data.get("workflow_name") or workflow_data.get("name", "Unnamed Workflow")
             
-            # 创建工作流对象
+            input_params = (
+                workflow_data.get("input_parameters") or 
+                workflow_data.get("input_params") or 
+                []
+            )
+            output_params = (
+                workflow_data.get("output_parameters") or 
+                workflow_data.get("output_params") or 
+                []
+            )
+            
             workflow = Workflow(
                 workflow_id=workflow_id,
                 workflow_name=workflow_name,
                 description=workflow_data.get("description", ""),
                 schema=workflow_data.get("schema", {}),
-                input_params=workflow_data.get("input_params", []),
-                output_params=workflow_data.get("output_params", []),
+                input_params=input_params,
+                output_params=output_params,
                 variables=workflow_data.get("variables", [])
             )
             

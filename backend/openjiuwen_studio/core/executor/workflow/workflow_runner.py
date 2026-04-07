@@ -4,6 +4,7 @@
 
 import asyncio
 import json
+import uuid
 from typing import Any, Dict, AsyncGenerator, Optional
 from builtins import id as builtinid
 
@@ -227,21 +228,31 @@ class WorkflowRunner(IWorkflowLoader):
             space_id: str,
             current_user: Dict[str, Any],
     ) -> AsyncGenerator[Any, None]:
+        # 生成唯一的 execution_id，用于 workflow_execution_manager 的执行键
+        # 这确保同一个 conversation_id 可以并发执行多个工作流，避免连续调用卡住
+        execution_id = f"{conversation_id}:{uuid.uuid4().hex}"
+        logger.info(
+            "Workflow run requested: conversation_id=%s, execution_id=%s, workflow_id=%s, version=%s",
+            conversation_id,
+            execution_id,
+            id,
+            version,
+        )
 
-        # 检查当前conversation_id是否处于执行状态
-        if workflow_execution_manager.is_executing(conversation_id):
+        # 检查当前 execution_id 是否处于执行状态（使用唯一的 execution_id 而不是 conversation_id）
+        if workflow_execution_manager.is_executing(execution_id):
             all_execution_infos = workflow_execution_manager.list_executions()
             logger.info(f"Now existing workflow executions: {all_execution_infos}")
             logger.error(
                 f"Workflow execution conflict detected: "
-                f"conversation_id={conversation_id}, workflow_id={id}"
+                f"execution_id={execution_id}, workflow_id={id}"
             )
-            # 如果存在执行id, 可直接停止当前会话id
-            cancel_success = await workflow_execution_manager.cancel_execution(conversation_id)
+            # 如果存在执行id, 可直接停止当前 execution_id
+            cancel_success = await workflow_execution_manager.cancel_execution(execution_id)
             if not cancel_success:
                 raise JiuWenExecuteException(
                     code=StatusCode.WORKFLOW_EXECUTION_CONFLICT_ERROR.code,
-                    message=StatusCode.WORKFLOW_EXECUTION_CONFLICT_ERROR.errmsg.format(msg=conversation_id),
+                    message=StatusCode.WORKFLOW_EXECUTION_CONFLICT_ERROR.errmsg.format(msg=execution_id),
                     workflow_id=id,
                 )
 
@@ -270,14 +281,23 @@ class WorkflowRunner(IWorkflowLoader):
         try:
             # 编译工作流
             flow = await self.get_compiled_workflow(Context(), id, version, space_id, current_user)
-            # 创建 Session 用于 workflow 执行, session_id确保唯一性
-            session = create_workflow_session(session_id=conversation_id)
+            # 创建 Session 用于 workflow 执行, 使用 execution_id 作为 session_id 确保唯一性
+            # 这避免同一个 conversation_id 的多次工作流调用共享同一个 session，导致状态冲突
+            session = create_workflow_session(session_id=execution_id)
 
             task = asyncio.current_task()
-            logger.info(f"Workflow task_id: {builtinid(task)}")
-            # 注册执行任务
+            logger.info(
+                "Workflow execution starting: "
+                "conversation_id=%s, execution_id=%s, workflow_id=%s, session_id=%s, task_id=%s",
+                conversation_id,
+                execution_id,
+                id,
+                session.get_session_id(),
+                builtinid(task),
+            )
+            # 注册执行任务（使用 execution_id 作为执行键）
             registration = WorkflowExecutionRegistration(
-                conversation_id=conversation_id,
+                conversation_id=execution_id,
                 workflow_id=id,
                 workflow_version=version,
                 space_id=space_id,
@@ -304,12 +324,12 @@ class WorkflowRunner(IWorkflowLoader):
             ):
                 # 检查任务是否被取消
                 if task and task.cancelled():
-                    logger.warning(f"Workflow execution has been cancelled: conversation_id={conversation_id}")
+                    logger.warning(f"Workflow execution has been cancelled: execution_id={execution_id}")
                     break
-                # 检查执行管理器中的取消标志
-                if workflow_execution_manager.is_cancelled(conversation_id):
+                # 检查执行管理器中的取消标志（使用 execution_id）
+                if workflow_execution_manager.is_cancelled(execution_id):
                     logger.warning(
-                        f"Workflow execution cancelled via execution manager: conversation_id={conversation_id}")
+                        f"Workflow execution cancelled via execution manager: execution_id={execution_id}")
                     break
 
                 # 检查是否为需要过滤的workflow trace chunk
@@ -332,12 +352,24 @@ class WorkflowRunner(IWorkflowLoader):
                     logger.debug(f"workflow stream return rsp: {rsp}")
                     yield rsp
 
+            logger.info(
+                "Workflow execution stream finished: "
+                "execution_id=%s, conversation_id=%s, workflow_id=%s, last_chunk_type=%s",
+                execution_id,
+                conversation_id,
+                id,
+                type(last_chunk).__name__ if last_chunk is not None else None,
+            )
+
             if trace_logs:
                 await save_execution_traces(flow_index, trace_logs)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
         except asyncio.CancelledError:
-            logger.warning(f"Workflow execution cancelled: conversation_id={conversation_id}")
+            logger.warning(
+                f"Workflow execution cancelled: "
+                f"execution_id={execution_id}, conversation_id={conversation_id}, workflow_id={id}"
+            )
             # task.cancel()
             # logger.warning(f"Workflow execution cancelled 1 : task.cancelled() {task.cancelled()} "
             #                f"taskid {builtinid(task)}")
@@ -363,8 +395,14 @@ class WorkflowRunner(IWorkflowLoader):
                 workflow_id=id,
             ) from e
         finally:
-            # 取消注册执行任务
-            workflow_execution_manager.unregister_execution(conversation_id)
+            # 取消注册执行任务（使用 execution_id）
+            logger.info(
+                "Workflow execution cleanup: execution_id=%s, conversation_id=%s, workflow_id=%s",
+                execution_id,
+                conversation_id,
+                id,
+            )
+            workflow_execution_manager.unregister_execution(execution_id)
 
     async def validate(
             self,

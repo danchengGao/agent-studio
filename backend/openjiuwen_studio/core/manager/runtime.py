@@ -128,12 +128,19 @@ async def deploy_to_runtime(
         client: RuntimeAgentClient = None,
 ) -> str:
     # 构造部署请求 payload
+    userdata = {'api_keys': payload.get('api_keys', "")}
+    
+    # 支持环境变量配置
+    env_vars = payload.get('env_vars', {})
+    if env_vars:
+        userdata['env_vars'] = env_vars
+    
     deploy_payload = {
         "name": payload.get('name'),
         "file": payload.get('file'),
         "deployer_type": payload.get('deployer_type', ""),
         "port": payload.get('port', ""),
-        "userdata": {'api_keys': payload.get('api_keys', "")}
+        "userdata": userdata
     }
 
     # 调用 runtime 接口进行部署

@@ -21,6 +21,11 @@ except ImportError:
     InvokableAgent = None
     HAS_INVOKABLE_AGENT = False
 
+try:
+    from openjiuwen.core.single_agent.legacy import WorkflowFactory
+except ImportError:
+    WorkflowFactory = None
+
 
 class AgentCompiler:
     """
@@ -57,6 +62,7 @@ class AgentCompiler:
             workflow_runner: 工作流运行器
             plugin_manager: 插件管理器
         """
+        self.workflow_runner = workflow_runner
         self.loader = LowCodeAgentLoader(
             workflow_runner=workflow_runner,
             plugin_manager=plugin_manager
@@ -467,6 +473,10 @@ class AgentCompiler:
             )
 
             agent_config = compiled_result['agent_config']
+            
+            dependencies = config.get("dependencies", {})
+            raw_workflows = dependencies.get("workflows", [])
+            raw_plugins = dependencies.get("plugins", [])
 
             agent_card = AgentCard(
                 id=agent_config.get("agent_id", ""),
@@ -475,14 +485,82 @@ class AgentCompiler:
                 version=agent_config.get("agent_version", "draft"),
             )
 
-            runtime_config = ConfigAdapter.adapt_to_runtime_config(agent_config)
+            adapted_result = ConfigAdapter.adapt_to_runtime_config(agent_config)
+            runtime_config = adapted_result["runtime_config"]
 
+            workflow_providers = ConfigAdapter.create_workflow_providers(
+                workflows=raw_workflows,
+                config=config,
+                model_overrides=model_overrides,
+                workflow_runner=self.workflow_runner,
+                current_user=current_user,
+                space_id=config.get("space_id", "default"),
+            )
+            
+            # 创建 WorkflowFactory 包装工作流提供者
+            # 关键：factory 必须是同步工厂函数，返回已编译的 workflow 实例
+            # WorkflowFactory.__call__ 会处理 async factory，但我们需要避免 coroutine 问题
+            workflow_factories = []
+            if WorkflowFactory is not None:
+                for workflow_card, workflow_provider in workflow_providers:
+                    logger.info(f"Creating WorkflowFactory for: {workflow_card.name} (id={workflow_card.id})")
+                    
+                    # 预先调用 workflow_provider 获取编译后的 workflow
+                    # 然后创建一个同步的 factory 函数返回该实例
+                    # 注意：这会导致所有调用使用同一个实例，可能有问题
+                    # 更好的方案是让 WorkflowFactory 支持异步 factory
+                    try:
+                        compiled_workflow = await workflow_provider()
+                        logger.info(f"Pre-compiled workflow: {workflow_card.name} (id={workflow_card.id})")
+                        
+                        # 创建同步 factory 函数 - 使用默认参数避免闭包问题
+                        def make_sync_factory(workflow):
+                            def sync_factory(w=workflow):
+                                return w
+                            return sync_factory
+                        
+                        sync_factory = make_sync_factory(compiled_workflow)
+                        
+                        workflow_factories.append(
+                            WorkflowFactory(
+                                workflow_id=workflow_card.id,
+                                workflow_version=workflow_card.version,
+                                factory=sync_factory,  # 同步工厂函数
+                                workflow_name=workflow_card.name,
+                                workflow_description=workflow_card.description or "",
+                                input_schema=workflow_card.input_params,
+                            )
+                        )
+                        logger.info(f"WorkflowFactory created with sync factory: {workflow_card.name} (id={workflow_card.id})")
+                    except Exception as e:
+                        logger.error(f"Failed to pre-compile workflow {workflow_card.name}: {e}")
+                        # 回退到原始方式
+                        workflow_factories.append(
+                            WorkflowFactory(
+                                workflow_id=workflow_card.id,
+                                workflow_version=workflow_card.version,
+                                factory=workflow_provider,
+                                workflow_name=workflow_card.name,
+                                workflow_description=workflow_card.description or "",
+                                input_schema=workflow_card.input_params,
+                            )
+                        )
+            
+            plugin_tools = ConfigAdapter.create_plugin_tools(raw_plugins)
+
+            logger.info(
+                f"Created {len(workflow_providers)} workflow providers, "
+                f"{len(workflow_factories)} workflow factories, {len(plugin_tools)} plugin tools"
+            )
             logger.info("Agent compilation for runtime completed successfully")
 
             return {
                 "agent_card": agent_card,
                 "runtime_config": runtime_config,
                 "agent_config": agent_config,
+                "workflow_providers": workflow_providers,
+                "workflow_factories": workflow_factories,
+                "plugin_tools": plugin_tools,
             }
 
         except Exception as e:
