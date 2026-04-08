@@ -83,6 +83,11 @@ services:
     depends_on:
       - "<<ETCD_SERVICE>>"
       - "<<MINIO_SERVICE>>"
+    logging:
+      driver: "json-file"
+      options: # milvus logs often grow to large so taming them
+        max-file: "3"
+        max-size: "10m"
 
 volumes:
   <<ETCD_VOLUME>>:
