@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from 'react-query'
 import { ChevronLeft } from 'lucide-react'
 import {
   AgentService,
@@ -38,6 +39,7 @@ type RuntimeDeployStatus = 'running' | 'pending' | 'stopped' | 'failed' | 'unkno
 const AgentPublishPage: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const params = useParams()
   const agentId = params.id || ''
   const { user } = useAuthStore()
@@ -190,8 +192,10 @@ const AgentPublishPage: React.FC = () => {
     if (!agentId) return
 
     try {
-      // 下架后无需再查询部署详情，避免详情接口返回空导致报错
+      // 点击下架后立刻停止详情轮询与重试，避免离线过程中继续请求 agent_detail 报错
       setIsRuntimeDetailEnabled(false)
+      await queryClient.cancelQueries(['runtime', 'agent_detail'], { exact: false })
+      await queryClient.cancelQueries(['runtime', 'detail', agentId, spaceId], { exact: true })
       await removeRuntimeMutation.mutateAsync({
         space_id: spaceId,
         agent_id: agentId,
@@ -199,7 +203,7 @@ const AgentPublishPage: React.FC = () => {
 
       setOfflineConfirmOpen(false)
       showSuccess(t('runtime.publish.messages.offlineSuccess'))
-      // 先展示成功提示，再跳转，避免页面卸载导致 Snackbar 不可见
+      // 先展示成功提示，再跳转
       setTimeout(() => {
         navigate('/dashboard/agents')
       }, 1000)
@@ -207,6 +211,7 @@ const AgentPublishPage: React.FC = () => {
       // 下架失败时恢复查询能力
       setIsRuntimeDetailEnabled(true)
       console.error('Failed to offline agent:', error)
+      showError(t('runtime.publish.messages.offlineFailed'))
     }
   }
 
@@ -249,7 +254,7 @@ const AgentPublishPage: React.FC = () => {
       target_url: deployedAgentDetailTargetUrl,
       space_id: String(spaceId),
     },
-    { enabled: isRuntimeReady && !!deployedAgentDetailTargetUrl && !!spaceId }
+    { enabled: isRuntimeDetailEnabled && isRuntimeReady && !!deployedAgentDetailTargetUrl && !!spaceId }
   )
   const runtimeAgentDetailData = runtimeAgentDetailQuery.data?.data as any
   const runtimeAgent = runtimeAgentDetailData?.data?.agent as

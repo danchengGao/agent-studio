@@ -12,6 +12,7 @@
         "messages": {
             "agentNotFound": "Agent not found",
             "offlineSuccess": "Offline successfully",
+            "offlineFailed": "Failed to offline. Please try again later.",
             "resetConversationFailed": "Failed to reset conversation. Please try again later.",
             "pending": "Agent is being published. Please wait",
             "stopped": "Agent has been stopped",

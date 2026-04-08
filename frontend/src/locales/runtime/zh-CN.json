@@ -12,6 +12,7 @@
         "messages": {
             "agentNotFound": "智能体未找到",
             "offlineSuccess": "下架成功",
+            "offlineFailed": "下架失败，请稍后重试",
             "resetConversationFailed": "重置会话失败，请稍后重试",
             "pending": "智能体发布中，请稍等",
             "stopped": "智能体已停止",
