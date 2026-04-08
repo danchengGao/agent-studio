@@ -56,6 +56,14 @@ class StatusCode(Enum):
     # Agent publish 1050~1100
     AGENT_RUNTIME_CLIENT_ERROR = (BASE_CODE + 1050, "与RunTime服务端连接失败",
                                     "Failed to connect RunTime server")
+    AGENT_RUNTIME_DEPLOYMENT_URL_EMPTY = (BASE_CODE + 1051, "部署地址为空",
+                                          "Deployment URL is empty")
+    AGENT_RUNTIME_QUERY_HTTP_ERROR = (BASE_CODE + 1052, "RunTime服务调用失败: {msg}",
+                                      "Runtime service call failed: {msg}")
+    AGENT_RUNTIME_QUERY_STATUS_ERROR = (BASE_CODE + 1053, "RunTime服务状态异常: {msg}",
+                                        "Runtime service status error: {msg}")
+    AGENT_RUNTIME_QUERY_UNEXPECTED_ERROR = (BASE_CODE + 1054, "RunTime服务内部异常: {msg}",
+                                            "Runtime service internal error: {msg}")
 
     # Workflow模块 2001~2999
     WORKFLOW_DL_FETCH_FAILED = (BASE_CODE + 2001, "获取工作流描述语言失败: {msg}",

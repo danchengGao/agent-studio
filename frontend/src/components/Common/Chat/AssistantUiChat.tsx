@@ -145,12 +145,17 @@ function extractMessageText(content: unknown): string {
 }
 
 /** 统一错误条文案：有 code 时为「错误 0101：说明」，否则为「错误：说明」 */
-function formatErrorBannerLine(code: string | undefined, message: string): string {
+function formatErrorBannerLine(
+  code: string | undefined,
+  message: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
   const m = (message ?? '').trim()
   if (!m) return ''
+  const errorLabel = t('runtime.publish.chat.errorLabel')
   const c = code != null ? String(code).trim() : ''
-  if (c) return `error ${c}：${m}`
-  return `error：${m}`
+  if (c) return `${errorLabel} ${c}：${m}`
+  return `${errorLabel}：${m}`
 }
 
 /** AG-UI RUN_ERROR 写入 message.status.error，不一定是 string；统一成可展示文案 */
@@ -227,7 +232,7 @@ const ExtendedAssistantActionBar = () => {
 
   const runtimeCopyText = (messageRuntime.getCopyText?.() || '').trim()
   const runErrorBody = runError !== undefined ? formatAssistantRunError(runError) : ''
-  const runErrorText = runErrorBody ? formatErrorBannerLine(undefined, runErrorBody) : ''
+  const runErrorText = runErrorBody ? formatErrorBannerLine(undefined, runErrorBody, t) : ''
   const pinnedErrorText = pinnedByMessageId[message.id] || ''
   const fallbackErrorCopyText = pinnedErrorText || runErrorText
   // useActionBarCopy 的 disabled 在无正文 text part 时为 true（错误气泡不算 parts），不能与错误回退复制一起 AND
@@ -335,7 +340,7 @@ const CustomAssistantMessage = () => {
   const threadConfig = useThreadConfig()
   const assistantName = threadConfig.assistantAvatar?.alt ?? ''
   const runErrorBody = runError !== undefined ? formatAssistantRunError(runError) : ''
-  const runErrorText = runErrorBody ? formatErrorBannerLine(undefined, runErrorBody) : ''
+  const runErrorText = runErrorBody ? formatErrorBannerLine(undefined, runErrorBody, t) : ''
   const statusType =
     message.status && typeof message.status === 'object' && 'type' in message.status
       ? String((message.status as { type?: string }).type ?? '')
@@ -346,7 +351,9 @@ const CustomAssistantMessage = () => {
     messageText === '' &&
     (statusType === 'complete' || statusType === 'incomplete' || statusType === 'running')
   const streamFallbackText =
-    showStreamRunErrorFallback && streamRunError ? formatErrorBannerLine(streamRunError.code, streamRunError.message) : ''
+    showStreamRunErrorFallback && streamRunError
+      ? formatErrorBannerLine(streamRunError.code, streamRunError.message, t)
+      : ''
   const pinnedErrorText = pinnedByMessageId[message.id] || ''
   const errorBannerText = pinnedErrorText || runErrorText || streamFallbackText
 
@@ -561,7 +568,7 @@ export function AssistantUiChat({
   className = '',
   onNewChat,
 }: AssistantUiChatProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const agUiConfigRef = useRef(agUi)
   const [agUiStreamRunError, setAgUiStreamRunError] = useState<AgUiStreamRunError | null>(null)
   const [agUiPinnedRunErrors, setAgUiPinnedRunErrors] = useState<Record<string, string>>({})
@@ -618,6 +625,13 @@ export function AssistantUiChat({
       protected requestInit(input: any): RequestInit {
         const cfg = agUiConfigRef.current
         const base = super.requestInit(input)
+        const language = i18n.language || 'zh-CN'
+        const acceptLanguage =
+          language === 'en-US'
+            ? 'en-US;q=1.0, zh-CN;q=0.5'
+            : language === 'zh-CN'
+              ? 'zh-CN;q=1.0, en-US;q=0.5'
+              : language
         return {
           ...base,
           method: 'POST',
@@ -626,6 +640,7 @@ export function AssistantUiChat({
             ...(cfg.headers || {}),
             'Content-Type': 'application/json',
             Accept: 'text/event-stream',
+            'Accept-Language': acceptLanguage,
           },
           body: JSON.stringify(cfg.buildBody(input)),
           // 复用 super.requestInit(input) 里的 signal，确保 ComposerPrimitive.Cancel 可中断流式请求
@@ -635,7 +650,7 @@ export function AssistantUiChat({
     }
 
     return new ExecutionHttpAgent({ url: agUi.url, headers: agUi.headers })
-  }, [agUi.url])
+  }, [agUi.url, i18n.language])
 
   const agUiRuntime = useAgUiRuntime({
     agent: agUiAgent,

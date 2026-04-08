@@ -36,6 +36,7 @@
             "title": "对话体验",
             "debugTitle": "提示词调试",
             "description": "对话体验页面，待完善",
+            "errorLabel": "错误",
             "assistantDefaultName": "智能助手",
             "emptyStateText": "暂无消息",
             "emptyStateSubtext": "发送一条消息开始对话",

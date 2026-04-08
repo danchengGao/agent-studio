@@ -36,6 +36,7 @@
             "title": "Chat Experience",
             "debugTitle": "Prompt Debug",
             "description": "Chat experience page, to be completed",
+            "errorLabel": "error",
             "assistantDefaultName": "AI Assistant",
             "emptyStateText": "No messages yet",
             "emptyStateSubtext": "Send a message to start the conversation",

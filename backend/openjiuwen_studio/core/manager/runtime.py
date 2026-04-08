@@ -13,6 +13,7 @@ from fastapi import HTTPException, status
 
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.schemas.common import ResponseModel
+from openjiuwen_studio.core.common.status_code import StatusCode
 from openjiuwen_studio.core.thirdparty_client import RuntimeAgentClient
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw, JiuwenBaseRepository
 from openjiuwen_studio.models.runtime_info import RuntimeInfoDB
@@ -478,12 +479,18 @@ async def stream_deployed_agent_query(
     """
     服务端转发聊天请求到已部署的 Runtime /query，避免浏览器直连 Runtime 触发 CORS。
     """
+    def _agui_run_error_event(code: int, message: str) -> bytes:
+        payload = {"type": "RUN_ERROR", "message": message, "code": str(code)}
+        # AG-UI SSE: 每条事件以 data: 开头并以空行结尾
+        return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
+
     target = (target_url or "").strip()
     if not target:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Deployment URL is empty",
+        yield _agui_run_error_event(
+            StatusCode.AGENT_RUNTIME_DEPLOYMENT_URL_EMPTY.code,
+            StatusCode.AGENT_RUNTIME_DEPLOYMENT_URL_EMPTY.errmsg,
         )
+        return
 
     forward = {k: v for k, v in body.items() if k not in {"agent_id", "target_url"}}
     forward.setdefault("space_id", space_id)
@@ -502,27 +509,42 @@ async def stream_deployed_agent_query(
             ) as resp:
                 if resp.status_code >= 400:
                     err = await resp.aread()
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=(
-                            f"Runtime returned {resp.status_code}: "
-                            f"{err.decode('utf-8', errors='replace')[:2000]}"
+                    err_text = err.decode('utf-8', errors='replace')[:2000].strip()
+                    logger.error(
+                        f"stream_deployed_agent_query: Runtime returned {resp.status_code}: {err_text}"
+                    )
+                    yield _agui_run_error_event(
+                        StatusCode.AGENT_RUNTIME_QUERY_HTTP_ERROR.code,
+                        StatusCode.AGENT_RUNTIME_QUERY_HTTP_ERROR.errmsg.format(
+                            msg=err_text or "runtime response is empty"
                         ),
                     )
+                    return
                 async for chunk in resp.aiter_bytes():
                     yield chunk
     except httpx.HTTPStatusError as e:
         err = await e.response.aread() if e.response else b""
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=err.decode("utf-8", errors="replace")[:2000],
-        ) from e
+        raw_msg = err.decode("utf-8", errors="replace")[:2000] or str(e)
+        logger.error(f"stream_deployed_agent_query: HTTPStatusError: {raw_msg}")
+        yield _agui_run_error_event(
+            StatusCode.AGENT_RUNTIME_QUERY_STATUS_ERROR.code,
+            StatusCode.AGENT_RUNTIME_QUERY_STATUS_ERROR.errmsg.format(msg=raw_msg),
+        )
+        return
     except httpx.RequestError as e:
         logger.error(f"stream_deployed_agent_query: failed to reach {target}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to reach runtime: {e}",
-        ) from e
+        yield _agui_run_error_event(
+            StatusCode.AGENT_RUNTIME_CLIENT_ERROR.code,
+            StatusCode.AGENT_RUNTIME_CLIENT_ERROR.errmsg,
+        )
+        return
+    except Exception as e:
+        logger.exception(f"stream_deployed_agent_query: unexpected error: {e}")
+        yield _agui_run_error_event(
+            StatusCode.AGENT_RUNTIME_QUERY_UNEXPECTED_ERROR.code,
+            StatusCode.AGENT_RUNTIME_QUERY_UNEXPECTED_ERROR.errmsg.format(msg=str(e)),
+        )
+        return
 
 
 async def reset_deployed_agent_conversation(
