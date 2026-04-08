@@ -897,17 +897,12 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 6. 删除 Milvus | Chroma 向量索引（document + weblink，需在删 document/weblink 行之前）
+    # 6. Delete Milvus | Chroma vector collection (chunks + triples collections)
     try:
         index_result = await _delete_kb_indices(req.kb_id, req.space_id)
-        if index_result["success_count"] > 0:
-            logger.info(
-                f"[KB_DELETE] Indices successfully deleted - KB ID: {req.kb_id}, "
-                f"Success: {index_result['success_count']}, Failed: {index_result['failed_count']}"
-            )
         if index_result["errors"]:
             logger.warning(
-                f"[KB_DELETE] Some indices failed to delete - KB ID: {req.kb_id}, "
+                f"[KB_DELETE] Failed to delete indices - KB ID: {req.kb_id}, "
                 f"Errors: {index_result['errors']}"
             )
     except Exception as e:
@@ -1895,81 +1890,40 @@ def ensure_milvus_connection_for_indexing() -> None:
 
 
 async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
-    """删除知识库下所有文档和链接的 chunks 和 triples 索引
-    从 DB 拉取 knowledge_base_document 的 doc_id 与 knowledge_base_weblink 的 weblink_id，
-    去重后逐条删除向量索引（chunks + triples）。须在删除 document / weblink 表行之前调用。
-    """
+    """Delete the chunks and triples collection of the knowledge base"""
     result = {"success_count": 0, "failed_count": 0, "errors": []}
 
-    try:
-        index_manager_type = _CURR_INDEX_TYPE
-        doc_ids_result = knowledge_base_repository.get_all_doc_ids_for_kb(
-            space_id=space_id, kb_id=kb_id, index_manager_type=index_manager_type
-        )
-        weblink_ids_result = knowledge_base_repository.get_all_weblink_ids_for_kb(
-            space_id=space_id, kb_id=kb_id, index_manager_type=index_manager_type
-        )
-        doc_ids = doc_ids_result.data or [] if doc_ids_result.code == status.HTTP_200_OK else []
-        weblink_ids = (
-            weblink_ids_result.data or []
-            if weblink_ids_result.code == status.HTTP_200_OK
-            else []
-        )
-        # 与分页 document_list 覆盖范围一致（全表 doc_id），并包含 weblink；sorted 便于日志稳定
-        all_ids = sorted(set(doc_ids + weblink_ids))
+    chunk_index = f"kb_{kb_id}_chunks"
+    triple_index = f"kb_{kb_id}_triples"
 
-        if not all_ids:
-            logger.debug(f"[KB_DELETE] No documents/weblinks to delete indices for KB {kb_id}")
-            return result
-
-        logger.info(
-            f"[KB_DELETE] Deleting indices for {len(all_ids)} items "
-            f"(doc: {len(doc_ids)}, weblink: {len(weblink_ids)}) in KB {kb_id}"
-        )
-
-        index_manager = _create_index_manager(kb_id=kb_id)
-        chunk_index = f"kb_{kb_id}_chunks"
-        triple_index = f"kb_{kb_id}_triples"
-
+    for collection_name in (chunk_index, triple_index):
         try:
-            for doc_id in all_ids:
-                if not doc_id:
-                    continue
-                try:
-                    await _delete_document_from_index(
-                        index_manager=index_manager,
-                        index_name=chunk_index,
-                        doc_id=doc_id,
-                        kb_id=kb_id,
-                        index_type="chunks",
-                    )
-                    await _delete_document_from_index(
-                        index_manager=index_manager,
-                        index_name=triple_index,
-                        doc_id=doc_id,
-                        kb_id=kb_id,
-                        index_type="triples",
-                    )
-                    result["success_count"] += 1
-                except Exception as e:
-                    result["failed_count"] += 1
-                    result["errors"].append(f"Doc {doc_id}: {str(e)}")
-                    logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
-        finally:
-            try:
-                index_manager.close()
-            except Exception as e:
-                logger.warning(f"[KB_DELETE] Failed to close index manager: {e}")
+            vector_store = _create_vector_store(
+                collection_name=collection_name, kb_id=kb_id,
+            )
+            await vector_store.delete_table(collection_name)
+            result["success_count"] += 1
+            logger.info(
+                f"[KB_DELETE] Collection {collection_name} dropped successfully"
+            )
+        except Exception as e:
+            error_msg = str(e)
+            # Collection not existing is not an error during deletion
+            if "not exist" in error_msg.lower() or "not found" in error_msg.lower():
+                logger.debug(
+                    f"[KB_DELETE] Collection {collection_name} does not exist, skipping"
+                )
+            else:
+                result["failed_count"] += 1
+                result["errors"].append(f"Drop collection {collection_name}: {error_msg}")
+                logger.warning(
+                    f"[KB_DELETE] Failed to drop collection {collection_name}: {e}"
+                )
 
-        logger.info(
-            f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "
-            f"Success: {result['success_count']}, Failed: {result['failed_count']}"
-        )
-
-    except Exception as e:
-        error_msg = f"Failed to delete KB indices: {str(e)}"
-        result["errors"].append(error_msg)
-        logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+    logger.info(
+        f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "
+        f"Success: {result['success_count']}, Failed: {result['failed_count']}"
+    )
 
     return result
 
