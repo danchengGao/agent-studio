@@ -216,7 +216,7 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
     """
     # Workflow Trace
     if isinstance(chunk, TraceSchema) and chunk.type == "tracer_workflow":
-        logger.debug(f"get chunk.type == tracer_workflow, chunk: {chunk}")
+        logger.info(f"get chunk.type == tracer_workflow, chunk: {chunk}")
         data = TraceWorkflowSpan.model_validate(chunk.payload)
         if EMPTY_NODE_ID_PREFIX in data.invoke_id:
             return None, None, None

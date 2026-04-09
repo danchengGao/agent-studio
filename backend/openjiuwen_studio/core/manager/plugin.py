@@ -25,6 +25,7 @@ except ImportError:
     JSONSCHEMA_AVAILABLE = False
     logger.warning("jsonschema library not available, plugin validation will be skipped")
 
+from openjiuwen_studio.core.common.url_validator import validate_plugin_url
 from openjiuwen_studio.core.database import milliseconds
 import openjiuwen_studio.core.manager.convertor.plugin as convert
 from openjiuwen_studio.core.manager.convertor.components.plugin import param_type_mapping
@@ -732,6 +733,8 @@ def plugin_create(
     """创建新的插件"""
     _ = check_user_space(req.space_id, current_user)
 
+    validate_plugin_url(req.url)
+
     current_time = milliseconds()
 
     plugin_id = str(uuid.uuid4())
@@ -1006,6 +1009,8 @@ def plugin_update(
 ) -> ResponseModel:
     """获取插件信息"""
     _ = check_user_space(req.space_id, current_user)
+
+    validate_plugin_url(req.url)
 
     logger.info(f"update plugin: {req}")
     res, _ = plugin_repository.plugin_get(req.model_dump())

@@ -4,7 +4,9 @@
 from enum import IntEnum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from openjiuwen_studio.core.common.url_validator import validate_plugin_url
 
 
 class PluginType(IntEnum):
@@ -65,6 +67,11 @@ class PluginCreate(BaseModel):
     args: Optional[List[str]] = Field(default_factory=list, alias="args")
     env: Optional[Dict[str, str]] = Field(None, alias="env")
 
+    @field_validator("url")
+    @classmethod
+    def check_url_ssrf(cls, v: Optional[str]) -> Optional[str]:
+        return validate_plugin_url(v)
+
 
 class PluginId(BaseModel):
     space_id: str = Field(alias="space_id")
@@ -102,6 +109,11 @@ class PluginInfo(PluginBase):
     icon_uri: Optional[str] = Field("", alias="icon_uri")
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
+
+    @field_validator("url")
+    @classmethod
+    def check_url_ssrf(cls, v: Optional[str]) -> Optional[str]:
+        return validate_plugin_url(v)
 
     class Config:
         populate_by_name = True
