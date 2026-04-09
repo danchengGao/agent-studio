@@ -3011,10 +3011,24 @@ async def agent_export(
             logger.warning(f"[AGENT_EXPORT] Failed to process workflow schema: {e}")
 
     # 6. 构建导出数据
+    # 导出兼容：如果 prompt_template 为空，但 configs.system_prompt 存在，
+    # 则自动补齐 prompt_template，确保 Runtime 侧可直接识别。
+    export_agent_data = dict(agent_data) if isinstance(agent_data, dict) else agent_data
+    if isinstance(export_agent_data, dict):
+        prompt_template = export_agent_data.get("prompt_template", [])
+        if isinstance(prompt_template, str):
+            prompt_template = [{"role": "system", "content": prompt_template}]
+        if not prompt_template:
+            system_prompt = (export_agent_data.get("configs") or {}).get("system_prompt")
+            if isinstance(system_prompt, str) and system_prompt.strip():
+                export_agent_data["prompt_template"] = [
+                    {"role": "system", "content": system_prompt}
+                ]
+
     version = get_current_project_version()
     export_data = AgentExportData(
         version=version,  # 暂定和代码发布版本相同
-        agent=agent_data,
+        agent=export_agent_data,
         dependencies=AgentDependencies(
             workflows=workflows,
             plugins=plugins,

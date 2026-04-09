@@ -59,6 +59,26 @@ class ConfigAdapter:
     _build_workflow_func_cache = None
     
     @staticmethod
+    def _resolve_prompt_template(config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        统一解析提示词模板，兼容历史导出格式。
+
+        优先使用 agent.prompt_template；若为空则回退到 configs.system_prompt。
+        """
+        prompt_template = config.get("prompt_template", [])
+        if isinstance(prompt_template, str):
+            prompt_template = [{"role": "system", "content": prompt_template}]
+
+        if isinstance(prompt_template, list) and prompt_template:
+            return prompt_template
+
+        system_prompt = (config.get("configs") or {}).get("system_prompt")
+        if isinstance(system_prompt, str) and system_prompt.strip():
+            return [{"role": "system", "content": system_prompt}]
+
+        return []
+
+    @staticmethod
     def _get_build_workflow_func():
         """
         获取 build_core_workflow_from_ir_dict 函数
@@ -120,9 +140,7 @@ class ConfigAdapter:
         workflow_cards = ConfigAdapter._create_workflow_cards(config.get("workflows", []))
         plugin_schemas = ConfigAdapter._create_plugin_schemas(config.get("plugins", []))
         
-        prompt_template = config.get("prompt_template", [])
-        if isinstance(prompt_template, str):
-            prompt_template = [{"role": "system", "content": prompt_template}]
+        prompt_template = ConfigAdapter._resolve_prompt_template(config)
         
         constrain = ConstrainConfig(
             reserved_max_chat_rounds=config.get("constraint", {}).get("reserved_max_chat_rounds", 10),
@@ -773,9 +791,7 @@ class ConfigAdapter:
         model_data = config.get("model", {})
         model_info_data = model_data.get("model_info", {})
         
-        prompt_template = config.get("prompt_template", [])
-        if isinstance(prompt_template, str):
-            prompt_template = [{"role": "system", "content": prompt_template}]
+        prompt_template = ConfigAdapter._resolve_prompt_template(config)
         
         model_name = model_data.get("model_name", "")
         model_provider = model_data.get("model_provider", "openai")
