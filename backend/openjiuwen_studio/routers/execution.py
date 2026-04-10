@@ -48,24 +48,6 @@ def _normalize_language(language: Optional[str]) -> str:
     return "en"
 
 
-def _normalize_interactive_input_value(value: Any) -> Any:
-    """
-    交互节点（如提问器）将用户输入交给下游构造 UserMessage；其 content 须为 str 或规范列表，
-    不能是裸 dict。前端常以「题干/字段说明 -> 回答」形式传 dict，需在此处转为可读文本。
-    """
-    if isinstance(value, dict):
-        if not value:
-            return ""
-        lines: list[str] = []
-        for k, v in value.items():
-            if k is None or k == "":
-                lines.append(str(v))
-            else:
-                lines.append(f"{k}: {v}")
-        return "\n".join(lines)
-    return value
-
-
 def _resolve_language(current_user: Optional[dict]) -> str:
     """
     解析当前语言。
@@ -154,10 +136,7 @@ async def handler(
         logger.info(f"in execute: {request_body}, {current_user}")
         if isinstance(request_body.inputs, UserInput):
             inputs = InteractiveInput()
-            inputs.update(
-                request_body.inputs.node_id,
-                _normalize_interactive_input_value(request_body.inputs.input_value),
-            )
+            inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
         else:
             inputs = request_body.inputs
 
@@ -305,10 +284,7 @@ async def execute_component(
     try:
         if isinstance(request_body.inputs, UserInput):
             inputs = InteractiveInput()
-            inputs.update(
-                request_body.inputs.node_id,
-                _normalize_interactive_input_value(request_body.inputs.input_value),
-            )
+            inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
         else:
             inputs = request_body.inputs
         logger.info(f"request_body: {request_body}")
@@ -389,10 +365,7 @@ async def execute_plugin(
         logger.info(f"in execute: {request_body}")
         if isinstance(request_body.inputs, UserInput):
             inputs = InteractiveInput()
-            inputs.update(
-                request_body.inputs.node_id,
-                _normalize_interactive_input_value(request_body.inputs.input_value),
-            )
+            inputs.update(request_body.inputs.node_id, request_body.inputs.input_value)
         else:
             inputs = request_body.inputs
         version = "draft"
