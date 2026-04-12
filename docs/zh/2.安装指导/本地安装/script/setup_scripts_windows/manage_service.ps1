@@ -1066,162 +1066,34 @@ function Start-FrontendService {
     Set-Location $PrevLocation
 }
 
-# Runtime server: verify uv, venv, uv sync, and editable management/foundation packages (same steps as deploy.bat for deps and SDKs)
-function Install-RuntimeDependencies {
-    param(
-        [Parameter(Mandatory)]
-        [string]$RuntimeServerDir
-    )
-    Push-Location $RuntimeServerDir
-    $PrevErrorActionPreference = $ErrorActionPreference
-    try {
-        # uv writes progress to stderr; with $ErrorActionPreference Stop (setup.ps1) that becomes a terminating NativeCommandError
-        $ErrorActionPreference = 'Continue'
-        try {
-            $null = Get-Command uv -ErrorAction Stop
-        } catch {
-            Write-Log "ERROR" "uv is not installed. Please install it with: powershell -ExecutionPolicy Bypass -c `"irm https://astral.sh/uv/install.ps1 | iex`""
-            exit 1
-        }
-        $UvVersionLine = (uv --version 2>&1 | Out-String).Trim()
-        Write-Log "INFO" "uv is installed: $UvVersionLine"
-
-        $venvPath = Join-Path $RuntimeServerDir ".venv"
-        $pyvenvCfg = Join-Path $venvPath "pyvenv.cfg"
-        if (-not (Test-Path $venvPath)) {
-            uv venv
-            if ($LASTEXITCODE -ne 0) {
-                Write-Log "ERROR" "Failed to create virtual environment (uv venv)"
-                exit 1
-            }
-            Write-Log "INFO" "Virtual environment created"
-        } elseif (Test-Path $pyvenvCfg) {
-            Write-Log "INFO" "Virtual environment already exists"
-        } else {
-            Write-Log "WARN" ".venv is incomplete (missing pyvenv.cfg), recreating..."
-            Remove-Item $venvPath -Recurse -Force -ErrorAction SilentlyContinue
-            uv venv
-            if ($LASTEXITCODE -ne 0) {
-                Write-Log "ERROR" "Failed to recreate virtual environment. Close running servers/terminals that may lock .venv, then retry"
-                exit 1
-            }
-            Write-Log "INFO" "Virtual environment recreated"
-        }
-
-        $UvDiArgs = Get-UvDefaultIndexArgsFromUserConfig -WorkHome $WORK_HOME
-        $RuntimeVenvPython = Join-Path $RuntimeServerDir ".venv\Scripts\python.exe"
-        if (-not (Test-Path $RuntimeVenvPython)) {
-            Write-Log "ERROR" "Runtime venv python not found: $RuntimeVenvPython"
-            exit 1
-        }
-
-        $uvSyncCmd = @('sync') + $UvDiArgs
-        $uvSyncCmdLog = ($uvSyncCmd | ForEach-Object { "$_" }) -join ' '
-        $uvSyncCmdLog = $uvSyncCmdLog -replace '(https?://)([^/\s:@]+):([^/\s@]+)@', '$1***:***@'
-        Write-Log "INFO" "Running uv command: uv $uvSyncCmdLog"
-        $uvSyncOutput = (uv @uvSyncCmd 2>&1 | Out-String).Trim()
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "WARN" "uv sync failed"
-            if ($uvSyncOutput) {
-                Write-Log "WARN" "uv sync output:`n$uvSyncOutput"
-            }
-        } else {
-            Write-Log "INFO" "Dependencies synced (uv sync)"
-        }
-
-        $uvPipFound = @('pip', 'install') + $UvDiArgs + @('--python', $RuntimeVenvPython, '-e', '..\foundation', '--force-reinstall')
-        $uvPipFoundLog = ($uvPipFound | ForEach-Object { "$_" }) -join ' '
-        $uvPipFoundLog = $uvPipFoundLog -replace '(https?://)([^/\s:@]+):([^/\s@]+)@', '$1***:***@'
-        Write-Log "INFO" "Running uv command: uv $uvPipFoundLog"
-        $uvPipFoundOutput = (uv @uvPipFound 2>&1 | Out-String).Trim()
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "ERROR" "Failed to install foundation SDK. Ensure no old server process is using .venv files"
-            if ($uvPipFoundOutput) {
-                Write-Log "ERROR" "uv pip install (foundation) output:`n$uvPipFoundOutput"
-            }
-            exit 1
-        }
-        Write-Log "INFO" "foundation SDK installed"
-
-        $uvPipMgmt = @('pip', 'install') + $UvDiArgs + @('--python', $RuntimeVenvPython, '-e', '..\management', '--force-reinstall', '--no-deps')
-        $uvPipMgmtLog = ($uvPipMgmt | ForEach-Object { "$_" }) -join ' '
-        $uvPipMgmtLog = $uvPipMgmtLog -replace '(https?://)([^/\s:@]+):([^/\s@]+)@', '$1***:***@'
-        Write-Log "INFO" "Running uv command: uv $uvPipMgmtLog"
-        $uvPipMgmtOutput = (uv @uvPipMgmt 2>&1 | Out-String).Trim()
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "ERROR" "Failed to install management SDK. Ensure no old server process is using .venv files"
-            if ($uvPipMgmtOutput) {
-                Write-Log "ERROR" "uv pip install (management) output:`n$uvPipMgmtOutput"
-            }
-            exit 1
-        }
-        Write-Log "INFO" "management SDK installed"
-
-        $PrevErrPrefForRuntimeCheck = $ErrorActionPreference
-        try {
-            $ErrorActionPreference = 'Continue'
-            $RuntimeImportCheckOutput = (& $RuntimeVenvPython -c "import openjiuwen_runtime.management; import openjiuwen_runtime.foundation.deploy_utils" 2>&1 | Out-String).Trim()
-        } finally {
-            $ErrorActionPreference = $PrevErrPrefForRuntimeCheck
-        }
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "ERROR" "Runtime SDK import verification failed after dependency installation"
-            if ($RuntimeImportCheckOutput) {
-                Write-Log "ERROR" "Runtime SDK import check output:`n$RuntimeImportCheckOutput"
-            }
-            Write-Log "ERROR" "Possible cause: mirror dependency resolution replaced local foundation package. Check user_config.ps1 UV_INDEX mirror consistency."
-            exit 1
-        }
-        Write-Log "INFO" "Runtime SDK import verification passed"
-    } finally {
-        $ErrorActionPreference = $PrevErrorActionPreference
-        Pop-Location
-    }
-}
-
 function Start-RuntimeService {
     Write-Log "INFO" "===== Starting Runtime Service ====="
     $RuntimeServerDir = Join-Path $RUNTIME_DIR "server"
     $RuntimeEnvFile = Join-Path $RuntimeServerDir ".env"
     $RuntimeLog = Join-Path $WORK_HOME "runtime.log"
-    $RuntimeVenvPython = Join-Path $RuntimeServerDir ".venv\Scripts\python.exe"
+    $RuntimeRunScript = Join-Path $RUNTIME_DIR "scripts\run-server.ps1"
     Test-Directory $RuntimeServerDir
     Test-File $RuntimeEnvFile
-    Install-RuntimeDependencies -RuntimeServerDir $RuntimeServerDir
-    if (-not (Test-Path $RuntimeVenvPython)) {
-        Write-Log "ERROR" "Runtime venv python not found after dependency installation: $RuntimeVenvPython"
+    Test-File $RuntimeRunScript
+    $PwshCmd = Get-Command powershell.exe -ErrorAction SilentlyContinue
+    if (-not $PwshCmd) {
+        Write-Log "ERROR" "powershell.exe not found in PATH"
         exit 1
     }
 
-    Push-Location $RuntimeServerDir
+    Push-Location $RUNTIME_DIR
     try {
-        $RuntimeListenPort = $null
-        for ($p = 8100; $p -lt 8300; $p++) {
-            $used = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
-            if (-not $used) {
-                $RuntimeListenPort = $p
-                break
-            }
-        }
-        if (-not $RuntimeListenPort) {
-            Write-Log "ERROR" "No available port found in range 8100-8299"
-            exit 1
-        }
-        Write-Log "INFO" "Selected runtime port: $RuntimeListenPort"
-
         if (Test-Path $RuntimeLog) {
             Remove-Item $RuntimeLog -Force -ErrorAction SilentlyContinue
         }
         "" | Out-File -FilePath $RuntimeLog -Encoding utf8 -NoNewline
 
-        Write-Log "INFO" "Starting runtime server in background on port $RuntimeListenPort, log file: $RuntimeLog"
-        $RuntimePyArgs = @('-m', 'uvicorn', 'openjiuwen_runtime.server.main:app', '--host', '0.0.0.0', '--port', "$RuntimeListenPort")
-        $RuntimePyArgsLog = ($RuntimePyArgs | ForEach-Object { "$_" }) -join ' '
-        Write-Log "INFO" "Running python command: `"$RuntimeVenvPython`" $RuntimePyArgsLog"
-        $RuntimeCmd = "chcp 65001 >nul && `"$RuntimeVenvPython`" $RuntimePyArgsLog >> `"$RuntimeLog`" 2>&1"
+        Write-Log "INFO" "Starting runtime server by run-server.ps1 in background, log file: $RuntimeLog"
+        Write-Log "INFO" "Running command: powershell.exe -ExecutionPolicy Bypass -File .\scripts\run-server.ps1"
+        $RuntimeCmd = "chcp 65001 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-server.ps1 >> `"$RuntimeLog`" 2>&1"
         $RuntimeProcess = Start-Process -FilePath "cmd.exe" `
             -ArgumentList "/c", $RuntimeCmd `
-            -WorkingDirectory $RuntimeServerDir `
+            -WorkingDirectory $RUNTIME_DIR `
             -WindowStyle Hidden `
             -PassThru
         if (-not $RuntimeProcess) {
@@ -1234,22 +1106,9 @@ function Start-RuntimeService {
     }
 
     $RuntimePort = $null
-    $RuntimePid = $null
+    $RuntimePid = $RuntimeProcess.Id
     for ($i = 0; $i -lt 45; $i++) {
         Start-Sleep -Seconds 1
-        try {
-            $ListenConn = Get-NetTCPConnection -LocalPort $RuntimeListenPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($ListenConn) {
-                $RuntimePort = $ListenConn.LocalPort
-                if ($ListenConn.OwningProcess -gt 0) {
-                    $RuntimePid = [int]$ListenConn.OwningProcess
-                }
-                break
-            }
-        } catch {
-            # ignore transient netstat query errors
-        }
-
         if ($RuntimeProcess.HasExited -and $RuntimeProcess.ExitCode -ne 0) {
             Write-Log "ERROR" "Runtime service process exited unexpectedly (exit code: $($RuntimeProcess.ExitCode))"
             if (Test-Path $RuntimeLog) {
@@ -1260,40 +1119,40 @@ function Start-RuntimeService {
             }
             exit 1
         }
+
+        if (-not $RuntimeProcess.HasExited) {
+            break
+        }
     }
 
-    if ($RuntimePort) {
-        if (-not $RuntimePid) {
-            $RuntimePid = $RuntimeProcess.Id
-        }
-        Set-ServiceProcessState -Values @{
-            runtime_pid  = $RuntimePid
-            runtime_port = $RuntimePort
-        }
+    if (-not $RuntimeProcess.HasExited) {
         if ($TARGET_ENV_FILE -and (Test-Path $TARGET_ENV_FILE)) {
             try {
                 $EnvContent = Get-Content $TARGET_ENV_FILE -ErrorAction Stop
-                if (($EnvContent | Where-Object { $_ -match '^RUNTIME_PORT=' } | Select-Object -First 1)) {
-                    $UpdatedEnvContent = $EnvContent | ForEach-Object {
-                        if ($_ -match '^RUNTIME_PORT=') { "RUNTIME_PORT=$RuntimePort" } else { $_ }
-                    }
-                    Set-Content -Path $TARGET_ENV_FILE -Value $UpdatedEnvContent -Encoding utf8 -Force
-                } else {
-                    Add-Content -Path $TARGET_ENV_FILE -Value "RUNTIME_PORT=$RuntimePort"
+                $RuntimePortLine = $EnvContent | Where-Object { $_ -match '^RUNTIME_PORT=' } | Select-Object -First 1
+                if ($RuntimePortLine -match '^RUNTIME_PORT=(\d+)$') {
+                    $RuntimePort = [int]$Matches[1]
                 }
-                Write-Log "INFO" "Updated RUNTIME_PORT in .env: $RuntimePort"
             } catch {
-                Write-Log "WARN" "Failed to update RUNTIME_PORT in .env: $TARGET_ENV_FILE"
+                Write-Log "WARN" "Failed to read RUNTIME_PORT from .env: $TARGET_ENV_FILE"
             }
-        } else {
-            Write-Log "WARN" "Skipped .env runtime port update: TARGET_ENV_FILE not found"
         }
-        Write-Log "INFO" "Saved runtime_pid / runtime_port to services.state (pid: $RuntimePid, port: $RuntimePort)"
-        Write-Log "SUCCESS" "Runtime service started in background: http://localhost:$RuntimePort"
+
+        Set-ServiceProcessState -Values @{
+            runtime_pid = $RuntimePid
+        } -RemoveKeys @('runtime_port')
+        if ($RuntimePort) {
+            Set-ServiceProcessState -Values @{ runtime_port = $RuntimePort }
+            Write-Log "INFO" "Saved runtime_pid / runtime_port to services.state (pid: $RuntimePid, port: $RuntimePort)"
+            Write-Log "SUCCESS" "Runtime service started in background: http://localhost:$RuntimePort"
+        } else {
+            Write-Log "INFO" "Saved runtime_pid to services.state (pid: $RuntimePid)"
+            Write-Log "SUCCESS" "Runtime service started in background"
+        }
     } else {
         Set-ServiceProcessState -Values @{ runtime_pid = $RuntimeProcess.Id } -RemoveKeys @('runtime_port')
         Write-Log "WARN" "Saved runtime_pid (launcher only) to services.state (pid: $($RuntimeProcess.Id))"
-        Write-Log "WARN" "Runtime background process started but port not detected yet (expected range: 8100-8299). See log: $RuntimeLog"
+        Write-Log "WARN" "Runtime launcher process exited quickly. Check runtime log: $RuntimeLog"
     }
 }
 

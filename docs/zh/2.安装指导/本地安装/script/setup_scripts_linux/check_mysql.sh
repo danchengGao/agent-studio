@@ -11,11 +11,24 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+UTILS_SH="${SCRIPT_DIR}/utils.sh"
+if [ ! -f "$UTILS_SH" ]; then
+    echo -e "${RED}❌ utils.sh not found: ${UTILS_SH}${NC}"
+    exit 1
+fi
+# shellcheck source=utils.sh
+source "$UTILS_SH"
+
+# DB_HOST / DB_PORT from user_config.sh (see load_db_host_port_from_user_config in utils.sh)
+load_db_host_port_from_user_config
+
 # Version requirement
 REQUIRED_MAJOR_VERSION=8
 REQUIRED_MINOR_VERSION=0
 
-echo -e "${BLUE}=== MySQL configuration check ===${NC}\n"
+echo -e "${BLUE}=== MySQL configuration check ===${NC}"
+echo -e "${BLUE}Database host: ${DB_HOST}  port: ${DB_PORT}${NC}\n"
 
 # Get MySQL version
 get_mysql_version() {
@@ -40,6 +53,17 @@ get_mysql_version() {
         fi
     fi
     
+    return 1
+}
+
+run_mysql_client_check() {
+    local password="$1"
+    local sql="${2:-SELECT 1;}"
+
+    if MYSQL_PWD="$password" mysql --protocol=TCP -h "$DB_HOST" -P "$DB_PORT" -u root -e "$sql" 2>/dev/null | grep -q "1"; then
+        return 0
+    fi
+
     return 1
 }
 
@@ -216,6 +240,37 @@ check_mysql_installed() {
     fi
 }
 
+# Apply root password for local admin accounts (TCP + socket naming) and Docker bridge.
+# - 'root'@'localhost' / 'root'@'127.0.0.1': ALTER (each may fail if account absent; ignored).
+# - 'root'@'172.17.0.1': CREATE IF NOT EXISTS + GRANT + ALTER (Docker client source IP on default bridge).
+# Returns 0 if at least one step succeeds (mysqladmin or any mysql statement).
+_mysql_apply_root_password_all_hosts() {
+    local pwd="$1"
+    local ok=0
+
+    if command -v mysqladmin &>/dev/null; then
+        if sudo mysqladmin --protocol=TCP -h "$DB_HOST" -P "$DB_PORT" -u root password "$pwd" 2>/dev/null; then
+            ok=1
+        fi
+    fi
+
+    local rh
+    for rh in localhost 127.0.0.1; do
+        if echo "ALTER USER 'root'@'${rh}' IDENTIFIED BY '${pwd}';" | sudo mysql --protocol=TCP -h "$DB_HOST" -P "$DB_PORT" -u root 2>/dev/null; then
+            ok=1
+        fi
+    done
+
+    if echo "CREATE USER IF NOT EXISTS 'root'@'172.17.0.1' IDENTIFIED BY '${pwd}';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'172.17.0.1' WITH GRANT OPTION;
+ALTER USER 'root'@'172.17.0.1' IDENTIFIED BY '${pwd}';
+FLUSH PRIVILEGES;" | sudo mysql --protocol=TCP -h "$DB_HOST" -P "$DB_PORT" -u root 2>/dev/null; then
+        ok=1
+    fi
+
+    [ "$ok" -eq 1 ]
+}
+
 # Set MySQL root password
 set_mysql_root_password() {
     local is_newly_installed="$1"
@@ -264,34 +319,23 @@ set_mysql_root_password() {
             fi
         done
         
-        echo -e "${BLUE}Setting MySQL root password...${NC}"
-        
-        if command -v mysqladmin &> /dev/null; then
-            if sudo mysqladmin -u root password "$root_password" 2>/dev/null; then
-                echo -e "${GREEN}✅ MySQL root password set${NC}"
-            else
-                if echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_password'; FLUSH PRIVILEGES;" | sudo mysql -u root 2>/dev/null; then
-                    echo -e "${GREEN}✅ MySQL root password set${NC}"
-                else
-                    echo -e "${YELLOW}⚠ Cannot set MySQL root password automatically${NC}"
-                    echo -e "${YELLOW}Set manually:${NC}"
-                    echo -e "  ${GREEN}sudo mysql -u root${NC}"
-                    echo -e "  ${GREEN}ALTER USER 'root'@'localhost' IDENTIFIED BY 'your_password';${NC}"
-                    echo -e "  ${GREEN}FLUSH PRIVILEGES;${NC}"
-                    return 1
-                fi
-            fi
+        echo -e "${BLUE}Setting MySQL root password (localhost, 127.0.0.1, 172.17.0.1 for Docker)...${NC}"
+
+        if _mysql_apply_root_password_all_hosts "$root_password"; then
+            echo -e "${GREEN}✅ MySQL root password set${NC}"
         else
-            if echo "ALTER USER 'root'@'localhost' IDENTIFIED BY '$root_password'; FLUSH PRIVILEGES;" | sudo mysql -u root 2>/dev/null; then
-                echo -e "${GREEN}✅ MySQL root password set${NC}"
-            else
-                echo -e "${YELLOW}⚠ Cannot set MySQL root password automatically${NC}"
-                return 1
-            fi
+            echo -e "${YELLOW}⚠ Cannot set MySQL root password automatically${NC}"
+            echo -e "${YELLOW}Set manually (connect with: sudo mysql --protocol=TCP -h ${DB_HOST} -P ${DB_PORT} -u root):${NC}"
+            echo -e "  ${GREEN}ALTER USER 'root'@'localhost' IDENTIFIED BY 'your_password';${NC}"
+            echo -e "  ${GREEN}ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY 'your_password';${NC}"
+            echo -e "  ${GREEN}CREATE USER IF NOT EXISTS 'root'@'172.17.0.1' IDENTIFIED BY 'your_password';${NC}"
+            echo -e "  ${GREEN}GRANT ALL PRIVILEGES ON *.* TO 'root'@'172.17.0.1' WITH GRANT OPTION;${NC}"
+            echo -e "  ${GREEN}FLUSH PRIVILEGES;${NC}"
+            return 1
         fi
         
         sleep 2
-        if MYSQL_PWD="$root_password" mysql -u root -e "SELECT 1;" 2>/dev/null | grep -q "1"; then
+        if run_mysql_client_check "$root_password" "SELECT 1;"; then
             echo -e "${GREEN}✅ MySQL root password verified${NC}"
         else
             echo -e "${YELLOW}⚠ Password verification failed but password may be set${NC}"
@@ -314,7 +358,7 @@ set_mysql_root_password() {
                 continue
             fi
             
-            if MYSQL_PWD="$root_password" mysql -u root -e "SELECT 1;" 2>/dev/null | grep -q "1"; then
+            if run_mysql_client_check "$root_password" "SELECT 1;"; then
                 password_entered=true
                 echo -e "${GREEN}✅ MySQL root password verified${NC}"
             else
@@ -408,61 +452,72 @@ verify_mysql() {
 }
 
 
-# ===================== Main =====================
+run_check_mysql_main() {
+    MYSQL_INSTALLED=false
+    MYSQL_VERSION=""
+    MYSQL_WAS_NEWLY_INSTALLED=false
 
-MYSQL_INSTALLED=false
-MYSQL_VERSION=""
-MYSQL_WAS_NEWLY_INSTALLED=false
-check_mysql_installed
+    check_mysql_installed
 
-if [ "$MYSQL_INSTALLED" = false ]; then
-    if install_mysql; then
-        MYSQL_WAS_NEWLY_INSTALLED=true
-        
-        sleep 3
-        
-        if command -v mysql &> /dev/null; then
-            MYSQL_VERSION=$(get_mysql_version "mysql")
-            if [ -n "$MYSQL_VERSION" ]; then
-                if check_version_requirement "$MYSQL_VERSION"; then
-                    echo -e "${GREEN}✅ MySQL $MYSQL_VERSION installed and meets version requirement${NC}"
-                    MYSQL_INSTALLED=true
+    if [ "$MYSQL_INSTALLED" = false ]; then
+        if install_mysql; then
+            MYSQL_WAS_NEWLY_INSTALLED=true
+
+            sleep 3
+
+            if command -v mysql &> /dev/null; then
+                MYSQL_VERSION=$(get_mysql_version "mysql")
+                if [ -n "$MYSQL_VERSION" ]; then
+                    if check_version_requirement "$MYSQL_VERSION"; then
+                        echo -e "${GREEN}✅ MySQL $MYSQL_VERSION installed and meets version requirement${NC}"
+                        MYSQL_INSTALLED=true
+                    else
+                        echo -e "${RED}❌ MySQL installed but version $MYSQL_VERSION still does not meet requirement${NC}"
+                        return 1
+                    fi
                 else
-                    echo -e "${RED}❌ MySQL installed but version $MYSQL_VERSION still does not meet requirement${NC}"
-                    exit 1
+                    echo -e "${RED}❌ MySQL installed but cannot get version${NC}"
+                    return 1
                 fi
             else
-                echo -e "${RED}❌ MySQL installed but cannot get version${NC}"
-                exit 1
+                echo -e "${RED}❌ MySQL installation failed, mysql command not available${NC}"
+                return 1
             fi
         else
-            echo -e "${RED}❌ MySQL installation failed, mysql command not available${NC}"
-            exit 1
+            echo -e "${RED}❌ MySQL installation failed${NC}"
+            return 1
         fi
-    else
-        echo -e "${RED}❌ MySQL installation failed${NC}"
-        exit 1
     fi
-fi
 
-if ! verify_mysql "$MYSQL_WAS_NEWLY_INSTALLED"; then
-    echo -e "${RED}❌ MySQL verification failed${NC}"
-    exit 1
-fi
+    if ! verify_mysql "$MYSQL_WAS_NEWLY_INSTALLED"; then
+        echo -e "${RED}❌ MySQL verification failed${NC}"
+        return 1
+    fi
 
-echo ""
+    echo ""
+    echo -e "${BLUE}=== MySQL configuration ===${NC}"
+    echo "DB_HOST=${DB_HOST}"
+    echo "DB_PORT=${DB_PORT}"
+    if [ -n "${MYSQL_EXE_PATH:-}" ]; then
+        echo "MYSQL_EXE_PATH=${MYSQL_EXE_PATH}"
+    fi
+    if [ -n "${MYSQL_BIN_DIR:-}" ]; then
+        echo "MYSQL_BIN_DIR=${MYSQL_BIN_DIR}"
+    fi
+    if [ -n "${MYSQL_PWD:-}" ]; then
+        echo "MYSQL_PWD=***"
+        echo -e "${GREEN}✅ MySQL root password set in environment${NC}"
+    fi
 
-echo -e "${BLUE}=== MySQL configuration ===${NC}"
-if [ -n "${MYSQL_EXE_PATH:-}" ]; then
-    echo "MYSQL_EXE_PATH=${MYSQL_EXE_PATH}"
-fi
-if [ -n "${MYSQL_BIN_DIR:-}" ]; then
-    echo "MYSQL_BIN_DIR=${MYSQL_BIN_DIR}"
-fi
-if [ -n "${MYSQL_PWD:-}" ]; then
-    echo "MYSQL_PWD=***"
-    echo -e "${GREEN}✅ MySQL root password set in environment${NC}"
-fi
+    echo -e "\n${BLUE}=== Check complete ===${NC}"
+    return 0
+}
 
-echo -e "\n${BLUE}=== Check complete ===${NC}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    run_check_mysql_main
+    exit $?
+else
+    run_check_mysql_main
+    return $?
+fi
 

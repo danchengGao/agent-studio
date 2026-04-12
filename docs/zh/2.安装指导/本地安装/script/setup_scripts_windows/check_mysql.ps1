@@ -15,6 +15,11 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $UtilsScript = Join-Path $ScriptDir "utils.ps1"
 . $UtilsScript
 
+$DbConnCfg = Get-DbHostPortFromUserConfig -WorkHome $ScriptDir -DefaultHost "127.0.0.1" -DefaultPort 3306
+$DB_HOST = $DbConnCfg.Host
+$DB_PORT = [int]$DbConnCfg.Port
+Write-Log "INFO" "Database connection from user_config.ps1 => host: $DB_HOST, port: $DB_PORT"
+
 
 function Search-MySQLExecutable {
     # Common MySQL installation paths
@@ -944,7 +949,7 @@ function Set-MySQLRootPassword {
             try {
                 $TestSQL = "SELECT 1;"
                 $env:MYSQL_PWD = $RootPassword
-                $TestResult = $TestSQL | & $MySQLExePath -u root 2>&1 | Out-String
+                $TestResult = $TestSQL | & $MySQLExePath -u root -h $DB_HOST -P $DB_PORT 2>&1 | Out-String
                 Remove-Item Env:\MYSQL_PWD -ErrorAction SilentlyContinue
                 
                 if ($LASTEXITCODE -eq 0 -and $TestResult -notmatch "Access denied|error|1045") {
@@ -987,7 +992,7 @@ function Set-MySQLRootPassword {
         
         try {
             # Try connecting without password to set the new password
-            $Result = $SetPasswordSQL | & $MySQLExePath -u root 2>&1 | Out-String
+            $Result = $SetPasswordSQL | & $MySQLExePath -u root -h $DB_HOST -P $DB_PORT 2>&1 | Out-String
             if ($LASTEXITCODE -eq 0 -and $Result -notmatch "Access denied|error|1045") {
                 Write-Log "SUCCESS" "MySQL root password set successfully"
             } else {
@@ -995,7 +1000,7 @@ function Set-MySQLRootPassword {
                 $MySQLAdminPath = Join-Path (Split-Path -Parent $MySQLExePath) "mysqladmin.exe"
                 if (Test-Path $MySQLAdminPath) {
                     Write-Log "INFO" "Trying to set password using mysqladmin..."
-                    $AdminResult = & $MySQLAdminPath -u root password $RootPassword 2>&1 | Out-String
+                    $AdminResult = & $MySQLAdminPath -u root -h $DB_HOST -P $DB_PORT password $RootPassword 2>&1 | Out-String
                     if ($LASTEXITCODE -eq 0) {
                         Write-Log "SUCCESS" "MySQL root password set using mysqladmin"
                     } else {
@@ -1018,7 +1023,7 @@ function Set-MySQLRootPassword {
         try {
             $VerifySQL = "SELECT 1;"
             $env:MYSQL_PWD = $RootPassword
-            $VerifyResult = $VerifySQL | & $MySQLExePath -u root 2>&1 | Out-String
+            $VerifyResult = $VerifySQL | & $MySQLExePath -u root -h $DB_HOST -P $DB_PORT 2>&1 | Out-String
             Remove-Item Env:\MYSQL_PWD -ErrorAction SilentlyContinue
             if ($LASTEXITCODE -eq 0) {
                 Write-Log "SUCCESS" "MySQL root password verified"

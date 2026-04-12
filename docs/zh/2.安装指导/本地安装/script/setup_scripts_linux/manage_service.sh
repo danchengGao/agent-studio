@@ -599,185 +599,55 @@ stop_services() {
     return 0
 }
 
-# Runtime server: uv, venv, uv sync, editable management/foundation 
-install_runtime_dependencies() {
-    local RUNTIME_SERVER_DIR="$1"
-    if [ -z "$RUNTIME_SERVER_DIR" ]; then
-        error_exit "install_runtime_dependencies: RuntimeServerDir is required" \
-            "Pass the agent-runtime server directory, e.g. \${RUNTIME_DIR}/server"
-    fi
-
-    check_command "uv"
-    log "INFO" "uv is installed: $(uv --version 2>&1 | tr -d '\r' | head -1)"
-
-    local venv_path pyvenv_cfg
-    venv_path="${RUNTIME_SERVER_DIR}/.venv"
-    pyvenv_cfg="${venv_path}/pyvenv.cfg"
-    get_uv_index_args_from_user_config
-
-    if [ ! -d "$venv_path" ]; then
-        ( cd "$RUNTIME_SERVER_DIR" && uv venv ) || error_exit "Failed to create virtual environment (uv venv)" \
-            "cd $RUNTIME_SERVER_DIR && uv venv"
-        log "INFO" "Virtual environment created"
-    elif [ -f "$pyvenv_cfg" ]; then
-        log "INFO" "Virtual environment already exists"
-    else
-        log "WARN" ".venv is incomplete (missing pyvenv.cfg), recreating..."
-        rm -rf "$venv_path"
-        ( cd "$RUNTIME_SERVER_DIR" && uv venv ) || error_exit "Failed to recreate virtual environment. Close running servers/terminals that may lock .venv, then retry" \
-            "cd $RUNTIME_SERVER_DIR && rm -rf .venv && uv venv"
-        log "INFO" "Virtual environment recreated"
-    fi
-
-    local uv_sync_args uv_sync_cmd uv_sync_cmd_log uv_sync_output
-    uv_sync_args=("sync" "${UV_INDEX_ARGS[@]}")
-    uv_sync_cmd="uv ${uv_sync_args[*]}"
-    uv_sync_cmd_log=$(echo "$uv_sync_cmd" | sed -E 's#(https?://)([^/[:space:]:@]+):([^/[:space:]@]+)@#\1***:***@#g')
-    log "INFO" "Running uv command: $uv_sync_cmd_log"
-    uv_sync_output=$(cd "$RUNTIME_SERVER_DIR" && uv "${uv_sync_args[@]}" 2>&1)
-    if [ $? -ne 0 ]; then
-        log "WARN" "uv sync failed"
-        if [ -n "$uv_sync_output" ]; then
-            log "WARN" "uv sync output:"
-            echo "$uv_sync_output"
-        fi
-        log "WARN" "uv sync did not succeed (e.g. missing pyproject.toml); continuing per deploy.bat behavior"
-    else
-        log "INFO" "Dependencies synced (uv sync)"
-    fi
-
-    local uv_pip_mgmt_args uv_pip_mgmt_cmd uv_pip_mgmt_cmd_log uv_pip_mgmt_output
-    uv_pip_mgmt_args=("pip" "install" "${UV_INDEX_ARGS[@]}" "-e" "../management" "--force-reinstall")
-    uv_pip_mgmt_cmd="uv ${uv_pip_mgmt_args[*]}"
-    uv_pip_mgmt_cmd_log=$(echo "$uv_pip_mgmt_cmd" | sed -E 's#(https?://)([^/[:space:]:@]+):([^/[:space:]@]+)@#\1***:***@#g')
-    log "INFO" "Running uv command: $uv_pip_mgmt_cmd_log"
-    uv_pip_mgmt_output=$(cd "$RUNTIME_SERVER_DIR" && uv "${uv_pip_mgmt_args[@]}" 2>&1)
-    if [ $? -ne 0 ]; then
-        log "ERROR" "Failed to install management SDK. Ensure no old server process is using .venv files"
-        if [ -n "$uv_pip_mgmt_output" ]; then
-            log "ERROR" "uv pip install (management) output:"
-            echo "$uv_pip_mgmt_output"
-        fi
-        error_exit "Failed to install management SDK. Ensure no old server process is using .venv files" \
-            "cd $RUNTIME_SERVER_DIR && uv pip install -e ../management --force-reinstall"
-    fi
-    log "INFO" "management SDK installed"
-
-    local uv_pip_found_args uv_pip_found_cmd uv_pip_found_cmd_log uv_pip_found_output
-    uv_pip_found_args=("pip" "install" "${UV_INDEX_ARGS[@]}" "-e" "../foundation" "--force-reinstall")
-    uv_pip_found_cmd="uv ${uv_pip_found_args[*]}"
-    uv_pip_found_cmd_log=$(echo "$uv_pip_found_cmd" | sed -E 's#(https?://)([^/[:space:]:@]+):([^/[:space:]@]+)@#\1***:***@#g')
-    log "INFO" "Running uv command: $uv_pip_found_cmd_log"
-    uv_pip_found_output=$(cd "$RUNTIME_SERVER_DIR" && uv "${uv_pip_found_args[@]}" 2>&1)
-    if [ $? -ne 0 ]; then
-        log "ERROR" "Failed to install foundation SDK. Ensure no old server process is using .venv files"
-        if [ -n "$uv_pip_found_output" ]; then
-            log "ERROR" "uv pip install (foundation) output:"
-            echo "$uv_pip_found_output"
-        fi
-        error_exit "Failed to install foundation SDK. Ensure no old server process is using .venv files" \
-            "cd $RUNTIME_SERVER_DIR && uv pip install -e ../foundation --force-reinstall"
-    fi
-    log "INFO" "foundation SDK installed"
-}
-
 start_runtime_service() {
     log "INFO" "===== Starting Runtime Service ====="
 
-    local RUNTIME_SERVER_DIR RUNTIME_ENV_FILE RUNTIME_LOG
+    local RUNTIME_SERVER_DIR RUNTIME_ENV_FILE RUNTIME_LOG RUNTIME_RUN_SCRIPT
     RUNTIME_SERVER_DIR="${RUNTIME_DIR:?}/server"
     RUNTIME_ENV_FILE="${RUNTIME_SERVER_DIR}/.env"
     RUNTIME_LOG="${WORK_HOME}/runtime.log"
+    RUNTIME_RUN_SCRIPT="${RUNTIME_DIR:?}/scripts/run-server.sh"
 
     check_dir "$RUNTIME_SERVER_DIR"
     check_file "$RUNTIME_ENV_FILE"
-
-    # --start skips full setup; PATH may omit ~/.local/bin (non-interactive bash).
-    # Frontend start path already calls load_environments; runtime must do the same so nohup finds uv.
-    load_environments
-    check_command "uv"
-    get_uv_index_args_from_user_config
-
-    local p RuntimeListenPort=""
-    for ((p = 8100; p < 8300; p++)); do
-        if [ -z "$(find_pid_by_port "$p")" ]; then
-            RuntimeListenPort=$p
-            break
-        fi
-    done
-    if [ -z "$RuntimeListenPort" ]; then
-        error_exit "No available port found in range 8100-8299" \
-            "Free a port in 8100-8299 or stop another service using that range"
-    fi
-    log "INFO" "Selected runtime port: $RuntimeListenPort"
+    check_file "$RUNTIME_RUN_SCRIPT"
 
     : > "$RUNTIME_LOG"
 
-    log "INFO" "Starting runtime server in background on port $RuntimeListenPort, log file: $RUNTIME_LOG"
-    cd "$RUNTIME_SERVER_DIR" || error_exit "Cannot cd to runtime server directory: $RUNTIME_SERVER_DIR"
-
-    local uv_run_args uv_run_cmd uv_run_cmd_log
-    uv_run_args=("run" "${UV_INDEX_ARGS[@]}" "-m" "uvicorn" "openjiuwen_runtime.server.main:app" "--host" "0.0.0.0" "--port" "$RuntimeListenPort")
-    uv_run_cmd="uv ${uv_run_args[*]}"
-    uv_run_cmd_log=$(echo "$uv_run_cmd" | sed -E 's#(https?://)([^/[:space:]:@]+):([^/[:space:]@]+)@#\1***:***@#g')
-    log "INFO" "Running uv command: $uv_run_cmd_log"
-    nohup uv "${uv_run_args[@]}" >> "$RUNTIME_LOG" 2>&1 &
+    log "INFO" "Starting runtime server by run-server.sh in background, log file: $RUNTIME_LOG"
+    cd "${RUNTIME_DIR}" || error_exit "Cannot cd to runtime directory: ${RUNTIME_DIR}"
+    log "INFO" "Running command: bash ./scripts/run-server.sh"
+    nohup bash ./scripts/run-server.sh >> "$RUNTIME_LOG" 2>&1 &
     local LAUNCH_PID=$!
     log "INFO" "Runtime server process started (pid: $LAUNCH_PID)"
 
-    local RuntimePort="" RuntimePid="" i
+    local RuntimePort="" RuntimePid="$LAUNCH_PID" i
     for ((i = 1; i <= 45; i++)); do
         sleep 1
-        RuntimePid=$(find_pid_by_port "$RuntimeListenPort" || true)
-        if [ -n "$RuntimePid" ]; then
-            RuntimePort="$RuntimeListenPort"
-            break
-        fi
         if ! ps -p "$LAUNCH_PID" > /dev/null 2>&1; then
             log "ERROR" "Runtime service process exited unexpectedly"
             error_exit "Runtime failed to stay running; see log: $RUNTIME_LOG" \
                 "tail -n 50 $RUNTIME_LOG"
         fi
+        break
     done
 
+    if [ -n "${TARGET_ENV_FILE:-}" ] && [ -f "${TARGET_ENV_FILE}" ]; then
+        RuntimePort=$(grep '^RUNTIME_PORT=' "${TARGET_ENV_FILE}" 2>/dev/null | head -n 1 | cut -d'=' -f2 | tr -d '\r' | tr -d '"' | tr -d "'" || true)
+        if [[ ! "$RuntimePort" =~ ^[0-9]+$ ]]; then
+            RuntimePort=""
+        fi
+    fi
+
+    service_state_unset runtime_port
+    service_state_set "runtime_pid=$RuntimePid"
     if [ -n "$RuntimePort" ]; then
-        if [ -z "$RuntimePid" ]; then
-            RuntimePid=$LAUNCH_PID
-        fi
-        service_state_set "runtime_pid=$RuntimePid" "runtime_port=$RuntimePort"
-        if [ -n "${TARGET_ENV_FILE:-}" ] && [ -f "${TARGET_ENV_FILE}" ]; then
-            if grep -q '^RUNTIME_PORT=' "${TARGET_ENV_FILE}" 2>/dev/null; then
-                if [[ "$(uname -s)" == "Darwin" ]]; then
-                    sed -i '' "s|^RUNTIME_PORT=.*|RUNTIME_PORT=${RuntimePort}|" "${TARGET_ENV_FILE}"
-                else
-                    sed -i "s|^RUNTIME_PORT=.*|RUNTIME_PORT=${RuntimePort}|" "${TARGET_ENV_FILE}"
-                fi
-            else
-                echo "RUNTIME_PORT=${RuntimePort}" >> "${TARGET_ENV_FILE}"
-            fi
-            log "INFO" "Updated RUNTIME_PORT in .env: ${RuntimePort}"
-        fi
-        local WINDOWS_AGENT_ENV_FILE=""
-        WINDOWS_AGENT_ENV_FILE="${WORK_HOME}/../setup_scripts_windows/agent-studio/.env"
-        if [ -f "${WINDOWS_AGENT_ENV_FILE}" ]; then
-            if grep -q '^RUNTIME_PORT=' "${WINDOWS_AGENT_ENV_FILE}" 2>/dev/null; then
-                if [[ "$(uname -s)" == "Darwin" ]]; then
-                    sed -i '' "s|^RUNTIME_PORT=.*|RUNTIME_PORT=${RuntimePort}|" "${WINDOWS_AGENT_ENV_FILE}"
-                else
-                    sed -i "s|^RUNTIME_PORT=.*|RUNTIME_PORT=${RuntimePort}|" "${WINDOWS_AGENT_ENV_FILE}"
-                fi
-            else
-                echo "RUNTIME_PORT=${RuntimePort}" >> "${WINDOWS_AGENT_ENV_FILE}"
-            fi
-            log "INFO" "Updated Windows agent-studio .env RUNTIME_PORT: ${RuntimePort}"
-        fi
+        service_state_set "runtime_port=$RuntimePort"
         log "INFO" "Saved runtime_pid / runtime_port to services.state (pid: $RuntimePid, port: $RuntimePort)"
         log "SUCCESS" "Runtime service started in background: http://localhost:$RuntimePort"
     else
-        service_state_unset runtime_port
-        service_state_set "runtime_pid=$LAUNCH_PID"
-        log "WARN" "Saved runtime_pid (launcher only) to services.state (pid: $LAUNCH_PID)"
-        log "WARN" "Runtime background process started but port not detected yet (expected range: 8100-8299). See log: $RUNTIME_LOG"
+        log "INFO" "Saved runtime_pid to services.state (pid: $RuntimePid)"
+        log "SUCCESS" "Runtime service started in background"
     fi
 }
 

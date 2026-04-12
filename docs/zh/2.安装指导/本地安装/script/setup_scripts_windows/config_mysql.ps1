@@ -25,12 +25,16 @@ $WORK_HOME = if ($env:WORK_HOME) {
 }
 $ENV_FILE = Join-Path $WORK_HOME "agent-studio\.env"
 
-# Default MySQL configuration values 
-$MYSQL_HOST = "localhost"
-$MYSQL_PORT = 3306
+# Default MySQL configuration values
+$DB_HOST = "127.0.0.1"
+$DB_PORT = 3306
 $MYSQL_OPS_DB_NAME = "openjiuwen_ops"
 $MYSQL_AGENT_DB_NAME = "openjiuwen_agent"
 $MYSQL_RUNTIME_DB_NAME = "jiuwen_runtime"
+
+$DbConnCfg = Get-DbHostPortFromUserConfig -WorkHome $WORK_HOME -DefaultHost "127.0.0.1" -DefaultPort 3306
+$DB_HOST = $DbConnCfg.Host
+$DB_PORT = [int]$DbConnCfg.Port
 
 $APP_DB_USER = $AppDbUser
 $APP_DB_PASSWORD = $AppDbPassword
@@ -38,24 +42,6 @@ $APP_DB_PASSWORD = $AppDbPassword
 # Try to read configuration from .env file
 if (Test-Path $ENV_FILE) {
     try {
-        # Read DB_HOST
-        $DB_HOST_LINE = Select-String -Path $ENV_FILE -Pattern "^DB_HOST=" -ErrorAction SilentlyContinue
-        if ($DB_HOST_LINE) {
-            $HostValue = ($DB_HOST_LINE.Line -replace "DB_HOST=", "").Trim() -replace "`"", "" -replace "'", ""
-            if (-not [string]::IsNullOrEmpty($HostValue)) {
-                $MYSQL_HOST = $HostValue
-            }
-        }
-        
-        # Read DB_PORT
-        $DB_PORT_LINE = Select-String -Path $ENV_FILE -Pattern "^DB_PORT=" -ErrorAction SilentlyContinue
-        if ($DB_PORT_LINE) {
-            $PortValue = ($DB_PORT_LINE.Line -replace "DB_PORT=", "").Trim() -replace "`"", "" -replace "'", ""
-            if (-not [string]::IsNullOrEmpty($PortValue) -and $PortValue -match "^\d+$") {
-                $MYSQL_PORT = [int]$PortValue
-            }
-        }
-        
         # Read OPS_DB_NAME
         $OPS_DB_NAME_LINE = Select-String -Path $ENV_FILE -Pattern "^OPS_DB_NAME=" -ErrorAction SilentlyContinue
         if ($OPS_DB_NAME_LINE) {
@@ -91,9 +77,9 @@ if (Test-Path $ENV_FILE) {
             }
         }
         
-        Write-Log 'INFO' ('MySQL configuration loaded from .env file')
-        Write-Log 'INFO' ('  Host: ' + $MYSQL_HOST)
-        Write-Log 'INFO' ('  Port: ' + $MYSQL_PORT)
+        Write-Log 'INFO' ('MySQL configuration loaded (.env for DB names, user_config.ps1 for DB host/port)')
+        Write-Log 'INFO' ('  Host: ' + $DB_HOST)
+        Write-Log 'INFO' ('  Port: ' + $DB_PORT)
         Write-Log 'INFO' ('  OPS Database: ' + $MYSQL_OPS_DB_NAME)
         Write-Log 'INFO' ('  AGENT Database: ' + $MYSQL_AGENT_DB_NAME)
         Write-Log 'INFO' ('  RUNTIME Database: ' + $MYSQL_RUNTIME_DB_NAME)
@@ -225,7 +211,7 @@ function Create-MySQLDatabases {
     $RootPwdUsed = $null
     
     foreach ($TryPwd in @($RootPwd, $null)) {
-        $R = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $TryPwd -SqlCommand $SqlCreateDbs
+        $R = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $DB_HOST -Port $DB_PORT -Password $TryPwd -SqlCommand $SqlCreateDbs
         if ($R.ExitCode -eq 0 -and $R.Result -notmatch 'Access denied|1045|ERROR') {
             $RootConnected = $true
             $RootPwdUsed = $TryPwd
@@ -240,7 +226,7 @@ function Create-MySQLDatabases {
     }
     
     # Create databases (run as root)
-    $R1 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $RootPwdUsed -SqlCommand $SqlCreateDbs
+    $R1 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $DB_HOST -Port $DB_PORT -Password $RootPwdUsed -SqlCommand $SqlCreateDbs
     if ($R1.ExitCode -ne 0 -or ($R1.Result -match 'Access denied|1045|ERROR' -and $R1.Result -notmatch '\[Warning\]')) {
         Write-Log 'ERROR' ('Create database failed: ' + $R1.Result)
         return $false
@@ -248,7 +234,7 @@ function Create-MySQLDatabases {
     Write-Log 'SUCCESS' ('Databases ' + $OPS_DB_NAME + ', ' + $AGENT_DB_NAME + ', ' + $RUNTIME_DB_NAME + ' created or already exist')
     
     # Check if app user exists
-    $R2 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $RootPwdUsed -SqlCommand $CheckUserSql
+    $R2 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $DB_HOST -Port $DB_PORT -Password $RootPwdUsed -SqlCommand $CheckUserSql
     $CountLine = ($R2.Result -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -match "^\d+$" }) | Select-Object -Last 1
     $UserExists = $false
     if ($R2.ExitCode -eq 0 -and $CountLine -match "^\d+$") {
@@ -257,7 +243,7 @@ function Create-MySQLDatabases {
     
     if ($UserExists) {
         $AlterSql = "ALTER USER '${APP_DB_USER}'@'localhost' IDENTIFIED BY '$APP_DB_PASSWORD';"
-        $R3 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $RootPwdUsed -SqlCommand $AlterSql
+        $R3 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $DB_HOST -Port $DB_PORT -Password $RootPwdUsed -SqlCommand $AlterSql
         if ($R3.ExitCode -ne 0 -and $R3.Result -match 'Access denied|1045|ERROR' -and $R3.Result -notmatch '\[Warning\]') {
             Write-Log 'WARN' ('Update user ' + $APP_DB_USER + ' password failed, continue grant: ' + $R3.Result)
         } else {
@@ -265,7 +251,7 @@ function Create-MySQLDatabases {
         }
     } else {
         $CreateUserSql = "CREATE USER '${APP_DB_USER}'@'localhost' IDENTIFIED BY '$APP_DB_PASSWORD';"
-        $R3 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $RootPwdUsed -SqlCommand $CreateUserSql
+        $R3 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $DB_HOST -Port $DB_PORT -Password $RootPwdUsed -SqlCommand $CreateUserSql
         if ($R3.ExitCode -ne 0 -or ($R3.Result -match 'Access denied|1045|ERROR' -and $R3.Result -notmatch '\[Warning\]')) {
             Write-Log 'ERROR' ('Create user ' + $APP_DB_USER + ' failed: ' + $R3.Result)
             return $false
@@ -274,7 +260,7 @@ function Create-MySQLDatabases {
     }
     
     # Grant privileges to app account (DBs visible/usable under this account)
-    $R4 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $RootPwdUsed -SqlCommand $GrantSql
+    $R4 = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User 'root' -MySQLHost $DB_HOST -Port $DB_PORT -Password $RootPwdUsed -SqlCommand $GrantSql
     if ($R4.ExitCode -ne 0 -or ($R4.Result -match 'Access denied|1045|ERROR' -and $R4.Result -notmatch '\[Warning\]')) {
         Write-Log 'ERROR' ('Grant failed: ' + $R4.Result)
         return $false
@@ -284,7 +270,7 @@ function Create-MySQLDatabases {
     # Verify DB with app account (DBs visible under this account)
     Write-Log 'INFO' ('Verify DB with app account: ' + $APP_DB_USER)
     $VerifySQL = "SHOW DATABASES;"
-    $VerifyR = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User $APP_DB_USER -MySQLHost $MYSQL_HOST -Port $MYSQL_PORT -Password $APP_DB_PASSWORD -SqlCommand $VerifySQL
+    $VerifyR = Invoke-MySQLCommand -MySQLExePath $MySQLExePath -User $APP_DB_USER -MySQLHost $DB_HOST -Port $DB_PORT -Password $APP_DB_PASSWORD -SqlCommand $VerifySQL
     if ($VerifyR.ExitCode -eq 0 -and $VerifyR.Result -match $OPS_DB_NAME -and $VerifyR.Result -match $AGENT_DB_NAME -and $VerifyR.Result -match $RUNTIME_DB_NAME) {
         Write-Log 'SUCCESS' ('App account can access DB: ' + $OPS_DB_NAME + ', ' + $AGENT_DB_NAME + ', ' + $RUNTIME_DB_NAME)
         return $true
@@ -300,7 +286,7 @@ function Start-MySQLDatabaseConfig {
         $ErrMsg = if (-not $MySQLExePath) { 'MySQL executable path not found in environment variable MYSQL_EXE_PATH' } else { 'MySQL executable path not found: ' + $MySQLExePath }
         Write-Log 'ERROR' ($ErrMsg)
         Write-Log 'INFO' ('Please ensure check_mysql.ps1 has been executed and MySQL is installed')
-        Write-Log 'INFO' ('Connection details: ' + $APP_DB_USER + '@' + $MYSQL_HOST + ':' + $MYSQL_PORT)
+        Write-Log 'INFO' ('Connection details: ' + $APP_DB_USER + '@' + $DB_HOST + ':' + $DB_PORT)
         Write-Log 'INFO' ('Please create the following databases manually:')
         Write-Log 'INFO' ('1. Database: ' + $MYSQL_OPS_DB_NAME)
         Write-Log 'INFO' ('2. Database: ' + $MYSQL_AGENT_DB_NAME)
@@ -313,7 +299,7 @@ function Start-MySQLDatabaseConfig {
 
     Write-Log 'INFO' ('Using MySQL executable from environment variable: ' + $MySQLExePath)
     Write-Log 'INFO' ('Creating databases: ' + $MYSQL_OPS_DB_NAME + ', ' + $MYSQL_AGENT_DB_NAME + ' and ' + $MYSQL_RUNTIME_DB_NAME)
-    Write-Log 'INFO' ('Connection details: ' + $APP_DB_USER + '@' + $MYSQL_HOST + ':' + $MYSQL_PORT)
+    Write-Log 'INFO' ('Connection details: ' + $APP_DB_USER + '@' + $DB_HOST + ':' + $DB_PORT)
 
     # Create databases
     $Result = Create-MySQLDatabases -MySQLExePath $MySQLExePath

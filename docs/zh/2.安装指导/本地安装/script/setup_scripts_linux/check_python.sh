@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script: install_and_check_python311.sh
-# Purpose: Check Python 3.11+ and uv; install via PPA if missing, minimal verification
+# Purpose: Check Python >=3.11.4 (recommended 3.11.x) and uv; install via PPA if missing, minimal verification
 # Supported: Debian/Ubuntu (apt + PPA only)
 
 set -euo pipefail
@@ -11,8 +11,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Config: min 3.11; verification accepts 3.11+
-PYTHON_MIN_VERSION="3.11"
+# Config: minimum required Python version
+PYTHON_MIN_VERSION="3.11.4"
 PYTHON_VERSION="3.11"
 PPA_SOURCE="ppa:deadsnakes/ppa"
 
@@ -39,7 +39,7 @@ detect_ubuntu_version() {
     return 1
 }
 
-# Discover installed Python 3.11+ (for verification)
+# Discover installed Python >=3.11.4 (recommended 3.11.x) for verification
 discover_python_version() {
     local v
     for v in 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do
@@ -48,17 +48,45 @@ discover_python_version() {
             return 0
         fi
     done
-    PYTHON_VERSION="$PYTHON_MIN_VERSION"
+    # Keep executable name stable (python3.11), min requirement is checked separately.
+    PYTHON_VERSION="3.11"
     return 1
 }
 
-# Check Python 3.11+ installed (uses discover version)
+# Compare two semver strings.
+# Returns 0 when $1 >= $2, otherwise 1.
+version_ge() {
+    local current="$1"
+    local required="$2"
+    local c1 c2 c3 r1 r2 r3
+    c1=$(echo "$current" | cut -d. -f1 | sed -E 's/[^0-9].*$//')
+    c2=$(echo "$current" | cut -d. -f2 | sed -E 's/[^0-9].*$//')
+    c3=$(echo "$current" | cut -d. -f3 | sed -E 's/[^0-9].*$//')
+    r1=$(echo "$required" | cut -d. -f1 | sed -E 's/[^0-9].*$//')
+    r2=$(echo "$required" | cut -d. -f2 | sed -E 's/[^0-9].*$//')
+    r3=$(echo "$required" | cut -d. -f3 | sed -E 's/[^0-9].*$//')
+    c3=${c3:-0}; r3=${r3:-0}
+    c1=${c1:-0}; c2=${c2:-0}; r1=${r1:-0}; r2=${r2:-0}
+
+    if [ "$c1" -gt "$r1" ]; then return 0; fi
+    if [ "$c1" -lt "$r1" ]; then return 1; fi
+    if [ "$c2" -gt "$r2" ]; then return 0; fi
+    if [ "$c2" -lt "$r2" ]; then return 1; fi
+    if [ "$c3" -ge "$r3" ]; then return 0; fi
+    return 1
+}
+
+# Check Python >= minimum version installed (uses discover version)
 check_python_installed() {
-    if command -v python${PYTHON_VERSION} &> /dev/null; then
-        return 0
-    else
+    if ! command -v python${PYTHON_VERSION} &> /dev/null; then
         return 1
     fi
+    local full_version
+    full_version=$(python${PYTHON_VERSION} --version 2>&1 | awk '{print $2}')
+    if [ -z "$full_version" ]; then
+        return 1
+    fi
+    version_ge "$full_version" "$PYTHON_MIN_VERSION"
 }
 
 # Check if conda is installed
@@ -128,7 +156,7 @@ install_miniconda() {
     return 0
 }
 
-# Install Python 3.11 with Conda
+# Install Python >=3.11.4 (recommended 3.11.x) with Conda
 install_python_with_conda() {
     echo -e "${YELLOW}Installing Python${PYTHON_VERSION} with Conda...${NC}"
     
@@ -229,7 +257,7 @@ install_python_with_conda() {
     return 0
 }
 
-# Add PPA and install Python3.11
+# Add PPA and install Python >=3.11.4 (recommended 3.11.x)
 install_python_only() {
     echo -e "${YELLOW}\nInstalling Python${PYTHON_VERSION}...${NC}"
     
@@ -258,48 +286,48 @@ install_python_only() {
     if ! sudo apt install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python${PYTHON_VERSION}-distutils python${PYTHON_VERSION}-venv > "$INSTALL_OUTPUT" 2>&1; then
         echo -e "${RED}❌ Python${PYTHON_VERSION} installation failed. Output:${NC}"
         cat "$INSTALL_OUTPUT"
-        rm -f "$INSTALL_OUTPUT"
-        
-        if detect_ubuntu_version; then
-            echo ""
-            echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
-            echo -e "${YELLOW}Ubuntu 20.04 or earlier detected.${NC}"
-            echo -e "${YELLOW}Deadsnakes PPA no longer supports Ubuntu 20.04 (Focal) and below.${NC}"
-            echo ""
-            echo -e "${GREEN}Switching to Conda to install Python 3.11...${NC}"
-            echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
-            echo ""
-            
-            if install_python_with_conda; then
-                echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed with Conda${NC}"
-                if check_python_installed; then
-                    echo -e "${GREEN}✅ Python${PYTHON_VERSION} verified${NC}"
+        if grep -Eq "Unmet dependencies|apt --fix-broken install|held broken packages" "$INSTALL_OUTPUT"; then
+            echo -e "${YELLOW}Detected broken apt dependencies, trying: apt --fix-broken install${NC}"
+            if sudo apt --fix-broken install -y; then
+                echo -e "${YELLOW}Retrying Python${PYTHON_VERSION} installation after dependency repair...${NC}"
+                if sudo apt install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python${PYTHON_VERSION}-distutils python${PYTHON_VERSION}-venv; then
                     rm -f "$INSTALL_OUTPUT"
-                    echo -e "${YELLOW}Note: Script uses python${PYTHON_VERSION} (not python3) to avoid affecting system tools.${NC}"
+                    echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed after fixing dependencies.${NC}"
                     return 0
-                else
-                    echo -e "${YELLOW}⚠ Install completed but verification failed. Please check.${NC}"
-                    rm -f "$INSTALL_OUTPUT"
-                    exit 1
                 fi
-            else
-                echo ""
-                echo -e "${RED}❌ Auto install failed${NC}"
-                echo -e "${YELLOW}Install Python 3.11 manually and re-run this script.${NC}"
-                echo ""
-                echo -e "${YELLOW}Manual steps:${NC}"
-                echo -e "1. Download and install Miniconda:"
-                echo -e "   ${GREEN}wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh${NC}"
-                echo -e "   ${GREEN}bash Miniconda3-latest-Linux-x86_64.sh${NC}"
-                echo ""
-                echo -e "2. Create Python 3.11 env:"
-                echo -e "   ${GREEN}conda create -n py311 python=3.11 -y${NC}"
-                echo ""
-                echo -e "3. Create symlink:"
-                echo -e "   ${GREEN}sudo ln -s \$(conda info --base)/envs/py311/bin/python3.11 /usr/local/bin/python3.11${NC}"
             fi
+        fi
+
+        echo ""
+        echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
+        echo -e "${YELLOW}APT installation failed; switching to Conda fallback.${NC}"
+        echo -e "${YELLOW}════════════════════════════════════════════════════════════${NC}"
+        echo ""
+
+        if install_python_with_conda; then
+            echo -e "${GREEN}✅ Python${PYTHON_VERSION} installed with Conda${NC}"
+            if check_python_installed; then
+                echo -e "${GREEN}✅ Python${PYTHON_VERSION} verified${NC}"
+                rm -f "$INSTALL_OUTPUT"
+                echo -e "${YELLOW}Note: Script uses python${PYTHON_VERSION} (not python3) to avoid affecting system tools.${NC}"
+                return 0
+            fi
+            echo -e "${YELLOW}⚠ Install completed but verification failed. Please check.${NC}"
         else
-            echo -e "${YELLOW}Check network and apt sources, then retry.${NC}"
+            echo ""
+            echo -e "${RED}❌ Auto install failed${NC}"
+            echo -e "${YELLOW}Install Python >=3.11.4 (recommended 3.11.x) manually and re-run this script.${NC}"
+            echo ""
+            echo -e "${YELLOW}Manual steps:${NC}"
+            echo -e "1. Download and install Miniconda:"
+            echo -e "   ${GREEN}wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh${NC}"
+            echo -e "   ${GREEN}bash Miniconda3-latest-Linux-x86_64.sh${NC}"
+            echo ""
+            echo -e "2. Create Python >=3.11.4 (recommended 3.11.x) env:"
+            echo -e "   ${GREEN}conda create -n py311 python=3.11 -y${NC}"
+            echo ""
+            echo -e "3. Create symlink:"
+            echo -e "   ${GREEN}sudo ln -s \$(conda info --base)/envs/py311/bin/python3.11 /usr/local/bin/python3.11${NC}"
         fi
         rm -f "$INSTALL_OUTPUT"
         exit 1
@@ -312,7 +340,7 @@ install_python_only() {
 
 # Minimal verification of Python
 verify_python() {
-    echo -e "${YELLOW}\nVerifying Python${PYTHON_VERSION}...${NC}"
+    echo -e "${YELLOW}\nVerifying Python >= ${PYTHON_MIN_VERSION}...${NC}"
     
     if check_python_installed; then
         PYTHON_FULL_VERSION=$(python${PYTHON_VERSION} --version 2>&1)
@@ -324,7 +352,7 @@ verify_python() {
             echo -e "${YELLOW}⚠ Python installed but basic test failed${NC}"
         fi
     else
-        echo -e "${RED}❌ Python${PYTHON_VERSION} installation failed${NC}"
+        echo -e "${RED}❌ Python version does not meet minimum requirement: ${PYTHON_MIN_VERSION}${NC}"
         exit 1
     fi
 
@@ -392,7 +420,7 @@ install_uv_cli() {
 }
 
 # ===================== Main =====================
-echo -e "${YELLOW}=== Checking Python${PYTHON_VERSION} and uv ===${NC}"
+echo -e "${YELLOW}=== Checking Python >= ${PYTHON_MIN_VERSION} and uv ===${NC}"
 
 check_apt_system
 

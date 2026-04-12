@@ -29,3 +29,9 @@ NVM_NODEJS_ORG_MIRROR=""
 # - Leave empty to skip npm registry config (script will skip)
 NPM_REGISTRY=""
 
+# Database server host. Leave empty for default 127.0.0.1
+DB_HOST=""
+
+# Database server port. Leave empty for default 3306
+DB_PORT=""
+

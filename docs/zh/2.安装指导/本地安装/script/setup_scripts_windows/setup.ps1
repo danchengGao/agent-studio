@@ -42,7 +42,6 @@ $INSTALL_STEPS = @(
     "fetch_runtime_code",
     "config_runtime_env",
     "config_mysql",
-    "install_runtime_dep",
     "install_backend_dep",
     "install_frontend_dep",
     "start_services"
@@ -348,7 +347,7 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
     $Content = $Content -replace "BACKEND_PORT=\d+", "BACKEND_PORT=$BackendPort"
     $Content = $Content -replace "VITE_API_PROXY_TARGET=http://localhost:\d+/", "VITE_API_PROXY_TARGET=http://localhost:${BackendPort}/"
     $Content = $Content -replace 'ALLOWED_ORIGINS=\["http://localhost:\d+","http://127\.0\.0\.1:\d+"\]', "ALLOWED_ORIGINS=[`"http://localhost:${FrontendPort}`",`"http://127.0.0.1:${FrontendPort}`"]"
-    # MySQL 应用账号（与 config_mysql.ps1 创建的库用户一致；原在 config_mysql 的 Update-EnvFileDbCredentials 已合并至此）
+    # MySQL 应用账号
     Write-Log "INFO" "Setting DB_USER / DB_PASSWORD from -AppDbUser / -AppDbPassword"
     if ($Content -match '(?m)^\s*DB_USER=') {
         $Content = $Content -replace '(?m)^\s*DB_USER=.*$', ('DB_USER=' + $AppDbUser)
@@ -361,6 +360,20 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
     } else {
         if (-not $Content.EndsWith("`n")) { $Content += "`n" }
         $Content += 'DB_PASSWORD=' + $AppDbPassword + "`n"
+    }
+    $MysqlConnForEnv = Get-DbHostPortFromUserConfig -WorkHome $WORK_HOME -DefaultHost "127.0.0.1" -DefaultPort 3306
+    Write-Log "INFO" "Setting DB_HOST / DB_PORT from user_config.ps1 (`$DB_HOST / `$DB_PORT)"
+    if ($Content -match '(?m)^\s*DB_HOST=') {
+        $Content = $Content -replace '(?m)^\s*DB_HOST=.*$', ('DB_HOST=' + $MysqlConnForEnv.Host)
+    } else {
+        if (-not $Content.EndsWith("`n")) { $Content += "`n" }
+        $Content += 'DB_HOST=' + $MysqlConnForEnv.Host + "`n"
+    }
+    if ($Content -match '(?m)^\s*DB_PORT=') {
+        $Content = $Content -replace '(?m)^\s*DB_PORT=.*$', ('DB_PORT=' + $MysqlConnForEnv.Port)
+    } else {
+        if (-not $Content.EndsWith("`n")) { $Content += "`n" }
+        $Content += 'DB_PORT=' + $MysqlConnForEnv.Port + "`n"
     }
     # 统一为 LF 换行并用 UTF-8 无 BOM 写回，避免 CRLF 导致配置解析/编码错误
     $Content = $Content -replace "`r`n", "`n" -replace "`r", "`n"
@@ -377,7 +390,7 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
     $FrontendPortActual = (Select-String -Path $TARGET_ENV_FILE -Pattern "^FRONTEND_PORT=").Line -replace "FRONTEND_PORT=", ""
     $BackendPortActual = (Select-String -Path $TARGET_ENV_FILE -Pattern "^BACKEND_PORT=").Line -replace "BACKEND_PORT=", ""
     Write-Log "INFO" "FRONTEND_PORT configured: $FrontendPortActual, BACKEND_PORT configured: $BackendPortActual"
-    Write-Log "SUCCESS" ".env updated: DB_USER=$AppDbUser (DB_PASSWORD set)"
+    Write-Log "SUCCESS" ".env updated: DB_USER=$AppDbUser (DB_PASSWORD set), DB_HOST=$($MysqlConnForEnv.Host), DB_PORT=$($MysqlConnForEnv.Port)"
 
     Save-Progress -Step $STEP
 }
@@ -447,27 +460,37 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
         $RuntimeEnvContent += "DB_TYPE=$DbType`n"
     }
 
-    if ($DbType -eq "mysql") {
-        Write-Log "INFO" "Setting runtime DB_USER / DB_PASSWORD from -AppDbUser / -AppDbPassword"
-        $UserWritten = $false
-        $PasswordWritten = $false
-        $RuntimeLines = [System.Collections.ArrayList]@()
-        foreach ($Line in [regex]::Split($RuntimeEnvContent, '\r\n|\r|\n')) {
-            if ($Line -match "^\s*DB_USER=") {
-                [void]$RuntimeLines.Add("DB_USER=$AppDbUser")
-                $UserWritten = $true
-            } elseif ($Line -match "^\s*DB_PASSWORD=") {
-                [void]$RuntimeLines.Add("DB_PASSWORD=$AppDbPassword")
-                $PasswordWritten = $true
-            } else {
-                [void]$RuntimeLines.Add($Line)
-            }
+    $RtDbCfg = Get-DbHostPortFromUserConfig -WorkHome $WORK_HOME -DefaultHost "127.0.0.1" -DefaultPort 3306
+    Write-Log "INFO" "Setting runtime DB_USER / DB_PASSWORD from -AppDbUser / -AppDbPassword"
+    Write-Log "INFO" "Setting runtime DB_HOST / DB_PORT from user_config.ps1 (`$DB_HOST / `$DB_PORT)"
+    $UserWritten = $false
+    $PasswordWritten = $false
+    $HostWritten = $false
+    $PortWritten = $false
+    $RuntimeLines = [System.Collections.ArrayList]@()
+    foreach ($Line in [regex]::Split($RuntimeEnvContent, '\r\n|\r|\n')) {
+        if ($Line -match "^\s*DB_USER=") {
+            [void]$RuntimeLines.Add("DB_USER=$AppDbUser")
+            $UserWritten = $true
+        } elseif ($Line -match "^\s*DB_PASSWORD=") {
+            [void]$RuntimeLines.Add("DB_PASSWORD=$AppDbPassword")
+            $PasswordWritten = $true
+        } elseif ($Line -match "^\s*DB_HOST=") {
+            [void]$RuntimeLines.Add("DB_HOST=$($RtDbCfg.Host)")
+            $HostWritten = $true
+        } elseif ($Line -match "^\s*DB_PORT=") {
+            [void]$RuntimeLines.Add("DB_PORT=$($RtDbCfg.Port)")
+            $PortWritten = $true
+        } else {
+            [void]$RuntimeLines.Add($Line)
         }
-        if (-not $UserWritten) { [void]$RuntimeLines.Add("DB_USER=$AppDbUser") }
-        if (-not $PasswordWritten) { [void]$RuntimeLines.Add("DB_PASSWORD=$AppDbPassword") }
-        $RuntimeEnvContent = ($RuntimeLines -join "`n")
-        Write-Log "SUCCESS" "Runtime .env updated: DB_USER=$AppDbUser (DB_PASSWORD set)"
     }
+    if (-not $UserWritten) { [void]$RuntimeLines.Add("DB_USER=$AppDbUser") }
+    if (-not $PasswordWritten) { [void]$RuntimeLines.Add("DB_PASSWORD=$AppDbPassword") }
+    if (-not $HostWritten) { [void]$RuntimeLines.Add("DB_HOST=$($RtDbCfg.Host)") }
+    if (-not $PortWritten) { [void]$RuntimeLines.Add("DB_PORT=$($RtDbCfg.Port)") }
+    $RuntimeEnvContent = ($RuntimeLines -join "`n")
+    Write-Log "SUCCESS" "Runtime .env updated: DB_USER=$AppDbUser (DB_PASSWORD set), DB_HOST=$($RtDbCfg.Host), DB_PORT=$($RtDbCfg.Port)"
 
     $RuntimeEnvContent = $RuntimeEnvContent -replace "`r`n", "`n" -replace "`r", "`n"
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -508,21 +531,6 @@ if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
     Save-Progress -Step $STEP
 } else {
     Write-Log "INFO" "Skipping: MySQL database configuration (not applicable, DbType=$DbType)"
-    Save-Progress -Step $STEP
-}
-
-# ===================== Install Runtime Dependencies =====================
-$STEP = "install_runtime_dep"
-if (Test-SkipStep -CurrentStep $STEP -LastProgress $LAST_PROGRESS) {
-    Write-Log "INFO" "Skipping: Runtime dependencies install (already completed)"
-} else {
-    Write-Log "INFO" "===== Installing Runtime Dependencies ====="
-    $RuntimeServerDirForInstall = Join-Path $RUNTIME_DIR "server"
-    if ((Test-Path $RuntimeServerDirForInstall) -and (Test-Path (Join-Path $RuntimeServerDirForInstall ".env"))) {
-        Install-RuntimeDependencies -RuntimeServerDir $RuntimeServerDirForInstall
-    } else {
-        Write-Log "INFO" "Skipping runtime uv/SDK setup (agent-runtime\server or server\.env not found)"
-    }
     Save-Progress -Step $STEP
 }
 

@@ -30,7 +30,7 @@ The one-click script automates tool checks, code fetch, environment setup, and s
 
 #### 1. Get the Installation Script
 
-* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_macos_v2.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
+* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_macos.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
   * `setup.sh` – Main installation script that runs the full flow
   * `check_curl.sh` – Check and install curl
   * `check_git.sh` – Check and install Git

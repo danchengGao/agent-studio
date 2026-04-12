@@ -32,7 +32,7 @@ The one-click script automates tool checks, code fetch, environment setup, and s
 
 #### 1. Get the Installation Script
 
-* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_linux_v2.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
+* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_linux.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
   * `setup.sh` – Main installation script that runs the full flow
   * `utils.sh` – Common utilities
   * `check_curl.sh` – Check/install curl
@@ -42,11 +42,11 @@ The one-click script automates tool checks, code fetch, environment setup, and s
   * `check_mysql.sh` – Check/install MySQL
   * `config_mysql.sh` – Configure MySQL (create database, user, etc.)
   * `manage_service.sh` – Service management: start, stop, restart Runtime, backend, and frontend, and show status
-  * `user_config.sh` – User configuration (optional: proxy, uv index, NVM mirror, npm registry)
+  * `user_config.sh` – User configuration (optional: proxy, uv index, NVM mirror, npm registry, database host/port)
 
-#### 2. Configure Proxy, uv Index, NVM Mirror, and npm Registry (Optional)
+#### 2. Configure Proxy, uv Index, NVM Mirror, npm Registry, and Database Address (Optional)
 
-If you need a proxy to access the internet or want to use a custom uv index, NVM Node.js mirror, or npm registry, edit `user_config.sh`:
+If you need a proxy to access the internet or want to use a custom uv index, NVM Node.js mirror, or npm registry, or you need to set the database service host and port (for example, remote MySQL or a Docker-mapped port), edit `user_config.sh`:
 
 * Open `user_config.sh` and set the following variables as needed:
 
@@ -65,6 +65,10 @@ If you need a proxy to access the internet or want to use a custom uv index, NVM
 
   # npm registry (optional)
   NPM_REGISTRY=""       # e.g. https://registry.npmmirror.com
+
+  # Database connection (optional)
+  DB_HOST=""            # Leave empty for default 127.0.0.1
+  DB_PORT=""            # Leave empty for default 3306
   ```
 
 * **Proxy**: Leave variables empty to skip proxy; set full URL (e.g. `http://127.0.0.1:7890`) when needed. Authenticated proxy is supported (e.g. `http://user:pass@proxy.example.com:8080`). `SSL_VERIFY`: `true` enables Git SSL verification, `false` disables it.
@@ -77,6 +81,8 @@ If you need a proxy to access the internet or want to use a custom uv index, NVM
   * npmmirror: `https://registry.npmmirror.com`
   * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
   * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
+* **Database connection**:
+  * **Purpose**: Configure these when the database is on a remote host or uses a non-default host/port.
 
 #### 3. Run the Installation Script
 

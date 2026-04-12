@@ -67,6 +67,62 @@ get_uv_index_args_from_user_config() {
     fi
 }
 
+# Read a single KEY=value from user_config.sh without sourcing the file (avoids side effects).
+# Uses the first matching assignment line only.
+# Args:
+#   $1  Variable name (e.g. DB_PORT, HTTP_PROXY). Must match [A-Za-z_][A-Za-z0-9_]*
+#   $2  Path to user_config.sh (optional). Default: ${WORK_HOME}/user_config.sh if WORK_HOME is set,
+#       otherwise <directory of utils.sh>/user_config.sh
+# Stdout: value with surrounding quotes stripped and outer whitespace trimmed; empty if file/key missing
+# Returns: 0 on success (including empty value); 1 if $1 is missing or not a valid identifier
+get_user_config_value() {
+    local key="${1:-}"
+    local user_cfg="${2:-}"
+    local line val
+
+    if [ -z "$key" ] || [[ ! "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+        return 1
+    fi
+
+    if [ -z "$user_cfg" ]; then
+        if [ -n "${WORK_HOME:-}" ]; then
+            user_cfg="${WORK_HOME}/user_config.sh"
+        else
+            user_cfg="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/user_config.sh"
+        fi
+    fi
+
+    if [ ! -f "$user_cfg" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    line=$(grep -E "^[[:space:]]*${key}=" "$user_cfg" 2>/dev/null | head -n 1)
+    if [ -z "$line" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    val=$(echo "$line" | cut -d'=' -f2- | tr -d '"' | tr -d "'" | xargs)
+    printf '%s\n' "$val"
+    return 0
+}
+
+# Set globals DB_HOST / DB_PORT from user_config.sh via get_user_config_value (default path: see get_user_config_value).
+load_db_host_port_from_user_config() {
+    DB_HOST="$(get_user_config_value DB_HOST)"
+    local _configured_db_port
+    _configured_db_port="$(get_user_config_value DB_PORT)"
+    if [ -z "$DB_HOST" ]; then
+        DB_HOST="127.0.0.1"
+    fi
+    if [[ "$_configured_db_port" =~ ^[0-9]+$ ]] && [ "$_configured_db_port" -ge 1 ] && [ "$_configured_db_port" -le 65535 ]; then
+        DB_PORT="$_configured_db_port"
+    else
+        DB_PORT="3306"
+    fi
+}
+
 # Detect Linux distro and package manager.
 # Sets globals: OS_TYPE, PKG_MANAGER, OS_ID (from /etc/os-release ID), OS_VERSION (VERSION_ID)
 detect_os() {

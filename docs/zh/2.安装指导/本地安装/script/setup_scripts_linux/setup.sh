@@ -27,7 +27,6 @@ INSTALL_STEPS=(
     "fetch_runtime_code"
     "config_runtime_env"
     "config_mysql"
-    "install_runtime_dep"
     "install_backend_dep"
     "install_frontend_dep"
     "start_services"
@@ -229,7 +228,15 @@ else
         log "INFO" "Running script: $SCRIPT_PATH"
         echo -e "${GREEN}[Progress] Running: ${script}${NC}"
         
-        if ! retry_execute 3 5 "Run $script" "bash '$SCRIPT_PATH'"; then
+        if [ "$script" = "check_mysql.sh" ]; then
+            # Source check_mysql.sh so MYSQL_PWD entered by user stays in current shell env
+            if ! retry_execute 3 5 "Run $script" "source '$SCRIPT_PATH'"; then
+                error_exit "Running $script failed" \
+                    "1. Check script permission: chmod +x $SCRIPT_PATH\n\
+2. Inspect script content\n\
+3. Run manually: source $SCRIPT_PATH"
+            fi
+        elif ! retry_execute 3 5 "Run $script" "bash '$SCRIPT_PATH'"; then
             error_exit "Running $script failed" \
                 "1. Check script permission: chmod +x $SCRIPT_PATH\n\
 2. Inspect script content\n\
@@ -387,29 +394,47 @@ else
     sed -i "s|ALLOWED_ORIGINS=\[\"http://localhost:[0-9]*\",\"http://127.0.0.1:[0-9]*\"\]|ALLOWED_ORIGINS=[\"http://localhost:${FRONTEND_PORT}\",\"http://127.0.0.1:${FRONTEND_PORT}\"]|" "$TARGET_ENV_FILE"
 fi
 
-if [ "$DB_TYPE" = "mysql" ]; then
-    log "INFO" "Setting DB_USER / DB_PASSWORD from --app_db_user / --app_db_password"
-    if grep -q "^DB_USER=" "$TARGET_ENV_FILE"; then
-        if [[ "$(uname -s)" == "Darwin" ]]; then
-            sed -i '' "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$TARGET_ENV_FILE"
-        else
-            sed -i "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$TARGET_ENV_FILE"
-        fi
+load_db_host_port_from_user_config
+log "INFO" "Setting DB_USER / DB_PASSWORD from --app_db_user / --app_db_password"
+if grep -q "^DB_USER=" "$TARGET_ENV_FILE"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$TARGET_ENV_FILE"
     else
-        echo "DB_USER=${APP_DB_USER}" >> "$TARGET_ENV_FILE"
+        sed -i "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$TARGET_ENV_FILE"
     fi
-    ESCAPED_APP_DB_PASSWORD=$(printf '%s\n' "$APP_DB_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
-    if grep -q "^DB_PASSWORD=" "$TARGET_ENV_FILE"; then
-        if [[ "$(uname -s)" == "Darwin" ]]; then
-            sed -i '' "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_APP_DB_PASSWORD}|" "$TARGET_ENV_FILE"
-        else
-            sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_APP_DB_PASSWORD}|" "$TARGET_ENV_FILE"
-        fi
-    else
-        echo "DB_PASSWORD=${APP_DB_PASSWORD}" >> "$TARGET_ENV_FILE"
-    fi
-    log "SUCCESS" ".env updated: DB_USER=${APP_DB_USER} (DB_PASSWORD set)"
+else
+    echo "DB_USER=${APP_DB_USER}" >> "$TARGET_ENV_FILE"
 fi
+ESCAPED_APP_DB_PASSWORD=$(printf '%s\n' "$APP_DB_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
+if grep -q "^DB_PASSWORD=" "$TARGET_ENV_FILE"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_APP_DB_PASSWORD}|" "$TARGET_ENV_FILE"
+    else
+        sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_APP_DB_PASSWORD}|" "$TARGET_ENV_FILE"
+    fi
+else
+    echo "DB_PASSWORD=${APP_DB_PASSWORD}" >> "$TARGET_ENV_FILE"
+fi
+log "INFO" "Setting DB_HOST / DB_PORT from user_config.sh"
+if grep -q "^DB_HOST=" "$TARGET_ENV_FILE"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "s|^DB_HOST=.*|DB_HOST=${DB_HOST}|" "$TARGET_ENV_FILE"
+    else
+        sed -i "s|^DB_HOST=.*|DB_HOST=${DB_HOST}|" "$TARGET_ENV_FILE"
+    fi
+else
+    echo "DB_HOST=${DB_HOST}" >> "$TARGET_ENV_FILE"
+fi
+if grep -q "^DB_PORT=" "$TARGET_ENV_FILE"; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        sed -i '' "s|^DB_PORT=.*|DB_PORT=${DB_PORT}|" "$TARGET_ENV_FILE"
+    else
+        sed -i "s|^DB_PORT=.*|DB_PORT=${DB_PORT}|" "$TARGET_ENV_FILE"
+    fi
+else
+    echo "DB_PORT=${DB_PORT}" >> "$TARGET_ENV_FILE"
+fi
+log "SUCCESS" ".env updated: DB_USER=${APP_DB_USER} (DB_PASSWORD set), DB_HOST=${DB_HOST}, DB_PORT=${DB_PORT}"
 
 DB_TYPE_ACTUAL=$(grep '^DB_TYPE=' "$TARGET_ENV_FILE" 2>/dev/null | cut -d'=' -f2 || echo "not found")
 if [ "$DB_TYPE_ACTUAL" != "$DB_TYPE" ]; then
@@ -490,29 +515,47 @@ else
         printf '\nDB_TYPE=%s\n' "$DB_TYPE" >> "$RUNTIME_ENV_FILE"
     fi
 
-    if [ "$DB_TYPE" = "mysql" ]; then
-        log "INFO" "Setting runtime DB_USER / DB_PASSWORD from --app_db_user / --app_db_password"
-        if grep -q "^DB_USER=" "$RUNTIME_ENV_FILE"; then
-            if [[ "$(uname -s)" == "Darwin" ]]; then
-                sed -i '' "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$RUNTIME_ENV_FILE"
-            else
-                sed -i "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$RUNTIME_ENV_FILE"
-            fi
+    load_db_host_port_from_user_config
+    log "INFO" "Setting runtime DB_USER / DB_PASSWORD from --app_db_user / --app_db_password"
+    if grep -q "^DB_USER=" "$RUNTIME_ENV_FILE"; then
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            sed -i '' "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$RUNTIME_ENV_FILE"
         else
-            echo "DB_USER=${APP_DB_USER}" >> "$RUNTIME_ENV_FILE"
+            sed -i "s|^DB_USER=.*|DB_USER=${APP_DB_USER}|" "$RUNTIME_ENV_FILE"
         fi
-        ESCAPED_RT_DB_PASSWORD=$(printf '%s\n' "$APP_DB_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
-        if grep -q "^DB_PASSWORD=" "$RUNTIME_ENV_FILE"; then
-            if [[ "$(uname -s)" == "Darwin" ]]; then
-                sed -i '' "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_RT_DB_PASSWORD}|" "$RUNTIME_ENV_FILE"
-            else
-                sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_RT_DB_PASSWORD}|" "$RUNTIME_ENV_FILE"
-            fi
-        else
-            echo "DB_PASSWORD=${APP_DB_PASSWORD}" >> "$RUNTIME_ENV_FILE"
-        fi
-        log "SUCCESS" "Runtime .env updated: DB_USER=${APP_DB_USER} (DB_PASSWORD set)"
+    else
+        echo "DB_USER=${APP_DB_USER}" >> "$RUNTIME_ENV_FILE"
     fi
+    ESCAPED_RT_DB_PASSWORD=$(printf '%s\n' "$APP_DB_PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
+    if grep -q "^DB_PASSWORD=" "$RUNTIME_ENV_FILE"; then
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            sed -i '' "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_RT_DB_PASSWORD}|" "$RUNTIME_ENV_FILE"
+        else
+            sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=${ESCAPED_RT_DB_PASSWORD}|" "$RUNTIME_ENV_FILE"
+        fi
+    else
+        echo "DB_PASSWORD=${APP_DB_PASSWORD}" >> "$RUNTIME_ENV_FILE"
+    fi
+    log "INFO" "Setting runtime DB_HOST / DB_PORT from user_config.sh"
+    if grep -q "^DB_HOST=" "$RUNTIME_ENV_FILE"; then
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            sed -i '' "s|^DB_HOST=.*|DB_HOST=${DB_HOST}|" "$RUNTIME_ENV_FILE"
+        else
+            sed -i "s|^DB_HOST=.*|DB_HOST=${DB_HOST}|" "$RUNTIME_ENV_FILE"
+        fi
+    else
+        echo "DB_HOST=${DB_HOST}" >> "$RUNTIME_ENV_FILE"
+    fi
+    if grep -q "^DB_PORT=" "$RUNTIME_ENV_FILE"; then
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            sed -i '' "s|^DB_PORT=.*|DB_PORT=${DB_PORT}|" "$RUNTIME_ENV_FILE"
+        else
+            sed -i "s|^DB_PORT=.*|DB_PORT=${DB_PORT}|" "$RUNTIME_ENV_FILE"
+        fi
+    else
+        echo "DB_PORT=${DB_PORT}" >> "$RUNTIME_ENV_FILE"
+    fi
+    log "SUCCESS" "Runtime .env updated: DB_USER=${APP_DB_USER} (DB_PASSWORD set), DB_HOST=${DB_HOST}, DB_PORT=${DB_PORT}"
 
     RUNTIME_DB_TYPE_ACTUAL=$(grep '^DB_TYPE=' "$RUNTIME_ENV_FILE" 2>/dev/null | cut -d'=' -f2- || echo "not found")
     if [ "$RUNTIME_DB_TYPE_ACTUAL" != "$DB_TYPE" ]; then
@@ -545,23 +588,6 @@ elif [ "$DB_TYPE" = "mysql" ]; then
     save_progress "$STEP"
 else
     log "INFO" "Skipping: MySQL configuration (not applicable, DB_TYPE=$DB_TYPE)"
-    save_progress "$STEP"
-fi
-
-# ===================== Install runtime dependencies =====================
-STEP="install_runtime_dep"
-if should_skip_step "$STEP" "$LAST_PROGRESS"; then
-    log "INFO" "Skipping: install runtime dependencies (already done)"
-else
-    log "INFO" "===== Installing runtime dependencies ====="
-
-    RUNTIME_SERVER_DIR="${RUNTIME_DIR}/server"
-    check_dir "$RUNTIME_SERVER_DIR"
-
-    log "INFO" "Running install_runtime_dependencies (manage_service.sh)"
-    install_runtime_dependencies "$RUNTIME_SERVER_DIR"
-
-    log "SUCCESS" "Runtime dependencies installed successfully"
     save_progress "$STEP"
 fi
 

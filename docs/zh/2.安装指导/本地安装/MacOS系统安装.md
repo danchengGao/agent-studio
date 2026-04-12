@@ -21,7 +21,7 @@
 
 #### 1. 获取安装脚本
 
-* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_macos_v2.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
+* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_macos.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
   * `setup.sh`：主安装脚本，串联整个安装流程
   * `check_curl.sh`：检查并安装 curl
   * `check_git.sh`：检查并安装 Git

@@ -150,6 +150,55 @@ function Get-UvDefaultIndexArgsFromUserConfig {
     return @()
 }
 
+function Get-DbHostPortFromUserConfig {
+    <#
+    .SYNOPSIS
+        Reads $DB_HOST / $DB_PORT from user_config.ps1 (string assignment lines).
+    #>
+    param(
+        [string]$WorkHome,
+        [string]$DefaultHost = "127.0.0.1",
+        [int]$DefaultPort = 3306
+    )
+
+    $result = @{
+        Host = $DefaultHost
+        Port = $DefaultPort
+    }
+
+    if ([string]::IsNullOrWhiteSpace($WorkHome)) {
+        return $result
+    }
+
+    $UserConfigPath = Join-Path $WorkHome "user_config.ps1"
+    if (-not (Test-Path $UserConfigPath)) {
+        return $result
+    }
+
+    try {
+        $UserConfigContent = Get-Content -Path $UserConfigPath -Raw -Encoding UTF8
+
+        if ($UserConfigContent -match '(?m)^\s*\$DB_HOST\s*=\s*["''](.*?)["'']\s*$') {
+            $configuredHost = $Matches[1].Trim()
+            if (-not [string]::IsNullOrWhiteSpace($configuredHost)) {
+                $result.Host = $configuredHost
+            }
+        }
+
+        if ($UserConfigContent -match '(?m)^\s*\$DB_PORT\s*=\s*["''](.*?)["'']\s*$') {
+            $configuredPortRaw = $Matches[1].Trim()
+            [int]$configuredPort = 0
+            if ([int]::TryParse($configuredPortRaw, [ref]$configuredPort) -and $configuredPort -ge 1 -and $configuredPort -le 65535) {
+                $result.Port = $configuredPort
+            }
+        }
+    } catch {
+        # Keep defaults when user config parsing fails.
+    }
+
+    return $result
+}
+
 function Remove-DirectoryRobust {
     <#
     .SYNOPSIS

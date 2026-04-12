@@ -21,7 +21,7 @@
 
 #### 1. 获取安装脚本
 
-* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows_v2.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
+* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
   * `setup.ps1`：主安装脚本，串联整个安装流程
   * `utils.ps1`：公共工具
   * `check_git.ps1`：检查 Git 是否安装，未安装则安装 Git
@@ -30,16 +30,16 @@
   * `check_mysql.ps1`：检查 MySQL 是否安装，未安装则安装 MySQL
   * `config_mysql.ps1`：配置 MySQL（创建数据库、用户等）
   * `manage_service.ps1`：服务管理，管理 Runtime、后端与前端的启动、停止、重启与状态
-  * `user_config.ps1`：用户配置文件（可选，包含代理、uv 源、npm 源配置）
+  * `user_config.ps1`：用户配置文件（可选，包含代理、uv 源、npm 源、数据库连接地址等）
 
-#### 2. 配置代理、uv 源和 npm 源（可选）
+#### 2. 配置代理、uv 源、npm 源与数据库地址（可选）
 
-如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 uv 源或 npm 源，可以在 `user_config.ps1` 文件中进行配置：
+如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 uv 源、npm 源，或需要指定数据库服务的主机与端口（例如远程 MySQL、Docker 映射端口），可以在 `user_config.ps1` 文件中进行配置：
 
 * 打开 `user_config.ps1` 文件，修改以下变量：
 
   ```powershell
-  # 用户填写的代理配置
+  # 代理配置
   $HTTP_PROXY=""  # HTTP 代理地址，例如 http://127.0.0.1:7890
   $HTTPS_PROXY=""  # HTTPS 代理地址，例如 http://127.0.0.1:7890
   $SSL_VERIFY=""  # 可选：true/false（对应 git http.sslVerify）
@@ -55,6 +55,10 @@
 
   # npm 源配置（可选）
   $NPM_REGISTRY=""       # npm 源地址，例如 https://registry.npmmirror.com
+
+  # 数据库连接配置（可选）
+  $DB_HOST=""            # 留空默认 127.0.0.1
+  $DB_PORT=""            # 留空默认 3306
   ```
 
 * 代理配置说明：
@@ -76,6 +80,8 @@
     * 淘宝镜像：`https://registry.npmmirror.com`
     * 腾讯云：`https://mirrors.cloud.tencent.com/npm/`
     * 华为云：`https://repo.huaweicloud.com/repository/npm/`
+* 数据库连接配置说明（`DB_HOST` / `DB_PORT`）：
+  * **作用**：使用的数据库在远程或非默认主机和端口时配置。
 
 #### 3. 运行安装脚本
 * 以管理员身份运行 PowerShell，设置执行策略：
