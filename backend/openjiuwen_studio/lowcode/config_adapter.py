@@ -391,10 +391,14 @@ class ConfigAdapter:
         elif isinstance(workflow_schema, dict):
             schema_dict = workflow_schema
 
+        from openjiuwen_studio.core.common.dsl import ComponentType
+
+        _llm_node_types = {str(ComponentType.COMPONENT_TYPE_LLM), str(ComponentType.COMPONENT_TYPE_QUESTION)}
+
         nodes = schema_dict.get("nodes", [])
         for node in nodes:
             node_type = str(node.get("type", ""))
-            is_llm_node = "llm" in node_type.lower() or node_type == "3"
+            is_llm_node = "llm" in node_type.lower() or node_type in _llm_node_types
 
             if is_llm_node:
                 model_info = node.get("data", {}).get("inputs", {}).get("llmParam", {}).get("model", {})
