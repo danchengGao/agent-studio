@@ -54,11 +54,6 @@ def convert_params_to_json_schema(params: List[Param]) -> Dict[str, Any]:
     required_params = []
 
     for param in params:
-        # Do not expose header params (e.g. Authorization) to LLM tool schema.
-        # Header values are injected via RestfulApiCard.headers.
-        if param.method == "header":
-            continue
-
         # 构建每个参数的属性
         param_schema = {
             "type": param.type,
@@ -68,11 +63,7 @@ def convert_params_to_json_schema(params: List[Param]) -> Dict[str, Any]:
 
         # 添加默认值（如果存在）
         if param.default_value is not None:
-            default_value = param.default_value
-            # Some providers reject empty search_depth; use a stable fallback.
-            if param.name == "search_depth" and isinstance(default_value, str) and default_value.strip() == "":
-                default_value = "basic"
-            param_schema["default"] = default_value
+            param_schema["default"] = param.default_value
 
         # 将参数添加到properties中
         properties[param.name] = param_schema
