@@ -179,6 +179,9 @@ set_mysql_vars() {
     if ! version_is_less_than "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" "0.1.4"; then
         set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_DEEPSEARCH_DB_NAME" "${PRE_UPGRADE_VARS["DEEPSEARCH_DB_NAME"]}"
     fi
+    if ! version_is_less_than "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" "0.1.7"; then
+        set_if_empty "DEPLOY_VARS" "PRE_UPGRADE_RUNTIME_DB_NAME" "${PRE_UPGRADE_VARS["RUNTIME_DB_NAME"]}"
+    fi
 
     set_if_empty "DEPLOY_VARS" "POST_UPGRADE_DB_HOST" "${RUNTIME_VARS["DB_HOST"]}"
     set_if_empty "DEPLOY_VARS" "POST_UPGRADE_DB_PORT" "${RUNTIME_VARS["DB_PORT"]}"
@@ -186,6 +189,7 @@ set_mysql_vars() {
     set_if_empty "DEPLOY_VARS" "POST_UPGRADE_AGENT_DB_NAME" "${RUNTIME_VARS["AGENT_DB_NAME"]}"
     set_if_empty "DEPLOY_VARS" "POST_UPGRADE_OPS_DB_NAME" "${RUNTIME_VARS["OPS_DB_NAME"]}"
     set_if_empty "DEPLOY_VARS" "POST_UPGRADE_DEEPSEARCH_DB_NAME" "${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
+    set_if_empty "DEPLOY_VARS" "POST_UPGRADE_RUNTIME_DB_NAME" "${DEPLOY_VARS["RUNTIME_DB_NAME"]}"
 
     DEPLOY_VARS["UPGRADE_MYSQL_SCRIPT"]="${CONFIG["UPGRADE_DIR"]}/upgrade-mysql-${DEPLOY_VARS["NAME_SUFFIX"]}.sh"
 }
@@ -277,6 +281,9 @@ gen_mysql_upload_cmds() {
     local db_keys=("AGENT_DB_NAME" "OPS_DB_NAME")
     if ! version_is_less_than "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" "0.1.4"; then
         db_keys+=("DEEPSEARCH_DB_NAME")
+    fi
+    if ! version_is_less_than "${DEPLOY_VARS["PRE_UPGRADE_VERSION"]}" "0.1.7"; then
+        db_keys+=("RUNTIME_DB_NAME")
     fi
 
     local cmd_file="${DEPLOY_VARS["UPGRADE_MYSQL_SCRIPT"]}"
