@@ -86,10 +86,7 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                         continue
 
                     # Add tool card to ability_manager using the proper add() method
-                    # This will check for duplicates and skip if already exists
-                    # Note: Runner.resource_mgr.add_tool() is called in agent.py's add_tools() method,
-                    # so we don't need to call it here to avoid duplicate registration
-                    from openjiuwen.core.foundation.tool import ToolCard
+                    # This will check for duplicates and skip if already exists.
                     result = self._react_agent._ability_manager.add(tool.card)
                     if hasattr(result, 'added') and not result.added:
                         logger.warning(
@@ -98,6 +95,18 @@ class ReActAgentCompWithToolsExecutable(ReActAgentCompExecutable):
                         )
                     else:
                         logger.warning(f"Added tool card to ability_manager: {tool_name}")
+
+                    # ReAct workflow components do not always pass through agent.py add_tools(),
+                    # so we must ensure tool instances are present in Runner.resource_mgr.
+                    from openjiuwen.core.runner import Runner
+                    try:
+                        Runner.resource_mgr.add_tool(tool)
+                        logger.warning(f"Registered tool instance in resource_mgr: {tool_name}")
+                    except Exception as add_err:
+                        # Duplicate registration may occur when cache is reused; keep execution path alive.
+                        logger.warning(
+                            f"Skip resource_mgr add_tool for {tool_name}, reason: {add_err}"
+                        )
 
                     added_tool_names.add(tool_name)
                 except Exception as e:
