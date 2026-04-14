@@ -557,6 +557,7 @@ const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({ open, knowledgeBa
           strategy_config: {
             max_tokens: formData.maxTokens,
             chunk_overlap_percent: formData.chunkOverlapPercent,
+            ...(formData.segmentationStrategy === '2' ? { chunk_unit: 'token' as const } : {}),
           },
         },
         indexing_strategy: {

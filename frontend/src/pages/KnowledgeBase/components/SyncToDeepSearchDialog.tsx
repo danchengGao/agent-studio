@@ -314,6 +314,7 @@ const SyncToDeepSearchDialog: React.FC<SyncToDeepSearchDialogProps> = ({
           strategy_config: {
             max_tokens: formData.maxTokens,
             chunk_overlap_percent: formData.chunkOverlapPercent,
+            ...(formData.segmentationStrategy === '2' ? { chunk_unit: 'token' as const } : {}),
           },
         },
         indexing_strategy: {

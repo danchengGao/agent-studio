@@ -275,6 +275,7 @@ const AddWeblinkDialog: React.FC<AddWeblinkDialogProps> = ({
         strategy_config: {
           max_tokens: maxTokens,
           chunk_overlap_percent: chunkOverlapPercent,
+          ...(formData.segmentationStrategy === '2' ? { chunk_unit: 'token' as const } : {}),
         },
       }
       const indexing_strategy: IndexingStrategy = {
