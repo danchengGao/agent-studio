@@ -44,6 +44,7 @@ from openjiuwen_studio.core.dsl_converter.converter.n8n_mappings import (
 # ID GENERATOR
 # =============================================================================
 
+
 class IDGenerator:
     """Generate sequential IDs like Jiuwen: start_1, llm_1, end_1"""
     
@@ -63,6 +64,7 @@ class IDGenerator:
 # =============================================================================
 # TRANSFORMATION REPORT
 # =============================================================================
+
 
 @dataclass
 class UnsupportedNode:
@@ -175,6 +177,7 @@ class TransformationReport:
 # =============================================================================
 # MAIN CONVERTER CLASS
 # =============================================================================
+
 
 class N8nWorkflowConverter(WorkflowConverter):
     """
@@ -488,11 +491,18 @@ class N8nWorkflowConverter(WorkflowConverter):
         node_type = trigger_node.get("type", "")
         params = trigger_node.get("parameters", {})
 
-        # Manual trigger has no inputs/outputs — it just starts execution
+        # Manual trigger has no form inputs — expose a generic "input" field so
+        # downstream LLM nodes can build a valid inputParameters reference to it.
         if "manual" in node_type.lower():
             return {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "input": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Manual trigger input"
+                    }
+                },
                 "required": []
             }
 
@@ -728,46 +738,60 @@ class N8nWorkflowConverter(WorkflowConverter):
         """Convert n8n Agent/LLM node to OpenJiuwen LLM component."""
         params = n8n_node.get("parameters", {})
         node_name = n8n_node.get("name", "")
-        
-        # Extract system prompt from various possible locations
-        system_prompt = ""
-        if params.get("options", {}).get("systemMessage"):
-            system_prompt = params["options"]["systemMessage"]
-        elif params.get("systemMessage"):
-            system_prompt = params["systemMessage"]
-        
-        # Extract user prompt
-        user_prompt = ""
-        if params.get("text"):
-            user_prompt = params["text"]
-        elif params.get("promptType") == "define" and params.get("text"):
-            user_prompt = params["text"]
-        
-        # Convert expressions with field mapping
-        system_prompt = self._convert_expression_with_mapping(system_prompt)
-        user_prompt = self._convert_expression_with_mapping(user_prompt)
-        
-        # Build default prompt from field map if no explicit prompt
+        node_type = n8n_node.get("type", "")
+
+        # ── OpenAI Assistant: uses assistantId instead of a model sub-node ───
+        if "openAiAssistant" in node_type:
+            raw_assistant = params.get("assistantId", params.get("assistant", {}))
+            if isinstance(raw_assistant, dict):
+                assistant_id = raw_assistant.get("value", raw_assistant.get("cachedResultName", ""))
+            else:
+                assistant_id = str(raw_assistant) if raw_assistant else ""
+            model_config = {
+                "id": "1",
+                "name": "openai",
+                "type": f"assistant:{assistant_id}" if assistant_id else "openai-assistant",
+            }
+            user_prompt = params.get("text", params.get("prompt", "{{input}}"))
+            system_prompt = ""
+            user_prompt = self._convert_expression_with_mapping(user_prompt)
+        else:
+            # ── All other chain types: delegate prompt extraction ─────────────
+            system_prompt, user_prompt = self._extract_chain_prompts(n8n_node)
+            system_prompt = self._convert_expression_with_mapping(system_prompt)
+            user_prompt = self._convert_expression_with_mapping(user_prompt)
+            # Get model config from connected AI sub-node
+            model_config = self._find_connected_model(node_name)
+
+        # ── Build default prompt when extraction yielded nothing ──────────────
         if not user_prompt and self.field_name_map:
             prompt_parts = [f"{{{{{name}}}}}" for name in self.field_name_map.values()]
             user_prompt = " ".join(prompt_parts)
         elif not user_prompt:
-            user_prompt = "{{input}}"
-        
-        # Get model config from connected AI sub-node
-        model_config = self._find_connected_model(node_name)
-        
-        # Extract template variables and build inputParameters.
-        # Each {{var}} in the prompt needs a ref to the node that provides it.
-        # Priority: immediate data-predecessor's declared output properties,
-        #           falling back to start node for vars found there.
+            pred_id_for_prompt = self._find_data_predecessor_id(node_name)
+            if pred_id_for_prompt:
+                primary = self._get_primary_output_field(pred_id_for_prompt)
+                pred_node_for_prompt = next(
+                    (n for n in self.openjiuwen_nodes if n["id"] == pred_id_for_prompt), None
+                )
+                direct_fields = list(
+                    pred_node_for_prompt.get("data", {}).get("outputs", {})
+                    .get("properties", {}).keys()
+                ) if pred_node_for_prompt else []
+                user_prompt = (
+                    f"{{{{{direct_fields[0]}}}}}" if direct_fields
+                    else f"{{{{{primary or 'input'}}}}}"
+                )
+            else:
+                user_prompt = "{{input}}"
+
+        # ── Extract template variables → build inputParameters ────────────────
         template_vars = re.findall(r'\{\{(\w+)\}\}', user_prompt)
-        input_parameters = {}
+        input_parameters: Dict[str, Any] = {}
 
         pred_id = self._find_data_predecessor_id(node_name)
         pred_output_field = self._get_primary_output_field(pred_id) if pred_id else ""
 
-        # Build a set of field names declared directly on the predecessor's outputs
         pred_direct_fields: set = set()
         if pred_id:
             pred_node = next((n for n in self.openjiuwen_nodes if n["id"] == pred_id), None)
@@ -777,29 +801,26 @@ class N8nWorkflowConverter(WorkflowConverter):
 
         for idx, var_name in enumerate(template_vars):
             if var_name in pred_direct_fields and pred_id:
-                # Predecessor declares this field directly — ref it by name
                 content = [pred_id, var_name]
             elif pred_id and pred_output_field:
-                # Predecessor is a code/plugin/etc. — pass its whole output
                 content = [pred_id, pred_output_field]
             else:
-                # No predecessor found — fall back to start node
                 content = [self.start_node_id, var_name]
 
             param: Dict[str, Any] = {"type": "ref", "content": content}
             if idx == 0:
                 param["extra"] = {"index": 0}
             input_parameters[var_name] = param
-        
-        # Check for connected tools
+
+        # ── Warn about connected tools ────────────────────────────────────────
         tools = self._find_connected_tools(node_name)
         if tools:
             self.report.add_warning(
                 f"Agent '{node_name}' has {len(tools)} tools: {', '.join(tools)}"
             )
-        
+
         llm_count = self.id_gen.counters.get("llm", 1)
-        
+
         return {
             "id": node_id,
             "type": str(ComponentType.COMPONENT_TYPE_LLM),
@@ -810,28 +831,161 @@ class N8nWorkflowConverter(WorkflowConverter):
                     "llmParam": {
                         "systemPrompt": {
                             "type": "template",
-                            "content": system_prompt
+                            "content": system_prompt,
                         },
                         "prompt": {
                             "type": "template",
-                            "content": user_prompt
+                            "content": user_prompt,
                         },
-                        "model": model_config
+                        "model": model_config,
                     },
-                    "inputParameters": input_parameters
+                    "inputParameters": input_parameters,
                 },
                 "outputs": {
                     "type": "object",
                     "properties": {
                         "output": {
                             "type": "string",
-                            "extra": {"index": 1}
+                            "extra": {"index": 1},
                         }
                     },
-                    "required": ["output"]
-                }
-            }
+                    "required": ["output"],
+                },
+            },
         }
+
+    @staticmethod
+    def _extract_model_name(params: Dict) -> str:
+        """
+        Safely extract a plain model-name string from n8n model parameters.
+
+        n8n's resource-locator widget stores model as a nested object:
+            {"__rl": true, "value": "deepseek-chat", "mode": "list", ...}
+        Calling .lower() on that dict raises AttributeError.  This helper
+        unwraps the object and always returns a plain string.
+        """
+        raw = params.get("model", params.get("modelId", ""))
+        if isinstance(raw, dict):
+            # Resource-locator format — prefer "value", fall back to "cachedResultName"
+            return str(raw.get("value", raw.get("cachedResultName", "")) or "")
+        return str(raw) if raw else ""
+
+    @staticmethod
+    def _extract_chain_prompts(n8n_node: Dict) -> Tuple[str, str]:
+        """
+        Return (system_prompt, user_prompt) for any LLM chain/agent node type.
+
+        Every node type stores its prompt in a different location.  This method
+        centralises the per-type extraction so _convert_llm_node stays clean.
+
+        Supported types and their param layouts:
+          chainLlm / agent          text, messages.messageValues, options.systemMessage
+          chainSummarization        summarizationMethodAndPrompts.values.prompt
+          chainRetrievalQa          query / options.systemPrompt
+          informationExtractor      text / schema.attributes[]
+          textClassifier            inputText / categories.categories[]
+          sentimentAnalysis         inputText  (fixed system prompt)
+          aiTransform               prompt / systemPrompt
+          openAiAssistant           handled separately (no chain prompts)
+        """
+        node_type = n8n_node.get("type", "")
+        params = n8n_node.get("parameters", {})
+        system_prompt = ""
+        user_prompt = ""
+
+        # ── chainLlm / agent ─────────────────────────────────────────────────
+        if "chainLlm" in node_type or "agent" in node_type:
+            # System prompt — check all known locations in priority order
+            if params.get("options", {}).get("systemMessage"):
+                system_prompt = params["options"]["systemMessage"]
+            elif params.get("systemMessage"):
+                system_prompt = params["systemMessage"]
+            # chainLlm: system message in parameters.messages.messageValues[0].message
+            if not system_prompt:
+                msg_values = params.get("messages", {}).get("messageValues", [])
+                if msg_values and isinstance(msg_values, list):
+                    system_prompt = msg_values[0].get("message", "")
+            if not system_prompt:
+                system_prompt = n8n_node.get("notes", "")
+            # User prompt
+            if params.get("promptType") == "define" and params.get("text"):
+                user_prompt = params["text"]
+            elif params.get("text"):
+                user_prompt = params["text"]
+
+        # ── chainSummarization ───────────────────────────────────────────────
+        elif "chainSummarization" in node_type:
+            mode = params.get("chunkingMode", "map_reduce")
+            method_cfg = params.get("summarizationMethodAndPrompts", {})
+            custom_prompt = (
+                method_cfg.get("values", {}).get("prompt")
+                or method_cfg.get("prompt")
+            )
+            if custom_prompt:
+                user_prompt = custom_prompt
+            elif params.get("text"):
+                user_prompt = params["text"]
+            else:
+                user_prompt = "{{input}}"
+            system_prompt = f"Summarize the following text. Chunking mode: {mode}."
+
+        # ── chainRetrievalQa ─────────────────────────────────────────────────
+        elif "chainRetrievalQa" in node_type:
+            user_prompt = params.get("query", params.get("text", "{{input}}"))
+            system_prompt = params.get("options", {}).get("systemPrompt", "")
+
+        # ── informationExtractor ─────────────────────────────────────────────
+        elif "informationExtractor" in node_type:
+            user_prompt = params.get("text", params.get("inputText", "{{input}}"))
+            schema = params.get("schema", {})
+            attributes = schema.get("attributes", [])
+            if attributes:
+                attr_desc = "; ".join(
+                    "{name} ({type}): {desc}".format(
+                        name=a.get("name", "field"),
+                        type=a.get("type", "string"),
+                        desc=a.get("description", ""),
+                    )
+                    for a in attributes
+                )
+                system_prompt = f"Extract the following fields from the text — {attr_desc}"
+            else:
+                system_prompt = "Extract structured information from the provided text."
+
+        # ── textClassifier ───────────────────────────────────────────────────
+        elif "textClassifier" in node_type:
+            user_prompt = params.get("inputText", params.get("text", "{{input}}"))
+            categories = params.get("categories", {}).get("categories", [])
+            cat_names = [
+                c.get("category", c.get("name", ""))
+                for c in categories if c
+            ]
+            if cat_names:
+                system_prompt = (
+                    "Classify the text into exactly one of these categories: "
+                    + ", ".join(cat_names)
+                    + ". Return only the category name."
+                )
+            else:
+                system_prompt = "Classify the text and return the category name."
+
+        # ── sentimentAnalysis ────────────────────────────────────────────────
+        elif "sentimentAnalysis" in node_type:
+            user_prompt = params.get("inputText", params.get("text", "{{input}}"))
+            system_prompt = (
+                "Analyze the sentiment of the following text. "
+                "Return exactly one of: Positive, Negative, or Neutral."
+            )
+
+        # ── aiTransform ──────────────────────────────────────────────────────
+        elif "aiTransform" in node_type:
+            user_prompt = params.get("prompt", params.get("text", "{{input}}"))
+            system_prompt = params.get("systemPrompt", "")
+
+        # ── openAiAssistant: no chain-style prompts (handled in _convert_llm_node)
+        # ── vectorStore nodes: no prompt extraction needed
+
+        return system_prompt, user_prompt
 
     def _find_connected_model(self, agent_name: str) -> Dict:
         """Find model configuration from connected AI sub-node."""
@@ -850,7 +1004,7 @@ class N8nWorkflowConverter(WorkflowConverter):
                         for conn in conn_list:
                             if conn.get("node") == agent_name:
                                 params = source_node.get("parameters", {})
-                                model_name = params.get("model", params.get("modelId", ""))
+                                model_name = self._extract_model_name(params)
                                 return self._map_model_to_jiuwen(model_name, conn_info[1])
         
         # Also check all nodes for AI model sub-nodes (they may not be in connections)
@@ -860,7 +1014,7 @@ class N8nWorkflowConverter(WorkflowConverter):
                 conn_info = AI_SUBNODES[source_type]
                 if conn_info[0] == "ai_languageModel":
                     params = node.get("parameters", {})
-                    model_name = params.get("model", params.get("modelId", ""))
+                    model_name = self._extract_model_name(params)
                     return self._map_model_to_jiuwen(model_name, conn_info[1])
         
         # Default model
@@ -868,31 +1022,74 @@ class N8nWorkflowConverter(WorkflowConverter):
 
     @staticmethod
     def _map_model_to_jiuwen(model_name: str, provider: str) -> Dict:
-        """Map n8n model name to Jiuwen model configuration."""
+        """
+        Map an n8n model name + provider string to a Jiuwen model config dict.
+
+        Strategy:
+          1. Provider-first: the AI_SUBNODES tuple carries the authoritative
+             provider tag (e.g. "groq", "mistral") — use it as the primary key.
+             This correctly handles providers whose model names contain no
+             brand hint (llama-3.1-70b-versatile on Groq, command-r on Cohere…).
+          2. Model-name fallback: when the provider string is absent or unknown,
+             scan the model name for well-known brand keywords.
+        """
+        # ── 1. Provider-first lookup ─────────────────────────────────────────
+        _defaults: Dict[str, str] = {
+            "openai": "gpt-4o",
+            "anthropic": "claude-3-5-sonnet-20241022",
+            "azure-openai": "gpt-4o",
+            "gemini": "gemini-1.5-pro",
+            "google-vertex": "gemini-1.5-pro",
+            "ollama": "llama3",
+            "groq": "llama-3.3-70b-versatile",
+            "mistral": "mistral-large-latest",
+            "deepseek": "deepseek-chat",
+            "cohere": "command-r-plus",
+            "aws-bedrock": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "openrouter": "openai/gpt-4o",
+            "xai": "grok-2",
+            "huggingface": "",
+            "lemonade": "",
+            "perplexity": "sonar-pro",
+            "fireworks": "",
+            "togetherai": "",
+            "novita": "",
+            "Qwen": "qwen-max",
+        }
+        if provider in _defaults:
+            return {
+                "id": "1",
+                "name": provider,
+                "type": model_name or _defaults[provider],
+            }
+
+        # ── 2. Model-name keyword fallback ───────────────────────────────────
         model_lower = model_name.lower()
-        
         if "qwen" in model_lower:
             return {"id": "1", "name": "Qwen", "type": model_name}
-        elif "gpt-4" in model_lower:
+        if any(p in model_lower for p in ("gpt-4", "gpt-3", "gpt-3.5", "o1-", "o3-")):
             return {"id": "1", "name": "openai", "type": model_name}
-        elif "gpt-3" in model_lower:
-            return {"id": "1", "name": "openai", "type": model_name}
-        elif "claude" in model_lower:
+        if "claude" in model_lower:
             return {"id": "1", "name": "anthropic", "type": model_name}
-        elif "deepseek" in model_lower:
-            return {"id": "1", "name": "deepseek", "type": "deepseek-chat"}
-        elif "gemini" in model_lower:
+        if "deepseek" in model_lower:
+            return {"id": "1", "name": "deepseek", "type": model_name}
+        if "gemini" in model_lower:
             return {"id": "1", "name": "gemini", "type": model_name}
-        elif "llama" in model_lower:
+        if any(p in model_lower for p in ("llama", "mixtral", "mistral")):
             return {"id": "1", "name": "ollama", "type": model_name}
-        elif provider == "ollama":
-            return {"id": "1", "name": "ollama", "type": model_name}
-        else:
-            return {
-                "id": "1", 
-                "name": provider or "deepseek", 
-                "type": model_name or "deepseek-chat"
-            }
+        if "grok" in model_lower:
+            return {"id": "1", "name": "xai", "type": model_name}
+        if any(p in model_lower for p in ("command-r", "command-light")):
+            return {"id": "1", "name": "cohere", "type": model_name}
+        if "sonar" in model_lower:
+            return {"id": "1", "name": "perplexity", "type": model_name}
+
+        # ── 3. Final catch-all ───────────────────────────────────────────────
+        return {
+            "id": "1",
+            "name": provider or "openai",
+            "type": model_name or "gpt-4o",
+        }
 
     def _find_connected_tools(self, agent_name: str) -> List[str]:
         """Find tools connected to agent."""
@@ -1929,8 +2126,13 @@ class N8nWorkflowConverter(WorkflowConverter):
             f'    Converted from n8n Set node: {node_name}',
             f'    Mode: {mode}',
             f'    """',
+            '    import datetime, json as _json',
             '    # Get input data',
-            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}',
+            '    _raw = args.params.get("input", {}) if hasattr(args, "params") else {}',
+            '    if isinstance(_raw, str):',
+            '        try: _raw = _json.loads(_raw)',
+            '        except Exception: _raw = {}',
+            '    input_data = _raw if isinstance(_raw, dict) else {}',
             '    ',
         ]
         
@@ -2032,8 +2234,20 @@ class N8nWorkflowConverter(WorkflowConverter):
             values_data = params["values"]
             if isinstance(values_data, list):
                 assignments = values_data
-            elif isinstance(values_data, dict) and "values" in values_data:
-                assignments = values_data["values"]
+            elif isinstance(values_data, dict):
+                if "values" in values_data:
+                    assignments = values_data["values"]
+                else:
+                    # n8n v1 format: values.{type}: [{name, value}, ...]
+                    # e.g. {"number": [{"name": "score", "value": 75}]}
+                    for value_type in ["string", "number", "boolean", "array", "object"]:
+                        if value_type in values_data:
+                            type_values = values_data[value_type]
+                            if isinstance(type_values, list):
+                                for item in type_values:
+                                    item_copy = dict(item)
+                                    item_copy["type"] = value_type
+                                    assignments.append(item_copy)
         
         # Handle single-value format (string, number, boolean, etc.)
         if not assignments:
@@ -2146,7 +2360,16 @@ class N8nWorkflowConverter(WorkflowConverter):
     @staticmethod
     def _convert_inner_expression(inner: str) -> str:
         """Convert the inner part of an n8n expression to Python."""
-        
+
+        # Bare $json — the entire input object (e.g. summary = {{ $json }})
+        if re.match(r'^\$json$', inner.strip()):
+            return 'dict(input_data)'
+
+        # $now / $today date helpers  (e.g. {{ $now.toISO() }})
+        # NOTE: _convert_set_to_code injects `import datetime` at function top.
+        if re.match(r'^\$now', inner.strip()) or re.match(r'^\$today', inner.strip()):
+            return 'datetime.datetime.now(datetime.timezone.utc).isoformat()'
+
         # $json.fieldName or $json["fieldName"]
         json_dot_match = re.match(r'\$json\.(\w+)', inner)
         if json_dot_match:
@@ -2676,39 +2899,40 @@ class N8nWorkflowConverter(WorkflowConverter):
             source_id = self.node_id_map.get(source_name)
             if not source_id:
                 continue
-            
+
             for conn_type, target_lists in conn_types.items():
-                # Skip AI sub-node connections (they're embedded)
-                if conn_type in ["ai_languageModel", "ai_memory", "ai_tool", 
-                                 "ai_embedding", "ai_document"]:
+                if conn_type in ["ai_languageModel", "ai_memory", "ai_tool",
+                                "ai_embedding", "ai_document"]:
                     continue
-                
+
                 source_n8n_node = self.nodes_by_name.get(source_name, {})
                 source_n8n_type = source_n8n_node.get("type", "")
                 source_jiuwen_type = self.N8N_TO_OPENJIUWEN.get(source_n8n_type)
-                is_code = source_jiuwen_type == ComponentType.COMPONENT_TYPE_CODE or \
-                      source_jiuwen_type is None
-                is_selector = source_jiuwen_type == ComponentType.COMPONENT_TYPE_IF
 
-                # Pre-fetch branch IDs from the already-converted jiuwen node
-                # so each output_index maps to its correct branchId
+                is_start = (source_id == self.start_node_id)  # ← new guard
+                is_code = (source_jiuwen_type == ComponentType.COMPONENT_TYPE_CODE
+                            or source_jiuwen_type is None)
+                is_selector = (source_jiuwen_type == ComponentType.COMPONENT_TYPE_IF)
+
                 selector_branch_ids = []
                 if is_selector:
-                    jiuwen_node = next((n for n in self.openjiuwen_nodes if n["id"] == source_id), None)
+                    jiuwen_node = next(
+                        (n for n in self.openjiuwen_nodes if n["id"] == source_id), None
+                    )
                     if jiuwen_node:
                         branches = jiuwen_node.get("data", {}).get("branches", [])
-                        selector_branch_ids = [b.get("branchId", str(i)) for i, b in enumerate(branches)]
-                
-                
+                        selector_branch_ids = [
+                            b.get("branchId", str(i)) for i, b in enumerate(branches)
+                        ]
+
                 for output_index, target_list in enumerate(target_lists):
                     for target in target_list:
                         target_name = target.get("node")
                         target_id = self.node_id_map.get(target_name)
-                        
+
                         if target_id and source_id != target_id:
-                            # Check for duplicate edges
                             edge_exists = any(
-                                e.get("sourceNodeID") == source_id and 
+                                e.get("sourceNodeID") == source_id and
                                 e.get("targetNodeID") == target_id
                                 for e in self.openjiuwen_edges
                             )
@@ -2717,11 +2941,10 @@ class N8nWorkflowConverter(WorkflowConverter):
                                     "sourceNodeID": source_id,
                                     "targetNodeID": target_id,
                                 }
-                                if is_code:
+                                # Start node must never carry sourcePortID
+                                if not is_start and is_code:
                                     edge["sourcePortID"] = "0"
-                                elif is_selector and output_index < len(selector_branch_ids):
-                                    # output_index 0 → first branch (true/if)
-                                    # output_index 1 → second branch (else)
+                                elif not is_start and is_selector and output_index < len(selector_branch_ids):
                                     edge["sourcePortID"] = selector_branch_ids[output_index]
                                 self.openjiuwen_edges.append(edge)
 
@@ -2765,7 +2988,6 @@ class N8nWorkflowConverter(WorkflowConverter):
                         "id": f"edge_{uuid.uuid4().hex[:8]}",
                         "sourceNodeID": self.start_node_id,
                         "targetNodeID": target_id,
-                        "sourcePortID": "0",
                     })
         
         # Connect ALL terminal nodes (leaves) to End — handles branching workflows
@@ -2780,12 +3002,20 @@ class N8nWorkflowConverter(WorkflowConverter):
                     for e in self.openjiuwen_edges
                 )
                 if not edge_exists:
-                    self.openjiuwen_edges.append({
+                    terminal_node = next(
+                        (n for n in self.openjiuwen_nodes if n["id"] == terminal_id), None
+                    )
+                    terminal_type = int(terminal_node.get("type", 0)) if terminal_node else 0
+                    terminal_edge: Dict[str, Any] = {
                         "id": f"edge_{uuid.uuid4().hex[:8]}",
                         "sourceNodeID": terminal_id,
                         "targetNodeID": self.end_node_id,
-                        "sourcePortID": "0",
-                    })
+                    }
+                    # Only Code and Selector nodes use sourcePortID on outgoing edges
+                    if terminal_type in (ComponentType.COMPONENT_TYPE_CODE,
+                                        ComponentType.COMPONENT_TYPE_IF):
+                        terminal_edge["sourcePortID"] = "0"
+                    self.openjiuwen_edges.append(terminal_edge)
         
         if self.end_node_id:
             for node in self.openjiuwen_nodes:
@@ -2967,8 +3197,7 @@ class N8nWorkflowConverter(WorkflowConverter):
         return f"{simple_type}_{uuid.uuid4().hex[:8]}"
 
     # Legacy method for backward compatibility
-    @staticmethod
-    def add_start_end_nodes(nodes: List[Dict], edges: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+    def add_start_end_nodes(self, nodes: List[Dict], edges: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
         """Add START and END nodes to workflow (legacy static method)."""
         # Find entry points (nodes with no incoming connections)
         all_targets = {edge["targetNodeID"] for edge in edges}

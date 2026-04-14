@@ -187,6 +187,21 @@ AI_SUBNODES: Dict[str, Tuple[str, str]] = {
     "@n8n/n8n-nodes-langchain.lmLemonade": ("ai_languageModel", "lemonade"),
     "n8n-nodes-langchain.lmOpenHuggingFaceInference": ("ai_languageModel", "huggingface"),
     "@n8n/n8n-nodes-langchain.lmOpenHuggingFaceInference": ("ai_languageModel", "huggingface"),
+    # Chat-mode HuggingFace (separate node from the completion-mode one above)
+    "n8n-nodes-langchain.lmChatHuggingFaceInference": ("ai_languageModel", "huggingface"),
+    "@n8n/n8n-nodes-langchain.lmChatHuggingFaceInference": ("ai_languageModel", "huggingface"),
+    # Perplexity AI
+    "n8n-nodes-langchain.lmChatPerplexity": ("ai_languageModel", "perplexity"),
+    "@n8n/n8n-nodes-langchain.lmChatPerplexity": ("ai_languageModel", "perplexity"),
+    # Fireworks AI
+    "n8n-nodes-langchain.lmChatFireworks": ("ai_languageModel", "fireworks"),
+    "@n8n/n8n-nodes-langchain.lmChatFireworks": ("ai_languageModel", "fireworks"),
+    # Together AI
+    "n8n-nodes-langchain.lmChatTogetherAi": ("ai_languageModel", "togetherai"),
+    "@n8n/n8n-nodes-langchain.lmChatTogetherAi": ("ai_languageModel", "togetherai"),
+    # Novita AI
+    "n8n-nodes-langchain.lmChatNovita": ("ai_languageModel", "novita"),
+    "@n8n/n8n-nodes-langchain.lmChatNovita": ("ai_languageModel", "novita"),
     # Memory
     "n8n-nodes-langchain.memoryBufferWindow": ("ai_memory", "buffer"),
     "@n8n/n8n-nodes-langchain.memoryBufferWindow": ("ai_memory", "buffer"),
