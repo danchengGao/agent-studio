@@ -95,7 +95,7 @@
         "data": "响应数据（200 OK时的JSON对象）"
       }
     },
-      "reactAgent": {
+    "reactAgent": {
       "ReactAgent": "反应代理",
       "titlePrefix": "反应代理",
       "description": "反应代理节点",
@@ -116,8 +116,8 @@
       "addKnowledgeBase": "添加知识库",
       "noKnowledgeBase": "未选择知识库",
       "selectKnowledgeBase": "选择知识库",
-      "singleKBNote": "当前仅支持选择一个知识库。",
-      "close": "关闭",
+      "cancel": "取消",
+      "save": "保存",
       "retrievalSettings": "检索设置",
       "knowledgeCannotBeEmpty": "知识库不能为空",
       "maxRecallCount": "最大召回数量",

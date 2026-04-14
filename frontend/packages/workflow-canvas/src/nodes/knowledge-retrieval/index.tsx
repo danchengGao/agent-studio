@@ -4,13 +4,13 @@
  * Knowledge Retrieval workflow node registry.
  */
 
-import { customNanoid } from '../../utils/nanoid-custom'
-import { WorkflowNodeType } from '../constants'
-import { FlowNodeRegistry } from '../../typings'
-import { BookOpen } from 'lucide-react'
-import { formMeta } from './form-meta'
-import { t } from '../../i18n'
-import { generateNodeTitle } from '../../utils/workflow-node-utils'
+import { customNanoid } from '../../utils/nanoid-custom';
+import { WorkflowNodeType } from '../constants';
+import { FlowNodeRegistry } from '../../typings';
+import { BookOpen } from 'lucide-react';
+import { formMeta } from './form-meta';
+import { t } from '../../i18n';
+import { generateNodeTitle } from '../../utils/workflow-node-utils';
 
 export const KnowledgeRetrievalNodeRegistry: FlowNodeRegistry = {
   type: WorkflowNodeType.KnowledgeRetrieval,
@@ -28,9 +28,9 @@ export const KnowledgeRetrievalNodeRegistry: FlowNodeRegistry = {
   },
   formMeta,
   onAdd: (context?) => {
-    const nodeId = `kr_${customNanoid(5)}`
-    const titlePrefix = t('workflowCanvas.nodes.knowledgeRetrieval.titlePrefix')
-    const title = generateNodeTitle(WorkflowNodeType.KnowledgeRetrieval, context, titlePrefix)
+    const nodeId = `kr_${customNanoid(5)}`;
+    const titlePrefix = t('workflowCanvas.nodes.knowledgeRetrieval.titlePrefix');
+    const title = generateNodeTitle(WorkflowNodeType.KnowledgeRetrieval, context, titlePrefix);
 
     return {
       id: nodeId,
@@ -87,17 +87,10 @@ export const KnowledgeRetrievalNodeRegistry: FlowNodeRegistry = {
                 index: 2,
               },
             },
-            results_with_metadata: {
-              type: 'array',
-              items: { type: 'object' },
-              extra: {
-                index: 3,
-              },
-            },
           },
           required: ['results', 'context'],
         },
       },
-    }
+    };
   },
-}
+};

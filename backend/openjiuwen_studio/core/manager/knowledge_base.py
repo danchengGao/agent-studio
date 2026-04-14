@@ -1984,16 +1984,44 @@ def _create_vector_store(
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
 
 
-def get_vector_store_configs(collection_name: str) -> Tuple[VectorStoreConfig, Dict[str, Any]]:
-    """Return the VectorStoreConfig and additional connection parameters
-    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+def get_vector_store_config(collection_name: str) -> VectorStoreConfig:
+    """Return the VectorStoreConfig based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
 
     Args:
         collection_name: Collection name
 
     Returns:
-        A tuple of (VectorStoreConfig, additional_config) where
-        *additional_config* contains backend-specific connection parameters
+        VectorStoreConfig
+
+    Raises:
+        ValueError: If the configured INDEX_MANAGER_TYPE is not supported.
+    """
+    index_manager_type = _CURR_INDEX_TYPE
+
+    if index_manager_type == "chroma":
+        vector_store_config = VectorStoreConfig(
+            store_provider=StoreType.Chroma,
+            collection_name=collection_name,
+        )
+        return vector_store_config
+
+    elif index_manager_type == "milvus":
+        vector_store_config = VectorStoreConfig(
+            store_provider=StoreType.Milvus,
+            collection_name=collection_name,
+        )
+        return vector_store_config
+
+    else:
+        raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
+    
+    
+def get_vector_store_connection_config() -> Dict[str, Any]:
+    """Return the vector store connection parameters
+    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+
+    Returns:
+        A dictionary containing backend-specific connection parameters
 
     Raises:
         ValueError: If the configured INDEX_MANAGER_TYPE is not supported.
@@ -2002,14 +2030,10 @@ def get_vector_store_configs(collection_name: str) -> Tuple[VectorStoreConfig, D
 
     if index_manager_type == "chroma":
         data_dir = _get_chroma_data_dir()
-        vector_store_config = VectorStoreConfig(
-            store_provider="chroma",
-            collection_name=collection_name,
-        )
-        additional_config = {
+        connection_config = {
             "chroma_path": str(data_dir),
         }
-        return vector_store_config, additional_config
+        return connection_config
 
     elif index_manager_type == "milvus":
         milvus_host = os.getenv("MILVUS_HOST", "localhost")
@@ -2020,15 +2044,11 @@ def get_vector_store_configs(collection_name: str) -> Tuple[VectorStoreConfig, D
         )
         milvus_uri = f"http://{milvus_host}:{milvus_port}"
 
-        vector_store_config = VectorStoreConfig(
-            store_provider="milvus",
-            collection_name=collection_name,
-        )
-        additional_config = {
+        connection_config = {
             "milvus_uri": milvus_uri,
             "milvus_token": milvus_token,
         }
-        return vector_store_config, additional_config
+        return connection_config
 
     else:
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")

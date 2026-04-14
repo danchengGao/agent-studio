@@ -459,8 +459,6 @@ class KnowledgeRetrievalConfig(BaseModel):
     kb_ids: List[str] = Field(default_factory=list)
     retrieval_config: Dict[str, Any] = Field(default_factory=dict)
     model: Optional[ModelConfig] = Field(default=None)
-    result_separator: str = Field(default="\n\n")
-    include_metadata: bool = Field(default=False)
 
 
 def encode_to_json(m: BaseModel) -> str:
