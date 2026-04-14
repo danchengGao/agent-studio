@@ -62,7 +62,7 @@ def convert_params_to_json_schema(params: List[Param]) -> Dict[str, Any]:
         }
 
         # 添加默认值（如果存在）
-        if param.default_value is not None:
+        if param.default_value:
             param_schema["default"] = param.default_value
 
         # 将参数添加到properties中
