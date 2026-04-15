@@ -1,5 +1,5 @@
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
-import { Button, IconButton, Paper, CircularProgress, Divider, Select, MenuItem, SelectChangeEvent, Tooltip } from '@mui/material'
+import { Button, IconButton, Paper, CircularProgress, Divider, Select, MenuItem, SelectChangeEvent, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   AgentDetailResponse,
@@ -100,6 +100,7 @@ const AgentEditorEditPage = () => {
   const [submitVersionDialogOpen, setSubmitVersionDialogOpen] = useState(false)
   // Publish dialog state
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [publishNoticeOpen, setPublishNoticeOpen] = useState(false)
   const [publishSuccessCardOpen, setPublishSuccessCardOpen] = useState(false)
 
   // History version related state (panel control only, data fetched within component)
@@ -299,7 +300,12 @@ const AgentEditorEditPage = () => {
   }
 
   // Publish dialog
-  const handleOpenPublishDialog = () => setPublishDialogOpen(true)
+  const handleOpenPublishDialog = () => setPublishNoticeOpen(true)
+  const handleClosePublishNoticeDialog = () => setPublishNoticeOpen(false)
+  const handleConfirmPublishNoticeDialog = () => {
+    setPublishNoticeOpen(false)
+    setPublishDialogOpen(true)
+  }
   const handleClosePublishDialog = () => setPublishDialogOpen(false)
   const handleClosePublishSuccessCard = () => setPublishSuccessCardOpen(false)
   const handleGoPublishTest = () => {
@@ -908,6 +914,19 @@ const AgentEditorEditPage = () => {
         }}
       />
       {/* 发布对话框 */}
+      <Dialog open={publishNoticeOpen} onClose={handleClosePublishNoticeDialog}>
+        <DialogTitle>{t('publishNotice.title')}</DialogTitle>
+        <DialogContent>{t('publishNotice.description')}</DialogContent>
+        <DialogActions>
+          <Button onClick={handleClosePublishNoticeDialog}>
+            {t('publishNotice.cancel')}
+          </Button>
+          <Button variant="contained" className="btn-primary" onClick={handleConfirmPublishNoticeDialog}>
+            {t('publishNotice.confirm')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <AgentPublishDialog
         open={publishDialogOpen}
         agentId={agentId ?? undefined}
