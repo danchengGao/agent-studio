@@ -29,7 +29,7 @@ export const renderForm = () => {
       <FormContent>
         <FormInput />
         <FormModel />
-        <FormPrompt />
+        <FormPrompt mode={'systemOnly'}/>
         {isSidebar && (
           <>
             <ReactAgentFormIterations />
