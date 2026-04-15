@@ -1272,15 +1272,15 @@ class N8nWorkflowConverter(WorkflowConverter):
     # -------------------------------------------------------------------------
     N8N_OPERATOR_MAP: Dict[str, str] = {
     # generic equality
-    "equals": "==",
-    "notEquals": "!=",
-    "equal": "==",
-    "notEqual": "!=",
+    "equals": "eq",
+    "notEquals": "neq",
+    "equal": "eq",
+    "notEqual": "neq",
     # boolean
-    "true": "==",      # paired with right=true
-    "false": "==",     # paired with right=false
-    "exists": "!=",    # paired with right=null
-    "notExists": "==", # paired with right=null
+    "true": "eq",      # paired with right=true
+    "false": "neq",     # paired with right=false
+    "exists": "is_not_empty",    # paired with right=null
+    "notExists": "is_empty", # paired with right=null
     # numeric
     "gt": "gt",
     "gte": "gte",
@@ -1296,8 +1296,8 @@ class N8nWorkflowConverter(WorkflowConverter):
     "startsWith": "starts_with",
     "endsWith": "ends_with",
     "regex": "regex",
-    "empty": "==",
-    "notEmpty": "!=",
+    "empty": "is_empty",
+    "notEmpty": "is_not_empty",
 }
 
     def _map_n8n_operator(self, n8n_op: Any) -> Tuple[str, Any]:
