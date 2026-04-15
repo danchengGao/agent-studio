@@ -78,6 +78,12 @@
         "switchVersionFailed": "切换版本失败",
         "publishSuccess": "发布成功",
         "submitVersionSuccess": "提交成功"
+      },
+      "publishNotice": {
+        "title": "发布说明",
+        "description": "说明：本版本发布的智能体不支持知识库和记忆的调用。工作流中不支持代码组件、输入-输出组件、提问器组件。插件中不支持代码插件。",
+        "cancel": "取消",
+        "confirm": "确认"
       }
     },
     "systemPrompt": {
@@ -212,9 +218,9 @@
           "noModelsConfiguredMessage": "当前未配置任何模型，请前往模型配置页面添加模型"
         },
         "workflow": {
-          "refreshTooltip": "刷新工作流信息",
+          "refreshTooltip": "校验工作流",
           "validationWarning": "所选工作流存在校验不通过（{{count}} 个），请跳转对应工作流进行修改",
-          "refreshAriaLabel": "刷新"
+          "refreshAriaLabel": "校验"
         },
         "knowledge": {
           "sectionTitle": "知识",
@@ -601,8 +607,8 @@
       "tooltip": "所选工作流存在校验不通过（{{count}} 个），请跳转对应工作流进行修改"
     },
     "refreshWorkflows": {
-      "tooltip": "刷新工作流信息",
-      "ariaLabel": "刷新"
+      "tooltip": "校验工作流",
+      "ariaLabel": "校验"
     }
   }
 }

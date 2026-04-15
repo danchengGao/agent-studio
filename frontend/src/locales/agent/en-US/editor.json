@@ -78,6 +78,12 @@
         "switchVersionFailed": "Failed to switch version",
         "publishSuccess": "Published successfully",
         "submitVersionSuccess": "Submitted successfully"
+      },
+      "publishNotice": {
+        "title": "Publishing Notice",
+        "description": "Note: In this version, published agents do not support invoking knowledge bases or memories. Workflows do not support Code, Input/Output, or Questioner components. Plugins do not support code plugins.",
+        "cancel": "Cancel",
+        "confirm": "Confirm"
       }
     },
     "systemPrompt": {
@@ -212,9 +218,9 @@
           "noModelsConfiguredMessage": "No models are configured. Please go to the model configuration page to add models."
         },
         "workflow": {
-          "refreshTooltip": "Refresh workflow",
+          "refreshTooltip": "Validate workflows",
           "validationWarning": "Some workflows have validation errors ({{count}}). Please open the corresponding workflow to fix.",
-          "refreshAriaLabel": "Refresh"
+          "refreshAriaLabel": "Validate"
         },
         "knowledge": {
           "sectionTitle": "Knowledge",
@@ -601,8 +607,8 @@
       "tooltip": "Some workflows failed validation ({{count}}). Please go to the corresponding workflow(s) to fix."
     },
     "refreshWorkflows": {
-      "tooltip": "Refresh workflow info",
-      "ariaLabel": "Refresh"
+      "tooltip": "Validate workflows",
+      "ariaLabel": "Validate"
     }
   }
 }
