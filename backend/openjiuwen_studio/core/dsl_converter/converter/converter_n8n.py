@@ -1271,34 +1271,34 @@ class N8nWorkflowConverter(WorkflowConverter):
     # n8n stores operators as {"type": "string"|"number"|"boolean", "operation": "..."}
     # -------------------------------------------------------------------------
     N8N_OPERATOR_MAP: Dict[str, str] = {
-        # generic equality
-        "equals": "==",
-        "notEquals": "!=",
-        "equal": "==",
-        "notEqual": "!=",
-        # boolean
-        "true": "==",   # paired with right=true
-        "false": "==",   # paired with right=false
-        "exists": "!=",   # paired with right=null
-        "notExists": "==",   # paired with right=null
-        # numeric
-        "gt": ">",
-        "gte": ">=",
-        "lt": "<",
-        "lte": "<=",
-        "smaller": "<",
-        "smallerEqual": "<=",
-        "larger": ">",
-        "largerEqual": ">=",
-        # string
-        "contains": "contains",
-        "notContains": "not_contains",
-        "startsWith": "starts_with",
-        "endsWith": "ends_with",
-        "regex": "regex",
-        "empty": "==",
-        "notEmpty": "!=",
-    }
+    # generic equality
+    "equals": "==",
+    "notEquals": "!=",
+    "equal": "==",
+    "notEqual": "!=",
+    # boolean
+    "true": "==",      # paired with right=true
+    "false": "==",     # paired with right=false
+    "exists": "!=",    # paired with right=null
+    "notExists": "==", # paired with right=null
+    # numeric
+    "gt": "gt",
+    "gte": "gte",
+    "lt": "lt",
+    "lte": "lte",
+    "smaller": "lt",
+    "smallerEqual": "lte",
+    "larger": "gt",
+    "largerEqual": "gte",
+    # string
+    "contains": "contains",
+    "notContains": "not_contains",
+    "startsWith": "starts_with",
+    "endsWith": "ends_with",
+    "regex": "regex",
+    "empty": "==",
+    "notEmpty": "!=",
+}
 
     def _map_n8n_operator(self, n8n_op: Any) -> Tuple[str, Any]:
         """
