@@ -27,7 +27,7 @@ export const renderForm = () => {
     <>
       <FormHeader />
       <FormContent>
-        <FormInput />
+        <FormInput nameEditable={false}/>
         <FormModel />
         <FormPrompt mode={'systemOnly'}/>
         {isSidebar && (
