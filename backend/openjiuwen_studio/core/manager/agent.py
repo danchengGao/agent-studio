@@ -1510,6 +1510,7 @@ def _collect_workflow_dependencies(
     processed_workflow_ids: Set[str],
     plugins: list,
     processed_plugin_ids: Set[str],
+    workflow_version: str = None,
 ):
     """递归收集Workflow依赖（包括子工作流和插件）"""
     if workflow_id in processed_workflow_ids:
@@ -1518,7 +1519,7 @@ def _collect_workflow_dependencies(
     from openjiuwen_studio.schemas.workflow import WorkflowId
 
     wf_query = WorkflowId(
-        space_id=space_id, workflow_id=workflow_id, workflow_version=None
+        space_id=space_id, workflow_id=workflow_id, workflow_version=workflow_version
     )
 
     wf_result = workflow_repository.workflow_get(wf_query)
@@ -2690,8 +2691,9 @@ async def agent_export(
         # 3.1 处理直接依赖的Workflows
         agent_workflows = agent_data.get("workflows", []) or []
         for wf in agent_workflows:
-            # 兼容处理：尝试获取 "id" 或 "workflow_id"
+            # 兼容处理：尝试获取 "id" 或 "workflow_id" 以及 "workflow_version"
             wf_id = wf.get("id") or wf.get("workflow_id")
+            wf_version = wf.get("workflow_version")  # 获取工作流版本
             if wf_id and wf_id not in processed_workflow_ids:
                 _collect_workflow_dependencies(
                     wf_id,
@@ -2700,6 +2702,7 @@ async def agent_export(
                     processed_workflow_ids,
                     plugins,
                     processed_plugin_ids,
+                    workflow_version=wf_version,  # 传递工作流版本
                 )
 
         # 3.2 处理直接依赖的Plugins
@@ -4382,6 +4385,7 @@ async def agent_get_model_api_keys(
         agent_workflows = agent_data.get("workflows", []) or []
         for wf in agent_workflows:
             wf_id = wf.get("id") or wf.get("workflow_id")
+            wf_version = wf.get("workflow_version")  # 获取工作流版本
             if wf_id and wf_id not in processed_workflow_ids:
                 _collect_workflow_dependencies(
                     wf_id,
@@ -4390,6 +4394,7 @@ async def agent_get_model_api_keys(
                     processed_workflow_ids,
                     plugins=[],
                     processed_plugin_ids=processed_plugin_ids,
+                    workflow_version=wf_version,  # 传递工作流版本
                 )
     except Exception as e:
         logger.error(f"[AGENT_GET_MODEL_API_KEYS] Dependency collection failed: {e}", exc_info=True)
