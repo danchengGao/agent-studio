@@ -68,7 +68,7 @@ def _get_llm_config_from_db(llm_model_id: int, space_id: str) -> tuple[ModelClie
             api_key=api_key,
             api_base=model_config.base_url,
             timeout=float(model_config.timeout),
-            verify_ssl=False,
+            verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
         )
 
         model_request_config = ModelRequestConfig(
