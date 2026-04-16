@@ -239,6 +239,87 @@ export class AgentService {
     }
   }
 
+  // 导出智能体
+  static async exportAgent(request: {
+    space_id: string
+    agent_id: string
+    agent_version?: string
+  }): Promise<any> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post(API_ENDPOINTS.AGENTS.EXPORT, request, {
+        responseType: 'blob', // 支持二进制文件下载
+      })
+
+      // 检查响应类型
+      const contentType = response.headers['content-type']
+      if (contentType && contentType.includes('application/json')) {
+        // 如果是JSON，读取文本并解析
+        const text = await (response.data as Blob).text()
+        return JSON.parse(text)
+      }
+
+      // 如果是文件流
+      let filename = 'agent_export.zip'
+      const disposition = response.headers['content-disposition']
+      if (disposition) {
+        // 优先尝试匹配 filename*= (RFC 5987)
+        const filenameStarMatch = disposition.match(/filename\*=UTF-8''(.+)/i)
+        if (filenameStarMatch && filenameStarMatch[1]) {
+          filename = decodeURIComponent(filenameStarMatch[1])
+        } else {
+          // 回退匹配 filename=
+          const filenameMatch = disposition.match(/filename=(.+)/i)
+          if (filenameMatch && filenameMatch[1]) {
+             // 去除引号
+            filename = filenameMatch[1].replace(/["']/g, '')
+          }
+        }
+      }
+
+      return {
+        blob: response.data,
+        filename,
+        isBlob: true
+      }
+    } catch (error) {
+      console.error('导出智能体API调用失败:', error)
+      throw new Error(`导出智能体失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 导入智能体
+  static async importAgent(request: {
+    space_id: string
+    import_data: any
+    overwrite: boolean
+  }): Promise<{ code: number; message: string; data: any }> {
+    try {
+      const apiClient = getApiClient()
+      
+      // 如果 import_data 是 File 对象，使用 FormData 上传
+      if (request.import_data instanceof File || (typeof Blob !== 'undefined' && request.import_data instanceof Blob)) {
+        const formData = new FormData()
+        formData.append('file', request.import_data)
+        formData.append('space_id', request.space_id)
+        formData.append('overwrite', String(request.overwrite))
+        
+        const response = await apiClient.post(API_ENDPOINTS.AGENTS.IMPORT, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+        return response.data
+      }
+
+      const response = await apiClient.post(API_ENDPOINTS.AGENTS.IMPORT, request)
+      return response.data
+    } catch (error) {
+      console.error('导入智能体API调用失败:', error)
+      throw new Error(`导入智能体失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
   // 获取智能体版本列表
   static async getAgentVersionList(request: AgentVersionListRequest): Promise<AgentVersionListResponse> {
     try {

@@ -2085,6 +2085,38 @@ const PromptEditPage: React.FC = () => {
     }
   }, [availableModels, setSelectedModel])
 
+  // 新建提示词场景：自动选择第一个模型
+  useEffect(() => {
+    // 检查是否是新建场景：isNew 为 true，或者是刚创建的提示词（通过 localStorage 判断）
+    const basicInfoStr = localStorage.getItem('newPromptBasicInfo')
+    const basicInfo = basicInfoStr ? JSON.parse(basicInfoStr) : null
+    const isNewlyCreated = basicInfo && basicInfo.prompt_id && String(basicInfo.prompt_id) === id
+    const isNewScenario = isNew || isNewlyCreated || isNewPromptScenario
+
+    // 只在新建场景下执行
+    if (!isNewScenario) {
+      return
+    }
+
+    // 如果已经有选中的模型，不需要自动选择
+    if (selectedModel) {
+      return
+    }
+
+    // 如果模型列表已加载且没有选中模型，自动选择第一个模型
+    if (availableModels.length > 0 && !selectedModel && !modelsLoading) {
+      const firstModel = availableModels[0]
+      setSelectedModel(firstModel)
+      const defaultParams = PromptModelService.getModelDefaultParams(firstModel)
+      setModelConfig(prev => ({
+        ...prev,
+        model: firstModel.openModel.model_id,
+        model_from: firstModel.model_from,
+        ...defaultParams,
+      }))
+    }
+  }, [isNew, id, isNewPromptScenario, availableModels, selectedModel, modelsLoading])
+
   // 【统一加载逻辑】整合所有进入提示词页面的加载逻辑
   useEffect(() => {
     // 检查基础条件：必须有workspaceId和初始化完成

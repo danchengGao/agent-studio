@@ -7,6 +7,11 @@ from minio.error import S3Error
 from minio.commonconfig import ENABLED, Filter
 from minio.lifecycleconfig import LifecycleConfig, Rule, Expiration
 
+from minio import Minio
+from minio.error import S3Error
+from minio.commonconfig import ENABLED, Filter
+from minio.lifecycleconfig import LifecycleConfig, Rule, Expiration
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker

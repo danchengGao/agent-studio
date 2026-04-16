@@ -105,6 +105,12 @@ const PluginSelector: React.FC<PluginSelectorProps> = ({ open, onClose, onConfir
         clearTimeout(debounceTimerRef.current)
       }
     }
+
+    return () => {
+      // Cleanup: Clear any pending timeouts or intervals
+      setLoadingVersions(new Set())
+      setLoadingTools(new Set())
+    }
   }, [open])
 
   const loadPlugins = async () => {

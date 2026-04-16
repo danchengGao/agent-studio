@@ -12,6 +12,32 @@
   left: 0;
   width: 100%;
   min-width: 360px;
+  max-width: 600px;
+
+  &-body {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    /* Custom scrollbar styling */
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.04);
+      border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.3);
+      }
+    }
+  }
 
   &-body {
     max-height: 400px;

@@ -53,6 +53,15 @@ const validateConstantValueSchema = (value: any): string | undefined => {
     }
   }
 
+  // Validate format types
+  if (originalExpectedType === 'date-time') {
+    // ISO 8601 date-time format: YYYY-MM-DDTHH:mm:ss.sssZ
+    const dateTimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+    if (!dateTimeRegex.test(content)) {
+      return '期望日期时间格式（ISO 8601），例如：2026-01-09T15:44:53.043Z'
+    }
+  }
+
   return undefined
 }
 
