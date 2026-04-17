@@ -15,4 +15,4 @@ export { CustomSideMenu } from './CustomSideMenu'
 export type { CustomSideMenuProps } from './CustomSideMenu'
 
 // 从 constants 重导出常量
-export { PANEL_TOTAL_HEIGHT } from '../constants'
+export { PANEL_TOTAL_HEIGHT } from '../../constants'

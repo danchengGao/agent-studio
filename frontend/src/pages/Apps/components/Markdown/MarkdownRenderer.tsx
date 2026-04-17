@@ -1,9 +1,11 @@
 /**
- * Markdown 核心渲染组件
+ * Core markdown renderer built on react-markdown.
  */
 
 import React, { useMemo } from 'react'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
+import remarkCjkFriendly from 'remark-cjk-friendly'
+import remarkCjkFriendlyGfmStrikethrough from 'remark-cjk-friendly-gfm-strikethrough'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -17,7 +19,6 @@ import { CitationLink } from '../CitationPanel/CitationLink'
 import { InferenceLink } from '../InferenceGraph'
 import { SmartImage } from './SmartImage'
 import { MermaidChart } from './MermaidChart/index'
-import { normalizeProblematicStrongPercentForRender } from '@/utils/markdownCleaner'
 import {
   createVLMChartReference,
   getChartDataUrl,
@@ -53,14 +54,9 @@ export const MarkdownRenderer: React.FC<{
     [chartMessages, content]
   )
 
-  const normalizedContent = useMemo(
-    () => normalizeProblematicStrongPercentForRender(renderableContent),
-    [renderableContent]
-  )
-
   const defaultComponents = useMemo(() => {
     const markdownComponents: Components = {
-      a: ({ href, children, ...rest }) => {
+      a: ({ href, title, children, ...rest }) => {
         const childrenText = children !== undefined && children !== null ? children.toString() : ''
         const isInferenceLink = /#inference:\d+/.test(href || '')
         const isCitation = /^\[(\d+)\]$/.test(childrenText)
@@ -82,8 +78,8 @@ export const MarkdownRenderer: React.FC<{
             <CitationLink
               key={`${instanceId || 'no-id'}-citation-${childrenText}`}
               href={href ?? ''}
+              title={title}
               citations={citations}
-              markdownInstanceId={instanceId}
             >
               {children}
             </CitationLink>
@@ -173,12 +169,17 @@ export const MarkdownRenderer: React.FC<{
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
+      remarkPlugins={[
+        remarkGfm,
+        remarkCjkFriendly,
+        remarkCjkFriendlyGfmStrikethrough,
+        [remarkMath, { singleDollarTextMath: true }],
+      ]}
       rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
       components={defaultComponents}
       urlTransform={urlTransform}
     >
-      {normalizedContent}
+      {renderableContent}
     </ReactMarkdown>
   )
 }

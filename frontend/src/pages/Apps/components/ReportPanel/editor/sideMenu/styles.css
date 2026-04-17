@@ -100,11 +100,13 @@
 @keyframes status-slide-down {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
+    transform: translateX(-50%) translateY(-12px) scale(0.985);
+    filter: blur(2px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
@@ -112,11 +114,13 @@
 @keyframes status-slide-up {
   from {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
   }
   to {
     opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
+    transform: translateX(-50%) translateY(-8px) scale(0.985);
+    filter: blur(1.5px);
   }
 }
 
@@ -233,5 +237,84 @@
   }
   100% {
     background-color: transparent;
+  }
+}
+
+/* ==================== Rewrite Motion Refinement ==================== */
+
+.rewrite-snapshot-overlay,
+.rewrite-diff-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 40;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+
+.rewrite-snapshot-overlay {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.72));
+  box-shadow:
+    0 12px 24px rgba(15, 23, 42, 0.06),
+    inset 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+.rewrite-snapshot-overlay--writing {
+  opacity: 0.96;
+  filter: blur(0.6px);
+  transform: translateY(-1px);
+}
+
+.rewrite-snapshot-overlay--morphing {
+  animation: rewriteOverlayExit 0.42s ease-out forwards;
+}
+
+.rewrite-snapshot-overlay--reduced {
+  filter: none !important;
+  transform: none !important;
+  animation: none !important;
+  opacity: 0.72;
+}
+
+@keyframes rewriteOverlayExit {
+  from {
+    opacity: 0.92;
+    filter: blur(0.8px);
+    transform: translateY(-1px);
+  }
+  to {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(-6px);
+  }
+}
+
+.rewrite-diff-overlay {
+  animation: rewriteDiffSettle 1.6s ease-out forwards;
+  text-shadow: 0 0 0 transparent;
+}
+
+.rewrite-diff-overlay--reduced {
+  animation: none;
+}
+
+.rewrite-diff-overlay mark[data-rewrite-diff="true"] {
+  background: rgba(34, 197, 94, 0.22);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.12);
+  color: inherit;
+  padding: 0 1px;
+}
+
+@keyframes rewriteDiffSettle {
+  0% {
+    opacity: 0.96;
+    transform: translateY(1px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0);
   }
 }

@@ -26,6 +26,7 @@ import ResultPanel from '../../components/Conversation/ResultPanel'
 import ConversationHistorySidebar from './components/ConversationHistorySidebar'
 import { MindMapPanel } from '../../components/Conversation/MindMap'
 import { TopToolbar, ViewType } from '../../components/Conversation'
+import { consumeReportRewriteSseChunk } from '@/pages/Apps/components/ReportPanel/editor/rewrite/reportRewriteSse'
 
 // ==================== 开发调试配置 ====================
 // 从环境变量读取，默认为 false（生产环境）
@@ -209,6 +210,7 @@ const AppsPage: React.FC = () => {
         } catch (error) {
           console.error('[AppsPage] Failed to delete oldest conversation:', error)
         }
+
       }
 
       // 创建新对话
@@ -374,6 +376,7 @@ const AppsPage: React.FC = () => {
         if (modelName) {
           setSelectedModel(modelName)
         }
+
       }
     }
   }, [agentConfigs['deepsearch']?.generalModelId, modelIdMap, selectedModelId])
@@ -454,6 +457,7 @@ const AppsPage: React.FC = () => {
         if (matchedAgent) {
           setSelectedAgent(matchedAgent)
         }
+
       }
     }
   }, [currentConversationId])
@@ -769,12 +773,14 @@ const AppsPage: React.FC = () => {
    * 报告局部改写处理函数
    * 复用 DeepSearch 配置，通过 SSE 流处理改写结果
    * 将改写请求和结果集成到对话流中
-   */
+  */
   const handleReportRewrite = async (params: ReportRewriteParams) => {
     const { action, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
 
     // 获取配置
     const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
+    const rewriteSessionUnavailableMessage = '报告对应的改写会话已超时，请重新提问后再尝试改写。'
+    const missingRewriteResultMessage = '服务端未返回可应用的改写结果，请重试。'
 
     if (config.userFeedbackProcessorEnable === false) {
       onStatusChange?.('error')
@@ -785,13 +791,19 @@ const AppsPage: React.FC = () => {
     const token = getToken()
 
     if (!token) {
-      onError('无法获取认证信息，请重新登录')
+      onError?.('无法获取认证信息，请重新登录')
       return
     }
 
-    // 获取带 session 的 conversation_id（与主 DeepSearch 流程一致）
+    // 报告改写依赖 user_feedback_processor 保持的后端会话。
+    // 一旦会话超时/取消，应直接阻止改写，而不是复用一个失效的 session id。
     const sessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID
-    const backendConversationId = sessionConversationId || conversationId
+    if (!sessionConversationId) {
+      onStatusChange?.('error')
+      onError?.(rewriteSessionUnavailableMessage)
+      return
+    }
+    const backendConversationId = sessionConversationId
 
     // 【重要】在处理 rewrite 之前，先获取当前报告的剩余改写次数
     // 这样才能正确计算递减，而不是每次都从新消息的 undefined 开始
@@ -885,29 +897,36 @@ const AppsPage: React.FC = () => {
       const FEEDBACK_AGENT = 'user_feedback_processor'
       let finalResultMessageId: string | null = null
       let hasReceivedContent = false  // 用于追踪是否已收到内容
+      let hasReceivedApplicableRewrite = false
+
+      const finalizeRewriteStream = () => {
+        if (!hasReceivedApplicableRewrite) {
+          onStatusChange?.('error')
+          onError?.(missingRewriteResultMessage)
+          return false
+        }
+
+        onStatusChange?.('idle')
+        onEnd?.()
+        return true
+      }
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) {
-          onEnd()
-          break
-        }
+        const chunkText = value ? decoder.decode(value, { stream: !done }) : ''
+        const parsed = consumeReportRewriteSseChunk({
+          buffer,
+          chunkText,
+          flush: done,
+        })
+        buffer = parsed.buffer
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-
-          const raw = line.slice(6)
+        for (const data of parsed.events) {
           try {
-            const data = JSON.parse(raw)
 
             // 处理 ALL END
             if (data.agent === 'end' && data.content === 'ALL END') {
-              onStatusChange?.('idle')
-              onEnd()
+              finalizeRewriteStream()
               return
             }
 
@@ -920,7 +939,7 @@ const AppsPage: React.FC = () => {
                 if (content.error) {
                   console.error('[handleReportRewrite] Backend error:', content.error)
                   onStatusChange?.('error')
-                  onError(content.error)
+                  onError?.(content.error)
                   return
                 }
 
@@ -929,13 +948,14 @@ const AppsPage: React.FC = () => {
 
                 // 1. 处理增量 delta（选中文本的改写结果）
                 if (typeof content.rewritten_text === 'string') {
+                  hasReceivedApplicableRewrite = true
                   // 第一次收到内容时，切换状态为 writing
                   if (!hasReceivedContent) {
                     hasReceivedContent = true
                     onStatusChange?.('writing')
                   }
 
-                  onDelta({
+                  onDelta?.({
                     rewritten_text: content.rewritten_text,
                     original_start_offset: content.original_start_offset,
                     original_end_offset: content.original_end_offset,
@@ -944,7 +964,8 @@ const AppsPage: React.FC = () => {
 
                 // 2. 处理完整快照（在 final_result 中），添加到对话流
                 if (content.final_result && typeof content.final_result.response_content === 'string') {
-                  onSnapshot({ response_content: content.final_result.response_content })
+                  hasReceivedApplicableRewrite = true
+                  onSnapshot?.({ response_content: content.final_result.response_content })
 
                   // 添加 REPORT 消息到对话流（FINAL_REPORT 类型）
                   const reportContent = {
@@ -1009,9 +1030,14 @@ const AppsPage: React.FC = () => {
             // JSON 解析失败，忽略
           }
         }
+
+        if (done) {
+          finalizeRewriteStream()
+          break
+        }
       }
     } catch (err) {
-      onError(err instanceof Error ? err.message : '请求失败')
+      onError?.(err instanceof Error ? err.message : '请求失败')
     }
   }
 

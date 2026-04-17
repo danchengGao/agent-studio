@@ -10,7 +10,7 @@ import React, { useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, Expand, Shrink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { OPTIONS_HEIGHT, OPTIONS_OFFSET, REWRITE_ACTIONS } from '../constants'
+import { OPTIONS_HEIGHT, OPTIONS_OFFSET, REWRITE_ACTIONS } from '../../constants'
 import type { ReportRewriteAction } from '@/pages/Apps/types'
 
 interface AIRewriteOptionsProps {

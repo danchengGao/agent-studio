@@ -20,7 +20,7 @@ import type { Block } from '@blocknote/core'
 import { SideMenuExtension } from '@blocknote/core/extensions'
 import { useExtensionState, useBlockNoteEditor } from '@blocknote/react'
 import { AIButton } from './AIButton'
-import { HIGHLIGHT_STYLE_ID, HIGHLIGHT_CSS } from '../constants'
+import { HIGHLIGHT_STYLE_ID, HIGHLIGHT_CSS } from '../../constants'
 
 // 使用泛型 Block 类型以兼容 BlockNote 的扩展状态
 type AnyBlock = Block<any, any, any>

@@ -1955,9 +1955,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return;
       }
 
-      // 将 SESSION_CONVERSATION_ID 持久化到 conversation.lastSessionConversationId
-      const sessionConversationId = state.SESSION_CONVERSATION_ID;
-      const shouldUpdateSessionId = sessionConversationId && sessionConversationId !== conversation.lastSessionConversationId;
+      // 将 SESSION_CONVERSATION_ID 持久化到 conversation.lastSessionConversationId。
+      // 这里必须支持清空，否则超时/取消后的失效 session 会被错误恢复。
+      const sessionConversationId = state.SESSION_CONVERSATION_ID ?? undefined;
+      const shouldUpdateSessionId = sessionConversationId !== conversation.lastSessionConversationId;
 
       if (shouldUpdateSessionId) {
         // Zustand 的 set 是同步的，更新后 get() 立即返回新状态
@@ -2147,16 +2148,16 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           console.log(`[loadConversationFullData] Restored ${Object.keys(doc.thoughtGraphs).length} mind map manager collections`);
         }
 
-        // 恢复 SESSION_CONVERSATION_ID（用于 AI 改写功能）
-        // 注意：lastSessionConversationId 在 ConversationDocument 顶层，不是在 conversation 中
-        const sessionConversationId = doc.lastSessionConversationId;
+        // 恢复或清空 SESSION_CONVERSATION_ID（用于 AI 改写功能）。
+        // 注意：lastSessionConversationId 在 ConversationDocument 顶层，不是在 conversation 中。
+        const sessionConversationId = doc.lastSessionConversationId ?? null;
         if (sessionConversationId) {
           console.log('[loadConversationFullData] Restored SESSION_CONVERSATION_ID:', sessionConversationId);
-          // 使用 setTimeout 避免在 reducer 中直接调用 set
-          setTimeout(() => {
-            get().setSessionConversationId(sessionConversationId);
-          }, 0);
         }
+        // 使用 setTimeout 避免在 reducer 中直接调用 set
+        setTimeout(() => {
+          get().setSessionConversationId(sessionConversationId);
+        }, 0);
 
         return {
           messageItemsMap: newMessageItemsMap,
@@ -2354,6 +2355,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       console.error('[markCurrentConversationIncompleteAsAbort] Failed to load deepsearchApi:', error);
     });
 
+    // 超时/取消后，这个 session 已不应继续用于报告改写。
+    get().setSessionConversationId(null);
+
     // 根据 abortType 决定目标状态
     const targetStatus = abortMessage?.abortType ?? TaskStatus.CANCELLED;
 
@@ -2463,8 +2467,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
    * 如果没有 INTERRUPT 消息，会创建一个 CANCELLED 状态的 INTERRUPT 消息用于显示取消提示
    */
   updateMessageItemsStatusToCancelled: () => {
-    const { getCurrentMessageItemsList, updateMessageItems, updateMessage, getMessageById, getChildMessages, getCurrentConversation, saveConversationToDB, addMessageItems } = get();
+    const { getCurrentMessageItemsList, updateMessageItems, updateMessage, getMessageById, getChildMessages, getCurrentConversation, saveConversationToDB } = get();
     const messageItemsList = getCurrentMessageItemsList();
+
+    // 取消后禁止继续复用旧的后端会话。
+    get().setSessionConversationId(null);
 
     // 清空 SSE 队列，防止取消后仍有事件被处理
     set({ sseEventQueue: [] });
@@ -2534,6 +2541,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           }
           return state;
         });
+
+        saveConversationToDB(currentConversation.id);
       }
       return;
     }

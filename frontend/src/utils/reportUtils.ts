@@ -2,18 +2,28 @@
  * 报告相关工具函数
  */
 
+import { parseMarkdownToCanonical } from '@/pages/Apps/components/ReportPanel/editor/canonical';
 import type { ChartMessage, DeepSearchResult, Report } from '@/pages/Apps/types'
 import { MESSAGE_TITLES } from '@/stores/useConversationStore'
 
 const CHART_PLACEHOLDER_PATTERN = /\(#insertChart:([^)]+)\)/g
 const VLM_CHART_PROTOCOL = 'vlm-chart:'
+const CHECKED_CITATION_PATTERN = /\[checked_citation:(\d+)\]\[\[(\d+)\]\]\(([^)\s]+)\)/g
 
 /**
  * 清理报告内容中的引用标记
  */
 export function cleanReportContent(content: string): string {
   if (!content) return ''
-  return content.replace(/ *\[ *citation *: *\d+ *\] */g, '')
+  return normalizeCheckedCitationLinks(content)
+}
+
+export function normalizeCheckedCitationLinks(content: string): string {
+  if (!content) return ''
+
+  return content.replace(CHECKED_CITATION_PATTERN, (_match, citationIndex, displayIndex, url) => {
+    return `[[${displayIndex}]](${url} "checked_citation:${citationIndex}")`
+  })
 }
 
 /**
@@ -126,8 +136,13 @@ export function buildReportFromDeepSearch(
   messageCreatedAt: number,
   deepSearchResult: DeepSearchResult
 ): Report {
-  const rawResponseContent = deepSearchResult.response_content || ''
-  const responseContent = cleanReportContent(rawResponseContent)
+  const rawResponseContent = deepSearchResult.response_content || '';
+  const responseContent = cleanReportContent(rawResponseContent);
+  const canonicalDocument = parseMarkdownToCanonical({
+    rawMarkdown: rawResponseContent,
+    baseVersion: `report:${messageId}`,
+    draftRevision: 0,
+  });
 
   const extractedTitle = extractTitleFromMarkdown(responseContent)
   const title = extractedTitle || MESSAGE_TITLES.FINAL_REPORT
@@ -141,5 +156,6 @@ export function buildReportFromDeepSearch(
     inferMessages: deepSearchResult.infer_messages || [],
     chartMessages: deepSearchResult.chart_messages || [],
     rawContent: rawResponseContent,
-  }
+    canonicalDocument,
+  };
 }

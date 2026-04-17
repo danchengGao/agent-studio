@@ -5,14 +5,15 @@
  * 使用 BlockNote 提供 Notion 风格的块级编辑体验
  */
 
-import React, { useEffect, useState, useRef, useMemo } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { FileText, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Report, ReportRewriteParams } from '@/pages/Apps/types'
-import { BlockNoteEditor } from './BlockNoteEditor'
+import { ReportEditorRuntime } from './editor/ReportEditorRuntime'
 import { useReducedMotion } from '../shared/hooks/usePreferences'
 import { LOADING_DELAY, LOADING_TIMEOUT } from './constants'
-import { preprocessMarkdown } from '@/utils/markdownCleaner'
+import { planReportEditLoadingTransition } from './loadingStatePolicy'
+import type { RecoveryState, RewriteOverlayState } from '@/pages/Apps/components/ReportPanel/editor/session'
 
 type LoadingState = 'loading' | 'loaded' | 'empty' | 'timeout'
 
@@ -23,6 +24,10 @@ export interface ReportEditViewProps {
   conversationId?: string
   /** 报告局部改写回调 */
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
+  onSessionStateChange?: (state: {
+    rewriteOverlayState: RewriteOverlayState
+    recoveryState: RecoveryState
+  }) => void
 }
 
 export const ReportEditView: React.FC<ReportEditViewProps> = ({
@@ -30,6 +35,7 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
   className = '',
   conversationId,
   onReportRewrite,
+  onSessionStateChange,
 }) => {
   const { t } = useTranslation()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -37,27 +43,31 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
 
   const [loadingState, setLoadingState] = useState<LoadingState>('loading')
   const loadingStateRef = useRef<LoadingState>('loading')
+  const previousReportIdRef = useRef<string | null>(null)
 
   const rawContent = report.rawContent || report.content || ''
 
-  const { cleaned: cleanedContent, offsetMap, blockOffsets } = useMemo(() => {
-    return preprocessMarkdown(rawContent)
-  }, [rawContent])
-
   useEffect(() => {
+    const hasContent = rawContent.trim()
+    const { shouldEnterLoading, settledState } = planReportEditLoadingTransition({
+      previousReportId: previousReportIdRef.current,
+      nextReportId: report.id,
+      hasContent: Boolean(hasContent),
+    })
+    previousReportIdRef.current = report.id
+
+    if (!shouldEnterLoading) {
+      setLoadingState(settledState)
+      loadingStateRef.current = settledState
+      return
+    }
+
     setLoadingState('loading')
     loadingStateRef.current = 'loading'
 
-    const hasContent = cleanedContent?.trim()
-
     const normalTimer = setTimeout(() => {
-      if (hasContent) {
-        setLoadingState('loaded')
-        loadingStateRef.current = 'loaded'
-      } else {
-        setLoadingState('empty')
-        loadingStateRef.current = 'empty'
-      }
+      setLoadingState(settledState)
+      loadingStateRef.current = settledState
     }, LOADING_DELAY)
 
     const timeoutTimer = setTimeout(() => {
@@ -71,7 +81,7 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
       clearTimeout(normalTimer)
       clearTimeout(timeoutTimer)
     }
-  }, [report.id, cleanedContent])
+  }, [report.id, rawContent])
 
   return (
     <div className={`relative h-full flex flex-col ${className}`}>
@@ -116,15 +126,14 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
               <p className="text-gray-500 text-sm text-center">{t('apps.report.timeoutMessage')}</p>
             </div>
           ) : (
-            <BlockNoteEditor
-              content={cleanedContent}
+            <ReportEditorRuntime
               rawContent={rawContent}
-              offsetMap={offsetMap}
-              blockOffsets={blockOffsets}
+              canonicalDocument={report.canonicalDocument}
               readonly={false}
               scrollContainerRef={scrollContainerRef}
               conversationId={conversationId}
               onReportRewrite={onReportRewrite}
+              onSessionStateChange={onSessionStateChange}
             />
           )}
         </article>

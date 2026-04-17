@@ -1,3 +1,5 @@
+import type { CanonicalDocument } from '@/pages/Apps/components/ReportPanel/editor/canonical'
+
 /**
  * Apps 页面共享类型定义
  */
@@ -81,6 +83,8 @@ export interface Report {
   chartMessages?: ChartMessage[]
   /** 原始响应内容（未清理，用于 offsets 基线） */
   rawContent?: string
+  /** canonical 快照种子（供编辑态初始化使用） */
+  canonicalDocument?: CanonicalDocument
 }
 
 /** 报告局部改写操作类型 */

@@ -10,6 +10,12 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { Report, ReportRewriteParams } from '@/pages/Apps/types'
+import { parseMarkdownToCanonical } from '@/pages/Apps/components/ReportPanel/editor/canonical'
+import {
+  deriveEditorSessionState,
+  type RecoveryState,
+  type RewriteOverlayState,
+} from '@/pages/Apps/components/ReportPanel/editor/session'
 import { ReportContentToolbar } from './ReportContentToolbar'
 import { ReportView } from './ReportView'
 import { ReportEditView } from './ReportEditView'
@@ -42,6 +48,8 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   onReportRewrite,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
+  const [rewriteOverlayState, setRewriteOverlayState] = useState<RewriteOverlayState>('idle')
+  const [recoveryState, setRecoveryState] = useState<RecoveryState>('idle')
   const messagesMap = useConversationStore(state => state.messagesMap)
 
   // 判断是否为最终报告（子报告不能编辑）
@@ -51,16 +59,57 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
     return message ? isFinalReportMessage(message) : true
   }, [reportMessageId, messagesMap])
 
+  const canEditReport = isFinalReport && feedbackOptimizationEnabled
+  const initialCanonicalDocument = useMemo(() => {
+    if (report.canonicalDocument) {
+      return report.canonicalDocument
+    }
+
+    return parseMarkdownToCanonical({
+      rawMarkdown: report.rawContent || report.content || '',
+      baseVersion: `report:${report.id}`,
+      draftRevision: 0,
+    })
+  }, [report.canonicalDocument, report.content, report.id, report.rawContent])
+
+  const sessionState = useMemo(
+    () =>
+      deriveEditorSessionState({
+        baseVersion: initialCanonicalDocument.meta.baseVersion,
+        canonical: initialCanonicalDocument,
+        mode: isEditing ? 'edit' : 'browse',
+        rewriteOverlayState,
+        recoveryState,
+        isFinalReport,
+        editingEnabled: canEditReport,
+      }),
+    [
+      canEditReport,
+      initialCanonicalDocument,
+      isEditing,
+      isFinalReport,
+      recoveryState,
+      rewriteOverlayState,
+    ],
+  )
+
   const handleEnterEdit = useCallback(() => {
-    if (!isFinalReport || !feedbackOptimizationEnabled) return
+    if (!sessionState.canEnterEditMode) return
     setIsEditing(true)
-  }, [isFinalReport, feedbackOptimizationEnabled])
+  }, [sessionState.canEnterEditMode])
 
   const handleExitEdit = useCallback(() => {
+    if (!sessionState.canExitEditMode) return
     setIsEditing(false)
-  }, [])
+  }, [sessionState.canExitEditMode])
 
-  const canEditReport = isFinalReport && feedbackOptimizationEnabled
+  const handleSessionStateChange = useCallback(
+    (state: { rewriteOverlayState: RewriteOverlayState; recoveryState: RecoveryState }) => {
+      setRewriteOverlayState(state.rewriteOverlayState)
+      setRecoveryState(state.recoveryState)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!canEditReport && isEditing) {
@@ -73,20 +122,25 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
       {/* 内容工具栏 */}
       <ReportContentToolbar
         report={report}
-        isEditing={isEditing}
+        isEditing={sessionState.mode === 'edit'}
         editingEnabled={canEditReport}
         onEnterEdit={handleEnterEdit}
         onExitEdit={handleExitEdit}
         isFinalReport={isFinalReport}
+        mode={sessionState.mode}
+        recoveryState={sessionState.recoveryState}
+        canEnterEditMode={sessionState.canEnterEditMode}
+        canExitEditMode={sessionState.canExitEditMode}
       />
 
       {/* 报告内容 */}
       <div className="flex-1 overflow-auto px-2 pb-2">
-        {isEditing && canEditReport ? (
+        {sessionState.mode === 'edit' && canEditReport ? (
           <ReportEditView
             report={report}
             conversationId={conversationId}
             onReportRewrite={onReportRewrite}
+            onSessionStateChange={handleSessionStateChange}
           />
         ) : (
           <ReportView report={report} />

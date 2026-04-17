@@ -5,5 +5,5 @@
  * 引用面板模块 - 处理引用链接和提示
  */
 
-export { CitationLink, resetLinkIndexCounter } from './CitationLink'
+export { CitationLink } from './CitationLink'
 export { CitationTooltip } from './CitationTooltip'
