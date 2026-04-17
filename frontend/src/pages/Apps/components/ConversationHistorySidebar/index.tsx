@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react'
-import { Plus, ChevronLeft, ChevronRight, Clock, AlertCircle } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
+import { Plus, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConversationStore } from '../../../../stores/useConversationStore'
 import { RADIUS_BUTTON, BUTTON_HOVER_EFFECTS, BUTTON_TRANSITION, RADIUS_CIRCLE } from '../../constants/styles'
@@ -9,9 +9,6 @@ import type { ConversationHistorySidebarProps } from './types'
 // Local storage key for sidebar collapsed state
 const SIDEBAR_COLLAPSED_KEY = 'deepsearch_sidebar_collapsed'
 
-// 超时时间：60分钟
-const STREAMING_TIMEOUT = 60 * 60 * 1000
-
 const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
   currentConversationId,
   onConversationSelect,
@@ -20,52 +17,6 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
   forceCollapsed = false,
 }) => {
   const { t, i18n } = useTranslation()
-
-  // 超时检测状态
-  const [showForceStop, setShowForceStop] = useState(false)
-  const streamingStartTimeRef = useRef<number | null>(null)
-
-  // 监听 isStreaming 变化，记录开始时间
-  useEffect(() => {
-    if (isStreaming && !streamingStartTimeRef.current) {
-      // 开始传输
-      streamingStartTimeRef.current = Date.now()
-      setShowForceStop(false)
-    } else if (!isStreaming && streamingStartTimeRef.current) {
-      // 传输结束
-      streamingStartTimeRef.current = null
-      setShowForceStop(false)
-    }
-  }, [isStreaming])
-
-  // 检测超时
-  useEffect(() => {
-    if (!isStreaming || !streamingStartTimeRef.current) return
-
-    const checkTimeout = () => {
-      if (streamingStartTimeRef.current) {
-        const elapsed = Date.now() - streamingStartTimeRef.current
-        if (elapsed > STREAMING_TIMEOUT) {
-          setShowForceStop(true)
-        }
-      }
-    }
-
-    // 每秒检查一次
-    const intervalId = setInterval(checkTimeout, 1000)
-
-    return () => clearInterval(intervalId)
-  }, [isStreaming])
-
-  // 强制中断
-  const handleForceStop = () => {
-    const { abortController } = useConversationStore.getState() as any
-    if (abortController) {
-      abortController.abort()
-    }
-    setShowForceStop(false)
-    streamingStartTimeRef.current = null
-  }
 
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -174,20 +125,6 @@ const ConversationHistorySidebar: React.FC<ConversationHistorySidebarProps> = ({
         onDeleteConversation={handleDeleteConversation}
         isStreaming={isStreaming}
       />
-
-      {/* Force stop button - 只在超时时显示 */}
-      {showForceStop && (
-        <div className="px-4 py-3 border-t border-gray-200">
-          <button
-            onClick={handleForceStop}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors duration-200 text-sm font-medium"
-            title={t('apps.chat.conversationTimeout')}
-          >
-            <AlertCircle className="w-4 h-4" />
-            <span>{t('apps.chat.forceStop')}</span>
-          </button>
-        </div>
-      )}
     </div>
   )
 }
