@@ -19,6 +19,7 @@ import { deepsearchTemplateService, PromptModel } from '@test-agentstudio/api-cl
 import DeleteConfirmationDialog from '../../../components/Common/DeleteConfirmationDialog'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../../Common/UnifiedSnackbar'
 import { DEFAULT_DEEPSEARCH_CONFIG } from '../utils/deepsearchConstants'
+import type { Model } from '@/types/promptType'
 
 // 导入新的配置标签系统
 import { ConfigRegistryManager, ConfigTabId } from './config/ConfigRegistry'
@@ -49,6 +50,8 @@ export interface DeepSearchConfig {
   enableSourceTracerInfer: boolean // 溯源推理功能开关
   userFeedbackProcessorEnable: boolean // 报告改写功能开关，默认开启
   userFeedbackProcessorMaxInteractions: number // 用户反馈优化最大交互次数，默认 3（隐藏配置）
+  vlmChartGeneratorEnable: boolean
+  vlmChartGeneratorMaxIterations: number
 
   // 搜索配置
   searchMode: 'local' | 'web' | 'all'
@@ -70,6 +73,7 @@ export interface DeepSearchConfig {
   planUnderstandingModelId?: string // 计划理解模型ID
   infoCollectingModelId?: string // 信息收集模型ID
   writingCheckingModelId?: string // 写作检查模型ID
+  vlmChartModelId?: string // VLM图表生成模型ID
   execution_method?: string,   // DeepSearch执行模式："parallel", "dependency_driving"
 }
 
@@ -89,6 +93,8 @@ export interface AgentConfigDialogProps {
   // 模型配置相关
   availableModels?: PromptModel[]
   modelsLoading?: boolean
+  availableVLMModels?: Model[]
+  vlmModelsLoading?: boolean
 }
 
 // ==================== 辅助组件 ====================
@@ -165,6 +171,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   isFirstConfig = false,
   availableModels = [],
   modelsLoading = false,
+  availableVLMModels = [],
+  vlmModelsLoading = false,
 }) => {
   const { t } = useTranslation()
   const { snackbar, closeSnackbar, showError } = useUnifiedSnackbar()
@@ -348,6 +356,14 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     // 规划章节数量验证
     if (config.planChapterCount < 1 || config.planChapterCount > 10) {
       errors.push(t('apps.config.validation.chapterCountRange'))
+    }
+
+    if (config.vlmChartGeneratorMaxIterations < 0 || config.vlmChartGeneratorMaxIterations > 3) {
+      errors.push(t('apps.config.validation.vlmChartIterationsRange', { defaultValue: 'VLM 图表生成最大迭代次数必须在 0 到 3 之间' }))
+    }
+
+    if (config.vlmChartGeneratorEnable && config.vlmChartGeneratorMaxIterations > 0 && !config.vlmChartModelId) {
+      errors.push(t('apps.config.validation.vlmChartModelRequired', { defaultValue: '启用 VLM 图表生成且迭代次数大于 0 时，需要选择 VLM 模型' }))
     }
 
     // 通用模型验证（必选项）
@@ -789,6 +805,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                       disabled: false,
                       ToggleSwitch,
                       RangeSlider,
+                      availableVLMModels,
+                      vlmModelsLoading,
                   } : activeTab === 'search' ? {
                         config,
                         updateConfig,
@@ -827,6 +845,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                           disabled: false,
                           availableModels,
                           modelsLoading,
+                          availableVLMModels,
+                          vlmModelsLoading,
                           spaceId: spaceId || '',
                         }
               }

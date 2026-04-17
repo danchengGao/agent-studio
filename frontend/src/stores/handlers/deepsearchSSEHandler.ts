@@ -1318,12 +1318,14 @@ export class DeepsearchSSEHandler {
     const responseContent = actualFinalResult.response_content || '';
     const citationMessages = actualFinalResult.citation_messages || {};
     const inferMessages = actualFinalResult.infer_messages || [];
+    const chartMessages = actualFinalResult.chart_messages || [];
 
     // 构建 content 对象
     const reportContent = {
       response_content: responseContent,
       citation_messages: citationMessages,
       infer_messages: inferMessages,
+      chart_messages: chartMessages,
     };
 
     // 查找是否存在正在进行中的最终报告（由 SECTION END 创建的占位报告）

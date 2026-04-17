@@ -36,8 +36,18 @@ export interface InferMessage {
   inference: string
   /** 结论 */
   conclusion: string
-  /** 推理图 ID（对应 Markdown 中的 #inference:id） */
+  /** 推理图 ID，对应 Markdown 中的 #inference:id */
   id: number
+}
+
+/**
+ * VLM 图表消息
+ */
+export interface ChartMessage {
+  chart_id: string
+  chart_title?: string
+  description?: string
+  base64?: string
 }
 
 /**
@@ -50,6 +60,8 @@ export interface DeepSearchResult {
   citation_messages: CitationMessages | null
   /** 推理图谱列表 */
   infer_messages: InferMessage[]
+  /** VLM 图表结果 */
+  chart_messages?: ChartMessage[]
   /** 异常信息 */
   exception_info?: string
 }
@@ -65,6 +77,8 @@ export interface Report {
   citations?: CitationMessages | null
   /** 推理图谱消息列表（原始数据，保留完整信息） */
   inferMessages?: InferMessage[]
+  /** VLM 图表结果 */
+  chartMessages?: ChartMessage[]
   /** 原始响应内容（未清理，用于 offsets 基线） */
   rawContent?: string
 }
@@ -116,4 +130,3 @@ export interface Message {
   modelName?: string
   report?: Report
 }
-

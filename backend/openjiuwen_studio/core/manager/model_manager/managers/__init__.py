@@ -8,6 +8,8 @@ from .embedding_model_config_manager import EmbeddingModelConfigManager
 from .embedding_model_test_manager import EmbeddingModelTester
 from .model_config_manager import ModelConfigManager
 from .model_test_manager import ModelTester
+from .vlm_model_config_manager import VLMModelConfigManager
+from .vlm_model_test_manager import VLMModelTester
 
 from .system_embedding_model_manager import SystemEmbeddingModelManager
 
@@ -18,6 +20,8 @@ __all__ = [
     "ModelTester",
     "EmbeddingModelConfigManager",
     "EmbeddingModelTester",
+    "VLMModelConfigManager",
+    "VLMModelTester",
     "SystemLLMModelManager",
     "SystemEmbeddingModelManager",
 ]

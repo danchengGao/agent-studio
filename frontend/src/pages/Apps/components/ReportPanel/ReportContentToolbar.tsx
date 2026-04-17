@@ -15,6 +15,7 @@ import { useClipboard } from '../ClipboardPanel/hooks'
 import { useDownload } from '../DownloadPanel/hooks'
 import { FormatMenu } from '../DownloadPanel/components/FormatMenu'
 import { GRADIENT_BUTTON } from '../../constants/styles'
+import { cleanReportContent, insertVLMChartsIntoReportContent } from '@/utils/reportUtils'
 
 export interface ReportContentToolbarProps {
   /** 报告数据 */
@@ -51,7 +52,19 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
     [report.content]
   )
 
-  const download = useDownload(content, report.title || 'report')
+  const exportContent = React.useMemo(
+    () => insertVLMChartsIntoReportContent(
+      cleanReportContent(report.rawContent || report.content || ''),
+      report.chartMessages
+    ),
+    [report.chartMessages, report.content, report.rawContent]
+  )
+
+  const download = useDownload(exportContent, report.title || 'report', {
+    rawContent: report.rawContent,
+    chartMessages: report.chartMessages,
+    inferMessages: report.inferMessages,
+  })
 
   const handleCopy = () => {
     clipboard.copy(content)

@@ -19,6 +19,7 @@ from openjiuwen_studio.routers import (
     tags,
     knowledge_base,
     embedding_models,
+    vlm_models,
     prompt_router,
     prompt_debug_router,
     prompt_tuning_router,
@@ -45,6 +46,7 @@ def router_register(app: FastAPI):
     v1_router.include_router(space.space_router, prefix="/spaces", tags=["Space"])
     v1_router.include_router(models.models_router, prefix="/models", tags=["Models"])
     v1_router.include_router(embedding_models.embedding_models_router, tags=["Embedding Models"])
+    v1_router.include_router(vlm_models.vlm_models_router, tags=["VLM Models"])
     v1_router.include_router(agents.agents_router, prefix="/agents", tags=["Agents"])
     v1_router.include_router(execution.execution_router, prefix="/execution", tags=["Execution"])
     v1_router.include_router(workflows.workflows_router, prefix="/workflows", tags=["Workflows"])

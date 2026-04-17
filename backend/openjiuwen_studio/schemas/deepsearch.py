@@ -52,6 +52,12 @@ class DeepSearchRequest(BaseModel):
     plan_understanding_model_id: Optional[int] = Field(default=None, description="计划理解模型ID（可选）")
     info_collecting_model_id: Optional[int] = Field(default=None, description="信息收集模型ID（可选）")
     writing_checking_model_id: Optional[int] = Field(default=None, description="写作检查模型ID（可选）")
+    vlm_model_config_id: Optional[int] = Field(default=None, description="VLM图表生成模型ID（可选）")
+    vlm_chart_generator_enable: bool = Field(default=False, description="是否启用VLM图表生成")
+    vlm_chart_generator_max_iterations: int = Field(
+        default=1,
+        description="VLM图表生成最大迭代次数，0表示不进行VLM迭代",
+    )
     execution_method: Literal["parallel", "dependency_driving"] = Field(default="parallel",
                                                                          description="执行方法："
                                                                                      "parallel: 并行工作流执行"

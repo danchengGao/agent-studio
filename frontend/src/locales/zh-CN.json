@@ -913,6 +913,11 @@
           "description": "",
           "recommendation": "建议使用编程、数学能力较强的模型"
         },
+        "vlmChart": {
+          "label": "VLM图表",
+          "description": "",
+          "recommendation": "建议选择支持图像输入的多模态模型"
+        },
         "useGeneral": "未选择",
         "selectModel": "选择模型",
         "clear": "清除选择",
@@ -936,7 +941,16 @@
         "userFeedbackProcessorEnable": "启用用户反馈优化",
         "userFeedbackProcessorEnableDesc": "生成报告后支持基于用户反馈的 AI 优化，关闭则报告不可编辑",
         "chapterCount": "章节数量",
-        "chapterCountDesc": "控制报告最大章节数量"
+        "chapterCountDesc": "控制报告最大章节数量",
+        "vlmChart": {
+          "title": "VLM 图表生成",
+          "enable": "启用 VLM 图表生成",
+          "enableDesc": "使用视觉模型对 DeepSearch 生成的图表进行迭代优化",
+          "maxIterations": "最大迭代次数",
+          "maxIterationsDesc": "0 表示不进行迭代",
+          "model": "VLM 模型",
+          "modelDesc": "与模型配置中的VLM模型保持同步"
+        }
       },
       "search": {
         "mode": "搜索方式",
@@ -970,7 +984,9 @@
         "localModeRequires": "本地搜索模式下必须选择至少一个知识库",
         "webResultCountRange": "联网增强结果数量必须在 1-10 之间",
         "localResultCountRange": "本地搜索结果数量必须在 1-10 之间",
-        "generalModelRequired": "通用模型为必选项，请先选择模型"
+        "generalModelRequired": "通用模型为必选项，请先选择模型",
+        "vlmChartIterationsRange": "VLM 图表生成最大迭代次数必须在 0 到 3 之间",
+        "vlmChartModelRequired": "启用 VLM 图表生成且迭代次数大于 0 时，需要选择 VLM 模型"
       },
       "engine": {
         "select": "选择联网增强引擎",
@@ -2315,7 +2331,8 @@
     "subtitle": "配置和管理您的大模型服务",
     "tabs": {
       "llm": "LLM 模型",
-      "embedding": "Embedding 模型"
+      "embedding": "Embedding 模型",
+      "vlm": "VLM 模型"
     },
     "addModel": "添加模型",
     "saveModel": "保存模型",
@@ -2346,6 +2363,7 @@
       "title": "模型列表",
       "noModels": "暂无模型",
       "searchPlaceholder": "搜索模型名称、API协议或标签...",
+      "searchPlaceholderNoTags": "搜索模型名称或 API 协议...",
       "name": "模型名称",
       "provider": "API协议",
       "type": "模型ID",
@@ -2413,7 +2431,9 @@
         "topp": "核采样",
         "toppDesc": "Top-p:选择累计概率达到p的最小词集合进行采样。动态调整候选词的数量，平衡输出的多样性和质量。建议：通常设置为0.9-0.95，与温度配合使用时建议只调整其中一个。",
         "timeout": "超时时间(s)",
-        "timeoutDesc": "超时时间范围：1-3600秒（输入超出范围将自动调整）"
+        "timeoutDesc": "超时时间范围：1-3600秒（输入超出范围将自动调整）",
+        "retryCount": "重试次数",
+        "retryCountDesc": "重试次数范围：0-10次（输入超出范围将自动调整）"
       },
       "actions": {
         "save": "保存",

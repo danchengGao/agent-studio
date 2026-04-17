@@ -26,6 +26,7 @@ export const ReportMarkdown: React.FC<MarkdownProps> = ({
   content,
   citations,
   inferMessages,
+  chartMessages,
 }) => {
   /**
    * 每次渲染前重置 linkIndex 计数器
@@ -46,6 +47,7 @@ export const ReportMarkdown: React.FC<MarkdownProps> = ({
         content={content}
         citations={citations}
         inferMessages={inferMessages}
+        chartMessages={chartMessages}
       />
     </div>
   )

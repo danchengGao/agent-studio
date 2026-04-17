@@ -12,6 +12,8 @@ export const DEFAULT_DEEPSEARCH_CONFIG: DeepSearchConfig = {
   enableSourceTracerInfer: true, // 溯源推理功能开关，默认开启
   userFeedbackProcessorEnable: true, // 报告改写功能开关，默认开启
   userFeedbackProcessorMaxInteractions: 3, // 用户反馈优化最大交互次数，默认 3
+  vlmChartGeneratorEnable: false,
+  vlmChartGeneratorMaxIterations: 1,
   searchMode: 'web',
   selectedWebSearchEngineId: undefined,
   webSearchResultCount: 5,
@@ -27,4 +29,5 @@ export const DEFAULT_DEEPSEARCH_CONFIG: DeepSearchConfig = {
   planUnderstandingModelId: undefined,
   infoCollectingModelId: undefined,
   writingCheckingModelId: undefined,
+  vlmChartModelId: undefined,
 }

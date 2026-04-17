@@ -5,7 +5,7 @@ import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/Men
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
 import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
-import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
+import { useModels, useVLMModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, isTaskOngoing,
   type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
@@ -259,6 +259,12 @@ const AppsPage: React.FC = () => {
     size: 100,
   })
 
+  const { data: vlmModelsData, isLoading: vlmModelsLoading } = useVLMModels({
+    spaceId: user?.spaceId || getDefaultSpaceId(),
+    is_active: true,
+    size: 100,
+  })
+
   // 提取模型名称列表和 ID 映射
   const models = modelsData?.items?.map(model => model.name) || []
   const modelIdMap = React.useMemo(() => {
@@ -292,6 +298,27 @@ const AppsPage: React.FC = () => {
       model_from: model.is_system_model ? 'config' : 'db',
     }))
   }, [modelsData])
+
+  const availableVLMModels = React.useMemo(() => {
+    if (!vlmModelsData?.items) return []
+    return vlmModelsData.items.map(model => ({
+      tags: model.tags || [],
+      icon: '',
+      openModel: {
+        model_id: model.id,
+        name: model.name,
+        desc: model.description || '',
+        workspace_id: '',
+        param_config: { param_schemas: [] },
+      },
+      series: {
+        icon: '',
+        name: model.modelId || '',
+        vendor: model.provider || '',
+      },
+      model_from: 'db',
+    }))
+  }, [vlmModelsData])
 
   // 从 localStorage 恢复对话状态和智能体配置
   useEffect(() => {
@@ -924,6 +951,7 @@ const AppsPage: React.FC = () => {
                     response_content: content.final_result.response_content,
                     citation_messages: content.final_result.citation_messages || null,
                     infer_messages: content.final_result.infer_messages || [],
+                    chart_messages: content.final_result.chart_messages || [],
                   }
 
                   // 如果还没有创建过 final_result 消息，创建一个新的
@@ -1582,6 +1610,8 @@ const AppsPage: React.FC = () => {
       }
 
       const messageToBackend = options?.backend_message ?? content
+      const vlmChartGeneratorEnable = config.vlmChartGeneratorEnable ?? DEFAULT_DEEPSEARCH_CONFIG.vlmChartGeneratorEnable
+      const vlmChartGeneratorMaxIterations = config.vlmChartGeneratorMaxIterations ?? DEFAULT_DEEPSEARCH_CONFIG.vlmChartGeneratorMaxIterations
 
       // ===== 提取并保存配置参数 =====
       const agentConfig = {
@@ -1608,6 +1638,11 @@ const AppsPage: React.FC = () => {
         // 用户反馈优化配置
         user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
         user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+        vlm_chart_generator_enable: vlmChartGeneratorEnable,
+        vlm_chart_generator_max_iterations: vlmChartGeneratorMaxIterations,
+        ...(vlmChartGeneratorEnable && vlmChartGeneratorMaxIterations > 0 && config.vlmChartModelId && {
+          vlm_model_config_id: parseInt(config.vlmChartModelId),
+        }),
         // 联网搜索QPS限制，0表示不限流
         web_search_max_qps: config.webSearchMaxQps ?? 0,
       };
@@ -2054,6 +2089,8 @@ const AppsPage: React.FC = () => {
         isFirstConfig={isFirstConfigMode}
         availableModels={availableModels}
         modelsLoading={modelsLoading}
+        availableVLMModels={availableVLMModels}
+        vlmModelsLoading={vlmModelsLoading}
       />
 
       {/* 模型选择弹窗 */}

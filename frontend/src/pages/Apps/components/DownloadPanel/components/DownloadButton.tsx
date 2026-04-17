@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { IconButton } from '@test-agentstudio/base-ui'
 import { useDownload } from '../hooks'
 import { FormatMenu } from './FormatMenu'
+import type { ChartMessage, InferMessage } from '@/pages/Apps/types'
 
 /**
  * 下载按钮组件属性
@@ -25,6 +26,12 @@ export interface DownloadButtonProps {
   content: string
   /** 文件标题（用于生成文件名） */
   title: string
+  /** 原始 Markdown 内容 */
+  rawContent?: string
+  /** VLM 图表数据 */
+  chartMessages?: ChartMessage[] | null
+  /** 推理图数据 */
+  inferMessages?: InferMessage[] | null
   /** 自定义样式类名 */
   className?: string
 }
@@ -43,10 +50,17 @@ export interface DownloadButtonProps {
 export const DownloadButton: React.FC<DownloadButtonProps> = ({
   content,
   title,
+  rawContent,
+  chartMessages,
+  inferMessages,
   className = '',
 }) => {
   const { t } = useTranslation()
-  const download = useDownload(content, title)
+  const download = useDownload(content, title, {
+    rawContent,
+    chartMessages,
+    inferMessages,
+  })
 
   return (
     <DropdownMenu.Root modal={false}>

@@ -22,6 +22,8 @@ export interface ModelConfigTabProps extends ConfigTabProps {
   modelsLoading: boolean
   /** 空间 ID，用于模型测试 */
   spaceId?: string
+  availableVLMModels?: Model[]
+  vlmModelsLoading?: boolean
 }
 
 // 模型配置项类型
@@ -104,7 +106,15 @@ const ModelConfigItem: React.FC<{
 /**
  * 模型配置标签组件
  */
-export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateConfig, availableModels, modelsLoading, spaceId }) => {
+export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
+  config,
+  updateConfig,
+  availableModels,
+  modelsLoading,
+  spaceId,
+  availableVLMModels = [],
+  vlmModelsLoading = false,
+}) => {
   const { t } = useTranslation()
 
   // 模型测试状态
@@ -149,6 +159,11 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
   const getModelById = (modelId: string | undefined): Model | null => {
     if (!modelId) return null
     return availableModels.find(m => m.openModel.model_id === modelId) || null
+  }
+
+  const getVLMModelById = (modelId: string | undefined): Model | null => {
+    if (!modelId) return null
+    return availableVLMModels.find(m => m.openModel.model_id === modelId) || null
   }
 
   // 带验证的模型选择处理函数
@@ -270,6 +285,20 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
                 isOtherTesting={!!testingModelId && testingConfigKey !== modelConfig.configKey}
               />
             ))}
+
+            <ModelConfigItem
+              label={t('apps.config.model.vlmChart.label', { defaultValue: 'VLM 图表生成模型' })}
+              description={t('apps.config.model.vlmChart.description', { defaultValue: '用于 DeepSearch 图表生成后的视觉模型迭代优化' })}
+              recommendation={t('apps.config.model.vlmChart.recommendation', { defaultValue: '建议选择支持图像输入的多模态模型' })}
+              availableModels={availableVLMModels}
+              selectedModel={getVLMModelById(config.vlmChartModelId)}
+              modelsLoading={vlmModelsLoading}
+              onModelChange={model => updateConfig('vlmChartModelId', model?.openModel.model_id)}
+              placeholder={t('apps.config.model.useGeneral')}
+              required={config.vlmChartGeneratorEnable && config.vlmChartGeneratorMaxIterations > 0}
+              isCurrentTesting={false}
+              isOtherTesting={!!testingModelId}
+            />
           </div>
         </ConfigSection>
       </div>

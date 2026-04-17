@@ -24,12 +24,36 @@ from openjiuwen_studio.routers import register
 from openjiuwen_studio.core.database import engine
 from openjiuwen_studio.models.db_fun_base import Base
 # Import all models to ensure they are registered with SQLAlchemy
-from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelConfig, AgentBaseDB, AgentPublishDB, \
-    PromptRelationDB, TagDB, UserDB, SpaceDB, SpaceUserDB, WorkflowBaseDB, WorkflowPublishDB, PluginBaseDB, \
-    PluginPublishDB, ToolBaseDB, \
-    WorkflowExecutionDB, WorkflowExecutionDetailsDB, AgentExecutionDB, AgentExecutionDetailsDB, \
-    AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB, ReferenceDB, SystemEmbeddingModelDB, \
-    SystemLLMModelDB, MemoryBaseDB, RuntimeInfoDB
+from openjiuwen_studio.models import (
+    AgentBaseDB,
+    AgentExecutionDB,
+    AgentExecutionDetailsDB,
+    AgentPublishDB,
+    AgentWorkflowRelationDB,
+    EmbeddingModelConfig,
+    KnowledgeBaseDB,
+    KnowledgeBaseDocumentDB,
+    MemoryBaseDB,
+    ModelConfig,
+    ModelUsageLog,
+    PluginBaseDB,
+    PluginPublishDB,
+    PromptRelationDB,
+    ReferenceDB,
+    RuntimeInfoDB,
+    SpaceDB,
+    SpaceUserDB,
+    SystemEmbeddingModelDB,
+    SystemLLMModelDB,
+    TagDB,
+    ToolBaseDB,
+    UserDB,
+    VLMModelConfig,
+    WorkflowBaseDB,
+    WorkflowExecutionDB,
+    WorkflowExecutionDetailsDB,
+    WorkflowPublishDB,
+)
 # Import alembic version check
 from openjiuwen.core.common.logging import logger, interface_logger
 from openjiuwen_studio.core.common.logging.events import CustomLogEventType
@@ -59,6 +83,7 @@ async def lifespan_func(app: FastAPI):
         ModelConfig.__table__,
         ModelUsageLog.__table__,
         EmbeddingModelConfig.__table__,
+        VLMModelConfig.__table__,
         AgentBaseDB.__table__,
         AgentPublishDB.__table__,
         PromptRelationDB.__table__,
