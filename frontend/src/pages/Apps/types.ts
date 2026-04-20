@@ -88,7 +88,10 @@ export interface Report {
 }
 
 /** 报告局部改写操作类型 */
-export type ReportRewriteAction = 'expand' | 'polish' | 'shorten'
+export type ReportRewriteAction = 'expand' | 'polish' | 'shorten' | 'supplementary_search'
+
+/** 报告改写范围类型 */
+export type RewriteScope = 'selected_only' | 'selected_and_related'
 
 /** AI 改写状态类型 */
 export type RewriteStatus = 'idle' | 'thinking' | 'writing' | 'error'
@@ -98,7 +101,9 @@ export type RewriteStatus = 'idle' | 'thinking' | 'writing' | 'error'
  */
 export interface ReportRewriteParams {
   /** 改写操作类型 */
-  action: 'polish' | 'expand' | 'shorten'
+  action: ReportRewriteAction
+  /** 改写范围 */
+  rewrite_scope?: RewriteScope
   /** 选中的文本 */
   selectedText: string
   /** 起始偏移量（code point） */

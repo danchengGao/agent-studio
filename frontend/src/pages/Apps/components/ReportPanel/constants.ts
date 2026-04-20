@@ -33,10 +33,12 @@ export const REWRITE_ACTIONS: {
   icon: string
   labelKey: string
   defaultLabel: string
+  hasSubMenu?: boolean
 }[] = [
   { action: 'polish', icon: 'Sparkles', labelKey: 'apps.report.aiPolish', defaultLabel: '润色' },
   { action: 'expand', icon: 'Expand', labelKey: 'apps.report.aiExpand', defaultLabel: '扩写' },
   { action: 'shorten', icon: 'Shrink', labelKey: 'apps.report.aiShrink', defaultLabel: '缩写' },
+  { action: 'supplementary_search', icon: 'Search', labelKey: 'apps.report.aiSupplementarySearch', defaultLabel: '补充搜索', hasSubMenu: true },
 ]
 
 // ============================================================================

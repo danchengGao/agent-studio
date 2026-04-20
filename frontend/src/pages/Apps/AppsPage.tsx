@@ -9,6 +9,7 @@ import { useModels, useVLMModels, getToken, deepsearchHeartbeatService } from '@
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, isTaskOngoing,
   type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
+import { DeepsearchAgentType } from '../../stores/handlers/deepsearchSSETypes'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import {
   type DeepSearchRecordingHandle,
@@ -41,6 +42,7 @@ const REWRITE_ACTION_LABELS: Record<string, string> = {
   polish: '润色',
   expand: '扩写',
   shorten: '缩写',
+  supplementary_search: '补充搜索',
 }
 
 /**
@@ -806,7 +808,7 @@ const AppsPage: React.FC = () => {
    * 将改写请求和结果集成到对话流中
   */
   const handleReportRewrite = async (params: ReportRewriteParams) => {
-    const { action, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
+    const { action, rewrite_scope, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
 
     const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
     const rewriteSessionUnavailableMessage = '报告对应的改写会话已超时，请重新提问后再尝试改写。'
@@ -864,6 +866,7 @@ const AppsPage: React.FC = () => {
     type RewriteRequestContext = {
       messagePayload: {
         action: ReportRewriteParams['action']
+        rewrite_scope: ReportRewriteParams['rewrite_scope']
         selected_text: string
         start_offset: number
         end_offset: number
@@ -871,6 +874,7 @@ const AppsPage: React.FC = () => {
       }
       rewriteRequest: {
         action: ReportRewriteParams['action']
+        rewrite_scope: ReportRewriteParams['rewrite_scope']
         selectedText: string
         startOffset: number
         endOffset: number
@@ -889,6 +893,7 @@ const AppsPage: React.FC = () => {
     const createRewriteRequestContext = (): RewriteRequestContext => ({
       messagePayload: {
         action,
+        rewrite_scope: rewrite_scope,
         selected_text: selectedText,
         start_offset: startOffset,
         end_offset: endOffset,
@@ -896,6 +901,7 @@ const AppsPage: React.FC = () => {
       },
       rewriteRequest: {
         action,
+        rewrite_scope: rewrite_scope,
         selectedText,
         startOffset,
         endOffset,
@@ -2065,7 +2071,7 @@ const AppsPage: React.FC = () => {
               const data = JSON.parse(jsonStr)
 
               // 检测是否收到正常结束信号
-              if (data.agent === 'end' && data.content === 'ALL END') {
+              if (data.agent === DeepsearchAgentType.END && data.content === 'ALL END') {
                 sseCompletedNormally = true
               }
 

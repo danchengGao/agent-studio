@@ -61,7 +61,7 @@ import {
   matchCanonicalBlockByVisibleText,
   type ReportEditorViewModel,
 } from './presentation'
-import type { ReportRewriteAction, ReportRewriteParams, RewriteStatus } from '@/pages/Apps/types'
+import type { ReportRewriteAction, ReportRewriteParams, RewriteStatus, RewriteScope } from '@/pages/Apps/types'
 import { useReducedMotion } from '../../shared'
 import type { RecoveryState, RewriteOverlayState } from './session'
 import './sideMenu/styles.css'
@@ -379,6 +379,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
   const [rewriteStatus, setRewriteStatus] = useState<RewriteStatus>('idle')
   const [rewriteErrorMessage, setRewriteErrorMessage] = useState<string | undefined>()
   const [isRewriting, setIsRewriting] = useState(false)
+  const [selectedScope, setSelectedScope] = useState<RewriteScope | null>(null)
   const [needsRecovery, setNeedsRecovery] = useState(false)
   const [recoveryMessage, setRecoveryMessage] = useState<string | undefined>()
   const [motionSession, setMotionSession] = useState<RewriteMotionSession | null>(null)
@@ -765,6 +766,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
   const handleCloseRewritePanel = useCallback(() => {
     setShowRewritePanel(false)
     setSelectedBlock(null)
+    setSelectedScope(null) // 重置选择范围
     rewriteSelectionRef.current = null
   }, [])
 
@@ -1137,7 +1139,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
   )
 
   const handleSubmitRewrite = useCallback(
-    async (action: ReportRewriteAction, prompt?: string) => {
+    async (action: ReportRewriteAction, prompt?: string, rewriteScope?: RewriteScope) => {
       const currentSelection = rewriteSelectionRef.current
       const resetAfterPreflightFailure = () => {
         const cleanupPlan = getRewritePreflightFailureCleanupPlan()
@@ -1227,6 +1229,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
         action,
         conversationId,
         userInstruction: prompt,
+        rewrite_scope: rewriteScope,
       })
 
       await runRewrite({
@@ -1372,6 +1375,8 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
           onClose={handleCloseRewritePanel}
           onSubmit={handleSubmitRewrite}
           remainingRewriteRounds={remainingRewriteRounds}
+          selectedScope={selectedScope}
+          onScopeSelect={setSelectedScope}
         />
       ) : null}
 

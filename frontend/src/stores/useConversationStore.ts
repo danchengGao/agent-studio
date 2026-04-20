@@ -30,6 +30,11 @@ import {
   createMindMapManager
 } from './handlers/deepsearchMindMapHandler';
 
+// ===== Deepsearch SSE 相关导入 =====
+import {
+  DeepsearchEvent
+} from './handlers/deepsearchSSETypes';
+
 // ===== 重新导出（保持向后兼容）=====
 export {
   MessageType,
@@ -1653,7 +1658,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         // 降级处理：批量创建简单的文本消息
         eventsToProcess.forEach(event => {
           const sseData = event.sseData as any;
-          if (sseData.event === 'start' || sseData.event === 'message') {
+          if (sseData.event === DeepsearchEvent.START || sseData.event === DeepsearchEvent.MESSAGE) {
             get().addSystemMessage(event.conversationId, MessageType.REPORT, sseData.content || '');
           }
         });

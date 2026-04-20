@@ -13,7 +13,7 @@ import type { Block, BlockNoteEditor } from '@blocknote/core'
 import { AIRewriteInput } from './AIRewriteInput'
 import { AIRewriteOptions } from './AIRewriteOptions'
 import { useClickOutsideSelectors } from '@/hooks/prompts'
-import type { ReportRewriteAction } from '@/pages/Apps/types'
+import type { ReportRewriteAction, RewriteScope } from '@/pages/Apps/types'
 
 // 使用泛型 Block 类型以兼容 BlockNote 的扩展状态
 type AnyBlock = Block<any, any, any>
@@ -26,9 +26,13 @@ export interface AIRewritePanelProps {
   /** 关闭回调 */
   onClose: () => void
   /** 提交回调 */
-  onSubmit: (action: ReportRewriteAction, prompt?: string) => void
+  onSubmit: (action: ReportRewriteAction, prompt?: string, rewriteScope?: RewriteScope) => void
   /** 剩余改写次数 */
   remainingRewriteRounds?: number
+  /** 当前选中的范围 */
+  selectedScope: RewriteScope | null
+  /** 选中范围回调 */
+  onScopeSelect: (scope: RewriteScope | null) => void
 }
 
 /**
@@ -39,6 +43,8 @@ export const AIRewritePanel: React.FC<AIRewritePanelProps> = ({
   onClose,
   onSubmit,
   remainingRewriteRounds,
+  selectedScope,
+  onScopeSelect,
 }) => {
   const [input, setInput] = useState('')
   const [selectedAction, setSelectedAction] = useState<ReportRewriteAction | null>(null)
@@ -82,12 +88,28 @@ export const AIRewritePanel: React.FC<AIRewritePanelProps> = ({
   // 发送处理（带 prompt）
   const handleSend = () => {
     if (!selectedAction) return
-    onSubmit(selectedAction, input || undefined)
+    if (selectedAction === 'supplementary_search') {
+      onSubmit(selectedAction, input || undefined, selectedScope)
+    } else {
+      onSubmit(selectedAction, input || undefined)
+    }
   }
 
   // 选项选中处理
   const handleSelectAction = (action: ReportRewriteAction) => {
     setSelectedAction(action)
+    // 如果选择的不是补充搜索，重置选择范围
+    if (action !== 'supplementary_search') {
+      onScopeSelect(null)
+    }
+  }
+
+  // 范围选择处理
+  const handleScopeSelect = (scope: RewriteScope | null) => {
+    onScopeSelect(scope)
+    if (scope !== null) {
+      setSelectedAction('supplementary_search')
+    }
   }
 
   // 点击外部关闭（使用现有 hook）
@@ -129,7 +151,9 @@ export const AIRewritePanel: React.FC<AIRewritePanelProps> = ({
       {/* Options 基于 Input 位置定位 */}
       <AIRewriteOptions
         selectedAction={selectedAction}
+        selectedScope={selectedScope}
         onSelect={handleSelectAction}
+        onScopeSelect={handleScopeSelect}
         targetElement={inputRef.current}
       />
     </>

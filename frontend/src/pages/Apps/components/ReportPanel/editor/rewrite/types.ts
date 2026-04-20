@@ -29,6 +29,7 @@ export interface BuildRewriteRequestInput {
   action: ReportRewriteAction
   conversationId: string
   userInstruction?: string
+  rewrite_scope?: string
 }
 
 export type CanonicalRewriteRequest = ReportRewriteParams
