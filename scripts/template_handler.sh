@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 set -euo >/dev/null 2>&1
 
+DEEPSEARCH_RUNTIME_ENV_KEYS=(
+    INDEX_MANAGER_TYPE
+    MILVUS_HOST
+    MILVUS_PORT
+    MILVUS_TOKEN
+    CHECKPOINTER_TYPE
+    CHECKPOINTER_DB_TYPE
+    CHECKPOINTER_DB_PATH
+    REDIS_URL
+    REDIS_CLUSTER_MODE
+    REDIS_TTL
+    REDIS_REFRESH_ON_READ
+    OBS_ACCESS_KEY_ID
+    OBS_SECRET_ACCESS_KEY
+    OBS_SERVER
+    OBS_REGION
+    OBS_BUCKET
+)
+
 # === Extracts and deduplicates <<variable>> placeholders from template ===
 extract_placeholders() {
     local templatefile="$1"
@@ -73,14 +92,14 @@ generate_nginx_file() {
 
 generate_deepsearch_env_file() {
     local db_type="${RUNTIME_VARS["DB_TYPE"]}"
-    #DEEPSERACH_ENV_VARS["DB_TYPE"]="${db_type}"
+    DEEPSERACH_ENV_VARS["DB_TYPE"]="${db_type}"
 
     case "${db_type}" in
         mysql)
-            #DEEPSERACH_ENV_VARS["DB_HOST"]="${RUNTIME_VARS["DB_HOST"]}"
-            #DEEPSERACH_ENV_VARS["DB_PORT"]="${RUNTIME_VARS["DB_PORT"]}"
-            #DEEPSERACH_ENV_VARS["DB_USER"]="${RUNTIME_VARS["DB_USER"]}"
-            #DEEPSERACH_ENV_VARS["DB_PASSWORD"]="${RUNTIME_VARS["DB_PASSWORD"]}"
+            DEEPSERACH_ENV_VARS["DB_HOST"]="${RUNTIME_VARS["DB_HOST"]}"
+            DEEPSERACH_ENV_VARS["DB_PORT"]="${RUNTIME_VARS["DB_PORT"]}"
+            DEEPSERACH_ENV_VARS["DB_USER"]="${RUNTIME_VARS["DB_USER"]}"
+            DEEPSERACH_ENV_VARS["DB_PASSWORD"]="${RUNTIME_VARS["DB_PASSWORD"]}"
             DEEPSERACH_ENV_VARS["DEEPSEARCH_DB_NAME"]="${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
             ;;
         sqlite)
@@ -88,6 +107,10 @@ generate_deepsearch_env_file() {
             DEEPSERACH_ENV_VARS["DEEPSEARCH_SQLITE_DB"]="${DEPLOY_VARS["DEEPSEARCH_SQLITE_DB"]}"
             ;;
     esac
+
+    for key in "${DEEPSEARCH_RUNTIME_ENV_KEYS[@]}"; do
+        DEEPSERACH_ENV_VARS["${key}"]="${RUNTIME_VARS["${key}"]:-}"
+    done
 
     local env_file="${CONFIG["ENV_DIR"]}/env.deepsearch.${DEPLOY_VARS["NAME_SUFFIX"]}"
     write_env_to_file "${env_file}" "DEEPSERACH_ENV_VARS"

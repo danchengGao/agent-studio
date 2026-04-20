@@ -6,6 +6,7 @@ DeepSearch SSE 数据日志记录模块
 import os
 import json
 import asyncio
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -24,6 +25,18 @@ class DeepSearchLogger:
 
     # 默认日志过期天数（可配置）
     DEFAULT_LOG_EXPIRE_DAYS = 3
+    MAX_LOG_FILE_STEM_LENGTH = 128
+    REDACTED_VALUE = "***REDACTED***"
+    SENSITIVE_KEYS = {
+        "api_key",
+        "api_secret",
+        "access_token",
+        "refresh_token",
+        "password",
+        "secret",
+        "secret_key",
+        "token",
+    }
 
     # 分隔符
     USER_REQUEST_SEPARATOR = "\n" + "=" * 18 + "\n" + "======    user    ======" + "\n" + "=" * 18 + "\n"
@@ -46,7 +59,44 @@ class DeepSearchLogger:
 
     def _get_log_file_path(self) -> Path:
         """获取日志文件路径"""
-        return self.LOG_DIR / f"{self.conversation_id}.log"
+        log_dir = self.LOG_DIR.resolve()
+        log_file_path = (log_dir / f"{self._safe_log_file_stem(self.conversation_id)}.log").resolve()
+        log_file_path.relative_to(log_dir)
+        return log_file_path
+
+    @classmethod
+    def _safe_log_file_stem(cls, conversation_id: str) -> str:
+        raw_id = str(conversation_id or "").strip()
+        if not raw_id:
+            return "unknown"
+
+        raw_path = Path(raw_id)
+        if raw_path.is_absolute():
+            parts = [part for part in raw_path.parts if part not in (raw_path.anchor, os.sep, "")]
+            raw_id = "_" + "_".join(parts)
+        else:
+            parts = [part for part in raw_path.parts if part not in ("", ".", "..")]
+            raw_id = "_".join(parts)
+
+        safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", raw_id).strip(".")
+        if not safe_stem:
+            safe_stem = "unknown"
+        return safe_stem[:cls.MAX_LOG_FILE_STEM_LENGTH]
+
+    @classmethod
+    def _redact_sensitive_data(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            redacted = {}
+            for key, value in data.items():
+                key_text = str(key)
+                if key_text.lower() in cls.SENSITIVE_KEYS:
+                    redacted[key] = cls.REDACTED_VALUE
+                else:
+                    redacted[key] = cls._redact_sensitive_data(value)
+            return redacted
+        if isinstance(data, list):
+            return [cls._redact_sensitive_data(item) for item in data]
+        return data
 
     def _ensure_log_directory(self):
         """确保日志目录存在"""
@@ -78,7 +128,7 @@ class DeepSearchLogger:
             f.write(self.USER_REQUEST_SEPARATOR)
 
             # 写入请求数据（格式化的 JSON）
-            f.write(json.dumps(request_data, ensure_ascii=False, indent=2))
+            f.write(json.dumps(self._redact_sensitive_data(request_data), ensure_ascii=False, indent=2))
             f.write("\n")
 
             # 写入 deepsearch 分隔符（在请求数据后面）
