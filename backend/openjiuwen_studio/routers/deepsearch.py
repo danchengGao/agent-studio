@@ -187,6 +187,10 @@ async def run(
             'vlm_model_config_id',
         }
     )
+    
+    # 先检查用户权限
+    _ = check_user_space(payload["space_id"], current_user)
+    
     # 取消请求不需要获取模型配置，直接转发到 deepsearch 服务
     if request.interrupt_feedback == "cancel":
         logger.info(f"[DeepSearch Cancel] Received cancel request for conversation_id={payload.get('conversation_id')}")
@@ -217,8 +221,6 @@ async def run(
         )
         # 用构建好的 model_config 覆盖 llm_config
         payload["llm_config"] = model_config
-
-    _ = check_user_space(payload["space_id"], current_user)
 
     # 获取 conversation_id
     conversation_id = payload.get("conversation_id", "")
@@ -270,6 +272,9 @@ async def import_template(
         current_user: dict = Depends(get_current_user)
 ):
     """导入模板"""
+    # 先检查用户权限
+    _ = check_user_space(request.space_id, current_user)
+    
     # 构建 llm_config（模板导入只需要 general 模型配置）
     model_config = get_model_configs(request.model_config_id, request.space_id)
 
@@ -278,7 +283,6 @@ async def import_template(
     # 用构建好的 model_config 覆盖 llm_config
     payload["llm_config"] = model_config
 
-    _ = check_user_space(payload["space_id"], current_user)
     result = await client.import_templates(payload)
     # 直接返回，FastAPI 会自动校验并序列化为 TemplateImportResponse
     return result
@@ -433,7 +437,10 @@ async def report_convert(
 
 
 @deepsearch_router.get("/heartbeat")
-async def deepsearch_heartbeat():
+@handle_deepsearch_errors
+async def deepsearch_heartbeat(
+        current_user: dict = Depends(get_current_user)
+):
     """检查 DeepSearch 服务是否可用"""
     try:
         # 检查配置

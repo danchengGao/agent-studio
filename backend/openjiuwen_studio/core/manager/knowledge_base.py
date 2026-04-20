@@ -451,6 +451,9 @@ def _create_embed_model(kb_id: str, space_id: str) -> OpenAIEmbedding:
         if not embed_model_config:
             raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
 
+        if embed_model_config.space_id != space_id:
+            raise ValueError(f"Embedding model config does not belong to this space (ID: {embedding_model_config_id})")
+
         if not embed_model_config.is_active:
             raise ValueError(
                 f"Embedding model config is not active (ID: {embedding_model_config_id})"
@@ -527,6 +530,9 @@ def get_embed_model_config(kb_id: str, space_id: str) -> EmbeddingConfig:
 
         if not embed_model_config:
             raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
+
+        if embed_model_config.space_id != space_id:
+            raise ValueError(f"Embedding model config does not belong to this space (ID: {embedding_model_config_id})")
 
         if not embed_model_config.is_active:
             raise ValueError(
@@ -1069,6 +1075,11 @@ async def knowledge_base_sync_upload(
                     code=status.HTTP_404_NOT_FOUND,
                     message=f"Embedding model config not found: {embed_id}",
                 )
+            if embed_model.space_id != space_id:
+                return ResponseModel(
+                    code=status.HTTP_403_FORBIDDEN,
+                    message="Embedding model config does not belong to this space",
+                )
             if not embed_model.is_active:
                 return ResponseModel(
                     code=status.HTTP_400_BAD_REQUEST,
@@ -1144,7 +1155,7 @@ async def knowledge_base_sync_upload(
         try:
             embed_repo = EmbeddingModelConfigRepository(db)
             embed_model = embed_repo.get_by_id(embed_id)
-            if embed_model and embed_model.is_active:
+            if embed_model and embed_model.space_id == space_id and embed_model.is_active:
                 embed_model_config, llm_config = _build_ds_stored_kb_model_configs(
                     embed_model
                 )

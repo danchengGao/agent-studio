@@ -163,7 +163,7 @@ class DeepSearchClientError(Exception):
             "response_content": "",
             "citation_messages": {},
             "infer_messages": [],
-            "exception_info": f"Failed to initialize DeepSearch HTTP client: {self.message}"
+            "exception_info": "Failed to initialize DeepSearch HTTP client"
         }
 
         # Summary response (error payload)
