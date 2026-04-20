@@ -8,9 +8,16 @@
  * - ReportEditView: 报告编辑器（编辑模式）
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import type { Report, ReportRewriteParams } from '@/pages/Apps/types'
 import { parseMarkdownToCanonical } from '@/pages/Apps/components/ReportPanel/editor/canonical'
+import {
+  buildReportSyncRequest,
+  createReportSyncScheduler,
+  flushLatestReportDraft,
+  type ReportSyncScheduler,
+  type ReportSyncStatus,
+} from '@/pages/Apps/components/ReportPanel/editor/sync'
 import {
   deriveEditorSessionState,
   type RecoveryState,
@@ -18,7 +25,7 @@ import {
 } from '@/pages/Apps/components/ReportPanel/editor/session'
 import { ReportContentToolbar } from './ReportContentToolbar'
 import { ReportView } from './ReportView'
-import { ReportEditView } from './ReportEditView'
+import { ReportEditView, type ReportEditViewHandle } from './ReportEditView'
 import { useConversationStore, isFinalReportMessage } from '@/stores/useConversationStore'
 
 interface ReportPanelProps {
@@ -36,6 +43,13 @@ interface ReportPanelProps {
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
 }
 
+type ReportHistoryControls = {
+  canUndo: boolean
+  canRedo: boolean
+  undo: () => void
+  redo: () => void
+}
+
 /**
  * 报告展示面板组件
  */
@@ -48,8 +62,17 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   onReportRewrite,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<ReportSyncStatus>('synced')
+  const [historyControls, setHistoryControls] = useState<ReportHistoryControls>({
+    canUndo: false,
+    canRedo: false,
+    undo: () => {},
+    redo: () => {},
+  })
   const [rewriteOverlayState, setRewriteOverlayState] = useState<RewriteOverlayState>('idle')
   const [recoveryState, setRecoveryState] = useState<RecoveryState>('idle')
+  const syncSchedulerRef = useRef<ReportSyncScheduler | null>(null)
+  const editViewRef = useRef<ReportEditViewHandle | null>(null)
   const messagesMap = useConversationStore(state => state.messagesMap)
 
   // 判断是否为最终报告（子报告不能编辑）
@@ -98,9 +121,88 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
     setIsEditing(true)
   }, [sessionState.canEnterEditMode])
 
-  const handleExitEdit = useCallback(() => {
+  const syncReportMarkdown = useCallback(
+    (markdown: string) =>
+      new Promise<void>((resolve, reject) => {
+        if (!conversationId || !onReportRewrite) {
+          reject(new Error('当前没有可用会话，无法同步报告。'))
+          return
+        }
+
+        let settled = false
+        const settleResolve = () => {
+          if (settled) return
+          settled = true
+          resolve()
+        }
+        const settleReject = (error: string) => {
+          if (settled) return
+          settled = true
+          reject(new Error(error))
+        }
+
+        void onReportRewrite({
+          ...buildReportSyncRequest({
+            markdown,
+            conversationId,
+          }),
+          onEnd: settleResolve,
+          onError: settleReject,
+        }).catch((error) => {
+          settleReject(error instanceof Error ? error.message : '报告同步失败')
+        })
+      }),
+    [conversationId, onReportRewrite],
+  )
+
+  useEffect(() => {
+    if (!isEditing) {
+      syncSchedulerRef.current?.dispose()
+      syncSchedulerRef.current = null
+      setSyncStatus('synced')
+      return
+    }
+
+    syncSchedulerRef.current?.dispose()
+    syncSchedulerRef.current = createReportSyncScheduler({
+      initialMarkdown: report.rawContent || report.content || '',
+      debounceMs: 3000,
+      sync: syncReportMarkdown,
+      onStatusChange: setSyncStatus,
+    })
+
+    return () => {
+      syncSchedulerRef.current?.dispose()
+      syncSchedulerRef.current = null
+    }
+  }, [isEditing, report.content, report.rawContent, syncReportMarkdown])
+
+  const handleDraftChange = useCallback((markdown: string) => {
+    syncSchedulerRef.current?.markChanged(markdown)
+  }, [])
+
+  const handleManualSync = useCallback(async () => {
+    try {
+      await flushLatestReportDraft({
+        scheduler: syncSchedulerRef.current,
+        getCurrentMarkdown: editViewRef.current?.getCurrentMarkdown,
+      })
+    } catch (error) {
+      console.error('[ReportPanel] 手动同步失败:', error)
+    }
+  }, [])
+
+  const handleExitEdit = useCallback(async () => {
     if (!sessionState.canExitEditMode) return
-    setIsEditing(false)
+    try {
+      await flushLatestReportDraft({
+        scheduler: syncSchedulerRef.current,
+        getCurrentMarkdown: editViewRef.current?.getCurrentMarkdown,
+      })
+      setIsEditing(false)
+    } catch (error) {
+      console.error('[ReportPanel] 退出编辑前同步失败:', error)
+    }
   }, [sessionState.canExitEditMode])
 
   const handleSessionStateChange = useCallback(
@@ -131,15 +233,24 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
         recoveryState={sessionState.recoveryState}
         canEnterEditMode={sessionState.canEnterEditMode}
         canExitEditMode={sessionState.canExitEditMode}
+        syncStatus={syncStatus}
+        onManualSync={handleManualSync}
+        onUndo={historyControls.undo}
+        onRedo={historyControls.redo}
+        canUndo={historyControls.canUndo}
+        canRedo={historyControls.canRedo}
       />
 
       {/* 报告内容 */}
       <div className="flex-1 overflow-auto px-2 pb-2">
         {sessionState.mode === 'edit' && canEditReport ? (
           <ReportEditView
+            ref={editViewRef}
             report={report}
             conversationId={conversationId}
             onReportRewrite={onReportRewrite}
+            onDraftChange={handleDraftChange}
+            onHistoryStateChange={setHistoryControls}
             onSessionStateChange={handleSessionStateChange}
           />
         ) : (

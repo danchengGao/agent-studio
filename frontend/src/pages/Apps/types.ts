@@ -87,8 +87,8 @@ export interface Report {
   canonicalDocument?: CanonicalDocument
 }
 
-/** 报告局部改写操作类型 */
-export type ReportRewriteAction = 'expand' | 'polish' | 'shorten' | 'supplementary_search'
+/** 报告改写/同步操作类型 */
+export type ReportRewriteAction = 'expand' | 'polish' | 'shorten' | 'supplementary_search' | 'sync'
 
 /** 报告改写范围类型 */
 export type RewriteScope = 'selected_only' | 'selected_and_related'
@@ -126,6 +126,8 @@ export interface ReportRewriteParams {
   onEnd?: () => void
   /** 错误回调 */
   onError?: (error: string) => void
+  /** 静默请求：不在聊天流中追加可见用户消息 */
+  silent?: boolean
 }
 
 /**

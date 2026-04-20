@@ -38,7 +38,7 @@ export interface InteractionEvent {
   timestamp: number
 }
 
-export type RewriteAction = 'polish' | 'expand' | 'shorten'
+export type RewriteAction = 'polish' | 'expand' | 'shorten' | 'supplementary_search' | 'sync'
 
 export interface RewriteRequest {
   action: RewriteAction

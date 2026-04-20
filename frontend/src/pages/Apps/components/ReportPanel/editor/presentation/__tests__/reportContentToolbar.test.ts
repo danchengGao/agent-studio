@@ -7,8 +7,12 @@ import { ReportContentToolbar } from '@/pages/Apps/components/ReportPanel/Report
 import type { Report } from '@/pages/Apps/types'
 
 vi.mock('react-i18next', () => ({
+  initReactI18next: {
+    type: '3rdParty',
+    init: vi.fn(),
+  },
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, options?: { defaultValue?: string }) => {
       const translations: Record<string, string> = {
         'apps.report.edit': 'Edit',
         'apps.report.exitEdit': 'Exit Edit',
@@ -22,9 +26,11 @@ vi.mock('react-i18next', () => ({
         'apps.download.downloadReport': 'Download report',
         'apps.download.downloading': 'Downloading',
         'apps.download.downloadingReport': 'Downloading report',
+        'apps.report.undo': '撤销',
+        'apps.report.redo': '重做',
       }
 
-      return translations[key] ?? key
+      return translations[key] ?? options?.defaultValue ?? key
     },
   }),
 }))
@@ -92,5 +98,52 @@ describe('ReportContentToolbar', () => {
 
     expect(editMarkup).not.toContain('Browse')
     expect(editMarkup).not.toContain('Edit Mode')
+  })
+
+  it('renders undo and redo buttons in edit mode and disables them from controller state', () => {
+    const editMarkup = renderToStaticMarkup(
+      React.createElement(ReportContentToolbar, {
+        report,
+        isEditing: true,
+        editingEnabled: true,
+        onEnterEdit: vi.fn(),
+        onExitEdit: vi.fn(),
+        onManualSync: vi.fn(),
+        onUndo: vi.fn(),
+        onRedo: vi.fn(),
+        canUndo: false,
+        canRedo: true,
+        isFinalReport: true,
+        mode: 'edit',
+      }),
+    )
+
+    expect(editMarkup).toContain('撤销')
+    expect(editMarkup).toContain('重做')
+    expect(editMarkup).toContain('disabled')
+  })
+
+  it('hides copy and download in edit mode and keeps undo/redo before sync', () => {
+    const editMarkup = renderToStaticMarkup(
+      React.createElement(ReportContentToolbar, {
+        report,
+        isEditing: true,
+        editingEnabled: true,
+        onEnterEdit: vi.fn(),
+        onExitEdit: vi.fn(),
+        onManualSync: vi.fn(),
+        onUndo: vi.fn(),
+        onRedo: vi.fn(),
+        canUndo: true,
+        canRedo: true,
+        isFinalReport: true,
+        mode: 'edit',
+      }),
+    )
+
+    expect(editMarkup).not.toContain('Copy')
+    expect(editMarkup).not.toContain('Download report')
+    expect(editMarkup.indexOf('aria-label="撤销"')).toBeLessThan(editMarkup.indexOf('aria-label="手动同步报告"'))
+    expect(editMarkup.indexOf('aria-label="重做"')).toBeLessThan(editMarkup.indexOf('aria-label="手动同步报告"'))
   })
 })

@@ -5,11 +5,14 @@
  * 使用 BlockNote 提供 Notion 风格的块级编辑体验
  */
 
-import React, { useEffect, useState, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { FileText, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Report, ReportRewriteParams } from '@/pages/Apps/types'
-import { ReportEditorRuntime } from './editor/ReportEditorRuntime'
+import {
+  ReportEditorRuntime,
+  type ReportEditorRuntimeHandle,
+} from './editor/ReportEditorRuntime'
 import { useReducedMotion } from '../shared/hooks/usePreferences'
 import { LOADING_DELAY, LOADING_TIMEOUT } from './constants'
 import { planReportEditLoadingTransition } from './loadingStatePolicy'
@@ -24,21 +27,37 @@ export interface ReportEditViewProps {
   conversationId?: string
   /** 报告局部改写回调 */
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
+  /** 编辑器草稿 Markdown 变化回调 */
+  onDraftChange?: (markdown: string) => void
+  /** 编辑器历史状态变化回调 */
+  onHistoryStateChange?: (state: {
+    canUndo: boolean
+    canRedo: boolean
+    undo: () => void
+    redo: () => void
+  }) => void
   onSessionStateChange?: (state: {
     rewriteOverlayState: RewriteOverlayState
     recoveryState: RecoveryState
   }) => void
 }
 
-export const ReportEditView: React.FC<ReportEditViewProps> = ({
+export type ReportEditViewHandle = {
+  getCurrentMarkdown: () => Promise<string>
+}
+
+export const ReportEditView = forwardRef<ReportEditViewHandle, ReportEditViewProps>(({
   report,
   className = '',
   conversationId,
   onReportRewrite,
+  onDraftChange,
+  onHistoryStateChange,
   onSessionStateChange,
-}) => {
+}, ref) => {
   const { t } = useTranslation()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const editorRuntimeRef = useRef<ReportEditorRuntimeHandle | null>(null)
   const prefersReducedMotion = useReducedMotion()
 
   const [loadingState, setLoadingState] = useState<LoadingState>('loading')
@@ -46,6 +65,15 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
   const previousReportIdRef = useRef<string | null>(null)
 
   const rawContent = report.rawContent || report.content || ''
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCurrentMarkdown: async () =>
+        (await editorRuntimeRef.current?.getCurrentMarkdown()) ?? rawContent,
+    }),
+    [rawContent],
+  )
 
   useEffect(() => {
     const hasContent = rawContent.trim()
@@ -127,12 +155,15 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
             </div>
           ) : (
             <ReportEditorRuntime
+              ref={editorRuntimeRef}
               rawContent={rawContent}
               canonicalDocument={report.canonicalDocument}
               readonly={false}
               scrollContainerRef={scrollContainerRef}
               conversationId={conversationId}
               onReportRewrite={onReportRewrite}
+              onDraftChange={onDraftChange}
+              onHistoryStateChange={onHistoryStateChange}
               onSessionStateChange={onSessionStateChange}
             />
           )}
@@ -140,4 +171,6 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
       </div>
     </div>
   )
-}
+})
+
+ReportEditView.displayName = 'ReportEditView'

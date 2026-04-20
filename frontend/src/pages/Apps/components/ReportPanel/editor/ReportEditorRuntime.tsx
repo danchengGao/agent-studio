@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { BlockNoteEditor as BNEditor, type Block } from '@blocknote/core'
 import { BlockNoteView } from '@blocknote/mantine'
 import { SideMenuController } from '@blocknote/react'
@@ -61,6 +61,8 @@ import {
   matchCanonicalBlockByVisibleText,
   type ReportEditorViewModel,
 } from './presentation'
+import { shouldApplyExternalSnapshot } from './historyBaselinePolicy'
+import { resolveEditorBootstrapCanonical } from './editorBootstrapPolicy'
 import type { ReportRewriteAction, ReportRewriteParams, RewriteStatus, RewriteScope } from '@/pages/Apps/types'
 import { useReducedMotion } from '../../shared'
 import type { RecoveryState, RewriteOverlayState } from './session'
@@ -75,6 +77,11 @@ type RangeSelectionSnapshot = SelectionSnapshot & {
 type PendingRewriteSnapshot = {
   raw: string
   canonical: CanonicalDocument
+}
+
+type HistoryExtension = {
+  undoCommand?: Parameters<BNEditor<any, any, any>['canExec']>[0]
+  redoCommand?: Parameters<BNEditor<any, any, any>['canExec']>[0]
 }
 
 type RenderedRewriteSnapshotOverlay = RewriteSnapshotOverlay & {
@@ -103,15 +110,26 @@ export interface ReportEditorRuntimeProps {
   canonicalDocument?: CanonicalDocument
   readonly?: boolean
   onChange?: (markdown: string) => void
+  onDraftChange?: (markdown: string) => void
   onSelectionChange?: (selectedText: string, range: Range | null) => void
   className?: string
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>
   conversationId?: string
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
+  onHistoryStateChange?: (state: {
+    canUndo: boolean
+    canRedo: boolean
+    undo: () => void
+    redo: () => void
+  }) => void
   onSessionStateChange?: (state: {
     rewriteOverlayState: RewriteOverlayState
     recoveryState: RecoveryState
   }) => void
+}
+
+export type ReportEditorRuntimeHandle = {
+  getCurrentMarkdown: () => Promise<string>
 }
 
 const getEditorElement = (wrapper: HTMLDivElement | null) =>
@@ -276,6 +294,32 @@ const renderMarkdownToHTML = (markdown: string) => String(htmlRendererProcessor.
 const parseMarkdownToEditorBlocks = (editor: BNEditor<any, any, any>, markdown: string) =>
   editor.tryParseHTMLToBlocks(renderMarkdownToHTML(markdown))
 
+const createBlockNoteEditor = (initialMarkdown: string) => {
+  const codeBlock = {
+    createHighlighter: async () => ({
+      codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
+    }),
+  }
+  const parserEditor = BNEditor.create({
+    initialContent: [{ type: 'paragraph', props: {} }],
+    codeBlock,
+  })
+
+  try {
+    const initialBlocks = parseMarkdownToEditorBlocks(parserEditor, initialMarkdown)
+
+    return BNEditor.create({
+      initialContent:
+        initialBlocks && initialBlocks.length > 0
+          ? (initialBlocks as any)
+          : [{ type: 'paragraph', props: {} }],
+      codeBlock,
+    })
+  } finally {
+    parserEditor._tiptapEditor.destroy()
+  }
+}
+
 const buildCanonicalFromRaw = (
   rawMarkdown: string,
   previous: CanonicalDocument | null,
@@ -341,18 +385,20 @@ const buildViewModel = (
   return buildReportEditorViewModel(nextDocument, changedBlockIds)
 }
 
-export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
+export const ReportEditorRuntime = forwardRef<ReportEditorRuntimeHandle, ReportEditorRuntimeProps>(({
   rawContent,
   canonicalDocument,
   readonly = false,
-  onChange: _onChange,
+  onChange,
+  onDraftChange,
   onSelectionChange,
   className = '',
   scrollContainerRef,
   conversationId: propConversationId,
   onReportRewrite,
+  onHistoryStateChange,
   onSessionStateChange,
-}) => {
+}, ref) => {
   const storeConversationId = useConversationStore((state) => state.currentConversationId)
   const conversationId = propConversationId || storeConversationId
   const sessionConversationId = useConversationStore((state) => state.SESSION_CONVERSATION_ID)
@@ -415,12 +461,28 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
     [activeTransition, isRewriting, motionSession?.phase, needsRecovery, rewriteStatus],
   )
 
+  const fallbackBaseVersion = useMemo(
+    () => `report:${selectedResultMessageId || 'draft'}`,
+    [selectedResultMessageId],
+  )
+  const initialCanonicalRef = useRef<CanonicalDocument | null>(null)
+  initialCanonicalRef.current = resolveEditorBootstrapCanonical({
+    existingBootstrap: initialCanonicalRef.current,
+    incomingCanonical: canonicalDocument,
+    buildFallback: () => buildCanonicalFromRaw(rawContent, null, fallbackBaseVersion),
+  })
+  const initialCanonical = initialCanonicalRef.current
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const styleElRef = useRef<HTMLStyleElement | null>(null)
   const transitionStyleElRef = useRef<HTMLStyleElement | null>(null)
-  const rawContentRef = useRef(rawContent)
-  const canonicalDocumentRef = useRef<CanonicalDocument | null>(canonicalDocument || null)
-  const currentViewModelRef = useRef<ReportEditorViewModel | null>(null)
+  const rawContentRef = useRef(initialCanonical.rawMarkdown)
+  const canonicalDocumentRef = useRef<CanonicalDocument | null>(initialCanonical)
+  const currentViewModelRef = useRef<ReportEditorViewModel | null>(
+    buildReportEditorViewModel(
+      initialCanonical,
+      initialCanonical.blocks.map((block) => block.id),
+    ),
+  )
   const cachedSelectionRef = useRef<RangeSelectionSnapshot | null>(null)
   const rewriteSelectionRef = useRef<SelectionSnapshot | null>(null)
   const pendingIncomingPropsRef = useRef<PendingRewriteSnapshot | null>(null)
@@ -431,11 +493,8 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
   const cleanupTimerRef = useRef<number | null>(null)
   const errorCleanupTimerRef = useRef<number | null>(null)
   const overlayCleanupTimerRef = useRef<number | null>(null)
-
-  const fallbackBaseVersion = useMemo(
-    () => `report:${selectedResultMessageId || 'draft'}`,
-    [selectedResultMessageId],
-  )
+  const applyingSnapshotRef = useRef(false)
+  const draftChangeSeqRef = useRef(0)
 
   useEffect(() => {
     needsRecoveryRef.current = needsRecovery
@@ -503,18 +562,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
     [],
   )
 
-  const editor = useMemo(() => {
-    const instance = BNEditor.create({
-      initialContent: [{ type: 'paragraph', props: {} }],
-      codeBlock: {
-        createHighlighter: async () => ({
-          codeToHtml: (code: string) => `<pre><code>${code}</code></pre>`,
-        }),
-      },
-    })
-
-    return instance
-  }, [])
+  const editor = useMemo(() => createBlockNoteEditor(initialCanonical.rawMarkdown), [initialCanonical])
 
   const syncEditorSnapshot = useCallback(
     (
@@ -540,7 +588,12 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
       const replaceWholeDocument = () => {
         const nextBlocks = parseMarkdownToEditorBlocks(editor, nextDocument.rawMarkdown)
         if (nextBlocks && nextBlocks.length > 0) {
-          editor.replaceBlocks(editor.document, nextBlocks as any)
+          applyingSnapshotRef.current = true
+          try {
+            editor.replaceBlocks(editor.document, nextBlocks as any)
+          } finally {
+            applyingSnapshotRef.current = false
+          }
         }
         currentViewModelRef.current = nextViewModel
         return { incomingAnimationBlockId: null }
@@ -568,7 +621,14 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
         return replaceWholeDocument()
       }
 
-      const replacementResult = editor.replaceBlocks([editor.document[nextIndex]], replacementBlocks as any)
+      applyingSnapshotRef.current = true
+      const replacementResult = (() => {
+        try {
+          return editor.replaceBlocks([editor.document[nextIndex]], replacementBlocks as any)
+        } finally {
+          applyingSnapshotRef.current = false
+        }
+      })()
       currentViewModelRef.current = nextViewModel
       return {
         incomingAnimationBlockId: getIncomingAnimationBlockId({
@@ -581,6 +641,73 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
     },
     [editor],
   )
+
+  const serializeEditorMarkdown = useCallback(async () => {
+    const serializer = (editor as unknown as {
+      blocksToMarkdownLossy?: (blocks?: AnyBlock[]) => string | Promise<string>
+    }).blocksToMarkdownLossy
+
+    if (!serializer) {
+      return rawContentRef.current
+    }
+
+    return await serializer.call(editor, editor.document as AnyBlock[])
+  }, [editor])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCurrentMarkdown: serializeEditorMarkdown,
+    }),
+    [serializeEditorMarkdown],
+  )
+
+  const emitHistoryState = useCallback(() => {
+    const historyExtension =
+      ((editor.getExtension('yUndo') ?? editor.getExtension('history')) as HistoryExtension | undefined)
+    const canUndo = historyExtension?.undoCommand ? editor.canExec(historyExtension.undoCommand) : false
+    const canRedo = historyExtension?.redoCommand ? editor.canExec(historyExtension.redoCommand) : false
+
+    onHistoryStateChange?.({
+      canUndo,
+      canRedo,
+      undo: () => {
+        editor.undo()
+      },
+      redo: () => {
+        editor.redo()
+      },
+    })
+  }, [editor, onHistoryStateChange])
+
+  const handleEditorChange = useCallback(() => {
+    if (readonly || applyingSnapshotRef.current) {
+      return
+    }
+
+    const seq = draftChangeSeqRef.current + 1
+    draftChangeSeqRef.current = seq
+
+    void serializeEditorMarkdown()
+      .then((markdown) => {
+        if (seq !== draftChangeSeqRef.current) {
+          return
+        }
+
+        onChange?.(markdown)
+        onDraftChange?.(markdown)
+        emitHistoryState()
+      })
+      .catch((error) => {
+        console.error('[ReportEditor] Markdown 序列化失败:', error)
+      })
+  }, [emitHistoryState, onChange, onDraftChange, readonly, serializeEditorMarkdown])
+
+  useEffect(() => {
+    return () => {
+      editor._tiptapEditor.destroy()
+    }
+  }, [editor])
 
   useEffect(() => {
     const nextRawContent = rawContent
@@ -610,6 +737,19 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
       return
     }
 
+    if (
+      !shouldApplyExternalSnapshot({
+        previousRawContent,
+        nextRawContent,
+        changedCanonicalBlockIdsCount: changedCanonicalBlockIds.length,
+        hasCurrentViewModel: currentViewModelRef.current !== null,
+      })
+    ) {
+      canonicalDocumentRef.current = nextCanonical
+      emitHistoryState()
+      return
+    }
+
     rawContentRef.current = nextRawContent
     syncEditorSnapshot(nextCanonical, {
       changedCanonicalBlockIds,
@@ -618,7 +758,12 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
     canonicalDocumentRef.current = nextCanonical
     setNeedsRecovery(false)
     setRecoveryMessage(undefined)
-  }, [canonicalDocument, rawContent, isRewriting, fallbackBaseVersion, syncEditorSnapshot])
+    emitHistoryState()
+  }, [canonicalDocument, rawContent, isRewriting, fallbackBaseVersion, syncEditorSnapshot, emitHistoryState])
+
+  useEffect(() => {
+    emitHistoryState()
+  }, [emitHistoryState])
 
   useEffect(() => {
     if (selectedBlock?.id) {
@@ -800,6 +945,25 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
       setRecoveryMessage('重新加载最新版本失败，请刷新页面后重试。')
     }
   }, [canonicalDocument, rawContent, fallbackBaseVersion, syncEditorSnapshot])
+
+  const resetAfterPreflightFailure = useCallback(() => {
+    const cleanupPlan = getRewritePreflightFailureCleanupPlan()
+    if (cleanupPlan.clearActiveTransitionImmediately) {
+      setActiveTransition(null)
+    }
+    if (cleanupPlan.clearMotionImmediately) {
+      setMotionSession(null)
+    }
+    if (cleanupPlan.clearOverlaysImmediately) {
+      setSnapshotOverlay(null)
+      setDiffOverlay(null)
+    }
+    if (cleanupPlan.releaseRewriteLockImmediately) {
+      setIsRewriting(false)
+    }
+    pendingIncomingPropsRef.current = null
+    pendingAppliedRewriteRef.current = null
+  }, [])
 
   const runRewrite = useCallback(
     async (request: ReportRewriteParams) => {
@@ -1134,6 +1298,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
       fallbackBaseVersion,
       motionProfile,
       onReportRewrite,
+      resetAfterPreflightFailure,
       syncEditorSnapshot,
     ],
   )
@@ -1141,25 +1306,6 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
   const handleSubmitRewrite = useCallback(
     async (action: ReportRewriteAction, prompt?: string, rewriteScope?: RewriteScope) => {
       const currentSelection = rewriteSelectionRef.current
-      const resetAfterPreflightFailure = () => {
-        const cleanupPlan = getRewritePreflightFailureCleanupPlan()
-        if (cleanupPlan.clearActiveTransitionImmediately) {
-          setActiveTransition(null)
-        }
-        if (cleanupPlan.clearMotionImmediately) {
-          setMotionSession(null)
-        }
-        if (cleanupPlan.clearOverlaysImmediately) {
-          setSnapshotOverlay(null)
-          setDiffOverlay(null)
-        }
-        if (cleanupPlan.releaseRewriteLockImmediately) {
-          setIsRewriting(false)
-        }
-        pendingIncomingPropsRef.current = null
-        pendingAppliedRewriteRef.current = null
-      }
-
       if (needsRecovery) {
         setRewriteStatus('error')
         setRewriteErrorMessage('服务端版本已更新，但本地无法正确加载，请先重新加载最新版本。')
@@ -1244,6 +1390,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
       fallbackBaseVersion,
       handleCloseRewritePanel,
       needsRecovery,
+      resetAfterPreflightFailure,
       runRewrite,
       sessionConversationId,
       selectedBlock?.id,
@@ -1353,6 +1500,7 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
         editor={editor}
         editable={!readonly && !needsRecovery}
         theme="light"
+        onChange={handleEditorChange}
         onSelectionChange={captureCurrentSelection}
         sideMenu={false}
         formattingToolbar={false}
@@ -1391,4 +1539,6 @@ export const ReportEditorRuntime: React.FC<ReportEditorRuntimeProps> = ({
       />
     </div>
   )
-}
+})
+
+ReportEditorRuntime.displayName = 'ReportEditorRuntime'

@@ -13,6 +13,7 @@ import { DeepsearchAgentType } from '../../stores/handlers/deepsearchSSETypes'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import {
   type DeepSearchRecordingHandle,
+  type SSEData,
   useDeepSearchRecordingBridge,
   useRecordingStore,
 } from '../../modules/recording';
@@ -808,10 +809,11 @@ const AppsPage: React.FC = () => {
    * 将改写请求和结果集成到对话流中
   */
   const handleReportRewrite = async (params: ReportRewriteParams) => {
-    const { action, rewrite_scope, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
+    const { action, rewrite_scope, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError, silent } = params
 
     const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
     const rewriteSessionUnavailableMessage = '报告对应的改写会话已超时，请重新提问后再尝试改写。'
+    const isSyncAction = action === 'sync'
 
     if (config.userFeedbackProcessorEnable === false) {
       onStatusChange?.('error')
@@ -860,8 +862,10 @@ const AppsPage: React.FC = () => {
     }
     const { originalRemainingRewriteRounds, originalMaxRewriteRounds } = getOriginalRewriteRoundContext()
 
-    const userMessageContent = buildRewriteUserMessage(action, selectedText, userInstruction)
-    addUserMessage(conversationId, userMessageContent)
+    if (!silent) {
+      const userMessageContent = buildRewriteUserMessage(action, selectedText, userInstruction)
+      addUserMessage(conversationId, userMessageContent)
+    }
 
     type RewriteRequestContext = {
       messagePayload: {
@@ -1010,6 +1014,9 @@ const AppsPage: React.FC = () => {
         config.userFeedbackProcessorMaxInteractions,
         originalRemainingRewriteRounds
       )
+      const remainingRewriteRounds = isSyncAction
+        ? originalRemainingRewriteRounds ?? maxInteractions
+        : newRemaining
 
       conversationStore.updateMessage(
         message.messageItemsId,
@@ -1021,14 +1028,39 @@ const AppsPage: React.FC = () => {
         message.messageItemsId,
         {
           status: TaskStatus.COMPLETED,
-          remainingRewriteRounds: newRemaining,
+          remainingRewriteRounds,
           maxRewriteRounds: originalMaxRewriteRounds ?? maxInteractions
         }
       )
     }
+    const updateCurrentRewriteReportMessage = (reportContent: ReturnType<typeof buildRewriteReportContent>) => {
+      if (!currentSelectedResultMessageId) {
+        return false
+      }
+
+      const currentMessage = conversationStore.messagesMap.get(currentSelectedResultMessageId)
+      if (!currentMessage?.messageItemsId) {
+        return false
+      }
+
+      conversationStore.updateMessage(
+        currentMessage.messageItemsId,
+        currentSelectedResultMessageId,
+        {
+          content: JSON.stringify(reportContent),
+          status: TaskStatus.COMPLETED,
+          isStreaming: false,
+        }
+      )
+      return true
+    }
     const applyRewriteFinalResult = (finalResult: RewriteFinalResult, state: Pick<RewriteRuntimeState, 'finalResultMessageId'>) => {
       onSnapshot?.({ response_content: finalResult.response_content })
       const reportContent = buildRewriteReportContent(finalResult)
+
+      if (isSyncAction && updateCurrentRewriteReportMessage(reportContent)) {
+        return
+      }
 
       if (!state.finalResultMessageId) {
         const newMessage = createRewriteReportMessage(reportContent)
@@ -1054,8 +1086,8 @@ const AppsPage: React.FC = () => {
 
         onDelta?.({
           rewritten_text: content.rewritten_text,
-          original_start_offset: content.original_start_offset,
-          original_end_offset: content.original_end_offset,
+          original_start_offset: content.original_start_offset ?? 0,
+          original_end_offset: content.original_end_offset ?? content.rewritten_text.length,
         })
       }
 
@@ -1226,7 +1258,7 @@ const AppsPage: React.FC = () => {
         consumeEvents: createRewriteEventConsumer(
           createRewriteState(),
           { stop, logError: true },
-          (data) => rewriteRecording?.record(data)
+          (data) => rewriteRecording?.record(data as SSEData)
         ),
       }
     }
@@ -1268,7 +1300,7 @@ const AppsPage: React.FC = () => {
       decoder: TextDecoder,
       currentBuffer: string,
       consumeEvents: RewriteEventConsumer
-    ): RewriteChunkConsumeResult => {
+    ): Promise<RewriteChunkConsumeResult> => {
       const parsedChunk = parseRewriteChunkEvents(chunk, decoder, currentBuffer)
       const handled = await runRewriteEventSequence(parsedChunk.events, consumeEvents)
 
