@@ -532,8 +532,10 @@ async def delete_longterm_memory(
 @execution_router.post("/memory/delete_longterm_mem_by_scope", response_model=ResponseModel[dict])
 async def delete_longterm_mem_by_scope(
     request: dict,
+    current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = DeleteScopeLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await delete_longterm_mem_by_scope_id(req)
         return ResponseModel(
