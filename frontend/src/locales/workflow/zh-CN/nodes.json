@@ -537,7 +537,9 @@
   },
   "pluginSelector": {
     "selectPluginTools": "选择插件工具",
+    "selectPlugins": "选择插件",
     "supportMultipleSelection": "支持同时选择多个插件中的多个工具",
+    "supportPluginSelection": "仅按插件选择，选中后自动包含该插件下全部工具",
     "searchPlaceholder": "搜索插件名称",
     "noSearchResults": "未找到匹配的插件",
     "noAvailablePlugins": "暂无可用插件",
@@ -548,8 +550,13 @@
     "draft": "草稿",
     "selectVersion": "请选择插件版本",
     "toolList": "工具列表",
+    "pluginIncluded": "插件包含工具",
     "loadingTools": "正在加载工具列表...",
     "noTools": "暂无工具",
+    "selectPlugin": "选择插件",
+    "selectedPlugin": "已选插件",
+    "selectedToolCount": "已选 {{count}} 个工具",
+    "selectedPluginCount": "已选 {{count}} 个插件",
     "cancel": "取消",
     "confirm": "确认选择"
   },

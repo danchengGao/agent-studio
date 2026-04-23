@@ -232,17 +232,7 @@ class PluginMcpTool(Tool):
         return cls(card=card, conf=conf)
 
     def _build_auth_headers(self, inputs: Input) -> Dict[str, str]:
-        """Collect header-typed parameters from card.input_params and merge with conf.headers.
-
-        card.input_params is the JSON-Schema dict produced by convert_params_to_json_schema().
-        Each property carries a "location" key (== param.method).  Properties whose location
-        is "header" contribute an auth/custom header entry; their value is taken from the
-        runtime inputs first, falling back to the stored default.
-
-        The result is then merged on top of conf.headers so that explicitly configured
-        headers (e.g. set during plugin creation) are always present.
-        """
-        # Start from the headers already stored on the tool config.
+        """Collect tool-level headers and let runtime header inputs override them."""
         merged: Dict[str, str] = dict(self.conf.headers or {})
 
         properties: Dict[str, Any] = (self.card.input_params or {}).get("properties", {})
@@ -251,7 +241,6 @@ class PluginMcpTool(Tool):
                 continue
             if prop.get("location") != "header":
                 continue
-            # Prefer the runtime value supplied by the caller; fall back to the stored default.
             value = str((inputs or {}).get(name) or prop.get("default") or "").strip()
             if value:
                 merged[name] = value

@@ -5,6 +5,10 @@ interface MCPPluginForm {
   description: string
   desc_mk?: string
   url: string
+  transport: number
+  command: string
+  argsText: string
+  envText: string
 }
 
 interface Plugin {
@@ -42,9 +46,13 @@ export const useMCPPluginForm = (initialPlugin?: Plugin | null) => {
     description: initialPlugin?.description || '',
     desc_mk: '',
     url: initialPlugin?.config?.url || '',
+    transport: 2,
+    command: '',
+    argsText: '',
+    envText: '',
   })
 
-  const handleFormChange = (field: keyof MCPPluginForm, value: string) => {
+  const handleFormChange = (field: keyof MCPPluginForm, value: string | number) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
@@ -54,6 +62,10 @@ export const useMCPPluginForm = (initialPlugin?: Plugin | null) => {
       description: plugin?.description || '',
       desc_mk: '',
       url: plugin?.config?.url || '',
+      transport: 2,
+      command: '',
+      argsText: '',
+      envText: '',
     })
   }
 

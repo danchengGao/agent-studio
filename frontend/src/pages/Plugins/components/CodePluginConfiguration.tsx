@@ -110,6 +110,28 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
   toolsQuery,
   isReadOnly = false,
 }) => {
+  const renderPluginIcon = (icon: string) => {
+    const isUrl = typeof icon === 'string' && /^(https?:\/\/|\/)/.test(icon)
+    if (isUrl) {
+      return (
+        <>
+          <img
+            src={icon}
+            alt="Plugin icon"
+            className="w-full h-full object-cover rounded-lg"
+            onError={e => {
+              const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+              e.currentTarget.style.display = 'none'
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+          <div className="w-full h-full items-center justify-center text-2xl hidden">📦</div>
+        </>
+      )
+    }
+    return icon
+  }
+
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
@@ -231,8 +253,6 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
         language: codePluginToolForm.codeLanguage,
         code: codePluginToolForm.code,
       }
-
-      console.log('Creating code plugin tool with API:', createRequest)
 
       // Call the API
       const response = await createCodeToolApi.mutateAsync(createRequest)
@@ -381,7 +401,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl bg-gray-100 flex-shrink-0">{plugin.icon}</div>
+            <div className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl bg-gray-100 flex-shrink-0 overflow-hidden">{renderPluginIcon(configForm.icon_uri || plugin.config?.icon_uri || plugin.icon)}</div>
             <div className="min-w-0 flex-1">
               {isEditingName ? (
                 <div className="flex items-center space-x-2">
@@ -534,7 +554,7 @@ const CodePluginConfiguration: React.FC<CodePluginConfigurationProps> = ({
                         {/* Current selection display */}
                         <div className="mt-4 text-center">
                           <Typography variant="body2" className="text-gray-500">
-                            {t('plugins.pluginConfig.currentSelection')}: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
+                            {t('plugins.pluginConfig.currentSelection')}: <span className="text-2xl ml-2">{(/^(https?:\/\/|\/)/.test(configForm.icon_uri || '') ? '🖼️' : (configForm.icon_uri || '☁️'))}</span>
                           </Typography>
                         </div>
                       </>

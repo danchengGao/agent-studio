@@ -8,6 +8,7 @@ interface CloudPluginForm {
   description: string
   desc_mk?: string
   url: string
+  header_configuration?: Array<{ name: string; value: string; description?: string }>
 }
 
 interface Plugin {
@@ -46,6 +47,9 @@ interface CloudPluginFormDialogProps {
   form: CloudPluginForm
   editingPlugin: Plugin | null
   onFormChange: (_field: string, _value: unknown) => void
+  onHeaderChange?: (_index: number, _field: string, _value: string) => void
+  onAddHeader?: () => void
+  onRemoveHeader?: (_index: number) => void
   onSubmit: (_isEditing: boolean) => void
   onCancel: () => void
 }
@@ -57,6 +61,9 @@ const CloudPluginFormDialog: React.FC<CloudPluginFormDialogProps> = ({
   form,
   _editingPlugin,
   onFormChange,
+  onHeaderChange,
+  onAddHeader,
+  onRemoveHeader,
   onSubmit,
   onCancel,
 }) => {
@@ -159,6 +166,25 @@ const CloudPluginFormDialog: React.FC<CloudPluginFormDialogProps> = ({
               error={Boolean(form.url && (!isUrlValid || !isUrlLengthValid))}
             />
           </div>
+
+          {onHeaderChange && onAddHeader && onRemoveHeader && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">Headers</label>
+                <Button size="small" onClick={onAddHeader}>{t('common.buttons.add')}</Button>
+              </div>
+              {(form.header_configuration || []).map((header, index) => (
+                <div key={`${header.name}-${index}`} className="grid grid-cols-12 gap-2 items-start">
+                  <TextField className="col-span-4" label={t('plugins.dialog.pluginDetails.headerName')} value={header.name} onChange={e => onHeaderChange(index, 'name', e.target.value)} />
+                  <TextField className="col-span-3" label={t('plugins.dialog.pluginDetails.defaultValue')} value={header.value} onChange={e => onHeaderChange(index, 'value', e.target.value)} />
+                  <TextField className="col-span-4" label={t('plugins.description')} value={header.description || ''} onChange={e => onHeaderChange(index, 'description', e.target.value)} />
+                  <div className="col-span-1 flex justify-end pt-2">
+                    <Button color="error" onClick={() => onRemoveHeader(index)}>{t('common.buttons.delete')}</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </DialogContent>
       <DialogActions>

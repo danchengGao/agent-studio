@@ -538,7 +538,9 @@
   },
   "pluginSelector": {
     "selectPluginTools": "Select Plugin Tools",
+    "selectPlugins": "Select Plugins",
     "supportMultipleSelection": "Support selecting multiple tools from multiple plugins",
+    "supportPluginSelection": "Plugin-level selection only; selecting a plugin includes all its tools",
     "searchPlaceholder": "Search plugin name",
     "noSearchResults": "No matching plugins found",
     "noAvailablePlugins": "No available plugins",
@@ -549,8 +551,13 @@
     "draft": "Draft",
     "selectVersion": "Please select plugin version",
     "toolList": "Tool list",
+    "pluginIncluded": "Included tools",
     "loadingTools": "Loading tool list...",
     "noTools": "No tools available",
+    "selectPlugin": "Select plugin",
+    "selectedPlugin": "Plugin selected",
+    "selectedToolCount": "{{count}} tool(s) selected",
+    "selectedPluginCount": "{{count}} plugin(s) selected",
     "cancel": "Cancel",
     "confirm": "Confirm"
   },

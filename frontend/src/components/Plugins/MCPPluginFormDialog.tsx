@@ -10,6 +10,9 @@ interface MCPPluginForm {
   desc_mk?: string
   url: string
   transport: number
+  command: string
+  argsText: string
+  envText: string
 }
 
 export const MCP_TRANSPORT_OPTIONS = [
@@ -99,11 +102,20 @@ const MCPPluginFormDialog: React.FC<MCPPluginFormDialogProps> = ({
   const isUrlValid = form.url ? isValidUrl(form.url) : true
 
   // Determine validity of the url/path field based on transport
+  const isStdio = transportNum === 1
+  const envLines = (form.envText || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+  const hasInvalidEnvLine = envLines.some(line => !line.includes('=') || line.startsWith('='))
+
   const isUrlFieldValid = isFilePath
     ? (form.url ? isFilePathValid(form.url) : true)
     : isUrlValid && isUrlLengthValid
 
-  const isFormValid = form.name.trim() && form.description.trim() && form.url.trim() && isUrlFieldValid
+  const isFormValid = Boolean(
+    form.name.trim() &&
+    form.description.trim() &&
+    (isStdio ? form.command.trim() : form.url.trim()) &&
+    (isStdio ? !hasInvalidEnvLine : isUrlFieldValid),
+  )
 
   // Compute label, placeholder and helper text based on transport
   const urlFieldLabel = isFilePath
@@ -142,7 +154,16 @@ const MCPPluginFormDialog: React.FC<MCPPluginFormDialogProps> = ({
       </DialogTitle>
 
       <DialogContent>
-        <div className="space-y-6">
+        <form
+          className="space-y-6"
+          onSubmit={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (isFormValid && !loading) {
+              onSubmit(isEditing)
+            }
+          }}
+        >
           {/* Plugin Name */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 flex items-center">
@@ -213,47 +234,95 @@ const MCPPluginFormDialog: React.FC<MCPPluginFormDialogProps> = ({
             </TextField>
           </div>
 
-          {/* MCP Server URL / OpenAPI file / StdIO path — label and validation depend on transport */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 flex items-center">
-              {urlFieldLabel} <span className="text-red-500 ml-1">*</span>
-            </label>
-            <TextField
-              value={form.url}
-              onChange={e => onFormChange('url', e.target.value)}
-              fullWidth
-              required
-              placeholder={urlFieldPlaceholder}
-              helperText={urlFieldHelperText}
-              error={urlFieldError}
-            />
-          </div>
-        </div>
-      </DialogContent>
-
-      <DialogActions className="px-6 pb-4">
-        <Button onClick={onCancel} variant="outlined" disabled={loading}>
-          {t('common.buttons.cancel')}
-        </Button>
-        <Button
-          onClick={() => onSubmit(isEditing)}
-          variant="contained"
-          color="primary"
-          disabled={!isFormValid || loading}
-          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-        >
-          {loading ? (
+          {isStdio ? (
             <>
-              <CircularProgress size={16} className="mr-2" />
-              {t('plugins.dialog.cloudPluginForm.saving')}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center">
+                  Command <span className="text-red-500 ml-1">*</span>
+                </label>
+                <TextField
+                  value={form.command}
+                  onChange={e => onFormChange('command', e.target.value)}
+                  fullWidth
+                  required
+                  placeholder="例如: D:/nodejs/npx.cmd"
+                  helperText="填写可执行命令或脚本路径"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center">Args</label>
+                <TextField
+                  value={form.argsText}
+                  onChange={e => onFormChange('argsText', e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={4}
+                  placeholder={"每行一个参数\n例如:\n-y\n@modelcontextprotocol/server-filesystem\nC:/Users/qq567/Desktop/codes/agent_studio_tool"}
+                  helperText="每行一个参数，提交时会转成 string[]"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center">Environment Variables</label>
+                <TextField
+                  value={form.envText}
+                  onChange={e => onFormChange('envText', e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={4}
+                  placeholder={"每行一个 KEY=VALUE\n例如:\nNODE_ENV=development\nDEBUG=true"}
+                  helperText={hasInvalidEnvLine ? '环境变量格式必须为 KEY=VALUE' : '每行一个 KEY=VALUE，提交时会转成对象'}
+                  error={hasInvalidEnvLine}
+                />
+              </div>
             </>
-          ) : isEditing ? (
-            t('plugins.dialog.cloudPluginForm.saveChanges')
           ) : (
-            t('plugins.dialog.cloudPluginForm.create')
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                {urlFieldLabel} <span className="text-red-500 ml-1">*</span>
+              </label>
+              <TextField
+                value={form.url}
+                onChange={e => onFormChange('url', e.target.value)}
+                fullWidth
+                required
+                placeholder={urlFieldPlaceholder}
+                helperText={urlFieldHelperText}
+                error={urlFieldError}
+              />
+            </div>
           )}
-        </Button>
-      </DialogActions>
+          <DialogActions className="px-6 pb-4">
+            <Button onClick={onCancel} variant="outlined" disabled={loading}>
+              {t('common.buttons.cancel')}
+            </Button>
+            <Button
+              type="button"
+              onClick={e => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (isFormValid && !loading) {
+                  onSubmit(isEditing)
+                }
+              }}
+              variant="contained"
+              color="primary"
+              disabled={!isFormValid || loading}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+            >
+              {loading ? (
+                <>
+                  <CircularProgress size={16} className="mr-2" />
+                  {t('plugins.dialog.cloudPluginForm.saving')}
+                </>
+              ) : isEditing ? (
+                t('plugins.dialog.cloudPluginForm.saveChanges')
+              ) : (
+                t('plugins.dialog.cloudPluginForm.create')
+              )}
+            </Button>
+          </DialogActions>
+        </form>
+      </DialogContent>
     </Dialog>
   )
 }

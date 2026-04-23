@@ -173,7 +173,7 @@ export const TestDebugPanel: FC<TestDebugPanelProps> = ({ nodeData, workflowId, 
           result
             ? {
                 inputs: result.inputs,
-                outputs: result.output,
+                outputs: result.outputs,
               }
             : undefined
         }

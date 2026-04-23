@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PluginService } from '@test-agentstudio/api-client'
+import { resolvePluginIconUrl, getExternalPluginTypeDisplayName, getExternalPluginTypeMeta } from '../../utils/pluginConfig'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
 import { useCloudPluginForm } from '../../hooks/useCloudPluginForm'
@@ -39,9 +40,26 @@ interface Plugin {
     retryCount?: number
     url?: string
     authMethod?: string
+    icon_uri?: string
   }
   permissions: string[]
   size: string
+}
+
+const getPluginIconFallback = (pluginType?: number, externalPluginType?: string) => {
+  const meta = getExternalPluginTypeMeta(externalPluginType)
+  if (meta) return meta.icon
+
+  switch (pluginType) {
+    case 1:
+      return '☁️'
+    case 2:
+      return '💻'
+    case 3:
+      return '🔌'
+    default:
+      return '📦'
+  }
 }
 
 const PluginConfigurationPage: React.FC = () => {
@@ -60,7 +78,11 @@ const PluginConfigurationPage: React.FC = () => {
     icon_uri: '',
     url: '',
     authMethod: 'none',
+    command: '',
+    args: [] as string[],
+    env: {} as Record<string, string>,
     request_params: [] as any[],
+    header_configuration: [] as Array<{ name: string; value: string; description: string }>,
   })
 
   // Icon options for selection - diversified without similar types
@@ -226,37 +248,111 @@ const PluginConfigurationPage: React.FC = () => {
         space_id: getDefaultSpaceId(),
       }
 
-      const response = await PluginService.getPlugin(request)
+      const pluginResponse = await PluginService.getPlugin(request)
 
-      if (response.code === 200) {
-        setPluginConfigData(response.data.plugin_info)
+      const pluginInfo = pluginResponse.code === 200 ? pluginResponse.data.plugin_info : null
+      const isMcpPlugin = Number(pluginInfo?.plugin_type || 0) === 3
+      const toolsResponse = isMcpPlugin
+        ? await PluginService.getPluginMcpToolsList({
+            space_id: getDefaultSpaceId(),
+            plugin_id: plugin_id,
+            page: 1,
+            size: 100,
+          })
+        : await PluginService.getPluginApiList({
+            space_id: getDefaultSpaceId(),
+            plugin_id: plugin_id,
+            page: 1,
+            size: 100,
+          })
+
+      if (pluginResponse.code === 200 && pluginInfo) {
+        const apiInfo = isMcpPlugin
+          ? toolsResponse.code === 200
+            ? toolsResponse.data?.mcp_info || []
+            : []
+          : toolsResponse.code === 200
+            ? toolsResponse.data?.api_info || []
+            : []
+        const enrichedPluginInfo = {
+          ...pluginInfo,
+          api_info: apiInfo,
+        }
+        setPluginConfigData(enrichedPluginInfo)
+
+        const resolvedCategory = (() => {
+          const mapped = getExternalPluginTypeDisplayName(pluginInfo.external_plugin_type, pluginInfo.category_name)
+          if (mapped) return mapped
+          switch (pluginInfo.plugin_type) {
+            case 1: return t('plugins.types.cloud')
+            case 2: return t('plugins.types.ide')
+            case 3: return t('plugins.types.mcp')
+            default: return t('plugins.types.pluginTypeUnknown', { type: pluginInfo.plugin_type })
+          }
+        })()
+
+        const pluginLevelParams = Array.isArray(pluginInfo.request_params) ? pluginInfo.request_params : []
+        const pluginHeaderParams = pluginLevelParams.filter((param: any) => Number(param?.method) === 1)
+        const pluginNonHeaderParams = pluginLevelParams.filter((param: any) => Number(param?.method) !== 1)
+        const fallbackParams = apiInfo.flatMap((tool: any) => Array.isArray(tool.request_params) ? tool.request_params : [])
+        const dbRequestParams = pluginLevelParams.filter((param: any) => Number(param?.method) !== 1)
+        const dedupedFallbackParams = fallbackParams.filter((param: any) => {
+          const paramName = String(param?.name || '')
+          return paramName && !dbRequestParams.some((dbParam: any) => String(dbParam?.name || '') === paramName)
+        })
+        const derivedPluginParams = [...dbRequestParams, ...dedupedFallbackParams]
+        const rawHeaderConfiguration =
+          pluginHeaderParams.length > 0
+            ? null
+            : (pluginInfo as any)?.header_configuration || null
+        const derivedHeaderConfiguration = pluginHeaderParams.length > 0
+          ? Array.from(new Map(
+              pluginHeaderParams.map((param: any) => {
+                const header = {
+                  name: String(param?.name || ''),
+                  value: String(param?.value || ''),
+                  description: String(param?.desc || ''),
+                }
+                return [header.name.toLowerCase(), header] as const
+              }).filter(([, param]) => param.name),
+            ).values())
+          : Object.entries(rawHeaderConfiguration || {}).map(([name, config]: [string, any]) => ({
+              name: String(name || ''),
+              value: String(config?.value || ''),
+              description: String(config?.description || ''),
+            })).filter((param: any) => param.name)
+        const resolvedIcon =
+          resolvePluginIconUrl(pluginInfo.icon_uri) ||
+          getPluginIconFallback(pluginInfo.plugin_type, pluginInfo.external_plugin_type)
 
         // Initialize configuration form state
+        const resolvedDetailMarkdown =
+          String(pluginInfo.desc_mk || '').trim() ||
+          String((pluginInfo as any).detail_desc || '').trim() ||
+          String(pluginInfo.desc || '').trim()
+
         setConfigForm({
-          name: response.data.plugin_info.name || '',
-          desc: response.data.plugin_info.desc || '',
-          desc_mk: response.data.plugin_info.desc_mk || '',
-          icon_uri: response.data.plugin_info.icon_uri || '☁️',
-          url: response.data.plugin_info.url || '',
+          name: pluginInfo.name || '',
+          desc: pluginInfo.desc || '',
+          desc_mk: resolvedDetailMarkdown,
+          icon_uri: resolvedIcon,
+          url: pluginInfo.url || '',
           authMethod: 'none',
-          request_params: response.data.plugin_info.request_params || [],
+          command: pluginInfo.command || '',
+          args: Array.isArray(pluginInfo.args) ? pluginInfo.args : [],
+          env: pluginInfo.env && typeof pluginInfo.env === 'object' ? pluginInfo.env : {},
+          request_params: derivedPluginParams,
+          header_configuration: derivedHeaderConfiguration,
         })
 
         // Create plugin object from the response data
         const pluginData: Plugin = {
           id: plugin_id,
           plugin_id: plugin_id,
-          name: response.data.plugin_info.name || '',
-          description: response.data.plugin_info.desc || '',
-          icon: response.data.plugin_info.icon_uri || '⚙️',
-          category: (() => {
-            switch (response.data.plugin_info.plugin_type) {
-              case 1: return t('plugins.types.cloud')
-              case 2: return t('plugins.types.ide')
-              case 3: return t('plugins.types.mcp')
-              default: return t('plugins.types.pluginTypeUnknown', { type: response.data.plugin_info.plugin_type })
-            }
-          })(),
+          name: pluginInfo.name || '',
+          description: pluginInfo.desc || '',
+          icon: resolvedIcon,
+          category: resolvedCategory,
           status: 'active',
           version: 'v1.0.0',
           author: t('plugins.dialog.pluginDetails.author'),
@@ -265,19 +361,28 @@ const PluginConfigurationPage: React.FC = () => {
           usageCount: 0,
           rating: 5.0,
           downloadCount: 1,
-          tags: [t('plugins.types.cloud'), t('plugins.types.ide'), 'API'],
+          tags: [resolvedCategory],
           dependencies: [],
-          config: {
-            url: response.data.plugin_info.url || '',
-            authMethod: 'none',
-          },
-          permissions: ['network'],
+          permissions: pluginInfo.external_plugin_type === 'skill' ? ['skill'] : ['network'],
           size: '0.5MB',
+          config: {
+            url: pluginInfo.url || '',
+            authMethod: 'none',
+            icon_uri: resolvedIcon,
+          },
         }
 
         setPlugin(pluginData)
+        resetForm(pluginData, {
+          name: pluginInfo.name || '',
+          description: pluginInfo.desc || '',
+          desc_mk: resolvedDetailMarkdown,
+          url: pluginInfo.url || '',
+          authMethod: 'none',
+          header_configuration: derivedHeaderConfiguration,
+        })
       } else {
-        showError(`${t('plugins.pluginConfig.pluginConfigLoadFailed')}: ${response.message}`)
+        showError(`${t('plugins.pluginConfig.pluginConfigLoadFailed')}: ${pluginResponse.message || t('plugins.messages.unknownError')}`)
       }
     } catch (error) {
       console.error(t('plugins.pluginConfig.pluginConfigLoadFailed') + ':', error)
@@ -315,6 +420,19 @@ const PluginConfigurationPage: React.FC = () => {
     }
 
     try {
+      const persistedHeaderConfiguration =
+        (pluginConfigData as any)?.header_configuration ||
+        null
+
+      const normalizedHeaderConfiguration =
+        (configForm.header_configuration && configForm.header_configuration.length > 0)
+          ? configForm.header_configuration
+          : Object.entries(persistedHeaderConfiguration || {}).map(([name, config]: [string, any]) => ({
+              name: String(name || ''),
+              value: String(config?.value || ''),
+              description: String(config?.description || ''),
+            })).filter((header: any) => header.name)
+
       const updateRequest = {
         space_id: getDefaultSpaceId(),
         plugin_id,
@@ -327,9 +445,20 @@ const PluginConfigurationPage: React.FC = () => {
         url: configForm.url,
         icon_uri: configForm.icon_uri,
         request_params: pluginConfigData.plugin_type === 2 ? [] : configForm.request_params,
+        header_configuration: normalizedHeaderConfiguration,
+        mcp_transport: pluginConfigData.plugin_type === 3 ? Number((pluginConfigData as any).mcp_transport || 0) : undefined,
+        command: pluginConfigData.plugin_type === 3 ? configForm.command : undefined,
+        args: pluginConfigData.plugin_type === 3 ? configForm.args : undefined,
+        env: pluginConfigData.plugin_type === 3 ? configForm.env : undefined,
+        external_plugin_type: (pluginConfigData as any).external_plugin_type,
+        original_market_plugin_id: (pluginConfigData as any).original_market_plugin_id,
+        market_source: (pluginConfigData as any).market_source,
+        category: (pluginConfigData as any).category,
+        category_name: (pluginConfigData as any).category_name,
+        tags: (pluginConfigData as any).tags,
+        author: (pluginConfigData as any).author,
+        detail_desc: (pluginConfigData as any).detail_desc,
       }
-
-      console.log('Updating plugin configuration:', updateRequest)
 
       // Call the API
       const response = await updatePluginApi.mutateAsync(updateRequest)
@@ -345,6 +474,10 @@ const PluginConfigurationPage: React.FC = () => {
           desc_mk: configForm.desc_mk,
           url: configForm.url,
           icon_uri: configForm.icon_uri,
+          command: configForm.command,
+          args: configForm.args,
+          env: configForm.env,
+          header_configuration: normalizedHeaderConfiguration,
         }))
 
         // Update plugin display
@@ -396,9 +529,6 @@ const PluginConfigurationPage: React.FC = () => {
 
       // Update plugin state
       setPlugin(updatedPlugin)
-
-      // Here you would typically send the data to your backend API
-      console.log('Updating plugin:', updatedPlugin)
       showSuccess(t('plugins.pluginVersion.updateSuccess', { name: updatedPlugin.name }))
       setIsEditDialogOpen(false)
       setEditingPlugin(null)
@@ -422,8 +552,6 @@ const PluginConfigurationPage: React.FC = () => {
         version_desc: versionDesc,
         force: false,
       }
-
-      console.log('Publishing plugin:', publishRequest)
 
       const response = await publishPluginApi.mutateAsync(publishRequest)
 
@@ -554,12 +682,9 @@ const PluginConfigurationPage: React.FC = () => {
       <CloudPluginFormDialog
         open={isEditDialogOpen}
         isEditing={true}
-        form={cloudPluginForm}
+        form={{ ...cloudPluginForm, header_configuration: [] }}
         editingPlugin={editingPlugin}
         onFormChange={handleCloudPluginFormChange}
-        onHeaderChange={handleHeaderChange}
-        onAddHeader={addHeaderRow}
-        onRemoveHeader={removeHeaderRow}
         onSubmit={handlePluginSubmit}
         onCancel={() => {
           setIsEditDialogOpen(false)

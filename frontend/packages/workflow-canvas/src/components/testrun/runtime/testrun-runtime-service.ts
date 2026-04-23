@@ -177,7 +177,7 @@ export class TestRunRuntimeService implements ITestRunRuntimeService {
 
       if (result.code === 200) {
         const timeCost = Date.now() - startTime
-        nodeReport.outputs = result.data.output
+        nodeReport.outputs = result.data?.payload?.output ?? result.data?.output?.result ?? result.data?.output ?? result.data
         nodeReport.timeCost = Math.max(0, timeCost)
         this.reportEmitter.fire(nodeReport)
       }

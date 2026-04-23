@@ -16,7 +16,7 @@ export const Card: React.FC<CardProps> = ({ children, className, onClick }) => {
   return (
     <CardContext.Provider value={{ onClick }}>
       <div
-        className={`group bg-white rounded-[8px] shadow-card-hover cursor-pointer flex flex-col ${className || ''}`}
+        className={`group bg-white rounded-[8px] shadow-card-hover cursor-pointer flex flex-col min-h-0 ${className || ''}`}
         onClick={onClick}
       >
         {children}
@@ -47,8 +47,8 @@ interface CardHeaderIconProps {
 
 export const CardHeaderIcon: React.FC<CardHeaderIconProps> = ({ children, bgColor, textColor, className }) => {
   return (
-    <div className={`w-12 flex-shrink-0 ${bgColor || ''} rounded-lg flex items-center justify-center ${className || ''}`}>
-      <span className={textColor || ''}>{children}</span>
+    <div className={`w-12 h-12 flex-shrink-0 ${bgColor || ''} rounded-lg flex items-center justify-center ${className || ''}`}>
+      <div className={`w-full h-full overflow-hidden rounded-lg flex items-center justify-center ${textColor || ''}`}>{children}</div>
     </div>
   )
 }

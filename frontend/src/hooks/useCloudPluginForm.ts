@@ -3,8 +3,10 @@ import { useState } from 'react'
 interface CloudPluginForm {
   name: string
   description: string
+  desc_mk?: string
   url: string
   authMethod: string
+  header_configuration: Array<{ name: string; value: string; description?: string }>
 }
 
 interface Plugin {
@@ -36,25 +38,61 @@ interface Plugin {
   size: string
 }
 
+interface CloudPluginFormValues {
+  name?: string
+  description?: string
+  desc_mk?: string
+  url?: string
+  authMethod?: string
+  header_configuration?: Array<{ name: string; value: string; description?: string }>
+}
+
 export const useCloudPluginForm = (initialPlugin?: Plugin | null) => {
   const [form, setForm] = useState<CloudPluginForm>({
     name: initialPlugin?.name || '',
     description: initialPlugin?.description || '',
+    desc_mk: '',
     url: initialPlugin?.config?.url || '',
     authMethod: initialPlugin?.config?.authMethod || 'none',
+    header_configuration: [],
   })
 
   const handleFormChange = (field: keyof CloudPluginForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  const resetForm = (plugin?: Plugin | null) => {
+  const resetForm = (plugin?: Plugin | null, values?: CloudPluginFormValues) => {
     setForm({
-      name: plugin?.name || '',
-      description: plugin?.description || '',
-      url: plugin?.config?.url || '',
-      authMethod: plugin?.config?.authMethod || 'none',
+      name: values?.name ?? plugin?.name ?? '',
+      description: values?.description ?? plugin?.description ?? '',
+      desc_mk: values?.desc_mk ?? '',
+      url: values?.url ?? plugin?.config?.url ?? '',
+      authMethod: values?.authMethod ?? plugin?.config?.authMethod ?? 'none',
+      header_configuration: values?.header_configuration ?? [],
     })
+  }
+
+  const handleHeaderChange = (index: number, field: string, value: string) => {
+    setForm(prev => ({
+      ...prev,
+      header_configuration: prev.header_configuration.map((header, currentIndex) =>
+        currentIndex === index ? { ...header, [field]: value } : header,
+      ),
+    }))
+  }
+
+  const addHeaderRow = () => {
+    setForm(prev => ({
+      ...prev,
+      header_configuration: [...prev.header_configuration, { name: '', value: '', description: '' }],
+    }))
+  }
+
+  const removeHeaderRow = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      header_configuration: prev.header_configuration.filter((_, currentIndex) => currentIndex !== index),
+    }))
   }
 
   const validateForm = () => {
@@ -82,6 +120,9 @@ export const useCloudPluginForm = (initialPlugin?: Plugin | null) => {
   return {
     form,
     handleFormChange,
+    handleHeaderChange,
+    addHeaderRow,
+    removeHeaderRow,
     resetForm,
     validateForm,
   }

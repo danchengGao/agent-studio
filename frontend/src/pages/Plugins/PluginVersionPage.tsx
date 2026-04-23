@@ -180,12 +180,19 @@ const PluginVersionPage: React.FC = () => {
       const versionData = versionDataResponse.data
       setPluginConfigData(versionData.plugin_info)
 
+      const resolvedIcon = versionData.plugin_info.icon_uri || (versionData.plugin_info.plugin_type === 3 ? '🔌' : '☁️')
+      const resolvedCategory = versionData.plugin_info.plugin_type === 1
+        ? t('plugins.types.cloud')
+        : versionData.plugin_info.plugin_type === 3
+          ? t('plugins.types.mcp')
+          : t('plugins.types.ide')
+
       // Initialize configuration form state with version data
       setConfigForm({
         name: versionData.plugin_info.name || '',
         desc: versionData.plugin_info.desc || '',
         desc_mk: versionData.plugin_info.desc_mk || '',
-        icon_uri: versionData.plugin_info.icon_uri || '☁️',
+        icon_uri: resolvedIcon,
         url: versionData.plugin_info.url || '',
         authMethod: 'none',
         request_params: versionData.plugin_info.request_params || [],
@@ -197,8 +204,8 @@ const PluginVersionPage: React.FC = () => {
         plugin_id: plugin_id,
         name: versionData.plugin_info.name || '',
         description: versionData.plugin_info.desc || '',
-        icon: versionData.plugin_info.icon_uri || '⚙️',
-        category: versionData.plugin_info.plugin_type === 1 ? t('plugins.types.cloud') : t('plugins.types.ide'),
+        icon: resolvedIcon,
+        category: resolvedCategory,
         status: 'active',
         version: versionData.plugin_info.plugin_version || version,
         installDate: new Date().toISOString().split('T')[0],
@@ -245,8 +252,6 @@ const PluginVersionPage: React.FC = () => {
         url: configForm.url,
         icon_uri: configForm.icon_uri,
       }
-
-      console.log('Updating plugin version configuration:', updateRequest)
 
       // Call the API
       const response = await updatePluginApi.mutateAsync(updateRequest)
@@ -329,8 +334,6 @@ const PluginVersionPage: React.FC = () => {
         // Update plugin state
         setPlugin(updatedPlugin)
 
-        // Here you would typically send the data to your backend API
-        console.log('Updating plugin version:', updatedPlugin)
         showSuccess(t('plugins.pluginVersion.updateSuccess', { name: updatedPlugin.name }))
         setIsEditDialogOpen(false)
         setEditingPlugin(null)
@@ -372,8 +375,6 @@ const PluginVersionPage: React.FC = () => {
           version_desc: versionDesc,
           force: false,
         }
-
-        console.log('Publishing plugin version:', publishRequest)
 
         const response = await updatePluginApi.mutateAsync(publishRequest)
 

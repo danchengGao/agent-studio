@@ -87,6 +87,9 @@ interface URLPluginConfigurationProps {
     icon_uri: string
     url: string
     authMethod: string
+    command?: string
+    args?: string[]
+    env?: Record<string, string>
   }
   toolsLoading: boolean
   iconOptions: string[]
@@ -139,6 +142,27 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
   setIsPublishDialogOpen,
   isReadOnly = false,
 }) => {
+  const renderPluginIcon = (icon: string) => {
+    const isUrl = typeof icon === 'string' && /^(https?:\/\/|\/)/.test(icon)
+    if (isUrl) {
+      return (
+        <>
+          <img
+            src={icon}
+            alt="Plugin icon"
+            className="w-full h-full object-cover rounded-lg"
+            onError={e => {
+              const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+              e.currentTarget.style.display = 'none'
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+          <div className="w-full h-full items-center justify-center text-2xl hidden">📦</div>
+        </>
+      )
+    }
+    return icon
+  }
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
@@ -170,6 +194,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
 
   const pluginType = Number(pluginConfigData?.plugin_type)
   const isMcpPlugin = pluginType === 3
+  const isStdioMcpPlugin = isMcpPlugin && Number((pluginConfigData as any)?.mcp_transport) === 1
 
   // Wait until pluginConfigData is loaded so we know the type before firing any query
   const pluginTypeKnown = pluginConfigData !== null
@@ -367,8 +392,6 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         method: methodNumber,
       }
 
-      console.log('Creating tool with API:', createRequest)
-
       // Call the API
       const response = await createToolApi.mutateAsync(createRequest)
 
@@ -526,6 +549,27 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
     })
   }
 
+  const getHeaderConfigurationForUpdate = () => {
+    if (Array.isArray(configForm.header_configuration) && configForm.header_configuration.length > 0) {
+      return configForm.header_configuration
+    }
+
+    const persistedHeaderConfiguration = (pluginConfigData as any)?.header_configuration
+    if (!persistedHeaderConfiguration || typeof persistedHeaderConfiguration !== 'object') {
+      return undefined
+    }
+
+    const headers = Object.entries(persistedHeaderConfiguration)
+      .map(([name, config]: [string, any]) => ({
+        name: String(name || ''),
+        value: String(config?.value || ''),
+        description: String(config?.description || ''),
+      }))
+      .filter(header => header.name)
+
+    return headers.length > 0 ? headers : undefined
+  }
+
   const handleSaveParameter = async () => {
     if (!parameterForm.name.trim()) {
       showError(t('plugins.paramConfig.nameRequired'))
@@ -567,6 +611,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         url: configForm.url,
         icon_uri: configForm.icon_uri,
         request_params: updatedRequestParams,
+        header_configuration: getHeaderConfigurationForUpdate(),
       }
 
       const response = await updatePluginApi.mutateAsync(updateRequest)
@@ -607,6 +652,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         url: configForm.url,
         icon_uri: configForm.icon_uri,
         request_params: updatedRequestParams,
+        header_configuration: getHeaderConfigurationForUpdate(),
       }
 
       const response = await updatePluginApi.mutateAsync(updateRequest)
@@ -680,7 +726,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl bg-gray-100 flex-shrink-0">{plugin.icon}</div>
+            <div className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl bg-gray-100 flex-shrink-0 overflow-hidden">{renderPluginIcon(configForm.icon_uri || plugin.config?.icon_uri || plugin.icon)}</div>
             <div className="min-w-0 flex-1">
               {isEditingName ? (
                 <div className="flex items-center space-x-2">
@@ -771,6 +817,52 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
             {configTabValue === 'basic' && (
               <div className="space-y-6">
                 <div className="space-y-6">
+                  {isStdioMcpPlugin && (
+                    <div>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                        STDIO
+                      </Typography>
+                      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+                        <TextField
+                          label="Command"
+                          value={configForm.command || ''}
+                          onChange={e => setConfigForm((prev: any) => ({ ...prev, command: e.target.value }))}
+                          fullWidth
+                          disabled={isReadOnly}
+                        />
+                        <TextField
+                          label="Args"
+                          value={(configForm.args || []).join('\n')}
+                          onChange={e => setConfigForm((prev: any) => ({ ...prev, args: e.target.value.split(/\r?\n/).map(item => item.trim()).filter(Boolean) }))}
+                          fullWidth
+                          multiline
+                          rows={4}
+                          disabled={isReadOnly}
+                          helperText="每行一个参数"
+                        />
+                        <TextField
+                          label="Environment Variables"
+                          value={Object.entries(configForm.env || {}).map(([key, value]) => `${key}=${value}`).join('\n')}
+                          onChange={e => setConfigForm((prev: any) => ({
+                            ...prev,
+                            env: Object.fromEntries(
+                              e.target.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+                                const separatorIndex = line.indexOf('=')
+                                const key = line.slice(0, separatorIndex).trim()
+                                const value = line.slice(separatorIndex + 1)
+                                return [key, value]
+                              }).filter(([key]) => Boolean(key)),
+                            ),
+                          }))}
+                          fullWidth
+                          multiline
+                          rows={4}
+                          disabled={isReadOnly}
+                          helperText="每行一个 KEY=VALUE"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-bold text-gray-800 mb-3">
                       {t('plugins.pluginConfig.pluginDescription')} <span className="text-red-500">*</span>
@@ -842,7 +934,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                         {/* Current selection display */}
                         <div className="mt-4 text-center">
                           <Typography variant="body2" className="text-gray-500">
-                            {t('plugins.pluginConfig.currentSelection')}: <span className="text-2xl ml-2">{configForm.icon_uri || '☁️'}</span>
+                            {t('plugins.pluginConfig.currentSelection')}: <span className="text-2xl ml-2">{(/^(https?:\/\/|\/)/.test(configForm.icon_uri || '') ? '🖼️' : (configForm.icon_uri || '☁️'))}</span>
                           </Typography>
                         </div>
                       </>
@@ -885,6 +977,48 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                         }}
                       />
                     </div>
+                    {configForm.header_configuration && configForm.header_configuration.length > 0 && (
+                      <div>
+                        <Typography variant="subtitle2" className="mb-2">
+                          Headers
+                        </Typography>
+                        <div className="space-y-4">
+                          {configForm.header_configuration.map((header, index) => {
+                            const isFixedValueHeader = header.name.toLowerCase() === 'content-type'
+                            return (
+                              <div key={`${header.name}-${index}`} className="rounded-lg border border-gray-200 p-4 bg-gray-50/60">
+                                <div className="grid grid-cols-12 gap-3 items-start">
+                                  <TextField
+                                    className="col-span-4"
+                                    label={t('plugins.dialog.pluginDetails.headerName')}
+                                    value={header.name}
+                                    InputProps={{ readOnly: true }}
+                                    disabled
+                                  />
+                                  <TextField
+                                    className="col-span-8"
+                                    label={isFixedValueHeader ? '固定值' : 'Header 值'}
+                                    value={header.value}
+                                    onChange={e => {
+                                      const value = e.target.value
+                                      setConfigForm(prev => ({
+                                        ...prev,
+                                        header_configuration: prev.header_configuration.map((item, currentIndex) =>
+                                          currentIndex === index ? { ...item, value } : item,
+                                        ),
+                                      }))
+                                      handleHeaderChange(index, 'value', value)
+                                    }}
+                                    disabled={isReadOnly || isFixedValueHeader}
+                                    helperText={header.description || (isFixedValueHeader ? '系统固定请求头。' : '')}
+                                  />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -931,7 +1065,7 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                       {t('plugins.pluginConfig.loadFailed')}
                     </Typography>
                     {!isReadOnly && (
-                      <Button size="small" variant="outlined" onClick={() => urlToolsQuery.refetch()} className="mt-2">
+                      <Button size="small" variant="outlined" onClick={() => currentToolsQuery?.refetch()} className="mt-2">
                         {t('common.actions.retry')}
                       </Button>
                     )}

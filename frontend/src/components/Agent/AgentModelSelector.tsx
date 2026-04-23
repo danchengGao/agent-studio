@@ -671,6 +671,37 @@ const AgentModelSelector = (props: {
     }
   }
 
+  const getPluginToolEntries = useCallback((plugin: PluginObject): AgentPlugin[] => {
+    if (!plugin?.plugin_id || !Array.isArray(plugin.selectedTools) || plugin.selectedTools.length === 0) {
+      return []
+    }
+
+    return plugin.selectedTools.map(tool => ({
+      plugin_id: plugin.plugin_id,
+      plugin_name: plugin.name || undefined,
+      tool_id: tool.tool_id,
+      tool_name: tool.name || undefined,
+      plugin_version: plugin.selectedVersion || 'draft',
+    }))
+  }, [])
+
+  const getUniquePlugins = useCallback((plugins: AgentPlugin[]) => {
+    // The editor stores selections at tool granularity, but the sidebar should show one entry per plugin version.
+    const pluginMap = new Map<string, AgentPlugin>()
+    for (const plugin of plugins) {
+      if (!plugin?.plugin_id) {
+        continue
+      }
+      const key = `${plugin.plugin_id}:${plugin.plugin_version || 'draft'}`
+      if (!pluginMap.has(key)) {
+        pluginMap.set(key, plugin)
+      }
+    }
+    return Array.from(pluginMap.values())
+  }, [])
+
+  const pluginListItems = getUniquePlugins(pluginObjects)
+
   // 处理插件选择
   interface PluginObject {
     plugin_id: string
@@ -679,29 +710,14 @@ const AgentModelSelector = (props: {
     selectedTools?: PluginApiInfo[]
   }
   const handlePluginConfirm = (pluginObject: PluginObject[]) => {
-    const mapped: AgentPlugin[] = []
-    for (const p of pluginObject || []) {
-      if (!p?.plugin_id || !Array.isArray(p.selectedTools) || p.selectedTools.length === 0) {
-        continue
-      }
-
-      // 为每个选中的工具创建一个插件条目
-      for (const tool of p.selectedTools) {
-        mapped.push({
-          plugin_id: p.plugin_id,
-          plugin_name: p.name || undefined,
-          tool_id: tool.tool_id,
-          tool_name: tool.name || undefined,
-          plugin_version: p.selectedVersion || 'draft',
-        })
-      }
-    }
+    const mapped = (pluginObject || []).flatMap(getPluginToolEntries)
     if (mapped.length === 0) {
       return
     }
+
     const deduped = [...pluginObjects]
     for (const m of mapped) {
-      if (!deduped.some(x => x.plugin_id === m.plugin_id && x.tool_id === m.tool_id)) {
+      if (!deduped.some(x => x.plugin_id === m.plugin_id && x.tool_id === m.tool_id && (x.plugin_version || 'draft') === (m.plugin_version || 'draft'))) {
         deduped.push(m)
       }
     }
@@ -743,10 +759,10 @@ const AgentModelSelector = (props: {
   }, [validateWorkflows, workflowObjects])
 
   // 处理插件操作（删除）
-  const handlePluginOperation = (operate: 'delete', _pluginId: string, toolId: string) => {
+  const handlePluginOperation = (operate: 'delete', pluginId: string, version?: string) => {
     if (operate === 'delete') {
       setPluginObjects(prevPlugins => {
-        const updatedPlugins = prevPlugins.filter(plugin => plugin.tool_id !== toolId)
+        const updatedPlugins = prevPlugins.filter(plugin => !(plugin.plugin_id === pluginId && (plugin.plugin_version || 'draft') === (version || 'draft')))
         // 更新插件数据到store
         updatePluginDetail(updatedPlugins)
         return updatedPlugins
@@ -1787,10 +1803,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
               {t('orchestrationPage.sections.pluginTitle')}
               <span
                 className={`inline-flex items-center justify-center ml-2 w-[18px] h-[18px] text-xs font-medium text-white rounded-full ${
-                  pluginObjects.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
+                  pluginListItems.length > 0 ? 'bg-blue-500' : 'bg-gray-400'
                 }`}
               >
-                {pluginObjects.length}
+                {pluginListItems.length}
               </span>
             </Typography>
             <AddButton
@@ -1812,7 +1828,7 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
           </AccordionSummary>
           <AccordionDetails>
             {/* 插件列表 */}
-            <PluginList pluginObjects={pluginObjects} onClick={handlePluginOperation} disabled={readonly} />
+            <PluginList pluginObjects={pluginListItems} onClick={handlePluginOperation} disabled={readonly} />
           </AccordionDetails>
         </Accordion>
       </div>
@@ -1910,7 +1926,13 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
         />
       )}
       {showPluginSelector && !readonly && (
-        <PluginSelector open={showPluginSelector} onClose={() => setShowPluginSelector(false)} onConfirm={handlePluginConfirm} initialSelected={[]} />
+        <PluginSelector
+          open={showPluginSelector}
+          onClose={() => setShowPluginSelector(false)}
+          onConfirm={handlePluginConfirm}
+          initialSelected={[]}
+          allowSelectWholePlugin={true}
+        />
       )}
       {showKnowledgeBaseSelector && !readonly && (
         <KnowledgeBaseSelector

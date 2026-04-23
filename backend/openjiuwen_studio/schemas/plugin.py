@@ -62,6 +62,11 @@ class PluginCreate(BaseModel):
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
     header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
+    external_plugin_type: Optional[str] = Field(None, alias="external_plugin_type")
+    category: Optional[str] = Field(None, alias="category")
+    category_name: Optional[str] = Field(None, alias="category_name")
+    market_source: Optional[str] = Field(None, alias="market_source")
+    original_market_plugin_id: Optional[str] = Field(None, alias="original_market_plugin_id")
     # stdio transport fields
     command: Optional[str] = Field("", alias="command")
     args: Optional[List[str]] = Field(default_factory=list, alias="args")
@@ -87,6 +92,22 @@ class PluginList(BaseModel):
     space_id: str = Field(alias="space_id")
     page: Optional[int] = Field(1, ge=1, alias="page")
     size: Optional[int] = Field(10, ge=1, le=100, alias="size")
+    market_source: Optional[str] = Field("local", alias="market_source")
+
+
+class PluginMarketDetailRequest(BaseModel):
+    space_id: str = Field(alias="space_id")
+    plugin_id: str = Field(alias="plugin_id")
+    plugin_version: Optional[str] = Field("", alias="plugin_version")
+    market_source: Optional[str] = Field("local", alias="market_source")
+    include_contract: Optional[bool] = Field(False, alias="include_contract")
+
+
+class PluginMarketInstallRequest(BaseModel):
+    space_id: str = Field(alias="space_id")
+    plugin_id: str = Field(alias="plugin_id")
+    plugin_version: Optional[str] = Field("", alias="plugin_version")
+    market_source: Optional[str] = Field("local", alias="market_source")
 
 
 class PluginPublish(PluginId):
@@ -108,11 +129,33 @@ class PluginInfo(PluginBase):
     url: Optional[str] = Field("", alias="url")
     icon_uri: Optional[str] = Field("", alias="icon_uri")
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
+    header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
+    external_plugin_type: Optional[str] = Field(None, alias="external_plugin_type")
+    original_market_plugin_id: Optional[str] = Field(None, alias="original_market_plugin_id")
+    category: Optional[str] = Field(None, alias="category")
+    category_name: Optional[str] = Field(None, alias="category_name")
+    category_icon: Optional[str] = Field(None, alias="category_icon")
+    market_source: Optional[str] = Field(None, alias="market_source")
+    ready: Optional[bool] = Field(None, alias="ready")
+    tags: Optional[List[str]] = Field(None, alias="tags")
+    status: Optional[str] = Field(None, alias="status")
+    config: Optional[Dict[str, Any]] = Field(None, alias="config")
+    original_data: Optional[Dict[str, Any]] = Field(None, alias="original_data")
+    market_detail_snapshot: Optional[Dict[str, Any]] = Field(None, alias="market_detail_snapshot")
+    author: Optional[str] = Field(None, alias="author")
+    detail_desc: Optional[str] = Field(None, alias="detail_desc")
+    plugin_version: Optional[str] = Field("", alias="plugin_version")
+    space_id: Optional[str] = Field(None, alias="space_id")
+    plugin_id: Optional[str] = Field(None, alias="plugin_id")
 
     @field_validator("url")
     @classmethod
     def check_url_ssrf(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        if isinstance(v, str) and v.startswith("/"):
+            return v
         return validate_plugin_url(v)
 
     class Config:
@@ -133,10 +176,64 @@ class PluginInfo(PluginBase):
         if "inputs" in data_dict and data_dict["inputs"] is not None:
             data_dict["request_params"] = data_dict.pop("inputs")
 
-        # Extract mcp_transport from _rest_ if present
+        # Extract extra metadata from _rest_ if present
         rest = data_dict.get("_rest_")
-        if isinstance(rest, dict) and "mcp_transport" in rest:
-            data_dict["mcp_transport"] = rest["mcp_transport"]
+        if isinstance(rest, dict) and isinstance(rest.get("_rest_"), dict):
+            rest = rest.get("_rest_")
+            data_dict["_rest_"] = rest
+        if isinstance(rest, dict):
+            if "mcp_transport" in rest:
+                data_dict["mcp_transport"] = rest["mcp_transport"]
+            for key in (
+                "external_plugin_type",
+                "original_market_plugin_id",
+                "category",
+                "category_name",
+                "category_icon",
+                "market_source",
+                "ready",
+                "tags",
+                "status",
+                "config",
+                "original_data",
+                "market_detail_snapshot",
+                "author",
+                "detail_desc",
+            ):
+                if key not in rest:
+                    continue
+                current_value = data_dict.get(key)
+                if current_value in (None, "", [], {}):
+                    data_dict[key] = rest[key]
+
+            data_market_detail_snapshot = data_dict.get("market_detail_snapshot") or {}
+            data_market_detail_config = data_market_detail_snapshot.get("config") or {}
+            data_config = data_dict.get("config") or {}
+            original_data = data_dict.get("original_data") or {}
+            original_market_detail_snapshot = original_data.get("market_detail_snapshot") or {}
+            original_market_detail_config = original_market_detail_snapshot.get("config") or {}
+            original_config = original_data.get("config") or {}
+            rest_market_detail_snapshot = rest.get("market_detail_snapshot") or {}
+            rest_market_detail_config = rest_market_detail_snapshot.get("config") or {}
+            rest_config = rest.get("config") or {}
+            header_config_candidates = (
+                data_market_detail_snapshot.get("header_configuration"),
+                data_market_detail_config.get("header_configuration"),
+                data_config.get("header_configuration"),
+                original_market_detail_snapshot.get("header_configuration"),
+                original_market_detail_config.get("header_configuration"),
+                original_config.get("header_configuration"),
+                rest.get("header_configuration"),
+                rest_market_detail_snapshot.get("header_configuration"),
+                rest_market_detail_config.get("header_configuration"),
+                rest_config.get("header_configuration"),
+            )
+            header_configuration = next(
+                (candidate for candidate in header_config_candidates if candidate),
+                None,
+            )
+            if header_configuration:
+                data_dict["header_configuration"] = header_configuration
 
         return cls(**data_dict)
 

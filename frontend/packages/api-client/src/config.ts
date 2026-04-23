@@ -296,6 +296,8 @@ export const API_ENDPOINTS = {
     DELETE: '/plugin/delete',
     LIST: '/plugin/list',
     GET_MARKET: '/plugin/get_market',
+    GET_MARKET_DETAIL: '/plugin/get_market_detail',
+    INSTALL_MARKET_PLUGIN: '/plugin/install_market_plugin',
     PUBLISH: '/plugin/publish',
     PUBLISH_GET: '/plugin/publish_get',
     PUBLISH_LIST: '/plugin/publish_list',

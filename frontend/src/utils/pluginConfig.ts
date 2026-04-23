@@ -6,22 +6,146 @@ export interface PluginToolConfig {
   method: string
   description: string
   request_params: Record<string, any>
+  response_params?: Record<string, any>
+  headers?: Record<string, any> | Array<Record<string, any>>
+  parameters?: Record<string, any>
+  input_params?: Record<string, any>
+  output_params?: Record<string, any>
+  inputSchema?: Record<string, any>
+  input_schema?: Record<string, any>
+  output_schema?: Record<string, any>
+  available?: boolean
 }
 
 export interface PluginConfig {
   name: string
   description: string
+  display_name?: string
+  detail_desc?: string
+  desc_mk?: string
   api_prefix: string
   icon_uri?: string
+  icon?: string
+  version?: string
+  tags?: string[]
+  author?: string
+  external_plugin_type?: string
+  category?: string
+  category_name?: string
+  ready?: boolean
   tools: PluginToolConfig[]
+}
+
+const normalizeRequestParams = (tool: PluginToolConfig) => {
+  if (tool.request_params && typeof tool.request_params === 'object') return tool.request_params
+  if (tool.parameters && typeof tool.parameters === 'object') return tool.parameters
+  const inputSchema = (tool.inputSchema || tool.input_schema || tool.input_params) as Record<string, any> | undefined
+  if (inputSchema?.properties && typeof inputSchema.properties === 'object') return inputSchema.properties
+  return {}
+}
+
+const normalizeResponseParams = (tool: PluginToolConfig) => {
+  if (tool.response_params && typeof tool.response_params === 'object') return tool.response_params
+  const outputSchema = (tool.output_schema || tool.output_params) as Record<string, any> | undefined
+  if (outputSchema?.properties && typeof outputSchema.properties === 'object') return outputSchema.properties
+  return {}
+}
+
+export function resolvePluginIconUrl(uri: string | null | undefined): string {
+  return typeof uri === 'string' ? uri.trim() : ''
+}
+
+const getPluginIconValue = (config: PluginConfig, key: string): string => {
+  const rawIcon = (config as any).icon_uri || (config as any).icon
+  if (typeof rawIcon === 'string' && rawIcon.trim()) {
+    return resolvePluginIconUrl(rawIcon)
+  }
+  if (key.includes('mcp')) return '🔌'
+  if (key.includes('skill')) return '✨'
+  if (key.includes('rest') || key.includes('http') || key.includes('api')) return '🌐'
+  if (key.includes('weather')) return '🌤️'
+  if (key.includes('image')) return '🎨'
+  if (key.includes('translation')) return '🌐'
+  if (key.includes('text')) return '📝'
+  if (key.includes('link')) return '🔗'
+  if (key.includes('qa')) return '❓'
+  if (key.includes('nlp')) return '🧠'
+  if (key.includes('map')) return '🗺️'
+  if (key.includes('system')) return '⚙️'
+  if (key.includes('twitter') || key.includes('social')) return '𝕏'
+  return '📦'
+}
+
+const inferPluginType = (config: PluginConfig, key: string): number => {
+  const explicitType = Number((config as any).plugin_type)
+  if (Number.isFinite(explicitType) && explicitType > 0) return explicitType
+  const externalType = String((config as any).external_plugin_type || (config as any).plugin_type || '').toLowerCase()
+  if (externalType === 'mcp-stdio') return 3
+  return 1
+}
+
+const normalizeTools = (tools: PluginToolConfig[] | undefined) =>
+  Array.isArray(tools)
+    ? tools.map(tool => {
+        const normalizedInputSchema = tool.inputSchema || tool.input_schema || tool.input_params
+        const normalizedOutputSchema = tool.output_schema || tool.output_params
+        return {
+          ...tool,
+          input_params: tool.input_params || normalizedInputSchema,
+          output_params: tool.output_params || normalizedOutputSchema,
+          inputSchema: normalizedInputSchema,
+          input_schema: normalizedInputSchema,
+          output_schema: normalizedOutputSchema,
+          request_params: normalizeRequestParams(tool),
+          response_params: normalizeResponseParams(tool),
+        }
+      })
+    : []
+
+const getPluginName = (config: PluginConfig) => String((config as any).display_name || config.name)
+const getPluginDesc = (config: PluginConfig) => String((config as any).description || (config as any).short_desc || '')
+const getPluginDescMk = (config: PluginConfig) => String((config as any).desc_mk || (config as any).detail_desc || '')
+const getPluginVersion = (config: PluginConfig) => String((config as any).version || '')
+const getPluginTags = (config: PluginConfig) => Array.isArray((config as any).tags) ? (config as any).tags : []
+const getPluginAuthor = (config: PluginConfig) => String((config as any).author || '')
+const getPluginCategory = (config: PluginConfig) => String((config as any).category || 'other')
+const getPluginCategoryName = (config: PluginConfig) => String((config as any).category_name || getPluginCategory(config))
+const getPluginUrl = (config: PluginConfig) => String((config as any).api_prefix || '')
+const getExternalPluginType = (config: PluginConfig) => typeof (config as any).external_plugin_type === 'string' ? (config as any).external_plugin_type : undefined
+const isPluginReady = (config: PluginConfig) => (config as any).ready !== false
+
+const EXTERNAL_PLUGIN_TYPE_META: Record<string, { displayName: string; icon: string }> = {
+  'restful-api': { displayName: 'RESTful API', icon: '🌐' },
+  'mcp-stdio': { displayName: 'MCP STDIO', icon: '🔌' },
+  tools: { displayName: 'Tools', icon: '🧰' },
+  skill: { displayName: 'Skill', icon: '✨' },
+}
+
+export function getExternalPluginTypeMeta(externalPluginType?: string): { displayName: string; icon: string } | null {
+  const key = (externalPluginType || '').trim().toLowerCase()
+  return EXTERNAL_PLUGIN_TYPE_META[key] || null
 }
 
 export interface PluginConfigs {
   PLUGIN_SERVICE_URL: string
+  VITE_PLUGIN_SERVICE_URL?: string
   plugins: Record<string, PluginConfig>
 }
 
 let cachedPluginConfigs: PluginConfigs | null = null
+
+const prepareMarketPluginConfigs = (configData: PluginConfigs): PluginConfigs => {
+  if (configData.VITE_PLUGIN_SERVICE_URL) {
+    configData.PLUGIN_SERVICE_URL = configData.VITE_PLUGIN_SERVICE_URL
+  }
+
+  if (!configData.plugins || typeof configData.plugins !== 'object') {
+    console.warn('Market data has invalid plugins structure, using empty object')
+    configData.plugins = {}
+  }
+
+  return configData
+}
 
 /**
  * Load plugin configurations from the config file specified in environment variables
@@ -35,8 +159,6 @@ export async function loadPluginConfigs(): Promise<PluginConfigs> {
   try {
     const configPath = ENV_CONFIG.PLUGIN_CONFIG_PATH
 
-    // For Vite development, we need to fetch from the public directory
-    // or use an API endpoint to serve the config file
     const response = await fetch(configPath)
 
     if (!response.ok) {
@@ -45,7 +167,6 @@ export async function loadPluginConfigs(): Promise<PluginConfigs> {
 
     const configData = await response.json()
 
-    // Override PLUGIN_SERVICE_URL with environment variable if available
     if (ENV_CONFIG.PLUGIN_SERVICE_URL) {
       configData.PLUGIN_SERVICE_URL = ENV_CONFIG.PLUGIN_SERVICE_URL
     }
@@ -56,7 +177,6 @@ export async function loadPluginConfigs(): Promise<PluginConfigs> {
   } catch (error) {
     console.error('Error loading plugin configurations:', error)
 
-    // Return fallback configuration
     const fallbackConfig: PluginConfigs = {
       PLUGIN_SERVICE_URL: ENV_CONFIG.PLUGIN_SERVICE_URL,
       plugins: {},
@@ -72,39 +192,20 @@ export async function loadPluginConfigs(): Promise<PluginConfigs> {
  * @returns Promise<PluginConfigs> The plugin configuration object
  */
 export async function loadPluginConfigsFromMarket(marketData: string): Promise<PluginConfigs> {
-  if (cachedPluginConfigs) {
-    return cachedPluginConfigs
-  }
-
   try {
-    // Parse the market data JSON string
     let configData: PluginConfigs
 
     try {
-      configData = JSON.parse(marketData)
+      configData = prepareMarketPluginConfigs(JSON.parse(marketData))
     } catch (parseError) {
       console.error('Failed to parse market data JSON:', parseError)
       throw new Error('Invalid market data format')
     }
 
-    // Override PLUGIN_SERVICE_URL with environment variable if available
-    if (configData.VITE_PLUGIN_SERVICE_URL) {
-      configData.PLUGIN_SERVICE_URL = configData.VITE_PLUGIN_SERVICE_URL
-    }
-
-    // Validate the structure
-    if (!configData.plugins || typeof configData.plugins !== 'object') {
-      console.warn('Market data has invalid plugins structure, using empty object')
-      configData.plugins = {}
-    }
-
-    cachedPluginConfigs = configData
-
     return configData
   } catch (error) {
     console.error('Error loading plugin configurations from market:', error)
 
-    // Return fallback configuration
     const fallbackConfig: PluginConfigs = {
       PLUGIN_SERVICE_URL: ENV_CONFIG.PLUGIN_SERVICE_URL,
       plugins: {},
@@ -114,123 +215,45 @@ export async function loadPluginConfigsFromMarket(marketData: string): Promise<P
   }
 }
 
-/**
- * Get all available plugins from the configuration
- * @returns Promise<PluginConfig[]> Array of plugin configurations
- */
-export async function getAvailablePlugins(): Promise<PluginConfig[]> {
-  const configs = await loadPluginConfigs()
-  return Object.values(configs.plugins)
-}
-
-/**
- * Get all available plugins from market data
- * @param marketData The JSON string data from the plugin market API
- * @returns Promise<Record<string, PluginConfig>> Object mapping plugin IDs to plugin configurations
- */
-export async function getAvailablePluginsFromMarket(marketData: string): Promise<Record<string, PluginConfig>> {
-  const configs = await loadPluginConfigsFromMarket(marketData)
-
-  // Check if using new multi-file structure (has 'plugins' object directly)
-  if (configs.plugins) {
-    return configs.plugins
-  }
-
-  // Legacy fallback
-  return {}
-}
-
-/**
- * Get a specific plugin configuration by name
- * @param pluginName The name of the plugin to retrieve
- * @returns Promise<PluginConfig | null> The plugin configuration or null if not found
- */
-export async function getPluginConfig(pluginName: string): Promise<PluginConfig | null> {
-  const configs = await loadPluginConfigs()
-  return configs.plugins[pluginName] || null
-}
-
-/**
- * Clear the cached plugin configurations (useful for refresh scenarios)
- */
 export function clearPluginConfigCache(): void {
   cachedPluginConfigs = null
 }
 
-/**
- * Transform plugin config to market plugin format for display
- * @param pluginConfig The raw plugin configuration
- * @param pluginKey The plugin identifier/key
- * @returns Transformed plugin object for UI display
- */
+export async function getAvailablePluginsFromMarket(marketData: string): Promise<Record<string, PluginConfig>> {
+  const configs = await loadPluginConfigsFromMarket(marketData)
+  return configs.plugins || {}
+}
+
+export function getExternalPluginTypeDisplayName(externalPluginType?: string, fallbackCategoryName?: string): string {
+  const meta = getExternalPluginTypeMeta(externalPluginType)
+  if (meta) return meta.displayName
+  if (fallbackCategoryName?.trim()) return fallbackCategoryName
+  return ''
+}
+
 export function transformConfigToMarketPlugin(pluginConfig: PluginConfig, pluginKey: string) {
-  // Extract plugin_type from config if available, otherwise infer
-  const pluginType = (pluginConfig as any).plugin_type || (pluginKey.includes('system') ? 2 : 1)
-
-  // Determine status (could be extended to include health checks)
   const status: 'active' | 'inactive' | 'error' | 'updating' = 'active'
-
-  // Use icon_uri from configuration if available, otherwise fallback to generated icon
-  const getIconForPlugin = (config: PluginConfig, key: string): string => {
-    // Use icon_uri from configuration if it exists
-    if ('icon_uri' in config && config.icon_uri) {
-      return config.icon_uri
-    }
-
-    // Fallback to generated icon based on plugin key/description
-    if (key.includes('weather')) return '🌤️'
-    if (key.includes('image')) return '🎨'
-    if (key.includes('translation')) return '🌐'
-    if (key.includes('text')) return '📝'
-    if (key.includes('link')) return '🔗'
-    if (key.includes('qa')) return '❓'
-    if (key.includes('nlp')) return '🧠'
-    if (key.includes('map')) return '🗺️'
-    if (key.includes('system')) return '⚙️'
-    if (key.includes('twitter') || key.includes('social')) return '𝕏'
-    return '📦'
-  }
-
-  const generateVersion = (): string => {
-    // Use version from config if available
-    if ((pluginConfig as any).version) {
-      return (pluginConfig as any).version
-    }
-    return `v${Math.floor(Math.random() * 5) + 1}.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`
-  }
-
-  // Extract category info from plugin config (if using new multi-file structure)
-  const category = (pluginConfig as any).category || 'other'
-  const categoryName = (pluginConfig as any).category_name || category
-  const categoryIcon = (pluginConfig as any).category_icon || '📦'
-
-  // Extract tags if available
-  const tags = (pluginConfig as any).tags || []
-
-  // Extract detailed markdown description if available
-  const descMk = (pluginConfig as any).desc_mk || ''
-
-  // Preserve the ready flag; default to true if absent (backward compat with legacy plugins)
-  const ready: boolean = (pluginConfig as any).ready !== false
-
   return {
     space_id: '',
     plugin_id: (pluginConfig as any).plugin_id || pluginKey,
-    plugin_version: generateVersion(),
-    name: pluginConfig.name,
-    desc: pluginConfig.description,
-    desc_mk: descMk,
-    plugin_type: pluginType,
+    plugin_version: getPluginVersion(pluginConfig),
+    name: getPluginName(pluginConfig),
+    desc: getPluginDesc(pluginConfig),
+    desc_mk: getPluginDescMk(pluginConfig),
+    plugin_type: inferPluginType(pluginConfig, pluginKey),
     published: true,
-    url: (pluginConfig as any).api_prefix || '',
-    icon_uri: getIconForPlugin(pluginConfig, pluginKey),
+    url: getPluginUrl(pluginConfig),
+    icon_uri: getPluginIconValue(pluginConfig, pluginKey),
     status,
-    category,
-    category_name: categoryName,
-    category_icon: categoryIcon,
-    tags,
-    ready,
-    // Include original config data for installation use
-    config: pluginConfig,
+    category: getPluginCategory(pluginConfig),
+    category_name: getPluginCategoryName(pluginConfig),
+    tags: getPluginTags(pluginConfig),
+    ready: isPluginReady(pluginConfig),
+    author: getPluginAuthor(pluginConfig),
+    external_plugin_type: getExternalPluginType(pluginConfig),
+    config: {
+      ...pluginConfig,
+      tools: normalizeTools(pluginConfig.tools),
+    },
   }
 }
