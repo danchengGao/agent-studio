@@ -3261,7 +3261,7 @@
       "createFromServiceDescription": "Quickly create plugins based on cloud services",
       "createFromIDE": "Create in IDE",
       "createFromIDEDescription": "Create plugins in integrated development environment",
-      "createFromMCP": "MCP Plugin",
+      "createFromMCP": "Create plugin based on existing MCP service",
       "createFromMCPDescription": "Connect to an MCP (Model Context Protocol) server"
     },
     "confirmDelete": "Confirm Delete",

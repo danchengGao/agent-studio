@@ -753,8 +753,8 @@ const PluginManagementPageNew: React.FC = () => {
               className="justify-start p-3"
             >
               <div className="text-left">
-                <Typography variant="subtitle1">{t('plugins.types.mcp')}-{t('plugins.cloudPlugin.createFromService')}</Typography>
-                <Typography variant="body2" color="text.secondary">创建 MCP 插件并支持 STDIO command / args / env</Typography>
+                <Typography variant="subtitle1">{t('plugins.types.mcp')}-{t('plugins.cloudPlugin.createFromMCP')}</Typography>
+                <Typography variant="body2" color="text.secondary">{t('plugins.cloudPlugin.createFromMCPDescription')}</Typography>
               </div>
             </Button>
           </div>

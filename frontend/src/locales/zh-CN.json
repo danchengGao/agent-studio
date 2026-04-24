@@ -3244,7 +3244,7 @@
       "createFromServiceDescription": "基于云服务快速创建插件",
       "createFromIDE": "手动创建",
       "createFromIDEDescription": "手动创建本地代码插件",
-      "createFromMCP": "MCP插件",
+      "createFromMCP": "基于现有 MCP 服务创建插件",
       "createFromMCPDescription": "连接到MCP（模型上下文协议）服务器"
     },
     "confirmDelete": "确认删除",
