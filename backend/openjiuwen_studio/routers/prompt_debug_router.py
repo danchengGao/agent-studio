@@ -76,7 +76,7 @@ async def save_debug_context(
 @handle_exceptions(response_model=DebugContextResponse)
 async def get_debug_context(
     prompt_id: int = Path(...),
-    workspace_id: int = Query(...),
+    workspace_id: str = Query(...),
     service: PromptDebugService = Depends(get_debug_service),
     current_user: dict = Depends(get_current_user)
 ):
