@@ -59,6 +59,7 @@ class PluginCreate(BaseModel):
     plugin_type: PluginType = Field(..., alias="plugin_type")
     url: Optional[str] = Field("", alias="url")
     icon_uri: Optional[str] = Field("", alias="icon_uri")
+    auth: Optional[Any] = Field(None, alias="auth")
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
     header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
@@ -128,6 +129,7 @@ class PluginInfo(PluginBase):
     published: bool = Field(False, alias="published")
     url: Optional[str] = Field("", alias="url")
     icon_uri: Optional[str] = Field("", alias="icon_uri")
+    auth: Optional[Any] = Field(None, alias="auth")
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
     header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
@@ -185,6 +187,7 @@ class PluginInfo(PluginBase):
             if "mcp_transport" in rest:
                 data_dict["mcp_transport"] = rest["mcp_transport"]
             for key in (
+                "auth",
                 "external_plugin_type",
                 "original_market_plugin_id",
                 "category",
@@ -234,6 +237,23 @@ class PluginInfo(PluginBase):
             )
             if header_configuration:
                 data_dict["header_configuration"] = header_configuration
+
+            if not data_dict.get("auth"):
+                auth_candidates = (
+                    data_market_detail_snapshot.get("auth"),
+                    data_market_detail_config.get("auth"),
+                    data_config.get("auth"),
+                    original_market_detail_snapshot.get("auth"),
+                    original_market_detail_config.get("auth"),
+                    original_config.get("auth"),
+                    rest.get("auth"),
+                    rest_market_detail_snapshot.get("auth"),
+                    rest_market_detail_config.get("auth"),
+                    rest_config.get("auth"),
+                )
+                auth_data = next((candidate for candidate in auth_candidates if candidate), None)
+                if auth_data:
+                    data_dict["auth"] = auth_data
 
         return cls(**data_dict)
 

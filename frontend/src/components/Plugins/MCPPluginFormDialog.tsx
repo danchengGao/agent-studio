@@ -1,6 +1,21 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, CircularProgress, MenuItem } from '@mui/material'
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  CircularProgress,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Select,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+} from '@mui/material'
 import { Cpu } from 'lucide-react'
 import { isFilePathValid } from '../../utils/validationUtils'
 
@@ -13,6 +28,14 @@ interface MCPPluginForm {
   command: string
   argsText: string
   envText: string
+  authMethod: string
+  apiKeyLocation: 'header' | 'query'
+  apiKeyParamName: string
+  apiKeyValue: string
+  oauthEndpointUrl: string
+  oauthClientId: string
+  oauthClientSecret: string
+  oauthScope?: string
 }
 
 export const MCP_TRANSPORT_OPTIONS = [
@@ -109,12 +132,19 @@ const MCPPluginFormDialog: React.FC<MCPPluginFormDialogProps> = ({
   const isUrlFieldValid = isFilePath
     ? (form.url ? isFilePathValid(form.url) : true)
     : isUrlValid && isUrlLengthValid
+  const normalizedAuthMethod = (form.authMethod || 'none').toLowerCase()
+  const requiresApiKeyFields = normalizedAuthMethod === 'api_key'
+  const requiresOAuthFields = normalizedAuthMethod === 'oauth2'
+  const hasApiKeyRequiredFields = form.apiKeyParamName?.trim() && form.apiKeyValue?.trim()
+  const hasOAuthRequiredFields = form.oauthEndpointUrl?.trim() && form.oauthClientId?.trim() && form.oauthClientSecret?.trim()
 
   const isFormValid = Boolean(
     form.name.trim() &&
     form.description.trim() &&
     (isStdio ? form.command.trim() : form.url.trim()) &&
-    (isStdio ? !hasInvalidEnvLine : isUrlFieldValid),
+    (isStdio ? !hasInvalidEnvLine : isUrlFieldValid) &&
+    (isStdio || !requiresApiKeyFields || hasApiKeyRequiredFields) &&
+    (isStdio || !requiresOAuthFields || hasOAuthRequiredFields),
   )
 
   // Compute label, placeholder and helper text based on transport
@@ -288,6 +318,109 @@ const MCPPluginFormDialog: React.FC<MCPPluginFormDialogProps> = ({
                 placeholder={urlFieldPlaceholder}
                 helperText={urlFieldHelperText}
                 error={urlFieldError}
+              />
+            </div>
+          )}
+          {!isStdio && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center">
+                鉴权方式 <span className="text-red-500 ml-1">*</span>
+              </label>
+              <FormControl fullWidth size="small">
+                <InputLabel id="mcp-plugin-auth-method-label">鉴权方式</InputLabel>
+                <Select
+                  labelId="mcp-plugin-auth-method-label"
+                  value={form.authMethod || 'none'}
+                  label="鉴权方式"
+                  onChange={e => onFormChange('authMethod', e.target.value)}
+                >
+                  <MenuItem value="none">无需鉴权</MenuItem>
+                  <MenuItem value="api_key">API Key</MenuItem>
+                  <MenuItem value="oauth2">OAuth2.0</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+          )}
+
+          {!isStdio && normalizedAuthMethod === 'api_key' && (
+            <div className="space-y-3 rounded-md border border-gray-200 p-3">
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                位置 <span className="text-red-500">*</span>
+              </label>
+              <div className="text-xs text-gray-500">
+                决定将 API Key 传给服务器的位置：Header 放在请求头中，Query 放在 URL 查询参数中。
+              </div>
+              <FormControl component="fieldset">
+                <RadioGroup
+                  row
+                  value={form.apiKeyLocation || 'header'}
+                  onChange={e => onFormChange('apiKeyLocation', e.target.value)}
+                >
+                  <FormControlLabel value="header" control={<Radio size="small" />} label="Header" />
+                  <FormControlLabel value="query" control={<Radio size="small" />} label="Query" />
+                </RadioGroup>
+              </FormControl>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1">Parameter name <span className="text-red-500">*</span></label>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={form.apiKeyParamName || ''}
+                  onChange={e => onFormChange('apiKeyParamName', e.target.value)}
+                  placeholder="请输入 Parameter Name"
+                  inputProps={{ maxLength: 100 }}
+                  helperText={`${(form.apiKeyParamName || '').length}/100`}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-1">API Key <span className="text-red-500">*</span></label>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={form.apiKeyValue || ''}
+                  onChange={e => onFormChange('apiKeyValue', e.target.value)}
+                  placeholder="请输入 API Key"
+                  inputProps={{ maxLength: 2000 }}
+                  helperText={`${(form.apiKeyValue || '').length}/2000`}
+                />
+              </div>
+            </div>
+          )}
+
+          {!isStdio && requiresOAuthFields && (
+            <div className="space-y-3">
+              <TextField
+                label="Endpoint URL"
+                value={form.oauthEndpointUrl || ''}
+                onChange={e => onFormChange('oauthEndpointUrl', e.target.value)}
+                fullWidth
+                required
+                placeholder="http://sa.as"
+              />
+              <TextField
+                label="Client ID"
+                value={form.oauthClientId || ''}
+                onChange={e => onFormChange('oauthClientId', e.target.value)}
+                fullWidth
+                required
+                placeholder="客户端ID"
+              />
+              <TextField
+                label="Client Secret"
+                value={form.oauthClientSecret || ''}
+                onChange={e => onFormChange('oauthClientSecret', e.target.value)}
+                fullWidth
+                required
+                placeholder="客户端密钥"
+              />
+              <TextField
+                label="Scope（可选）"
+                value={form.oauthScope || ''}
+                onChange={e => onFormChange('oauthScope', e.target.value)}
+                fullWidth
+                placeholder="例如：read write"
               />
             </div>
           )}

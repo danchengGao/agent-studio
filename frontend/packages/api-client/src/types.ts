@@ -1729,6 +1729,9 @@ export interface PluginCreateRequest {
   plugin_type: PluginType | number
   url?: string
   icon_uri?: string
+  auth?: Record<string, unknown>
+  request_params?: PluginRequestParam[]
+  header_configuration?: Array<{ name: string; value: string; description?: string; type?: string; send_method?: string }>
   mcp_transport?: number
   command?: string
   args?: string[]
@@ -1761,6 +1764,7 @@ export interface PluginInfo {
   published: boolean
   url?: string
   icon_uri?: string
+  auth?: Record<string, unknown>
   request_params?: PluginRequestParam[]
   mcp_transport?: number
   command?: string
@@ -1808,6 +1812,7 @@ export interface PluginUpdateRequest {
   published?: boolean
   url?: string
   icon_uri?: string
+  auth?: Record<string, unknown>
   request_params?: PluginRequestParam[]
   header_configuration?: Array<{ name: string; value: string; description?: string }>
   mcp_transport?: number

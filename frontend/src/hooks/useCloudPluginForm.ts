@@ -6,6 +6,13 @@ interface CloudPluginForm {
   desc_mk?: string
   url: string
   authMethod: string
+  apiKeyLocation: 'header' | 'query'
+  apiKeyParamName: string
+  apiKeyValue: string
+  oauthEndpointUrl: string
+  oauthClientId: string
+  oauthClientSecret: string
+  oauthScope?: string
   header_configuration: Array<{ name: string; value: string; description?: string }>
 }
 
@@ -44,6 +51,13 @@ interface CloudPluginFormValues {
   desc_mk?: string
   url?: string
   authMethod?: string
+  apiKeyLocation?: 'header' | 'query'
+  apiKeyParamName?: string
+  apiKeyValue?: string
+  oauthEndpointUrl?: string
+  oauthClientId?: string
+  oauthClientSecret?: string
+  oauthScope?: string
   header_configuration?: Array<{ name: string; value: string; description?: string }>
 }
 
@@ -54,6 +68,13 @@ export const useCloudPluginForm = (initialPlugin?: Plugin | null) => {
     desc_mk: '',
     url: initialPlugin?.config?.url || '',
     authMethod: initialPlugin?.config?.authMethod || 'none',
+    apiKeyLocation: 'header',
+    apiKeyParamName: '',
+    apiKeyValue: '',
+    oauthEndpointUrl: '',
+    oauthClientId: '',
+    oauthClientSecret: '',
+    oauthScope: '',
     header_configuration: [],
   })
 
@@ -68,6 +89,13 @@ export const useCloudPluginForm = (initialPlugin?: Plugin | null) => {
       desc_mk: values?.desc_mk ?? '',
       url: values?.url ?? plugin?.config?.url ?? '',
       authMethod: values?.authMethod ?? plugin?.config?.authMethod ?? 'none',
+      apiKeyLocation: values?.apiKeyLocation ?? 'header',
+      apiKeyParamName: values?.apiKeyParamName ?? '',
+      apiKeyValue: values?.apiKeyValue ?? '',
+      oauthEndpointUrl: values?.oauthEndpointUrl ?? '',
+      oauthClientId: values?.oauthClientId ?? '',
+      oauthClientSecret: values?.oauthClientSecret ?? '',
+      oauthScope: values?.oauthScope ?? '',
       header_configuration: values?.header_configuration ?? [],
     })
   }
@@ -109,6 +137,25 @@ export const useCloudPluginForm = (initialPlugin?: Plugin | null) => {
     }
     if (!form.authMethod.trim()) {
       errors.push('请选择授权方式')
+    }
+    if (form.authMethod === 'api_key') {
+      if (!form.apiKeyParamName.trim()) {
+        errors.push('请输入 Parameter name')
+      }
+      if (!form.apiKeyValue.trim()) {
+        errors.push('请输入 Service token / API key')
+      }
+    }
+    if (form.authMethod === 'oauth2') {
+      if (!form.oauthEndpointUrl.trim()) {
+        errors.push('请输入 OAuth2 Endpoint URL')
+      }
+      if (!form.oauthClientId.trim()) {
+        errors.push('请输入 OAuth2 Client ID')
+      }
+      if (!form.oauthClientSecret.trim()) {
+        errors.push('请输入 OAuth2 Client Secret')
+      }
     }
 
     return {

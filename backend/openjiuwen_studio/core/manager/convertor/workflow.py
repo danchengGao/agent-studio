@@ -129,7 +129,11 @@ def _friendly_validation_message(err: dict, schema: dict) -> tuple[str, str, int
     return hint, field_path, component_type, component_id
 
 
-def workflow_convert(workflow_info: WorkflowBase, skip_validation: bool = False) -> dsl.Workflow:
+def workflow_convert(
+        workflow_info: WorkflowBase,
+        skip_validation: bool = False,
+        export_raw_auth: bool = False
+) -> dsl.Workflow:
     try:
         workflow_schema = json.loads(getattr(workflow_info, "workflow_schema", "{}") or "{}")
         try:
@@ -157,7 +161,13 @@ def workflow_convert(workflow_info: WorkflowBase, skip_validation: bool = False)
 
         # 3. DSL 转换
         nodes = canvas.nodes
-        components = component_convert(canvas.edges, nodes, workflow_info.space_id, False)
+        components = component_convert(
+            canvas.edges,
+            nodes,
+            workflow_info.space_id,
+            False,
+            export_raw_auth=export_raw_auth
+        )
 
         input_properties, input_requires = convert_to_properties_format(workflow_info.input_parameters)
         inputs = {

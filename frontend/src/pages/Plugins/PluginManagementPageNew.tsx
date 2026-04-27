@@ -68,6 +68,13 @@ interface CloudPluginFormState {
   desc_mk?: string
   url: string
   authMethod: string
+  apiKeyLocation: 'header' | 'query'
+  apiKeyParamName: string
+  apiKeyValue: string
+  oauthEndpointUrl: string
+  oauthClientId: string
+  oauthClientSecret: string
+  oauthScope?: string
 }
 
 interface IDEPluginFormState {
@@ -147,8 +154,16 @@ const PluginManagementPageNew: React.FC = () => {
   const [cloudPluginForm, setCloudPluginForm] = useState<CloudPluginFormState>({
     name: '',
     description: '',
+    desc_mk: '',
     url: '',
     authMethod: 'none',
+    apiKeyLocation: 'header',
+    apiKeyParamName: '',
+    apiKeyValue: '',
+    oauthEndpointUrl: '',
+    oauthClientId: '',
+    oauthClientSecret: '',
+    oauthScope: '',
   })
   const [idePluginForm, setIdePluginForm] = useState<IDEPluginFormState>({
     name: '',
@@ -172,8 +187,16 @@ const PluginManagementPageNew: React.FC = () => {
     setCloudPluginForm({
       name: plugin?.name || '',
       description: plugin?.desc || '',
+      desc_mk: plugin?.desc_mk || '',
       url: plugin?.url || '',
       authMethod: 'none',
+      apiKeyLocation: 'header',
+      apiKeyParamName: '',
+      apiKeyValue: '',
+      oauthEndpointUrl: '',
+      oauthClientId: '',
+      oauthClientSecret: '',
+      oauthScope: '',
     })
   }
   const resetIDEForm = () => {
@@ -184,6 +207,15 @@ const PluginManagementPageNew: React.FC = () => {
     if (!cloudPluginForm.name.trim()) errors.push(t('plugins.dialog.cloudPluginForm.validation.nameRequired'))
     if (!cloudPluginForm.description.trim()) errors.push(t('plugins.dialog.cloudPluginForm.validation.descRequired'))
     if (!cloudPluginForm.url.trim()) errors.push(t('plugins.dialog.cloudPluginForm.validation.urlRequired'))
+    if (cloudPluginForm.authMethod === 'api_key') {
+      if (!cloudPluginForm.apiKeyParamName.trim()) errors.push('Parameter name 不能为空')
+      if (!cloudPluginForm.apiKeyValue.trim()) errors.push('Service token / API key 不能为空')
+    }
+    if (cloudPluginForm.authMethod === 'oauth2') {
+      if (!cloudPluginForm.oauthEndpointUrl.trim()) errors.push('OAuth2 Endpoint URL 不能为空')
+      if (!cloudPluginForm.oauthClientId.trim()) errors.push('OAuth2 Client ID 不能为空')
+      if (!cloudPluginForm.oauthClientSecret.trim()) errors.push('OAuth2 Client Secret 不能为空')
+    }
     return { isValid: errors.length === 0, errors }
   }
   const validateIDEForm = () => {
@@ -385,14 +417,40 @@ const PluginManagementPageNew: React.FC = () => {
     }
 
     try {
-      const response = await createPluginMutation.mutateAsync({
+      const normalizedAuthMethod = (cloudPluginForm.authMethod || 'none').toLowerCase()
+      let authPayload: Record<string, unknown> | undefined
+
+      if (normalizedAuthMethod === 'api_key') {
+        const isHeaderLocation = cloudPluginForm.apiKeyLocation === 'header'
+        const paramName = cloudPluginForm.apiKeyParamName.trim()
+        authPayload = {
+          type: 'SERVICE',
+          headers: isHeaderLocation ? { [paramName]: cloudPluginForm.apiKeyValue } : {},
+          query: isHeaderLocation ? {} : { [paramName]: cloudPluginForm.apiKeyValue },
+        }
+      } else if (normalizedAuthMethod === 'oauth2') {
+        authPayload = {
+          type: 'OAUTH',
+          endpoint_url: cloudPluginForm.oauthEndpointUrl.trim(),
+          client_id: cloudPluginForm.oauthClientId.trim(),
+          client_secret: cloudPluginForm.oauthClientSecret.trim(),
+        }
+        if (cloudPluginForm.oauthScope?.trim()) {
+          authPayload.scope = cloudPluginForm.oauthScope.trim()
+        }
+      }
+
+      const createRequest: Record<string, unknown> = {
         name: cloudPluginForm.name.trim(),
         desc: cloudPluginForm.description.trim(),
+        desc_mk: cloudPluginForm.desc_mk?.trim() || '',
         space_id: getDefaultSpaceId(),
         plugin_type: 1,
         url: cloudPluginForm.url.trim(),
         icon_uri: '☁️',
-      })
+        auth: authPayload,
+      }
+      const response = await createPluginMutation.mutateAsync(createRequest as any)
       if (response.code === 200) {
         refetchPluginList()
         showSuccess(t('plugins.messages.cloudPluginInstallSuccess', { name: cloudPluginForm.name.trim() }))
@@ -806,6 +864,28 @@ const PluginManagementPageNew: React.FC = () => {
           }
           try {
             const isStdio = Number(mcpPluginForm.transport) === 1
+            const normalizedAuthMethod = (mcpPluginForm.authMethod || 'none').toLowerCase()
+            let authPayload: Record<string, unknown> | undefined
+            if (!isStdio && normalizedAuthMethod === 'api_key') {
+              const isHeaderLocation = mcpPluginForm.apiKeyLocation === 'header'
+              const paramName = mcpPluginForm.apiKeyParamName.trim()
+              authPayload = {
+                type: 'SERVICE',
+                headers: isHeaderLocation ? { [paramName]: mcpPluginForm.apiKeyValue } : {},
+                query: isHeaderLocation ? {} : { [paramName]: mcpPluginForm.apiKeyValue },
+              }
+            } else if (!isStdio && normalizedAuthMethod === 'oauth2') {
+              authPayload = {
+                type: 'OAUTH',
+                endpoint_url: mcpPluginForm.oauthEndpointUrl.trim(),
+                client_id: mcpPluginForm.oauthClientId.trim(),
+                client_secret: mcpPluginForm.oauthClientSecret.trim(),
+              }
+              if (mcpPluginForm.oauthScope?.trim()) {
+                authPayload.scope = mcpPluginForm.oauthScope.trim()
+              }
+            }
+
             const result = await createPluginMutation.mutateAsync({
               space_id: getDefaultSpaceId(),
               plugin_type: 3,
@@ -818,6 +898,7 @@ const PluginManagementPageNew: React.FC = () => {
               command: isStdio ? mcpPluginForm.command.trim() : undefined,
               args: isStdio ? parseArgsText(mcpPluginForm.argsText) : undefined,
               env: isStdio ? parseEnvText(mcpPluginForm.envText) : undefined,
+              auth: authPayload,
             })
             if (result.code === 200) {
               refetchPluginList()

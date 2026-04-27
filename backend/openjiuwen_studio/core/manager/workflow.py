@@ -814,7 +814,11 @@ def workflow_export(
             )
             return None
 
-        sub_dl_workflow = convert.workflow_convert(WorkflowBase(**sub_canvas_result.data), skip_validation=True)
+        sub_dl_workflow = convert.workflow_convert(
+            WorkflowBase(**sub_canvas_result.data),
+            skip_validation=True,
+            export_raw_auth=True
+        )
         sub_executable_workflow = ExecutableWorkflow(sub_dl_workflow, req.space_id, current_user)
         sub_export = sub_executable_workflow.dl_workflow.model_dump()
         _patch_export_model_fields(sub_export, sub_canvas_result.data, req.space_id)
@@ -830,7 +834,11 @@ def workflow_export(
             message=canvas_result.message,
         )
 
-    dl_workflow = convert.workflow_convert(WorkflowBase(**canvas_result.data), skip_validation=True)
+    dl_workflow = convert.workflow_convert(
+        WorkflowBase(**canvas_result.data),
+        skip_validation=True,
+        export_raw_auth=True
+    )
     executable_workflow = ExecutableWorkflow(dl_workflow, req.space_id, current_user)
 
     export_data = executable_workflow.dl_workflow.model_dump()

@@ -33,11 +33,12 @@ except ImportError:
 from openjiuwen_studio.core.common.url_validator import validate_plugin_url
 from openjiuwen_studio.core.database import milliseconds, get_minio_client
 import openjiuwen_studio.core.manager.convertor.plugin as convert
-from openjiuwen_studio.core.manager.convertor.components.plugin import param_type_mapping
+from openjiuwen_studio.core.manager.convertor.components.plugin import param_type_mapping, _execute_auth as execute_auth
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.repositories.plugin_repository import plugin_repository
 from openjiuwen_studio.core.manager.repositories.tool_repository import tool_repository
 from openjiuwen_studio.core.manager.repositories.agent_repository import agent_repository
+from openjiuwen_studio.core.manager.model_manager.utils.security_utils import SecurityUtils
 from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.core.utils.exception import log_exception
 from openjiuwen_studio.models.plugin import PluginBaseDB, PluginBaseDBPd, ToolBaseDB, PluginPublishDBPd
@@ -200,7 +201,20 @@ def _mcp_card_input_params_to_tool_params(input_params: dict) -> List[PluginTool
     return params
 
 
-def _extract_auth_headers(plugin_data: dict) -> Dict[str, str]:
+def _resolve_plugin_auth(plugin_data: dict) -> Dict[str, Any]:
+    auth_payload = plugin_data.get("auth")
+    if not isinstance(auth_payload, dict):
+        return {}
+    normalized_auth_payload = {"type": str(auth_payload.get("type") or "NONE").upper(), **auth_payload}
+    try:
+        resolved_auth = execute_auth(normalized_auth_payload)
+        return resolved_auth if isinstance(resolved_auth, dict) else {}
+    except Exception as e:
+        logger.warning(f"Failed to resolve auth payload for plugin '{plugin_data.get('plugin_id', '')}': {str(e)}")
+        return {}
+
+
+def _extract_auth_headers(plugin_data: dict, resolved_auth: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
     """
     Build a header dict from plugin inputs that have method == PARAM_SEND_METHOD_HEADER (1).
 
@@ -208,6 +222,19 @@ def _extract_auth_headers(plugin_data: dict) -> Dict[str, str]:
 
     Non-header inputs and inputs with an empty name or value are silently skipped.
     """
+    # Prefer plugin-level auth payload for MCP plugins.
+    auth_data = resolved_auth if isinstance(resolved_auth, dict) else _resolve_plugin_auth(plugin_data)
+    resolved_headers = auth_data.get("headers")
+    if isinstance(resolved_headers, dict):
+        headers_from_auth: Dict[str, str] = {}
+        for key, value in resolved_headers.items():
+            key_str = str(key or "").strip()
+            value_str = str(value or "").strip()
+            if key_str and value_str:
+                headers_from_auth[key_str] = value_str
+        if headers_from_auth:
+            return headers_from_auth
+
     inputs = plugin_data.get("inputs") or []
     headers: Dict[str, str] = {}
     for inp in inputs:
@@ -223,6 +250,61 @@ def _extract_auth_headers(plugin_data: dict) -> Dict[str, str]:
         if name and value:
             headers[name] = value
     return headers
+
+
+def _extract_auth_query(plugin_data: dict, resolved_auth: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
+    auth_data = resolved_auth if isinstance(resolved_auth, dict) else _resolve_plugin_auth(plugin_data)
+    resolved_query = auth_data.get("query")
+    if not isinstance(resolved_query, dict):
+        return {}
+    query: Dict[str, str] = {}
+    for key, value in resolved_query.items():
+        key_str = str(key or "").strip()
+        if not key_str:
+            continue
+        query[key_str] = "" if value is None else str(value)
+    return query
+
+
+_security_utils = SecurityUtils()
+
+
+def _encrypt_secret_value(value: Any) -> Any:
+    """Encrypt secret strings while avoiding double-encryption."""
+    if not isinstance(value, str) or not value.strip():
+        return value
+    try:
+        # If decrypt result differs from source, value is likely already encrypted.
+        decrypted = _security_utils.decrypt_api_key(value)
+        if isinstance(decrypted, str) and decrypted != value:
+            return value
+    except Exception:
+        # Treat parsing/decryption failures as plaintext and encrypt below.
+        pass
+    return _security_utils.encrypt_api_key(value)
+
+
+def _encrypt_auth_payload(auth_payload: Any) -> Any:
+    """Encrypt sensitive fields in plugin auth payload before persistence."""
+    if not isinstance(auth_payload, dict):
+        return auth_payload
+
+    encrypted_auth = copy.deepcopy(auth_payload)
+    auth_type = str(encrypted_auth.get("type") or encrypted_auth.get("scope") or "").upper()
+
+    if auth_type == "SERVICE":
+        for field_name in ("headers", "query"):
+            data = encrypted_auth.get(field_name)
+            if not isinstance(data, dict):
+                continue
+            encrypted_auth[field_name] = {
+                key: _encrypt_secret_value(val)
+                for key, val in data.items()
+            }
+    elif auth_type == "OAUTH":
+        encrypted_auth["client_secret"] = _encrypt_secret_value(encrypted_auth.get("client_secret"))
+
+    return encrypted_auth
 
 
 @dataclass
@@ -567,17 +649,19 @@ def plugin_create(
         "icon_uri": req.icon_uri,
         "space_id": req.space_id,
         "plugin_type": req.plugin_type,
+        "auth": _encrypt_auth_payload(getattr(req, "auth", None)),
         "create_time": current_time,
         "update_time": current_time,
     }
 
     # Build plugin-level inputs from request_params and header_configuration
-    all_inputs: List[PluginToolParam] = list(req.request_params or [])
-    if hasattr(req, 'header_configuration') and req.header_configuration:
-        header_params = _header_configuration_to_plugin_params(req.header_configuration)
-        all_inputs = all_inputs + header_params
-    if all_inputs:
-        plugin_dict["inputs"] = [param.model_dump() for param in all_inputs]
+    if getattr(req, "auth", None) in (None, ""):
+        all_inputs: List[PluginToolParam] = list(req.request_params or [])
+        if hasattr(req, 'header_configuration') and req.header_configuration:
+            header_params = _header_configuration_to_plugin_params(req.header_configuration)
+            all_inputs = all_inputs + header_params
+        if all_inputs:
+            plugin_dict["inputs"] = [param.model_dump() for param in all_inputs]
 
     plugin = PluginBaseDBPd(**plugin_dict)
     logger.info(f"create plugin info: {plugin}")
@@ -649,13 +733,20 @@ def plugin_discover_mcp_tools(
     transport = rest.get("mcp_transport", PluginMcpTransport.PLUGIN_MCP_TRANSPORT_SSE)
     mcp_params = rest.get("params", {})
 
-    # Collect header-type plugin inputs so they can be forwarded to the MCP client.
-    auth_headers = _extract_auth_headers(data_dict)
+    resolved_auth = _resolve_plugin_auth(data_dict)
+    # Collect auth headers so they can be forwarded to the MCP client.
+    auth_headers = _extract_auth_headers(data_dict, resolved_auth=resolved_auth)
     if auth_headers:
         logger.info(
             f"Passing {len(auth_headers)} auth header(s) to MCP client "
             f"for plugin '{req.plugin_id}': {list(auth_headers.keys())}"
         )
+    auth_query = _extract_auth_query(data_dict, resolved_auth=resolved_auth)
+    if auth_query and isinstance(url, str) and url:
+        parsed_url = urllib.parse.urlparse(url)
+        merged_query = dict(urllib.parse.parse_qsl(parsed_url.query, keep_blank_values=True))
+        merged_query.update(auth_query)
+        url = urllib.parse.urlunparse(parsed_url._replace(query=urllib.parse.urlencode(merged_query)))
 
     is_stdio = transport == PluginMcpTransport.PLUGIN_MCP_TRANSPORT_STDIO
     if is_stdio and not mcp_params.get("command"):
@@ -768,26 +859,32 @@ def plugin_update(
         update_dict["desc_mk"] = req.desc_mk
 
     fields_set = set(getattr(req, 'model_fields_set', set()) or set())
+    has_auth_update = 'auth' in fields_set
     has_request_params_update = 'request_params' in fields_set
     has_header_configuration_update = 'header_configuration' in fields_set
 
-    non_header_request_params = (
-        list(req.request_params or [])
-        if has_request_params_update and req.request_params is not None
-        else []
-    )
+    if has_auth_update:
+        update_dict["auth"] = _encrypt_auth_payload(req.auth)
+
+    non_header_request_params = []
     normalized_header_configuration = None
-    if has_header_configuration_update:
-        normalized_header_configuration = (
-            _normalize_header_configuration(req.header_configuration)
-            if req.header_configuration is not None
-            else {}
+    if not has_auth_update:
+        non_header_request_params = (
+            list(req.request_params or [])
+            if has_request_params_update and req.request_params is not None
+            else []
         )
-    if normalized_header_configuration is not None:
-        header_params = _header_configuration_to_plugin_params(normalized_header_configuration)
-        update_dict["inputs"] = [param.model_dump() for param in [*non_header_request_params, *header_params]]
-    elif has_request_params_update and req.request_params is not None:
-        update_dict["inputs"] = [param.model_dump() for param in non_header_request_params]
+        if has_header_configuration_update:
+            normalized_header_configuration = (
+                _normalize_header_configuration(req.header_configuration)
+                if req.header_configuration is not None
+                else {}
+            )
+        if normalized_header_configuration is not None:
+            header_params = _header_configuration_to_plugin_params(normalized_header_configuration)
+            update_dict["inputs"] = [param.model_dump() for param in [*non_header_request_params, *header_params]]
+        elif has_request_params_update and req.request_params is not None:
+            update_dict["inputs"] = [param.model_dump() for param in non_header_request_params]
 
     metadata_keys = (
         'external_plugin_type', 'original_market_plugin_id', 'category', 'category_name', 'category_icon',
@@ -2468,6 +2565,7 @@ def plugin_publish(
         "url": plugin_info.url,
         "icon_uri": plugin_info.icon_uri,
         "plugin_type": plugin_info.plugin_type,
+        "auth": plugin_info.auth,
         "space_id": req.space_id,
         "inputs": plugin_info.inputs,
         "tools": tool_list,
