@@ -333,7 +333,7 @@ const PluginManagementPageNew: React.FC = () => {
   // 插件图标渲染
   const renderPluginIcon = (icon: string, fallbackIcon = '📦') => {
     const resolvedIcon = resolvePluginIconUrl(icon)
-    const isUrl = typeof resolvedIcon === 'string' && (resolvedIcon.startsWith('http://') || resolvedIcon.startsWith('https://') || resolvedIcon.startsWith('/') || resolvedIcon.includes('.'))
+    const isUrl = typeof resolvedIcon === 'string' && (resolvedIcon.startsWith('http://') || resolvedIcon.startsWith('https://') || resolvedIcon.startsWith('/'))
     if (isUrl) {
       return (
         <>

@@ -461,29 +461,75 @@ const PluginMarketPageNew: React.FC = () => {
   const renderPluginIcon = (icon: string | undefined, fallbackIcon = '📦') => {
     if (!icon) return fallbackIcon
     const resolvedIcon = resolvePluginIconUrl(icon)
-    const isUrl = typeof resolvedIcon === 'string' && (resolvedIcon.startsWith('http://') || resolvedIcon.startsWith('https://') || resolvedIcon.startsWith('/') || resolvedIcon.includes('.'))
+    const isUrl =
+      typeof resolvedIcon === 'string' &&
+      (resolvedIcon.startsWith('http://') ||
+        resolvedIcon.startsWith('https://') ||
+        resolvedIcon.startsWith('//') ||
+        resolvedIcon.startsWith('/'))
     if (isUrl) {
       return (
-        <img
-          src={resolvedIcon}
-          alt="Plugin icon"
-          className="w-full h-full object-cover rounded-lg"
-          onError={e => {
-            const fallback = e.currentTarget.parentElement
-            e.currentTarget.style.display = 'none'
-            if (fallback) fallback.textContent = fallbackIcon
-          }}
-        />
+        <>
+          <img
+            src={resolvedIcon}
+            alt="Plugin icon"
+            className="w-full h-full object-cover rounded-lg"
+            onError={e => {
+              const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+              e.currentTarget.style.display = 'none'
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+          <div className="hidden w-full h-full items-center justify-center text-2xl">{fallbackIcon}</div>
+        </>
       )
     }
-    return resolvedIcon
+    return resolvedIcon || fallbackIcon
   }
 
   const getPluginFallbackIcon = (_plugin: Plugin) => '📦'
 
   const getPluginIconValue = (plugin: Plugin) => String(plugin.icon_uri || '')
 
-  const renderIcon = (plugin: Plugin) => renderPluginIcon(getPluginIconValue(plugin), getPluginFallbackIcon(plugin))
+  const getResolvedPluginIcon = (plugin: Plugin) => {
+    const resolvedIcon = resolvePluginIconUrl(getPluginIconValue(plugin))
+    const isUrl =
+      typeof resolvedIcon === 'string' &&
+      (resolvedIcon.startsWith('http://') ||
+        resolvedIcon.startsWith('https://') ||
+        resolvedIcon.startsWith('//') ||
+        resolvedIcon.startsWith('/'))
+    return {
+      icon: isUrl ? resolvedIcon : resolvedIcon || getPluginFallbackIcon(plugin),
+      isUrl,
+    }
+  }
+
+  const renderIcon = (plugin: Plugin) => getResolvedPluginIcon(plugin).icon
+
+  const renderDetailDialogIcon = (plugin: Plugin) => {
+    const { icon, isUrl } = getResolvedPluginIcon(plugin)
+    if (isUrl && typeof icon === 'string') {
+      return (
+        <>
+          <img
+            src={icon}
+            alt="Plugin icon"
+            className="w-full h-full object-cover rounded-lg"
+            onError={e => {
+              const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+              e.currentTarget.style.display = 'none'
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+          <div className="hidden w-full h-full items-center justify-center text-2xl">{getPluginFallbackIcon(plugin)}</div>
+        </>
+      )
+    }
+    return icon
+  }
+
+
 
   const gridView = useMemo(() => {
     if (displayPlugins.length === 0) return <Empty searchTerm={searchTerm} type="plugins" />
@@ -695,7 +741,9 @@ const PluginMarketPageNew: React.FC = () => {
         {selectedPlugin && (
           <>
             <DialogTitle className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-3xl bg-gray-100">{renderIcon(selectedPlugin)}</div>
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center text-3xl bg-gray-100 overflow-hidden">
+                {renderDetailDialogIcon(selectedPlugin)}
+              </div>
               <div><Typography variant="h6">{selectedPlugin.name || selectedPlugin.plugin_id || 'Plugin'}</Typography></div>
             </DialogTitle>
             <DialogContent>

@@ -52,7 +52,18 @@ const normalizeResponseParams = (tool: PluginToolConfig) => {
 }
 
 export function resolvePluginIconUrl(uri: string | null | undefined): string {
-  return typeof uri === 'string' ? uri.trim() : ''
+  if (typeof uri !== 'string') return ''
+  const value = uri.trim()
+  if (!value) return ''
+  if (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('//') ||
+    value.startsWith('/')
+  ) {
+    return value
+  }
+  return value
 }
 
 const getPluginIconValue = (config: PluginConfig, key: string): string => {
@@ -108,10 +119,13 @@ const getPluginDescMk = (config: PluginConfig) => String((config as any).desc_mk
 const getPluginVersion = (config: PluginConfig) => String((config as any).version || '')
 const getPluginTags = (config: PluginConfig) => Array.isArray((config as any).tags) ? (config as any).tags : []
 const getPluginAuthor = (config: PluginConfig) => String((config as any).author || '')
-const getPluginCategory = (config: PluginConfig) => String((config as any).category || 'other')
+const getPluginCategory = (config: PluginConfig) => String((config as any).category || (config as any).category_id || 'other')
 const getPluginCategoryName = (config: PluginConfig) => String((config as any).category_name || getPluginCategory(config))
-const getPluginUrl = (config: PluginConfig) => String((config as any).api_prefix || '')
-const getExternalPluginType = (config: PluginConfig) => typeof (config as any).external_plugin_type === 'string' ? (config as any).external_plugin_type : undefined
+const getPluginUrl = (config: PluginConfig) => String((config as any).api_prefix || (config as any).base_url || (config as any).api_base_url || '')
+const getExternalPluginType = (config: PluginConfig) => {
+  const value = (config as any).external_plugin_type || (config as any).plugin_type
+  return typeof value === 'string' ? value : undefined
+}
 const isPluginReady = (config: PluginConfig) => (config as any).ready !== false
 
 const EXTERNAL_PLUGIN_TYPE_META: Record<string, { displayName: string; icon: string }> = {
@@ -233,27 +247,44 @@ export function getExternalPluginTypeDisplayName(externalPluginType?: string, fa
 
 export function transformConfigToMarketPlugin(pluginConfig: PluginConfig, pluginKey: string) {
   const status: 'active' | 'inactive' | 'error' | 'updating' = 'active'
+  const iconUri = getPluginIconValue(pluginConfig, pluginKey)
+  const apiPrefix = getPluginUrl(pluginConfig)
+  const category = getPluginCategory(pluginConfig)
+  const categoryName = getPluginCategoryName(pluginConfig)
+  const tags = getPluginTags(pluginConfig)
+  const author = getPluginAuthor(pluginConfig)
+  const externalPluginType = getExternalPluginType(pluginConfig)
+  const descMk = getPluginDescMk(pluginConfig)
   return {
     space_id: '',
     plugin_id: (pluginConfig as any).plugin_id || pluginKey,
     plugin_version: getPluginVersion(pluginConfig),
     name: getPluginName(pluginConfig),
     desc: getPluginDesc(pluginConfig),
-    desc_mk: getPluginDescMk(pluginConfig),
+    desc_mk: descMk,
     plugin_type: inferPluginType(pluginConfig, pluginKey),
     published: true,
-    url: getPluginUrl(pluginConfig),
-    icon_uri: getPluginIconValue(pluginConfig, pluginKey),
+    url: apiPrefix,
+    icon_uri: iconUri,
     status,
-    category: getPluginCategory(pluginConfig),
-    category_name: getPluginCategoryName(pluginConfig),
-    tags: getPluginTags(pluginConfig),
+    category,
+    category_name: categoryName,
+    tags,
     ready: isPluginReady(pluginConfig),
-    author: getPluginAuthor(pluginConfig),
-    external_plugin_type: getExternalPluginType(pluginConfig),
+    author,
+    external_plugin_type: externalPluginType,
     config: {
       ...pluginConfig,
       tools: normalizeTools(pluginConfig.tools),
+      icon_uri: iconUri,
+      api_prefix: apiPrefix,
+      category,
+      category_name: categoryName,
+      tags,
+      author,
+      external_plugin_type: externalPluginType,
+      desc_mk: descMk,
+      detail_desc: descMk,
     },
   }
 }

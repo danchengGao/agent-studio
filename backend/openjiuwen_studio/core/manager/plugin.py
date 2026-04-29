@@ -2072,7 +2072,31 @@ def _download_market_artifact_zip(asset_id: str, artifact_version: str = '') -> 
         raise ValueError('artifact metadata missing download_url')
 
     try:
-        with urllib.request.urlopen(download_url, timeout=120) as response:
+        market_base = urllib.parse.urlsplit(market_base_url)
+        parsed_download_url = urllib.parse.urlsplit(download_url)
+        rewriteable_download_hosts = {
+            'host.docker.internal',
+            'localhost',
+            '127.0.0.1',
+            '::1',
+        }
+        should_rewrite_download_host = (
+            parsed_download_url.hostname in rewriteable_download_hosts
+            and market_base.hostname
+        )
+        if should_rewrite_download_host:
+            rewritten_netloc = (
+                f"{market_base.hostname}:{parsed_download_url.port}"
+                if parsed_download_url.port
+                else market_base.hostname
+            )
+            rewritten_download_url = parsed_download_url._replace(
+                scheme=market_base.scheme or parsed_download_url.scheme,
+                netloc=rewritten_netloc,
+            ).geturl()
+        else:
+            rewritten_download_url = download_url
+        with urllib.request.urlopen(rewritten_download_url, timeout=120) as response:
             content = response.read()
     except Exception as exc:
         raise ValueError(f'failed to download artifact zip: {exc}') from exc
@@ -2146,6 +2170,7 @@ def _extract_market_contract_from_zip(zip_bytes: bytes) -> dict[str, Any]:
                 'tools': tools_data.get('tools') or [],
                 'header_configuration': api.get('default_headers') or {},
                 'api_prefix': str(api.get('base_url') or '').strip(),
+                'icon_uri': icon_uri,
                 'author': str(author or '').strip(),
                 'tags': tags or [],
             },
@@ -2160,6 +2185,33 @@ def _extract_market_contract_from_zip(zip_bytes: bytes) -> dict[str, Any]:
                 'external_plugin_type': 'restful-api',
                 'category': 'restful-api',
                 'category_name': 'RESTful API',
+                'config': {
+                    'tools': tools_data.get('tools') or [],
+                    'header_configuration': api.get('default_headers') or {},
+                    'api_prefix': str(api.get('base_url') or '').strip(),
+                    'icon_uri': icon_uri,
+                },
+            },
+            'market_detail_snapshot': {
+                'name': name,
+                'display_name': name,
+                'short_desc': desc,
+                'detail_desc': detail_markdown,
+                'icon_uri': icon_uri,
+                'version': str(plugin_data.get('version') or '').strip(),
+                'plugin_type': 'restful-api',
+                'tags': tags or [],
+                'publisher_name': str(author or '').strip(),
+                'category': 'restful-api',
+                'category_name': 'RESTful API',
+                'config': {
+                    'tools': tools_data.get('tools') or [],
+                    'header_configuration': api.get('default_headers') or {},
+                    'api_prefix': str(api.get('base_url') or '').strip(),
+                    'icon_uri': icon_uri,
+                    'author': str(author or '').strip(),
+                    'tags': tags or [],
+                },
             },
         }
 
@@ -2374,30 +2426,128 @@ def _get_external_plugin_type_display_name(external_plugin_type: str, fallback: 
 
 
 def _normalize_agent_tools_market_plugin(item: Dict[str, Any]) -> Dict[str, Any]:
-    category = item.get("category") or item.get("plugin_type") or "other"
-    external_plugin_type = item.get("plugin_type") or ""
-    category_name = item.get("category_name") or _get_external_plugin_type_display_name(external_plugin_type, category)
+    config = item.get("config") if isinstance(item.get("config"), dict) else {}
+    category = (
+        item.get("category")
+        or item.get("category_id")
+        or config.get("category")
+        or config.get("category_id")
+        or item.get("plugin_type")
+        or "other"
+    )
+    external_plugin_type = (
+        item.get("external_plugin_type")
+        or item.get("plugin_type")
+        or config.get("external_plugin_type")
+        or config.get("plugin_type")
+        or ""
+    )
+    category_name = (
+        item.get("category_name")
+        or config.get("category_name")
+        or _get_external_plugin_type_display_name(
+            str(external_plugin_type),
+            str(category),
+        )
+    )
+    item_tags = item.get("tags")
+    config_tags = config.get("tags")
+    tags = item_tags if isinstance(item_tags, list) else config_tags if isinstance(config_tags, list) else []
+
+    item_tools = item.get("tools")
+    config_tools = config.get("tools")
+    tools = item_tools if isinstance(item_tools, list) else config_tools if isinstance(config_tools, list) else []
+    header_configuration = (
+        item.get("header_configuration")
+        or item.get("headers")
+        or config.get("header_configuration")
+        or config.get("headers")
+        or {}
+    )
+    detail_desc = (
+        item.get("detail_desc")
+        or item.get("desc_mk")
+        or config.get("detail_desc")
+        or config.get("desc_mk")
+        or item.get("short_desc")
+        or item.get("description")
+        or ""
+    )
+    plugin_id = item.get("asset_id") or item.get("plugin_id") or ""
+    plugin_version = item.get("latest_version") or item.get("version") or ""
+    icon_fallback_url = ""
+    if plugin_id and plugin_version:
+        icon_fallback_url = (
+            f"{_get_agent_tools_market_base_url()}/api/v1/plugins/"
+            f"{plugin_id}/versions/{plugin_version}"
+        )
+    description = (
+        item.get("short_desc")
+        or item.get("description")
+        or config.get("description")
+        or ""
+    )
+    api_prefix = (
+        item.get("api_prefix")
+        or item.get("base_url")
+        or item.get("api_base_url")
+        or config.get("api_prefix")
+        or config.get("base_url")
+        or config.get("api_base_url")
+        or ""
+    )
+    icon_uri = (
+        item.get("icon_uri")
+        or item.get("icon")
+        or config.get("icon_uri")
+        or config.get("icon")
+        or icon_fallback_url
+    )
+    author = (
+        item.get("publisher_name")
+        or item.get("author")
+        or config.get("author")
+        or ""
+    )
+    ready = item.get("ready")
+    if ready is None:
+        ready = config.get("ready", True)
+
     return {
-        "plugin_id": item.get("asset_id") or item.get("plugin_id") or "",
-        "asset_id": item.get("asset_id") or item.get("plugin_id") or "",
+        "plugin_id": plugin_id,
+        "asset_id": plugin_id,
         "name": item.get("display_name") or item.get("name") or "",
         "display_name": item.get("display_name") or item.get("name") or "",
-        "description": item.get("short_desc") or item.get("description") or "",
-        "short_desc": item.get("short_desc") or item.get("description") or "",
-        "detail_desc": item.get("detail_desc") or item.get("short_desc") or item.get("description") or "",
-        "desc_mk": item.get("detail_desc") or item.get("desc_mk") or "",
-        "api_prefix": item.get("api_prefix") or item.get("base_url") or item.get("api_base_url") or "",
-        "icon_uri": item.get("icon_uri") or item.get("icon") or "",
-        "version": item.get("latest_version") or item.get("version") or "",
-        "tags": item.get("tags") if isinstance(item.get("tags"), list) else [],
-        "author": item.get("publisher_name") or item.get("author") or "",
+        "description": description,
+        "short_desc": description,
+        "detail_desc": detail_desc,
+        "desc_mk": detail_desc,
+        "api_prefix": api_prefix,
+        "icon_uri": icon_uri,
+        "version": plugin_version or config.get("version") or "",
+        "tags": tags,
+        "author": author,
         "category": category,
         "category_name": category_name,
         "external_plugin_type": external_plugin_type,
-        "ready": item.get("ready", True),
-        "tools": item.get("tools") if isinstance(item.get("tools"), list) else [],
-        "header_configuration": item.get("header_configuration") or item.get("headers") or {},
-      }
+        "ready": bool(ready),
+        "tools": tools,
+        "header_configuration": header_configuration,
+        "config": {
+            **config,
+            "tools": tools,
+            "header_configuration": header_configuration,
+            "icon_uri": icon_uri,
+            "api_prefix": api_prefix,
+            "author": author,
+            "tags": tags,
+            "external_plugin_type": external_plugin_type,
+            "category": category,
+            "category_name": category_name,
+            "detail_desc": detail_desc,
+            "desc_mk": detail_desc,
+        },
+    }
 
 
 def _agent_tools_market_list_to_studio_payload(market_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -2437,7 +2587,7 @@ def plugin_read_market_json_by_source(
     _ = check_user_space(req.space_id, current_user)
     market_data = _request_agent_tools_market_json(
         "/api/v1/plugins",
-        query={"page": req.page or 1, "page_size": req.size or 10},
+        query={"page": req.page or 1, "page_size": req.size or 10, "plugin_type": "restful-api"},
     )
     payload = _agent_tools_market_list_to_studio_payload(market_data.get("data") or {})
     payload["VITE_PLUGIN_SERVICE_URL"] = _get_agent_tools_market_base_url()

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MoreVertical, Info, Check, X } from 'lucide-react'
 import { Tooltip, CircularProgress, Popover } from '@mui/material'
+import { resolvePluginIconUrl } from '../../../utils/pluginConfig'
 import { Card, CardHeader, CardHeaderIcon, CardHeaderContent, CardBody, CardFooter, CardFooterRow } from './CommonCard'
 
 export interface ConfigCardTag {
@@ -337,8 +338,18 @@ export const ConfigCard: React.FC<ConfigCardProps> = ({
       >
         <CardHeader>
           <CardHeaderIcon bgColor={iconBgColor} textColor={`${iconTextColor} text-2xl`}>
-            {icon}
+            {typeof icon === 'string' && (() => {
+              const resolvedIcon = resolvePluginIconUrl(icon)
+              const isUrl =
+                resolvedIcon.startsWith('http://') ||
+                resolvedIcon.startsWith('https://') ||
+                resolvedIcon.startsWith('//') ||
+                resolvedIcon.startsWith('/')
+              return isUrl ? <img src={resolvedIcon} alt="Card icon" className="w-full h-full object-cover rounded-lg" /> : resolvedIcon
+            })()}
+            {typeof icon !== 'string' && icon}
           </CardHeaderIcon>
+
           <CardHeaderContent className={tags.length > 0 ? 'justify-between !h-auto gap-1' : 'justify-center'}>
             {isEditingThis && editingState.field === 'name' ? (
               <div className="flex items-center gap-1 min-w-0 flex-1">
