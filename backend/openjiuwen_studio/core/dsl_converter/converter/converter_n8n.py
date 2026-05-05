@@ -32,6 +32,7 @@ from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.dsl_converter.converter.converter import WorkflowConverter, WorkflowImportResult
 from openjiuwen_studio.core.common.dsl import ComponentType
 from openjiuwen_studio.core.database import milliseconds
+from openjiuwen_studio.schemas.node import BaseType, BaseValue
 
 from openjiuwen_studio.core.dsl_converter.converter.n8n_mappings import (
     N8N_TO_OPENJIUWEN,
@@ -275,6 +276,30 @@ class N8nWorkflowConverter(WorkflowConverter):
         self.openjiuwen_edges: List[Dict] = []
         self.last_llm_node_id: Optional[str] = None
         self.first_main_node: Optional[str] = None
+         # Maps synthetic compareDatasets selector_id → paired code_id so that
+        # _find_data_predecessor_id returns the Code node (the real data source)
+        # instead of skipping past the Selector to compareDatasets' own predecessor.
+        self.compare_datasets_code_ids: Dict[str, str] = {}
+        # Maps n8n compareDatasets node name → {port_index: selector_id}.
+        # node_id_map[name] points to code_id (so Dataset A/B edges wire correctly
+        # into the Code node).  Outgoing edges from compareDatasets (to Label nodes
+        # etc.) must use the per-port Selector as source; this dict provides that
+        # override inside _convert_connections.
+        self.compare_datasets_selector_ids: Dict[str, Dict[int, str]] = {}
+        # Maps compareDatasets guard selector_id → the Code node output field that
+        # selector guards (e.g. selector_for_port_1 → "only_a").  Used by
+        # _build_predecessor_input_ref so downstream nodes reference the right field.
+        self.compare_datasets_port_fields: Dict[str, str] = {}
+        # Maps n8n loop node name → {"loop_id": jiuwen_node_id}.
+        # Populated in _convert_main_nodes when a LOOP component is created.
+        # Used in _convert_connections to route edges to/from the Loop node.
+        self.loop_node_registry: Dict[str, Dict[str, str]] = {}
+        # Maps n8n node name → (code_id, field_name) for nodes that are directly
+        # downstream of a compareDatasets node.  Populated during node conversion
+        # (before _convert_connections runs) by inspecting n8n_connections so that
+        # _build_predecessor_input_ref can inject the correct port-specific field
+        # (e.g. "matched", "only_a") rather than the generic "result".
+        self.compare_datasets_downstream_fields: Dict[str, tuple] = {}
 
     # =========================================================================
     # MAIN CONVERT METHOD
@@ -621,7 +646,92 @@ class N8nWorkflowConverter(WorkflowConverter):
             if self._is_ai_subnode(node_type):
                 self.report.skipped_nodes += 1
                 continue
-            
+
+            # Sticky notes — converted to Jiuwen note (type 99) and appended
+            # directly, bypassing the regular conversion pipeline.
+            # They have no edges, no ID mapping, and do not affect x_pos /
+            # first_main_node tracking.
+            if node_type == "n8n-nodes-base.stickyNote":
+                note_node = self._convert_sticky_note(node)
+                self.openjiuwen_nodes.append(note_node)
+                self.report.converted_nodes += 1
+                self.report.jiuwen_type_counts[99].append(node_name)
+                continue
+
+            # compareDatasets → two-node conversion: Code node + Selector node.
+            # The Code node runs the comparison and exposes matched/only_a/only_b
+            # as named output fields.  The Selector routes execution so that n8n's
+            # two primary output ports (matched vs unmatched) map to Jiuwen's two
+            # Selector branches.  node_id_map points to the Selector so that
+            # _convert_connections routes downstream edges correctly (port 0/1 →
+            # branch 0/1).  _compare_datasets_code_ids lets _find_data_predecessor_id
+            # return the Code node (the actual data source) when a downstream node
+            # asks "where does my input data come from?".
+            if node_type == "n8n-nodes-base.compareDatasets":
+                try:
+                    code_node, selector_nodes = self._convert_compare_datasets_node(node, x_pos)
+                    self.openjiuwen_nodes.append(code_node)
+
+                    port_to_selector: Dict[int, str] = {}
+                    # port_defs order: matched(0), only_a(1), only_b(2), union_excl(3)
+                    port_fields = ["matched", "only_a", "only_b", "union_excl"]
+
+                    for port_idx, sel_node in enumerate(selector_nodes):
+                        self.openjiuwen_nodes.append(sel_node)
+                        sel_id = sel_node["id"]
+                        # Wire Code → each guard Selector independently
+                        self.openjiuwen_edges.append({
+                            "id": f"edge_{uuid.uuid4().hex[:8]}",
+                            "sourceNodeID": code_node["id"],
+                            "targetNodeID": sel_id,
+                            "sourcePortID": "0",
+                        })
+                        port_to_selector[port_idx] = sel_id
+                        # _compare_datasets_code_ids: selector → code (for
+                        # _find_data_predecessor_id to skip past the guard)
+                        self.compare_datasets_code_ids[sel_id] = code_node["id"]
+                        # _compare_datasets_port_fields: selector → field name
+                        # (so _build_predecessor_input_ref picks the right field)
+                        self.compare_datasets_port_fields[sel_id] = port_fields[port_idx]
+
+                    # node_id_map → code_node so incoming Dataset A/B edges land
+                    # on the Code node, not on any Selector
+                    self.node_id_map[node_name] = code_node["id"]
+                    # Per-port selector map for _convert_connections outgoing routing
+                    self.compare_datasets_selector_ids[node_name] = port_to_selector
+
+                    # Map each n8n downstream node name → (code_id, field_name) so
+                    # _build_predecessor_input_ref injects the port-specific field
+                    # (e.g. "matched", "only_a") rather than the generic "result".
+                    _cd_port_fields = ["matched", "only_a", "only_b", "union_excl"]
+                    _cd_connections = self.n8n_connections.get(node_name, {}).get("main", [])
+                    for _port_idx, _targets in enumerate(_cd_connections):
+                        if _port_idx >= len(_cd_port_fields):
+                            break
+                        for _tgt in _targets:
+                            _tgt_name = _tgt.get("node", "")
+                            if _tgt_name:
+                                self.compare_datasets_downstream_fields[_tgt_name] = (
+                                    code_node["id"], _cd_port_fields[_port_idx]
+                                )
+
+                    self.report.converted_nodes += 1
+                    self.report.jiuwen_type_counts[
+                        int(code_node.get("type", 0))
+                    ].append(node_name)
+                    if self.first_main_node is None:
+                        self.first_main_node = node_name
+                    x_pos += 460
+                except Exception as e:
+                    error_msg = f"Failed to convert compareDatasets node '{node_name}': {e}"
+                    self.report.add_warning(error_msg)
+                    logger.warning(error_msg)
+                    fallback = self._create_fallback_node(node, x_pos)
+                    self.openjiuwen_nodes.append(fallback)
+                    self.node_id_map[node_name] = fallback["id"]
+                    x_pos += 460
+                continue
+
             # Optimise away pure passthrough Set nodes ---
             if self._is_passthrough_set_node(node):
                 predecessor_id = self._find_predecessor_id(node_name)
@@ -647,9 +757,14 @@ class N8nWorkflowConverter(WorkflowConverter):
                     jiuwen_type = int(jiuwen_node.get("type", 0))
                     self.report.jiuwen_type_counts[jiuwen_type].append(node_name)
                     
-                    # Track last LLM node for End node reference
-                    if jiuwen_type == ComponentType.COMPONENT_TYPE_LLM:
+                    # Track last LLM node or react agent for End node reference
+                    if jiuwen_type in (ComponentType.COMPONENT_TYPE_LLM, ComponentType.COMPONENT_TYPE_REACT_AGENT):
                         self.last_llm_node_id = jiuwen_node["id"]
+
+                    # Register loop nodes so _convert_connections can route
+                    # incoming/outgoing edges to the correct Loop component ID.
+                    if jiuwen_type == ComponentType.COMPONENT_TYPE_LOOP:
+                        self.loop_node_registry[node_name] = {"loop_id": jiuwen_node["id"]}
                     
                     if self.first_main_node is None:
                         self.first_main_node = node_name
@@ -675,6 +790,15 @@ class N8nWorkflowConverter(WorkflowConverter):
         node_type = n8n_node.get("type", "")
         node_name = n8n_node.get("name", "")
         
+        # ── Data Transform nodes: always route through Code, regardless of what
+        # N8N_TO_OPENJIUWEN says.  An incorrect mapping entry (e.g. sort →
+        # SUB_WORKFLOW) would otherwise call _convert_workflow_node and produce a
+        # node with an empty workflowId → OpenJiuwen error "<missing:workflow>".
+        if node_type in self.DATA_TRANSFORM_HANDLERS:
+            type_prefix = self._get_type_prefix(ComponentType.COMPONENT_TYPE_CODE)
+            node_id = self.id_gen.next_id(type_prefix)
+            return self._convert_code_node(n8n_node, node_id, x_pos)
+
         # Determine OpenJiuwen component type
         if node_type in self.N8N_TO_OPENJIUWEN:
             component_type = self.N8N_TO_OPENJIUWEN[node_type]
@@ -711,6 +835,10 @@ class N8nWorkflowConverter(WorkflowConverter):
             return self._convert_merge_node(n8n_node, node_id, x_pos)
         elif component_type == ComponentType.COMPONENT_TYPE_SUB_WORKFLOW:
             return self._convert_workflow_node(n8n_node, node_id, x_pos)
+        elif component_type == ComponentType.COMPONENT_TYPE_HTTP_REQUEST:
+            return self._convert_http_request_node(n8n_node, node_id, x_pos)
+        elif component_type == ComponentType.COMPONENT_TYPE_REACT_AGENT:
+            return self._convert_react_agent_node(n8n_node, node_id, x_pos)
         else:
             return self._create_fallback_node(n8n_node, x_pos)
 
@@ -727,8 +855,13 @@ class N8nWorkflowConverter(WorkflowConverter):
             ComponentType.COMPONENT_TYPE_PLUGIN: "plugin",
             ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: "merge",
             ComponentType.COMPONENT_TYPE_SUB_WORKFLOW: "workflow",
+            ComponentType.COMPONENT_TYPE_HTTP_REQUEST: "http",
+            ComponentType.COMPONENT_TYPE_REACT_AGENT: "react_agent",
         }
         return prefixes.get(component_type, "node")
+
+    # Note (type 99) is not in ComponentType — handled by _convert_sticky_note
+    # which calls id_gen.next_id("note") directly.
 
     # =========================================================================
     # LLM NODE CONVERSION
@@ -1175,6 +1308,36 @@ class N8nWorkflowConverter(WorkflowConverter):
                             return self.node_id_map.get(source_name)
         return None
 
+    def _find_predecessor_by_input_index(
+        self, n8n_node_name: str, input_index: int
+    ) -> Optional[str]:
+        """
+        Find the Jiuwen ID of the predecessor connected to a specific input
+        port (index) of the given n8n node.
+
+        In n8n connections the ``index`` field on the target object indicates
+        which input port of the target node the edge arrives on:
+
+            "Dataset A": {"main": [[{"node": "Compare Datasets", "type": "main", "index": 0}]]}
+            "Dataset B": {"main": [[{"node": "Compare Datasets", "type": "main", "index": 1}]]}
+
+        This is used by ``_convert_compare_datasets_node`` to distinguish
+        Input A (index 0) from Input B (index 1) so that both datasets are
+        passed as separate ``inputParameters`` to the generated Code node.
+        """
+        for source_name, conn_types in self.n8n_connections.items():
+            for conn_type, target_lists in conn_types.items():
+                if conn_type != "main":
+                    continue
+                for target_list in target_lists:
+                    for target in target_list:
+                        if (
+                            target.get("node") == n8n_node_name
+                            and target.get("index", 0) == input_index
+                        ):
+                            return self.node_id_map.get(source_name)
+        return None
+
     def _find_data_predecessor_id(self, n8n_node_name: str) -> Optional[str]:
         """
         Find the Jiuwen ID of the nearest predecessor that actually holds output data.
@@ -1193,6 +1356,11 @@ class N8nWorkflowConverter(WorkflowConverter):
             (n for n in self.openjiuwen_nodes if n["id"] == pred_id), None
         )
         if pred_jiuwen_node and int(pred_jiuwen_node.get("type", 0)) == ComponentType.COMPONENT_TYPE_IF:
+            # Synthetic compareDatasets selector: return the paired Code node so
+            # downstream nodes reference [code_id, "matched"/"only_a"/…] instead
+            # of skipping all the way back to compareDatasets' own predecessor.
+            if pred_id in self.compare_datasets_code_ids:
+                return self.compare_datasets_code_ids[pred_id]
             # Find the n8n name that maps to this selector ID
             pred_n8n_name = next(
                 (name for name, jid in self.node_id_map.items() if jid == pred_id), None
@@ -1222,7 +1390,9 @@ class N8nWorkflowConverter(WorkflowConverter):
         node_type = int(node.get("type", 0))
         if node_type == ComponentType.COMPONENT_TYPE_LLM:
             return "output"
-        if node_type == ComponentType.COMPONENT_TYPE_PLUGIN:
+        if node_type == ComponentType.COMPONENT_TYPE_REACT_AGENT:
+            return "output"
+        if node_type == ComponentType.COMPONENT_TYPE_PLUGIN or node_type == ComponentType.COMPONENT_TYPE_HTTP_REQUEST:
             return "data"
         if node_type == ComponentType.COMPONENT_TYPE_VARIABLE_MERGE:
             return "merged"
@@ -1246,12 +1416,43 @@ class N8nWorkflowConverter(WorkflowConverter):
             {"input": {"type": "ref", "content": ["code_1", "result"],
                        "extra": {"index": 0}}}
         """
+        # Resolve the immediate predecessor first (before skipping selectors)
+        # so we can detect if it is a compareDatasets guard.
+        immediate_pred_id = self._find_predecessor_id(n8n_node_name)
+
+        # ── compareDatasets downstream field special case ─────────────────────
+        # If this n8n node is directly downstream of a compareDatasets node,
+        # we know exactly which Code node field to reference (e.g. "matched",
+        # "only_a").  This is resolved from n8n_connections at node-conversion
+        # time, before _convert_connections runs, so it is always available.
+        if n8n_node_name in self.compare_datasets_downstream_fields:
+            cd_code_id, cd_field = self.compare_datasets_downstream_fields[n8n_node_name]
+            return {
+                param_key: {
+                    "type": "ref",
+                    "content": [cd_code_id, cd_field],
+                    "extra": {"index": 0},
+                }
+            }
+
         pred_id = self._find_data_predecessor_id(n8n_node_name)
         if not pred_id:
             return {}
+        # ── compareDatasets guard Selector special case ───────────────────────
+        # immediate_pred_id is the guard Selector; pred_id is the Code node.
+        # Use the port-specific field rather than the generic "result".
+        if (immediate_pred_id
+                and immediate_pred_id in self.compare_datasets_port_fields):
+            port_field = self.compare_datasets_port_fields[immediate_pred_id]
+            return {
+                param_key: {
+                    "type": "ref",
+                    "content": [pred_id, port_field],
+                    "extra": {"index": 0},
+                }
+            }
+        
         output_field = self._get_primary_output_field(pred_id)
-        # Empty string means the predecessor has no declared outputs (e.g. manual
-        # trigger Start node, or a selector) — nothing to reference.
         if not output_field:
             return {}
         return {
@@ -1270,6 +1471,66 @@ class N8nWorkflowConverter(WorkflowConverter):
     # Operator mapping: n8n operator objects → OpenJiuwen operator strings
     # n8n stores operators as {"type": "string"|"number"|"boolean", "operation": "..."}
     # -------------------------------------------------------------------------
+    # =========================================================================
+    # DATA TRANSFORM DISPATCH TABLE
+    # Maps n8n node type → handler method name.  To add a new Data Transform
+    # node: (1) add one entry here, (2) write the _convert_X_to_code method.
+    # No changes required anywhere else in _convert_code_node.
+    # =========================================================================
+    DATA_TRANSFORM_HANDLERS: Dict[str, str] = {
+        # Set / passthrough
+        "n8n-nodes-base.set": "_convert_set_to_code",
+        "n8n-nodes-base.readWriteFile": "_convert_read_write_file_to_code",
+        # Collection transforms
+        "n8n-nodes-base.sort": "_convert_sort_to_code",
+        "n8n-nodes-base.limit": "_convert_limit_to_code",
+        "n8n-nodes-base.removeDuplicates": "_convert_remove_duplicates_to_code",
+        "n8n-nodes-base.aggregate": "_convert_aggregate_to_code",
+        # Expansion transforms
+        "n8n-nodes-base.splitOut": "_convert_split_out_to_code",
+        "n8n-nodes-base.itemLists": "_convert_item_lists_to_code",
+        # Side-effect / control
+        "n8n-nodes-base.noOp": "_convert_no_op_to_code",
+        "n8n-nodes-base.wait": "_convert_wait_to_code",
+        "n8n-nodes-base.respondToWebhook": "_convert_respond_to_webhook_to_code",
+        "n8n-nodes-base.stopAndError": "_convert_stop_and_error_to_code",
+        # Format / transformation
+        "n8n-nodes-base.html": "_convert_html_to_code",
+        "n8n-nodes-base.markdown": "_convert_markdown_to_code",
+        "n8n-nodes-base.xml": "_convert_xml_to_code",
+        "n8n-nodes-base.crypto": "_convert_crypto_to_code",
+        "n8n-nodes-base.dateTime": "_convert_date_time_to_code",
+        "n8n-nodes-base.compression": "_convert_compression_to_code",
+        # File I/O
+        "n8n-nodes-base.readBinaryFiles": "_convert_read_binary_files_to_code",
+        "n8n-nodes-base.writeBinaryFile": "_convert_write_binary_file_to_code",
+        "n8n-nodes-base.spreadsheetFile": "_convert_spreadsheet_file_to_code",
+        "n8n-nodes-base.convertToFile": "_convert_convert_to_file_to_code",
+        "n8n-nodes-base.extractFromFile": "_convert_extract_from_file_to_code",
+    }
+
+    # Maps each data-transform node type to the output style produced by its handler.
+    # "list"  -> returns {"items": <list>, "result": <list>}  -- both typed as array
+    # "field" -> returns a flat dict of named fields plus "result"
+    # Absence means no predictable structured output (noOp, wait, etc.)
+    DATA_TRANSFORM_OUTPUT_STYLES: Dict[str, str] = {
+        "n8n-nodes-base.sort": "list",
+        "n8n-nodes-base.limit": "list",
+        "n8n-nodes-base.removeDuplicates": "list",
+        "n8n-nodes-base.splitOut": "list",
+        "n8n-nodes-base.itemLists": "list",
+        "n8n-nodes-base.aggregate": "field",
+        "n8n-nodes-base.html": "field",
+        "n8n-nodes-base.markdown": "field",
+        "n8n-nodes-base.xml": "field",
+        "n8n-nodes-base.crypto": "field",
+        "n8n-nodes-base.dateTime": "field",
+        "n8n-nodes-base.compression": "field",
+        "n8n-nodes-base.readWriteFile": "field",
+        "n8n-nodes-base.spreadsheetFile": "field",
+        "n8n-nodes-base.convertToFile": "field",
+        "n8n-nodes-base.extractFromFile": "field",
+    }
     N8N_OPERATOR_MAP: Dict[str, str] = {
     # generic equality
     "equals": "eq",
@@ -1473,42 +1734,44 @@ class N8nWorkflowConverter(WorkflowConverter):
         """
         Find the best OpenJiuwen node ID that exposes *condition_field*.
 
+        Walks the full predecessor chain (not just one extra step) until it finds
+        a node whose declared output properties contain *condition_field*.
+        This is necessary when pass-through nodes (noOp, wait, etc.) sit between
+        the IF node and the node that actually produces the field — those nodes
+        only declare 'result'/'waited' etc. in their schemas, not the upstream
+        data fields they forward.
+
         Search order:
-        1. Immediate predecessor — check its declared output properties.
-        2. Any code node in the predecessor chain whose outputs were enriched
-           by spread/cross-ref resolution (the field was injected from a
-           cross-referenced node but lives on the Code node's output schema).
-        3. Fallback to immediate predecessor regardless.
+        1. Walk back through predecessors until the field is found.
+        2. Fallback to immediate predecessor so the ref is never empty.
         """
         if not immediate_predecessor_id:
             return None
 
-        # 1. Does the immediate predecessor declare the field?
-        pred_node = next(
-            (n for n in self.openjiuwen_nodes if n["id"] == immediate_predecessor_id), None
-        )
-        if pred_node:
-            props = pred_node.get("data", {}).get("outputs", {}).get("properties", {})
-            if condition_field in props:
-                return immediate_predecessor_id
+        visited: set = set()
+        current_id: Optional[str] = immediate_predecessor_id
 
-        # 2. Walk back one more level (in case predecessor is a selector pass-through)
-        pred_n8n_name = next(
-            (name for name, jid in self.node_id_map.items() if jid == immediate_predecessor_id),
-            None,
-        )
-        if pred_n8n_name:
-            upstream_id = self._find_predecessor_id(pred_n8n_name)
-            if upstream_id:
-                up_node = next(
-                    (n for n in self.openjiuwen_nodes if n["id"] == upstream_id), None
-                )
-                if up_node:
-                    props = up_node.get("data", {}).get("outputs", {}).get("properties", {})
-                    if condition_field in props:
-                        return upstream_id
+        while current_id and current_id not in visited:
+            visited.add(current_id)
+            node = next(
+                (n for n in self.openjiuwen_nodes if n["id"] == current_id), None
+            )
+            if node:
+                props = node.get("data", {}).get("outputs", {}).get("properties", {})
+                if condition_field in props:
+                    return current_id
 
-        # 3. Fallback — return immediate predecessor so the schema at least has a ref
+            # Resolve the n8n name for this jiuwen id so we can walk one step back
+            n8n_name = next(
+                (name for name, jid in self.node_id_map.items() if jid == current_id),
+                None,
+            )
+            if n8n_name:
+                current_id = self._find_predecessor_id(n8n_name)
+            else:
+                break
+
+        # Fallback — return immediate predecessor so the schema at least has a ref
         return immediate_predecessor_id
 
     # =========================================================================
@@ -1937,9 +2200,82 @@ class N8nWorkflowConverter(WorkflowConverter):
         for idx, ffield in enumerate(extra_fields, start=1):
             if ffield != 'result':
                 ftype = field_types.get(ffield, 'string')
-                properties[ffield] = {'type': ftype, 'extra': {'index': idx}}
+                entry: Dict[str, Any] = {'type': ftype, 'extra': {'index': idx}}
+                # OpenJiuwen requires object-typed outputs to carry a properties
+                # sub-schema; omitting it causes a validation error at runtime.
+                if ftype == 'object':
+                    entry['properties'] = {}
+                properties[ffield] = entry
         required = ['result'] + [f for f in extra_fields if f != 'result']
         return {'type': 'object', 'properties': properties, 'required': required}
+
+    # =========================================================================
+    # STICKY NOTE CONVERSION
+    # =========================================================================
+
+    def _convert_sticky_note(self, n8n_node: Dict) -> Dict:
+        """
+        Convert n8n stickyNote to an OpenJiuwen note (type 99).
+
+        n8n format:
+            {"type": "n8n-nodes-base.stickyNote",
+             "position": [x, y],
+             "parameters": {"content": "text", "width": 240, "height": 150}}
+
+        OpenJiuwen format:
+            {"id": "<uuid>", "type": "99",
+             "meta": {"position": {"x": x, "y": y}},
+             "data": {"size": {"width": 240, "height": 150}, "note": "text"}}
+
+        Sticky notes are UI-only: they carry no edges and are never referenced
+        by other nodes, so they bypass the regular node_id_map / x_pos pipeline.
+
+        COORDINATE ALIGNMENT
+        ────────────────────
+        The trigger node is always repositioned to (180, 34) in Jiuwen regardless
+        of where it lived in n8n.  All other nodes keep their raw n8n coordinates.
+        To keep sticky notes spatially consistent with the Start node we apply the
+        same translation delta:
+            delta = (180 - trigger.x, 34 - trigger.y)
+        When there is no trigger the raw n8n position is used as-is.
+        """
+        params = n8n_node.get("parameters", {})
+        position = n8n_node.get("position", [0, 0])
+
+        # n8n stores content as "content"; fall back to "name" when absent
+        note_text = params.get("content", n8n_node.get("name", ""))
+
+        # Dimensions — n8n defaults are 240 x 160
+        width = int(params.get("width", 240))
+        height = int(params.get("height", 160))
+
+        raw_x = position[0] if len(position) > 0 else 0
+        raw_y = position[1] if len(position) > 1 else 0
+
+        # Apply the same coordinate offset used for the Start (trigger) node so
+        # that sticky notes maintain their relative position on the canvas.
+        if self.trigger_node:
+            trig_pos = self.trigger_node.get("position", [180, 34])
+            trig_x = trig_pos[0] if len(trig_pos) > 0 else 180
+            trig_y = trig_pos[1] if len(trig_pos) > 1 else 34
+            final_x = raw_x + (180 - trig_x)
+            final_y = raw_y + (34 - trig_y)
+        else:
+            final_x, final_y = raw_x, raw_y
+
+        note_id = self.id_gen.next_id("note")
+
+        return {
+            "id": note_id,
+            "type": "99",
+            "meta": {
+                "position": {"x": final_x, "y": final_y}
+            },
+            "data": {
+                "size": {"width": width, "height": height},
+                "note": note_text,
+            },
+        }
 
     # =========================================================================
     # CODE NODE CONVERSION
@@ -1952,8 +2288,11 @@ class N8nWorkflowConverter(WorkflowConverter):
         params = n8n_node.get("parameters", {})
         position = n8n_node.get("position", [x_pos, 34])
         
-        # Determine language and extract code
-        language = "javascript"
+        # Determine language and extract code.
+        # Default is Python — the vast majority of handlers (all Data Transform
+        # nodes + fallback) generate Python.  Only the two native JS node types
+        # override this to "javascript".
+        language = "python"
         code = ""
         
         if node_type == "n8n-nodes-base.code":
@@ -1962,7 +2301,6 @@ class N8nWorkflowConverter(WorkflowConverter):
                 language = "javascript"
                 code = params.get("jsCode", "")
             else:
-                language = "python"
                 code = params.get("pythonCode", "")
         elif node_type in ["n8n-nodes-base.function", "n8n-nodes-base.functionItem"]:
             language = "javascript"
@@ -1986,9 +2324,13 @@ class N8nWorkflowConverter(WorkflowConverter):
             normalised["parameters"] = norm_params
             language = "python"
             code = self._convert_read_write_file_to_code(normalised)
+        elif node_type in self.DATA_TRANSFORM_HANDLERS:
+            # All Data Transform node types are registered in DATA_TRANSFORM_HANDLERS.
+            # To add a new type: add one entry to that dict + write the handler method.
+            handler = getattr(self, self.DATA_TRANSFORM_HANDLERS[node_type])
+            code = handler(n8n_node)
         else:
             # Fallback for other node types
-            language = "python"
             code = self._create_fallback_code(n8n_node)
         
         if not code:
@@ -2042,12 +2384,25 @@ class N8nWorkflowConverter(WorkflowConverter):
                 "  const _n8nResult = (function() {\n"
                 + indented + "\n"
                 "  })();\n"
-                "// Flatten n8n return format [{json:{...}}] -> {result:{...}, ...fields}\n"
-                "  const _data = (Array.isArray(_n8nResult) && _n8nResult[0] && _n8nResult[0].json)\n"
-                "    ? _n8nResult[0].json\n"
-                "    : (_n8nResult && typeof _n8nResult === 'object' ? _n8nResult : {});\n"
-                "  const _out = Object.assign({}, _data);\n"
-                "  _out.result = _data;\n"
+                "// Convert n8n [{json:{...}}, ...] array format to OpenJiuwen {items:[...], result:[...]}\n"
+                "  let _items;\n"
+                "  if (Array.isArray(_n8nResult) && _n8nResult.length > 0\n"
+                "      && _n8nResult[0] !== null && typeof _n8nResult[0] === 'object'\n"
+                "      && 'json' in _n8nResult[0]) {\n"
+                "    // Standard n8n multi-item format: [{json:{...}}, ...]\n"
+                "    _items = _n8nResult.map(function(i) { return i.json || i; });\n"
+                "  } else if (Array.isArray(_n8nResult)) {\n"
+                "    _items = _n8nResult;\n"
+                "  } else if (_n8nResult && typeof _n8nResult === 'object') {\n"
+                "    _items = [_n8nResult];\n"
+                "  } else {\n"
+                "    _items = [];\n"
+                "  }\n"
+                "  const _out = { items: _items, result: _items };\n"
+                "  // Also expose individual fields from first item so downstream ref lookups work\n"
+                "  if (_items.length > 0 && _items[0] && typeof _items[0] === 'object') {\n"
+                "    Object.assign(_out, _items[0]);\n"
+                "  }\n"
                 "  return _out;\n"
                 "}"
             )
@@ -2064,11 +2419,85 @@ class N8nWorkflowConverter(WorkflowConverter):
         # Build input parameters from referenced fields
         input_parameters = self._extract_code_input_parameters(n8n_node, code)
 
-        # Build outputs: extract every field this node returns so selectors and
-        # downstream nodes can reference them individually.
-        extra_fields = self._extract_return_field_names(n8n_node, language)
-        field_types = self._extract_return_field_types(n8n_node, language)
-        outputs = self._build_code_outputs(extra_fields, field_types)
+        # Build outputs.
+        # For data-transform nodes we know exactly what the handler returns, so
+        # we build the schema directly instead of trying to parse generated code.
+        transform_style = self.DATA_TRANSFORM_OUTPUT_STYLES.get(node_type)
+        if transform_style == "list":
+            # Sort / Limit / Remove Duplicates / SplitOut / ItemLists
+            # -> {"items": <list-of-objects>, "result": <list-of-objects>}
+            outputs = {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Sorted/filtered item list",
+                        "extra": {"index": 0}
+                    },
+                    "result": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "代码执行结果",
+                        "extra": {"index": 1}
+                    }
+                },
+                "required": ["items", "result"]
+            }
+        elif transform_style == "field":
+            # Aggregate / HTML / Markdown / XML / Crypto / DateTime / Compression
+            # -> flat dict of named fields + "result" (object)
+            extra_fields = self._extract_return_field_names(n8n_node, language)
+            field_types = self._extract_return_field_types(n8n_node, language)
+            # For aggregate the named fields are arrays; everything else is string.
+            if node_type == "n8n-nodes-base.aggregate":
+                params = n8n_node.get("parameters", {})
+                agg_fields = [
+                    fa.get("fieldToAggregate", "")
+                    for fa in params.get("fieldsToAggregate", {}).get("fieldToAggregate", [])
+                    if fa.get("fieldToAggregate")
+                ]
+                agg_types = {f: "array" for f in agg_fields}
+                agg_types.update(field_types)
+                outputs = self._build_code_outputs(
+                    agg_fields if agg_fields else extra_fields, agg_types
+                )
+            else:
+                outputs = self._build_code_outputs(extra_fields, field_types)
+        else:
+            # Native Code / Function nodes and everything else.
+            # If we applied the JS wrapper the runtime output is always
+            # {items: array, result: array, ...firstItemFields}.
+            # Override result+items to array so downstream nodes type-check correctly.
+            extra_fields = self._extract_return_field_names(n8n_node, language)
+            field_types = self._extract_return_field_types(n8n_node, language)
+            outputs = self._build_code_outputs(extra_fields, field_types)
+            if language == "javascript":
+                # The JS wrapper always produces {items:[...], result:[...], ...fields}.
+                # Patch result and add items as arrays; keep individual scalar fields.
+                props = outputs.setdefault("properties", {})
+                props["items"] = {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "All output items",
+                    "extra": {"index": 0}
+                }
+                props["result"] = {
+                    "type": "array",
+                    "items": {"type": "object"},
+                    "description": "代码执行结果",
+                    "extra": {"index": 1}
+                }
+                # Re-index any extra scalar fields starting from 2
+                for i, fname in enumerate(extra_fields, start=2):
+                    if fname not in ("result", "items") and fname in props:
+                        props[fname]["extra"] = {"index": i}
+                req = outputs.get("required", [])
+                if "items" not in req:
+                    req.insert(0, "items")
+                if "result" not in req:
+                    req.insert(1, "result")
+                outputs["required"] = req
 
         return {
             "id": node_id,
@@ -2132,7 +2561,8 @@ class N8nWorkflowConverter(WorkflowConverter):
             '    if isinstance(_raw, str):',
             '        try: _raw = _json.loads(_raw)',
             '        except Exception: _raw = {}',
-            '    input_data = _raw if isinstance(_raw, dict) else {}',
+            '    input_data = _raw if isinstance(_raw, dict) else (_raw[0] if isinstance(_raw, list) and _raw '
+            '                 and isinstance(_raw[0], dict) else {})',
             '    ',
         ]
         
@@ -2606,6 +3036,1166 @@ class N8nWorkflowConverter(WorkflowConverter):
 '''
 
     # =========================================================================
+    # COMPARE DATASETS NODE (Code + 4 independent guard Selectors)
+    # =========================================================================
+
+    def _convert_compare_datasets_node(
+        self, n8n_node: Dict, x_pos: int
+    ) -> Tuple[Dict, List[Dict]]:
+        """
+        Convert n8n compareDatasets to one Code node + four independent guard
+        Selector nodes, one per n8n output port.
+
+        Returns
+        -------
+        (code_node, [selector_port0, selector_port1, selector_port2, selector_port3])
+        """
+        node_name = n8n_node.get("name", "Compare Datasets")
+        params = n8n_node.get("parameters", {})
+        position = n8n_node.get("position", [x_pos, 34])
+        px = position[0] if len(position) > 0 else x_pos
+        py = position[1] if len(position) > 1 else 34
+
+        code_id = self.id_gen.next_id("code")
+
+        # ── Extract merge-by field pairs ──────────────────────────────────────
+        merge_fields_raw = params.get("mergeByFields", {}).get("values", [])
+        merge_fields = [
+            {"input1": f.get("field1", ""), "input2": f.get("field2", "")}
+            for f in merge_fields_raw
+        ]
+        merge_fields_repr = repr(merge_fields)
+
+        # ── Code body ─────────────────────────────────────────────────────────
+        code_body = (
+            'def main(args):\n'
+            f'    """Converted from n8n Compare Datasets node: {node_name}\n'
+            '    Computes four output sets mirroring n8n\'s four output ports:\n'
+            '      matched    (port 0) — items whose key exists in both A and B\n'
+            '      only_a     (port 1) — items whose key exists only in A\n'
+            '      only_b     (port 2) — items whose key exists only in B\n'
+            '      union_excl (port 3) — only_a + only_b (symmetric difference)\n'
+            '    Input A is received as the "input_a" parameter (n8n input port 0).\n'
+            '    Input B is received as the "input_b" parameter (n8n input port 1).\n'
+            '    """\n'
+            '    params = args.params if hasattr(args, "params") else {}\n'
+            '    raw_a = params.get("input_a", [])\n'
+            '    raw_b = params.get("input_b", [])\n'
+            '    items_a = raw_a if isinstance(raw_a, list) else [raw_a] if raw_a else []\n'
+            '    items_b = raw_b if isinstance(raw_b, list) else [raw_b] if raw_b else []\n'
+            f'    merge_fields = {merge_fields_repr}\n'
+            '    def get_key(item, fields, side):\n'
+            '        if not fields:\n'
+            '            return repr(sorted(item.items()) if isinstance(item, dict) else item)\n'
+            '        return tuple(\n'
+            '            item.get(f[side], "") if isinstance(item, dict) else ""\n'
+            '            for f in fields\n'
+            '        )\n'
+            '    keys_a = {\n'
+            '        get_key(item, merge_fields, "input1"): item\n'
+            '        for item in items_a if isinstance(item, dict)\n'
+            '    }\n'
+            '    keys_b = {\n'
+            '        get_key(item, merge_fields, "input2"): item\n'
+            '        for item in items_b if isinstance(item, dict)\n'
+            '    }\n'
+            '    matched, only_a, only_b = [], [], []\n'
+            '    for key, item in keys_a.items():\n'
+            '        if key in keys_b:\n'
+            '            merged = dict(keys_b[key])\n'
+            '            merged.update(item)\n'
+            '            matched.append(merged)\n'
+            '        else:\n'
+            '            only_a.append(item)\n'
+            '    for key, item in keys_b.items():\n'
+            '        if key not in keys_a:\n'
+            '            only_b.append(item)\n'
+            '    union_excl = only_a + only_b\n'
+            '    result = {\n'
+            '        "matched": matched,\n'
+            '        "only_a": only_a,\n'
+            '        "only_b": only_b,\n'
+            '        "union_excl": union_excl,\n'
+            '        "matched_count": len(matched),\n'
+            '        "only_a_count": len(only_a),\n'
+            '        "only_b_count": len(only_b),\n'
+            '        "union_excl_count": len(union_excl),\n'
+            '    }\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+        # ── Code node outputs schema ──────────────────────────────────────────
+        outputs = {
+            "type": "object",
+            "properties": {
+                "result": {"type": "object", "extra": {"index": 0}},
+                "matched": {"type": "array", "extra": {"index": 1}},
+                "only_a": {"type": "array", "extra": {"index": 2}},
+                "only_b": {"type": "array", "extra": {"index": 3}},
+                "union_excl": {"type": "array", "extra": {"index": 4}},
+                "matched_count": {"type": "number", "extra": {"index": 5}},
+                "only_a_count": {"type": "number", "extra": {"index": 6}},
+                "only_b_count": {"type": "number", "extra": {"index": 7}},
+                "union_excl_count": {"type": "number", "extra": {"index": 8}},
+            },
+            "required": ["result", "matched", "only_a", "only_b", "union_excl"],
+        }
+
+        # ── Resolve both input predecessors by n8n input port index ──────────
+        pred_a_id = self._find_predecessor_by_input_index(node_name, 0)
+        pred_b_id = self._find_predecessor_by_input_index(node_name, 1)
+        input_parameters: Dict[str, Any] = {}
+        if pred_a_id:
+            field_a = self._get_primary_output_field(pred_a_id)
+            input_parameters["input_a"] = {
+                "type": "ref",
+                "content": [pred_a_id, field_a or "result"],
+                "extra": {"index": 0},
+            }
+        if pred_b_id:
+            field_b = self._get_primary_output_field(pred_b_id)
+            input_parameters["input_b"] = {
+                "type": "ref",
+                "content": [pred_b_id, field_b or "result"],
+                "extra": {"index": 1},
+            }
+
+        code_node: Dict = {
+            "id": code_id,
+            "type": str(ComponentType.COMPONENT_TYPE_CODE),
+            "meta": {"position": {"x": px, "y": py}},
+            "data": {
+                "title": node_name,
+                "inputs": {
+                    "language": "python",
+                    "code": code_body,
+                    "inputParameters": input_parameters,
+                },
+                "outputs": outputs,
+                "exceptionConfig": {
+                    "retryTimes": 3,
+                    "timeoutSeconds": 30,
+                    "processType": "break",
+                    "executeStep": {"defaultStep": "0", "errorStep": "1"},
+                },
+            },
+        }
+
+        # ── Build 4 independent guard Selectors ───────────────────────────────
+        # Each Selector is sourced directly from the Code node (not from each
+        # other — no cascade).  Branch 0 fires when the set is non-empty;
+        # Branch 1 (else) lets _ensure_edge_connections wire it to End/skip.
+        #
+        # Port 3 uses OR logic (logic=1) because union_excl is non-empty when
+        # EITHER only_a OR only_b has items.
+
+        def _ref(field_name: str) -> Dict:
+            return {"type": "ref", "content": [code_id, field_name]}
+
+        def _const(val: int) -> Dict:
+            return {"type": "constant", "content": val, "schema": {"type": "number"}}
+
+        port_defs = [
+            # (port_index, title_suffix, input_param_key, condition_field,
+            #  count_field, logic, extra_condition)
+            (0, "matched", "matched_count", "matched_count", 2, None),
+            (1, "only_a", "only_a_count", "only_a_count", 2, None),
+            (2, "only_b", "only_b_count", "only_b_count", 2, None),
+            # Port 3: only_a_count > 0 OR only_b_count > 0
+            (3, "union_excl", "only_a_count", "only_a_count", 1,
+             {"left": _ref("only_b_count"), "operator": ">", "right": _const(0)}),
+        ]
+
+        selector_nodes: List[Dict] = []
+        for port_idx, field_name, param_key, cond_field, logic, extra_cond in port_defs:
+            sel_id = self.id_gen.next_id("selector")
+
+            branch_id_true = f"branch_{uuid.uuid4().hex[:5]}"
+            branch_id_skip = f"branch_{uuid.uuid4().hex[:5]}"
+
+            primary_cond = {
+                "left": _ref(cond_field),
+                "operator": ">",
+                "right": _const(0),
+            }
+            conditions = [primary_cond]
+            if extra_cond:
+                conditions.append(extra_cond)
+
+            ip: Dict[str, Any] = {
+                param_key: {
+                    "type": "ref",
+                    "content": [code_id, param_key],
+                    "extra": {"index": 0},
+                }
+            }
+            if extra_cond and port_idx == 3:
+                # Port 3 also references only_b_count for the OR clause
+                ip["only_b_count"] = {
+                    "type": "ref",
+                    "content": [code_id, "only_b_count"],
+                    "extra": {"index": 1},
+                }
+
+            sel_node: Dict = {
+                "id": sel_id,
+                "type": str(ComponentType.COMPONENT_TYPE_IF),
+                "meta": {"position": {"x": px + 230 + port_idx * 230, "y": py}},
+                "data": {
+                    "title": f"{node_name} – {field_name} guard",
+                    "inputs": {"inputParameters": ip},
+                    "branches": [
+                        {
+                            # Branch 0: set is non-empty → run the downstream consumer
+                            "conditions": conditions,
+                            "logic": logic,
+                            "branchId": branch_id_true,
+                        },
+                        {
+                            # Branch 1: set is empty → skip (wired to End by
+                            # _ensure_edge_connections)
+                            "conditions": [],
+                            "logic": 2,
+                            "branchId": branch_id_skip,
+                        },
+                    ],
+                },
+            }
+            selector_nodes.append(sel_node)
+
+        self.report.add_warning(
+            f"compareDatasets '{node_name}': converted to 1 Code node + "
+            f"4 independent guard Selectors (one per n8n output port). "
+            f"Port 0 (matched) → selector index 0; "
+            f"Port 1 (only_a)  → selector index 1; "
+            f"Port 2 (only_b)  → selector index 2; "
+            f"Port 3 (union_excl, OR logic) → selector index 3. "
+            f"Each guard's Branch 1 is wired to End when the set is empty."
+        )
+
+        return code_node, selector_nodes
+
+    # =========================================================================
+    # DATA TRANSFORM CODE-GENERATION HELPERS
+    # =========================================================================
+
+    @staticmethod
+    def _wrap_transform_code(
+        node_name: str,
+        label: str,
+        core_lines: str,
+        output_style: str = "field",
+    ) -> str:
+        """
+        Wrap core_lines with the standard def main(args): header and footer.
+
+        Every generated transform function shares the same header::
+
+            def main(args):
+                # docstring: Converted from n8n {label} node: {node_name}
+                input_data = args.params.get("input", {}) if hasattr(args, "params") else {}
+
+        output_style controls the footer:
+          "field" — result is a dict; exposes every key plus "result":
+                      _output = dict(result) if isinstance(result, dict) else {"data": result}
+                      _output["result"] = result
+                      return _output
+          "list"  — result is a list; exposes "items" alias + "result":
+                      _output = {"items": result, "result": result}
+                      return _output
+
+        core_lines is the body between input_data and the footer, already
+        4-space-indented.  It is responsible for setting `result`.
+        """
+        header = (
+            'def main(args):\n'
+            f'    """Converted from n8n {label} node: {node_name}"""\n'
+            '    _raw_params = args.params if hasattr(args, "params") else {}\n'
+            '    if isinstance(_raw_params, str):\n'
+            '        import json as _json\n'
+            '        try:\n'
+            '            _raw_params = _json.loads(_raw_params)\n'
+            '        except Exception:\n'
+            '            _raw_params = {}\n'
+            '    input_data = _raw_params.get("input", _raw_params) if isinstance(_raw_params, dict) else {}\n'
+            '    if isinstance(input_data, str):\n'
+            '        import json as _json\n'
+            '        try:\n'
+            '            input_data = _json.loads(input_data)\n'
+            '        except Exception:\n'
+            '            pass\n'
+            '    if not isinstance(input_data, (dict, list)):\n'
+            '        input_data = {}\n'
+        )
+        if output_style == "list":
+            footer = (
+                '    _output = {"items": result, "result": result}\n'
+                '    return _output\n'
+            )
+        else: # "field"
+            footer = (
+                '    _output = dict(result) if isinstance(result, dict) else {"data": result}\n'
+                '    _output["result"] = result\n'
+                '    return _output\n'
+            )
+        return header + core_lines + footer
+
+    @staticmethod
+    def _extract_items_lines(flat: bool = False) -> str:
+        """
+        Return the standard 4-space-indented items-extraction snippet.
+
+        flat=False (default) — tolerates both list and dict inputs:
+            items = (
+                input_data if isinstance(input_data, list)
+                else input_data.get("items", [input_data])
+            )
+
+        flat=True — treats any non-list as a single-element list (used by
+        splitOut which always works item-by-item):
+            items = input_data if isinstance(input_data, list) else [input_data]
+        """
+        if flat:
+            return '    items = input_data if isinstance(input_data, list) else [input_data]\n'
+        return (
+            '    items = (\n'
+            '        input_data if isinstance(input_data, list)\n'
+            '        else input_data.get("items", [input_data])\n'
+            '    )\n'
+        )
+
+    # =========================================================================
+    # DATA TRANSFORM NODE CODE GENERATORS
+    # =========================================================================
+
+    # ── Collection transforms ─────────────────────────────────────────────────
+
+    def _convert_sort_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Sort node to Python code."""
+        node_name = n8n_node.get("name", "Sort")
+        params = n8n_node.get("parameters", {})
+        sort_ui = params.get("sortFieldsUi", {})
+        # n8n ≥1.64 / 2.x uses "sortField"; older builds used "values"
+        sort_fields = sort_ui.get("sortField") or sort_ui.get("values") or []
+        # Normalise order values: "ascending"/"descending" → "asc"/"desc"
+        for sf in sort_fields:
+            order = sf.get("order", "asc").lower()
+            if order == "ascending":
+                sf["order"] = "asc"
+            elif order == "descending":
+                sf["order"] = "desc"
+        if not sort_fields:
+            field_name = params.get("fieldName", "")
+            order = params.get("order", "asc")
+            if field_name:
+                sort_fields = [{"fieldName": field_name, "order": order}]
+        core = (
+            self._extract_items_lines()
+            + f'    sort_fields = {repr(sort_fields)}\n'
+            + '    result = list(items)\n'
+            + '    for sf in reversed(sort_fields):\n'
+            + '        field = sf.get("fieldName", "")\n'
+            + '        reverse = sf.get("order", "asc").lower() == "desc"\n'
+            + '        if field:\n'
+            + '            result.sort(\n'
+            + '                key=lambda x: (x.get(field) is None, x.get(field, ""))\n'
+            + '                    if isinstance(x, dict) else (False, x),\n'
+            + '                reverse=reverse,\n'
+            + '            )\n'
+        )
+        return self._wrap_transform_code(node_name, "Sort", core, output_style="list")
+
+    def _convert_limit_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Limit node to Python code."""
+        node_name = n8n_node.get("name", "Limit")
+        params = n8n_node.get("parameters", {})
+        max_items = params.get("maxItems", 1)
+        keep = params.get("keep", "firstItems")
+        core = (
+            self._extract_items_lines()
+            + f'    max_items = {max_items}\n'
+            + f'    keep = "{keep}"\n'
+            + '    result = list(items[-max_items:]) if keep == "lastItems" else list(items[:max_items])\n'
+        )
+        return self._wrap_transform_code(node_name, "Limit", core, output_style="list")
+
+    def _convert_remove_duplicates_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Remove Duplicates node to Python code."""
+        node_name = n8n_node.get("name", "Remove Duplicates")
+        params = n8n_node.get("parameters", {})
+        compare_type = params.get("compare", "allFields")
+        # n8n ≥1.64 / 2.x (typeVersion 2): fieldsToCompare.fields[].fieldName
+        # n8n <1.64 (typeVersion 1): fields.values[].fieldName
+        raw_fields = (
+            params.get("fieldsToCompare", {}).get("fields")
+            or params.get("fields", {}).get("values")
+            or []
+        )
+        compare_fields = [f.get("fieldName", "") for f in raw_fields if f.get("fieldName")]
+        core = (
+            self._extract_items_lines()
+            + f'    compare_type = "{compare_type}"\n'
+            + f'    compare_fields = {repr(compare_fields)}\n'
+            + '    seen, result = [], []\n'
+            + '    for item in items:\n'
+            + '        if not isinstance(item, dict):\n'
+            + '            if item not in seen:\n'
+            + '                seen.append(item)\n'
+            + '                result.append(item)\n'
+            + '            continue\n'
+            + '        if compare_type == "selectedFields" and compare_fields:\n'
+            + '            key = tuple(item.get(f) for f in compare_fields)\n'
+            + '        else:\n'
+            + '            key = tuple(sorted(item.items()))\n'
+            + '        if key not in seen:\n'
+            + '            seen.append(key)\n'
+            + '            result.append(item)\n'
+        )
+        return self._wrap_transform_code(node_name, "Remove Duplicates", core, output_style="list")
+
+    def _convert_aggregate_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Aggregate node to Python code."""
+        node_name = n8n_node.get("name", "Aggregate")
+        params = n8n_node.get("parameters", {})
+        aggregate_type = params.get("aggregate", "aggregateAllItemData")
+        raw_fields = params.get("fieldsToAggregate", {}).get("fieldToAggregate", [])
+        fields = [f.get("fieldToAggregate", "") for f in raw_fields if f.get("fieldToAggregate")]
+        core = (
+            self._extract_items_lines()
+            + f'    aggregate_type = "{aggregate_type}"\n'
+            + f'    fields = {repr(fields)}\n'
+            + '    if aggregate_type == "aggregateAllItemData":\n'
+            + '        result = {"data": [item for item in items if isinstance(item, dict)]}\n'
+            + '    else:\n'
+            + '        result = {}\n'
+            + '        for field in fields:\n'
+            + '            result[field] = [\n'
+            + '                item.get(field) for item in items\n'
+            + '                if isinstance(item, dict) and field in item\n'
+            + '            ]\n'
+        )
+        return self._wrap_transform_code(node_name, "Aggregate", core, output_style="field")
+
+    # ── Expansion transforms ──────────────────────────────────────────────────
+
+    def _convert_split_out_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Split Out node to Python code."""
+        node_name = n8n_node.get("name", "Split Out")
+        params = n8n_node.get("parameters", {})
+        field_name = self._convert_expression(params.get("fieldToSplitOut", ""))
+        include = params.get("include", "noOtherFields")
+        raw_extra = params.get("fieldsToInclude", {}).get("fields", [])
+        extra_fields = [f.get("fieldName", "") for f in raw_extra if f.get("fieldName")]
+        core = (
+            self._extract_items_lines(flat=True)
+            + f'    field = "{field_name}"\n'
+            + f'    include = "{include}"\n'
+            + f'    extra_fields = {repr(extra_fields)}\n'
+            + '    result = []\n'
+            + '    for item in items:\n'
+            + '        if not isinstance(item, dict):\n'
+            + '            result.append(item)\n'
+            + '            continue\n'
+            + '        array_val = item.get(field, [])\n'
+            + '        if not isinstance(array_val, list):\n'
+            + '            array_val = [array_val]\n'
+            + '        for element in array_val:\n'
+            + '            if include == "allOtherFields":\n'
+            + '                new_item = {k: v for k, v in item.items() if k != field}\n'
+            + '            elif include == "selectedOtherFields" and extra_fields:\n'
+            + '                new_item = {k: item[k] for k in extra_fields if k in item}\n'
+            + '            else:\n'
+            + '                new_item = {}\n'
+            + '            new_item[field] = element\n'
+            + '            result.append(new_item)\n'
+        )
+        return self._wrap_transform_code(node_name, "Split Out", core, output_style="list")
+
+    def _convert_item_lists_to_code(self, n8n_node: Dict) -> str:
+        """
+        Convert n8n Item Lists node to Python code.
+
+        Item Lists is a legacy multi-operation node.  We generate a dispatcher
+        that handles: splitOutItems, aggregateItems, removeDuplicates, summarize,
+        sort, limit.
+        """
+        node_name = n8n_node.get("name", "Item Lists")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "splitOutItems")
+        field_to_split = params.get("fieldToSplitOut", "")
+        raw_cmp = params.get("fieldsToCompare", {}).get("fields", [])
+        compare_fields = [f.get("fieldName", "") for f in raw_cmp if f.get("fieldName")]
+        sort_ui = params.get("sortFieldsUi", {})
+        raw_sort = sort_ui.get("sortField") or sort_ui.get("values") or []
+        sort_fields = [
+            {
+                "field": f.get("fieldName", ""),
+                "order": (
+                    "desc" if f.get("order", "asc").lower() in ("desc", "descending")
+                    else "asc"
+                )
+            }
+            for f in raw_sort
+        ]
+        max_items = params.get("maxItems", 1)
+        raw_sum = params.get("fieldsToSummarize", {}).get("values", [])
+        summarize_fields = [
+            {"field": f.get("field", f.get("fieldToSummarize", "")), "aggregation": f.get("aggregation", "count")}
+            for f in raw_sum
+        ]
+        core = (
+            self._extract_items_lines()
+            + f'    operation = "{operation}"\n'
+            + f'    field_to_split = "{field_to_split}"\n'
+            + f'    compare_fields = {repr(compare_fields)}\n'
+            + f'    sort_fields = {repr(sort_fields)}\n'
+            + f'    max_items = {max_items}\n'
+            + f'    summarize_fields = {repr(summarize_fields)}\n'
+            + '    result = []\n'
+            + '    if operation == "splitOutItems":\n'
+            + '        for item in items:\n'
+            + '            if not isinstance(item, dict):\n'
+            + '                result.append(item); continue\n'
+            + '            arr = item.get(field_to_split, [])\n'
+            + '            if not isinstance(arr, list):\n'
+            + '                arr = [arr]\n'
+            + '            for el in arr:\n'
+            + '                new = dict(item); new[field_to_split] = el\n'
+            + '                result.append(new)\n'
+            + '    elif operation == "aggregateItems":\n'
+            + '        merged = {}\n'
+            + '        for item in items:\n'
+            + '            if isinstance(item, dict):\n'
+            + '                merged.update(item)\n'
+            + '        result = [merged]\n'
+            + '    elif operation == "removeDuplicates":\n'
+            + '        seen = []\n'
+            + '        for item in items:\n'
+            + '            key = (\n'
+            + '                tuple(item.get(f) for f in compare_fields)\n'
+            + '                if (compare_fields and isinstance(item, dict))\n'
+            + '                else (tuple(sorted(item.items())) if isinstance(item, dict) else item)\n'
+            + '            )\n'
+            + '            if key not in seen:\n'
+            + '                seen.append(key); result.append(item)\n'
+            + '    elif operation == "sort":\n'
+            + '        result = list(items)\n'
+            + '        for sf in reversed(sort_fields):\n'
+            + '            f2, rev = sf.get("field", ""), sf.get("order", "asc").lower() == "desc"\n'
+            + '            if f2:\n'
+            + '                result.sort(\n'
+            + '                    key=lambda x: (x.get(f2) is None, x.get(f2, ""))\n'
+            + '                        if isinstance(x, dict) else (False, x),\n'
+            + '                    reverse=rev,\n'
+            + '                )\n'
+            + '    elif operation == "limit":\n'
+            + '        result = list(items)[:max_items]\n'
+            + '    elif operation == "summarize":\n'
+            + '        summary = {}\n'
+            + '        for sf in summarize_fields:\n'
+            + '            f3, agg = sf.get("field", ""), sf.get("aggregation", "count")\n'
+            + '            vals = [item.get(f3) for item in items if isinstance(item, dict) and f3 in item]\n'
+            + '            nums = [v for v in vals if isinstance(v, (int, float))]\n'
+            + '            if   agg == "count": summary[f3] = len(vals)\n'
+            + '            elif agg == "sum": summary[f3] = sum(nums)\n'
+            + '            elif agg == "average": summary[f3] = sum(nums) / len(nums) if nums else 0\n'
+            + '            elif agg == "min": summary[f3] = min(nums) if nums else None\n'
+            + '            elif agg == "max": summary[f3] = max(nums) if nums else None\n'
+            + '            elif agg == "countUnique": summary[f3] = len(set(str(v) for v in vals))\n'
+            + '            else: summary[f3] = vals\n'
+            + '        result = [summary]\n'
+            + '    else:\n'
+            + '        result = list(items)\n'
+        )
+        return self._wrap_transform_code(node_name, "Item Lists", core, output_style="list")
+
+    # ── Side-effect / control nodes ───────────────────────────────────────────
+
+    @staticmethod
+    def _convert_no_op_to_code(n8n_node: Dict) -> str:
+        """Convert n8n No-Op node: pure pass-through."""
+        node_name = n8n_node.get("name", "No Operation")
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n No Op node: {node_name} — passes data through unchanged"""\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            '    result = input_data\n'
+            '    _output = dict(result) if isinstance(result, dict) else {"data": result}\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    @staticmethod
+    def _convert_wait_to_code(n8n_node: Dict) -> str:
+        """Convert n8n Wait node to Python code (time.sleep, capped at 60 s)."""
+        node_name = n8n_node.get("name", "Wait")
+        params = n8n_node.get("parameters", {})
+        resume = params.get("resume", "timeInterval")
+        amount = params.get("amount", 1)
+        unit = params.get("unit", "hours")
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Wait node: {node_name}"""\n'
+            '    import time\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    resume = "{resume}"\n'
+            f'    amount = {amount}\n'
+            f'    unit = "{unit}"\n'
+            '    unit_seconds = {"seconds": 1, "minutes": 60, "hours": 3600, "days": 86400}\n'
+            '    if resume == "timeInterval":\n'
+            '        wait_secs = amount * unit_seconds.get(unit, 3600)\n'
+            '        time.sleep(min(wait_secs, 60))  # cap at 60 s\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {"data": input_data}\n'
+            '    result["waited"] = True\n'
+            '    result["resume"] = resume\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    def _convert_respond_to_webhook_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Respond to Webhook node to Python code."""
+        node_name = n8n_node.get("name", "Respond to Webhook")
+        params = n8n_node.get("parameters", {})
+        respond_with = params.get("respondWith", "allIncomingItems")
+        response_body = self._convert_expression(params.get("responseBody", ""))
+        response_code = params.get("options", {}).get("responseCode", 200)
+        safe_body = response_body.replace('"""', '\\"\\"\\"')
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Respond to Webhook node: {node_name}"""\n'
+            '    import json\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    respond_with = "{respond_with}"\n'
+            f'    response_code = {response_code}\n'
+            f'    static_body = """{safe_body}"""\n'
+            '    if respond_with == "text":\n'
+            '        body = static_body or str(input_data)\n'
+            '    elif respond_with == "json":\n'
+            '        body = json.dumps(input_data)\n'
+            '    elif respond_with == "noData":\n'
+            '        body = ""\n'
+            '    else:\n'
+            '        body = json.dumps(input_data)\n'
+            '    result = {\n'
+            '        "responded": True,\n'
+            '        "responseCode": response_code,\n'
+            '        "body": body,\n'
+            '        "data": input_data,\n'
+            '    }\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    @staticmethod
+    def _convert_stop_and_error_to_code(n8n_node: Dict) -> str:
+        """Convert n8n Stop and Error node: raises RuntimeError unconditionally."""
+        node_name = n8n_node.get("name", "Stop and Error")
+        params = n8n_node.get("parameters", {})
+        error_message = params.get("errorMessage", f"Workflow stopped at node: {node_name}")
+        safe_msg = error_message.replace('"""', '\\"\\"\\"')
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Stop and Error node: {node_name}"""\n'
+            f'    raise RuntimeError("[StopAndError] {safe_msg}")\n'
+        )
+
+    # ── Format / transformation nodes ─────────────────────────────────────────
+
+    def _convert_html_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n HTML node (generate / extractHtmlContent) to Python code."""
+        node_name = n8n_node.get("name", "HTML")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "generate")
+        value = self._convert_expression(params.get("value", ""))
+        destination_key = params.get("destinationKey", "html")
+        source_key = params.get("sourceKey", "data")
+        safe_value = value.replace('"""', '\\"\\"\\"')
+        core = (
+            '    import re, html\n'
+            f'    operation = "{operation}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    if operation == "generate":\n'
+            f'        result["{destination_key}"] = """{safe_value}"""\n'
+            '    elif operation == "extractHtmlContent":\n'
+            f'        raw = input_data.get("{source_key}", str(input_data))\n'
+            '        text = re.sub(r"<[^>]+>", "", str(raw))\n'
+            '        text = html.unescape(text).strip()\n'
+            f'        result["{destination_key}"] = text\n'
+        )
+        return self._wrap_transform_code(node_name, "HTML", core, output_style="field")
+
+    def _convert_markdown_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Markdown node (markdownToHtml / htmlToMarkdown) to Python code."""
+        node_name = n8n_node.get("name", "Markdown")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("mode", "markdownToHtml")
+        html_param = self._convert_expression(params.get("html", ""))
+        markdown_param = self._convert_expression(params.get("markdown", ""))
+        destination_key = params.get("destinationKey", "data")
+        safe_md = markdown_param.replace('"""', '\\"\\"\\"')
+        safe_html = html_param.replace('"""', '\\"\\"\\"')
+        core = (
+            '    import re\n'
+            f'    operation = "{operation}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    if operation == "markdownToHtml":\n'
+            f'        md = """{safe_md}""" or input_data.get("markdown", str(input_data))\n'
+            '        out = re.sub(r"^# (.+)$",   r"<h1>\\1</h1>", md,  flags=re.MULTILINE)\n'
+            '        out = re.sub(r"^## (.+)$",  r"<h2>\\1</h2>", out, flags=re.MULTILINE)\n'
+            '        out = re.sub(r"^### (.+)$", r"<h3>\\1</h3>", out, flags=re.MULTILINE)\n'
+            r'        out = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", out)' + '\n'
+            r'        out = re.sub(r"\*(.+?)\*",     r"<em>\1</em>",         out)' + '\n'
+            '        out = out.replace("\\n", "<br>")\n'
+            f'        result["{destination_key}"] = out\n'
+            '    else:\n'
+            f'        htm = """{safe_html}""" or input_data.get("html", str(input_data))\n'
+            '        txt = re.sub(r"<h[1-6]>(.+?)</h[1-6]>", r"# \\1\\n", htm, flags=re.IGNORECASE)\n'
+            r'        txt = re.sub(r"<strong>(.+?)</strong>",  r"**\1**",   txt, flags=re.IGNORECASE)' + '\n'
+            r'        txt = re.sub(r"<em>(.+?)</em>",          r"*\1*",     txt, flags=re.IGNORECASE)' + '\n'
+            '        txt = re.sub(r"<br\\s*/?>", "\\n", txt, flags=re.IGNORECASE)\n'
+            '        txt = re.sub(r"<[^>]+>", "", txt).strip()\n'
+            f'        result["{destination_key}"] = txt\n'
+        )
+        return self._wrap_transform_code(node_name, "Markdown", core, output_style="field")
+
+    def _convert_xml_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n XML node (xmlToJson / jsonToXml) to Python code."""
+        node_name = n8n_node.get("name", "XML")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("mode", "xmlToJson")
+        data_key = params.get("dataPropertyName", "data")
+        core = (
+            '    import xml.etree.ElementTree as ET\n'
+            f'    operation = "{operation}"\n'
+            f'    data_key = "{data_key}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    def _xml_to_dict(el):\n'
+            '        d = {}\n'
+            '        for child in el:\n'
+            '            v = _xml_to_dict(child) if len(child) else (child.text or "")\n'
+            '            if child.tag in d:\n'
+            '                if not isinstance(d[child.tag], list):\n'
+            '                    d[child.tag] = [d[child.tag]]\n'
+            '                d[child.tag].append(v)\n'
+            '            else:\n'
+            '                d[child.tag] = v\n'
+            '        return d or (el.text or "")\n'
+            '    # Normalise list input: unwrap first item if it is a dict, else\n'
+            '    # wrap the list so .get() calls below are always on a dict.\n'
+            '    if isinstance(input_data, list):\n'
+            '        input_data = (input_data[0] if input_data and isinstance(input_data[0], dict)\n'
+            '                      else {"items": input_data})\n'
+            '    if operation == "xmlToJson":\n'
+            '        xml_str = input_data.get(data_key, "") if isinstance(input_data, dict) else ""\n'
+            '        try:\n'
+            '            root = ET.fromstring(str(xml_str))\n'
+            '            result[data_key] = {root.tag: _xml_to_dict(root)}\n'
+            '        except ET.ParseError as exc:\n'
+            '            result[data_key] = {"error": str(exc), "raw": xml_str}\n'
+            '    else:\n'
+            '        def _dict_to_xml(tag, d):\n'
+            '            el = ET.Element(tag)\n'
+            '            if isinstance(d, dict):\n'
+            '                for k, v in d.items():\n'
+            '                    el.append(_dict_to_xml(k, v))\n'
+            '            else:\n'
+            '                el.text = str(d)\n'
+            '            return el\n'
+            '        data = (input_data.get(data_key, input_data) if isinstance(input_data, dict)\n'
+            '                else input_data)\n'
+            '        if isinstance(data, dict) and data:\n'
+            '            root_tag = next(iter(data))\n'
+            '            root_el = _dict_to_xml(root_tag, data[root_tag])\n'
+            '        else:\n'
+            '            root_el = _dict_to_xml("root", data)\n'
+            '        result[data_key] = ET.tostring(root_el, encoding="unicode")\n'
+        )
+        return self._wrap_transform_code(node_name, "XML", core, output_style="field")
+
+    def _convert_crypto_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Crypto node (hash / hmac / sign) to Python code."""
+        node_name = n8n_node.get("name", "Crypto")
+        params = n8n_node.get("parameters", {})
+        action = params.get("action", "hash")
+        value = self._convert_expression(params.get("value", ""))
+        hash_type = params.get("type", "MD5")
+        secret = self._convert_expression(params.get("secret", ""))
+        encoding = params.get("encoding", "hex")
+        property_name = params.get("dataPropertyName", "data")
+        safe_val = value.replace('"""', '\\"\\"\\"')
+        safe_sec = secret.replace('"""', '\\"\\"\\"')
+        core = (
+            '    import hashlib, hmac as _hmac, base64\n'
+            f'    action = "{action}"\n'
+            f'    _iv = (input_data.get("{property_name}", str(input_data))\n'
+            f'           if isinstance(input_data, dict) else input_data)\n'
+            f'    raw_value = """{safe_val}""" or str(_iv)\n'
+            f'    hash_type = "{hash_type}".lower().replace("-", "")\n'
+            f'    secret_str = """{safe_sec}"""\n'
+            f'    encoding = "{encoding}"\n'
+            f'    property_name = "{property_name}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    try:\n'
+            '        data_bytes = raw_value.encode("utf-8")\n'
+            '        secret_bytes = secret_str.encode("utf-8")\n'
+            '        if action == "hash":\n'
+            '            h = hashlib.new(hash_type, data_bytes)\n'
+            '            digest = h.hexdigest() if encoding == "hex" else base64.b64encode(h.digest()).decode()\n'
+            '        elif action == "hmac":\n'
+            '            h = _hmac.new(secret_bytes, data_bytes, getattr(hashlib, hash_type, hashlib.sha256))\n'
+            '            digest = h.hexdigest() if encoding == "hex" else base64.b64encode(h.digest()).decode()\n'
+            '        elif action == "sign":\n'
+            '            digest = base64.b64encode(data_bytes).decode()\n'
+            '        else:\n'
+            '            digest = raw_value\n'
+            '        result[property_name] = digest\n'
+            '    except Exception as exc:\n'
+            '        result["error"] = str(exc)\n'
+            '        result[property_name] = raw_value\n'
+        )
+        return self._wrap_transform_code(node_name, "Crypto", core, output_style="field")
+
+    def _convert_date_time_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Date & Time node to Python code."""
+        node_name = n8n_node.get("name", "Date & Time")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "formatDate")
+        value = self._convert_expression(params.get("value", ""))
+        to_format = params.get("toFormat", "YYYY-MM-DD HH:mm:ss")
+        from_format = params.get("fromFormat", "")
+        # typeVersion 2 uses "outputFieldName"; older v1 used "dataPropertyName"
+        property_name = params.get("outputFieldName") or params.get("dataPropertyName", "data")
+        # If _convert_expression produced a template placeholder like {{fieldName}},
+        # the literal string must NOT be used as the date value — it must be resolved
+        # from input_data at runtime.  Extract the field name and emit a dict lookup.
+        _tpl_match = re.match(r'^\{\{(\w+)\}\}$', value.strip())
+        if operation == "getCurrentDate":
+            # getCurrentDate derives its value from the clock, not from input_data
+            raw_value_expr = '""'
+        elif _tpl_match:
+            _input_field = _tpl_match.group(1)
+            raw_value_expr = f'str(input_data.get("{_input_field}", ""))'
+        else:
+            safe_val = value.replace('"""', '\\"\\"\\"')
+            raw_value_expr = f'"""{safe_val}""" or str(input_data.get("{property_name}", ""))'
+        core = (
+            '    from datetime import datetime, timedelta\n'
+            f'    operation = "{operation}"\n'
+            f'    raw_value = {raw_value_expr}\n'
+            f'    property_name = "{property_name}"\n'
+            '    def moment_to_strftime(fmt):\n'
+            '        fmt = fmt.replace("YYYY", "%Y").replace("YY", "%y")\n'
+            '        fmt = fmt.replace("MM",   "%m").replace("DD", "%d")\n'
+            '        fmt = fmt.replace("HH",   "%H").replace("mm", "%M").replace("ss", "%S")\n'
+            '        return fmt\n'
+            f'    to_fmt = moment_to_strftime("{to_format}")\n'
+            f'    from_fmt = moment_to_strftime("{from_format}") if "{from_format}" else None\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    try:\n'
+            '        if operation == "formatDate":\n'
+            '            if from_fmt:\n'
+            '                dt = datetime.strptime(raw_value, from_fmt)\n'
+            '            else:\n'
+            '                for fmt in ["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",\n'
+            '                            "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]:\n'
+            '                    try:\n'
+            '                        dt = datetime.strptime(raw_value, fmt); break\n'
+            '                    except ValueError:\n'
+            '                        continue\n'
+            '                else:\n'
+            '                    dt = datetime.now()\n'
+            '            result[property_name] = dt.strftime(to_fmt)\n'
+            '        elif operation == "getCurrentDate":\n'
+            '            result[property_name] = datetime.now().strftime(to_fmt)\n'
+            '        elif operation == "addToDate":\n'
+            '            amt = int(input_data.get("duration", 1))\n'
+            '            result[property_name] = (datetime.now() + timedelta(days=amt)).strftime(to_fmt)\n'
+            '        elif operation == "subtractFromDate":\n'
+            '            amt = int(input_data.get("duration", 1))\n'
+            '            result[property_name] = (datetime.now() - timedelta(days=amt)).strftime(to_fmt)\n'
+            '        else:\n'
+            '            result[property_name] = raw_value\n'
+            '    except Exception as exc:\n'
+            '        result["error"] = str(exc)\n'
+            '        result[property_name] = raw_value\n'
+        )
+        return self._wrap_transform_code(node_name, "Date & Time", core, output_style="field")
+
+    def _convert_compression_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Compression node (compress / decompress) to Python code."""
+        node_name = n8n_node.get("name", "Compression")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "compress")
+        file_format = params.get("fileFormat", "gzip")
+        input_field = params.get("binaryPropertyName", "data")
+        output_field = params.get("outputPrefix", "data")
+        core = (
+            '    import gzip, zipfile, io, base64\n'
+            f'    operation = "{operation}"\n'
+            f'    file_format = "{file_format}"\n'
+            f'    input_field = "{input_field}"\n'
+            f'    output_field = "{output_field}"\n'
+            '    raw = input_data.get(input_field, "")\n'
+            '    raw_bytes = (\n'
+            '        raw.encode("utf-8") if isinstance(raw, str)\n'
+            '        else (raw if isinstance(raw, bytes) else str(raw).encode("utf-8"))\n'
+            '    )\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    try:\n'
+            '        if operation == "compress":\n'
+            '            if file_format == "gzip":\n'
+            '                out = gzip.compress(raw_bytes)\n'
+            '            else:\n'
+            '                buf = io.BytesIO()\n'
+            '                with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:\n'
+            '                    zf.writestr("data", raw_bytes)\n'
+            '                out = buf.getvalue()\n'
+            '            result[output_field] = base64.b64encode(out).decode("utf-8")\n'
+            '        else:\n'
+            '            decoded = base64.b64decode(raw_bytes) if not isinstance(raw, bytes) else raw_bytes\n'
+            '            if file_format == "gzip":\n'
+            '                out = gzip.decompress(decoded)\n'
+            '            else:\n'
+            '                buf = io.BytesIO(decoded)\n'
+            '                with zipfile.ZipFile(buf, "r") as zf:\n'
+            '                    out = zf.read(zf.namelist()[0])\n'
+            '            result[output_field] = out.decode("utf-8", errors="replace")\n'
+            '    except Exception as exc:\n'
+            '        result["error"] = str(exc)\n'
+        )
+        return self._wrap_transform_code(node_name, "Compression", core, output_style="field")
+
+    # ── File I/O nodes ────────────────────────────────────────────────────────
+
+    def _convert_read_binary_files_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Read Binary Files node to Python code."""
+        node_name = n8n_node.get("name", "Read Binary Files")
+        params = n8n_node.get("parameters", {})
+        file_selector = self._convert_expression(params.get("fileSelector", ""))
+        property_name = params.get("dataPropertyName", "data")
+        safe_sel = file_selector.replace('"""', '\\"\\"\\"')
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Read Binary Files node: {node_name}"""\n'
+            '    import base64, glob, os\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    file_selector = """{safe_sel}""" or input_data.get("fileSelector", "")\n'
+            f'    prop = "{property_name}"\n'
+            '    files = []\n'
+            '    try:\n'
+            '        for path in (glob.glob(file_selector) if file_selector else []):\n'
+            '            with open(path, "rb") as fh:\n'
+            '                content = fh.read()\n'
+            '            files.append({\n'
+            '                "fileName": os.path.basename(path),\n'
+            '                "filePath": path,\n'
+            '                "mimeType": "application/octet-stream",\n'
+            '                prop: base64.b64encode(content).decode("utf-8"),\n'
+            '                "fileSize": len(content),\n'
+            '            })\n'
+            '        result = {"files": files, "count": len(files)}\n'
+            '    except Exception as exc:\n'
+            '        result = {"error": str(exc), "files": [], "count": 0}\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    def _convert_write_binary_file_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Write Binary File node to Python code."""
+        node_name = n8n_node.get("name", "Write Binary File")
+        params = n8n_node.get("parameters", {})
+        file_name = self._convert_expression(params.get("fileName", "output.bin"))
+        property_name = params.get("dataPropertyName", "data")
+        safe_fn = file_name.replace('"""', '\\"\\"\\"')
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Write Binary File node: {node_name}"""\n'
+            '    import base64, os\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    file_name = """{safe_fn}""" or input_data.get("fileName", "output.bin")\n'
+            f'    binary_data = input_data.get("{property_name}", "")\n'
+            '    result = {}\n'
+            '    try:\n'
+            '        parent = os.path.dirname(file_name)\n'
+            '        os.makedirs(parent if parent else ".", exist_ok=True)\n'
+            '        raw = base64.b64decode(binary_data) if isinstance(binary_data, str) else bytes(binary_data)\n'
+            '        with open(file_name, "wb") as fh:\n'
+            '            fh.write(raw)\n'
+            '        result = {"success": True, "fileName": file_name, "bytesWritten": len(raw)}\n'
+            '    except Exception as exc:\n'
+            '        result = {"success": False, "error": str(exc), "fileName": file_name}\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    @staticmethod
+    def _convert_spreadsheet_file_to_code(n8n_node: Dict) -> str:
+        """Convert n8n Spreadsheet File node to Python code (CSV via stdlib; XLSX flagged)."""
+        node_name = n8n_node.get("name", "Spreadsheet File")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "fromFile")
+        file_format = params.get("fileFormat", "csv")
+        binary_prop = params.get("binaryPropertyName", "data")
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Spreadsheet File node: {node_name}"""\n'
+            '    import csv, io, base64, json\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    operation = "{operation}"\n'
+            f'    file_format = "{file_format}"\n'
+            f'    binary_prop = "{binary_prop}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    try:\n'
+            '        if operation == "fromFile":\n'
+            '            raw = input_data.get(binary_prop, "")\n'
+            '            try:\n'
+            '                content = base64.b64decode(raw).decode("utf-8", errors="replace") if raw else ""\n'
+            '            except Exception:\n'
+            '                content = str(raw)\n'
+            '            if file_format == "csv":\n'
+            '                rows = [dict(r) for r in csv.DictReader(io.StringIO(content))]\n'
+            '                result["rows"] = rows\n'
+            '                result["count"] = len(rows)\n'
+            '            elif file_format in ("xls", "xlsx"):\n'
+            '                result["rows"] = []\n'
+            '                result["warning"] = (\n'
+            '                    "XLSX parsing requires openpyxl. Install: pip install openpyxl"\n'
+            '                )\n'
+            '            else:\n'
+            '                result["content"] = content\n'
+            '        else:\n'
+            '            items = input_data.get(\n'
+            '                "items", [input_data] if isinstance(input_data, dict) else []\n'
+            '            )\n'
+            '            if file_format == "csv" and items:\n'
+            '                buf = io.StringIO()\n'
+            '                fieldnames = list(items[0].keys()) if isinstance(items[0], dict) else ["value"]\n'
+            '                w = csv.DictWriter(buf, fieldnames=fieldnames)\n'
+            '                w.writeheader()\n'
+            '                for item in items:\n'
+            '                    if isinstance(item, dict):\n'
+            '                        w.writerow(item)\n'
+            '                result[binary_prop] = base64.b64encode(buf.getvalue().encode()).decode()\n'
+            '                result["fileName"] = "output.csv"\n'
+            '            else:\n'
+            '                result[binary_prop] = base64.b64encode(json.dumps(items).encode()).decode()\n'
+            '                result["fileName"] = "output.json"\n'
+            '    except Exception as exc:\n'
+            '        result["error"] = str(exc)\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    def _convert_convert_to_file_to_code(self, n8n_node: Dict) -> str:
+        """Convert n8n Convert to File node to Python code."""
+        node_name = n8n_node.get("name", "Convert to File")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "toText")
+        file_name = self._convert_expression(params.get("fileName", "output"))
+        mime_type = params.get("mimeType", "text/plain")
+        binary_prop = params.get("binaryPropertyName", "data")
+        safe_fn = file_name.replace('"""', '\\"\\"\\"')
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Convert to File node: {node_name}"""\n'
+            '    import base64, csv, io, json\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    operation = "{operation}"\n'
+            f'    file_name = """{safe_fn}""" or "output"\n'
+            f'    binary_prop = "{binary_prop}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    try:\n'
+            '        if operation in ("toText", "toJson"):\n'
+            '            text = json.dumps(input_data, ensure_ascii=False)\n'
+            '            result[binary_prop] = base64.b64encode(text.encode()).decode()\n'
+            '            result["fileName"] = file_name + ".json"\n'
+            '            result["mimeType"] = "application/json"\n'
+            '        elif operation == "toCsv":\n'
+            '            items = input_data.get(\n'
+            '                "items", [input_data] if isinstance(input_data, dict) else []\n'
+            '            )\n'
+            '            buf = io.StringIO()\n'
+            '            fieldnames = list(items[0].keys()) if items and isinstance(items[0], dict) else ["value"]\n'
+            '            w = csv.DictWriter(buf, fieldnames=fieldnames)\n'
+            '            w.writeheader()\n'
+            '            for item in items:\n'
+            '                if isinstance(item, dict):\n'
+            '                    w.writerow(item)\n'
+            '            result[binary_prop] = base64.b64encode(buf.getvalue().encode()).decode()\n'
+            '            result["fileName"] = file_name + ".csv"\n'
+            '            result["mimeType"] = "text/csv"\n'
+            '        else:\n'
+            '            text = base64.b64encode(str(input_data).encode()).decode()\n'
+            '            result[binary_prop] = text\n'
+            f'            result["fileName"] = file_name\n'
+            f'            result["mimeType"] = "{mime_type}"\n'
+            '    except Exception as exc:\n'
+            '        result["error"] = str(exc)\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    @staticmethod
+    def _convert_extract_from_file_to_code(n8n_node: Dict) -> str:
+        """Convert n8n Extract From File node to Python code."""
+        node_name = n8n_node.get("name", "Extract From File")
+        params = n8n_node.get("parameters", {})
+        operation = params.get("operation", "extractFromCsv")
+        binary_prop = params.get("binaryPropertyName", "data")
+        destination_key = params.get("destinationKey", "data")
+        return (
+            'def main(args):\n'
+            f'    """Converted from n8n Extract From File node: {node_name}"""\n'
+            '    import base64, csv, io, json, re\n'
+            '    input_data = args.params.get("input", {}) if hasattr(args, "params") else {}\n'
+            f'    operation = "{operation}"\n'
+            f'    binary_prop = "{binary_prop}"\n'
+            f'    destination_key = "{destination_key}"\n'
+            '    result = dict(input_data) if isinstance(input_data, dict) else {}\n'
+            '    raw = input_data.get(binary_prop, "")\n'
+            '    try:\n'
+            '        try:\n'
+            '            content = base64.b64decode(raw).decode("utf-8", errors="replace") if raw else ""\n'
+            '        except Exception:\n'
+            '            content = str(raw)\n'
+            '        if operation == "extractFromCsv":\n'
+            '            result[destination_key] = [dict(r) for r in csv.DictReader(io.StringIO(content))]\n'
+            '        elif operation == "extractFromJson":\n'
+            '            result[destination_key] = json.loads(content)\n'
+            '        elif operation == "extractFromHtml":\n'
+            '            result[destination_key] = re.sub(r"<[^>]+>", "", content).strip()\n'
+            '        else:\n'
+            '            result[destination_key] = content\n'
+            '    except Exception as exc:\n'
+            '        result["error"] = str(exc)\n'
+            '        result[destination_key] = raw\n'
+            '    _output = dict(result)\n'
+            '    _output["result"] = result\n'
+            '    return _output\n'
+        )
+
+    @staticmethod
+    def _create_fallback_code(n8n_node: Dict) -> str:
+        """Create fallback Python code for unsupported node."""
+        node_type = n8n_node.get("type", "unknown")
+        node_name = n8n_node.get("name", "Node")
+        params = n8n_node.get("parameters", {})
+        
+        return f'''def main(args):
+    """Converted from n8n node: {node_name} ({node_type})"""
+    # Original params: {json.dumps(params, indent=2)}
+    return {{"result": args.params}}
+'''
+
+    # =========================================================================
     # PLUGIN NODE CONVERSION
     # =========================================================================
 
@@ -2661,6 +4251,329 @@ class N8nWorkflowConverter(WorkflowConverter):
                         "data": {"type": "object", "extra": {"index": 3}, "properties": {}}
                     },
                     "required": ["error_code", "error_message", "data"]
+                }
+            }
+        }
+
+    # =========================================================================
+    # HTTP REQUEST NODE CONVERSION
+    # =========================================================================
+
+    def _convert_http_request_node(self, n8n_node: Dict, node_id: str, x_pos: int) -> Dict:
+        """Convert n8n HTTP Request node to OpenJiuwen HTTP Request component."""
+        params = n8n_node.get("parameters", {})
+        node_name = n8n_node.get("name", "")
+        position = n8n_node.get("position", [x_pos, 34])
+
+        # Extract HTTP request parameters from n8n format
+        method = params.get("method", "GET")
+        url = params.get("url", "")
+        
+        # Convert headers from n8n format (list of {name, value} dicts)
+        headers_list = params.get("headerParameters", [])
+        headers = {}
+        for header in headers_list:
+            if isinstance(header, dict) and "name" in header:
+                headers[header["name"]] = header.get("value", "")
+        
+        # Convert query parameters from n8n format
+        query_params_list = params.get("queryParameters", [])
+        query_params = {}
+        for qp in query_params_list:
+            if isinstance(qp, dict) and "name" in qp:
+                query_params[qp["name"]] = qp.get("value", "")
+        
+        # Convert body - n8n uses different formats based on content type
+        body = None
+        body_content_type = params.get("options", {}).get("bodyContentType")
+        if body_content_type:
+            if body_content_type == "json":
+                body = params.get("body", {})
+            elif body_content_type == "raw":
+                body = params.get("body", {})
+            elif body_content_type == "form-data":
+                form_data = params.get("sendBody", {})
+                if isinstance(form_data, dict) and "parameters" in form_data:
+                    body = {}
+                    for param in form_data["parameters"]:
+                        if isinstance(param, dict) and "name" in param:
+                            body[param["name"]] = param.get("value", "")
+            elif body_content_type == "form-urlencoded":
+                form_data = params.get("sendBody", {})
+                if isinstance(form_data, dict) and "parameters" in form_data:
+                    body = {}
+                    for param in form_data["parameters"]:
+                        if isinstance(param, dict) and "name" in param:
+                            body[param["name"]] = param.get("value", "")
+        
+        # Build input parameters with BaseValue references
+        input_params = self._build_predecessor_input_ref(node_name)
+        
+        # Add HTTP-specific parameters
+        # url check not empty and input_params["url"] is None to avoid overwriting an explicit predecessor reference
+        if input_params.get("url") is None:
+            input_params["url"] = \
+                BaseValue(type='constant', content=url, schema=BaseType(type='string')).model_dump()
+        # method
+        if input_params.get("method") is None:
+            input_params["method"] = \
+                BaseValue(type='constant', content=method, schema=BaseType(type='string')).model_dump()
+        # headers 
+        if input_params.get("headers") is None:
+            input_params["headers"] = \
+                BaseValue(type='constant', content=headers, schema=BaseType(type='object')).model_dump()
+        # query 
+        if input_params.get("query") is None:
+            input_params["query"] = \
+                BaseValue(type='constant', content=query_params, schema=BaseType(type='object')).model_dump()
+        # body 
+        if input_params.get("body") is None:
+            input_params["body"] = \
+                BaseValue(type='constant', content=body, schema=BaseType(type='object')).model_dump()
+        
+        # Auth configuration (n8n typically handles auth via credentials)
+        auth_config = {
+            "type": "none",
+            "username": "",
+            "password": "",
+            "token": "",
+            "api_key": "",
+            "api_key_location": "header",
+            "api_key_param_name": "X-API-Key"
+        }
+        
+        # Check if n8n node has authentication configured
+        # n8n uses credentials which are resolved at runtime
+        # We'll set up a basic auth structure that can be configured later
+        if params.get("options", {}).get("authentication"):
+            auth_type = params["options"]["authentication"]
+            if auth_type == "basicAuth":
+                auth_config["type"] = "basic"
+            elif auth_type == "headerAuth":
+                auth_config["type"] = "api_key"
+                auth_config["api_key_location"] = "header"
+            elif auth_type == "queryAuth":
+                auth_config["type"] = "api_key"
+                auth_config["api_key_location"] = "query"
+        
+        input_params["auth"] = \
+            BaseValue(type='constant', content=auth_config, schema=BaseType(type='object')).model_dump()
+
+        # Build httpRequestParam structure
+        http_request_params = {
+            "url": {
+                "type": "constant",
+                "content": url,
+                "schema": {"type": "string"}
+            },
+            "method": method,
+            "headers": headers,
+            "queryParams": query_params,
+            "body": {
+                "contentType": "application/json" if body_content_type == "json" else "text/plain",
+                "content": body
+            },
+            "auth": {
+                "authType": auth_config["type"],
+                "username": auth_config["username"],
+                "password": auth_config["password"],
+                "token": auth_config["token"],
+                "apiKey": auth_config["api_key"],
+                "apiKeyLocation": auth_config["api_key_location"],
+                "apiKeyParamName": auth_config["api_key_param_name"]
+            },
+            "response": {
+                "responseFormat": "auto",
+                "successStatusCodes": [200, 201, 202, 204],
+                "failureStatusCodes": [],
+                "responseMode": "full",
+                "dataProperty": None
+            },
+            "advanced": {
+                "followRedirects": True,
+                "ignoreSslIssues": False,
+                "proxyUrl": None,
+                "timeout": 60,
+                "retry": {
+                    "enabled": False,
+                    "maxRetries": 3,
+                    "retryOnStatusCodes": [429, 500, 502, 503, 504],
+                    "retryDelayMs": 1000,
+                    "backoffType": "exponential"
+                },
+                "rateLimit": {
+                    "enabled": False,
+                    "requestsPerUnit": 10,
+                    "unit": "minute"
+                }
+            }
+        }
+
+        return {
+            "id": node_id,
+            "type": str(ComponentType.COMPONENT_TYPE_HTTP_REQUEST),
+            "meta": {
+                "position": {
+                    "x": position[0] if len(position) > 0 else x_pos,
+                    "y": position[1] if len(position) > 1 else 34
+                }
+            },
+            "data": {
+                "title": node_name,
+                "inputs": {
+                    "method": {
+                        "type": "constant",
+                        "content": method
+                    },
+                    "inputParameters": input_params,
+                    "httpRequestParam": http_request_params,
+                    "_n8n_type": n8n_node.get("type", ""),
+                    "_n8n_params": params
+                },
+                "outputs": {
+                    "type": "object",
+                    "properties": {
+                        "error_code": {
+                            "type": "integer",
+                            "description": "Error code (0 for success)",
+                            "extra": {"index": 1}
+                        },
+                        "error_msg": {
+                            "type": "string",
+                            "description": "Error message (empty for success)",
+                            "extra": {"index": 2}
+                        },
+                        "data": {
+                            "type": "object",
+                            "description": "Response data (JSON object for 200 OK)",
+                            "extra": {"index": 3}
+                        }
+                    },
+                    "required": ["error_code", "error_msg", "data"]
+                },
+                "exceptionConfig": {
+                    "retryTimes": 0,
+                    "timeoutSeconds": 60,
+                    "processType": "break",
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    }
+                }
+            }
+        }
+
+    # =========================================================================
+    # REACT AGENT NODE CONVERSION
+    # =========================================================================
+
+    def _convert_react_agent_node(self, n8n_node: Dict, node_id: str, x_pos: int) -> Dict:
+        """Convert n8n React Agent node to OpenJiuwen ReAct Agent component.
+
+        n8n Agent nodes have:
+        - Parameters with prompts (text, systemMessage in options)
+        - Connected AI sub-nodes (ai_languageModel, ai_tool, ai_memory)
+
+        The converted node structure matches ReactAgentConfig requirements:
+        - llmParam with systemPrompt, prompt, and model
+        - inputParameters for variable references
+        - skillsParam with plugins and workflows
+        - max_iterations for agent loop limit
+        """
+        params = n8n_node.get("parameters", {})
+        node_name = n8n_node.get("name", "")
+        position = n8n_node.get("position", [x_pos, 34])
+
+        # Extract system prompt from n8n format (may be in options or empty)
+        system_prompt = ""
+        if params.get("options", {}).get("systemMessage"):
+            system_prompt = params["options"]["systemMessage"]
+        elif params.get("systemMessage"):
+            system_prompt = params["systemMessage"]
+
+        # Extract user prompt (text field in n8n agent)
+        user_prompt = params.get("text", "")
+
+        # Convert expressions with field mapping
+        system_prompt = self._convert_expression_with_mapping(system_prompt)
+        user_prompt = self._convert_expression_with_mapping(user_prompt)
+
+        # Build default prompt if not provided
+        if not user_prompt and self.field_name_map:
+            prompt_parts = [f"{{{{{name}}}}}" for name in self.field_name_map.values()]
+            user_prompt = " ".join(prompt_parts)
+        elif not user_prompt:
+            user_prompt = "{{query}}"
+
+        # Get model config from connected AI sub-node (ai_languageModel connection)
+        model_config = self._find_connected_model(node_name)
+
+        # Build input parameters reference using "query" as the key for inputParameters
+        input_parameters = self._build_predecessor_input_ref(node_name, param_key="query")
+
+        # Find connected tools/plugins via ai_tool connection
+        tools = self._find_connected_tools(node_name)
+
+        # Build skillsParam from connected tools
+        skills_param = {
+            "plugins": [],
+            "workflows": []
+        }
+        for tool_info in tools:
+            # tool_info is in format "ToolName (tool_type)"
+            # For now, we create placeholder entries; in production these would be resolved to actual plugin IDs
+            tool_name = tool_info.split(" (")[0] if " (" in tool_info else tool_info
+            skills_param["plugins"].append({
+                "id": str(uuid.uuid4()),  # Placeholder ID - would be resolved at runtime
+                "name": tool_name,
+                "type": "plugin"
+            })
+
+        # Extract max_iterations from n8n params (default to 5)
+        max_iterations = params.get("options", {}).get("maxIterations", 5)
+        if not isinstance(max_iterations, int) or max_iterations < 1:
+            max_iterations = 5
+
+        return {
+            "id": node_id,
+            "type": str(ComponentType.COMPONENT_TYPE_REACT_AGENT),
+            "meta": {
+                "position": {
+                    "x": position[0] if len(position) > 0 else x_pos,
+                    "y": position[1] if len(position) > 1 else 34
+                }
+            },
+            "data": {
+                "title": node_name or "ReAct Agent",
+                "max_iterations": max_iterations,
+                "inputs": {
+                    "llmParam": {
+                        "systemPrompt": {
+                            "type": "template",
+                            "content": system_prompt or (
+                                "You are a helpful ReAct agent that can "
+                                "reason and use tools to solve problems."
+                            )
+                        },
+                        "prompt": {
+                            "type": "template",
+                            "content": user_prompt
+                        },
+                        "model": model_config
+                    },
+                    "inputParameters": input_parameters,
+                    "skillsParam": skills_param
+                },
+                "outputs": {
+                    "type": "object",
+                    "properties": {
+                        "output": {
+                            "type": "string",
+                            "description": "Agent response content",
+                            "extra": {"index": 1}
+                        }
+                    },
+                    "required": ["output"]
                 }
             }
         }
@@ -2900,6 +4813,14 @@ class N8nWorkflowConverter(WorkflowConverter):
             if not source_id:
                 continue
 
+            # compareDatasets: node_id_map → code_id for incoming edges.
+            # Outgoing edges must originate from the per-port guard Selector.
+            # We defer the source_id override to the per-target-list loop below
+            # because each output_index maps to a different Selector.
+            is_compare_datasets = source_name in self.compare_datasets_selector_ids
+
+            loop_source_info = self.loop_node_registry.get(source_name)
+
             for conn_type, target_lists in conn_types.items():
                 if conn_type in ["ai_languageModel", "ai_memory", "ai_tool",
                                 "ai_embedding", "ai_document"]:
@@ -2907,46 +4828,87 @@ class N8nWorkflowConverter(WorkflowConverter):
 
                 source_n8n_node = self.nodes_by_name.get(source_name, {})
                 source_n8n_type = source_n8n_node.get("type", "")
-                source_jiuwen_type = self.N8N_TO_OPENJIUWEN.get(source_n8n_type)
-
-                is_start = (source_id == self.start_node_id)  # ← new guard
-                is_code = (source_jiuwen_type == ComponentType.COMPONENT_TYPE_CODE
-                            or source_jiuwen_type is None)
-                is_selector = (source_jiuwen_type == ComponentType.COMPONENT_TYPE_IF)
-
-                selector_branch_ids = []
-                if is_selector:
-                    jiuwen_node = next(
-                        (n for n in self.openjiuwen_nodes if n["id"] == source_id), None
-                    )
-                    if jiuwen_node:
-                        branches = jiuwen_node.get("data", {}).get("branches", [])
-                        selector_branch_ids = [
-                            b.get("branchId", str(i)) for i, b in enumerate(branches)
-                        ]
 
                 for output_index, target_list in enumerate(target_lists):
+                    # Resolve effective source for this port
+                    if is_compare_datasets:
+                        port_map = self.compare_datasets_selector_ids[source_name]
+                        effective_source_id = port_map.get(output_index)
+                        if not effective_source_id:
+                            continue   # n8n port not mapped (shouldn't happen)
+                        # Always treat as a selector: use branch 0 of this guard
+                        sel_jw = next(
+                            (n for n in self.openjiuwen_nodes
+                             if n["id"] == effective_source_id), None
+                        )
+                        cd_branch_ids = []
+                        if sel_jw:
+                            cd_branch_ids = [
+                                b.get("branchId", "0")
+                                for b in sel_jw.get("data", {}).get("branches", [])
+                            ]
+                        pending_port = cd_branch_ids[0] if cd_branch_ids else "0"
+                        is_code = False
+                        is_selector = True
+                        selector_branch_ids = cd_branch_ids
+                    else:
+                        effective_source_id = source_id
+                        source_jiuwen_type = self.N8N_TO_OPENJIUWEN.get(source_n8n_type)
+                        is_code = (source_jiuwen_type == ComponentType.COMPONENT_TYPE_CODE
+                                       or source_jiuwen_type is None)
+                        is_selector = source_jiuwen_type == ComponentType.COMPONENT_TYPE_IF
+                        selector_branch_ids = []
+                        if is_selector:
+                            jw_node = next(
+                                (n for n in self.openjiuwen_nodes
+                                 if n["id"] == effective_source_id), None
+                            )
+                            if jw_node:
+                                selector_branch_ids = []
+                                branches = jw_node.get("data", {}).get("branches", [])
+                                for i, b in enumerate(branches):
+                                    selector_branch_ids.append(b.get("branchId", str(i)))
+                        pending_port = (
+                            str(output_index) if loop_source_info
+                            else ("0" if is_code
+                                  else (selector_branch_ids[output_index]
+                                        if is_selector and output_index < len(selector_branch_ids)
+                                        else None))
+                        )
+
                     for target in target_list:
                         target_name = target.get("node")
-                        target_id = self.node_id_map.get(target_name)
 
-                        if target_id and source_id != target_id:
-                            edge_exists = any(
-                                e.get("sourceNodeID") == source_id and
-                                e.get("targetNodeID") == target_id
-                                for e in self.openjiuwen_edges
-                            )
-                            if not edge_exists:
-                                edge = {
-                                    "sourceNodeID": source_id,
-                                    "targetNodeID": target_id,
-                                }
-                                # Start node must never carry sourcePortID
-                                if not is_start and is_code:
-                                    edge["sourcePortID"] = "0"
-                                elif not is_start and is_selector and output_index < len(selector_branch_ids):
-                                    edge["sourcePortID"] = selector_branch_ids[output_index]
-                                self.openjiuwen_edges.append(edge)
+                        target_loop_info = self.loop_node_registry.get(target_name)
+                        if target_loop_info:
+                            effective_target_id = target_loop_info["loop_id"]
+                        else:
+                            effective_target_id = self.node_id_map.get(target_name)
+
+                        if not effective_target_id:
+                            continue
+                        if effective_source_id == effective_target_id:
+                            continue
+
+                        edge_exists = any(
+                            e.get("sourceNodeID") == effective_source_id
+                            and e.get("targetNodeID") == effective_target_id
+                            and e.get("sourcePortID") == pending_port
+                            for e in self.openjiuwen_edges
+                        )
+                        if edge_exists:
+                            continue
+
+                        edge: Dict = {
+                            "id": f"edge_{uuid.uuid4().hex[:8]}",
+                            "sourceNodeID": effective_source_id,
+                            "targetNodeID": effective_target_id,
+                        }
+                        if pending_port is not None:
+                            edge["sourcePortID"] = pending_port
+
+                        self.openjiuwen_edges.append(edge)
+
 
     def _find_last_node(self) -> Optional[str]:
         """Find one terminal node (no outgoing edges). Used for End-node ref."""
@@ -2968,8 +4930,16 @@ class N8nWorkflowConverter(WorkflowConverter):
             if node_type in [ComponentType.COMPONENT_TYPE_START,
                              ComponentType.COMPONENT_TYPE_END]:
                 continue
+            # Sticky notes (type 99) are UI-only and must never receive edges
+            if node_type == 99:
+                continue
+            # Selector (IF) nodes are never terminal leaf nodes: every branch is
+            # wired explicitly in _ensure_edge_connections.
+            if node_type == ComponentType.COMPONENT_TYPE_IF:
+                continue
             if node_id not in sources:
                 terminals.append(node_id)
+
         return terminals
 
     def _ensure_edge_connections(self):
@@ -3023,23 +4993,25 @@ class N8nWorkflowConverter(WorkflowConverter):
                     continue
                 node_id = node["id"]
                 branches = node.get("data", {}).get("branches", [])
-                if len(branches) < 2:
-                    continue
-                else_branch_id = branches[1].get("branchId")
-                if not else_branch_id:
-                    continue
-                # Check if the else branch already has an outgoing edge
-                else_edge_exists = any(
-                    e.get("sourceNodeID") == node_id and e.get("sourcePortID") == else_branch_id
-                    for e in self.openjiuwen_edges
-                )
-                if not else_edge_exists:
-                    self.openjiuwen_edges.append({
-                        "id": f"edge_{uuid.uuid4().hex[:8]}",
-                        "sourceNodeID": node_id,
-                        "targetNodeID": self.end_node_id,
-                        "sourcePortID": else_branch_id,
-                    })
+                for branch in branches:
+                    branch_id = branch.get("branchId")
+                    if not branch_id:
+                        continue
+                    # Wire every branch that has no outgoing edge to End so that
+                    # empty-set guards (compareDatasets ports 2/3 when unused) and
+                    # regular else branches all get a clean skip path.
+                    branch_edge_exists = any(
+                        e.get("sourceNodeID") == node_id
+                        and e.get("sourcePortID") == branch_id
+                        for e in self.openjiuwen_edges
+                    )
+                    if not branch_edge_exists:
+                        self.openjiuwen_edges.append({
+                            "id": f"edge_{uuid.uuid4().hex[:8]}",
+                            "sourceNodeID": node_id,
+                            "targetNodeID": self.end_node_id,
+                            "sourcePortID": branch_id,
+                        })
 
     # =========================================================================
     # I/O PARAMETER EXTRACTION
@@ -3197,6 +5169,7 @@ class N8nWorkflowConverter(WorkflowConverter):
         return f"{simple_type}_{uuid.uuid4().hex[:8]}"
 
     # Legacy method for backward compatibility
+    @staticmethod
     def add_start_end_nodes(self, nodes: List[Dict], edges: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
         """Add START and END nodes to workflow (legacy static method)."""
         # Find entry points (nodes with no incoming connections)

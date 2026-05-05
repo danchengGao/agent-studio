@@ -199,15 +199,15 @@ class TestN8nWorkflowConverter:
 
     @staticmethod
     def test_convert_http_request_node(converter, n8n_workflow):
-        """Test conversion of n8n httpRequest node to Plugin component"""
+        """Test conversion of n8n httpRequest node to HTTP Request component"""
         result = converter.convert(n8n_workflow)
         schema = json.loads(result.workflow_data["schema"])
 
-        plugin_nodes = [n for n in schema["nodes"]
-                        if str(n["type"]) == str(ComponentType.COMPONENT_TYPE_PLUGIN)]
+        http_nodes = [n for n in schema["nodes"]
+                      if str(n["type"]) == str(ComponentType.COMPONENT_TYPE_HTTP_REQUEST)]
 
-        assert len(plugin_nodes) >= 1
-        assert any("HTTP Request" in n["data"]["title"] for n in plugin_nodes)
+        assert len(http_nodes) >= 1
+        assert any("HTTP Request" in n["data"]["title"] for n in http_nodes)
 
     @staticmethod
     def test_convert_code_node(converter, n8n_workflow):
@@ -466,13 +466,14 @@ class TestTriggerNodes:
 
 
 # =============================================================================
-# UNIT TESTS — LLM node
+# UNIT TESTS — LLM node (chainLlm and other non-agent LLM nodes)
 # =============================================================================
 
 class TestLLMNode:
     @staticmethod
     def _workflow(params=None):
-        return make_workflow(make_node("Agent", "n8n-nodes-base.agent", params or {
+        # Use chainLlm node type which maps to LLM (not ReAct Agent)
+        return make_workflow(make_node("ChainLLM", "n8n-nodes-langchain.chainLlm", params or {
             "text": "Hello {{input}}",
             "options": {"systemMessage": "You are helpful."}
         }))
@@ -493,7 +494,7 @@ class TestLLMNode:
 
     @staticmethod
     def test_llm_default_prompt_when_empty():
-        nodes, _ = schema_from(make_workflow(make_node("A", "n8n-nodes-base.agent")))
+        nodes, _ = schema_from(make_workflow(make_node("A", "n8n-nodes-langchain.chainLlm")))
         llm = node_of_type(nodes, ComponentType.COMPONENT_TYPE_LLM)
         assert len(llm["data"]["inputs"]["llmParam"]["prompt"]["content"]) > 0
 
@@ -510,9 +511,10 @@ class TestLLMNode:
                    for e in edges)
 
     @staticmethod
-    def test_langchain_agent_maps_to_llm():
+    def test_chain_llm_maps_to_llm():
+        """Test that chainLlm node type maps to LLM component."""
         nodes, _ = schema_from(
-            make_workflow(make_node("LCAgent", "@n8n/n8n-nodes-langchain.agent"))
+            make_workflow(make_node("LCChain", "@n8n/n8n-nodes-langchain.chainLlm"))
         )
         assert node_of_type(nodes, ComponentType.COMPONENT_TYPE_LLM) is not None
 
@@ -778,6 +780,160 @@ class TestPluginNode:
         node = make_node("Slack", "n8n-nodes-base.slack", {"operation": "message"})
         nodes, _ = schema_from(make_workflow(node))
         assert node_of_type(nodes, ComponentType.COMPONENT_TYPE_PLUGIN) is not None
+
+
+# =============================================================================
+# UNIT TESTS — HTTP Request node
+# =============================================================================
+
+class TestHttpRequestNode:
+    @staticmethod
+    def _workflow(params=None):
+        return make_workflow(
+            make_node("HTTP", "n8n-nodes-base.httpRequest",
+                      params or {"url": "https://api.example.com", "method": "GET"})
+        )
+
+    def test_http_maps_to_http_request(self):
+        nodes, _ = schema_from(self._workflow())
+        assert node_of_type(nodes, ComponentType.COMPONENT_TYPE_HTTP_REQUEST) is not None
+
+    def test_http_request_has_url_config(self):
+        nodes, _ = schema_from(self._workflow())
+        http_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_HTTP_REQUEST)
+        assert "url" in http_node["data"]["configs"]
+
+    def test_http_request_raw_params_stored(self):
+        """n8n params are forwarded in _n8n_params for downstream use."""
+        nodes, _ = schema_from(self._workflow(params={"url": "https://test.io", "method": "POST"}))
+        http_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_HTTP_REQUEST)
+        assert http_node["data"]["inputs"]["_n8n_params"]["url"] == "https://test.io"
+        assert http_node["data"]["inputs"]["_n8n_params"]["method"] == "POST"
+
+    def test_http_request_outputs_structure(self):
+        nodes, _ = schema_from(self._workflow())
+        http_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_HTTP_REQUEST)
+        props = http_node["data"]["outputs"]["properties"]
+        assert "error_code" in props
+        assert "data" in props
+
+    def test_http_request_connected_to_end(self):
+        nodes, edges = schema_from(self._workflow())
+        http_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_HTTP_REQUEST)
+        end = node_of_type(nodes, ComponentType.COMPONENT_TYPE_END)
+        assert any(e["sourceNodeID"] == http_node["id"] and e["targetNodeID"] == end["id"]
+                   for e in edges)
+
+
+# =============================================================================
+# UNIT TESTS — React Agent node
+# =============================================================================
+
+class TestReactAgentNode:
+    @staticmethod
+    def _workflow(node_type="@n8n/n8n-nodes-langchain.agent", params=None):
+        """Create a workflow with an n8n agent node."""
+        return make_workflow(
+            make_node("AI Agent", node_type, params or {"options": {}})
+        )
+
+    def test_react_agent_maps_correctly(self):
+        """Test that n8n agent node with @n8n/ prefix maps to ReAct Agent."""
+        nodes, _ = schema_from(self._workflow("@n8n/n8n-nodes-langchain.agent"))
+        assert node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT) is not None
+
+    def test_react_agent_maps_with_old_prefix(self):
+        """Test that n8n agent node without @n8n/ prefix maps to ReAct Agent."""
+        nodes, _ = schema_from(self._workflow("n8n-nodes-langchain.agent"))
+        assert node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT) is not None
+
+    def test_react_agent_has_llm_param(self):
+        """Test that ReAct Agent node has llmParam in inputs."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        assert "llmParam" in react_node["data"]["inputs"]
+
+    def test_react_agent_has_system_prompt(self):
+        """Test that ReAct Agent node has systemPrompt structure."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        llm_param = react_node["data"]["inputs"]["llmParam"]
+        assert "systemPrompt" in llm_param
+        assert "content" in llm_param["systemPrompt"]
+
+    def test_react_agent_has_user_prompt(self):
+        """Test that ReAct Agent node has prompt structure."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        llm_param = react_node["data"]["inputs"]["llmParam"]
+        assert "prompt" in llm_param
+        assert "content" in llm_param["prompt"]
+
+    def test_react_agent_has_model_config(self):
+        """Test that ReAct Agent node has model configuration."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        llm_param = react_node["data"]["inputs"]["llmParam"]
+        assert "model" in llm_param
+        assert "name" in llm_param["model"]
+        assert "type" in llm_param["model"]
+
+    def test_react_agent_outputs_structure(self):
+        """Test that ReAct Agent node has correct outputs structure."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        props = react_node["data"]["outputs"]["properties"]
+        assert "output" in props
+        # Output is string (agent response content)
+        assert props["output"]["type"] == "string"
+        # Should also have result_type field (answer/error/interrupt)
+        assert "result_type" in props
+
+    def test_react_agent_has_max_iterations(self):
+        """Test that ReAct Agent node has max_iterations config."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        assert "max_iterations" in react_node["data"]
+        assert react_node["data"]["max_iterations"] == 5  # default value
+
+    def test_react_agent_custom_max_iterations(self):
+        """Test that custom maxIterations is preserved."""
+        nodes, _ = schema_from(self._workflow(
+            params={"options": {"maxIterations": 10}}
+        ))
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        assert react_node["data"]["max_iterations"] == 10
+
+    def test_react_agent_has_skills_param(self):
+        """Test that ReAct Agent node has skillsParam for plugins/workflows."""
+        nodes, _ = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        assert "skillsParam" in react_node["data"]["inputs"]
+        skills = react_node["data"]["inputs"]["skillsParam"]
+        assert "plugins" in skills
+        assert "workflows" in skills
+
+    def test_react_agent_connected_to_end(self):
+        """Test that ReAct Agent node is connected to End node."""
+        nodes, edges = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        end = node_of_type(nodes, ComponentType.COMPONENT_TYPE_END)
+        assert any(e["sourceNodeID"] == react_node["id"] and e["targetNodeID"] == end["id"]
+                   for e in edges)
+
+    def test_react_agent_end_edge_no_source_port_id(self):
+        """Test that ReAct Agent -> End edge does NOT have sourcePortID.
+
+        Unlike Code nodes which need sourcePortID, React Agent should not have it.
+        """
+        nodes, edges = schema_from(self._workflow())
+        react_node = node_of_type(nodes, ComponentType.COMPONENT_TYPE_REACT_AGENT)
+        end = node_of_type(nodes, ComponentType.COMPONENT_TYPE_END)
+        react_to_end_edges = [e for e in edges
+                              if e["sourceNodeID"] == react_node["id"] and e["targetNodeID"] == end["id"]]
+        assert len(react_to_end_edges) == 1
+        # React Agent edges should NOT have sourcePortID
+        assert "sourcePortID" not in react_to_end_edges[0]
 
 
 # =============================================================================
