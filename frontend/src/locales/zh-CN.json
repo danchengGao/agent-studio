@@ -544,6 +544,7 @@
       "apps": "任务空间",
       "agents": "智能体开发",
       "workflows": "工作流编排",
+      "executions": "执行记录",
       "promptManagement": "提示词管理",
       "promptTemplates": "提示词模板管理",
       "promptOptimization": "提示词自优化",

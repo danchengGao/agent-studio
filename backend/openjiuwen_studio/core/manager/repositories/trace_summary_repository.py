@@ -7,7 +7,7 @@ For workflow and agent execution summary data management
 
 import ast
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +19,9 @@ from openjiuwen_studio.core.manager.repositories import JiuwenBaseRepository
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
 from openjiuwen_studio.models.trace_detail import TraceDetailDB
 from openjiuwen_studio.models.trace_summary import TraceSummaryDB
+from openjiuwen_studio.models.workflow import WorkflowBaseDB
+from openjiuwen_studio.models.workflow_execution import WorkflowExecutionDB
+from openjiuwen_studio.models import agent as agent_models
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.execution_log import ExecutionLogSummary, InvokeExecuteInfo
 from openjiuwen_studio.schemas.trace_summary import TraceSummary
@@ -832,6 +835,51 @@ class TraceSummaryRepository:
             )
 
     @with_exception_handling
+    def create_trace_summary_from_workflow_execution(self, trace_id: str) -> ResponseModel:
+        """Create TraceSummary from WorkflowExecutionDB data (for workflows that don't write to TraceDetailDB)."""
+        with get_db_jw() as db:
+            from sqlalchemy import select
+            stmt = select(WorkflowExecutionDB).where(WorkflowExecutionDB.trace_id == trace_id)
+            wf_exec = db.execute(stmt).scalar_one_or_none()
+            if not wf_exec:
+                return ResponseModel(
+                    code=status.HTTP_404_NOT_FOUND,
+                    message=f"No WorkflowExecution found for trace_id: {trace_id}",
+                    data=None,
+                )
+
+            trace_summary_data = TraceSummary(
+                space_id=wf_exec.space_id,
+                business_id=wf_exec.workflow_id,
+                business_type="WORKFLOW",
+                trace_id=trace_id,
+                mode=wf_exec.mode or 0,
+                duration=wf_exec.duration,
+                status=wf_exec.status or "finish",
+                inputs=wf_exec.inputs,
+                outputs=wf_exec.outputs,
+                execute_info_list=wf_exec.execute_info_list,
+                error_code=wf_exec.error_code,
+                fail_reason=wf_exec.fail_reason,
+                input_tokens=wf_exec.input_tokens,
+                output_tokens=wf_exec.output_tokens,
+                create_time=wf_exec.create_time,
+            )
+
+            summary_base_repo = JiuwenBaseRepository(db, TraceSummaryDB)
+            summary_find_id = {"business_id": wf_exec.workflow_id, "trace_id": trace_id}
+            result = summary_base_repo.register_dl_in_sql(
+                find_id=summary_find_id,
+                dl=trace_summary_data.model_dump(exclude_unset=True),
+            )
+
+            return ResponseModel(
+                code=result.code,
+                message=f"Created TraceSummary from WorkflowExecution: {result.message}",
+                data={"trace_id": trace_id},
+            )
+
+    @with_exception_handling
     def get_trace_summary_list(
         self, business_id: str, business_type: str
     ) -> ResponseModel:
@@ -865,6 +913,160 @@ class TraceSummaryRepository:
             return ResponseModel(
                 code=status.HTTP_200_OK,
                 message=f"Retrieved {len(data_list)} trace summary records",
+                data=data_list,
+            )
+
+    @staticmethod
+    def _enrich_with_business_names(data_list: list, db) -> list:
+        """Look up workflow/agent names for a list of trace dicts and add business_name field."""
+        if not data_list:
+            return data_list
+
+        workflow_ids = list({d["business_id"] for d in data_list if d.get("business_type") == "WORKFLOW"})
+        agent_ids = list({d["business_id"] for d in data_list if d.get("business_type") == "AGENT"})
+
+        name_map = {}
+        try:
+            if workflow_ids:
+                from sqlalchemy import select
+                stmt = select(WorkflowBaseDB.workflow_id, WorkflowBaseDB.name).where(
+                    WorkflowBaseDB.workflow_id.in_(workflow_ids)
+                )
+                for row in db.execute(stmt).all():
+                    name_map[row.workflow_id] = row.name
+
+            if agent_ids:
+                from sqlalchemy import select
+                stmt = select(agent_models.AgentBaseDB.agent_id, agent_models.AgentBaseDB.agent_name).where(
+                    agent_models.AgentBaseDB.agent_id.in_(agent_ids)
+                )
+                for row in db.execute(stmt).all():
+                    name_map[row.agent_id] = row.agent_name
+        except Exception as e:
+            logger.warning(f"Failed to look up business names: {e}")
+
+        for d in data_list:
+            d["business_name"] = name_map.get(d["business_id"])
+
+        return data_list
+
+    @with_exception_handling
+    def get_trace_summary_list_by_space(
+        self, space_id: str, business_type: str = None, limit: int = 50
+    ) -> ResponseModel:
+        """Get trace summaries for all workflows/agents in a space.
+
+        Args:
+            space_id: Space ID
+            business_type: Optional filter - 'WORKFLOW' or 'AGENT'
+            limit: Maximum number of records to return
+
+        Returns:
+            ResponseModel: list of trace summary briefs with status
+        """
+        with get_db_jw() as db:
+            base_repo = JiuwenBaseRepository(db, TraceSummaryDB)
+
+            find_id = {"space_id": space_id}
+            if business_type:
+                find_id["business_type"] = business_type
+
+            result = base_repo.get_dl_in_sql_with_cols(
+                find_id=find_id,
+                cols_find=["trace_id", "business_id", "business_type", "create_time", "duration", "status"],
+                order_cols_desc=["create_time"],
+                return_range=[limit],
+            )
+
+            if result.code != status.HTTP_200_OK:
+                return result
+
+            data_list = [
+                {
+                    "trace_id": d.get("trace_id"),
+                    "business_id": d.get("business_id"),
+                    "business_type": d.get("business_type"),
+                    "create_time": d.get("create_time"),
+                    "duration": d.get("duration"),
+                    "status": d.get("status"),
+                }
+                for d in (result.data or [])
+            ]
+
+            self._enrich_with_business_names(data_list, db)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Retrieved {len(data_list)} trace summary records for space",
+                data=data_list,
+            )
+
+    @with_exception_handling
+    def get_running_traces_by_space(
+        self, space_id: str, business_type: str = None
+    ) -> ResponseModel:
+        """Find traces that are currently running (exist in TraceDetail but have no
+        completed TraceSummary with status 'finish').
+
+        Returns trace_ids with business_id, business_type, and earliest start time.
+        """
+        from sqlalchemy import select, func, distinct, and_, not_, exists
+
+        with get_db_jw() as db:
+            # Subquery: trace_ids that have a completed TraceSummary
+            completed_subq = (
+                select(TraceSummaryDB.trace_id)
+                .where(TraceSummaryDB.status.in_(["finish", "error", "interrupted"]))
+            ).correlate(TraceDetailDB)
+
+            # Main query: distinct trace_ids from TraceDetail that are NOT in completed
+            conditions = [TraceDetailDB.space_id == space_id]
+            if business_type:
+                conditions.append(TraceDetailDB.business_type == business_type)
+
+            stmt = (
+                select(
+                    TraceDetailDB.trace_id,
+                    TraceDetailDB.business_id,
+                    TraceDetailDB.business_type,
+                    func.min(TraceDetailDB.start_time_micros).label("start_time_micros"),
+                )
+                .where(
+                    and_(
+                        *conditions,
+                        ~TraceDetailDB.trace_id.in_(completed_subq),
+                    )
+                )
+                .group_by(
+                    TraceDetailDB.trace_id,
+                    TraceDetailDB.business_id,
+                    TraceDetailDB.business_type,
+                )
+                .order_by(func.min(TraceDetailDB.start_time_micros).desc())
+                .limit(20)
+            )
+
+            rows = db.execute(stmt).all()
+            data_list = []
+            for row in rows:
+                start_micros = row.start_time_micros
+                create_time = None
+                if start_micros:
+                    create_time = datetime.fromtimestamp(start_micros / 1_000_000, tz=timezone.utc)
+                data_list.append({
+                    "trace_id": row.trace_id,
+                    "business_id": row.business_id,
+                    "business_type": row.business_type,
+                    "create_time": create_time,
+                    "duration": None,
+                    "status": "running",
+                })
+
+            self._enrich_with_business_names(data_list, db)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Found {len(data_list)} running traces",
                 data=data_list,
             )
 

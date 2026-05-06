@@ -130,6 +130,9 @@ export const API_ENDPOINTS = {
     COMPONENT_CANCEL: '/execution/component/cancel',
     GET_TRACE_SUMMARY_LIST: '/execution/get_trace_summary_list',
     GET_TRACE_SUMMARY_BY_TRACE_ID: '/execution/get_trace_summary_by_trace_id',
+    GET_ALL_TRACE_SUMMARIES: '/execution/get_all_trace_summaries',
+    LIST_ACTIVE_EXECUTIONS: '/execution/list_active_executions',
+    GET_RUNNING_TRACES: '/execution/get_running_traces',
   },
 
   // 运行时部署

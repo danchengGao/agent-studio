@@ -533,6 +533,7 @@
       "apps": "Task Space",
       "agents": "Agent Development",
       "workflows": "Workflows",
+      "executions": "Executions",
       "promptManagement": "Prompt Management",
       "promptTemplates": "Prompt Templates",
       "promptOptimization": "Prompt Optimization",

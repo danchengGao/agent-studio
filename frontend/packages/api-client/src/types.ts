@@ -970,6 +970,25 @@ export interface ExecutionLogCreateInfo {
   create_time: string
 }
 
+export interface TraceSummaryBriefWithStatus {
+  trace_id: string
+  business_id: string
+  business_name?: string
+  business_type: 'WORKFLOW' | 'AGENT'
+  create_time: string
+  duration?: number
+  status?: string
+}
+
+export interface ActiveExecution {
+  conversation_id: string
+  workflow_id: string
+  workflow_name?: string
+  workflow_version?: string
+  space_id: string
+  start_time?: number
+}
+
 export interface InvokeExecuteInfo {
   invokeId: string
   invoke_id?: string // 下划线命名格式

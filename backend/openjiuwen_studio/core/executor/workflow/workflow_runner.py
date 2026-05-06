@@ -28,6 +28,7 @@ from openjiuwen_studio.core.executor.util.utils import result_convert, save_exec
 from openjiuwen_studio.schemas import WorkflowId
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException, JiuWenExecuteException
 from openjiuwen_studio.core.manager.repositories.workflow_repository import workflow_repository
+from openjiuwen_studio.core.manager.repositories.trace_summary_repository import trace_summary_repository
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager, \
     WorkflowExecutionRegistration
 from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
@@ -350,8 +351,9 @@ class WorkflowRunner(IWorkflowLoader):
 
             if trace_logs:
                 await save_execution_traces(flow_index, trace_logs)
-            # if trace_id is not None:
-            #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
+            trace_id = trace_logs[0].trace_id if trace_logs else None
+            if trace_id is not None:
+                trace_summary_repository.create_trace_summary_from_workflow_execution(trace_id)
         except asyncio.CancelledError:
             logger.warning(
                 f"Workflow execution cancelled: "
@@ -363,19 +365,22 @@ class WorkflowRunner(IWorkflowLoader):
             pass
         except JiuWenExecuteException as e:
             await handle_stream_error(trace_logs, [], last_chunk, e.code, e.message, flow_index)
-            # if trace_id is not None:
-            #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
+            trace_id = trace_logs[0].trace_id if trace_logs else None
+            if trace_id is not None:
+                trace_summary_repository.create_trace_summary_from_workflow_execution(trace_id)
             e.set_workflow_id(id)
             raise e
         except (BaseError, JiuWenGraphException) as e:
             await handle_stream_error(trace_logs, [], last_chunk, e.code, e.message, flow_index)
-            # if trace_id is not None:
-            #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
+            trace_id = trace_logs[0].trace_id if trace_logs else None
+            if trace_id is not None:
+                trace_summary_repository.create_trace_summary_from_workflow_execution(trace_id)
             raise JiuWenExecuteException(e.code, e.message, workflow_id=id) from e
         except Exception as e:
             await handle_stream_error(trace_logs, [], last_chunk, -1, str(e), flow_index)
-            # if trace_id is not None:
-            #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
+            trace_id = trace_logs[0].trace_id if trace_logs else None
+            if trace_id is not None:
+                trace_summary_repository.create_trace_summary_from_workflow_execution(trace_id)
             raise JiuWenExecuteException(
                 StatusCode.WORKFLOW_RUNNER_ERROR.code,
                 StatusCode.WORKFLOW_RUNNER_ERROR.errmsg.format(msg=str(e)),
