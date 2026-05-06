@@ -27,7 +27,7 @@ def variable_merge_convert(node: Node) -> dsl.Component:
         variable_merge = inputs.variable_merge
         if variable_merge is None:
             raise ValueError("variable_merge is empty")
-        variable_merge_configs = {"groups": [group.model_dump() for group in variable_merge]}
+        variable_merge_configs = {"groups": [group.model_dump(by_alias=False) for group in variable_merge]}
 
         # 构建转换后的LLM组件配置
         variable_merge_component = dsl.Component(

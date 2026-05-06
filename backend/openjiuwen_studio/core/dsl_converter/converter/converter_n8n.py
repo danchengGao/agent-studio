@@ -344,7 +344,8 @@ class N8nWorkflowConverter(WorkflowConverter):
         
         # Step 4: Convert connections to edges
         self._convert_connections()
-        
+        self._fix_shared_merge_predecessors()
+
         # Step 5: Find last node and create End node
         last_node_id = self._find_last_node()
         self._create_end_node(last_node_id)
@@ -1073,14 +1074,14 @@ class N8nWorkflowConverter(WorkflowConverter):
             schema = params.get("schema", {})
             attributes = schema.get("attributes", [])
             if attributes:
-                attr_desc = "; ".join(
-                    "{name} ({type}): {desc}".format(
+                attr_parts = []
+                for a in attributes:
+                    attr_parts.append("{name} ({type}): {desc}".format(
                         name=a.get("name", "field"),
                         type=a.get("type", "string"),
                         desc=a.get("description", ""),
-                    )
-                    for a in attributes
-                )
+                    ))
+                attr_desc = "; ".join(attr_parts)
                 system_prompt = f"Extract the following fields from the text — {attr_desc}"
             else:
                 system_prompt = "Extract structured information from the provided text."
@@ -1089,10 +1090,10 @@ class N8nWorkflowConverter(WorkflowConverter):
         elif "textClassifier" in node_type:
             user_prompt = params.get("inputText", params.get("text", "{{input}}"))
             categories = params.get("categories", {}).get("categories", [])
-            cat_names = [
-                c.get("category", c.get("name", ""))
-                for c in categories if c
-            ]
+            cat_names = []
+            for c in categories:
+                if c:
+                    cat_names.append(c.get("category", c.get("name", "")))
             if cat_names:
                 system_prompt = (
                     "Classify the text into exactly one of these categories: "
@@ -1395,7 +1396,11 @@ class N8nWorkflowConverter(WorkflowConverter):
         if node_type == ComponentType.COMPONENT_TYPE_PLUGIN or node_type == ComponentType.COMPONENT_TYPE_HTTP_REQUEST:
             return "data"
         if node_type == ComponentType.COMPONENT_TYPE_VARIABLE_MERGE:
-            return "merged"
+            # Output group is named "output" by the converter
+            props = node.get("data", {}).get("outputs", {}).get("properties", {})
+            if props:
+                return next(iter(props))
+            return "output"
         if node_type == ComponentType.COMPONENT_TYPE_IF:
             return ""  # selector has no data output; caller must skip up one level
         if node_type == ComponentType.COMPONENT_TYPE_START:
@@ -1519,6 +1524,7 @@ class N8nWorkflowConverter(WorkflowConverter):
         "n8n-nodes-base.removeDuplicates": "list",
         "n8n-nodes-base.splitOut": "list",
         "n8n-nodes-base.itemLists": "list",
+        "n8n-nodes-base.noOp": "list",
         "n8n-nodes-base.aggregate": "field",
         "n8n-nodes-base.html": "field",
         "n8n-nodes-base.markdown": "field",
@@ -2021,8 +2027,10 @@ class N8nWorkflowConverter(WorkflowConverter):
                     fields = re.findall(r'\b([A-Za-z_]\w*)\b\s*[,:\n]', content)
                     skip = {'json', 'true', 'false', 'null', 'undefined',
                             'const', 'let', 'var', 'return', 'function'}
-                    cleaned = [f for f in fields
-                               if f and not f.startswith('_') and f not in skip]
+                    cleaned = []
+                    for f in fields:
+                        if f and not f.startswith('_') and f not in skip:
+                            cleaned.append(f)
 
                     # Resolve spread operators: ...varName → inject that var's fields
                     for spread_var in re.findall(r'\.\.\.(\w+)', content):
@@ -2043,8 +2051,10 @@ class N8nWorkflowConverter(WorkflowConverter):
                 content = self._extract_js_object_content(original, 'return')
                 if content:
                     fields = re.findall(r'\b([A-Za-z_]\w*)\s*:', content)
-                    cleaned = [f for f in fields
-                               if f and not f.startswith('_') and f not in {'json'}]
+                    cleaned = []
+                    for f in fields:
+                        if f and not f.startswith('_') and f not in {'json'}:
+                            cleaned.append(f)
                     # Resolve spreads here too
                     for spread_var in re.findall(r'\.\.\.(\w+)', content):
                         if spread_var in var_to_fields:
@@ -3060,10 +3070,9 @@ class N8nWorkflowConverter(WorkflowConverter):
 
         # ── Extract merge-by field pairs ──────────────────────────────────────
         merge_fields_raw = params.get("mergeByFields", {}).get("values", [])
-        merge_fields = [
-            {"input1": f.get("field1", ""), "input2": f.get("field2", "")}
-            for f in merge_fields_raw
-        ]
+        merge_fields = []
+        for f in merge_fields_raw:
+            merge_fields.append({"input1": f.get("field1", ""), "input2": f.get("field2", "")})
         merge_fields_repr = repr(merge_fields)
 
         # ── Code body ─────────────────────────────────────────────────────────
@@ -4606,66 +4615,159 @@ class N8nWorkflowConverter(WorkflowConverter):
         return [index_to_id[k] for k in sorted(index_to_id)]
 
     def _convert_merge_node(self, n8n_node: Dict, node_id: str, x_pos: int) -> Dict:
-        """Convert n8n Merge to OpenJiuwen Variable Merge component."""
-        position = n8n_node.get("position", [x_pos, 34])
+        """Convert n8n Merge node to OpenJiuwen Variable Merge component.
+
+        n8n merge modes:
+          - append         → mode: append
+          - combine
+              - mergeByFields  → mode: combine, combineBy: matchingFields
+              - keepKeyMatches → mode: combine, combineBy: matchingFields (keepMatches output)
+              - enrichInput1   → mode: combine, combineBy: matchingFields (enrichInput1 output)
+              - mergeByPosition → mode: combine, combineBy: position
+              - multiplex       → mode: combine, combineBy: allCombinations
+          - chooseBranch   → mode: chooseBranch
+          - sqlQuery       → mode: sqlQuery, sqlQuery: parameters.query
+        """
         node_name = n8n_node.get("name", "")
+        params = n8n_node.get("parameters", {})
+        position = n8n_node.get("position", [x_pos, 34])
+        px = position[0] if len(position) > 0 else x_pos
+        py = position[1] if len(position) > 1 else 34
 
-        # Gather all predecessors in input-index order.
-        # Each predecessor becomes one variable group so the runtime sees at
-        # least one group per connected input (fixes "At least one variable
-        # group must be added" error when groups was always left empty).
-        pred_ids = self._find_all_predecessor_ids(node_name)
+        n8n_mode = params.get("mode", "append")          # append | combine | chooseBranch
+        combine_by_raw = params.get("combineBy", "mergeByFields")  # used when mode == combine
+        output_type_raw = params.get("outputDataFrom", "both")  # chooseBranch: input1|input2|empty
 
-        # Build inputParameters and configs.groups together
-        input_parameters: Dict[str, Any] = {}
-        groups: List[Dict] = []
+        # ── Resolve input predecessors by port index ──────────────────────────
+        pred1_id = self._find_predecessor_by_input_index(node_name, 0)
+        pred2_id = self._find_predecessor_by_input_index(node_name, 1)
 
-        for idx, pred_id in enumerate(pred_ids):
-            output_field = self._get_primary_output_field(pred_id) or "result"
-            param_key = f"input_{idx}"
-
-            input_parameters[param_key] = {
-                "type": "ref",
-                "content": [pred_id, output_field],
-                "extra": {"index": idx}
+        def make_ref(pred_id: str, slot: str, group_index: int) -> Dict:
+            out_field = self._get_primary_output_field(pred_id)
+            return {
+                slot: {
+                    "type": "ref",
+                    "content": [pred_id, out_field],
+                    "extra": {"index": group_index},
+                }
             }
 
-            groups.append({
-                "groupId": f"group_{uuid.uuid4().hex[:8]}",
-                "inputs": {
-                    param_key: {
-                        "type": "ref",
-                        "content": [pred_id, output_field]
-                    }
-                }
-            })
+        input_parameters: Dict = {}
+        if pred1_id:
+            input_parameters.update(make_ref(pred1_id, "input1", 0))
+        if pred2_id:
+            input_parameters.update(make_ref(pred2_id, "input2", 1))
 
-        # Guarantee at least one group so the schema is always valid
-        if not groups:
-            groups.append({
-                "groupId": f"group_{uuid.uuid4().hex[:8]}",
-                "inputs": {}
-            })
+        # ── Map n8n mode → OpenJiuwen mode + group config ─────────────────────
+        if n8n_mode == "chooseBranch":
+            # chooseBranch: output_type_raw is "input1" | "input2" | "empty"
+            choose_index_map = {"input1": 0, "input2": 1, "empty": -1}
+            choose_index = choose_index_map.get(output_type_raw, 0)
+            group = {
+                "name": "output",
+                "type": "object",
+                "items": list(input_parameters.keys()),
+                "mode": "chooseBranch",
+                "chooseIndex": choose_index,
+            }
 
+        elif n8n_mode == "combine":
+            # Map n8n combineBy values to OpenJiuwen combineBy
+            combine_by_map = {
+                "mergeByFields": "matchingFields",
+                "keepKeyMatches": "matchingFields",
+                "enrichInput1": "matchingFields",
+                "mergeByPosition": "position",
+                "combineByPosition": "position",  # n8n typeVersion 3 alias
+                "multiplex": "allCombinations",
+                "combineAll": "allCombinations",    # n8n typeVersion 3 alias
+                "combineByAll": "allCombinations",  # n8n typeVersion 3 alias
+            }
+            ojw_combine_by = combine_by_map.get(combine_by_raw, "matchingFields")
+
+            # Map n8n combineBy to OpenJiuwen outputType for matchingFields
+            output_type_map = {
+                "mergeByFields": "keepMatches",
+                "keepKeyMatches": "keepMatches",
+                "enrichInput1": "enrichInput1",
+            }
+            ojw_output_type = output_type_map.get(combine_by_raw, "keepMatches")
+
+            # Extract matching field names if present
+            merge_fields_raw = params.get("mergeByFields", {}).get("values", [])
+            match_field1 = merge_fields_raw[0].get("field1", "") if merge_fields_raw else ""
+            match_field2 = merge_fields_raw[0].get("field2", "") if merge_fields_raw else ""
+
+            # Clash handling options
+            clash_handling = params.get("options", {})
+            clash_when_clash_map = {
+                "addSuffix": "addInputNumber",
+                "preferInput1": "preferInput1",
+                "preferInput2": "preferInput2",
+            }
+            ojw_clash = clash_when_clash_map.get(
+                clash_handling.get("clashHandling", {}).get("values", {}).get("resolveClash", "addSuffix"),
+                "addInputNumber"
+            )
+            merge_mode = clash_handling.get("clashHandling", {}).get("values", {}).get("mergeMode")
+            ojw_merging_nested = "deepMerge" if merge_mode == "deepMerge" else "shallowMerge"
+            keep_unpaired = bool(params.get("options", {}).get("includeUnpaired", False))
+            fuzzy_compare = bool(params.get("options", {}).get("fuzzyCompare", False))
+
+            group = {
+                "name": "output",
+                "type": "array",
+                "items": list(input_parameters.keys()),
+                "mode": "combine",
+                "combineBy": ojw_combine_by,
+                "matchField1": match_field1,
+                "matchField2": match_field2,
+                "outputType": ojw_output_type,
+                "keepUnpaired": keep_unpaired,
+                "fuzzyCompare": fuzzy_compare,
+                "clashWhenClash": ojw_clash,
+                "clashMergingNested": ojw_merging_nested,
+                "clashMinimizeEmptyFields": False,
+            }
+
+        elif n8n_mode == "sqlQuery":
+            sql_query = params.get("query", "")
+            group = {
+                "name": "output",
+                "type": "array",
+                "items": list(input_parameters.keys()),
+                "mode": "sqlQuery",
+                "sqlQuery": sql_query,
+            }
+
+        else:
+            # append (default) — stack all inputs
+            group = {
+                "name": "output",
+                "type": "array",
+                "items": list(input_parameters.keys()),
+                "mode": "append",
+            }
+
+        # ── Assemble node ─────────────────────────────────────────────────────
         return {
             "id": node_id,
             "type": str(ComponentType.COMPONENT_TYPE_VARIABLE_MERGE),
             "meta": {
-                "position": {
-                    "x": position[0] if len(position) > 0 else x_pos,
-                    "y": position[1] if len(position) > 1 else 34
-                }
+                "position": {"x": px, "y": py}
             },
             "data": {
-                "title": node_name or self.get_title("merge"),
-                "inputs": {"inputParameters": input_parameters},
+                "title": n8n_node.get("name", self.get_title("merge")),
+                "inputs": {
+                    "inputParameters": input_parameters,
+                    "variableMerge": [group],
+                },
                 "outputs": {
                     "type": "object",
                     "properties": {
-                        "merged": {"type": "object", "extra": {"index": 1}}
+                        "output": {"type": group.get("type", "object"), "extra": {"index": 1}}
                     }
                 },
-                "configs": {"groups": groups}
             }
         }
 
@@ -4806,6 +4908,183 @@ class N8nWorkflowConverter(WorkflowConverter):
     # CONNECTION CONVERSION
     # =========================================================================
 
+    def _code_node_has_selector_source(self, code_node_id: str) -> bool:
+        """Return True if code_node_id has at least one direct incoming edge from a
+        Selector (IF) node — i.e. it is a genuine branch output.
+
+        Pure fan-out Code nodes (fed from Start or other Code nodes) return False.
+        Only branch outputs can trigger WORKFLOW_GRAPH_BRANCH_REDUCE_ERROR, so
+        _fix_shared_merge_predecessors must skip any merge whose shared predecessors
+        are all plain fan-out nodes.
+        """
+        selector_type = ComponentType.COMPONENT_TYPE_IF
+        for edge in self.openjiuwen_edges:
+            if edge.get("targetNodeID") == code_node_id:
+                src_id = edge.get("sourceNodeID", "")
+                src_node = next(
+                    (n for n in self.openjiuwen_nodes if n["id"] == src_id), None
+                )
+                if src_node and int(src_node.get("type", 0)) == selector_type:
+                    return True
+        return False
+
+    def _fix_shared_merge_predecessors(self):
+        """Fix CBA fan-out error when multiple variable-merge nodes share code predecessors.
+
+        OpenJiuwen's pregel graph adapter raises WORKFLOW_GRAPH_BRANCH_REDUCE_ERROR
+        when a node receives edges from two different "branch ancestors" — i.e. two
+        separate code-type fan-outs.  This happens when two merge nodes both connect
+        to the same pair of code predecessors that are themselves on different selector
+        branches (e.g. Selector→CodeA→Merge1, Selector→CodeB→Merge1, same for Merge2).
+
+        IMPORTANT: This fix must NOT apply to pure fan-out patterns where the shared
+        Code predecessors are fed directly from Start or other non-branching nodes
+        (e.g. Input1→Merge1 and Input1→Merge2 as parallel consumers).  In those cases
+        there is no branch-reduce and stripping the edges breaks both merges.
+
+        Fix: keep the first merge's incoming edges intact, then for each subsequent
+        merge that shares *branch-output* code predecessors, remove those conflicting
+        edges and add a single ordering edge from the first merge node (or its direct
+        successor) so that execution ordering is preserved while the data is still read
+        from session state via inputParameters refs.
+        """
+        merge_type = ComponentType.COMPONENT_TYPE_VARIABLE_MERGE
+        code_type = ComponentType.COMPONENT_TYPE_CODE
+
+        merge_node_ids = []
+        for n in self.openjiuwen_nodes:
+            if int(n.get("type", 0)) == merge_type:
+                merge_node_ids.append(n["id"])
+        if len(merge_node_ids) < 2:
+            return
+
+        def _get_code_in_sources(merge_id: str):
+            sources = set()
+            for edge in self.openjiuwen_edges:
+                if edge.get("targetNodeID") == merge_id:
+                    src_id = edge.get("sourceNodeID", "")
+                    src_node = next((n for n in self.openjiuwen_nodes if n["id"] == src_id), None)
+                    if src_node and int(src_node.get("type", 0)) == code_type:
+                        sources.add(src_id)
+            return sources
+
+        def _get_direct_successor(node_id: str):
+            for edge in self.openjiuwen_edges:
+                if edge.get("sourceNodeID") == node_id:
+                    return edge.get("targetNodeID")
+            return None
+
+        # claimed_by: code_node_id → first merge_id that claimed it
+        claimed_by: Dict[str, str] = {}
+
+        for merge_id in merge_node_ids:
+            sources = _get_code_in_sources(merge_id)
+            conflicting = sources & set(claimed_by.keys())
+
+            if not conflicting:
+                for src in sources:
+                    claimed_by.setdefault(src, merge_id)
+            else:
+                # Only apply the fix when at least one of the conflicting code
+                # predecessors is a genuine branch output (fed from a Selector).
+                # Pure fan-out merges (same Code node → multiple Merge nodes, with
+                # no selector in between) do NOT cause BRANCH_REDUCE_ERROR and must
+                # keep their edges intact so both merges receive their inputs and
+                # both result nodes can reach End independently.
+                if not any(self._code_node_has_selector_source(cid) for cid in conflicting):
+                    # Plain fan-out: shared code predecessors without a Selector in
+                    # between.  OpenJiuwen still raises BRANCH_REDUCE_ERROR in this
+                    # case (e.g. Input1→MergeA and Input1→MergeB in the same flow).
+                    # Fix: deep-clone each shared source node so every merge node
+                    # gets its own exclusive predecessor chain.
+                    for old_src_id in conflicting:
+                        old_node = next(
+                            (n for n in self.openjiuwen_nodes if n["id"] == old_src_id), None
+                        )
+                        if not old_node:
+                            continue
+
+                        # 1. Deep-clone the source node with a fresh ID
+                        #    json round-trip avoids needing `import copy`
+                        new_node = json.loads(json.dumps(old_node))
+                        new_id = f"{old_src_id}_c{uuid.uuid4().hex[:6]}"
+                        new_node["id"] = new_id
+                        # Offset Y so the clone doesn't visually overlap the original
+                        if "meta" in new_node and "position" in new_node["meta"]:
+                            new_node["meta"]["position"]["y"] += 220
+                        self.openjiuwen_nodes.append(new_node)
+
+                        # 2. Replicate every incoming edge of the original → clone
+                        incoming = []
+                        for e in self.openjiuwen_edges:
+                            if e.get("targetNodeID") == old_src_id:
+                                incoming.append(e)
+                        for e in incoming:
+                            clone_edge: Dict = {
+                                "id": f"edge_{uuid.uuid4().hex[:8]}",
+                                "sourceNodeID": e["sourceNodeID"],
+                                "targetNodeID": new_id,
+                            }
+                            if "sourcePortID" in e:
+                                clone_edge["sourcePortID"] = e["sourcePortID"]
+                            self.openjiuwen_edges.append(clone_edge)
+
+                        # 3. Retarget the old_src→merge edge to new_id→merge
+                        for e in self.openjiuwen_edges:
+                            if (e.get("sourceNodeID") == old_src_id
+                                    and e.get("targetNodeID") == merge_id):
+                                e["sourceNodeID"] = new_id
+                                break
+
+                        # 4. Update the merge node's inputParameters refs
+                        merge_node = next(
+                            (n for n in self.openjiuwen_nodes if n["id"] == merge_id), None
+                        )
+                        if merge_node:
+                            ip = (merge_node.get("data", {})
+                                            .get("inputs", {})
+                                            .get("inputParameters", {}))
+                            for slot_val in ip.values():
+                                if (isinstance(slot_val, dict)
+                                        and slot_val.get("type") == "ref"):
+                                    content = slot_val.get("content", [])
+                                    if content and content[0] == old_src_id:
+                                        content[0] = new_id
+
+                        # 5. Register the clone as exclusively owned by this merge
+                        claimed_by[new_id] = merge_id
+
+                    # Claim non-conflicting sources for this merge
+                    for src in sources - conflicting:
+                        claimed_by.setdefault(src, merge_id)
+                    continue
+
+                # Find the first merge that already owns these sources
+                first_merge_id = claimed_by.get(next(iter(conflicting)))
+                if first_merge_id is None:
+                    continue
+
+                # Remove conflicting source→merge edges
+                new_edges = []
+                for e in self.openjiuwen_edges:
+                    if not (e.get("targetNodeID") == merge_id and e.get("sourceNodeID") in conflicting):
+                        new_edges.append(e)
+                self.openjiuwen_edges = new_edges
+
+                # Add ordering edge: first_merge (or its successor) → this merge
+                predecessor = _get_direct_successor(first_merge_id) or first_merge_id
+                already_exists = False
+                for e in self.openjiuwen_edges:
+                    if e.get("sourceNodeID") == predecessor and e.get("targetNodeID") == merge_id:
+                        already_exists = True
+                        break
+                if not already_exists:
+                    self.openjiuwen_edges.append({
+                        "id": f"edge_{uuid.uuid4().hex[:8]}",
+                        "sourceNodeID": predecessor,
+                        "targetNodeID": merge_id,
+                    })
+
     def _convert_connections(self):
         """Convert n8n connections to OpenJiuwen edges."""
         for source_name, conn_types in self.n8n_connections.items():
@@ -4837,16 +5116,15 @@ class N8nWorkflowConverter(WorkflowConverter):
                         if not effective_source_id:
                             continue   # n8n port not mapped (shouldn't happen)
                         # Always treat as a selector: use branch 0 of this guard
-                        sel_jw = next(
-                            (n for n in self.openjiuwen_nodes
-                             if n["id"] == effective_source_id), None
-                        )
+                        sel_jw = None
+                        for n in self.openjiuwen_nodes:
+                            if n["id"] == effective_source_id:
+                                sel_jw = n
+                                break
                         cd_branch_ids = []
                         if sel_jw:
-                            cd_branch_ids = [
-                                b.get("branchId", "0")
-                                for b in sel_jw.get("data", {}).get("branches", [])
-                            ]
+                            for b in sel_jw.get("data", {}).get("branches", []):
+                                cd_branch_ids.append(b.get("branchId", "0"))
                         pending_port = cd_branch_ids[0] if cd_branch_ids else "0"
                         is_code = False
                         is_selector = True
@@ -4859,10 +5137,11 @@ class N8nWorkflowConverter(WorkflowConverter):
                         is_selector = source_jiuwen_type == ComponentType.COMPONENT_TYPE_IF
                         selector_branch_ids = []
                         if is_selector:
-                            jw_node = next(
-                                (n for n in self.openjiuwen_nodes
-                                 if n["id"] == effective_source_id), None
-                            )
+                            jw_node = None
+                            for n in self.openjiuwen_nodes:
+                                if n["id"] == effective_source_id:
+                                    jw_node = n
+                                    break
                             if jw_node:
                                 selector_branch_ids = []
                                 branches = jw_node.get("data", {}).get("branches", [])
@@ -4890,12 +5169,13 @@ class N8nWorkflowConverter(WorkflowConverter):
                         if effective_source_id == effective_target_id:
                             continue
 
-                        edge_exists = any(
-                            e.get("sourceNodeID") == effective_source_id
-                            and e.get("targetNodeID") == effective_target_id
-                            and e.get("sourcePortID") == pending_port
-                            for e in self.openjiuwen_edges
-                        )
+                        edge_exists = False
+                        for e in self.openjiuwen_edges:
+                            if (e.get("sourceNodeID") == effective_source_id
+                                    and e.get("targetNodeID") == effective_target_id
+                                    and e.get("sourcePortID") == pending_port):
+                                edge_exists = True
+                                break
                         if edge_exists:
                             continue
 
@@ -4948,11 +5228,11 @@ class N8nWorkflowConverter(WorkflowConverter):
         if self.first_main_node:
             target_id = self.node_id_map.get(self.first_main_node)
             if target_id and target_id != self.start_node_id:
-                edge_exists = any(
-                    e.get("sourceNodeID") == self.start_node_id and 
-                    e.get("targetNodeID") == target_id
-                    for e in self.openjiuwen_edges
-                )
+                edge_exists = False
+                for e in self.openjiuwen_edges:
+                    if e.get("sourceNodeID") == self.start_node_id and e.get("targetNodeID") == target_id:
+                        edge_exists = True
+                        break
                 if not edge_exists:
                     self.openjiuwen_edges.insert(0, {
                         "id": f"edge_{uuid.uuid4().hex[:8]}",
@@ -4966,11 +5246,11 @@ class N8nWorkflowConverter(WorkflowConverter):
             for terminal_id in self._find_all_terminal_nodes():
                 if terminal_id == self.end_node_id:
                     continue
-                edge_exists = any(
-                    e.get("sourceNodeID") == terminal_id and
-                    e.get("targetNodeID") == self.end_node_id
-                    for e in self.openjiuwen_edges
-                )
+                edge_exists = False
+                for e in self.openjiuwen_edges:
+                    if e.get("sourceNodeID") == terminal_id and e.get("targetNodeID") == self.end_node_id:
+                        edge_exists = True
+                        break
                 if not edge_exists:
                     terminal_node = next(
                         (n for n in self.openjiuwen_nodes if n["id"] == terminal_id), None

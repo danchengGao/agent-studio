@@ -115,6 +115,24 @@ class VariableMerge(BaseModel):
     name: str = Field(..., alias="name")
     type: str = Field(..., alias="type")
     items: list[str] = Field(..., alias="items")
+    mode: Optional[str] = Field("firstNonNull", alias="mode")
+    # Combine sub-options
+    combine_by: Optional[str] = Field("matchingFields", alias="combineBy")
+    match_field1: Optional[str] = Field(None, alias="matchField1")
+    match_field2: Optional[str] = Field(None, alias="matchField2")
+    output_type: Optional[str] = Field("keepMatches", alias="outputType")
+    keep_unpaired: Optional[bool] = Field(False, alias="keepUnpaired")
+    fuzzy_compare: Optional[bool] = Field(False, alias="fuzzyCompare")
+    clash_when_clash: Optional[str] = Field("addInputNumber", alias="clashWhenClash")
+    clash_merging_nested: Optional[str] = Field("shallowMerge", alias="clashMergingNested")
+    clash_minimize_empty_fields: Optional[bool] = Field(False, alias="clashMinimizeEmptyFields")
+    # Choose Branch
+    choose_index: Optional[int] = Field(0, alias="chooseIndex")
+    # SQL Query
+    sql_query: Optional[str] = Field(None, alias="sqlQuery")
+
+    class Config:
+        populate_by_name = True
 
 
 class PluginParam(BaseModel):
