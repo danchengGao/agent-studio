@@ -16,11 +16,11 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@ag-ui/client": "^0.0.47",
-    "@assistant-ui/react": "^0.12.17",
-    "@assistant-ui/react-ag-ui": "^0.0.21",
-    "@assistant-ui/react-markdown": "^0.12.6",
-    "@assistant-ui/react-ui": "^0.2.1",
+    "@ag-ui/client": "0.0.47",
+    "@assistant-ui/react": "0.12.20",
+    "@assistant-ui/react-ag-ui": "0.0.21",
+    "@assistant-ui/react-markdown": "0.12.6",
+    "@assistant-ui/react-ui": "0.2.1",
     "@blocknote/core": "^0.47.1",
     "@blocknote/mantine": "^0.47.1",
     "@blocknote/react": "^0.47.1",

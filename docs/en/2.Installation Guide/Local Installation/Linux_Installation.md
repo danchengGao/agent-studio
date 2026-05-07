@@ -46,7 +46,7 @@ The one-click script automates tool checks, code fetch, environment setup, and s
 
 #### 2. Configure Proxy, uv Index, NVM Mirror, npm Registry, and Database Address (Optional)
 
-If you need a proxy to access the internet or want to use a custom uv index, NVM Node.js mirror, or npm registry, or you need to set the database service host and port (for example, remote MySQL or a Docker-mapped port), edit `user_config.sh`:
+If your network requires a proxy to access the internet, or you need a custom uv index, NVM Node.js mirror, npm registry, or you must set the database service host and port (for example, remote MySQL or a Docker-mapped port), configure these in `user_config.sh`:
 
 * Open `user_config.sh` and set the following variables as needed:
 
@@ -71,18 +71,34 @@ If you need a proxy to access the internet or want to use a custom uv index, NVM
   DB_PORT=""            # Leave empty for default 3306
   ```
 
-* **Proxy**: Leave variables empty to skip proxy; set full URL (e.g. `http://127.0.0.1:7890`) when needed. Authenticated proxy is supported (e.g. `http://user:pass@proxy.example.com:8080`). `SSL_VERIFY`: `true` enables Git SSL verification, `false` disables it.
-* **uv**: Leave `UV_INDEX` and `UV_TRUSTED_HOST` empty to use the default uv index; when using a mirror, set both. Common mirror examples:
-  * Tsinghua: `https://pypi.tuna.tsinghua.edu.cn/simple`, trusted host: `pypi.tuna.tsinghua.edu.cn`
-  * Aliyun: `https://mirrors.aliyun.com/pypi/simple/`, trusted host: `mirrors.aliyun.com`
-  * USTC: `https://pypi.mirrors.ustc.edu.cn/simple/`, trusted host: `pypi.mirrors.ustc.edu.cn`
-* **NVM mirror**: Leave `NVM_NODEJS_ORG_MIRROR` empty for default (nodejs.org), or set e.g. `https://npmmirror.com/mirrors/node` for check_nodejs.sh.
-* **npm**: Leave `NPM_REGISTRY` empty to use default; set to your registry URL when needed. Common examples:
-  * npmmirror: `https://registry.npmmirror.com`
-  * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
-  * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
-* **Database connection**:
-  * **Purpose**: Configure these when the database is on a remote host or uses a non-default host/port.
+* Proxy configuration notes:
+  * **No proxy**: Leave the variables empty (the script skips proxy configuration automatically).
+  * **Proxy required**: Set the full proxy URL, e.g. `http://127.0.0.1:7890`.
+  * **Authenticated proxy**: Supported, e.g. `http://user:pass@proxy.example.com:8080`.
+  * **SSL verification**: Set `SSL_VERIFY` to `true` or `false`; `true` enables Git SSL certificate verification, `false` disables it.
+
+* uv index notes:
+  * **Default uv index**: Leave `UV_INDEX` and `UV_TRUSTED_HOST` empty (the script uses the default uv index).
+  * **Custom uv index**: Set both `UV_INDEX` and `UV_TRUSTED_HOST`.
+  * **Common mirror examples (China)**:
+    * Tsinghua: `https://pypi.tuna.tsinghua.edu.cn/simple`, trusted host: `pypi.tuna.tsinghua.edu.cn`
+    * Aliyun: `https://mirrors.aliyun.com/pypi/simple/`, trusted host: `mirrors.aliyun.com`
+    * USTC: `https://pypi.mirrors.ustc.edu.cn/simple/`, trusted host: `pypi.mirrors.ustc.edu.cn`
+
+* NVM Node.js mirror notes:
+  * **Default**: Leave `NVM_NODEJS_ORG_MIRROR` empty to use the NVM default (nodejs.org).
+  * **Mirror or unreachable default**: Set e.g. `https://npmmirror.com/mirrors/node` for `check_nodejs.sh` when installing Node.js.
+
+* npm registry notes:
+  * **Default npm registry**: Leave `NPM_REGISTRY` empty (the script skips npm registry configuration and uses the default).
+  * **Custom registry**: Set `NPM_REGISTRY` to your registry URL.
+  * **Common mirror examples (China)**:
+    * npmmirror: `https://registry.npmmirror.com`
+    * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
+    * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
+
+* Database connection notes (`DB_HOST` / `DB_PORT`):
+  * **Purpose**: Use when the database is on a remote host or uses a non-default host/port.
 
 #### 3. Run the Installation Script
 
@@ -127,7 +143,7 @@ If you need a proxy to access the internet or want to use a custom uv index, NVM
 
 ### Method 2: Full Manual Installation (Not Recommended)
 
-> **Note**: This method requires manually installing and configuring all dependent services and is more complex. Prefer Method 1 when possible.
+> **Note**: This method requires manually installing all dependent services; the steps are complex and not recommended. Prefer Method 1.
 
 Complete dependency installation first, then perform source retrieval and installation.
 
@@ -242,9 +258,9 @@ Complete dependency installation first, then perform source retrieval and instal
 
 ##### 1.5. Milvus (Optional Component)
 
-* **Note**：`.env.example` uses Chroma by default. Simply keep `INDEX_MANAGER_TYPE` set to `chroma` to directly start the backend service without additional installation or configuration. If you need to use Milvus, please change `INDEX_MANAGER_TYPE` in `.env.example` to `milvus` and refer to [How to enable memory and knowledge base features](#linux-memory) to complete the installation and configuration of Milvus.
+* **Note**: `.env.example` uses Chroma by default. Simply keep `INDEX_MANAGER_TYPE` set to `chroma` to directly start the backend service without additional installation or configuration. If you need to use Milvus, change `INDEX_MANAGER_TYPE` in `.env.example` to `milvus` and follow [How to Enable Memory and Knowledge Base Features](#linux-memory) to install and configure Milvus.
 
-* **Chroma vs Milvus**：
+* **Chroma vs Milvus**:
   * Chroma requires no additional installation and boasts a simple configuration. All you need to do is obtain the vector model, making it ideal for quick experimentation and suitable for development and testing environments. For obtaining the vector model, refer to [How to Obtain the Vector Model](#linux-embed-model).
   * Milvus has more comprehensive functions and can meet the needs of complex scenarios, so it is more recommended for use in practical engineering and production environments.
 
@@ -314,23 +330,21 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    | **HOST**            | Service bind host (`0.0.0.0` allows all network addresses)                 | `0.0.0.0`                                                                    |
    | **PORT**            | Service startup port                                                        | `8186`                                                                       |
 
-##### 2.3. Run `deploy.sh` to Install Dependencies and Start Services
+##### 2.3. Run `run-server.sh` to Install Dependencies and Start the Service
 
-- **Prerequisites**: **Python 3.11**, **Git**, and **`uv`** available in the terminal. `deploy.sh` typically uses **`uv`** to create the virtual environment and sync dependencies.
-
-- In the **`server`** directory, run the deployment script (adjust the path to your clone):
+* Run the deployment script:
 
   ```bash
-  cd /path/to/agent-runtime/server
+  cd /path/to/agent-runtime/
   chmod +x deploy.sh
-  ./deploy.sh
+  ./scripts/run-server.sh
   ```
 
 #### 3. openJiuwen Installation
 
 ##### 3.1. Get the Source Code
 
-- Clone the code and enter the project root:
+* Clone the code and enter the project root:
 
   ```bash
   git clone https://gitcode.com/openJiuwen/agent-studio.git
@@ -339,33 +353,36 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
 
 ##### 3.2. Generate an AES Key (Optional)
 
-- If you do not need to encrypt critical fields for storage, you can skip this step.
-- Run the following commands to generate a key:
+* If you do not need to encrypt critical fields for storage, you can skip this step.
+
+* Run the following commands to generate a key:
   ```bash
   cd scripts
     
   bash build_AES_master_key.sh
   ```
-- After the script finishes, it will print the key to the console. Use it as needed; it is recommended to export it as an environment variable and save it elsewhere.
+
+* After the script finishes, it will print the key to the console. Use it as needed; exporting it as an environment variable and saving it elsewhere is recommended.
   ```bash
   export SERVER_AES_MASTER_KEY_ENV=your_aes_key
   ```
-- **Note**: the AES key must remain unchanged. Changing the key later will make previously encrypted data undecipherable.
+
+* **Note**: The AES key must remain stable. Changing it later will prevent decrypting data that was encrypted with the previous key.
 
 ##### 3.3. Start openJiuwen
 
-- Go to the project root directory.
+* Go to the project root directory.
 
-- Copy the .env file:
+* Copy the *.env* file:
   ```bash
   cp .env.example .env
   ```
 
-- In the .env file, modify the following variables according to your actual environment (do not overwrite other variables):
+* In the *.env* file, modify the following variables according to your actual environment (do not overwrite other variables):
 
-  > **Tip**: You may replace values such as DB_HOST and DB_PORT with your actual database info. DB_USER and DB_PASSWORD should be the MySQL user and password you created earlier. If the password contains special characters, refer to the [Special Character Escape Table](#linux-special-char) to replace special characters with URL encoding.
+  > **Note**: You may replace values such as DB_HOST and DB_PORT with your actual database info. DB_USER and DB_PASSWORD should be the MySQL user and password you created earlier. If the password contains special characters, refer to the [Special Character Escape Table](#linux-special-char) to replace special characters with URL encoding.
   >
-  > **OBS config**: For standalone/local deployment without object storage, OBS-related variables (OBS_BUCKET, OBS_SERVER, etc.) are left empty in `.env.example`; after copying to `.env` you do not need to fill them. Only fill real values when using object storage (e.g. distributed deployment). See [Distributed Installation](../Distributed%20Installation/README.md).
+  > **OBS configuration**: For standalone/local deployment without object storage, OBS-related entries (OBS_BUCKET, OBS_SERVER, etc.) are left empty in `.env.example`; after copying to `.env` you do not need to fill them. Only provide real values when using object storage (e.g. distributed deployment). See [Distributed Installation](../Distributed%20Installation/README.md).
 
   ```env
    # Database configuration (example)
@@ -397,7 +414,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    RUNTIME_PORT=8100
    ```
 
-  For variable descriptions, please refer to the table below. If you choose to enable the memory function for Milvus, please refer to [How to Enable the Memory and Knowledge Base Functions](#linux-memory). If you choose to enable the memory function for Chroma, you only need to obtain the vector model. For details, please refer to [How to Obtain the Vector Model](#linux-embed-model).
+  See the table below for variable descriptions. To use Milvus for memory and knowledge base features, follow [How to Enable Memory and Knowledge Base Features](#linux-memory). To use Chroma, you only need to obtain the embedding model—see [How to Obtain the Embedding Model](#linux-embed-model).
 
    | Variable Name                | Description                                                 | Example                                                                      |
    |------------------------------|-------------------------------------------------------------|------------------------------------------------------------------------------|
@@ -416,7 +433,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    | **RUNTIME_HOST**                 | Runtime service host (usually local `localhost`)            | `localhost`                                                                    |
    | **RUNTIME_PORT**                 | Runtime service port (must match runtime server listen port) | `8100`                                                                    |
 
-- In the project root directory, run the following commands to start the backend service and wait patiently:
+* In the project root directory, run the following commands to start the backend service and wait patiently:
    
   ```bash
   cd backend
@@ -424,7 +441,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
   uv sync
   ```
 
-* Execute database version stamp commands to confirm current database version:
+* Run the database version stamp commands to mark the current database version:
   ```bash
   # Agent database
   alembic -n alembic_mysql_agent stamp head
@@ -435,7 +452,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
   alembic -n alembic_sqlite_ops stamp head
   ```
 
-  > Detailed description: The above commands are used to mark that the current database is already the latest version, facilitating subsequent database operations. Need to be executed separately for agent and ops databases. If using MySQL, execute `alembic -n alembic_mysql_agent stamp head` and `alembic -n alembic_mysql_ops stamp head`. For alembic usage methods, refer to [DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE_EN.md)
+  > Detailed description: The above commands mark the current database schema as up to date for subsequent operations. Run them separately for the agent and ops databases. For MySQL, run `alembic -n alembic_mysql_agent stamp head` and `alembic -n alembic_mysql_ops stamp head`. For Alembic usage, see [DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md).
 
   > **Note**: If it stalls for more than 20 minutes, press "Ctrl + C", try changing the url value of [[tool.uv.index]] in "pyproject.toml" in this directory to another available source, then re-run "uv sync".
 
@@ -450,9 +467,9 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
 
   After a successful start, you will see "Application startup complete".
 
-  > **Tip**: If you need to enable code node or code plugin tool that require the code sandbox service, refer to [How to Enable the Sandbox Feature](#linux-sandbox) to complete the sandbox setup. And if you need to enable plugins that require the plugin server, which refer to [How to Enable the Plugin Server](#linux-plugin).
+  > **Note**: To use the code execution sandbox service, follow [How to Enable the Sandbox Feature](#linux-sandbox) to start and configure it. To use the plugin server, follow [How to Enable the Plugin Server](#linux-plugin).
 
-- Open a new terminal window, go to the project root directory, then run the following commands to install frontend dependencies:
+* Open a new terminal window, go to the project root directory, then run the following commands to install frontend dependencies:
 
   ```bash
   cd frontend
@@ -462,13 +479,13 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
 
   ![image](../images/npm-error.png)
 
-- Run the following command to start the frontend service:
+* Run the following command to start the frontend service:
 
   ```
   npm run dev
   ```
 
-- Upon successful startup, it will output:
+* Upon successful startup, it will output:
 
   Local: *local access URL*
 
@@ -482,7 +499,8 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
 
 ## III. Frequently Asked Questions (FAQ)
 
-### <a id="linux-memory"></a> Question 1: How to Enable the Memory and Knowledge Base Features
+<a id="linux-memory"></a>
+### Question 1: How to Enable the Memory and Knowledge Base Features
 
 The effectiveness of the memory feature is related to the parameter scale of the large language model.
 
@@ -534,7 +552,7 @@ The memory and knowledge base function supports two vector databases: Chroma and
     ```
     You need to modify the MILVUS_HOST configuration in the .env file to match the IP address used to start the Milvus service.
 
- <a id="linux-embed-model"></a>
+<a id="linux-embed-model"></a>
 #### 2. Obtain the embedding model
 
 The memory and knowledge base features rely on an embedding model. The following steps use Huawei Cloud as an example.
@@ -553,7 +571,8 @@ The memory and knowledge base features rely on an embedding model. The following
 
 - Click "API Key Management" and follow the official instructions to obtain an API Key.
 
-### <a id="linux-sandbox"></a> Question 2: How to Enable the Sandbox Feature
+<a id="linux-sandbox"></a>
+### Question 2: How to Enable the Sandbox Feature
 
 To use code plugins or run code nodes in workflows, you must enable the sandbox service. Follow these steps:
 
@@ -591,7 +610,7 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
 
    `HOST` and `PORT` are the bind address and port for the sandbox service; set `ENABLE_LINUX_SANDBOX` to `true` to enable sandbox mode. When sandbox mode is enabled, edit the sandbox config file `sandbox_server/sandbox/openjiuwen_sandbox_server/conf/sandbox_config.yaml`. Example configuration:
 
-   ```yaml
+   ```
    seccomp: # whitelist mode
      allow:
        x86_64: ["setsockopt", "mbind", "sched_getaffinity", "epoll_wait", "getcwd", "wait4", "pread64", "set_tid_address", "prlimit64", "capget", "pipe2", "eventfd2", "pkey_alloc", "madvise", "sysinfo", "readlink", "geteuid", "getegid", "statx", "access", "clone", "arch_prctl", "clone3", "execve", "open", "lstat", "stat", "newfstatat", "lseek", "getdents64", "write", "close", "openat", "read", "futex", "mmap", "brk", "mprotect", "munmap", "rt_sigreturn", "mremap", "getgid", "getuid", "getpid", "getppid", "gettid", "exit", "exit_group", "rt_sigaction", "sched_yield", "set_robust_list", "get_robust_list", "rseq", "clock_gettime", "gettimeofday", "nanosleep", "epoll_create1", "epoll_ctl", "clock_nanosleep", "pselect6", "time", "rt_sigprocmask", "sigaltstack", "getrandom", "mkdirat", "mkdir", "socket", "connect", "bind", "listen", "accept", "sendto", "recvfrom", "getsockname", "recvmsg", "getpeername", "ppoll", "uname", "sendmsg", "sendmmsg", "fstat", "fcntl", "fstatfs", "poll", "epoll_pwait", 'ioctl']
@@ -629,9 +648,9 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
    options: ['--proc', '/proc']
    ```
 
-   **Config reference**: `seccomp` is the allowlist of system calls for processes inside the sandbox; `namespace` specifies which namespaces to isolate; `mount` defines host-to-sandbox directory mappings, with modes `read`, `write`, and `dev` for read-only, read-write, and device mappings; `sandbox` sets the sandbox type and executable path (currently only `bubblewrap` is supported); `environment` is the environment for processes in the sandbox; `timeout` is the maximum execution time in seconds per task (tasks are killed when exceeded); `options` are extra command-line arguments passed to `bwrap`.
+   **Parameter descriptions**: `seccomp` is the syscall allowlist for processes inside the sandbox; `namespace` lists namespaces to isolate; `mount` maps host directories into the sandbox (`read` / `write` / `dev` mean read-only, read-write, and device mapping); `sandbox` sets the sandbox type and executable path (only `bubblewrap` is supported today); `environment` sets environment variables for sandbox processes; `timeout` is the maximum execution time in seconds per task (tasks are terminated when exceeded); `options` are extra arguments passed to `bwrap`.
 
-   After saving the config, start the sandbox service by running `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py`.
+   When configuration is complete, run `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py` to start the sandbox service.
 
 3. **Start the sandbox gateway**
 
@@ -643,7 +662,7 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
    SANDBOX_SERVER_URL=http://localhost:5001/run
    ```
 
-   `HOST` and `PORT` are the gateway bind address and port; `SANDBOX_SERVER_URL` is the URL of the sandbox service started in step 2 (the `/run` path is the execution endpoint).
+   `HOST` and `PORT` are the gateway bind address and port; `SANDBOX_SERVER_URL` is the running address of the sandbox service from step 2.
 
    Then run `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` to start the sandbox gateway.
 
@@ -651,15 +670,17 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
 
    In your project’s `.env`, set the sandbox gateway URL, for example: `CODE_SANDBOX_URL=http://localhost:8188/run`.
 
-### <a id="linux-plugin"></a> Question 3: How to Enable the Plugin Server
+<a id="linux-plugin"></a>
+### Question 3: How to Enable the Plugin Server
 
-If you need plugins, the plugin server is required, please do the following:
+To use plugins, enable the plugin server as follows:
 
-1. Refer to `plugin_server/openjiuwen_plugin_server` files, create plugin services as you need. Then start the plugin server by running the script `plugin_server/openjiuwen_plugin_server/run_restful.py`.
+1. Refer to `plugin_server/openjiuwen_plugin_server`, create the plugins you need, then start the plugin server by running `plugin_server/openjiuwen_plugin_server/run_restful.py`. The plugin service host and port are defined by `uvicorn.run(app, host="0.0.0.0", port=8185)` in that script.
 
-2. After running the plugin server, please configure plugin server's url in `.env`, such as: `VITE_PLUGIN_SERVICE_URL=http://localhost:8185`.
+2. After the plugin server is running, set the plugin service URL in `.env`, for example: `VITE_PLUGIN_SERVICE_URL=http://localhost:8185`.
 
-### <a id="linux-special-char"></a> Question 4: Special Character Escape Table
+<a id="linux-special-char"></a>
+### Question 4: Special Character Escape Table
 
 | Character | URL Encoding | Character | URL Encoding | Character | URL Encoding | Character | URL Encoding | Character | URL Encoding |
 |----------|---------------|-----------|--------------|-----------|--------------|-----------|--------------|-----------|--------------|

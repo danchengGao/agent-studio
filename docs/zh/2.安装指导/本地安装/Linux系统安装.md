@@ -15,6 +15,15 @@
   * Ubuntu：最低 Ubuntu 20.04，推荐 Ubuntu 22.04 (Jammy) 及以上
     > **注意**：Ubuntu 官方与主流软件源已停止支持 Ubuntu 20.04 (Focal) 及以下版本系统。
 
+* 软件（具体安装方式见下文）：
+  * Git：2.40 及以上
+  * Node.js：20.0 及以上
+  * npm：10.0 及以上
+  * Python：3.11 及以上
+  * uv：0.5.0 及以上
+  * MySQL：8.0 及以上
+  * Milvus：2.6.2 及以上
+
 ## 二、安装方法
 
 ### 方法一：使用一键安装部署脚本
@@ -325,18 +334,15 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
    | **HOST**            | 服务监听主机（`0.0.0.0` 表示允许所有网络地址访问）                       | `0.0.0.0`                                     |
    | **PORT**            | 服务启动端口号                                                           | `8186`                                        |
 
-##### 2.3. 运行 `deploy.sh` 安装依赖并启动服务
+##### 2.3. 运行 `run-server.sh` 安装依赖并启动服务
 
 
-
-* **前置条件**：已安装 **Python 3.11**、**Git**，且可在终端执行 **`uv`**。`deploy.sh` 通常依赖 **`uv`** 创建虚拟环境并同步依赖。
-
-* 在 **`server`** 目录执行部署脚本（路径按你的克隆位置替换）：
+  * 执行部署脚本：
 
   ```bash
-  cd /path/to/agent-runtime/server
+  cd /path/to/agent-runtime/
   chmod +x deploy.sh
-  ./deploy.sh
+  ./scripts/run-server.sh
   ```
 
 
