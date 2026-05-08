@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 # 添加项目根目录到 Python 路径，以便直接运行时能找到所有模块
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
+    sys.path.append(backend_dir)
 
 import uvicorn
 from dotenv import load_dotenv

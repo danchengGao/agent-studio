@@ -126,7 +126,7 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "@n8n/n8n-nodes-langchain.code": ComponentType.COMPONENT_TYPE_CODE,
 
     # =========================================================================
-    # HTTP/API → Plugin
+    # HTTP/API → HTTP Request
     # =========================================================================
     "n8n-nodes-base.httpRequest": ComponentType.COMPONENT_TYPE_HTTP_REQUEST,
     "n8n-nodes-langchain.openAi": ComponentType.COMPONENT_TYPE_PLUGIN,

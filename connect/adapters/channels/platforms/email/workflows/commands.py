@@ -1,0 +1,6 @@
+WORKFLOWS = "workflows"
+WORKFLOW = "workflow"
+SEARCH = "search"
+EXECUTE = "execute"
+SKIP = "skip"
+CANCEL = "cancel"

@@ -1,0 +1,30 @@
+# Platform token storage (contains user authentication tokens)
+platforms/experimental/telegram/.telegram_bot_tokens.json
+platforms/experimental/slack/.slack_bot_tokens.json
+platforms/experimental/discord/.discord_bot_tokens.json
+platforms/cli/.cli_tokens.json
+platforms/experimental/teams/.teams_bot_tokens.json
+platforms/experimental/whatsapp/.whatsapp_bot_tokens.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

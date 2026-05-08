@@ -15,7 +15,8 @@
         "ai/baichuan.json",
         "ai/baidu_translate.json",
         "ai/baidu_ocr.json",
-        "ai/baidu_speech.json"
+        "ai/baidu_speech.json",
+        "ai/tavily.json"
       ]
     },
     "cloud": {
@@ -61,8 +62,6 @@
       "description": "Plugins for data sources and analytics",
       "icon": "📊",
       "plugins": [
-        "data/coingecko.json",
-        "data/finnhub.json",
         "data/qweather.json",
         "data/caiyun_weather.json",
         "data/openweathermap.json",
@@ -123,6 +122,17 @@
         "entertainment/eventbrite.json",
         "entertainment/bandsintown.json",
         "entertainment/seatgeek.json"
+      ]
+    },
+    "finance": {
+      "name": "Finance & Trading",
+      "description": "Financial market data, trading platforms, and investment services",
+      "icon": "💰",
+      "plugins": [
+        "finance/alpaca.json",
+        "finance/alpaca_data.json",
+        "finance/coingecko.json",
+        "finance/finnhub.json"
       ]
     },
     "file_storage": {

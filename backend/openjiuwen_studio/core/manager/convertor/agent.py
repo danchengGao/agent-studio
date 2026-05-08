@@ -426,7 +426,7 @@ def react_agent_convert(
             configs=agent_info.memory,
             plugins=plugins_dsl,
             workflows=workflows_dsl,
-            model=model_dsl,
+            model=model_dsl or ModelConfig(),
             prompt_template_name=agent_info.prompt_template_name or "",
             prompt_template=prompt_templates,
             constrain=constrain_dsl,
@@ -566,7 +566,7 @@ def workflow_agent_convert(
             agent_type=agent_info.agent_type,
             configs={},
             workflows=workflows_dsl,
-            model=model_dsl,
+            model=model_dsl or ModelConfig(),
             default_response=default_response
         )
 

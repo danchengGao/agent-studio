@@ -389,8 +389,8 @@ export const API_ENDPOINTS = {
     STATUS: '/memory-bases/memories/status',
     SEARCH: '/memory/repo/search',
     SETTINGS: '/memory-base/settings',
-    CLEAN_EXPIRED: '/memory-bases/memories/clean-expired'
-  }
+    CLEAN_EXPIRED: '/memory-bases/memories/clean-expired',
+  },
 }
 
 // HTTP状态码常量

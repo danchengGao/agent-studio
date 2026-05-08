@@ -1,0 +1,27 @@
+from connect.client.agents import execute_agent
+from connect.client.agents import parse_agent_response
+from ...client_session import get_backend_client
+
+
+async def on_agent_message(user_id, text, say, user_data):
+    chat_data = user_data.get("agent_chat", {})
+    agent_id = chat_data.get("agent_id")
+    if not agent_id:
+        user_data["state"] = "idle"
+        await say("No active chat session. Say agent start followed by an ID to begin.")
+        return
+    client, err = get_backend_client(user_id)
+    if err:
+        await say(err)
+        return
+    try:
+        events = execute_agent(client, agent_id, text, chat_data.get("conversation_id", ""))
+        text_out, new_conv_id, error = parse_agent_response(events)
+        if new_conv_id:
+            user_data["agent_chat"]["conversation_id"] = new_conv_id
+        if error:
+            await say(f"Agent error: {error}")
+            return
+        await say(text_out if text_out else "No response.")
+    except Exception as e:
+        await say(f"Error: {e}")

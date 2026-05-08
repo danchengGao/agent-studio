@@ -1,0 +1,1625 @@
+{
+    "edges": [
+        {
+            "sourceNodeID": "1_e8d5fe36",
+            "targetNodeID": "10_ccd6d111"
+        },
+        {
+            "sourceNodeID": "10_ccd6d111",
+            "sourcePortID": "0",
+            "targetNodeID": "21_9894739b"
+        },
+        {
+            "sourceNodeID": "10_ccd6d111",
+            "sourcePortID": "0",
+            "targetNodeID": "21_75819376"
+        },
+        {
+            "sourceNodeID": "10_ccd6d111",
+            "sourcePortID": "0",
+            "targetNodeID": "21_747fa82a"
+        },
+        {
+            "sourceNodeID": "10_ccd6d111",
+            "sourcePortID": "0",
+            "targetNodeID": "21_66233eda"
+        },
+        {
+            "sourceNodeID": "10_ccd6d111",
+            "sourcePortID": "0",
+            "targetNodeID": "21_b8b889b4"
+        },
+        {
+            "sourceNodeID": "10_ccd6d111",
+            "sourcePortID": "0",
+            "targetNodeID": "21_a6458901"
+        },
+        {
+            "sourceNodeID": "21_9894739b",
+            "targetNodeID": "21_5383dba2"
+        },
+        {
+            "sourceNodeID": "21_75819376",
+            "targetNodeID": "21_5383dba2"
+        },
+        {
+            "sourceNodeID": "21_747fa82a",
+            "targetNodeID": "21_5383dba2"
+        },
+        {
+            "sourceNodeID": "21_66233eda",
+            "targetNodeID": "21_5383dba2"
+        },
+        {
+            "sourceNodeID": "21_b8b889b4",
+            "targetNodeID": "21_5383dba2"
+        },
+        {
+            "sourceNodeID": "21_a6458901",
+            "targetNodeID": "21_5383dba2"
+        },
+        {
+            "sourceNodeID": "21_5383dba2",
+            "targetNodeID": "10_cc2eed5b"
+        },
+        {
+            "sourceNodeID": "21_5383dba2",
+            "targetNodeID": "21_82bac6af"
+        },
+        {
+            "sourceNodeID": "10_cc2eed5b",
+            "sourcePortID": "0",
+            "targetNodeID": "10_f4518ed0"
+        },
+        {
+            "sourceNodeID": "21_82bac6af",
+            "targetNodeID": "10_f4518ed0"
+        },
+        {
+            "sourceNodeID": "10_f4518ed0",
+            "sourcePortID": "0",
+            "targetNodeID": "21_3ca15b07"
+        },
+        {
+            "sourceNodeID": "21_3ca15b07",
+            "targetNodeID": "10_35fee73f"
+        },
+        {
+            "sourceNodeID": "10_f4518ed0",
+            "sourcePortID": "0",
+            "targetNodeID": "21_796ea7f8"
+        },
+        {
+            "sourceNodeID": "21_796ea7f8",
+            "targetNodeID": "10_35fee73f"
+        },
+        {
+            "sourceNodeID": "10_35fee73f",
+            "sourcePortID": "0",
+            "targetNodeID": "2_d0bfa8f3"
+        }
+    ],
+    "nodes": [
+        {
+            "data": {
+                "outputs": {
+                    "properties": {
+                        "business_idea": {
+                            "default": "AI-powered meal planning app that creates personalized recipes based on dietary restrictions, budget, and available ingredients",
+                            "description": "Describe your business idea in detail",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "business_idea"
+                    ],
+                    "type": "object"
+                },
+                "title": "Start: Business Idea"
+            },
+            "id": "1_e8d5fe36",
+            "meta": {
+                "position": {
+                    "x": 180,
+                    "y": 667
+                }
+            },
+            "type": "1"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 1,
+                    "timeoutSeconds": 15
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n    import re\n\n    raw = args.params.get('business_idea', '')\n    rl = raw.lower()\n\n    is_saas      = any(w in rl for w in ['app', 'software', 'platform', 'saas', 'subscription', 'tool', 'dashboard', 'api'])\n    is_marketplace = any(w in rl for w in ['marketplace', 'connect', 'match', 'two-sided', 'peer-to-peer', 'p2p'])\n    is_b2b       = any(w in rl for w in ['enterprise', 'b2b', 'corporate', 'teams', 'business customers', 'smb', 'smbs'])\n    is_b2c       = any(w in rl for w in ['consumer', 'personal', 'individual', 'b2c', 'people', 'users', 'everyone'])\n    is_ai        = any(w in rl for w in ['ai', 'artificial intelligence', 'machine learning', 'ml', 'gpt', 'llm', 'automated', 'smart', 'intelligent', 'personalized'])\n    is_mobile    = any(w in rl for w in ['mobile', 'ios', 'android', 'app store'])\n    is_ecommerce = any(w in rl for w in ['sell', 'store', 'shop', 'product', 'ecommerce', 'e-commerce', 'retail'])\n    is_service   = any(w in rl for w in ['service', 'consulting', 'agency', 'coaching', 'freelance', 'outsource'])\n    is_data      = any(w in rl for w in ['data', 'analytics', 'insights', 'dashboard', 'reporting', 'metrics'])\n    is_fintech   = any(w in rl for w in ['payment', 'finance', 'banking', 'investment', 'crypto', 'fintech', 'money'])\n    is_health    = any(w in rl for w in ['health', 'medical', 'wellness', 'fitness', 'mental health', 'telemedicine', 'food', 'nutrition', 'diet', 'meal'])\n    is_edtech    = any(w in rl for w in ['education', 'learning', 'training', 'course', 'skill', 'edtech', 'tutoring'])\n\n    if is_marketplace:\n        biz_type = 'marketplace'\n        revenue_model = 'Transaction fees / Commission'\n        complexity = 'high'\n    elif is_saas and is_b2b:\n        biz_type = 'b2b_saas'\n        revenue_model = 'Subscription (MRR/ARR)'\n        complexity = 'medium'\n    elif is_saas:\n        biz_type = 'b2c_saas'\n        revenue_model = 'Freemium / Subscription'\n        complexity = 'medium'\n    elif is_ecommerce:\n        biz_type = 'ecommerce'\n        revenue_model = 'Product sales / Margin'\n        complexity = 'medium'\n    elif is_service:\n        biz_type = 'service'\n        revenue_model = 'Service fees / Retainer'\n        complexity = 'low'\n    else:\n        biz_type = 'general'\n        revenue_model = 'Subscription / Freemium'\n        complexity = 'medium'\n\n    tech_tags = []\n    if is_ai:     tech_tags.append('AI/ML')\n    if is_mobile: tech_tags.append('Mobile')\n    if is_saas:   tech_tags.append('SaaS/Cloud')\n    if is_data:   tech_tags.append('Data & Analytics')\n    if not tech_tags: tech_tags.append('Web/Digital')\n\n    verticals = []\n    if is_fintech: verticals.append('FinTech')\n    if is_health:  verticals.append('HealthTech')\n    if is_edtech:  verticals.append('EdTech')\n    if not verticals: verticals.append('General Tech')\n\n    target_market = 'B2B' if is_b2b and not is_b2c else ('B2C' if is_b2c and not is_b2b else 'B2B2C / Mixed')\n\n    structured = {\n        'raw': raw,\n        'business_type': biz_type,\n        'target_market': target_market,\n        'technology_tags': tech_tags,\n        'industry_verticals': verticals,\n        'revenue_model': revenue_model,\n        'build_complexity': complexity,\n        'flags': {\n            'is_ai_powered': is_ai,\n            'is_mobile': is_mobile,\n            'is_saas': is_saas,\n            'is_b2b': is_b2b,\n            'is_marketplace': is_marketplace,\n            'is_regulated_industry': is_fintech or is_health\n        },\n        'summary': f'{target_market} {biz_type.replace(\"_\", \" \").title()} in {\" / \".join(verticals)} using {\" + \".join(tech_tags)}. Revenue: {revenue_model}.'\n    }\n\n    return {\n        'structured_idea': json.dumps(structured, indent=2),\n        'business_idea': raw\n    }",
+                    "inputParameters": {
+                        "business_idea": {
+                            "content": [
+                                "1_e8d5fe36",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "business_idea": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        },
+                        "structured_idea": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "structured_idea",
+                        "business_idea"
+                    ],
+                    "type": "object"
+                },
+                "title": "Idea Classifier & Parser"
+            },
+            "id": "10_ccd6d111",
+            "meta": {
+                "position": {
+                    "x": 640,
+                    "y": 650
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Conduct deep market research for this business:\n\n{{business_idea}}\n\nClassification: {{structured_idea}}\n\nSearch for market size data, customer discussions on Reddit, and industry reports.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a senior market research analyst. Using the available search and community tools, research and provide:\n\n1. MARKET SIZE & GROWTH:\n   - Total addressable market (TAM), SAM, SOM\n   - Current market size with sources\n   - CAGR and 5-year projections\n   - Key growth drivers\n\n2. TARGET CUSTOMER SEGMENTS:\n   - Primary and secondary segments\n   - Demographics, firmographics, psychographics\n   - Willingness to pay signals\n   - Where they congregate online (subreddits, forums, communities)\n\n3. MARKET DYNAMICS:\n   - Key trends shaping the market\n   - Seasonality or cyclicality\n   - Geographic concentration\n   - Distribution channels\n\n4. UNMET NEEDS & GAPS:\n   - What customers are complaining about (search Reddit communities)\n   - Jobs-to-be-done that are poorly served\n   - Price points that are underserved\n\nBack every claim with data or source. Search Reddit for real customer voices.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-market-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-market-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 6,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "market_research"
+                    ],
+                    "type": "object"
+                },
+                "title": "Market Research Agent"
+            },
+            "id": "21_9894739b",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 0
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Map the full competitive landscape for:\n\n{{business_idea}}\n\nClassification: {{structured_idea}}\n\nSearch GitHub for open-source alternatives. Search Tavily for funded competitors and recent news.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a competitive intelligence expert. Research the competitive landscape thoroughly:\n\n1. DIRECT COMPETITORS (top 5-7):\n   - Company name, founding year, funding raised\n   - Business model and pricing\n   - Strengths and weaknesses\n   - Estimated market share and customer count\n   - Key features and differentiators\n   - Recent news and strategic moves\n\n2. INDIRECT COMPETITORS & SUBSTITUTES:\n   - Alternative solutions customers use today\n   - DIY / manual solutions being replaced\n\n3. COMPETITIVE ADVANTAGES TO BUILD:\n   - Gaps in existing solutions (check GitHub for open-source alternatives)\n   - Feature gaps customers complain about\n   - Pricing opportunities\n   - Underserved niches\n\n4. BARRIERS TO ENTRY:\n   - What makes this market hard to enter?\n   - Moats competitors have built\n   - Regulatory or technical barriers\n\n5. DIFFERENTIATION STRATEGY:\n   - Unique value propositions available\n   - Blue ocean opportunities\n\nSearch GitHub for open-source alternatives and their popularity (stars, forks, issues).",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-competitor-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "github-competitor-001",
+                                "name": "GitHub",
+                                "plugin_id": "git00000-0000-0000-0000-000000000002",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 6,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "competitor_analysis"
+                    ],
+                    "type": "object"
+                },
+                "title": "Competitive Intelligence Agent"
+            },
+            "id": "21_75819376",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 254
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Assess feasibility and risks for:\n\n{{business_idea}}\n\nClassification: {{structured_idea}}\n\nSearch GitHub for relevant open-source tools and tech stack options. Research failure patterns for similar businesses.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a business feasibility and risk analyst. Provide a rigorous, honest assessment:\n\n1. TECHNICAL FEASIBILITY:\n   - Technology requirements and maturity\n   - Build complexity (search GitHub for relevant libraries/tools)\n   - Required expertise and team size\n   - Build vs. buy vs. open-source decisions\n   - Infrastructure and scaling requirements\n\n2. OPERATIONAL FEASIBILITY:\n   - Time to first working product\n   - Resource requirements (team, capital, infrastructure)\n   - Key operational processes needed\n   - Support and customer success requirements\n\n3. RISK REGISTER:\n   - Market risks (timing, adoption)\n   - Technical risks (complexity, dependencies)\n   - Financial risks (burn rate, funding)\n   - Competitive risks (incumbents, fast followers)\n   - Regulatory/legal risks\n   - Team/execution risks\n   Rate each: PROBABILITY (Low/Med/High) × IMPACT (Low/Med/High)\n\n4. MITIGATION STRATEGIES:\n   - Specific mitigations for each high-priority risk\n   - Early warning indicators to monitor\n\n5. CRITICAL ASSUMPTIONS:\n   - What must be true for this to work?\n   - How to test each assumption quickly\n\nBe brutally honest. Better to know now than after spending resources.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-feasibility-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "github-feasibility-001",
+                                "name": "GitHub",
+                                "plugin_id": "git00000-0000-0000-0000-000000000002",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "feasibility_report"
+                    ],
+                    "type": "object"
+                },
+                "title": "Feasibility & Risk Analyst"
+            },
+            "id": "21_747fa82a",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 508
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Analyze industry trends and timing for:\n\n{{business_idea}}\n\nClassification: {{structured_idea}}\n\nSearch for recent VC funding in this space, Reddit discussions about industry trends, and technology shifts.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a technology and industry trends analyst. Research macro and micro forces shaping this market:\n\n1. MACRO TRENDS:\n   - Broad societal/economic/technological shifts (AI, remote work, climate, demographics)\n   - How these trends benefit or threaten this business\n   - 3-5 year trend trajectory\n\n2. VC & INVESTMENT CLIMATE:\n   - Recent funding rounds in this space (last 12-18 months)\n   - Total VC investment trends — growing or declining?\n   - Notable investors active in this space\n   - Average valuations and multiples\n   - Exit activity (IPOs, acquisitions)\n\n3. TECHNOLOGY DISRUPTION:\n   - Emerging technologies that could disrupt or enable this business\n   - AI/ML applicability\n   - Platform shifts (mobile, voice, AR/VR)\n   - API/infrastructure developments\n\n4. STARTUP ECOSYSTEM:\n   - Y Combinator, Techstars, and top accelerator bets in this space\n   - Recent high-profile launches or pivots\n   - Failed startups in this space and why they failed\n\n5. TIMING ASSESSMENT:\n   - Is now the right time? Why / why not?\n   - What has changed in the last 2-3 years to make this possible?\n   - \"Why now\" narrative for investors\n\nSearch Reddit for community sentiment. Search Tavily for recent funding news and industry reports.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-trends-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-trends-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "trend_analysis"
+                    ],
+                    "type": "object"
+                },
+                "title": "Industry Trends Analyst"
+            },
+            "id": "21_66233eda",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 762
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Analyze regulatory and legal landscape for:\n\n{{business_idea}}\n\nClassification: {{structured_idea}}\n\nPay special attention to regulated industries if applicable (health, finance, etc.). Search for recent regulatory changes.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a startup legal and regulatory specialist. Identify legal landscape for this business:\n\n1. BUSINESS REGISTRATION & STRUCTURE:\n   - Recommended entity type (LLC, C-Corp, etc.) and why\n   - Jurisdiction considerations (Delaware, etc.)\n   - Estimated setup costs and timeline\n\n2. DATA PRIVACY & SECURITY COMPLIANCE:\n   - GDPR requirements (if serving EU users)\n   - CCPA requirements (if serving California users)\n   - Data storage and processing obligations\n   - Required privacy policy and terms of service elements\n   - Encryption and security standards\n\n3. INDUSTRY-SPECIFIC REGULATIONS:\n   - Any sector-specific regulations (HIPAA for health, PCI-DSS for payments, SOC 2, etc.)\n   - Licensing requirements\n   - Geographic restrictions\n   - Age verification requirements\n\n4. INTELLECTUAL PROPERTY STRATEGY:\n   - Patentability assessment\n   - Trademark needs (company name, logo, product names)\n   - Trade secret protections\n   - Open-source license considerations\n   - Employee/contractor IP assignment\n\n5. KEY CONTRACTS NEEDED:\n   - Terms of service\n   - Privacy policy\n   - Employee/contractor agreements\n   - NDA templates\n   - SLA templates (for B2B)\n\n6. RISK AREAS:\n   - Potential lawsuit vectors\n   - Regulatory enforcement risks\n   - Estimated legal budget for Year 1\n\nNote: This is informational only — always consult a qualified attorney.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-regulatory-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "regulatory_analysis"
+                    ],
+                    "type": "object"
+                },
+                "title": "Regulatory & Legal Analyst"
+            },
+            "id": "21_b8b889b4",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 1016
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Build detailed customer personas for:\n\n{{business_idea}}\n\nClassification: {{structured_idea}}\n\nSearch Reddit for real user complaints and discussions about this problem space. Find actual communities this audience lives in.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a customer research and UX specialist. Build deep, research-backed customer personas:\n\n1. IDEAL CUSTOMER PROFILE (ICP):\n   - For B2B: company size, industry, tech stack, buying process, budget authority\n   - For B2C: age range, income, lifestyle, digital habits, pain frequency\n   - Geography and language considerations\n\n2. DETAILED PERSONAS (create 2-3):\n   For each persona:\n   - Name, age, role/occupation\n   - Goals and motivations\n   - Pain points and frustrations (search Reddit for real complaints)\n   - Current solutions they use\n   - Day-in-the-life scenario\n   - Triggers that would make them buy\n   - Objections to overcome\n   - Willingness to pay estimate\n   - Where they discover new solutions (search engines, communities, referrals)\n\n3. JOBS-TO-BE-DONE:\n   - Functional jobs (practical tasks to complete)\n   - Emotional jobs (how they want to feel)\n   - Social jobs (how they want to be perceived)\n\n4. CUSTOMER ACQUISITION INSIGHTS:\n   - Which communities are they in? (specific subreddits, Facebook groups, LinkedIn groups)\n   - Which influencers do they follow?\n   - What search terms do they use when frustrated?\n   - What content do they consume?\n\n5. EARLY ADOPTER PROFILE:\n   - Who would try an unfinished MVP first?\n   - Where to find them right now\n   - What would make them refer others\n\nSearch Reddit actively for real customer voices and complaints in this space.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-persona-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-persona-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "customer_personas"
+                    ],
+                    "type": "object"
+                },
+                "title": "Customer Persona Builder"
+            },
+            "id": "21_a6458901",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 1270
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "competitor_analysis": {
+                            "content": [
+                                "21_75819376",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "feasibility_report": {
+                            "content": [
+                                "21_747fa82a",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "market_research": {
+                            "content": [
+                                "21_9894739b",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 4
+                            },
+                            "type": "ref"
+                        },
+                        "regulatory_analysis": {
+                            "content": [
+                                "21_b8b889b4",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 5
+                            },
+                            "type": "ref"
+                        },
+                        "trend_analysis": {
+                            "content": [
+                                "21_66233eda",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 6
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Synthesize all research into a unified strategy for:\n\n{{business_idea}}\n\nMARKET RESEARCH:\n{{market_research}}\n\nCOMPETITOR ANALYSIS:\n{{competitor_analysis}}\n\nFEASIBILITY REPORT:\n{{feasibility_report}}\n\nTREND ANALYSIS:\n{{trend_analysis}}\n\nREGULATORY ANALYSIS:\n{{regulatory_analysis}}\n\nCUSTOMER PERSONAS:\n{{customer_personas}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a chief strategy officer synthesizing multiple research streams into a coherent strategic picture. Integrate all the research and produce:\n\n1. STRATEGIC SUMMARY:\n   - 3-sentence executive summary of the opportunity\n   - Core insight that makes this a viable business\n   - Single biggest risk that must be managed\n\n2. OPPORTUNITY SCORE (rate 1-10 each):\n   - Market attractiveness\n   - Competitive dynamics (higher = less competition / better positioning)\n   - Execution feasibility\n   - Timing advantage\n   - Customer pain severity\n   - Monetisation clarity\n\n3. UNIQUE VALUE PROPOSITION:\n   - Draft 3 versions of the core value proposition\n   - Recommended positioning against key competitors\n   - Key messaging pillars\n\n4. STRATEGIC OPTIONS:\n   - Option A: Conservative — narrow niche, bootstrapped\n   - Option B: Aggressive — VC-backed, land-grab strategy\n   - Option C: Hybrid — validate niche, raise at proof point\n   - Recommended option and rationale\n\n5. THE \"WHY NOW\" NARRATIVE:\n   - Why this opportunity exists today and not 3 years ago\n   - What tailwinds are accelerating it\n   - Window of opportunity timeline\n\n6. NORTH STAR METRIC:\n   - Single metric that best captures business health\n   - How to instrument it from day one\n\nBe decisive. Founders need clarity, not hedged opinions.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-strategy-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "strategy_synthesis"
+                    ],
+                    "type": "object"
+                },
+                "title": "Strategy Synthesizer"
+            },
+            "id": "21_5383dba2",
+            "meta": {
+                "position": {
+                    "x": 1560,
+                    "y": 634
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 2,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n    import re\n\n    structured_raw    = args.params.get('structured_idea', '{}')\n    market_research   = args.params.get('market_research', '')\n    customer_personas = args.params.get('customer_personas', '')\n    strategy          = args.params.get('strategy_synthesis', '')\n\n    try:\n        sp = json.loads(structured_raw)\n    except:\n        sp = {}\n\n    biz_type = sp.get('business_type', 'general')\n    is_b2b   = sp.get('flags', {}).get('is_b2b', False)\n    is_ai    = sp.get('flags', {}).get('is_ai_powered', False)\n    is_regulated = sp.get('flags', {}).get('is_regulated_industry', False)\n\n    # Model parameters by business type\n    params = {\n        'b2b_saas':    {'price': 199,  'cac': 500,  'churn': 0.03, 'gm': 0.85, 'label': 'B2B SaaS'},\n        'marketplace': {'price': 25,   'cac': 30,   'churn': 0.08, 'gm': 0.70, 'label': 'Marketplace (net revenue)'},\n        'b2c_saas':    {'price': 19,   'cac': 80,   'churn': 0.07, 'gm': 0.82, 'label': 'B2C SaaS'},\n        'ecommerce':   {'price': 65,   'cac': 40,   'churn': 0.25, 'gm': 0.42, 'label': 'E-commerce'},\n        'service':     {'price': 2500, 'cac': 800,  'churn': 0.06, 'gm': 0.65, 'label': 'Professional Services'},\n        'general':     {'price': 49,   'cac': 120,  'churn': 0.06, 'gm': 0.72, 'label': 'Digital Product'}\n    }\n    p = params.get(biz_type, params['general'])\n\n    # AI premium and regulatory cost\n    if is_ai:        p['price'] = int(p['price'] * 1.35)\n    if is_b2b:       p['cac']   = int(p['cac']   * 1.20)\n    if is_regulated: p['price'] = int(p['price'] * 1.25)\n\n    price  = p['price']\n    cac    = p['cac']\n    churn  = p['churn']\n    gm     = p['gm']\n\n    # Simulate customer growth over 3 years\n    def simulate_year(start_customers, monthly_new_base, growth_rate, churn_improvement=1.0):\n        customers = [start_customers]\n        for m in range(12):\n            new = monthly_new_base * ((1 + growth_rate) ** m)\n            lost = customers[-1] * churn * churn_improvement\n            customers.append(max(0, customers[-1] + new - lost))\n        return customers\n\n    y1_cust = simulate_year(0, 40, 0.10)\n    y2_cust = simulate_year(int(y1_cust[-1]), 120, 0.08)\n    y3_cust = simulate_year(int(y2_cust[-1]), 300, 0.06, 0.85)\n\n    def year_financials(customers, year_num):\n        revenue      = sum(c * price for c in customers[1:])\n        gross_profit = int(revenue * gm)\n        new_cust     = sum(max(0, customers[i+1] - customers[i] * (1 - churn)) for i in range(12))\n        cac_spend    = int(new_cust * cac)\n        base_opex    = [180_000, 380_000, 650_000][year_num - 1]\n        legal_cost   = 15_000 if (is_regulated and year_num == 1) else 5_000\n        total_costs  = cac_spend + base_opex + legal_cost\n        net_profit   = gross_profit - total_costs\n        margin       = round(net_profit / revenue * 100, 1) if revenue > 0 else 0.0\n        return {\n            'year': year_num,\n            'end_customers': int(customers[-1]),\n            'revenue': int(revenue),\n            'gross_profit': int(gross_profit),\n            'total_costs': int(total_costs),\n            'net_profit': int(net_profit),\n            'profit_margin_pct': margin\n        }\n\n    projections = [\n        year_financials(y1_cust, 1),\n        year_financials(y2_cust, 2),\n        year_financials(y3_cust, 3)\n    ]\n\n    # Unit economics\n    ltv = (price * 12) / churn if churn > 0 else price * 36\n    ltv_cac = round(ltv / cac, 2) if cac > 0 else 0\n    payback = int(cac / (price * gm)) if (price * gm) > 0 else 99\n\n    ltv_grade = ('Excellent (>3x)' if ltv_cac >= 3 else\n                 'Good (2-3x)'     if ltv_cac >= 2 else\n                 'Needs work (<2x)')\n\n    # Funding\n    min_cashflow = min(p['net_profit'] for p in projections)\n    seed_needed  = int(abs(min(min_cashflow, 0)) * 1.3 + 50_000)\n\n    # Break-even\n    y1_fixed  = 180_000\n    be_cust   = int(y1_fixed / (price * gm * 12)) if (price * gm) > 0 else 0\n\n    result = {\n        'business_model': p['label'],\n        'key_assumptions': {\n            'monthly_price_per_customer': f'${price:,}',\n            'customer_acquisition_cost':  f'${cac:,}',\n            'monthly_churn_rate':         f'{churn*100:.1f}%',\n            'gross_margin':               f'{gm*100:.0f}%',\n            'ai_premium_applied':         is_ai,\n            'regulatory_premium_applied': is_regulated\n        },\n        'unit_economics': {\n            'customer_lifetime_value': f'${int(ltv):,}',\n            'ltv_to_cac_ratio':        f'{ltv_cac}x',\n            'cac_payback_months':      payback,\n            'unit_economics_grade':    ltv_grade\n        },\n        'three_year_projections': projections,\n        'funding_plan': {\n            'seed_funding_needed': f'${seed_needed:,}',\n            'runway_months': 18,\n            'use_of_funds': [\n                f'Product & Engineering: ${int(seed_needed*0.40):,} (40%)',\n                f'Marketing & Growth:    ${int(seed_needed*0.30):,} (30%)',\n                f'Team & Operations:     ${int(seed_needed*0.20):,} (20%)',\n                f'Legal & Compliance:    ${int(seed_needed*0.05):,}  (5%)',\n                f'Reserve:               ${int(seed_needed*0.05):,}  (5%)'\n            ]\n        },\n        'key_milestones': {\n            'break_even_customers':  be_cust,\n            'year_1_burn_per_month': f'${abs(projections[0][\"net_profit\"]) // 12:,}/mo' if projections[0]['net_profit'] < 0 else 'Profitable Y1',\n            'projected_profitability': f'Year {next((p[\"year\"] for p in projections if p[\"net_profit\"] > 0), 4)}'\n        }\n    }\n\n    return {'financial_model': json.dumps(result, indent=2)}",
+                    "inputParameters": {
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "market_research": {
+                            "content": [
+                                "21_9894739b",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "strategy_synthesis": {
+                            "content": [
+                                "21_5383dba2",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "financial_model": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "financial_model"
+                    ],
+                    "type": "object"
+                },
+                "title": "Financial Model Generator"
+            },
+            "id": "10_cc2eed5b",
+            "meta": {
+                "position": {
+                    "x": 2020,
+                    "y": 528.5
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "competitor_analysis": {
+                            "content": [
+                                "21_75819376",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "strategy_synthesis": {
+                            "content": [
+                                "21_5383dba2",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "trend_analysis": {
+                            "content": [
+                                "21_66233eda",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 4
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Build a comprehensive GTM strategy for:\n\n{{business_idea}}\n\nSTRATEGY SYNTHESIS:\n{{strategy_synthesis}}\n\nCUSTOMER PERSONAS:\n{{customer_personas}}\n\nCOMPETITOR ANALYSIS:\n{{competitor_analysis}}\n\nTREND ANALYSIS:\n{{trend_analysis}}\n\nSearch Reddit for communities where these customers are active. Look for successful launch examples.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a go-to-market strategy expert for startups. Build a complete, actionable GTM plan:\n\n1. POSITIONING & MESSAGING:\n   - Positioning statement (fill in the template: For [target customer] who [pain], [product] is a [category] that [benefit]. Unlike [competitor], we [differentiator].)\n   - 3 core messaging pillars\n   - Elevator pitch (30 seconds)\n   - Hero headline for landing page\n\n2. ACQUISITION CHANNELS (rank by priority):\n   For each channel:\n   - Why it works for this business\n   - Specific tactics\n   - Estimated CAC\n   - Time to see results\n   - Required investment/effort\n   Channels to evaluate: SEO/content, paid search, paid social, communities (Reddit, forums), influencer/creator, product-led growth, partnerships, outbound sales, events/conferences\n\n3. PRICING STRATEGY:\n   - Recommended pricing model with tiers\n   - Pricing psychology tactics\n   - Competitive price positioning\n   - Freemium vs. free trial vs. paid-only recommendation\n\n4. LAUNCH SEQUENCE:\n   - Pre-launch (60 days before): list building, beta waitlist, community building\n   - Launch week: Product Hunt, Reddit posts, press outreach, community announcements\n   - Post-launch (90 days): iterate, double down on what works\n\n5. RETENTION & GROWTH:\n   - Onboarding flow key moments\n   - Activation metric definition\n   - Referral / viral loop design\n   - Expansion revenue opportunities (upsell, cross-sell)\n\n6. METRICS & TARGETS:\n   - Month 3 targets\n   - Month 6 targets\n   - Month 12 targets\n\nSearch Reddit for the communities where target customers live. Search for successful GTM examples in similar spaces.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-gtm-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-gtm-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 5,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "gtm_strategy"
+                    ],
+                    "type": "object"
+                },
+                "title": "Go-To-Market Strategist"
+            },
+            "id": "21_82bac6af",
+            "meta": {
+                "position": {
+                    "x": 2020,
+                    "y": 754.5
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "financial_model": {
+                            "content": [
+                                "10_cc2eed5b",
+                                "financial_model"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "market_research": {
+                            "content": [
+                                "21_9894739b",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 4
+                            },
+                            "type": "ref"
+                        },
+                        "strategy_synthesis": {
+                            "content": [
+                                "21_5383dba2",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 5
+                            },
+                            "type": "ref"
+                        },
+                        "validation_score": {
+                            "content": [
+                                "10_f4518ed0",
+                                "validation_score"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Write a compelling investor pitch narrative for:\n\n{{business_idea}}\n\nVALIDATION SCORE:\n{{validation_score}}\n\nFINANCIAL MODEL:\n{{financial_model}}\n\nMARKET RESEARCH:\n{{market_research}}\n\nSTRATEGY SYNTHESIS:\n{{strategy_synthesis}}\n\nCUSTOMER PERSONAS:\n{{customer_personas}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a startup pitch specialist who has helped companies raise from top VCs. Write a compelling investor narrative and pitch deck outline:\n\n1. SLIDE-BY-SLIDE PITCH DECK OUTLINE (10-12 slides):\n   For each slide — Title, Key Message, Supporting Points, Visuals/Charts to include\n   Slides: Cover → Problem → Solution → Why Now → Market Size → Product → Business Model → Traction/Validation → Go-To-Market → Competition → Team → Financials → Ask\n\n2. ELEVATOR PITCH (3 versions):\n   - 30 seconds (for networking)\n   - 2 minutes (for intro calls)\n   - Email cold outreach version (5 sentences)\n\n3. INVESTOR TARGETING:\n   - Which VC firms/angels are most likely to invest in this space?\n   - What stage and check size to target?\n   - Key investor objections to pre-empt\n   - Suggested lead investors to approach\n\n4. STORYTELLING FRAMEWORK:\n   - The founder's personal \"why\" narrative\n   - The compelling \"before / after\" for the customer\n   - The \"inevitable future\" frame\n\n5. DUE DILIGENCE PREPARATION:\n   - Data room checklist\n   - Key metrics to have ready\n   - Legal documents to prepare\n   - Reference customers to line up\n\nSearch for successful pitch examples in this space. Make the narrative emotionally compelling and data-driven.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-pitch-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "pitch_deck"
+                    ],
+                    "type": "object"
+                },
+                "title": "Pitch Deck & Investor Narrative"
+            },
+            "id": "21_3ca15b07",
+            "meta": {
+                "position": {
+                    "x": 2940,
+                    "y": 506
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "feasibility_report": {
+                            "content": [
+                                "21_747fa82a",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "gtm_strategy": {
+                            "content": [
+                                "21_82bac6af",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 4
+                            },
+                            "type": "ref"
+                        },
+                        "regulatory_analysis": {
+                            "content": [
+                                "21_b8b889b4",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 5
+                            },
+                            "type": "ref"
+                        },
+                        "validation_score": {
+                            "content": [
+                                "10_f4518ed0",
+                                "validation_score"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Build a detailed MVP roadmap for:\n\n{{business_idea}}\n\nVALIDATION SCORE:\n{{validation_score}}\n\nFEASIBILITY REPORT:\n{{feasibility_report}}\n\nGTM STRATEGY:\n{{gtm_strategy}}\n\nCUSTOMER PERSONAS:\n{{customer_personas}}\n\nREGULATORY REQUIREMENTS:\n{{regulatory_analysis}}\n\nSearch GitHub for relevant open-source tools and frameworks.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a product manager and CTO advisor specialising in MVP strategy for startups. Create a concrete build plan:\n\n1. MVP DEFINITION:\n   - The single core job-to-be-done the MVP solves\n   - What is explicitly OUT of scope for v1\n   - Definition of \"done\" for MVP launch\n   - Success criteria for MVP validation\n\n2. FEATURE PRIORITISATION (use RICE or MoSCoW):\n   Must Have (MVP):\n   - Feature list with brief justification\n   Should Have (v1.1):\n   - Post-MVP improvements\n   Nice to Have (future):\n   - Later roadmap items\n   Never (cut entirely):\n   - Scope creep to avoid\n\n3. TECH STACK RECOMMENDATION:\n   - Recommended stack with rationale\n   - No-code/low-code shortcuts for speed\n   - Open-source components to leverage (search GitHub)\n   - Cloud provider and key services\n   - Estimated infrastructure cost at launch\n\n4. SPRINT PLAN (8-week MVP sprint):\n   Week 1-2: [Core infrastructure + auth]\n   Week 3-4: [Core feature 1]\n   Week 5-6: [Core feature 2 + basic UI]\n   Week 7:   [Integration + testing]\n   Week 8:   [Beta launch prep]\n   Include: deliverables, team needed, risk flags\n\n5. TEAM REQUIREMENTS:\n   - Minimum viable founding team\n   - Contractors vs. full-time recommendations\n   - Key hires in order of priority\n   - Estimated monthly burn at each stage\n\n6. VALIDATION EXPERIMENTS:\n   - 3 experiments to run before writing code\n   - How to fake it before you make it\n   - Concierge MVP / Wizard of Oz approach\n   - First 10 customer acquisition plan\n\nSearch GitHub for relevant open-source tools to bootstrap with.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-mvp-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "github-mvp-001",
+                                "name": "GitHub",
+                                "plugin_id": "git00000-0000-0000-0000-000000000002",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "mvp_roadmap"
+                    ],
+                    "type": "object"
+                },
+                "title": "MVP Roadmap & Build Plan"
+            },
+            "id": "21_796ea7f8",
+            "meta": {
+                "position": {
+                    "x": 2940,
+                    "y": 762
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 2,
+                    "timeoutSeconds": 60
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n    from datetime import datetime\n\n    business_idea       = args.params.get('business_idea', '')\n    structured_raw      = args.params.get('structured_idea', '{}')\n    market_research     = args.params.get('market_research', '')\n    competitor_analysis = args.params.get('competitor_analysis', '')\n    feasibility_report  = args.params.get('feasibility_report', '')\n    trend_analysis      = args.params.get('trend_analysis', '')\n    regulatory_analysis = args.params.get('regulatory_analysis', '')\n    customer_personas   = args.params.get('customer_personas', '')\n    strategy_synthesis  = args.params.get('strategy_synthesis', '')\n    financial_raw       = args.params.get('financial_model', '{}')\n    gtm_strategy        = args.params.get('gtm_strategy', '')\n    validation_raw      = args.params.get('validation_score', '{}')\n    pitch_deck          = args.params.get('pitch_deck', '')\n    mvp_roadmap         = args.params.get('mvp_roadmap', '')\n\n    try: fm = json.loads(financial_raw)\n    except: fm = {}\n    try: vs = json.loads(validation_raw)\n    except: vs = {}\n    try: sp = json.loads(structured_raw)\n    except: sp = {}\n\n    sep = '━' * 77\n    thin = '─' * 77\n\n    score      = vs.get('total_score', 0)\n    grade      = vs.get('grade', 'N/A')\n    rec        = vs.get('recommendation', '')\n    action     = vs.get('recommended_action', '')\n    inv_ready  = vs.get('investor_readiness', 'N/A')\n    breakdown  = vs.get('score_breakdown', {})\n    max_dims   = vs.get('max_per_dimension', {})\n    strengths  = vs.get('strengths', [])\n    weaknesses = vs.get('weaknesses', [])\n\n    plan = f\"\"\"\n╔═══════════════════════════════════════════════════════════════════════════════╗\n║         🚀  COMPLETE BUSINESS VALIDATION & LAUNCH PLAN  🚀                   ║\n║                   Generated: {datetime.now().strftime('%B %d, %Y at %H:%M')}                         ║\n╚═══════════════════════════════════════════════════════════════════════════════╝\n\n\n💡 BUSINESS IDEA\n{sep}\n{business_idea}\n\nClassification: {sp.get('summary', '')}\n\n\n🎯 VALIDATION SCORECARD\n{sep}\n\nOVERALL SCORE:  {score}/100   Grade: {grade}   Investor Readiness: {inv_ready}\n\n{rec}\n\nSCORE BREAKDOWN:\n\"\"\"\n    for dim, s in breakdown.items():\n        max_s = max_dims.get(dim, 10)\n        filled = int((s / max_s) * 20)\n        bar = '█' * filled + '░' * (20 - filled)\n        plan += f\"   {dim:.<40} {bar}  {s}/{max_s}\\n\"\n\n    plan += f\"\"\"\n\n✅ STRENGTHS:\n\"\"\"\n    for s in strengths:  plan += f\"   {s}\\n\"\n    plan += \"\\n⚠️  AREAS TO STRENGTHEN:\\n\"\n    for w in weaknesses: plan += f\"   {w}\\n\"\n    plan += f\"\\n🎬 RECOMMENDED ACTION:\\n   {action}\\n\"\n\n    plan += f\"\"\"\n\n📊 STRATEGIC SYNTHESIS\n{sep}\n{strategy_synthesis[:2500]}\n\n[Full synthesis in appendix]\n\n\n🌍 MARKET RESEARCH\n{sep}\n{market_research[:2000]}\n\n[Full research in appendix]\n\n\n🏆 COMPETITIVE LANDSCAPE\n{sep}\n{competitor_analysis[:2000]}\n\n[Full analysis in appendix]\n\n\n📈 INDUSTRY TRENDS & TIMING\n{sep}\n{trend_analysis[:1500]}\n\n\n⚖️  REGULATORY & LEGAL OVERVIEW\n{sep}\n{regulatory_analysis[:1500]}\n\n\n👥 CUSTOMER PERSONAS\n{sep}\n{customer_personas[:2000]}\n\n[Full personas in appendix]\n\n\n⚠️  FEASIBILITY & RISK ASSESSMENT\n{sep}\n{feasibility_report[:2000]}\n\n[Full risk register in appendix]\n\n\n💰 FINANCIAL MODEL\n{sep}\n\n📋 Business Model:  {fm.get('business_model', 'N/A')}\n\nUNIT ECONOMICS:\n\"\"\"\n    for k, v in fm.get('unit_economics', {}).items():\n        plan += f\"   {k.replace('_',' ').title():.<50}  {v}\\n\"\n\n    plan += f\"\\n{'YEAR':>6}  {'CUSTOMERS':>12}  {'REVENUE':>14}  {'NET PROFIT':>14}  {'MARGIN':>8}\\n\"\n    plan += thin + \"\\n\"\n    for p in fm.get('three_year_projections', []):\n        plan += (f\"{p['year']:>6}  {p['end_customers']:>12,}  \"\n                 f\"${p['revenue']:>13,}  ${p['net_profit']:>13,}  {p['profit_margin_pct']:>7}%\\n\")\n\n    fund = fm.get('funding_plan', {})\n    plan += f\"\"\"\n\n💸 FUNDING PLAN:\n   Needed:  {fund.get('seed_funding_needed', 'N/A')}\n   Runway:  {fund.get('runway_months', 18)} months\n\n   Use of Funds:\n\"\"\"\n    for u in fund.get('use_of_funds', []):\n        plan += f\"   • {u}\\n\"\n\n    plan += f\"\"\"\n\n\n🎯 GO-TO-MARKET STRATEGY\n{sep}\n{gtm_strategy[:2500]}\n\n[Full GTM plan in appendix]\n\n\n📊 INVESTOR PITCH\n{sep}\n{pitch_deck[:3000]}\n\n[Full pitch deck outline in appendix]\n\n\n🏗️  MVP ROADMAP & BUILD PLAN\n{sep}\n{mvp_roadmap[:3000]}\n\n[Full roadmap in appendix]\n\n\n📅 90-DAY ACTION PLAN\n{sep}\n\nDAYS 1-30  — VALIDATION\n   □ Conduct 30 customer discovery interviews\n   □ Build landing page and collect 200+ email signups\n   □ Identify and join 5 communities where ICP lives\n   □ Map full competitive landscape personally\n   □ Register legal entity and open business bank account\n   □ Define core hypotheses and test plan\n   □ Find 1-2 potential co-founders or advisors\n\nDAYS 31-60 — FOUNDATION\n   □ Build concierge/manual version of the product\n   □ Onboard first 10 paying customers (manual delivery OK)\n   □ Establish tech stack and dev environment\n   □ Create brand identity (name, logo, domain, socials)\n   □ Begin SEO-focused content marketing\n   □ Apply to accelerators (YC, Techstars, etc.)\n   □ Implement basic analytics and tracking\n\nDAYS 61-90 — BUILD\n   □ Start MVP development (8-week sprint)\n   □ Weekly product demo to prospective customers\n   □ Build beta waitlist to 500+ people\n   □ Establish key KPI dashboard\n   □ Begin investor outreach (angels, pre-seed)\n   □ Hire first engineer/designer if needed\n   □ Document learnings and iterate on positioning\n\n\n📈 KEY METRICS DASHBOARD\n{sep}\n\n💚 NORTH STAR METRIC:  [Define this from strategy synthesis]\n\nACQUISITION:\n   • Weekly new signups / leads\n   • Customer Acquisition Cost (CAC)\n   • Channel attribution breakdown\n   • Trial-to-paid conversion rate\n\nENGAGEMENT:\n   • Activation rate (reached \"aha moment\")\n   • Daily / Weekly Active Users (DAU/WAU)\n   • Feature adoption rates\n   • Session depth and frequency\n\nREVENUE:\n   • Monthly Recurring Revenue (MRR)\n   • MRR growth rate (aim for 10-15% month-on-month)\n   • Average Revenue Per User (ARPU)\n   • LTV:CAC ratio (target >3x)\n\nRETENTION:\n   • Monthly churn rate (target <5%)\n   • Net Revenue Retention (NRR) (target >100%)\n   • NPS score (target >40)\n\n\n🏢 TEAM BUILDING PLAN\n{sep}\n\nFOUNDING TEAM (Day 0):\n   ✓ CEO — Vision, fundraising, customer relationships\n   ✓ CTO / Technical Co-founder — Product development\n   ✓ Head of Design / Product — UX and product strategy\n\nFIRST HIRES (Months 3-6):\n   • Full-stack engineer #2\n   • Growth / Marketing lead\n   • Customer Success manager\n\nSCALE HIRES (Months 7-12):\n   • Head of Sales (B2B) or Growth PM (B2C)\n   • Data analyst\n   • Additional engineers\n   • Operations / Finance lead\n\n\n🔑 CRITICAL INVESTOR QUESTIONS\n{sep}\n\"\"\"\n    for q in vs.get('critical_questions', []):\n        plan += f\"   ❓ {q}\\n\"\n\n    plan += f\"\"\"\n\n\n📚 RECOMMENDED RESOURCES\n{sep}\n\n📖 BOOKS:\n   • \"The Mom Test\" — Rob Fitzpatrick (customer interviews)\n   • \"Zero to One\" — Peter Thiel (contrarian thinking)\n   • \"The Lean Startup\" — Eric Ries (build-measure-learn)\n   • \"Traction\" — Gabriel Weinberg (acquisition channels)\n   • \"Crossing the Chasm\" — Geoffrey Moore (B2B GTM)\n\n🛠️  TOOLS TO SET UP:\n   • Notion / Linear — Planning and roadmap\n   • Mixpanel / PostHog — Product analytics\n   • Stripe — Payments from day one\n   • Intercom / HelpScout — Customer communication\n   • HubSpot / Airtable — CRM (early stage)\n   • Figma — Design\n   • GitHub — Code and project management\n\n👥 COMMUNITIES:\n   • Indie Hackers (indiehackers.com)\n   • Product Hunt (producthunt.com)\n   • Y Combinator Startup School (startupschool.org)\n   • relevant subreddits from customer persona research\n\n\n╔═══════════════════════════════════════════════════════════════════════════════╗\n║            APPENDIX — FULL RESEARCH & ANALYSIS                               ║\n╚═══════════════════════════════════════════════════════════════════════════════╝\n\n📄 A. FULL MARKET RESEARCH\n{thin}\n{market_research}\n\n\n📄 B. FULL COMPETITIVE ANALYSIS\n{thin}\n{competitor_analysis}\n\n\n📄 C. FULL FEASIBILITY & RISK REPORT\n{thin}\n{feasibility_report}\n\n\n📄 D. FULL TREND ANALYSIS\n{thin}\n{trend_analysis}\n\n\n📄 E. FULL REGULATORY ANALYSIS\n{thin}\n{regulatory_analysis}\n\n\n📄 F. FULL CUSTOMER PERSONAS\n{thin}\n{customer_personas}\n\n\n📄 G. FULL STRATEGY SYNTHESIS\n{thin}\n{strategy_synthesis}\n\n\n📄 H. FULL GO-TO-MARKET STRATEGY\n{thin}\n{gtm_strategy}\n\n\n📄 I. FULL PITCH DECK & INVESTOR NARRATIVE\n{thin}\n{pitch_deck}\n\n\n📄 J. FULL MVP ROADMAP\n{thin}\n{mvp_roadmap}\n\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\"Ideas are cheap. Execution is everything. Start today.\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n✨ Generated by AI Business Validator — Share with your co-founders and advisors ✨\n\"\"\"\n\n    return {'master_plan': plan}",
+                    "inputParameters": {
+                        "business_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "business_idea"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "competitor_analysis": {
+                            "content": [
+                                "21_75819376",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 4
+                            },
+                            "type": "ref"
+                        },
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 5
+                            },
+                            "type": "ref"
+                        },
+                        "feasibility_report": {
+                            "content": [
+                                "21_747fa82a",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 6
+                            },
+                            "type": "ref"
+                        },
+                        "financial_model": {
+                            "content": [
+                                "10_cc2eed5b",
+                                "financial_model"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "gtm_strategy": {
+                            "content": [
+                                "21_82bac6af",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 7
+                            },
+                            "type": "ref"
+                        },
+                        "market_research": {
+                            "content": [
+                                "21_9894739b",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 8
+                            },
+                            "type": "ref"
+                        },
+                        "mvp_roadmap": {
+                            "content": [
+                                "21_796ea7f8",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 9
+                            },
+                            "type": "ref"
+                        },
+                        "pitch_deck": {
+                            "content": [
+                                "21_3ca15b07",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 10
+                            },
+                            "type": "ref"
+                        },
+                        "regulatory_analysis": {
+                            "content": [
+                                "21_b8b889b4",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 11
+                            },
+                            "type": "ref"
+                        },
+                        "strategy_synthesis": {
+                            "content": [
+                                "21_5383dba2",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 12
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "trend_analysis": {
+                            "content": [
+                                "21_66233eda",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 13
+                            },
+                            "type": "ref"
+                        },
+                        "validation_score": {
+                            "content": [
+                                "10_f4518ed0",
+                                "validation_score"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "master_plan": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "master_plan"
+                    ],
+                    "type": "object"
+                },
+                "title": "Master Business Plan Generator"
+            },
+            "id": "10_35fee73f",
+            "meta": {
+                "position": {
+                    "x": 3400,
+                    "y": 649
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "content": {
+                        "content": "{{result}}",
+                        "type": "template"
+                    },
+                    "inputParameters": {
+                        "result": {
+                            "content": [
+                                "10_35fee73f",
+                                "master_plan"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    }
+                },
+                "title": "End: Business Validation Report"
+            },
+            "id": "2_d0bfa8f3",
+            "meta": {
+                "position": {
+                    "x": 3860,
+                    "y": 667
+                }
+            },
+            "type": "2"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 2,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n    import re\n\n    market      = args.params.get('market_research', '')\n    competitors = args.params.get('competitor_analysis', '')\n    feasibility = args.params.get('feasibility_report', '')\n    trends      = args.params.get('trend_analysis', '')\n    regulatory  = args.params.get('regulatory_analysis', '')\n    personas    = args.params.get('customer_personas', '')\n    strategy    = args.params.get('strategy_synthesis', '')\n    gtm         = args.params.get('gtm_strategy', '')\n    fin_raw     = args.params.get('financial_model', '{}')\n    struct_raw  = args.params.get('structured_idea', '{}')\n\n    try: fm = json.loads(fin_raw)\n    except: fm = {}\n    try: sp = json.loads(struct_raw)\n    except: sp = {}\n\n    scores = {}\n\n    # 1. Market Opportunity (0-20)\n    ms = 0\n    ml = market.lower()\n    if any(w in ml for w in ['billion', 'large market', 'massive']): ms += 7\n    if any(w in ml for w in ['growing', 'growth', 'increasing demand']): ms += 7\n    if any(w in ml for w in ['underserved', 'gap', 'unmet need']): ms += 6\n    scores['market_opportunity'] = min(ms, 20)\n\n    # 2. Competitive Position (0-15)\n    cs = 8  # baseline\n    cl = competitors.lower()\n    if any(w in cl for w in ['differentiation', 'unique', 'white space']): cs += 5\n    if any(w in cl for w in ['crowded', 'saturated', 'many competitors']): cs -= 4\n    if any(w in cl for w in ['advantage', 'moat', 'barrier']): cs += 2\n    scores['competitive_position'] = max(min(cs, 15), 0)\n\n    # 3. Financial Viability (0-20)\n    fs = 0\n    ue = fm.get('unit_economics', {})\n    ltv_str = ue.get('ltv_to_cac_ratio', '0x')\n    m = re.search(r'([\\d.]+)', ltv_str)\n    ltv_cac = float(m.group(1)) if m else 0\n    if ltv_cac >= 3:   fs += 12\n    elif ltv_cac >= 2: fs += 8\n    elif ltv_cac >= 1: fs += 4\n    projs = fm.get('three_year_projections', [])\n    if projs and any(p.get('net_profit', -1) > 0 for p in projs[:2]): fs += 8\n    scores['financial_viability'] = min(fs, 20)\n\n    # 4. Trend Tailwinds (0-15)\n    ts = 7\n    tl = trends.lower()\n    if any(w in tl for w in ['growing', 'accelerating', 'tailwind', 'rising investment']): ts += 5\n    if any(w in tl for w in ['why now', 'timing', 'right time', 'inflection']): ts += 3\n    if any(w in tl for w in ['declining', 'headwind', 'shrinking']): ts -= 5\n    scores['trend_tailwinds'] = max(min(ts, 15), 0)\n\n    # 5. Execution Feasibility (0-15)\n    ef = 10\n    fl = feasibility.lower()\n    risk_words = ['high risk', 'major challenge', 'very difficult', 'significant barrier']\n    ef -= min(sum(3 for w in risk_words if w in fl), 9)\n    if any(w in fl for w in ['feasible', 'achievable', 'straightforward']): ef += 5\n    scores['execution_feasibility'] = max(min(ef, 15), 0)\n\n    # 6. Customer Clarity (0-10)\n    cc = 5\n    pl = personas.lower()\n    if any(w in pl for w in ['clear pain', 'strong pain', 'frustrated', 'desperate']): cc += 3\n    if any(w in pl for w in ['willing to pay', 'budget', 'paying today']): cc += 2\n    scores['customer_clarity'] = min(cc, 10)\n\n    # 7. Regulatory Risk (0-5) — higher is less risk\n    rr = 5\n    rl_low = regulatory.lower()\n    if sp.get('flags', {}).get('is_regulated_industry', False): rr -= 2\n    if any(w in rl_low for w in ['high compliance', 'complex regulation', 'license required']): rr -= 2\n    scores['regulatory_clarity'] = max(rr, 0)\n\n    total = sum(scores.values())  # max 100\n\n    # Grade and recommendation\n    if total >= 80:\n        grade = 'A'\n        rec   = '🚀 EXCEPTIONAL — Move fast. Strong signal across all dimensions.'\n        action = 'Start building immediately. This is a strong opportunity.'\n    elif total >= 65:\n        grade = 'B'\n        rec   = '✅ STRONG — Solid opportunity. Manageable risks.'\n        action = 'Proceed. Build MVP and validate with early customers.'\n    elif total >= 50:\n        grade = 'C'\n        rec   = '⚠️ MODERATE — Real opportunity but meaningful challenges exist.'\n        action = 'Validate key assumptions before significant investment.'\n    elif total >= 35:\n        grade = 'D'\n        rec   = '🔶 WEAK — Significant concerns. Consider pivoting.'\n        action = 'Address fundamental issues or pivot before investing further.'\n    else:\n        grade = 'F'\n        rec   = '❌ NOT RECOMMENDED — Critical flaws across multiple dimensions.'\n        action = 'Rethink the concept significantly.'\n\n    strengths  = []\n    weaknesses = []\n    for dim, s in scores.items():\n        label = dim.replace('_', ' ').title()\n        max_s = {'market_opportunity': 20, 'competitive_position': 15,\n                 'financial_viability': 20, 'trend_tailwinds': 15,\n                 'execution_feasibility': 15, 'customer_clarity': 10,\n                 'regulatory_clarity': 5}[dim]\n        ratio = s / max_s\n        if ratio >= 0.75:  strengths.append(f'✓ Strong {label}')\n        elif ratio <= 0.40: weaknesses.append(f'✗ Weak {label}')\n\n    result = {\n        'total_score':        total,\n        'max_score':          100,\n        'grade':              grade,\n        'recommendation':     rec,\n        'recommended_action': action,\n        'score_breakdown':    {k.replace('_',' ').title(): v for k, v in scores.items()},\n        'max_per_dimension':  {'Market Opportunity': 20, 'Competitive Position': 15,\n                               'Financial Viability': 20, 'Trend Tailwinds': 15,\n                               'Execution Feasibility': 15, 'Customer Clarity': 10,\n                               'Regulatory Clarity': 5},\n        'strengths':          strengths or ['✓ Opportunities present across dimensions'],\n        'weaknesses':         weaknesses or ['No critical red flags identified'],\n        'investor_readiness':  'High' if total >= 70 else ('Medium' if total >= 50 else 'Low'),\n        'critical_questions': [\n            'Have you talked to 20+ potential customers about this problem?',\n            'Would your target customer pay for this today, even if imperfect?',\n            'What is your unfair advantage over well-funded competitors?',\n            'What does the business look like in 3 years if everything goes right?',\n            'What is the single most important assumption to validate first?'\n        ]\n    }\n\n    return {'validation_score': json.dumps(result, indent=2)}",
+                    "inputParameters": {
+                        "competitor_analysis": {
+                            "content": [
+                                "21_75819376",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "customer_personas": {
+                            "content": [
+                                "21_a6458901",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "feasibility_report": {
+                            "content": [
+                                "21_747fa82a",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 4
+                            },
+                            "type": "ref"
+                        },
+                        "financial_model": {
+                            "content": [
+                                "10_cc2eed5b",
+                                "financial_model"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "gtm_strategy": {
+                            "content": [
+                                "21_82bac6af",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 5
+                            },
+                            "type": "ref"
+                        },
+                        "market_research": {
+                            "content": [
+                                "21_9894739b",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 6
+                            },
+                            "type": "ref"
+                        },
+                        "regulatory_analysis": {
+                            "content": [
+                                "21_b8b889b4",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 7
+                            },
+                            "type": "ref"
+                        },
+                        "strategy_synthesis": {
+                            "content": [
+                                "21_5383dba2",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 8
+                            },
+                            "type": "ref"
+                        },
+                        "structured_idea": {
+                            "content": [
+                                "10_ccd6d111",
+                                "structured_idea"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "trend_analysis": {
+                            "content": [
+                                "21_66233eda",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 9
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "validation_score": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "validation_score"
+                    ],
+                    "type": "object"
+                },
+                "title": "Validation Score Calculator"
+            },
+            "id": "10_f4518ed0",
+            "meta": {
+                "position": {
+                    "x": 2480,
+                    "y": 649
+                }
+            },
+            "type": "10"
+        }
+    ]
+}

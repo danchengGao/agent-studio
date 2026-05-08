@@ -45,6 +45,11 @@ CATEGORIES = {
         "icon": "🎭",
         "description": "Music streaming, video platforms, live streaming, event discovery, and ticketing services"
     },
+    "finance": {
+        "name": "Finance & Trading",
+        "icon": "💰",
+        "description": "Financial market data, trading platforms, and investment services"
+    },
     "file_storage": {
         "name": "File Storage",
         "icon": "📂",

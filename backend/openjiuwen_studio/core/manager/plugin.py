@@ -1903,7 +1903,7 @@ def _build_local_market_plugin_create_request(req, plugin_id: str, plugin_data: 
 def plugin_create_market_plugin(req, current_user: dict) -> ResponseModel:
     _ = check_user_space(req.space_id, current_user)
 
-    plugins_data = _load_plugins_from_directory() or {"plugins": {}}
+    plugins_data = load_plugins_from_directory() or {"plugins": {}}
     plugin_key = str(req.plugin_id or '').strip()
     plugin_data = (plugins_data.get('plugins') or {}).get(plugin_key)
     if not isinstance(plugin_data, dict):
@@ -2901,8 +2901,9 @@ def _process_plugin_parameters(plugin_data: Dict[str, Any]) -> None:
     - "send_method" string (Path/Query/Body/Header/None) -> "method" integer (0-4)
     - "type" string values -> ParamType enum integers (e.g., "string" -> 1)
 
-    Also processes the "header_configuration" section and stores headers at plugin level.
-    Headers are NOT added to request_params - they are kept separate in a "headers" field.
+    Also processes the "header_configuration" section and stores all entries at plugin
+    level in a "headers" field. At runtime, plugin-level params (including path-type ones)
+    are merged into each tool via _merge_plugin_params() / plugin_api_tool_convert().
 
     Args:
         plugin_data: Plugin configuration data (modified in place)
@@ -2945,8 +2946,10 @@ def _process_plugin_parameters(plugin_data: Dict[str, Any]) -> None:
         "path": 4,
     }
 
-    # Process header_configuration section and store at plugin level
-    # Headers are NOT added to request_params - they're kept separate
+    # Process header_configuration section and store at plugin level.
+    # Path-type entries from header_configuration are merged into each tool's params at
+    # runtime via _merge_plugin_params() in plugin_api_tool_convert(), so no injection
+    # is needed here.
     headers = _process_header_configuration(plugin_data)
     if headers:
         plugin_data["headers"] = headers
@@ -3002,8 +3005,8 @@ def _process_plugin_parameters(plugin_data: Dict[str, Any]) -> None:
                 # Default to Query if no method specified
                 param_config["method"] = 2  # PARAM_SEND_METHOD_QUERY
 
-        # Note: Headers are now stored at plugin level, not added to request_params
-        # This keeps them separate from input parameters in the GUI
+        # Note: header_configuration params (Header, Path, etc.) are stored at plugin level
+        # in plugin.inputs and merged at runtime via _merge_plugin_params().
 
 
 def _load_plugin_schema() -> Dict[str, Any]:
@@ -3090,7 +3093,7 @@ def _load_legacy_plugins() -> Dict[str, Any]:
         return {}
 
 
-def _load_plugins_from_directory() -> Dict[str, Any]:
+def load_plugins_from_directory() -> Dict[str, Any]:
     """
     Load plugins from the new multi-file structure.
     Reads index.json and loads individual plugin files from category directories.
@@ -3211,7 +3214,7 @@ def plugin_read_market_json(
     _ = check_user_space(req.space_id, current_user)
 
     # 2. Try loading from new multi-file structure first
-    plugins_data = _load_plugins_from_directory()
+    plugins_data = load_plugins_from_directory()
 
     if plugins_data:
         # New structure found, use it

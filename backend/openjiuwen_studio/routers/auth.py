@@ -221,6 +221,17 @@ async def register(request: Request, form_data: OAuth2PasswordRequestForm = Depe
         raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
+@auth_router.get("/verify_access_token", response_model=ResponseModel[dict])
+async def verify_access_token(token: str = Depends(oauth2_scheme)):
+    from openjiuwen_studio.core.manager.login_manager.auth_service import AuthService
+    result = await AuthService.verify_access_token(token)
+    return ResponseModel(
+        code=200,
+        message="token 校验成功",
+        data=result
+    )
+
+
 @auth_router.post("/logout", response_model=ResponseModel[dict])
 async def logout(current_user: Dict[str, Any] = Depends(get_current_user)):
     """User logout endpoint"""

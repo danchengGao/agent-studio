@@ -1,0 +1,20 @@
+# Requirements for OpenJiuwen channels
+
+# HTTP client for backend API calls
+requests>=2.31.0
+
+# Telegram platform
+python-telegram-bot>=20.0
+
+# Slack platform
+slack-bolt>=1.18.0
+
+# Discord platform
+discord.py>=2.3.0
+
+# Webhook server platform
+fastapi>=0.111.0
+uvicorn>=0.29.0
+
+# Microsoft Teams platform
+botbuilder-core>=4.14.0

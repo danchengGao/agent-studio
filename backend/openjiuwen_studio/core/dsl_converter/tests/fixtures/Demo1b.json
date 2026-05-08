@@ -1,0 +1,275 @@
+{
+  "nodes": [
+    {
+      "id": "1_74106444",
+      "type": "1",
+      "meta": {
+        "position": {
+          "x": 180,
+          "y": 32
+        }
+      },
+      "data": {
+        "title": "Start",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "default": "",
+              "description": "Trigger input (stock ticker symbol, e.g. AAPL)"
+            }
+          },
+          "required": [
+            "input"
+          ]
+        }
+      }
+    },
+    {
+      "id": "21_9c462056",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 640,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "Stock Data Agent",
+        "max_iterations": 5,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You help everyday people understand stocks by fetching clean historical data.\nGiven a stock ticker symbol, call the Alpaca OHLCV data tool to fetch 25 days of 1D OHLCV bars.\nReturn ONLY the raw JSON response from the tool. No markdown, no prose, no explanation.\nThis JSON will be used by another component to create a friendly story about the stock."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "{{query}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "query": {
+              "type": "ref",
+              "content": [
+                "1_74106444",
+                "input"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "d4259814-2064-450c-8968-b4e47ae0f7e9",
+                "plugin_id": "0a720f44-ea94-4205-bb42-862f88addf97",
+                "version": "draft",
+                "name": "Alpaca Data",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "output": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "output"
+          ]
+        }
+      }
+    },
+    {
+      "id": "10_852fdf07",
+      "type": "10",
+      "meta": {
+        "position": {
+          "x": 1100,
+          "y": 15
+        }
+      },
+      "data": {
+        "title": "Quant Engine (Story Mode)",
+        "inputs": {
+          "inputParameters": {
+            "input": {
+              "type": "ref",
+              "content": [
+                "21_9c462056",
+                "output"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import json\n    import math\n\n    # --- Basic Math Utilities ---\n    def mean(v):\n        return sum(v) / len(v) if v else 0\n\n    def get_rsi(closes, p=14):\n        if len(closes) < p + 1:\n            return 50\n        diffs = [closes[i] - closes[i-1] for i in range(1, len(closes))]\n        avg_g = mean([d for d in diffs[-p:] if d > 0])\n        avg_l = mean([-d for d in diffs[-p:] if d < 0])\n        if avg_l == 0:\n            return 100\n        return 100 - (100 / (1 + (avg_g / avg_l)))\n\n    def get_hurst(ts):\n        lags = range(2, 20)\n        tau = []\n        for lag in lags:\n            diffs = [ts[j] - ts[j-lag] for j in range(lag, len(ts))]\n            if not diffs:\n                tau.append(0)\n                continue\n            m = mean(diffs)\n            v = sum((x - m)**2 for x in diffs) / len(diffs)\n            tau.append(math.sqrt(math.sqrt(v)))\n        log_l = [math.log(l) for l in lags]\n        log_t = [math.log(t) if t > 0 else 0 for t in tau]\n        n = len(log_l)\n        denom = (n * sum(x**2 for x in log_l) - sum(log_l)**2)\n        slope = (n * sum(log_l[i] * log_t[i] for i in range(n)) - sum(log_l) * sum(log_t)) / denom if denom != 0 else 0\n        return slope * 2.0\n\n    # --- Persona Logic ---\n    def build_persona(h_val, r_val, adr):\n        if h_val > 0.6 and adr < 2 and 40 <= r_val <= 60:\n            persona = \"The Confident Pro\"\n            vibe_summary = \"Strong, steady trend with calm energy\"\n            mood = \"Confident\"\n            energy = \"Balanced\"\n        elif h_val > 0.6 and adr >= 2:\n            persona = \"The High‑Energy Sprinter\"\n            vibe_summary = \"Powerful trend with big moves\"\n            mood = \"Intense\"\n            energy = \"Hyped\"\n        elif h_val < 0.45 and adr >= 2:\n            persona = \"The Rollercoaster\"\n            vibe_summary = \"Choppy price action with mood swings\"\n            mood = \"Unpredictable\"\n            energy = \"Chaotic\"\n        elif r_val > 70:\n            persona = \"The Overhyped Star\"\n            vibe_summary = \"Everyone is talking about it — maybe too much\"\n            mood = \"Euphoric\"\n            energy = \"Overextended\"\n        elif r_val < 30:\n            persona = \"The Exhausted Fighter\"\n            vibe_summary = \"Beaten down and tired, but maybe due for a bounce\"\n            mood = \"Exhausted\"\n            energy = \"Low\"\n        else:\n            persona = \"The Quiet Walker\"\n            vibe_summary = \"Drifting without a strong direction\"\n            mood = \"Indecisive\"\n            energy = \"Calm\"\n\n        adrenaline = \"High\" if adr > 2 else \"Chilled\"\n        return persona, vibe_summary, mood, energy, adrenaline\n\n    def build_human_signal(h_val, r_val, adr):\n        if h_val > 0.6 and 40 <= r_val <= 60 and adr < 2:\n            return \"Feels like a cautious buy — strong but not overheated.\"\n        if r_val > 70:\n            return \"Feels overhyped — might be wise to be careful or wait.\"\n        if r_val < 30:\n            return \"Feels beaten down — could be a recovery play, but with risk.\"\n        if adr > 2:\n            return \"Very jumpy right now — expect big swings.\"\n        return \"Feels like a hold — nothing too dramatic either way.\"\n\n    def build_story(ticker, price, persona, vibe_summary, mood, energy, adrenaline):\n        base = f\"{ticker} is acting like {persona.lower()} today. \"\n        vibe = f\"It has a vibe of: {vibe_summary}. \"\n        feel = f\"Mood: {mood}. Energy: {energy}. Adrenaline: {adrenaline}. \"\n        price_line = f\"Current price is around {price}. \"\n        return base + vibe + feel + price_line\n\n    # --- Stock Analysis ---\n    def analyze_stock(ticker, closes, highs, lows):\n        h_val = get_hurst(closes)\n        r_val = get_rsi(closes)\n        tr = [highs[i] - lows[i] for i in range(len(closes))]\n        adr = (mean(tr[-14:]) / closes[-1]) * 100 if closes[-1] else 0\n\n        persona, vibe_summary, mood, energy, adrenaline = build_persona(h_val, r_val, adr)\n        price_str = f\"${closes[-1]:.2f}\"\n        story = build_story(ticker, price_str, persona, vibe_summary, mood, energy, adrenaline)\n        human_signal = build_human_signal(h_val, r_val, adr)\n\n        return {\n            \"ticker\": ticker,\n            \"price\": price_str,\n            \"persona\": persona,\n            \"story\": story,\n            \"vibe_summary\": vibe_summary,\n            \"emotions\": {\n                \"mood\": mood,\n                \"energy\": energy,\n                \"adrenaline\": adrenaline\n            },\n            \"human_signal\": human_signal,\n            \"raw_metrics\": {\n                \"rsi\": round(float(r_val), 2),\n                \"hurst\": round(float(h_val), 3),\n                \"volatility_percent\": round(float(adr), 2)\n            }\n        }\n\n    # --- Input Cleanup ---\n    raw_in = args.params.get('input', '{}')\n    raw = {}\n\n    if isinstance(raw_in, str):\n        clean = raw_in.replace(\"```json\", \"\").replace(\"```\", \"\").strip()\n        try:\n            raw = json.loads(clean)\n        except Exception:\n            try:\n                import ast\n                raw = ast.literal_eval(clean)\n            except Exception:\n                raw = {}\n    else:\n        raw = raw_in\n\n    # --- FIXED TICKER PARSING (supports single + multi ticker) ---\n    def extract_bars(raw):\n        # Multi‑ticker: { \"bars\": { \"MSFT\": [...] } }\n        if \"bars\" in raw and isinstance(raw[\"bars\"], dict):\n            return raw[\"bars\"]\n\n        # Single‑ticker: { \"bars\": [...], \"symbol\": \"MSFT\" }\n        if \"bars\" in raw and isinstance(raw[\"bars\"], list) and \"symbol\" in raw:\n            return { raw[\"symbol\"]: raw[\"bars\"] }\n\n        # Deep nested fallback\n        def find_nested(obj):\n            if isinstance(obj, dict):\n                if \"bars\" in obj and isinstance(obj[\"bars\"], list) and \"symbol\" in obj:\n                    return { obj[\"symbol\"]: obj[\"bars\"] }\n                if \"bars\" in obj and isinstance(obj[\"bars\"], dict):\n                    return obj[\"bars\"]\n                for v in obj.values():\n                    res = find_nested(v)\n                    if res:\n                        return res\n            return None\n\n        return find_nested(raw) or {}\n\n    bars_map = extract_bars(raw)\n    results = []\n\n    # --- Process Each Ticker ---\n    for ticker, bars in bars_map.items():\n        if not isinstance(bars, list) or len(bars) < 20:\n            continue\n\n        try:\n            b_sorted = sorted(bars, key=lambda x: x.get('t', 0))\n            closes = [float(x.get('c', x.get('close', 0))) for x in b_sorted]\n            highs = [float(x.get('h', x.get('high', 0))) for x in b_sorted]\n            lows = [float(x.get('l', x.get('low', 0))) for x in b_sorted]\n\n            analysis = analyze_stock(ticker, closes, highs, lows)\n            results.append(analysis)\n\n        except Exception:\n            continue\n\n    return {\"result\": json.dumps(results)}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string",
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "required": [
+            "result"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 3,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": {
+            "defaultStep": "0",
+            "errorStep": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "21_4aea5072",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 1560,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "News Sentiment (Story Mode)",
+        "max_iterations": 5,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a friendly market storyteller for everyday people.\nYou receive JSON from a quant engine describing one or more stocks, each with fields like:\n[ticker, price, persona, story, vibe_summary, emotions, human_signal, raw_metrics].\n\nFor each ticker:\n1. Use the Tavily search tool to look up the most recent, relevant news.\n2. Understand the overall mood of the news (optimistic, fearful, mixed, cautious, etc.).\n3. Summarize the headlines in simple language.\n4. Add a bit of \"gossip\" style commentary (what people/analysts seem to be talking about).\n5. Combine the quant story + news mood into a clear, human‑friendly recommendation.\n\nOutput ONLY exact JSON (no markdown, no extra text):\n[\n  {\n    \"ticker\": \"string\",\n    \"news_mood\": \"string\",\n    \"headline_summary\": \"string\",\n    \"gossip\": \"string\",\n    \"final_recommendation\": \"Buy\" | \"Hold\" | \"Sell\",\n    \"explanation\": \"string\"\n  }\n]\nUse warm, simple language that a non‑expert can understand."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "{{query}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "query": {
+              "type": "ref",
+              "content": [
+                "10_852fdf07",
+                "result"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "184dc0fa-2937-41b8-877f-270a2a979210",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ],
+            "workflows": []
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "output": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "output"
+          ]
+        }
+      }
+    },
+    {
+      "id": "2_e24ac3d4",
+      "type": "2",
+      "meta": {
+        "position": {
+          "x": 2020,
+          "y": 32
+        }
+      },
+      "data": {
+        "title": "End (Story Output)",
+        "inputs": {
+          "inputParameters": {
+            "result": {
+              "type": "ref",
+              "content": [
+                "21_4aea5072",
+                "output"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "content": {
+            "type": "template",
+            "content": "{{result}}"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeID": "1_74106444",
+      "targetNodeID": "21_9c462056"
+    },
+    {
+      "sourceNodeID": "21_9c462056",
+      "targetNodeID": "10_852fdf07"
+    },
+    {
+      "sourceNodeID": "10_852fdf07",
+      "targetNodeID": "21_4aea5072",
+      "sourcePortID": "0"
+    },
+    {
+      "sourceNodeID": "21_4aea5072",
+      "targetNodeID": "2_e24ac3d4"
+    },
+    {
+      "sourceNodeID": "21_4aea5072",
+      "targetNodeID": "2_e24ac3d4"
+    }
+  ],
+  "plugins": [],
+  "model_references": {}
+}

@@ -215,7 +215,7 @@ class N8nWorkflowConverter(WorkflowConverter):
                     'zh' (or 'zh-CN', 'zh_CN', 'chinese') — Chinese titles
         """
         self.locale = locale
-        self._reset_state()
+        self.reset_state()
 
     # =========================================================================
     # LOCALISED TITLES
@@ -257,7 +257,7 @@ class N8nWorkflowConverter(WorkflowConverter):
         template = self.TITLES.get(lang, self.TITLES["en"]).get(key, key)
         return template.format(n=n)
 
-    def _reset_state(self):
+    def reset_state(self):
         """Reset converter state for new conversion."""
         # Preserve locale across resets (set once in __init__ or convert())
         if not hasattr(self, "locale"):
@@ -321,7 +321,7 @@ class N8nWorkflowConverter(WorkflowConverter):
         # Reset state for new conversion (honour per-call locale override)
         if locale:
             self.locale = locale
-        self._reset_state()
+        self.reset_state()
         
         # Extract n8n workflow data
         n8n_name = json_data.get("name", "Imported n8n Workflow")
@@ -402,7 +402,7 @@ class N8nWorkflowConverter(WorkflowConverter):
         """
         if locale:
             self.locale = locale
-        self._reset_state()
+        self.reset_state()
         n8n_nodes = n8n_json.get("nodes", [])
         self.n8n_connections = n8n_json.get("connections", {})
         self._index_nodes(n8n_nodes)
@@ -1567,7 +1567,7 @@ class N8nWorkflowConverter(WorkflowConverter):
     "notEmpty": "is_not_empty",
 }
 
-    def _map_n8n_operator(self, n8n_op: Any) -> Tuple[str, Any]:
+    def map_n8n_operator(self, n8n_op: Any) -> Tuple[str, Any]:
         """
         Convert an n8n operator to (openjiuwen_operator_str, adjusted_right_value).
 
@@ -1623,7 +1623,7 @@ class N8nWorkflowConverter(WorkflowConverter):
 
             # Map the operator
             n8n_op = cond.get("operator", {})
-            jiuwen_op, right_override = self._map_n8n_operator(n8n_op)
+            jiuwen_op, right_override = self.map_n8n_operator(n8n_op)
 
             # Right side value
             if right_override is not None:
