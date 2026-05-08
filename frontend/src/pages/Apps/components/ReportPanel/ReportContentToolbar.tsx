@@ -55,6 +55,8 @@ export interface ReportContentToolbarProps {
   canUndo?: boolean
   /** 是否可重做 */
   canRedo?: boolean
+  /** 是否显示"编辑"按钮（新增，用于控制按钮显示） */
+  showEditButton?: boolean
 }
 
 /**
@@ -77,6 +79,7 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
   onRedo,
   canUndo = false,
   canRedo = false,
+  showEditButton = true,
 }) => {
   const { t } = useTranslation()
   const clipboard = useClipboard()
@@ -252,7 +255,7 @@ export const ReportContentToolbar: React.FC<ReportContentToolbarProps> = ({
           </button>
         )}
 
-        {editingEnabled && onEnterEdit && onExitEdit && isFinalReport && (
+        {editingEnabled && onEnterEdit && onExitEdit && isFinalReport && showEditButton && (
           <button
             onClick={handleEditClick}
             disabled={editButtonDisabled}

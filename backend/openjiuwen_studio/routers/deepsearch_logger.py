@@ -20,8 +20,12 @@ class DeepSearchLogger:
     # 类级别的锁，确保线程安全
     _lock = Lock()
 
-    # 日志目录路径
-    LOG_DIR = Path(__file__).parent.parent.parent / "logs" / "deepsearch"
+    @classmethod
+    def _get_log_dir(cls) -> Path:
+        """获取日志目录路径，与 run/interface/performance 使用相同配置"""
+        # config.yaml 中配置：log_path: "./logs/"
+        # 直接使用相同的路径，确保与 run/interface/performance 在同一目录下
+        return Path("./logs/deepsearch")
 
     # 默认日志过期天数（可配置）
     DEFAULT_LOG_EXPIRE_DAYS = 3
@@ -52,6 +56,7 @@ class DeepSearchLogger:
         """
         self.conversation_id = conversation_id
         self.log_expire_days = log_expire_days or self.DEFAULT_LOG_EXPIRE_DAYS
+        self._log_dir = self._get_log_dir()  # 实例变量，缓存日志目录
         self.log_file_path = self._get_log_file_path()
 
         # 确保日志目录存在
@@ -59,7 +64,7 @@ class DeepSearchLogger:
 
     def _get_log_file_path(self) -> Path:
         """获取日志文件路径"""
-        log_dir = self.LOG_DIR.resolve()
+        log_dir = self._log_dir.resolve()
         log_file_path = (log_dir / f"{self._safe_log_file_stem(self.conversation_id)}.log").resolve()
         log_file_path.relative_to(log_dir)
         return log_file_path
@@ -101,7 +106,7 @@ class DeepSearchLogger:
     def _ensure_log_directory(self):
         """确保日志目录存在"""
         with self._lock:
-            self.LOG_DIR.mkdir(parents=True, exist_ok=True)
+            self._log_dir.mkdir(parents=True, exist_ok=True)
 
     async def log_request(self, request_data: Dict[str, Any]):
         """
@@ -166,8 +171,11 @@ class DeepSearchLogger:
         expire_days = expire_days or cls.DEFAULT_LOG_EXPIRE_DAYS
 
         try:
+            # 获取日志目录
+            log_dir = cls._get_log_dir()
+
             # 确保日志目录存在
-            if not cls.LOG_DIR.exists():
+            if not log_dir.exists():
                 return
 
             # 计算过期时间阈值（使用 UTC 时间）
@@ -175,7 +183,7 @@ class DeepSearchLogger:
 
             # 遍历日志目录
             with cls._lock:
-                for log_file in cls.LOG_DIR.glob("*.log"):
+                for log_file in log_dir.glob("*.log"):
                     try:
                         # 获取文件的修改时间（使用 UTC 时间）
                         file_mtime = datetime.fromtimestamp(log_file.stat().st_mtime, tz=timezone.utc)

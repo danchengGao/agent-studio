@@ -27,6 +27,7 @@ import { ReportContentToolbar } from './ReportContentToolbar'
 import { ReportView } from './ReportView'
 import { ReportEditView, type ReportEditViewHandle } from './ReportEditView'
 import { useConversationStore, isFinalReportMessage } from '@/stores/useConversationStore'
+import { useAuthStore } from '@/stores/useAuthStore'
 
 interface ReportPanelProps {
   /** 报告数据 */
@@ -74,6 +75,8 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
   const syncSchedulerRef = useRef<ReportSyncScheduler | null>(null)
   const editViewRef = useRef<ReportEditViewHandle | null>(null)
   const messagesMap = useConversationStore(state => state.messagesMap)
+  const messageItemsMap = useConversationStore(state => state.messageItemsMap)
+  const getLastMessageItems = useConversationStore(state => state.getLastMessageItems)
 
   // 判断是否为最终报告（子报告不能编辑）
   const isFinalReport = useMemo(() => {
@@ -81,6 +84,36 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
     const message = messagesMap.get(reportMessageId)
     return message ? isFinalReportMessage(message) : true
   }, [reportMessageId, messagesMap])
+
+  // 获取当前报告所属的 messageItems
+  const currentMessageItems = useMemo(() => {
+    if (!reportMessageId) return null
+    const message = messagesMap.get(reportMessageId)
+    return message?.messageItemsId ? messageItemsMap.get(message.messageItemsId) : null
+  }, [reportMessageId, messagesMap, messageItemsMap])
+
+  // 计算是否显示"编辑"按钮
+  // 条件：最终报告 && 配置开启可编辑 && 该报告所在的items是最后1个items && 还有可编辑的次数
+  const showEditButton = useMemo(() => {
+    // 1. 必须是最终报告
+    if (!isFinalReport) return false
+
+    // 2. 配置中打开了可编辑功能
+    if (!feedbackOptimizationEnabled) return false
+
+    // 3. 必须有当前 messageItems
+    if (!currentMessageItems) return false
+
+    // 4. 该报告所在的items是最后1个items
+    const lastMessageItems = getLastMessageItems()
+    if (!lastMessageItems || currentMessageItems.id !== lastMessageItems.id) return false
+
+    // 5. 还有可编辑的次数（undefined 表示未编辑过，默认允许）
+    const remainingRounds = currentMessageItems.remainingRewriteRounds ?? currentMessageItems.agentConfig?.remainingRewriteRounds
+    if (remainingRounds === 0) return false
+
+    return true
+  }, [isFinalReport, feedbackOptimizationEnabled, currentMessageItems, getLastMessageItems])
 
   const canEditReport = isFinalReport && feedbackOptimizationEnabled
   const initialCanonicalDocument = useMemo(() => {
@@ -239,6 +272,7 @@ const ReportPanel: React.FC<ReportPanelProps> = ({
         onRedo={historyControls.redo}
         canUndo={historyControls.canUndo}
         canRedo={historyControls.canRedo}
+        showEditButton={showEditButton}
       />
 
       {/* 报告内容 */}

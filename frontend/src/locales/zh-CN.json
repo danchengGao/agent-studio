@@ -855,6 +855,10 @@
         "aiExpand": "扩写",
         "aiShrink": "缩写",
         "aiSupplementarySearch": "补充搜索",
+        "supplementarySearch": {
+          "selectedOnly": "仅改选中",
+          "selectedAndRelated": "智能联改"
+        },
         "howToRewrite": "你想如何改写？",
         "send": "发送",
         "thinking": "正在思考...",

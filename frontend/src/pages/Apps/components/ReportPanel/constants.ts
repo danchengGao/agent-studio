@@ -41,6 +41,18 @@ export const REWRITE_ACTIONS: {
   { action: 'supplementary_search', icon: 'Search', labelKey: 'apps.report.aiSupplementarySearch', defaultLabel: '补充搜索', hasSubMenu: true },
 ]
 
+/** 补充搜索子菜单配置 */
+export const SUPPLEMENTARY_SEARCH_OPTIONS = {
+  selected_only: {
+    labelKey: 'apps.report.supplementarySearch.selectedOnly',
+    defaultLabel: '仅改选中',
+  },
+  selected_and_related: {
+    labelKey: 'apps.report.supplementarySearch.selectedAndRelated',
+    defaultLabel: '智能联改',
+  },
+} as const
+
 // ============================================================================
 // 面板尺寸
 // ============================================================================

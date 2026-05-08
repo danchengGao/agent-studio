@@ -846,6 +846,10 @@
         "aiExpand": "Expand",
         "aiShrink": "Shrink",
         "aiSupplementarySearch": "Supplementary Search",
+        "supplementarySearch": {
+          "selectedOnly": "Selected Only",
+          "selectedAndRelated": "Smart Related Rewrite"
+        },
         "howToRewrite": "How would you like to rewrite?",
         "send": "Send",
         "thinking": "Thinking...",

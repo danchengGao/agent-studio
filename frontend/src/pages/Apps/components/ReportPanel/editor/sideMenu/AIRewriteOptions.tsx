@@ -10,7 +10,7 @@ import React, { useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, Expand, Shrink, Search, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { OPTIONS_HEIGHT, OPTIONS_OFFSET, REWRITE_ACTIONS } from '../../constants'
+import { OPTIONS_HEIGHT, OPTIONS_OFFSET, REWRITE_ACTIONS, SUPPLEMENTARY_SEARCH_OPTIONS } from '../../constants'
 import type { ReportRewriteAction, RewriteScope } from '@/pages/Apps/types'
 
 interface AIRewriteOptionsProps {
@@ -181,7 +181,7 @@ export const AIRewriteOptions: React.FC<AIRewriteOptionsProps> = ({
               }
             `}
           >
-            仅改选中
+            {t(SUPPLEMENTARY_SEARCH_OPTIONS.selected_only.labelKey) || SUPPLEMENTARY_SEARCH_OPTIONS.selected_only.defaultLabel}
           </button>
           <button
             onClick={() => handleScopeSelect('selected_and_related')}
@@ -194,7 +194,7 @@ export const AIRewriteOptions: React.FC<AIRewriteOptionsProps> = ({
               }
             `}
           >
-            智能联改
+            {t(SUPPLEMENTARY_SEARCH_OPTIONS.selected_and_related.labelKey) || SUPPLEMENTARY_SEARCH_OPTIONS.selected_and_related.defaultLabel}
           </button>
         </div>
       )}

@@ -46,11 +46,19 @@ const REWRITE_ACTION_LABELS: Record<string, string> = {
   supplementary_search: '补充搜索',
 }
 
+const SUPPLEMENTARY_SEARCH_SCOPE_LABELS: Record<string, string> = {
+  selected_only: '仅改选中',
+  selected_and_related: '智能联改',
+}
+
 /**
  * 构建改写请求的用户消息内容
  */
-const buildRewriteUserMessage = (action: string, selectedText: string, userInstruction?: string): string => {
-  const actionLabel = REWRITE_ACTION_LABELS[action] || action
+const buildRewriteUserMessage = (action: string, selectedText: string, userInstruction?: string, scope?: string): string => {
+  let actionLabel = REWRITE_ACTION_LABELS[action] || action
+  if (action === 'supplementary_search' && scope && SUPPLEMENTARY_SEARCH_SCOPE_LABELS[scope]) {
+    actionLabel = `${actionLabel}（${SUPPLEMENTARY_SEARCH_SCOPE_LABELS[scope]}）`
+  }
   const displayText = selectedText.length > 100
     ? `${selectedText.slice(0, 100)}...`
     : selectedText
@@ -808,6 +816,7 @@ const AppsPage: React.FC = () => {
    * 复用 DeepSearch 配置，通过 SSE 流处理改写结果
    * 将改写请求和结果集成到对话流中
   */
+  const supplementarySearchTitle = t('apps.report.aiSupplementarySearch')
   const handleReportRewrite = async (params: ReportRewriteParams) => {
     const { action, rewrite_scope, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError, silent } = params
 
@@ -823,6 +832,36 @@ const AppsPage: React.FC = () => {
 
     const token = getToken()
     const conversationStore = useConversationStore.getState()
+
+    // For sync: immediately write the edited markdown to the store and IndexDB.
+    // The backend only returns {"action_category":"sync","synced":true} — no final_result —
+    // so we cannot rely on applyRewriteFinalResult to do this update.
+    if (isSyncAction) {
+      const syncMsgId = conversationStore.selectedResultMessageId
+      if (syncMsgId) {
+        const syncMsg = conversationStore.messagesMap.get(syncMsgId)
+        if (syncMsg?.messageItemsId) {
+          try {
+            const rawContent = typeof syncMsg.content === 'string'
+              ? syncMsg.content
+              : JSON.stringify(syncMsg.content)
+            const existingContent = JSON.parse(rawContent || '{}')
+            conversationStore.updateMessage(
+              syncMsg.messageItemsId,
+              syncMsgId,
+              {
+                content: JSON.stringify({ ...existingContent, response_content: selectedText }),
+                status: TaskStatus.COMPLETED,
+                isStreaming: false,
+              }
+            )
+            void conversationStore.saveConversationToDB(conversationId)
+          } catch (err) {
+            console.error('[handleReportRewrite] sync local save failed:', err)
+          }
+        }
+      }
+    }
 
     if (!token) {
       onError?.('无法获取认证信息，请重新登录')
@@ -863,7 +902,7 @@ const AppsPage: React.FC = () => {
     const { originalRemainingRewriteRounds, originalMaxRewriteRounds } = getOriginalRewriteRoundContext()
 
     if (!silent) {
-      const userMessageContent = buildRewriteUserMessage(action, selectedText, userInstruction)
+      const userMessageContent = buildRewriteUserMessage(action, selectedText, userInstruction, rewrite_scope)
       addUserMessage(conversationId, userMessageContent)
     }
 
@@ -930,6 +969,8 @@ const AppsPage: React.FC = () => {
     type RewriteRuntimeState = {
       finalResultMessageId: string | null
       hasReceivedContent: boolean
+      collectorTaskMessageId: string | null
+      collectorTaskMessageItemsId: string | null
     }
     type RewriteProcessResult = {
       status: 'continue' | 'completed' | 'error'
@@ -1101,10 +1142,87 @@ const AppsPage: React.FC = () => {
       data: RewriteEventData,
       state: RewriteRuntimeState
     ): RewriteProcessResult => {
+      // 处理结束
       if (data.agent === 'end' && data.content === 'ALL END') {
         return { status: 'completed' }
       }
 
+      // 处理 collector_info_retrieval 事件
+      if (data.agent === 'collector_info_retrieval' && typeof data.content === 'string') {
+        // 创建或获取根任务
+        if (!state.collectorTaskMessageId) {
+          const taskMessage = addSystemMessage(
+            conversationId,
+            MessageType.TASK,
+            '',
+            undefined,
+            supplementarySearchTitle,
+            'deepsearch'
+          )
+          if (taskMessage) {
+            state.collectorTaskMessageId = taskMessage.id
+            state.collectorTaskMessageItemsId = taskMessage.messageItemsId
+            conversationStore.updateMessage(
+              taskMessage.messageItemsId,
+              taskMessage.id,
+              { status: TaskStatus.IN_PROGRESS, isStreaming: false }
+            )
+          }
+        }
+
+        // 添加 link 子消息
+        if (state.collectorTaskMessageId && state.collectorTaskMessageItemsId) {
+          try {
+            const linkContent = JSON.parse(data.content)
+            const childMessage = conversationStore.addMessageAsChild(
+              state.collectorTaskMessageItemsId,
+              state.collectorTaskMessageId,
+              MessageType.LINK,
+              linkContent,
+              `collector_info_retrieval: ${linkContent.title || '搜索结果'}`
+            )
+            if (childMessage) {
+              conversationStore.updateMessage(
+                childMessage.messageItemsId,
+                childMessage.id,
+                { status: TaskStatus.COMPLETED, isStreaming: false }
+              )
+            }
+          } catch (e) {
+            console.error('[handleReportRewrite] Failed to parse collector_info_retrieval content:', e)
+          }
+        }
+        return { status: 'continue' }
+      }
+
+      // 处理 collector_summary 事件
+      if (data.agent === 'collector_summary' && typeof data.content === 'string') {
+        if (state.collectorTaskMessageId && state.collectorTaskMessageItemsId) {
+          const childMessage = conversationStore.addMessageAsChild(
+            state.collectorTaskMessageItemsId,
+            state.collectorTaskMessageId,
+            MessageType.TEXT,
+            data.content,
+            t('apps.deepSearch.informationSummary')
+          )
+          if (childMessage) {
+            conversationStore.updateMessage(
+              childMessage.messageItemsId,
+              childMessage.id,
+              { status: TaskStatus.COMPLETED, isStreaming: false }
+            )
+            // 更新根任务状态为完成
+            conversationStore.updateMessage(
+              childMessage.messageItemsId,
+              state.collectorTaskMessageId,
+              { status: TaskStatus.COMPLETED }
+            )
+          }
+        }
+        return { status: 'continue' }
+      }
+
+      // 处理 user_feedback_processor 事件（最终报告）
       if (data.agent !== rewriteFeedbackAgent || typeof data.content !== 'string') {
         return { status: 'continue' }
       }
@@ -1119,8 +1237,11 @@ const AppsPage: React.FC = () => {
     const createRewriteState = (): RewriteRuntimeState => ({
       finalResultMessageId: null,
       hasReceivedContent: false,
+      collectorTaskMessageId: null,
+      collectorTaskMessageItemsId: null,
     })
     const finishRewrite = () => {
+      useConversationStore.getState().stopSSETimeoutMonitor()
       onStatusChange?.('idle')
       onEnd?.()
     }
@@ -1133,6 +1254,7 @@ const AppsPage: React.FC = () => {
         console.error('[handleReportRewrite] Backend error:', errorMessage)
       }
       await options?.stop?.()
+      useConversationStore.getState().stopSSETimeoutMonitor()
       onStatusChange?.('error')
       onError?.(errorMessage)
     }
@@ -1325,6 +1447,8 @@ const AppsPage: React.FC = () => {
           await finishLiveRewriteStream(runtime.stop)
           break
         }
+
+        useConversationStore.getState().updateLastSSEEventTime()
 
         const chunkResult = await consumeLiveRewriteChunk(value, decoder, buffer, runtime.consumeEvents)
         buffer = chunkResult.remainingBuffer
@@ -2226,7 +2350,6 @@ const AppsPage: React.FC = () => {
       setAbortController(null)
     }
   }
-
 
   return (
     <div className={`${FONT_FAMILY} flex flex-col h-full w-full min-h-0`}>
