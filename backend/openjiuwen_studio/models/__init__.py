@@ -21,6 +21,10 @@ from .workflow_execution import WorkflowExecutionDB, WorkflowExecutionDetailsDB
 from .memory_base import MemoryBaseDB
 from .runtime_info import RuntimeInfoDB
 from .trigger import TriggerDB, TriggerExecutionLogDB
+from .evaluation import (
+    EvaluationDB, EvaluationTaskDB, EvaluationRunDB,
+    EvaluationTaskResultDB, GraderDB,
+)
 
 __all__ = [
     "ModelConfig",
@@ -56,4 +60,9 @@ __all__ = [
     "RuntimeInfoDB",
     "TriggerDB",
     "TriggerExecutionLogDB"
+    "EvaluationDB",
+    "EvaluationTaskDB",
+    "EvaluationRunDB",
+    "EvaluationTaskResultDB",
+    "GraderDB"
 ]

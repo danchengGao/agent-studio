@@ -112,11 +112,11 @@ export const WorkflowControl = ({ onSave, onImport, onExport, onExportPy, workfl
 
           {/* 新增的发布和版本历史按钮 */}
           <Tooltip content={t('workflowCanvas.workflow.publish')}>
-            <IconButton 
-              type="tertiary" 
-              theme="borderless" 
-              icon={<Tag size={16} />} 
-              onClick={handlePublishClick} 
+            <IconButton
+              type="tertiary"
+              theme="borderless"
+              icon={<Tag size={16} />}
+              onClick={handlePublishClick}
               disabled={!workflowId || !spaceId}
               style={{ color: 'var(--workflow-text-secondary)' }}
             />
@@ -144,30 +144,30 @@ export const WorkflowControl = ({ onSave, onImport, onExport, onExportPy, workfl
 
           {/* 原有的保存、导入、导出按钮 */}
           <Tooltip content={t('workflowCanvas.workflow.save')}>
-            <IconButton 
-              type="tertiary" 
-              theme="borderless" 
-              icon={<Save size={16} />} 
+            <IconButton
+              type="tertiary"
+              theme="borderless"
+              icon={<Save size={16} />}
               onClick={onSave}
               style={{ color: 'var(--workflow-text-secondary)' }}
             />
           </Tooltip>
 
           <Tooltip content={t('workflowCanvas.workflow.import')}>
-            <IconButton 
-              type="tertiary" 
-              theme="borderless" 
-              icon={<Upload size={16} />} 
+            <IconButton
+              type="tertiary"
+              theme="borderless"
+              icon={<Upload size={16} />}
               onClick={onImport}
               style={{ color: 'var(--workflow-text-secondary)' }}
             />
           </Tooltip>
 
           <Tooltip content={t('workflowCanvas.workflow.export')}>
-            <IconButton 
-              type="tertiary" 
-              theme="borderless" 
-              icon={<Download size={16} />} 
+            <IconButton
+              type="tertiary"
+              theme="borderless"
+              icon={<Download size={16} />}
               onClick={onExport}
               style={{ color: 'var(--workflow-text-secondary)' }}
             />

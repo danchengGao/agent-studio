@@ -1,0 +1,87 @@
+# Routing Pattern Benchmark
+# Tests IF-component-based conditional logic in workflows.
+# Pattern type: 0 (ROUTING)
+
+suite:
+  suite_name: "Routing Pattern Benchmark"
+  description: "Validates workflows that use conditional routing (IF components) to direct execution based on input conditions."
+
+tasks:
+  - task_id: "routing_positive_condition"
+    task_name: "Route on positive sentiment"
+    description: "Workflow should route to the 'positive' branch when input sentiment is positive."
+    difficulty: 0  # EASY
+    pattern_type: 0  # ROUTING
+    tags: ["routing", "if", "condition", "sentiment"]
+    trials: 3
+    input_data:
+      message: "I love this product! It works perfectly."
+      expected_branch: "positive"
+    expected_output:
+      branch: "positive"
+      contains_keyword: "positive"
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "output_contains_positive"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "positive"
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "routing_pattern_used"
+        config:
+          check_type: "pattern"
+          condition: "regex"
+          expected_value: "IF|condition|branch"
+          weight: 0.5
+
+  - task_id: "routing_negative_condition"
+    task_name: "Route on negative sentiment"
+    description: "Workflow should route to the 'negative' branch when input sentiment is negative."
+    difficulty: 0  # EASY
+    pattern_type: 0  # ROUTING
+    tags: ["routing", "if", "condition", "sentiment"]
+    trials: 3
+    input_data:
+      message: "This is terrible. I'm very disappointed."
+      expected_branch: "negative"
+    expected_output:
+      branch: "negative"
+      contains_keyword: "negative"
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "output_contains_negative"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "negative"
+          weight: 1.0
+
+  - task_id: "routing_threshold_check"
+    task_name: "Route based on numeric threshold"
+    description: "Workflow should route to 'high' branch when score > 80, else 'low' branch."
+    difficulty: 1  # MEDIUM
+    pattern_type: 0  # ROUTING
+    tags: ["routing", "numeric", "threshold"]
+    trials: 5
+    input_data:
+      score: 95
+      threshold: 80
+    expected_output:
+      branch: "high"
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "high_branch_taken"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "high"
+          weight: 1.0
+      - type: 1  # MODEL_BASED
+        name: "routing_logic_correct"
+        config:
+          model_id: null  # use default model
+          rubric: "The workflow correctly identified that score 95 exceeds threshold 80 and routed to the high branch."
+          passing_score: 0.7
+          weight: 0.5

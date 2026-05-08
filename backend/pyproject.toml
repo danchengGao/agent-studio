@@ -28,6 +28,8 @@ dependencies = [
     "psutil>=5.9.0",
     "PyYAML>=6.0",
     "alembic==1.13.1",
+    "numpy>=1.26.0",
+    "scipy>=1.13.0",
     "pymysql==1.1.1",
     "redis==7.1.0",
     "greenlet>=3.3.1",
@@ -35,7 +37,11 @@ dependencies = [
     "pymilvus<2.6.10",
     "apscheduler==3.10.4",
     "croniter==2.0.5",
+    "click>=8.0",
 ]
+
+[project.scripts]
+agenteval = "openjiuwen_studio.evaluation.cli.main:cli"
 
 [tool.uv]
 default-groups = ['dev']

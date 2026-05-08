@@ -567,7 +567,8 @@
         "appDevelopment": "应用开发",
         "promptEngineering": "提示词",
         "modelsAndData": "资源管理",
-        "plugins": "插件"
+        "plugins": "插件",
+        "evaluation": "基准测试"
       }
     }
   },

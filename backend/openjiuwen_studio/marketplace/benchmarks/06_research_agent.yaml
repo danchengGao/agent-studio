@@ -1,0 +1,148 @@
+# Example Evaluation Suite: Research / Web Search Agent
+# Domain: Information Research
+# Pattern: Orchestrator-Worker (orchestrator delegates to search workers)
+# Difficulty: Medium-Hard
+# Recommended Trials: 5
+
+suite:
+  name: "Research Agent Quality Suite"
+  description: "Evaluates research quality, source quality, synthesis, and information accuracy"
+  tags: ["research", "web-search", "orchestrator-worker", "synthesis"]
+
+tasks:
+  - task_name: "Simple Factual Lookup"
+    description: "Find and return a specific verifiable fact"
+    input_data:
+      query: "What is the current population of Tokyo?"
+    expected_output: "~13-14 million (city) or ~37-38 million (metro area)"
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["factual", "lookup"]
+    graders_config:
+      - name: "Contains a population number"
+        type: 0
+        weight: 5
+        check_type: "regex"
+        pattern: "(\\d{2}(\\.\\d+)?\\s*(million|,000,000|billion))"
+      - name: "Number in reasonable range"
+        type: 2
+        weight: 5
+        code: |
+          def grade(output, expected, context):
+              import re
+              # Extract numbers (in millions)
+              nums = re.findall(r'(\d+(?:\.\d+)?)\s*million', output.lower())
+              nums += [str(int(n.replace(',',''))/1_000_000) for n in re.findall(r'(\d{2},\d{3},\d{3})', output)]
+              for n in nums:
+                  try:
+                      val = float(n)
+                      if 10 <= val <= 45:  # Reasonable for Tokyo city or metro
+                          return {"passed": True, "score": 1.0, "reason": f"Population {val}M is reasonable for Tokyo"}
+                  except:
+                      pass
+              if nums:
+                  return {"passed": False, "score": 0.3, "reason": f"Numbers found but out of range: {nums}"}
+              return {"passed": False, "score": 0.0, "reason": "No population number found"}
+
+  - task_name: "Multi-Source Comparison"
+    description: "Compare information from multiple sources to give a balanced view"
+    input_data:
+      query: "What are the main arguments for and against nuclear energy? Provide a balanced overview."
+    expected_output: "Balanced coverage of pros (clean energy, reliability) and cons (waste, cost, risk)"
+    num_trials: 5
+    difficulty: "hard"
+    tags: ["balance", "synthesis", "multi-perspective"]
+    pattern_type: "ORCHESTRATOR_WORKER"
+    graders_config:
+      - name: "Covers pros"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(clean|low carbon|reliable|baseload|stable|efficient|benefit|advantage|advantage)"
+      - name: "Covers cons"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(waste|meltdown|expensive|cost|risk|danger|accident|radiation)"
+      - name: "Balanced presentation"
+        type: 1
+        weight: 4
+        passing_score: 0.75
+        rubric: |
+          Is this response genuinely balanced? Does it give fair representation to BOTH
+          arguments for AND arguments against nuclear energy?
+          Score 0.0-1.0. Penalize if heavily skewed to one side.
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Recent Events Research"
+    description: "Research and summarize a recent development"
+    input_data:
+      query: "What major AI developments happened in 2024? Provide 3-5 key developments."
+    expected_output: "3-5 specific AI developments from 2024 with some detail"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["current-events", "ai", "2024"]
+    graders_config:
+      - name: "Contains 2024 reference"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "2024"
+      - name: "Lists multiple developments"
+        type: 2
+        weight: 4
+        code: |
+          def grade(output, expected, context):
+              # Check for list markers
+              import re
+              bullet_count = len(re.findall(r'^\s*[-*•]\s+|\d+\.\s+', output, re.MULTILINE))
+              numbered_count = len(re.findall(r'\b(first|second|third|fourth|fifth|1\.|2\.|3\.|4\.|5\.)', output, re.IGNORECASE))
+              total = max(bullet_count, numbered_count)
+              if total >= 3:
+                  return {"passed": True, "score": min(1.0, total/5), "reason": f"Found {total} items"}
+              elif total >= 1:
+                  return {"passed": False, "score": 0.5, "reason": f"Only {total} items, need at least 3"}
+              return {"passed": False, "score": 0.0, "reason": "No list structure found"}
+      - name: "Specificity of AI developments"
+        type: 1
+        weight: 4
+        passing_score: 0.7
+        rubric: |
+          Are the AI developments mentioned specific and real-sounding?
+          (vs. vague statements like "AI improved a lot")
+          Score 0.0-1.0 based on specificity and plausibility.
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Citation Quality"
+    description: "Research response should cite sources or indicate where to verify"
+    input_data:
+      query: "What is the current global average temperature anomaly compared to pre-industrial levels?"
+    expected_output: "Temperature anomaly with source citation (IPCC, NASA, NOAA, etc.)"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["citations", "scientific", "sourcing"]
+    graders_config:
+      - name: "Contains temperature figure"
+        type: 0
+        weight: 4
+        check_type: "regex"
+        pattern: "(1\\.[0-9]|\\+[0-9]|degrees|°C|°F|celsius|warming)"
+      - name: "Cites authoritative source"
+        type: 0
+        weight: 4
+        check_type: "regex"
+        pattern: "(IPCC|NASA|NOAA|WMO|Nature|Science|according to|source|data from)"
+      - name: "No hallucinated extreme values"
+        type: 2
+        weight: 2
+        code: |
+          def grade(output, expected, context):
+              import re
+              # Temperature anomaly should be between 0.5°C and 2.5°C currently
+              values = re.findall(r'(\d+(?:\.\d+)?)\s*°?[Cc]', output)
+              for v in values:
+                  val = float(v)
+                  if val > 5.0:  # Clearly wrong
+                      return {"passed": False, "score": 0.0,
+                              "reason": f"Suspicious temperature value: {val}°C"}
+              return {"passed": True, "score": 1.0, "reason": "Temperature values within plausible range"}

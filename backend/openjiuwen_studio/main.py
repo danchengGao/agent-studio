@@ -31,6 +31,10 @@ from openjiuwen_studio.models import (
     AgentPublishDB,
     AgentWorkflowRelationDB,
     EmbeddingModelConfig,
+    EvaluationDB,
+    EvaluationTaskDB,
+    EvaluationRunDB,
+    EvaluationTaskResultDB,
     KnowledgeBaseDB,
     KnowledgeBaseDocumentDB,
     MemoryBaseDB,
@@ -119,6 +123,11 @@ async def lifespan_func(app: FastAPI):
         # Trigger tables
         TriggerDB.__table__,
         TriggerExecutionLogDB.__table__,
+        # Evaluation tables
+        EvaluationDB.__table__,
+        EvaluationTaskDB.__table__,
+        EvaluationRunDB.__table__,
+        EvaluationTaskResultDB.__table__
     ]
 
     if engine.url.drivername == "sqlite":

@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useCallback } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Database, ShoppingBag, Brain, Layers, Activity, Clock } from 'lucide-react'
+import { X, Database, ShoppingBag, Brain, Layers, Activity, Clock, FlaskConical } from 'lucide-react'
 import { Tooltip } from '@mui/material'
 import AgentIcon from '@/assets/icons/agent.svg?react'
 import WorkflowIcon from '@/assets/icons/workflow.svg?react'
@@ -80,6 +80,12 @@ const SidebarNew: React.FC<SidebarProps> = ({
           { name: t('layout.navigation.models'), href: `${basePath}/models`, icon: ModelIcon },
           { name: t('layout.navigation.knowledgeBases'), href: `${basePath}/knowledge-bases`, icon: Database },
           { name: t('layout.navigation.memoryBase'), href: `${basePath}/memory-bases`, icon: Brain },
+        ],
+      },
+      {
+        title: 'layout.navigation.section.evaluation',
+        items: [
+          { name: t('layout.navigation.evaluation', 'Evaluation'), href: `${basePath}/evaluation`, icon: FlaskConical },
         ],
       },
     ],

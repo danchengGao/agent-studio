@@ -1,0 +1,119 @@
+# Orchestrator-Worker Pattern Benchmark
+# Tests workflows using sub-workflow (SUB_WORKFLOW) delegation.
+# Pattern type: 3 (ORCHESTRATOR_WORKER)
+
+suite:
+  suite_name: "Orchestrator-Worker Pattern Benchmark"
+  description: "Validates workflows where an orchestrator delegates specialized tasks to worker sub-workflows and aggregates their outputs."
+
+tasks:
+  - task_id: "orchestrator_research_report"
+    task_name: "Orchestrate multi-section research report"
+    description: >
+      Orchestrator receives a research topic and delegates to specialized workers:
+      one for background research, one for current developments, one for future outlook.
+      Orchestrator assembles the final report.
+    difficulty: 2  # HARD
+    pattern_type: 3  # ORCHESTRATOR_WORKER
+    tags: ["orchestrator", "worker", "sub-workflow", "research", "delegation"]
+    trials: 3
+    input_data:
+      topic: "Artificial Intelligence in Drug Discovery"
+      sections: ["background", "current_developments", "future_outlook"]
+    expected_output:
+      has_background: true
+      has_current: true
+      has_future: true
+      is_coherent_report: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "report_completeness"
+        config:
+          model_id: null
+          rubric: >
+            The output is a structured research report about AI in Drug Discovery with:
+            (1) background section explaining foundational concepts,
+            (2) current developments with recent examples or advances,
+            (3) future outlook with predictions or emerging trends.
+            Each section should be substantive (not just a heading).
+          passing_score: 0.75
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "output_substantial"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: ""
+          weight: 0.3
+
+  - task_id: "orchestrator_code_review"
+    task_name: "Orchestrate multi-aspect code review"
+    description: >
+      Orchestrator coordinates parallel code review workers: security reviewer,
+      performance reviewer, and style reviewer. Consolidates findings into a report.
+    difficulty: 2  # HARD
+    pattern_type: 3  # ORCHESTRATOR_WORKER
+    tags: ["orchestrator", "worker", "code-review", "security", "performance"]
+    trials: 3
+    input_data:
+      code: |
+        def get_user(user_id):
+            query = "SELECT * FROM users WHERE id = " + user_id
+            result = db.execute(query)
+            return result
+      language: "python"
+    expected_output:
+      mentions_sql_injection: true
+      has_security_review: true
+      has_performance_review: true
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "sql_injection_detected"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "SQL injection"
+          weight: 1.0
+      - type: 1  # MODEL_BASED
+        name: "multi_perspective_review"
+        config:
+          model_id: null
+          rubric: >
+            The code review identifies the SQL injection vulnerability in the string concatenation
+            and provides feedback from multiple perspectives (security, possibly performance or style).
+            The review is actionable with specific suggestions for improvement.
+          passing_score: 0.8
+          weight: 0.8
+
+  - task_id: "orchestrator_data_pipeline"
+    task_name: "Orchestrate ETL data pipeline"
+    description: >
+      Orchestrator coordinates Extract, Transform, and Load workers sequentially,
+      passing data between stages and validating at each step.
+    difficulty: 2  # HARD
+    pattern_type: 3  # ORCHESTRATOR_WORKER
+    tags: ["orchestrator", "worker", "etl", "pipeline", "data"]
+    trials: 3
+    input_data:
+      source: "raw_sales_data"
+      records:
+        - {product: "Laptop", quantity: 5, unit_price: 999.99, date: "2024-01-15"}
+        - {product: "Mouse", quantity: 12, unit_price: 29.99, date: "2024-01-15"}
+        - {product: "Keyboard", quantity: 8, unit_price: 79.99, date: "invalid_date"}
+      transformations: ["validate", "calculate_total", "normalize_dates"]
+    expected_output:
+      valid_records: 2
+      invalid_records: 1
+      total_revenue: 5459.83
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "pipeline_correctness"
+        config:
+          model_id: null
+          rubric: >
+            The output shows that the ETL pipeline: (1) extracted 3 records,
+            (2) validated and flagged the invalid date in the Keyboard record,
+            (3) calculated totals for valid records (Laptop: 4999.95, Mouse: 359.88),
+            (4) produced a summary of valid and invalid records.
+          passing_score: 0.7
+          weight: 1.0

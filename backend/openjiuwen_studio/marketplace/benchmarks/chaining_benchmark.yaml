@@ -1,0 +1,104 @@
+# Chaining Pattern Benchmark
+# Tests sequential LLM call chains where output of one step feeds the next.
+# Pattern type: 1 (CHAINING)
+
+suite:
+  suite_name: "Chaining Pattern Benchmark"
+  description: "Validates workflows that chain multiple LLM calls sequentially, where each step transforms or enriches the previous output."
+
+tasks:
+  - task_id: "chaining_summarize_then_translate"
+    task_name: "Summarize then translate"
+    description: "Workflow should first summarize a long text, then translate the summary to French."
+    difficulty: 1  # MEDIUM
+    pattern_type: 1  # CHAINING
+    tags: ["chaining", "summarization", "translation", "sequential"]
+    trials: 3
+    input_data:
+      text: >
+        The history of computing spans several decades, beginning with mechanical calculators
+        in the 19th century and evolving through vacuum tubes, transistors, and integrated circuits
+        to today's modern microprocessors. Each era brought dramatic improvements in speed,
+        size, and cost. The invention of the personal computer in the 1970s democratized
+        computing, making it accessible to individuals and small businesses. The internet
+        revolution in the 1990s connected billions of people worldwide.
+      target_language: "French"
+    expected_output:
+      contains_french: true
+      is_shorter_than_input: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "is_french"
+        config:
+          model_id: null
+          rubric: "The final output is in French and is a condensed summary of the original English text about computing history."
+          passing_score: 0.7
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: ""
+          weight: 0.5
+
+  - task_id: "chaining_extract_then_format"
+    task_name: "Extract entities then format as JSON"
+    description: "Chain: extract named entities from text, then format them as structured JSON."
+    difficulty: 1  # MEDIUM
+    pattern_type: 1  # CHAINING
+    tags: ["chaining", "extraction", "formatting", "json"]
+    trials: 3
+    input_data:
+      text: "Apple CEO Tim Cook announced the new iPhone in San Francisco on September 12, 2024."
+    expected_output:
+      has_json: true
+      contains_apple: true
+      contains_tim_cook: true
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "output_contains_json_brackets"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "{"
+          weight: 0.5
+      - type: 0
+        name: "output_contains_apple"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "Apple"
+          weight: 0.5
+      - type: 1  # MODEL_BASED
+        name: "entities_correctly_extracted"
+        config:
+          model_id: null
+          rubric: "The output is a valid JSON structure containing named entities: Apple (organization), Tim Cook (person), San Francisco (location), September 12 2024 (date)."
+          passing_score: 0.8
+          weight: 1.0
+
+  - task_id: "chaining_three_step_pipeline"
+    task_name: "Three-step analysis pipeline"
+    description: "Chain: classify topic → generate insights → write executive summary."
+    difficulty: 2  # HARD
+    pattern_type: 1  # CHAINING
+    tags: ["chaining", "classification", "analysis", "summarization"]
+    trials: 3
+    input_data:
+      text: "Quarterly revenue increased 23% YoY driven by cloud segment growth. Operating margin improved to 31%. Customer retention rate hit 94%."
+    expected_output:
+      topic: "business/finance"
+      has_insights: true
+      has_summary: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "pipeline_quality"
+        config:
+          model_id: null
+          rubric: >
+            The output demonstrates a three-step chain: (1) identifies the text as business/financial content,
+            (2) provides meaningful insights about the company performance, and
+            (3) presents an executive summary that synthesizes the key information.
+          passing_score: 0.7
+          weight: 1.0

@@ -1,0 +1,205 @@
+# Example Evaluation Suite: Code Generation Agent
+# Domain: Software Development
+# Pattern: Mixed (chaining for complex tasks, simple for single-function)
+# Difficulty: Mixed
+# Recommended Trials: 5
+
+suite:
+  name: "Code Generation Quality Suite"
+  description: "Evaluates correctness, style, security, and completeness of generated code"
+  tags: ["code-generation", "software", "developer-tools"]
+
+tasks:
+  - task_name: "Simple Function Generation"
+    description: "Generate a Python function to calculate factorial"
+    input_data:
+      query: "Write a Python function called 'factorial' that calculates the factorial of n. Handle edge cases."
+      language: "python"
+    expected_output: "def factorial(n):"
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["python", "function", "algorithms"]
+    graders_config:
+      - name: "Has function definition"
+        type: 0
+        weight: 3
+        check_type: "contains"
+        expected_value: "def factorial"
+      - name: "Handles base case"
+        type: 2
+        weight: 4
+        code: |
+          def grade(output, expected, context):
+              has_base_case = any(phrase in output.lower() for phrase in [
+                  "if n == 0", "if n <= 0", "if n == 1", "if n <= 1",
+                  "n == 0", "n < 2", "base case"
+              ])
+              if has_base_case:
+                  return {"passed": True, "score": 1.0, "reason": "Base case handled"}
+              return {"passed": False, "score": 0.0, "reason": "No base case detected (edge case not handled)"}
+      - name: "Valid Python syntax (heuristic)"
+        type: 2
+        weight: 3
+        code: |
+          def grade(output, expected, context):
+              # Heuristic syntax check
+              required = ["def ", "return "]
+              issues = [r for r in required if r not in output]
+              if not issues:
+                  return {"passed": True, "score": 1.0, "reason": "Contains required Python constructs"}
+              return {"passed": False, "score": 0.0, "reason": f"Missing: {issues}"}
+
+  - task_name: "SQL Query Generation"
+    description: "Generate correct SQL for a given data request"
+    input_data:
+      query: "Write a SQL query to find the top 5 customers by total order amount in 2024, including their name and total"
+      schema: |
+        customers(id, name, email)
+        orders(id, customer_id, amount, created_at)
+    expected_output: "SELECT with JOIN, GROUP BY, ORDER BY, LIMIT 5"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["sql", "database", "query"]
+    graders_config:
+      - name: "Has required SQL clauses"
+        type: 2
+        weight: 5
+        code: |
+          def grade(output, expected, context):
+              output_upper = output.upper()
+              required = ["SELECT", "FROM", "ORDER BY", "LIMIT"]
+              missing = [clause for clause in required if clause not in output_upper]
+              if not missing:
+                  return {"passed": True, "score": 1.0, "reason": "All required SQL clauses present"}
+              score = 1.0 - (len(missing) / len(required))
+              return {"passed": False, "score": score,
+                      "reason": f"Missing SQL clauses: {missing}"}
+      - name: "Joins customers and orders"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(JOIN|join).*(order|customer)"
+      - name: "Limits to 5 results"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "5"
+
+  - task_name: "Security Vulnerability Detection"
+    description: "Agent should NOT generate code with SQL injection vulnerabilities"
+    input_data:
+      query: "Write a Python function to get a user from the database by their username"
+      language: "python"
+    expected_output: "Parameterized query, not string concatenation"
+    num_trials: 5
+    difficulty: "hard"
+    tags: ["security", "sql-injection", "best-practices"]
+    graders_config:
+      - name: "No SQL injection vulnerability"
+        type: 2
+        weight: 8
+        code: |
+          def grade(output, expected, context):
+              # Check for string concatenation in SQL (injection vulnerability)
+              injection_patterns = [
+                  '+ username', '+ user_name', "+ '" , '+ f"',
+                  "f'SELECT", 'f"SELECT',
+                  "% username", "% (username",
+                  ".format(username", ".format(user"
+              ]
+              for pattern in injection_patterns:
+                  if pattern.lower() in output.lower():
+                      return {"passed": False, "score": 0.0,
+                              "reason": f"SECURITY: Possible SQL injection via string concatenation: '{pattern}'"}
+              # Check for parameterized query (good)
+              safe_patterns = ["?", "%s", ":username", "$(username", "parameterized"]
+              has_safe = any(p in output for p in safe_patterns)
+              if has_safe:
+                  return {"passed": True, "score": 1.0, "reason": "Uses parameterized query (safe)"}
+              return {"passed": True, "score": 0.7, "reason": "No obvious injection, but verify manually"}
+      - name: "Function is complete"
+        type: 2
+        weight: 2
+        code: |
+          def grade(output, expected, context):
+              has_def = "def " in output
+              has_return = "return" in output
+              if has_def and has_return:
+                  return {"passed": True, "score": 1.0, "reason": "Complete function"}
+              return {"passed": False, "score": 0.3, "reason": "Incomplete function"}
+
+  - task_name: "Code Explanation Quality"
+    description: "Agent explains what a complex code snippet does"
+    input_data:
+      query: |
+        Explain this Python code:
+        ```python
+        result = list(map(lambda x: x**2, filter(lambda x: x % 2 == 0, range(10))))
+        ```
+    expected_output: "Clear explanation: squares of even numbers 0-8"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["explanation", "comprehension", "teaching"]
+    graders_config:
+      - name: "Mentions filtering even numbers"
+        type: 0
+        weight: 4
+        check_type: "regex"
+        pattern: "(even|divisible by 2|%.*2)"
+      - name: "Mentions squaring"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(square|squared|\\*\\*2|power of 2|raised to)"
+      - name: "Explanation clarity"
+        type: 1
+        weight: 3
+        passing_score: 0.8
+        rubric: |
+          Rate the clarity and accuracy of this code explanation.
+          The code computes squares of even numbers from 0 to 9 (result: [0,4,16,36,64]).
+          Score 0.0-1.0 based on accuracy and clarity.
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Unit Test Generation"
+    description: "Generate meaningful unit tests for a given function"
+    input_data:
+      query: "Write pytest unit tests for this function:\ndef divide(a, b):\n    return a / b"
+      language: "python"
+    expected_output: "Tests including: normal case, zero division error, negative numbers"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["testing", "pytest", "quality"]
+    graders_config:
+      - name: "Has test functions"
+        type: 0
+        weight: 3
+        check_type: "contains"
+        expected_value: "def test_"
+      - name: "Tests zero division"
+        type: 0
+        weight: 4
+        check_type: "regex"
+        pattern: "(ZeroDivisionError|divide.*0|0.*divide|b.*=.*0)"
+      - name: "Test quality"
+        type: 1
+        weight: 3
+        passing_score: 0.75
+        rubric: |
+          Are these unit tests comprehensive and meaningful?
+          Score 0.0-1.0 based on: edge case coverage (40%), test clarity (30%),
+          correct pytest syntax (30%). Return: {"score": float, "passed": bool, "reasoning": string}
+
+custom_metrics:
+  - name: "Security Score"
+    description: "Pass rate on security-tagged graders"
+    code: |
+      def compute(results):
+          security_results = [r for r in results if 'security' in r.get('tags', [])]
+          if not security_results:
+              return 1.0
+          passed = sum(1 for r in security_results if r['passed'])
+          return passed / len(security_results)
+    unit: "%"
+    warning_threshold: 1.0
+    failure_threshold: 0.9
