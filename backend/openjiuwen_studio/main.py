@@ -47,6 +47,8 @@ from openjiuwen_studio.models import (
     SystemLLMModelDB,
     TagDB,
     ToolBaseDB,
+    TriggerDB,
+    TriggerExecutionLogDB,
     UserDB,
     VLMModelConfig,
     WorkflowBaseDB,
@@ -114,6 +116,9 @@ async def lifespan_func(app: FastAPI):
         # Memory Base tables
         MemoryBaseDB.__table__,
         RuntimeInfoDB.__table__,
+        # Trigger tables
+        TriggerDB.__table__,
+        TriggerExecutionLogDB.__table__,
     ]
 
     if engine.url.drivername == "sqlite":
@@ -164,10 +169,28 @@ async def lifespan_func(app: FastAPI):
 
     await Runner.start()
 
+    # Initialize and start trigger scheduler
+    from openjiuwen_studio.core.scheduler.scheduler import init_scheduler
+    from openjiuwen_studio.core.scheduler.sync import sync_triggers_to_scheduler
+    from openjiuwen_studio.core.database import get_database_url
+
+    _scheduler = init_scheduler(get_database_url())
+    await sync_triggers_to_scheduler(_scheduler)
+    _scheduler.start()
+    logger.info("✅ Trigger scheduler started")
+
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down Jiuwen Agent Studio Backend...")
+
+    # Shutdown scheduler
+    from openjiuwen_studio.core.scheduler.scheduler import get_scheduler
+    try:
+        get_scheduler().shutdown(wait=False)
+        logger.info("✅ Trigger scheduler stopped")
+    except Exception as e:
+        logger.warning(f"⚠️ Error shutting down scheduler: {e}")
 
 
 # Create FastAPI app
@@ -191,7 +214,7 @@ app = FastAPI(
 class LogMiddleware:
     """
     纯 ASGI 中间件，兼容 StreamingResponse
-    
+
     不使用 BaseHTTPMiddleware，因为它与 StreamingResponse 有兼容性问题：
     当流式响应过程中发生异常时，会抛出 RuntimeError: Caught handled exception, but response already started
     """
@@ -207,7 +230,7 @@ class LogMiddleware:
         request = Request(scope, receive=receive)
         route_path = self._get_route_path(request)
         endpoint_name = self._truncate_path(route_path, max_parts=3)
-        
+
         status_code = None
         error_occurred = False
 

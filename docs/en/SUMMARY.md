@@ -60,6 +60,7 @@
     - [Debugging Prompts](4.Development%20Guide/Development%20Prompt/Debugging%20Prompts.md)
     - [Managing Prompt Versions](4.Development%20Guide/Development%20Prompt/Managing%20Prompt%20Versions.md)
   - [Plugin Management](4.Development%20Guide/Plugin%20Management.md)
+  - [Scheduled Triggers](4.Development%20Guide/Scheduled%20Triggers.md)
 - [5. Practical Tutorial](5.Practical%20Tutorial)
   - [Travel Assistant](5.Practical%20Tutorial/Travel%20Assistant.md)
   - [Financial AI Assistant](5.Practical%20Tutorial/Financial%20AI%20Assistant.md)

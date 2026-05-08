@@ -33,6 +33,8 @@ dependencies = [
     "greenlet>=3.3.1",
     "protobuf==6.33.5",
     "pymilvus<2.6.10",
+    "apscheduler==3.10.4",
+    "croniter==2.0.5",
 ]
 
 [tool.uv]

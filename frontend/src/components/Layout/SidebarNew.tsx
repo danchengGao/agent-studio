@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useCallback } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Database, ShoppingBag, Brain, Layers, Activity } from 'lucide-react'
+import { X, Database, ShoppingBag, Brain, Layers, Activity, Clock } from 'lucide-react'
 import { Tooltip } from '@mui/material'
 import AgentIcon from '@/assets/icons/agent.svg?react'
 import WorkflowIcon from '@/assets/icons/workflow.svg?react'
@@ -57,6 +57,7 @@ const SidebarNew: React.FC<SidebarProps> = ({
           { name: t('layout.navigation.agents'), href: `${basePath}/agents`, icon: AgentIcon },
           { name: t('layout.navigation.workflows'), href: `${basePath}/workflows`, icon: WorkflowIcon },
           { name: t('layout.navigation.executions'), href: `${basePath}/executions`, icon: Activity },
+          { name: t('layout.navigation.triggers'), href: `${basePath}/triggers`, icon: Clock },
         ],
       },
       {

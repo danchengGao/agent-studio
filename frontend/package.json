@@ -63,6 +63,7 @@
     "class-variance-authority": "^0.7.1",
     "classnames": "^2.5.1",
     "clsx": "^2.1.1",
+    "cronstrue": "^2.50.0",
     "dayjs": "^1.11.15",
     "diff": "^8.0.2",
     "dompurify": "^3.3.1",

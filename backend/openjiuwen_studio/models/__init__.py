@@ -20,6 +20,7 @@ from .workflow import WorkflowBaseDB, WorkflowPublishDB
 from .workflow_execution import WorkflowExecutionDB, WorkflowExecutionDetailsDB
 from .memory_base import MemoryBaseDB
 from .runtime_info import RuntimeInfoDB
+from .trigger import TriggerDB, TriggerExecutionLogDB
 
 __all__ = [
     "ModelConfig",
@@ -52,5 +53,7 @@ __all__ = [
     "SystemEmbeddingModelDB",
     "SystemLLMModelDB",
     "MemoryBaseDB",
-    "RuntimeInfoDB"
+    "RuntimeInfoDB",
+    "TriggerDB",
+    "TriggerExecutionLogDB"
 ]

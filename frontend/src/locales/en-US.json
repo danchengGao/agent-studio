@@ -548,6 +548,7 @@
       "models": "Models",
       "knowledgeBases": "Knowledge Bases",
       "memoryBase": "Memory Bases",
+      "triggers": "Triggers",
       "plugins": "Plugins",
       "pluginManagement": "Plugin Management",
       "pluginMarket": "Plugin Market",
@@ -5110,6 +5111,93 @@
     "policy": {
       "paragraph1": "This platform is <bold>for trial and demonstration purposes only</bold>. Please do not upload, enter, or submit real personal information (including but not limited to name, ID number, phone number, bank card information, address, social media accounts, sensitive business data, etc.).",
       "paragraph2": "The platform will <bold>periodically clean up</bold> usage data. Please <bold>make good use of the export function to back up and properly save important data</bold> during use, to avoid data loss or inability to recover due to data cleanup, or service adjustments."
+    }
+  },
+  "triggers": {
+    "title": "Triggers",
+    "create": "New Trigger",
+    "empty": "No triggers yet. Create one to start automating.",
+    "types": {
+      "cron": "Cron",
+      "webhook": "Webhook",
+      "polling": "Polling"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "executionStatus": {
+      "success": "Success",
+      "error": "Error",
+      "skipped": "Skipped",
+      "running": "Running"
+    },
+    "firedBy": {
+      "scheduler": "Scheduler",
+      "webhook": "Webhook",
+      "poll": "Poll",
+      "manual": "Manual"
+    },
+    "form": {
+      "name": "Name",
+      "description": "Description",
+      "status": "Status",
+      "targetType": "Target Type",
+      "target": "Target",
+      "targetVersion": "Version",
+      "targetVersionHint": "Use 'draft' for the latest unpublished version",
+      "inputPayload": "Input Payload",
+      "addInputRow": "Add Input",
+      "triggerType": "Trigger Type",
+      "cronExpression": "Cron Expression",
+      "cronExpressionInvalid": "Invalid cron expression",
+      "cronPreview": "Runs: {{preview}}",
+      "webhookUrl": "Inbound URL",
+      "webhookUrlPending": "URL available after saving",
+      "webhookUrlPendingHint": "Save the trigger first to get the inbound URL.",
+      "webhookCopy": "Copy URL",
+      "webhookCopied": "Copied!",
+      "webhookSecret": "HMAC Secret (optional)",
+      "webhookSecretHint": "Leave empty to accept all POST requests",
+      "pollUrl": "Poll URL",
+      "pollInterval": "Check every",
+      "pollLastChecked": "Last checked",
+      "pollLastHash": "Last content hash",
+      "pollNeverChecked": "Never checked",
+      "saveAndActivate": "Save & Activate",
+      "save": "Save"
+    },
+    "executionHistory": {
+      "title": "Execution History",
+      "startedAt": "Started",
+      "duration": "Duration",
+      "status": "Status",
+      "firedBy": "Fired By",
+      "viewTrace": "View Trace",
+      "noLogs": "No executions yet"
+    },
+    "messages": {
+      "created": "Trigger created",
+      "updated": "Trigger updated",
+      "deleted": "Trigger deleted",
+      "activated": "Trigger activated",
+      "deactivated": "Trigger deactivated",
+      "runQueued": "Execution queued",
+      "deleteFailed": "Failed to delete trigger",
+      "saveFailed": "Failed to save trigger"
+    },
+    "deleteConfirm": {
+      "title": "Delete Trigger",
+      "message": "Are you sure you want to delete \"{{name}}\"? This will also delete all execution history."
+    },
+    "intervals": {
+      "60": "1 minute",
+      "300": "5 minutes",
+      "900": "15 minutes",
+      "1800": "30 minutes",
+      "3600": "1 hour",
+      "21600": "6 hours",
+      "86400": "24 hours"
     }
   }
 }

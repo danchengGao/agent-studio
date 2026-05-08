@@ -81,6 +81,12 @@ def get_space_list(current_user: dict) -> List[SpaceInfo]:
 def check_user_space(space_id: str, current_user: dict) -> SpaceInfo:
     """check the access by space id"""
     try:
+        # Trigger-fired executions run as system_trigger — bypass space check
+        user_data = current_user.get("data") or {}
+        if user_data.get("user_id_str") == "system_trigger":
+            # Return a minimal SpaceInfo for system trigger - no validation needed
+            return SpaceInfo(space_id=space_id, space_name="System Trigger", is_default=False)
+
         space_info_list = get_space_list(current_user)
         space_info = None
         for space in space_info_list:

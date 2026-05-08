@@ -360,6 +360,20 @@ export const API_ENDPOINTS = {
     LIST: '/deepsearch-knowledge-base/knowledge-base/list',
     EMBEDDING_CONFIGS_LIST: '/deepsearch-knowledge-base/embedding-configs/list',
   },
+  // 触发器管理
+  TRIGGERS: {
+    CREATE: '/triggers/create',
+    LIST: '/triggers/list',
+    GET: '/triggers/get',
+    UPDATE: '/triggers/update',
+    DELETE: '/triggers/delete',
+    ACTIVATE: '/triggers/activate',
+    DEACTIVATE: '/triggers/deactivate',
+    RUN: '/triggers/run',
+    EXECUTION_LOGS: '/triggers/execution_logs',
+    EXECUTION_LOG_DETAIL: '/triggers/execution_log_detail',
+  },
+
   // 记忆库管理
   MEMORY_BASES: {
     CREATE: '/memory/repo/create',

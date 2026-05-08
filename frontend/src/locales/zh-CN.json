@@ -559,6 +559,7 @@
       "models": "模型管理",
       "knowledgeBases": "知识库管理",
       "memoryBase": "记忆库管理",
+      "triggers": "触发器",
       "plugins": "插件管理",
       "pluginManagement": "插件管理",
       "pluginMarket": "插件市场",
@@ -5107,6 +5108,93 @@
     "policy": {
       "paragraph1": "本平台<bold>仅用于用户体验使用</bold>，请勿上传、录入或提交真实个人隐私信息（包括但不限于姓名、身份证号、手机号、银行卡信息、住址、社交账号、敏感业务数据等）。",
       "paragraph2": "平台将对相关使用数据进行<bold>定期清理</bold>，请您在使用过程中<bold>善用系统导出功能，及时备份、妥善保存重要数据</bold>，避免因数据清理、服务调整等原因造成数据丢失或无法恢复。"
+    }
+  },
+  "triggers": {
+    "title": "触发器",
+    "create": "新建触发器",
+    "empty": "暂无触发器，创建一个以开始自动化。",
+    "types": {
+      "cron": "定时",
+      "webhook": "Webhook",
+      "polling": "轮询"
+    },
+    "status": {
+      "active": "已启用",
+      "inactive": "已禁用"
+    },
+    "executionStatus": {
+      "success": "成功",
+      "error": "失败",
+      "skipped": "跳过",
+      "running": "运行中"
+    },
+    "firedBy": {
+      "scheduler": "调度器",
+      "webhook": "Webhook",
+      "poll": "轮询",
+      "manual": "手动"
+    },
+    "form": {
+      "name": "名称",
+      "description": "描述",
+      "status": "状态",
+      "targetType": "目标类型",
+      "target": "目标",
+      "targetVersion": "版本",
+      "targetVersionHint": "使用 'draft' 表示最新未发布版本",
+      "inputPayload": "输入参数",
+      "addInputRow": "添加参数",
+      "triggerType": "触发器类型",
+      "cronExpression": "Cron 表达式",
+      "cronExpressionInvalid": "Cron 表达式无效",
+      "cronPreview": "执行时间：{{preview}}",
+      "webhookUrl": "入站 URL",
+      "webhookUrlPending": "保存后获取 URL",
+      "webhookUrlPendingHint": "请先保存触发器以获取入站 URL。",
+      "webhookCopy": "复制 URL",
+      "webhookCopied": "已复制！",
+      "webhookSecret": "HMAC 密钥（可选）",
+      "webhookSecretHint": "留空则接受所有 POST 请求",
+      "pollUrl": "轮询 URL",
+      "pollInterval": "检查间隔",
+      "pollLastChecked": "上次检查",
+      "pollLastHash": "上次内容哈希",
+      "pollNeverChecked": "从未检查",
+      "saveAndActivate": "保存并启用",
+      "save": "保存"
+    },
+    "executionHistory": {
+      "title": "执行历史",
+      "startedAt": "开始时间",
+      "duration": "耗时",
+      "status": "状态",
+      "firedBy": "触发方式",
+      "viewTrace": "查看追踪",
+      "noLogs": "暂无执行记录"
+    },
+    "messages": {
+      "created": "触发器已创建",
+      "updated": "触发器已更新",
+      "deleted": "触发器已删除",
+      "activated": "触发器已启用",
+      "deactivated": "触发器已禁用",
+      "runQueued": "执行已加入队列",
+      "deleteFailed": "删除触发器失败",
+      "saveFailed": "保存触发器失败"
+    },
+    "deleteConfirm": {
+      "title": "删除触发器",
+      "message": "确定要删除 \"{{name}}\" 吗？此操作将同时删除所有执行历史记录。"
+    },
+    "intervals": {
+      "60": "1 分钟",
+      "300": "5 分钟",
+      "900": "15 分钟",
+      "1800": "30 分钟",
+      "3600": "1 小时",
+      "21600": "6 小时",
+      "86400": "24 小时"
     }
   }
 }
