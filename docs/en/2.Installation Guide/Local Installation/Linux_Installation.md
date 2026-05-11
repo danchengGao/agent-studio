@@ -600,6 +600,17 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
    - **local mode**: Code runs directly on the host.
    - **sandbox mode**: Code runs inside a bwrap sandbox with isolation and security restrictions.
 
+   For sandbox mode, install the required system packages and prepare the execution user used by bwrap child processes:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y bubblewrap iptables libcap2-bin nodejs util-linux
+   sudo useradd --create-home --shell /usr/sbin/nologin sandbox-exec || true
+   if [ -f /usr/sbin/xtables-nft-multi ]; then sudo setcap cap_net_admin+ep /usr/sbin/xtables-nft-multi; fi
+   if [ -f /usr/sbin/xtables-legacy-multi ]; then sudo setcap cap_net_admin+ep /usr/sbin/xtables-legacy-multi; fi
+   sudo setcap cap_setuid,cap_setgid+ep /usr/bin/setpriv
+   ```
+
    Using `sandbox_server/sandbox/.env.example` as a reference, create a `.env` file under `sandbox_server/sandbox`. Example:
 
    ```env
@@ -624,6 +635,8 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
      uts: True
      cgroup: True
 
+   allow_internal_network_access: false
+
    mount:
      [
        {src: '/lib', dst: '/lib', mode: 'read'},
@@ -631,6 +644,8 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
        {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
        {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
        {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
+       {src: '/usr/local/bin', dst: '/usr/local/bin', mode: 'read'},
+       {src: '/usr/local/lib', dst: '/usr/local/lib', mode: 'read'},
        {src: '/etc/resolv.conf', dst: '/etc/resolv.conf', mode: 'read'},
        {src: '/usr/share/nodejs', dst: '/usr/share/nodejs', mode: 'read'},
        {src: '/dev/urandom', dst: '/dev/urandom', mode: 'dev'},
@@ -641,14 +656,14 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
      path: bwrap
 
    environment:
-     PATH: /bin:/usr/bin
+     PATH: /bin:/usr/bin:/usr/local/bin
 
    timeout: 10
 
    options: ['--proc', '/proc']
    ```
 
-   **Parameter descriptions**: `seccomp` is the syscall allowlist for processes inside the sandbox; `namespace` lists namespaces to isolate; `mount` maps host directories into the sandbox (`read` / `write` / `dev` mean read-only, read-write, and device mapping); `sandbox` sets the sandbox type and executable path (only `bubblewrap` is supported today); `environment` sets environment variables for sandbox processes; `timeout` is the maximum execution time in seconds per task (tasks are terminated when exceeded); `options` are extra arguments passed to `bwrap`.
+   **Parameter descriptions**: `seccomp` is the syscall allowlist for processes inside the sandbox; `namespace` lists namespaces to isolate; `allow_internal_network_access` controls whether bwrap child processes can access internal/private networks. When set to `false`, the sandbox server installs `iptables`/`ip6tables` owner-match rules for the `sandbox-exec` user, blocking private, loopback, and link-local destinations while preserving DNS access and the server process's own network access; `mount` maps host directories into the sandbox (`read` / `write` / `dev` mean read-only, read-write, and device mapping); `sandbox` sets the sandbox type and executable path (only `bubblewrap` is supported today); `environment` sets environment variables for sandbox processes; `timeout` is the maximum execution time in seconds per task (tasks are terminated when exceeded); `options` are extra arguments passed to `bwrap`.
 
    When configuration is complete, run `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py` to start the sandbox service.
 
