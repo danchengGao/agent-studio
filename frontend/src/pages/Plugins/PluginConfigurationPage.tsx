@@ -251,29 +251,42 @@ const PluginConfigurationPage: React.FC = () => {
       const pluginResponse = await PluginService.getPlugin(request)
 
       const pluginInfo = pluginResponse.code === 200 ? pluginResponse.data.plugin_info : null
-      const isMcpPlugin = Number(pluginInfo?.plugin_type || 0) === 3
-      const toolsResponse = isMcpPlugin
-        ? await PluginService.getPluginMcpToolsList({
+      const pluginType = Number(pluginInfo?.plugin_type || 0)
+      const isCodePlugin = pluginType === 2
+      const isMcpPlugin = pluginType === 3
+      const toolsResponse = isCodePlugin
+        ? await PluginService.getPluginCodeList({
             space_id: getDefaultSpaceId(),
             plugin_id: plugin_id,
             page: 1,
             size: 100,
           })
-        : await PluginService.getPluginApiList({
-            space_id: getDefaultSpaceId(),
-            plugin_id: plugin_id,
-            page: 1,
-            size: 100,
-          })
+        : isMcpPlugin
+          ? await PluginService.getPluginMcpToolsList({
+              space_id: getDefaultSpaceId(),
+              plugin_id: plugin_id,
+              page: 1,
+              size: 100,
+            })
+          : await PluginService.getPluginApiList({
+              space_id: getDefaultSpaceId(),
+              plugin_id: plugin_id,
+              page: 1,
+              size: 100,
+            })
 
       if (pluginResponse.code === 200 && pluginInfo) {
-        const apiInfo = isMcpPlugin
+        const apiInfo = isCodePlugin
           ? toolsResponse.code === 200
-            ? toolsResponse.data?.mcp_info || []
+            ? toolsResponse.data?.code_info || []
             : []
-          : toolsResponse.code === 200
-            ? toolsResponse.data?.api_info || []
-            : []
+          : isMcpPlugin
+            ? toolsResponse.code === 200
+              ? toolsResponse.data?.mcp_info || []
+              : []
+            : toolsResponse.code === 200
+              ? toolsResponse.data?.api_info || []
+              : []
         const enrichedPluginInfo = {
           ...pluginInfo,
           api_info: apiInfo,
