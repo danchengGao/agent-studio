@@ -293,14 +293,7 @@ const PluginConfigurationPage: React.FC = () => {
 
         const pluginLevelParams = Array.isArray(pluginInfo.request_params) ? pluginInfo.request_params : []
         const pluginHeaderParams = pluginLevelParams.filter((param: any) => Number(param?.method) === 1)
-        const pluginNonHeaderParams = pluginLevelParams.filter((param: any) => Number(param?.method) !== 1)
-        const fallbackParams = apiInfo.flatMap((tool: any) => Array.isArray(tool.request_params) ? tool.request_params : [])
-        const dbRequestParams = pluginLevelParams.filter((param: any) => Number(param?.method) !== 1)
-        const dedupedFallbackParams = fallbackParams.filter((param: any) => {
-          const paramName = String(param?.name || '')
-          return paramName && !dbRequestParams.some((dbParam: any) => String(dbParam?.name || '') === paramName)
-        })
-        const derivedPluginParams = [...dbRequestParams, ...dedupedFallbackParams]
+        const derivedPluginParams = pluginLevelParams.filter((param: any) => Number(param?.method) !== 1)
         const rawHeaderConfiguration =
           pluginHeaderParams.length > 0
             ? null
