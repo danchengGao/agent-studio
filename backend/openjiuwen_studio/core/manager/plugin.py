@@ -30,6 +30,7 @@ except ImportError:
     JSONSCHEMA_AVAILABLE = False
     logger.warning("jsonschema library not available, plugin validation will be skipped")
 
+from openjiuwen_studio.core.common.mcp_transport_utils import merge_mcp_server_url_query_params
 from openjiuwen_studio.core.common.url_validator import validate_plugin_url
 from openjiuwen_studio.core.database import milliseconds, get_minio_client
 import openjiuwen_studio.core.manager.convertor.plugin as convert
@@ -314,6 +315,7 @@ class _McpConnectionConfig:
     url: str
     params: Dict[str, Any] = field(default_factory=dict)
     auth_headers: Optional[Dict[str, str]] = field(default_factory=dict)
+    auth_query_params: Dict[str, str] = field(default_factory=dict)
 
 
 def _validate_network_url(url: str, transport_label: str) -> None:
@@ -451,6 +453,7 @@ async def _discover_and_create_mcp_tools(
         client_type=client_type,
         params=mcp_params,
         auth_headers=config.auth_headers or {},
+        auth_query_params=config.auth_query_params or {},
     )
 
     if mcp_transport_enum == PluginMcpTransport.PLUGIN_MCP_TRANSPORT_STDIO:
@@ -742,11 +745,7 @@ def plugin_discover_mcp_tools(
             f"for plugin '{req.plugin_id}': {list(auth_headers.keys())}"
         )
     auth_query = _extract_auth_query(data_dict, resolved_auth=resolved_auth)
-    if auth_query and isinstance(url, str) and url:
-        parsed_url = urllib.parse.urlparse(url)
-        merged_query = dict(urllib.parse.parse_qsl(parsed_url.query, keep_blank_values=True))
-        merged_query.update(auth_query)
-        url = urllib.parse.urlunparse(parsed_url._replace(query=urllib.parse.urlencode(merged_query)))
+    url, auth_query_params = merge_mcp_server_url_query_params(url, auth_query)
 
     is_stdio = transport == PluginMcpTransport.PLUGIN_MCP_TRANSPORT_STDIO
     if is_stdio and not mcp_params.get("command"):
@@ -781,6 +780,7 @@ def plugin_discover_mcp_tools(
                 url=url,
                 params=mcp_params,
                 auth_headers=auth_headers,
+                auth_query_params=auth_query_params,
             ),
             plugin_id=req.plugin_id,
             space_id=req.space_id,
