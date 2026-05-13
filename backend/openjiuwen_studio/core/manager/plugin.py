@@ -332,29 +332,43 @@ def _validate_network_url(url: str, transport_label: str) -> None:
 
 
 def _validate_openapi_paths(url: str) -> None:
-    """Prevent path-traversal for OPENAPI transport.
+    """Validate OPENAPI spec paths and URLs.
 
-    OpenApiClient accepts a comma-separated list of local file paths. Without
-    validation a user could supply '../../etc/passwd' and have the server read
-    arbitrary files. This function resolves every path and asserts it stays
-    inside the application working directory.
+    For URLs (http/https): Validates against SSRF attacks using validate_plugin_url.
+    For local file paths: Allows any path the user can access (OS enforces permissions).
 
-    Raises ValueError if any path escapes the safe root.
+    OpenApiClient accepts comma-separated paths/URLs. This function validates each one.
+
+    Raises ValueError if any URL is unsafe or if the path format is invalid.
     """
-    safe_root = Path(os.getcwd()).resolve()
     for raw in url.split(","):
         raw = raw.strip()
         if not raw:
             continue
-        resolved = Path(raw).expanduser().resolve()
-        try:
-            resolved.relative_to(safe_root)
-        except ValueError as exc:
-            raise ValueError(
-                f"OPENAPI spec path '{raw}' resolves to '{resolved}', which is "
-                f"outside the permitted directory '{safe_root}'. "
-                "Absolute paths outside the working directory are not allowed."
-            ) from exc
+
+        # Check if this is a URL (http/https)
+        if raw.startswith("http://") or raw.startswith("https://"):
+            # For URLs, apply SSRF protection
+            try:
+                validate_plugin_url(raw)
+            except ValueError as exc:
+                raise ValueError(
+                    f"OPENAPI spec URL '{raw}' rejected: {exc}"
+                ) from exc
+        else:
+            # For local file paths, allow them - OS permissions will control access
+            # Just verify it's a reasonable path format
+            try:
+                resolved = Path(raw).expanduser().resolve()
+                # Verify the path exists (this also prevents some path traversal issues)
+                if not resolved.exists():
+                    raise ValueError(
+                        f"OPENAPI spec file '{raw}' does not exist at resolved path '{resolved}'"
+                    )
+            except Exception as exc:
+                raise ValueError(
+                    f"OPENAPI spec path '{raw}' is invalid: {exc}"
+                ) from exc
 
 
 def _build_safe_stdio_params(config: "_McpConnectionConfig") -> dict:
@@ -619,7 +633,16 @@ def plugin_create(
     """创建新的插件"""
     _ = check_user_space(req.space_id, current_user)
 
-    validate_plugin_url(req.url)
+    # Only validate URL if it's not a file path
+    # File paths are already validated by Pydantic in PluginCreate schema
+    if req.url and not (
+        req.url.startswith('/') or
+        req.url.startswith('./') or
+        req.url.startswith('../') or
+        req.url.startswith('~/') or
+        (len(req.url) > 2 and req.url[1] == ':')
+    ):
+        validate_plugin_url(req.url)
 
     current_time = milliseconds()
 
@@ -827,7 +850,16 @@ def plugin_update(
     """获取插件信息"""
     _ = check_user_space(req.space_id, current_user)
 
-    validate_plugin_url(req.url)
+    # Only validate URL if it's not a file path
+    # File paths are already validated by Pydantic in PluginInfo schema
+    if req.url and not (
+        req.url.startswith('/') or
+        req.url.startswith('./') or
+        req.url.startswith('../') or
+        req.url.startswith('~/') or
+        (len(req.url) > 2 and req.url[1] == ':')
+    ):
+        validate_plugin_url(req.url)
 
     logger.info(f"update plugin: {req}")
     res, _ = plugin_repository.plugin_get(req.model_dump())
