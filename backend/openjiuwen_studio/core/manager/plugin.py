@@ -1498,6 +1498,8 @@ def plugin_list_api(
     api_infos: List[PluginApiInfo] = []
     for info_dict in tool_list:
         logger.info(f"tool: {info_dict}")
+        if info_dict.get('plugin_type') != PluginType.PLUGIN_TYPE_CLOUD_API:
+            continue
         if 'available' not in info_dict or info_dict.get('available') is None:
             info_dict['available'] = True
 
@@ -1637,6 +1639,8 @@ def plugin_list_code(
 
     code_infos: List[PluginCodeInfo] = []
     for info_dict in tool_list:
+        if info_dict.get('plugin_type') != PluginType.PLUGIN_TYPE_CLOUD_CODE:
+            continue
         info = PluginCodeInfo(**info_dict)
         if info.plugin_id == req.plugin_id:
             code_infos.append(info)
@@ -1770,6 +1774,8 @@ def plugin_list_mcp_tools(
 
     mcp_infos: List[PluginMcpInfo] = []
     for info_dict in tool_list:
+        if info_dict.get('plugin_type') != PluginType.PLUGIN_TYPE_CLOUD_MCP:
+            continue
         if 'input_parameters' in info_dict and info_dict['input_parameters']:
             request_params = _input_parameters_to_request_params(info_dict['input_parameters'])
             info_dict['request_params'] = [param.model_dump() for param in request_params]
