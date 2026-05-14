@@ -172,6 +172,10 @@ def trigger_update(req: TriggerUpdate, current_user: dict) -> ResponseModel:
                 trigger.name = req.name
             if req.description is not None:
                 trigger.description = req.description
+            if req.target_type is not None:
+                trigger.target_type = req.target_type
+            if req.target_id is not None:
+                trigger.target_id = req.target_id
             if req.target_version is not None:
                 trigger.target_version = req.target_version
             if req.input_payload is not None:
