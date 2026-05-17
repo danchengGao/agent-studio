@@ -163,7 +163,10 @@ const TriggerFormPage: React.FC = () => {
       target_type: targetType,
       target_id: targetId,
       target_version: targetVersion || 'draft',
-      input_payload: Object.keys(input_payload).length > 0 ? input_payload : undefined,
+        // In edit mode always send the dict (even if empty {}) so the backend
+      // "is not None" guard fires and clears the stored payload.
+      // In create mode undefined is fine — the backend defaults to null.
+      input_payload: Object.keys(input_payload).length > 0 ? input_payload : (isEditMode ? {} : undefined),
     }
 
     if (triggerType === 'cron') {
