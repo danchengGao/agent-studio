@@ -633,6 +633,7 @@ const ToolConfigurationPage: React.FC = () => {
       return {
         space_id: getDefaultSpaceId(),
         plugin_id: plugin_id || '',
+        plugin_type: 2,
         tool_id: tool.tool_id,
         name: tool.name,
         desc: tool.description,
