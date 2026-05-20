@@ -30,7 +30,8 @@ from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, 
 from openjiuwen_studio.core.manager.memory import delete_user_variable, delete_longterm_mem, update_user_variable, \
     update_longterm_mem, get_longterm_mem, get_user_variable, delete_longterm_mem_by_scope_id
 
-from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, WorkflowErrorData, ErrorNodeInfo
+from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, \
+                                                WorkflowErrorData, ErrorNodeInfo
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponseType
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
@@ -512,8 +513,7 @@ async def list_active_executions(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list active executions") from e
 
 
-@execution_router.post("/get_running_traces", response_model=ResponseModel[list[TraceSummaryBriefWithStatus]],
-                       response_model_by_alias=False)
+@execution_router.post("/get_running_traces")
 async def get_running_traces(
         request: Dict,
         current_user: dict = Depends(get_current_user)

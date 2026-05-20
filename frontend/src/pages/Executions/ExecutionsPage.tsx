@@ -18,6 +18,7 @@ const ExecutionsPage: React.FC = () => {
   const [runningTraces, setRunningTraces] = useState<TraceSummaryBriefWithStatus[]>([])
   const [activeExecutions, setActiveExecutions] = useState<ActiveExecution[]>([])
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null)
+  const [timeOffset, setTimeOffset] = useState<number>(0)
   const [selectedDetail, setSelectedDetail] = useState<WaterfallDetail | null>(null)
   const [listLoading, setListLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -48,7 +49,11 @@ const ExecutionsPage: React.FC = () => {
   const loadRunningTraces = useCallback(async (forceUpdate = false) => {
     try {
       const res = await ExecutionPanelService.getRunningTraces(spaceId, activeTab)
-      const newRunningTraces = res?.data || []
+      const newRunningTraces = res?.data?.traces || []
+      // Calculate clock offset: positive means browser is ahead of server
+      if (res?.data?.server_time_ms) {
+        setTimeOffset(Date.now() - res.data.server_time_ms)
+      }
       // Only update if data changed to prevent unnecessary re-renders
       setRunningTraces(prev => {
         if (!forceUpdate && isEqual(prev, newRunningTraces)) {
@@ -290,6 +295,7 @@ const ExecutionsPage: React.FC = () => {
             activeExecutions={activeTab === 'WORKFLOW' ? activeExecutions : []}
             selectedTraceId={selectedTraceId}
             onSelect={setSelectedTraceId}
+            timeOffset={timeOffset}
             isLoading={listLoading}
           />
         </div>

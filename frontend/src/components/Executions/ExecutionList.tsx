@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import dayjs from 'dayjs'
 import type { TraceSummaryBriefWithStatus, ActiveExecution } from '@test-agentstudio/api-client'
 import ExecutionStatusBadge from './ExecutionStatusBadge'
@@ -10,6 +10,7 @@ interface ExecutionListProps {
   selectedTraceId: string | null
   onSelect: (traceId: string) => void
   isLoading: boolean
+  timeOffset?: number
 }
 
 const formatDuration = (ms?: number): string => {
@@ -20,9 +21,9 @@ const formatDuration = (ms?: number): string => {
   return `${(n / 60000).toFixed(1)}m`
 }
 
-const formatElapsed = (startTime?: number): string => {
+const formatElapsed = (startTime?: number, timeOffset?: number): string => {
   if (!startTime) return '-'
-  const elapsed = Math.floor((Date.now() / 1000 - startTime) * 1000)
+  const elapsed = Math.floor((Date.now() / 1000 - startTime) * 1000) - (timeOffset || 0)
   return formatDuration(elapsed)
 }
 
@@ -32,7 +33,20 @@ const ExecutionList: React.FC<ExecutionListProps> = React.memo(({
   selectedTraceId,
   onSelect,
   isLoading,
+  timeOffset,
 }) => {
+  // Tick every second to update elapsed time for running executions
+  const [, setTick] = useState(0)
+  const hasRunning = useMemo(() =>
+    traces.some(t => t.status === 'running' || t.status === 'start') || activeExecutions.length > 0,
+    [traces, activeExecutions]
+  )
+  useEffect(() => {
+    if (!hasRunning) return
+    const id = setInterval(() => setTick(t => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [hasRunning])
+
   // Merge active executions as synthetic "running" entries at the top
   const mergedList = useMemo(() => {
     // Create synthetic entries for active executions not already in the trace list
@@ -47,9 +61,7 @@ const ExecutionList: React.FC<ExecutionListProps> = React.memo(({
         create_time: exec.start_time
           ? new Date(exec.start_time * 1000).toISOString()
           : new Date().toISOString(),
-        duration: exec.start_time
-          ? Math.floor((Date.now() / 1000 - exec.start_time) * 1000)
-          : undefined,
+        duration: undefined,
         status: 'running',
       }))
 
@@ -96,6 +108,7 @@ const ExecutionList: React.FC<ExecutionListProps> = React.memo(({
       {mergedList.map(trace => {
         const isSelected = trace.trace_id === selectedTraceId
         const isRunning = trace.status === 'running' || trace.status === 'start'
+        if (isRunning) console.log(trace)
 
         return (
           <div
@@ -109,7 +122,8 @@ const ExecutionList: React.FC<ExecutionListProps> = React.memo(({
             `}
           >
             <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-medium text-gray-800 truncate" title={trace.business_name || trace.business_id}>
+              <span className="text-sm font-medium text-gray-800 truncate"
+                title={trace.business_name || trace.business_id}>
                 {trace.business_name || trace.business_id.slice(0, 8) + '...'}
               </span>
               <ExecutionStatusBadge status={trace.status} />
@@ -117,16 +131,25 @@ const ExecutionList: React.FC<ExecutionListProps> = React.memo(({
             <div className="flex items-center justify-between text-xs text-gray-400">
               <span>{dayjs(trace.create_time).format('MM/DD HH:mm:ss')}</span>
               <span className="font-mono">
-                {isRunning ? formatElapsed(
-                  trace.create_time ? new Date(trace.create_time).getTime() / 1000 : undefined
-                ) : formatDuration(trace.duration)}
+                {isRunning
+                  ? (trace.elapsed_ms != null && trace.elapsed_ms > 0
+                      ? formatDuration(trace.elapsed_ms)
+                      : formatElapsed(trace.create_time ? 
+                        new Date(trace.create_time).getTime() / 1000 : undefined, timeOffset))
+                  : formatDuration(trace.duration)}
               </span>
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
               <span>{trace.business_type === 'WORKFLOW' ? 'Workflow' : 'Agent'}</span>
               {trace.business_version && trace.business_version !== 'draft' && (
                 <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" strokeWidth="2" 
+                    strokeLinecap="round" strokeLinejoin="round" 
+                    className="shrink-0">
+                      <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/>
+                      <path d="M7 7h.01"/>
+                  </svg>
                   <span>{trace.business_version}</span>
                 </>
               )}

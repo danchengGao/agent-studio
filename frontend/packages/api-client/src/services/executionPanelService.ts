@@ -10,7 +10,10 @@ import type {
 export interface TraceSummaryBySpaceResponse {
   code: number
   message: string
-  data: TraceSummaryBriefWithStatus[]
+  data: {
+    traces: TraceSummaryBriefWithStatus[]
+    server_time_ms: number
+  }
 }
 
 export interface ActiveExecutionsResponse {
@@ -93,7 +96,7 @@ export class ExecutionPanelService {
       return response.data
     } catch (e: any) {
       if (e?.response?.status === 404) {
-        return { code: 200, message: 'No data', data: [] }
+        return { code: 200, message: 'No data', data: { traces: [], server_time_ms: 0 } }
       }
       throw e
     }

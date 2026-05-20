@@ -977,6 +977,7 @@ export interface TraceSummaryBriefWithStatus {
   business_version?: string
   business_type: 'WORKFLOW' | 'AGENT'
   create_time: string
+  elapsed_ms?: number
   duration?: number
   status?: string
 }

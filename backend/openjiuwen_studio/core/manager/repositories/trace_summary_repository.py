@@ -348,6 +348,7 @@ def _extract_summary_execution_info_from_trace_detail(
 
 def _extract_agent_execution_info_from_trace_detail(
     trace_details: List[Dict[str, Any]],
+    is_live: bool = False,
 ) -> List[InvokeExecuteInfo]:
     execute_info_list: List[InvokeExecuteInfo] = []
     running_components: Dict[str, InvokeExecuteInfo] = {}
@@ -403,11 +404,11 @@ def _extract_agent_execution_info_from_trace_detail(
                     component_execute_info.duration = duration
             component_execute_info.outputs = _normalize_dict_field(detail.get("output"))
         else:
-            component_execute_info.status = "interrupted"
+            component_execute_info.status = "running" if is_live else "interrupted"
 
         # For any workflow component, add its associated studio_agent_workflow components
-        if (detail and 
-            detail.get("platform_type") == "studio_agent" and 
+        if (detail and
+            detail.get("platform_type") == "studio_agent" and
             detail.get("span_type") == "workflow"):
             # Get workflow's time range
             workflow_start = detail.get("start_time_micros")
@@ -1074,17 +1075,21 @@ class TraceSummaryRepository:
             )
 
             rows = db.execute(stmt).all()
+            now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
             data_list = []
             for row in rows:
                 start_micros = row.start_time_micros
                 create_time = None
+                elapsed_ms = None
                 if start_micros:
                     create_time = datetime.fromtimestamp(start_micros / 1_000_000, tz=timezone.utc)
+                    elapsed_ms = now_ms - int(start_micros // 1000)
                 data_list.append({
                     "trace_id": row.trace_id,
                     "business_id": row.business_id,
                     "business_type": row.business_type,
                     "create_time": create_time,
+                    "elapsed_ms": elapsed_ms,
                     "duration": None,
                     "status": "running",
                 })
@@ -1094,7 +1099,7 @@ class TraceSummaryRepository:
             return ResponseModel(
                 code=status.HTTP_200_OK,
                 message=f"Found {len(data_list)} running traces",
-                data=data_list,
+                data={"traces": data_list, "server_time_ms": now_ms},
             )
 
     @staticmethod
@@ -1163,7 +1168,7 @@ class TraceSummaryRepository:
                 overall_status = "running" if has_any_finish else "start"
 
         if business_type == "AGENT":
-            execute_info_models = _extract_agent_execution_info_from_trace_detail(trace_details)
+            execute_info_models = _extract_agent_execution_info_from_trace_detail(trace_details, is_live=True)
             inputs = None
             outputs = None
             for d in trace_details:
