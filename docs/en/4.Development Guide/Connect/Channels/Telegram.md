@@ -63,11 +63,35 @@ health - Check backend health
 help - Show all commands
 ```
 
+## Installation
+
+### For Direct Run (Local Development)
+
+If running the backend directly on your machine, install dependencies first:
+
+```bash
+pip install -r connect/adapters/channels/requirements.txt
+```
+
+### For Docker Run (Production)
+
+If running OpenJiuwen in Docker, dependencies are already installed via `pyproject.toml` — skip to the next step.
+
 ## Step 3 — Run the Bot
 
+**Direct Run:**
 ```bash
 python -m connect.adapters.channels.run telegram <BOT_TOKEN>
 ```
+
+**Docker Run:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run telegram <BOT_TOKEN>
+```
+
+Replace `<container_id>` with your actual container ID (find it with `docker ps`).
+
+**Note:** All examples below show Direct Run commands. For Docker, prefix each command with `docker exec -it <container_id>`.
 
 **With a custom backend URL:**
 ```bash

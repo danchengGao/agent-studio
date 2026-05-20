@@ -105,6 +105,35 @@ The Connect feature is automatically installed when you deploy OpenJiuwen Studio
 
 3. **Local Development** — For local development, the Connect module is available at `connect/` in the project root
 
+### Running Connect: Two Modes
+
+Connect can be operated in two ways depending on your deployment:
+
+#### 1. Direct Run (Local Development)
+
+For local development or when running the backend directly on your machine:
+
+```bash
+# First, install dependencies
+pip install -r connect/adapters/channels/requirements.txt
+
+# Then run channels
+python -m connect.adapters.channels.run <channel> <args>
+```
+
+**Note:** The `pip install` step is required only for direct run, as dependencies are not automatically installed outside Docker.
+
+#### 2. Docker Run (Production Deployment)
+
+When running OpenJiuwen in Docker, all dependencies are already installed via `pyproject.toml`:
+
+```bash
+# No pip install needed — dependencies are already in the container
+docker exec -it <container_id> python -m connect.adapters.channels.run <channel> <args>
+```
+
+**Note:** Replace `<container_id>` with your actual OpenJiuwen backend container ID (use `docker ps` to find it).
+
 ### Setting Up Channels
 
 Each platform has its own setup guide in this folder:
@@ -132,7 +161,7 @@ connect/adapters/channels/platforms/
 
 ### Setting Up MCP
 
-See the [MCP Server](./MCP%20Server.md) guide in this folder, or refer to `connect/adapters/mcp_server/README.md` in the source tree.
+See the [MCP Server](MCP%20Server/MCP%20Server.md) guide in this folder, or refer to `connect/adapters/mcp_server/README.md` in the source tree.
 
 ## Architecture
 

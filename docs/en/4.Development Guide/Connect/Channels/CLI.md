@@ -11,20 +11,41 @@ No bot account, no third-party service — just Python and your backend.
 
 ## Installation
 
+### For Direct Run (Local Development)
+
+If running the backend directly on your machine, install dependencies first:
+
 ```bash
 pip install -r connect/adapters/channels/requirements.txt
 ```
 
+### For Docker Run (Production)
+
+If running OpenJiuwen in Docker, dependencies are already installed via `pyproject.toml` — skip to Step 1.
+
 ## Step 1 — Log In
 
-From the project root:
+Choose the command based on your deployment mode:
 
+**Direct Run:**
 ```bash
 python -m connect.adapters.channels.run cli login
 ```
 
+**Docker Run:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run cli login
+```
+
+Replace `<container_id>` with your actual container ID (find it with `docker ps`).
+
 You will be prompted for your username and password. The session token is saved to
 `connect/adapters/channels/platforms/cli/.cli_tokens.json` and reused for all subsequent commands.
+
+**Note:** All examples below show Direct Run commands. For Docker, prefix each command with:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
+```
 
 ### Custom backend URL
 

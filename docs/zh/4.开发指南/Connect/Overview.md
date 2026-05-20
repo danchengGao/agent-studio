@@ -105,6 +105,35 @@ AI助手: [搜索OpenJiuwen，检查工作流输入，运行它]
 
 3. **本地开发** — 对于本地开发，Connect模块位于项目根目录的`connect/`目录下
 
+### 运行Connect的两种方式
+
+根据您的部署方式，Connect可以通过两种方式运行:
+
+#### 1. 直接运行(本地开发)
+
+对于本地开发或直接在您的机器上运行后端:
+
+```bash
+# 首先安装依赖
+pip install -r connect/adapters/channels/requirements.txt
+
+# 然后运行渠道
+python -m connect.adapters.channels.run <channel> <args>
+```
+
+**注意:** `pip install`步骤仅在直接运行时需要，因为在Docker外部依赖不会自动安装。
+
+#### 2. Docker运行(生产部署)
+
+在Docker中运行OpenJiuwen时，所有依赖已通过`pyproject.toml`安装:
+
+```bash
+# 无需pip install — 依赖已在容器中
+docker exec -it <container_id> python -m connect.adapters.channels.run <channel> <args>
+```
+
+**注意:** 将`<container_id>`替换为实际的OpenJiuwen后端容器ID(使用`docker ps`查找)。
+
 ### 设置渠道
 
 每个平台都有专属的设置指南(本文件夹内):
@@ -132,7 +161,7 @@ connect/adapters/channels/platforms/
 
 ### 设置MCP
 
-请参阅本文件夹中的 [MCP服务器](./MCP%20Server.md) 指南，或查阅源代码树中的`connect/adapters/mcp_server/README.md`。
+请参阅本文件夹中的 [MCP服务器](MCP%20Server/MCP%20Server.md) 指南，或查阅源代码树中的`connect/adapters/mcp_server/README.md`。
 
 ## 架构
 

@@ -7,13 +7,34 @@ Webhook服务器将OpenJiuwen工作流和智能体公开为普通HTTP端点。
 ## 前提条件
 
 - OpenJiuwen后端正在运行且可访问
-- Python依赖项: `pip install -r connect/adapters/channels/requirements.txt`
+
+## 安装
+
+### 直接运行(本地开发)
+
+如果直接在您的机器上运行后端，请先安装依赖:
+
+```bash
+pip install -r connect/adapters/channels/requirements.txt
+```
+
+### Docker运行(生产部署)
+
+如果在Docker中运行OpenJiuwen，依赖已通过`pyproject.toml`安装 — 跳到第1步。
 
 ## 第1步 — 启动服务器
 
+**直接运行:**
 ```bash
 python -m connect.adapters.channels.run webhook
 ```
+
+**Docker运行:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run webhook
+```
+
+将`<container_id>`替换为实际的容器ID(使用`docker ps`查找)。
 
 服务器默认在`http://0.0.0.0:8080`启动:
 
@@ -21,6 +42,11 @@ python -m connect.adapters.channels.run webhook
 Connected to OpenJiuwen backend at http://localhost:8000
 OpenJiuwen Webhook Server running on http://0.0.0.0:8080
    Docs: http://0.0.0.0:8080/docs
+```
+
+**注意:** 下面所有示例展示的是直接运行命令。对于Docker，请在每个命令前加上:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
 ```
 
 ### 常用选项

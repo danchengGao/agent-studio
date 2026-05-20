@@ -30,11 +30,19 @@ text (lines starting with `>`) is stripped automatically, so replying to a bot e
 
 ## Installation
 
+### For Direct Run (Local Development)
+
+If running the backend directly on your machine, install dependencies first:
+
 ```bash
 pip install -r connect/adapters/channels/requirements.txt
 ```
 
 No additional packages are needed for the email bot — it uses only the standard library.
+
+### For Docker Run (Production)
+
+If running OpenJiuwen in Docker, dependencies are already installed via `pyproject.toml` — skip to Step 1.
 
 ## Step 1 — Enable IMAP on Your Email Account
 
@@ -83,10 +91,25 @@ Chinese providers require **authorization codes** instead of account passwords:
 
 ## Step 2 — Start the Bot
 
+**Note:** All examples below show Direct Run commands. For Docker, prefix each command with:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
+```
+
+Replace `<container_id>` with your actual container ID (find it with `docker ps`).
+
 ### Gmail
 
+**Direct Run:**
 ```bash
 python -m connect.adapters.channels.run email \
+  imap.gmail.com smtp.gmail.com \
+  bot@gmail.com APP_PASSWORD
+```
+
+**Docker Run:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run email \
   imap.gmail.com smtp.gmail.com \
   bot@gmail.com APP_PASSWORD
 ```

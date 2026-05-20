@@ -7,13 +7,34 @@ can trigger them without a bot account.
 ## Prerequisites
 
 - OpenJiuwen backend running and accessible
-- Python dependencies: `pip install -r connect/adapters/channels/requirements.txt`
+
+## Installation
+
+### For Direct Run (Local Development)
+
+If running the backend directly on your machine, install dependencies first:
+
+```bash
+pip install -r connect/adapters/channels/requirements.txt
+```
+
+### For Docker Run (Production)
+
+If running OpenJiuwen in Docker, dependencies are already installed via `pyproject.toml` — skip to Step 1.
 
 ## Step 1 — Start the Server
 
+**Direct Run:**
 ```bash
 python -m connect.adapters.channels.run webhook
 ```
+
+**Docker Run:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run webhook
+```
+
+Replace `<container_id>` with your actual container ID (find it with `docker ps`).
 
 The server starts on `http://0.0.0.0:8080` by default:
 
@@ -21,6 +42,11 @@ The server starts on `http://0.0.0.0:8080` by default:
 Connected to OpenJiuwen backend at http://localhost:8000
 OpenJiuwen Webhook Server running on http://0.0.0.0:8080
    Docs: http://0.0.0.0:8080/docs
+```
+
+**Note:** All examples below show Direct Run commands. For Docker, prefix each command with:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
 ```
 
 ### Common options

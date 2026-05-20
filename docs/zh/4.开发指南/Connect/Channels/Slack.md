@@ -86,11 +86,35 @@ Socket Mode让机器人无需公共URL即可连接到Slack。
 
 **将此保存为您的`BOT_TOKEN`。**
 
+## 安装
+
+### 直接运行(本地开发)
+
+如果直接在您的机器上运行后端，请先安装依赖:
+
+```bash
+pip install -r connect/adapters/channels/requirements.txt
+```
+
+### Docker运行(生产部署)
+
+如果在Docker中运行OpenJiuwen，依赖已通过`pyproject.toml`安装 — 跳到下一步。
+
 ## 第7步 — 运行机器人
 
+**直接运行:**
 ```bash
 python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN>
 ```
+
+**Docker运行:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN>
+```
+
+将`<container_id>`替换为实际的容器ID(使用`docker ps`查找)。
+
+**注意:** 下面所有示例展示的是直接运行命令。对于Docker，请在每个命令前加上`docker exec -it <container_id>`。
 
 **使用自定义后端URL:**
 ```bash

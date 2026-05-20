@@ -11,20 +11,41 @@ CLI让您可以直接从终端与OpenJiuwen工作流和智能体交互。
 
 ## 安装
 
+### 直接运行(本地开发)
+
+如果直接在您的机器上运行后端，请先安装依赖:
+
 ```bash
 pip install -r connect/adapters/channels/requirements.txt
 ```
 
+### Docker运行(生产部署)
+
+如果在Docker中运行OpenJiuwen，依赖已通过`pyproject.toml`安装 — 跳到第1步。
+
 ## 第1步 — 登录
 
-从项目根目录执行:
+根据您的部署方式选择命令:
 
+**直接运行:**
 ```bash
 python -m connect.adapters.channels.run cli login
 ```
 
+**Docker运行:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run cli login
+```
+
+将`<container_id>`替换为实际的容器ID(使用`docker ps`查找)。
+
 系统会提示您输入用户名和密码。会话令牌保存到
 `connect/adapters/channels/platforms/cli/.cli_tokens.json`，并在后续所有命令中复用。
+
+**注意:** 下面所有示例展示的是直接运行命令。对于Docker，请在每个命令前加上:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
+```
 
 ### 自定义后端URL
 

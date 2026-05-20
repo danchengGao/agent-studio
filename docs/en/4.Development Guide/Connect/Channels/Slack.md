@@ -86,11 +86,35 @@ The bot uses DMs for multi-step flows (login, workflow parameter collection, age
 
 **Save this as your `BOT_TOKEN`.**
 
+## Installation
+
+### For Direct Run (Local Development)
+
+If running the backend directly on your machine, install dependencies first:
+
+```bash
+pip install -r connect/adapters/channels/requirements.txt
+```
+
+### For Docker Run (Production)
+
+If running OpenJiuwen in Docker, dependencies are already installed via `pyproject.toml` — skip to the next step.
+
 ## Step 7 — Run the Bot
 
+**Direct Run:**
 ```bash
 python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN>
 ```
+
+**Docker Run:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN>
+```
+
+Replace `<container_id>` with your actual container ID (find it with `docker ps`).
+
+**Note:** All examples below show Direct Run commands. For Docker, prefix each command with `docker exec -it <container_id>`.
 
 **With a custom backend URL:**
 ```bash

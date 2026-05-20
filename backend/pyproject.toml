@@ -41,8 +41,6 @@ dependencies = [
     # Connect feature dependencies
     "python-telegram-bot>=20.0",
     "slack-bolt>=1.18.0",
-    "discord.py>=2.3.0",
-    "botbuilder-core>=4.14.0",
     "mcp>=1.26.0",
 ]
 

@@ -28,11 +28,19 @@
 
 ## 安装
 
+### 直接运行(本地开发)
+
+如果直接在您的机器上运行后端，请先安装依赖:
+
 ```bash
 pip install -r connect/adapters/channels/requirements.txt
 ```
 
 邮件机器人仅使用标准库，无需额外安装包。
+
+### Docker运行(生产部署)
+
+如果在Docker中运行OpenJiuwen，依赖已通过`pyproject.toml`安装 — 跳到第1步。
 
 ## 第1步 — 在邮件账户上启用IMAP
 
@@ -81,10 +89,25 @@ pip install -r connect/adapters/channels/requirements.txt
 
 ## 第2步 — 启动机器人
 
+**注意:** 下面所有示例展示的是直接运行命令。对于Docker，请在每个命令前加上:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
+```
+
+将`<container_id>`替换为实际的容器ID(使用`docker ps`查找)。
+
 ### Gmail
 
+**直接运行:**
 ```bash
 python -m connect.adapters.channels.run email \
+  imap.gmail.com smtp.gmail.com \
+  bot@gmail.com APP_PASSWORD
+```
+
+**Docker运行:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run email \
   imap.gmail.com smtp.gmail.com \
   bot@gmail.com APP_PASSWORD
 ```
