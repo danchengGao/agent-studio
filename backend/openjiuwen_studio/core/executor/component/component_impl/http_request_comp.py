@@ -165,7 +165,15 @@ class HttpRequestComponent(WorkflowComponent):
         # Convert body (only for methods that support a body)
         body_config = None
         body_content = inputs.get("body")
+        # Fallback to static config body when not provided via runtime inputs
+        if (not body_content or body_content == {}) and self.conf.body:
+            body_content = self.conf.body.content
+            # Unwrap BaseValue-style dict {"type": "constant", "content": "..."}
+            if isinstance(body_content, dict) and "content" in body_content and "type" in body_content:
+                body_content = body_content["content"]
         if body_content and body_content != {} and method.upper() in ('POST', 'PUT', 'PATCH'):
+            if isinstance(body_content, str):
+                body_content = self._replace_variables(body_content, inputs)
             body_config = HttpRequestBodyConfig(
                 content_type=HttpContentType.JSON,
                 json_data=self.parse_body_content(body_content)
@@ -248,20 +256,25 @@ class HttpRequestComponent(WorkflowComponent):
 
     @staticmethod
     def _replace_variables(text: str, inputs: Input) -> str:
-        """Replace {{variable}} placeholders with values from inputs"""
+        """Replace {{variable}} placeholders with values from inputs.
+
+        Matches ``{{identifier}}`` patterns produced by the PromptEditor's
+        variable-insertion UI.  Only replaces when the identifier exists as a
+        key in *inputs* so that JSON structural braces are left untouched.
+        """
         if not isinstance(text, str):
             return text
 
-        # Find all {{variable}} patterns
-        pattern = r'\$\{(?:[^}.]+\.)?([^}.]+)\}'
-        matches = re.findall(pattern, text)
+        pattern = r'\{\{([a-zA-Z_][a-zA-Z0-9_.]*)\}\}'
 
-        for match in matches:
-            name = match.strip()
-            value = inputs.get(name, f"{{{{{name}}}}}")
-            text = value if isinstance(value, str) else str(value)
+        def _replacer(match: re.Match) -> str:
+            var_name = match.group(1)
+            value = inputs.get(var_name)
+            if value is not None:
+                return value if isinstance(value, str) else json.dumps(value)
+            return match.group(0)
 
-        return text
+        return re.sub(pattern, _replacer, text)
 
     @staticmethod
     def _process_response(response: Dict[str, Any]) -> Dict[str, Any]:

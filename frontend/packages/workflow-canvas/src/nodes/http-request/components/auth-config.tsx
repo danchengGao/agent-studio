@@ -8,17 +8,16 @@ import { Select, Input } from '@douyinfe/semi-ui'
 
 import { useIsSidebar } from '../../../hooks'
 import { FormItem } from '../../../form-components'
-import { IFlowConstantRefValue } from '../../../form-materials'
 import { useTranslation } from '../../../i18n'
 
 interface AuthContent {
-  type: string
+  authType: string
   username?: string
   password?: string
   token?: string
-  api_key?: string
-  api_key_location?: string
-  api_key_param_name?: string
+  apiKey?: string
+  apiKeyLocation?: string
+  apiKeyParamName?: string
 }
 
 const AUTH_OPTIONS = [
@@ -43,19 +42,13 @@ export function AuthConfig() {
   }
 
   return (
-    <Field<IFlowConstantRefValue> name="inputs.inputParameters.auth">
+    <Field<AuthContent> name="inputs.httpRequestParam.auth">
       {({ field }) => {
-        const val = field.value
-        const content = (val?.content as AuthContent) || { type: 'none' }
-        const authType = content.type || 'none'
+        const content = field.value || { authType: 'none' }
+        const authType = content.authType || 'none'
 
         const updateContent = (updates: Partial<AuthContent>) => {
-          field.onChange({
-            ...val,
-            type: 'constant',
-            content: { ...content, ...updates },
-            schema: (val as any)?.schema || { type: 'object' },
-          })
+          field.onChange({ ...content, ...updates })
         }
 
         return (
@@ -66,23 +59,18 @@ export function AuthConfig() {
                 value={authType}
                 onChange={(value) => {
                   const newType = value as string
-                  const newContent: AuthContent = { type: newType }
+                  const newContent: AuthContent = { authType: newType }
                   if (newType === 'basic') {
                     newContent.username = content.username || ''
                     newContent.password = content.password || ''
                   } else if (newType === 'bearer') {
                     newContent.token = content.token || ''
                   } else if (newType === 'api_key') {
-                    newContent.api_key = content.api_key || ''
-                    newContent.api_key_location = content.api_key_location || 'header'
-                    newContent.api_key_param_name = content.api_key_param_name || 'X-API-Key'
+                    newContent.apiKey = content.apiKey || ''
+                    newContent.apiKeyLocation = content.apiKeyLocation || 'header'
+                    newContent.apiKeyParamName = content.apiKeyParamName || 'X-API-Key'
                   }
-                  field.onChange({
-                    ...val,
-                    type: 'constant',
-                    content: newContent,
-                    schema: (val as any)?.schema || { type: 'object' },
-                  })
+                  field.onChange(newContent)
                 }}
                 style={{ width: '100%' }}
               >
@@ -125,13 +113,13 @@ export function AuthConfig() {
                   <Input
                     size="small"
                     placeholder={t('workflowCanvas.nodes.httpRequest.auth.apiKey') || 'API Key'}
-                    value={content.api_key || ''}
-                    onChange={(val) => updateContent({ api_key: val })}
+                    value={content.apiKey || ''}
+                    onChange={(val) => updateContent({ apiKey: val })}
                   />
                   <Select
                     size="small"
-                    value={content.api_key_location || 'header'}
-                    onChange={(val) => updateContent({ api_key_location: val as string })}
+                    value={content.apiKeyLocation || 'header'}
+                    onChange={(val) => updateContent({ apiKeyLocation: val as string })}
                     style={{ width: '100%' }}
                   >
                     {API_KEY_LOCATION_OPTIONS.map((opt) => (
@@ -142,9 +130,10 @@ export function AuthConfig() {
                   </Select>
                   <Input
                     size="small"
-                    placeholder={t('workflowCanvas.nodes.httpRequest.auth.paramName') || 'Parameter Name (e.g. X-API-Key)'}
-                    value={content.api_key_param_name || ''}
-                    onChange={(val) => updateContent({ api_key_param_name: val })}
+                    placeholder={t('workflowCanvas.nodes.httpRequest.auth.paramName')
+                      || 'Parameter Name (e.g. X-API-Key)'}
+                    value={content.apiKeyParamName || ''}
+                    onChange={(val) => updateContent({ apiKeyParamName: val })}
                   />
                 </>
               )}

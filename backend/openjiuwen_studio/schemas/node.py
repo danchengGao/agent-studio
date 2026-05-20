@@ -193,8 +193,8 @@ class HttpAdvancedConfig(BaseModel):
 class HttpRequestParam(BaseModel):
     url: BaseValue = Field(..., alias="url")
     method: str = Field("GET", alias="method")
-    headers: Optional[Dict[str, BaseValue]] = Field(None, alias="headers")
-    query_params: Optional[Dict[str, BaseValue]] = Field(None, alias="queryParams")
+    headers: Optional[Dict[str, Any]] = Field(None, alias="headers")
+    query_params: Optional[Dict[str, Any]] = Field(None, alias="queryParams")
     body: Optional[HttpBodyConfig] = Field(None, alias="body")
     auth: HttpAuthenticationConfig = Field(default_factory=HttpAuthenticationConfig, alias="auth")
     response: HttpResponseConfig = Field(default_factory=HttpResponseConfig, alias="response")

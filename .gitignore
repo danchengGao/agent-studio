@@ -116,5 +116,8 @@ QWEN.md
 .claudeignore
 CLAUDE.md
 AGENTS.md
+.claude
+.ocr
+.opencode
 
 /backend/openjiuwen_studio/memory-data/chroma.sqlite3
