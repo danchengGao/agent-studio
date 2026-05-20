@@ -181,6 +181,9 @@ class PluginInfo(PluginBase):
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
     header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
+    command: Optional[str] = Field("", alias="command")
+    args: Optional[List[str]] = Field(default_factory=list, alias="args")
+    env: Optional[Dict[str, str]] = Field(None, alias="env")
     external_plugin_type: Optional[str] = Field(None, alias="external_plugin_type")
     original_market_plugin_id: Optional[str] = Field(None, alias="original_market_plugin_id")
     category: Optional[str] = Field(None, alias="category")
@@ -234,6 +237,14 @@ class PluginInfo(PluginBase):
         if isinstance(rest, dict):
             if "mcp_transport" in rest:
                 data_dict["mcp_transport"] = rest["mcp_transport"]
+            mcp_params = rest.get("params") or {}
+            if isinstance(mcp_params, dict):
+                if "command" in mcp_params and data_dict.get("command") in (None, ""):
+                    data_dict["command"] = mcp_params["command"]
+                if "args" in mcp_params and not data_dict.get("args"):
+                    data_dict["args"] = mcp_params["args"]
+                if "env" in mcp_params and not data_dict.get("env"):
+                    data_dict["env"] = mcp_params["env"]
             for key in (
                 "auth",
                 "external_plugin_type",

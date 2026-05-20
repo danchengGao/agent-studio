@@ -929,6 +929,15 @@ def plugin_update(
         if value not in (None, ''):
             merged_rest[key] = value
 
+    # Update MCP stdio params (command, args, env) when explicitly provided in the request
+    mcp_stdio_keys = ('command', 'args', 'env')
+    explicitly_set = set(getattr(req, 'model_fields_set', set()) or set())
+    mcp_stdio_updates = {k: getattr(req, k) for k in mcp_stdio_keys if k in explicitly_set}
+    if mcp_stdio_updates:
+        mcp_params = dict(merged_rest.get('params') or {})
+        mcp_params.update(mcp_stdio_updates)
+        merged_rest['params'] = mcp_params
+
     if normalized_header_configuration is not None:
         merged_rest['header_configuration'] = normalized_header_configuration
         merged_config = dict(merged_rest.get('config') or {})
