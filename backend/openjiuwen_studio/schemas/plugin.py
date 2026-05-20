@@ -171,6 +171,14 @@ class PluginApiHeader(BaseModel):
 
 
 class PluginInfo(PluginBase):
+    @staticmethod
+    def _is_local_file_path(value: str) -> bool:
+        if value.startswith("/") or value.startswith("./") or value.startswith("../"):
+            return True
+        if value.startswith("~/"):
+            return True
+        return len(value) > 2 and value[1] == ":"
+
     name: str = Field(..., alias="name")
     desc: str = Field(..., alias="desc")
     desc_mk: Optional[str] = Field("", alias="desc_mk")
@@ -207,7 +215,7 @@ class PluginInfo(PluginBase):
     def check_url_ssrf(cls, v: Optional[str]) -> Optional[str]:
         if not v:
             return v
-        if isinstance(v, str) and v.startswith("/"):
+        if isinstance(v, str) and cls._is_local_file_path(v):
             return v
         return validate_plugin_url(v)
 

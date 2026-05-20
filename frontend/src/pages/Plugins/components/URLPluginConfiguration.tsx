@@ -103,9 +103,6 @@ interface URLPluginConfigurationProps {
   resetForm: () => void
   cloudPluginForm: any
   handleCloudPluginFormChange: (field: string, value: string | number) => void
-  handleHeaderChange: (index: number, field: string, value: string) => void
-  addHeaderRow: () => void
-  removeHeaderRow: (index: number) => void
   isEditDialogOpen: boolean
   setIsEditDialogOpen: (open: boolean) => void
   handlePluginSubmit: (isEditing: boolean) => void
@@ -132,9 +129,6 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
   resetForm,
   cloudPluginForm,
   handleCloudPluginFormChange,
-  handleHeaderChange,
-  addHeaderRow,
-  removeHeaderRow,
   isEditDialogOpen,
   setIsEditDialogOpen,
   handlePluginSubmit,
@@ -549,27 +543,6 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
     })
   }
 
-  const getHeaderConfigurationForUpdate = () => {
-    if (Array.isArray(configForm.header_configuration) && configForm.header_configuration.length > 0) {
-      return configForm.header_configuration
-    }
-
-    const persistedHeaderConfiguration = (pluginConfigData as any)?.header_configuration
-    if (!persistedHeaderConfiguration || typeof persistedHeaderConfiguration !== 'object') {
-      return undefined
-    }
-
-    const headers = Object.entries(persistedHeaderConfiguration)
-      .map(([name, config]: [string, any]) => ({
-        name: String(name || ''),
-        value: String(config?.value || ''),
-        description: String(config?.description || ''),
-      }))
-      .filter(header => header.name)
-
-    return headers.length > 0 ? headers : undefined
-  }
-
   const handleSaveParameter = async () => {
     if (!parameterForm.name.trim()) {
       showError(t('plugins.paramConfig.nameRequired'))
@@ -611,7 +584,6 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         url: configForm.url,
         icon_uri: configForm.icon_uri,
         request_params: updatedRequestParams,
-        header_configuration: getHeaderConfigurationForUpdate(),
       }
 
       const response = await updatePluginApi.mutateAsync(updateRequest)
@@ -652,7 +624,6 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
         url: configForm.url,
         icon_uri: configForm.icon_uri,
         request_params: updatedRequestParams,
-        header_configuration: getHeaderConfigurationForUpdate(),
       }
 
       const response = await updatePluginApi.mutateAsync(updateRequest)
@@ -979,9 +950,12 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                     </div>
                     {configForm.header_configuration && configForm.header_configuration.length > 0 && (
                       <div>
-                        <Typography variant="subtitle2" className="mb-2">
-                          Headers
-                        </Typography>
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <Typography variant="subtitle2">Headers</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {t('plugins.pluginConfig.headersReadOnlyHint', '只读展示，请到“参数配置”中修改')}
+                          </Typography>
+                        </div>
                         <div className="space-y-4">
                           {configForm.header_configuration.map((header, index) => {
                             const isFixedValueHeader = header.name.toLowerCase() === 'content-type'
@@ -999,18 +973,9 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
                                     className="col-span-8"
                                     label={isFixedValueHeader ? '固定值' : 'Header 值'}
                                     value={header.value}
-                                    onChange={e => {
-                                      const value = e.target.value
-                                      setConfigForm(prev => ({
-                                        ...prev,
-                                        header_configuration: prev.header_configuration.map((item, currentIndex) =>
-                                          currentIndex === index ? { ...item, value } : item,
-                                        ),
-                                      }))
-                                      handleHeaderChange(index, 'value', value)
-                                    }}
-                                    disabled={isReadOnly || isFixedValueHeader}
-                                    helperText={header.description || (isFixedValueHeader ? '系统固定请求头。' : '')}
+                                    InputProps={{ readOnly: true }}
+                                    disabled
+                                    helperText={header.description || (isFixedValueHeader ? '系统固定请求头。' : t('plugins.pluginConfig.headersReadOnlyHint', '只读展示，请到“参数配置”中修改'))}
                                   />
                                 </div>
                               </div>
@@ -1313,12 +1278,9 @@ const URLPluginConfiguration: React.FC<URLPluginConfigurationProps> = ({
       <CloudPluginFormDialog
         open={isEditDialogOpen}
         isEditing={true}
-        form={cloudPluginForm}
+        form={{ ...cloudPluginForm, header_configuration: [] }}
         editingPlugin={editingPlugin}
         onFormChange={handleCloudPluginFormChange}
-        onHeaderChange={handleHeaderChange}
-        onAddHeader={addHeaderRow}
-        onRemoveHeader={removeHeaderRow}
         onSubmit={handlePluginSubmit}
         onCancel={() => {
           setIsEditDialogOpen(false)

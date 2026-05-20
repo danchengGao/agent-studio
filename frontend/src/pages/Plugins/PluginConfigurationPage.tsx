@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { PluginService } from '@test-agentstudio/api-client'
+import { ParamSendMethod, PluginService } from '@test-agentstudio/api-client'
 import { resolvePluginIconUrl, getExternalPluginTypeDisplayName, getExternalPluginTypeMeta } from '../../utils/pluginConfig'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { ENV_CONFIG } from '../../config/environment'
@@ -61,6 +61,130 @@ const getPluginIconFallback = (pluginType?: number, externalPluginType?: string)
       return '📦'
   }
 }
+
+const isHeaderParam = (param: any) => Number(param?.method) === ParamSendMethod.HEADER
+
+const normalizeHeaderParams = (requestParams: any[] = []) => {
+  const deduped = new Map<string, any>()
+
+  requestParams
+    .filter(isHeaderParam)
+    .forEach((param: any) => {
+      const normalized = {
+        ...param,
+        name: String(param?.name || '').trim(),
+        desc: String(param?.desc || ''),
+        value: String(param?.value || ''),
+        method: ParamSendMethod.HEADER,
+      }
+      if (!normalized.name) {
+        return
+      }
+      deduped.set(normalized.name.toLowerCase(), normalized)
+    })
+
+  return Array.from(deduped.values())
+}
+
+const normalizeLegacyHeaderConfiguration = (headerConfiguration: any) =>
+  Object.entries(headerConfiguration || {})
+    .map(([name, config]: [string, any]) => ({
+      name: String(name || '').trim(),
+      desc: String(config?.description || ''),
+      value: String(config?.value || ''),
+      type: 1,
+      is_required: true,
+      is_runtime: false,
+      method: ParamSendMethod.HEADER,
+      priority: 1,
+    }))
+    .filter((param: any) => param.name)
+
+const splitRequestParams = (requestParams: any[] = [], legacyHeaderConfiguration?: any) => {
+  const headerParams = normalizeHeaderParams(requestParams)
+  const nonHeaderParams = requestParams.filter((param: any) => !isHeaderParam(param))
+  const effectiveHeaderParams = headerParams.length > 0 ? headerParams : normalizeLegacyHeaderConfiguration(legacyHeaderConfiguration)
+
+  return {
+    headerParams: effectiveHeaderParams,
+    nonHeaderParams,
+    mergedRequestParams: [...nonHeaderParams, ...effectiveHeaderParams],
+  }
+}
+
+const toHeaderConfiguration = (headerParams: any[] = []) =>
+  headerParams.map((param: any) => ({
+    name: String(param?.name || '').trim(),
+    value: String(param?.value || ''),
+    description: String(param?.desc || ''),
+  }))
+    .filter((header: any) => header.name)
+
+const withHeaderParams = (requestParams: any[] = [], headerParams: any[] = []) => [
+  ...requestParams.filter((param: any) => !isHeaderParam(param)),
+  ...normalizeHeaderParams(headerParams),
+]
+
+const normalizeRequestParamsForSave = (requestParams: any[] = []) => {
+  const { mergedRequestParams } = splitRequestParams(requestParams)
+  return mergedRequestParams
+}
+
+const getHeaderConfigurationPayload = (pluginType?: number, requestParams: any[] = []) => {
+  if (pluginType !== 1) {
+    return undefined
+  }
+
+  return toHeaderConfiguration(normalizeHeaderParams(requestParams))
+}
+
+const updateConfigFormRequestParams = (setConfigForm: React.Dispatch<React.SetStateAction<any>>, updater: (current: any[]) => any[]) => {
+  setConfigForm((prev: any) => {
+    const nextRequestParams = normalizeRequestParamsForSave(updater(prev.request_params || []))
+    return {
+      ...prev,
+      request_params: nextRequestParams,
+      header_configuration: toHeaderConfiguration(nextRequestParams),
+    }
+  })
+}
+
+const replaceHeaderParamAtIndex = (requestParams: any[] = [], index: number, patch: Record<string, any>) => {
+  let headerIndex = -1
+
+  return withHeaderParams(requestParams, normalizeHeaderParams(requestParams).map((param: any) => {
+    headerIndex += 1
+    return headerIndex === index ? { ...param, ...patch } : param
+  }))
+}
+
+const removeHeaderParamAtIndex = (requestParams: any[] = [], index: number) => {
+  let headerIndex = -1
+
+  return withHeaderParams(
+    requestParams,
+    normalizeHeaderParams(requestParams).filter(() => {
+      headerIndex += 1
+      return headerIndex !== index
+    }),
+  )
+}
+
+const addHeaderParam = (requestParams: any[] = []) => withHeaderParams(requestParams, [
+  ...normalizeHeaderParams(requestParams),
+  {
+    name: '',
+    desc: '',
+    value: '',
+    type: 1,
+    is_required: true,
+    is_runtime: false,
+    method: ParamSendMethod.HEADER,
+    priority: 1,
+  },
+])
+
+const getHeaderParamByIndex = (requestParams: any[] = [], index: number) => normalizeHeaderParams(requestParams)[index]
 
 const PluginConfigurationPage: React.FC = () => {
   const { t } = useTranslation()
@@ -164,12 +288,10 @@ const PluginConfigurationPage: React.FC = () => {
   const {
     form: cloudPluginForm,
     handleFormChange: handleCloudPluginFormChange,
-    handleHeaderChange,
-    addHeaderRow,
-    removeHeaderRow,
     resetForm,
     validateForm,
   } = useCloudPluginForm(editingPlugin)
+
 
   const { user } = useAuthStore()
 
@@ -305,28 +427,10 @@ const PluginConfigurationPage: React.FC = () => {
         })()
 
         const pluginLevelParams = Array.isArray(pluginInfo.request_params) ? pluginInfo.request_params : []
-        const pluginHeaderParams = pluginLevelParams.filter((param: any) => Number(param?.method) === 1)
-        const derivedPluginParams = pluginLevelParams.filter((param: any) => Number(param?.method) !== 1)
-        const rawHeaderConfiguration =
-          pluginHeaderParams.length > 0
-            ? null
-            : (pluginInfo as any)?.header_configuration || null
-        const derivedHeaderConfiguration = pluginHeaderParams.length > 0
-          ? Array.from(new Map(
-              pluginHeaderParams.map((param: any) => {
-                const header = {
-                  name: String(param?.name || ''),
-                  value: String(param?.value || ''),
-                  description: String(param?.desc || ''),
-                }
-                return [header.name.toLowerCase(), header] as const
-              }).filter(([, param]) => param.name),
-            ).values())
-          : Object.entries(rawHeaderConfiguration || {}).map(([name, config]: [string, any]) => ({
-              name: String(name || ''),
-              value: String(config?.value || ''),
-              description: String(config?.description || ''),
-            })).filter((param: any) => param.name)
+        const { mergedRequestParams, headerParams } = splitRequestParams(
+          pluginLevelParams,
+          (pluginInfo as any)?.header_configuration,
+        )
         const resolvedIcon =
           resolvePluginIconUrl(pluginInfo.icon_uri) ||
           getPluginIconFallback(pluginInfo.plugin_type, pluginInfo.external_plugin_type)
@@ -347,8 +451,8 @@ const PluginConfigurationPage: React.FC = () => {
           command: pluginInfo.command || '',
           args: Array.isArray(pluginInfo.args) ? pluginInfo.args : [],
           env: pluginInfo.env && typeof pluginInfo.env === 'object' ? pluginInfo.env : {},
-          request_params: derivedPluginParams,
-          header_configuration: derivedHeaderConfiguration,
+          request_params: mergedRequestParams,
+          header_configuration: toHeaderConfiguration(headerParams),
         })
 
         // Create plugin object from the response data
@@ -385,7 +489,7 @@ const PluginConfigurationPage: React.FC = () => {
           desc_mk: resolvedDetailMarkdown,
           url: pluginInfo.url || '',
           authMethod: 'none',
-          header_configuration: derivedHeaderConfiguration,
+          header_configuration: toHeaderConfiguration(headerParams),
         })
       } else {
         showError(`${t('plugins.pluginConfig.pluginConfigLoadFailed')}: ${pluginResponse.message || t('plugins.messages.unknownError')}`)
@@ -426,18 +530,11 @@ const PluginConfigurationPage: React.FC = () => {
     }
 
     try {
-      const persistedHeaderConfiguration =
-        (pluginConfigData as any)?.header_configuration ||
-        null
-
-      const normalizedHeaderConfiguration =
-        (configForm.header_configuration && configForm.header_configuration.length > 0)
-          ? configForm.header_configuration
-          : Object.entries(persistedHeaderConfiguration || {}).map(([name, config]: [string, any]) => ({
-              name: String(name || ''),
-              value: String(config?.value || ''),
-              description: String(config?.description || ''),
-            })).filter((header: any) => header.name)
+      const normalizedRequestParams = normalizeRequestParamsForSave(configForm.request_params)
+      const headerConfigurationPayload = getHeaderConfigurationPayload(
+        pluginConfigData.plugin_type as number | undefined,
+        normalizedRequestParams,
+      )
 
       const updateRequest = {
         space_id: getDefaultSpaceId(),
@@ -450,8 +547,8 @@ const PluginConfigurationPage: React.FC = () => {
         published: pluginConfigData.published,
         url: configForm.url,
         icon_uri: configForm.icon_uri,
-        request_params: pluginConfigData.plugin_type === 2 ? [] : configForm.request_params,
-        header_configuration: normalizedHeaderConfiguration,
+        request_params: pluginConfigData.plugin_type === 2 ? [] : normalizedRequestParams,
+        header_configuration: headerConfigurationPayload,
         mcp_transport: pluginConfigData.plugin_type === 3 ? Number((pluginConfigData as any).mcp_transport || 0) : undefined,
         command: pluginConfigData.plugin_type === 3 ? configForm.command : undefined,
         args: pluginConfigData.plugin_type === 3 ? configForm.args : undefined,
@@ -483,7 +580,8 @@ const PluginConfigurationPage: React.FC = () => {
           command: configForm.command,
           args: configForm.args,
           env: configForm.env,
-          header_configuration: normalizedHeaderConfiguration,
+          request_params: normalizedRequestParams,
+          header_configuration: toHeaderConfiguration(normalizedRequestParams),
         }))
 
         // Update plugin display
@@ -632,9 +730,6 @@ const PluginConfigurationPage: React.FC = () => {
           resetForm={resetForm}
           cloudPluginForm={cloudPluginForm}
           handleCloudPluginFormChange={handleCloudPluginFormChange}
-          handleHeaderChange={handleHeaderChange}
-          addHeaderRow={addHeaderRow}
-          removeHeaderRow={removeHeaderRow}
           isEditDialogOpen={isEditDialogOpen}
           setIsEditDialogOpen={setIsEditDialogOpen}
           handlePluginSubmit={handlePluginSubmit}
@@ -663,9 +758,6 @@ const PluginConfigurationPage: React.FC = () => {
           resetForm={resetForm}
           cloudPluginForm={cloudPluginForm}
           handleCloudPluginFormChange={handleCloudPluginFormChange}
-          handleHeaderChange={handleHeaderChange}
-          addHeaderRow={addHeaderRow}
-          removeHeaderRow={removeHeaderRow}
           isEditDialogOpen={isEditDialogOpen}
           setIsEditDialogOpen={setIsEditDialogOpen}
           handlePluginSubmit={handlePluginSubmit}

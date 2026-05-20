@@ -885,6 +885,7 @@ def plugin_update(
         "desc": req.desc,
         "url": req.url,
         "icon_uri": req.icon_uri,
+        "update_time": milliseconds(),
     }
 
     if hasattr(req, 'desc_mk') and req.desc_mk is not None:
@@ -898,25 +899,48 @@ def plugin_update(
     if has_auth_update:
         update_dict["auth"] = _encrypt_auth_payload(req.auth)
 
-    non_header_request_params = []
+    request_params = (
+        list(req.request_params or [])
+        if has_request_params_update and req.request_params is not None
+        else []
+    )
+    request_header_params = [
+        param for param in request_params
+        if int(param.method) == int(ParamSendMethod.PARAM_SEND_METHOD_HEADER)
+    ]
     normalized_header_configuration = None
     if not has_auth_update:
-        non_header_request_params = (
-            list(req.request_params or [])
-            if has_request_params_update and req.request_params is not None
-            else []
-        )
         if has_header_configuration_update:
             normalized_header_configuration = (
                 _normalize_header_configuration(req.header_configuration)
                 if req.header_configuration is not None
                 else {}
             )
-        if normalized_header_configuration is not None:
+        if has_request_params_update and req.request_params is not None:
+            if not request_header_params and normalized_header_configuration:
+                request_params.extend(_header_configuration_to_plugin_params(normalized_header_configuration))
+            deduped_request_params = []
+            header_names = set()
+            for param in request_params:
+                if int(param.method) == int(ParamSendMethod.PARAM_SEND_METHOD_HEADER):
+                    header_name = (param.name or '').strip().lower()
+                    if not header_name or header_name in header_names:
+                        continue
+                    header_names.add(header_name)
+                deduped_request_params.append(param)
+            update_dict["inputs"] = [param.model_dump() for param in deduped_request_params]
+        elif normalized_header_configuration is not None and normalized_header_configuration:
             header_params = _header_configuration_to_plugin_params(normalized_header_configuration)
-            update_dict["inputs"] = [param.model_dump() for param in [*non_header_request_params, *header_params]]
-        elif has_request_params_update and req.request_params is not None:
-            update_dict["inputs"] = [param.model_dump() for param in non_header_request_params]
+            existing_inputs = data_dict.get("inputs") or []
+            non_header_inputs = []
+            for item in existing_inputs:
+                if not isinstance(item, dict):
+                    continue
+                method = item.get("method", 0)
+                method_int = method.value if hasattr(method, "value") else int(method)
+                if method_int != int(ParamSendMethod.PARAM_SEND_METHOD_HEADER):
+                    non_header_inputs.append(item)
+            update_dict["inputs"] = [*non_header_inputs, *[param.model_dump() for param in header_params]]
 
     metadata_keys = (
         'external_plugin_type', 'original_market_plugin_id', 'category', 'category_name', 'category_icon',
@@ -2280,6 +2304,7 @@ def _install_agent_tools_plugin(req, current_user: dict) -> ResponseModel:
     installed_tool_ids: list[str] = []
 
     try:
+        plugin_headers = contract.get('header_configuration')
         plugin_create_req = PluginCreate(
             name=contract['name'] or req.plugin_id,
             desc=contract['desc'],
@@ -2288,7 +2313,8 @@ def _install_agent_tools_plugin(req, current_user: dict) -> ResponseModel:
             plugin_type=PluginType.PLUGIN_TYPE_CLOUD_API,
             url=contract['api_prefix'],
             icon_uri=contract['icon_uri'],
-            header_configuration=contract['header_configuration'],
+            request_params=_header_configuration_to_plugin_params(plugin_headers),
+            header_configuration=plugin_headers,
             market_source='agent-tools',
             original_market_plugin_id=req.plugin_id,
             external_plugin_type='restful-api',
