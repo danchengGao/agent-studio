@@ -1031,11 +1031,9 @@ def generate_workflow_python(workflow: dsl.Workflow) -> str:
 def _sanitize_identifier(name: str) -> str:
     """ Convert a string to a valid Python identifier (snake_case). """
     import re
-    # Replace non-alphanumeric chars with underscores
-    s = re.sub(r"[^\w]", "_", name, flags=re.UNICODE)
-    # Remove leading digits
-    s = re.sub(r"^[0-9]+", "", s)
-    # Collapse multiple underscores
+    s = re.sub(r"[^a-zA-Z0-9_]", "_", name)
     s = re.sub(r"_+", "_", s)
-    s = s.strip("_").lower()
+    s = s.rstrip("_").lower()
+    if s and s[0].isdigit():
+        s = "_" + s
     return s or "component"
