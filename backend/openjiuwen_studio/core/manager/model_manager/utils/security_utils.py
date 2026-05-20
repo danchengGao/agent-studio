@@ -295,10 +295,13 @@ class SecurityUtils:
         """
         if not api_key:
             return None
-        
+
+        if visible_chars <= 0:
+            return "*" * len(api_key)
+
         if len(api_key) <= visible_chars:
             return "*" * len(api_key)
-        
+
         return "*" * (len(api_key) - visible_chars) + api_key[-visible_chars:]
     
     @staticmethod
