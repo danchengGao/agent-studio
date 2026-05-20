@@ -69,6 +69,48 @@ pip install -r channels/requirements.txt
 2. Enable **IMAP** access.
 3. IMAP host: `outlook.office365.com`, SMTP host: `smtp-mail.outlook.com`
 
+### Chinese Email Providers (163.com, 188.com, QQ Mail, etc.)
+
+Chinese email providers require **authorization codes** instead of account passwords:
+
+#### 163.com / 126.com
+
+1. Log in to [mail.163.com](https://mail.163.com) → **Settings** → **POP3/SMTP/IMAP**
+2. Enable **IMAP/SMTP Service**
+3. Click **Generate Authorization Code** — copy this code (NOT your account password)
+4. IMAP host: `imap.163.com`, SMTP host: `smtp.163.com`
+
+```bash
+python -m connect.adapters.channels.run email \
+  imap.163.com smtp.163.com \
+  yourname@163.com AUTHORIZATION_CODE
+```
+
+#### 188.com
+
+1. Log in to your 188.com mailbox → **Settings** → **Account Security**
+2. Enable **IMAP/SMTP Service** and generate an **Authorization Code**
+3. Use this authorization code (NOT your account password)
+4. IMAP host: `imap.188.com`, SMTP host: `smtp.188.com`
+
+```bash
+python -m connect.adapters.channels.run email \
+  imap.188.com smtp.188.com \
+  yourname@188.com AUTHORIZATION_CODE
+```
+
+#### QQ Mail
+
+1. Go to [mail.qq.com](https://mail.qq.com) → **Settings** → **Account**
+2. Enable **IMAP/SMTP Service** and generate an **Authorization Code**
+3. IMAP host: `imap.qq.com`, SMTP host: `smtp.qq.com`
+
+```bash
+python -m connect.adapters.channels.run email \
+  imap.qq.com smtp.qq.com \
+  yourname@qq.com AUTHORIZATION_CODE
+```
+
 ### Other providers
 
 Consult your provider's documentation for IMAP/SMTP hostnames and ports.
@@ -224,10 +266,14 @@ WantedBy=multi-user.target
 
 | Problem | Solution |
 |---|---|
-| `IMAP login failed` | Check email/password. For Gmail use an App Password, not your account password |
-| `SMTP authentication failed` | Same — use App Password for Gmail |
+| `IMAP login failed` | Check email/password. For Gmail use an App Password, not your account password. For Chinese providers (163.com, 188.com, QQ), use Authorization Code. |
+| `SELECT INBOX failed: Unsafe Login` (188.com, 163.com) | NetEase mail servers require an IMAP `ID` command after login — this is handled automatically. If you still see this, ensure IMAP/SMTP service is explicitly enabled in your mailbox settings and that you are using an **Authorization Code**, not your account password. |
+| `SMTP authentication failed` | Use App Password for Gmail, Authorization Code for Chinese providers |
+| `Connection unexpectedly closed` (SMTP) | The bot now automatically tries both STARTTLS (port 587) and SSL (port 465). Check firewall settings if both fail. |
 | Bot doesn't see new emails | Confirm IMAP is enabled in account settings |
 | Bot replies to wrong thread | Check that the email client sends `In-Reply-To` header correctly |
 | Bot reads old emails on startup | IMAP `UNSEEN` flag is used — only emails received after SEEN mark |
 | Commands not recognised | Make sure the command is the very first non-blank line of the email body, not after a quoted reply |
 | Gmail blocks login | Enable IMAP and use an App Password; "Less secure app access" is not required |
+| Timeout errors | Increase timeout by checking network connectivity. The bot uses 30-second timeouts for both IMAP and SMTP. |
+| 163.com/188.com specific errors | These providers have strict security. Must use Authorization Code and ensure IMAP/SMTP service is explicitly enabled in settings. |

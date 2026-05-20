@@ -72,8 +72,9 @@ These platforms are stable, tested, and ready for production use:
 |---|---|
 | **CLI** | Developers and power users who work in the terminal |
 | **Email** | Anyone — email is universal and needs no setup on the user side |
-| **WeChat** | Individuals and teams in the Chinese market |
 | **Webhook** | Any custom system, product, or internal tool that can make an HTTP call |
+| **Telegram** | Individuals, technical users, communities |
+| **Slack** | Workplace teams with Slack as their daily hub |
 
 #### Experimental Platforms
 
@@ -81,8 +82,7 @@ These platforms are functional but still under development. They may have rough 
 
 | Platform | A good fit for |
 |---|---|
-| **Telegram** | Individuals, technical users, communities |
-| **Slack** | Workplace teams with Slack as their daily hub |
+| **WeChat** | Individuals and teams in the Chinese market |
 | **Discord** | Developer communities, creator groups, personal servers |
 | **WhatsApp** | Personal use and teams who run everything through WhatsApp |
 | **Microsoft Teams** | Enterprise organisations on the Microsoft ecosystem |

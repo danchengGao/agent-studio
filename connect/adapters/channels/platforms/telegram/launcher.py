@@ -24,7 +24,7 @@ Examples:
     python -m connect.adapters.channels.run telegram 123456:ABCDEF http://my-server:8000
     python -m connect.adapters.channels.run telegram 123456:ABCDEF http://my-server:8000 eyJhbGci...
 
-See platforms/experimental/telegram/SETUP.md for the full setup guide.
+See platforms/telegram/SETUP.md for the full setup guide.
 """
 import os
 import sys

@@ -119,17 +119,17 @@ The bot uses DMs for multi-step flows (login, workflow parameter collection, age
 From the project root directory:
 
 ```bash
-python -m channels.run slack <BOT_TOKEN> <APP_TOKEN>
+python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN>
 ```
 
 **With a custom backend URL:**
 ```bash
-python -m channels.run slack <BOT_TOKEN> <APP_TOKEN> http://your-server:8000
+python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN> http://your-server:8000
 ```
 
 **With a static access token** (all users share one backend session, no per-user login needed):
 ```bash
-python -m channels.run slack <BOT_TOKEN> <APP_TOKEN> http://your-server:8000 <ACCESS_TOKEN>
+python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN> http://your-server:8000 <ACCESS_TOKEN>
 ```
 
 You should see:
@@ -156,7 +156,7 @@ You should see:
 ## Notes
 
 - Both tokens are sensitive — treat them like passwords. Never share them publicly.
-- User sessions are stored locally in `platforms/slack/.slack_bot_tokens.json` (gitignored).
+- User sessions are stored locally in `connect/adapters/channels/platforms/slack/.slack_bot_tokens.json` (gitignored).
 - The bot must be running for users to interact with it. Stop it with `Ctrl+C`.
 - If you reinstall the app (e.g. to add new scopes), you get a new BOT_TOKEN — update your run command.
 - To add the bot to a channel (optional), go to the channel → **Integrations** → **Add apps**.

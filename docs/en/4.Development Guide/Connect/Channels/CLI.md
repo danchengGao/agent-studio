@@ -1,29 +1,21 @@
-# CLI Setup Guide
+# Connect — CLI
 
 The CLI lets you interact with OpenJiuwen workflows and agents directly from your terminal.
 No bot account, no third-party service — just Python and your backend.
-
----
 
 ## Prerequisites
 
 - OpenJiuwen backend running and accessible
 - Python 3.9+
-- No extra dependencies beyond the standard library
+- No extra dependencies beyond the standard library (shared client requires `requests`)
 
----
-
-## Step 1 — Install Dependencies
+## Installation
 
 ```bash
 pip install -r connect/adapters/channels/requirements.txt
 ```
 
-The CLI itself uses only stdlib, but the shared `client/` client requires `requests`.
-
----
-
-## Step 2 — Log In
+## Step 1 — Log In
 
 From the project root:
 
@@ -31,8 +23,8 @@ From the project root:
 python -m connect.adapters.channels.run cli login
 ```
 
-You will be prompted for your username and password.
-The session token is saved to `connect/adapters/channels/platforms/cli/.cli_tokens.json` and reused for all subsequent commands.
+You will be prompted for your username and password. The session token is saved to
+`connect/adapters/channels/platforms/cli/.cli_tokens.json` and reused for all subsequent commands.
 
 ### Custom backend URL
 
@@ -40,16 +32,14 @@ The session token is saved to `connect/adapters/channels/platforms/cli/.cli_toke
 python -m connect.adapters.channels.run cli --backend-url http://my-server:8000 login
 ```
 
-You can also set the env var instead of typing the flag every time:
+You can also set the environment variable instead of typing the flag every time:
 
 ```bash
 export BACKEND_URL=http://my-server:8000
 python -m connect.adapters.channels.run cli login
 ```
 
----
-
-## Step 3 — Check Status
+## Step 2 — Check Status
 
 ```bash
 python -m connect.adapters.channels.run cli status
@@ -63,9 +53,7 @@ python -m connect.adapters.channels.run cli health
 
 Checks that the backend is reachable and healthy.
 
----
-
-## Step 4 — Work with Workflows
+## Step 3 — Work with Workflows
 
 ### List all workflows
 
@@ -95,9 +83,7 @@ python -m connect.adapters.channels.run cli workflow execute <workflow-id> -i ci
 
 `-i` can be repeated for multiple parameters. Any parameter not supplied via `-i` will be prompted interactively.
 
----
-
-## Step 5 — Work with Agents
+## Step 4 — Work with Agents
 
 ### List all agents
 
@@ -123,14 +109,12 @@ python -m connect.adapters.channels.run cli agent execute <agent-id> "Hello, how
 python -m connect.adapters.channels.run cli agent chat <agent-id>
 ```
 
-Starts an interactive chat session. Simply type your messages at the `You:` prompt and press Enter. Type `exit`, `quit`, or `q` to end the session, or press `Ctrl+C`.
-
-Example session:
+Starts an interactive chat session. Type your messages at the `You:` prompt and press Enter.
+Type `exit`, `quit`, or `q` to end the session, or press `Ctrl+C`.
 
 ```
-💬 Starting chat with agent <agent-id>
-   Type 'exit' or press Ctrl+C to end the chat.
-──────────────────────────────────────────────────
+Starting chat with agent <agent-id>
+Type 'exit' or press Ctrl+C to end the chat.
 
 You: What can you do?
 
@@ -138,12 +122,10 @@ Agent: I can help you with...
 
 You: exit
 
-👋 Chat ended.
+Chat ended.
 ```
 
----
-
-## Step 6 — Log Out
+## Step 5 — Log Out
 
 ```bash
 python -m connect.adapters.channels.run cli logout
@@ -151,26 +133,10 @@ python -m connect.adapters.channels.run cli logout
 
 Removes the saved token for your OS user.
 
----
-
-## Token Storage
-
-Tokens are stored in:
-
-```
-connect/adapters/channels/platforms/cli/.cli_tokens.json
-```
-
-Each token is keyed by OS username (the output of `whoami`), so multiple OS users on the same machine each have their own session.
-
-This file is listed in `.gitignore` and will not be committed.
-
----
-
-## Quick Reference
+## Command Reference
 
 | Command | Description |
-|---|---|
+|---------|-------------|
 | `cli login` | Log in (prompts for credentials) |
 | `cli logout` | Log out |
 | `cli status` | Show login status |
@@ -188,3 +154,9 @@ Global option available for all commands:
 ```bash
 python -m connect.adapters.channels.run cli --backend-url http://my-server:8000 <command>
 ```
+
+## Token Storage
+
+Tokens are stored in `connect/adapters/channels/platforms/cli/.cli_tokens.json`, keyed by OS username
+(`whoami`). Multiple OS users on the same machine each have their own session. This file is
+gitignored and will not be committed.

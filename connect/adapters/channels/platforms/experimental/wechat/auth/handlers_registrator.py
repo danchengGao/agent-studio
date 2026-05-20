@@ -1,6 +1,6 @@
 from .commands import CMD_LOGIN, CMD_LOGOUT, CMD_STATUS, CMD_CANCEL
 from .handlers import login_start, logout, status, cancel
-from ...command_context import CommandContext
+from ....command_context import CommandContext
 
 
 async def handle_command(ctx: CommandContext) -> bool:

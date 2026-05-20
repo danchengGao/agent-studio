@@ -29,7 +29,7 @@ Examples:
     python -m connect.adapters.channels.run slack xoxb-... xapp-... http://my-server:8000
     python -m connect.adapters.channels.run slack xoxb-... xapp-... http://my-server:8000 eyJhbGci...
 
-See platforms/experimental/slack/SETUP.md for the full setup guide.
+See platforms/slack/SETUP.md for the full setup guide.
 """
 import os
 import ssl

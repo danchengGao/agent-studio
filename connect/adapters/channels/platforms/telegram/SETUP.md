@@ -80,19 +80,19 @@ help - Show all commands
 From the project root directory:
 
 ```bash
-python -m channels.run telegram <BOT_TOKEN>
+python -m connect.adapters.channels.run telegram <BOT_TOKEN>
 ```
 
 Replace `<BOT_TOKEN>` with the token you copied in Step 1.
 
 **With a custom backend URL:**
 ```bash
-python -m channels.run telegram <BOT_TOKEN> http://your-server:8000
+python -m connect.adapters.channels.run telegram <BOT_TOKEN> http://your-server:8000
 ```
 
 **With a static access token** (all users share one backend session, no per-user login needed):
 ```bash
-python -m channels.run telegram <BOT_TOKEN> http://your-server:8000 <ACCESS_TOKEN>
+python -m connect.adapters.channels.run telegram <BOT_TOKEN> http://your-server:8000 <ACCESS_TOKEN>
 ```
 
 You should see:
@@ -116,6 +116,6 @@ You should see:
 ## Notes
 
 - The bot token is sensitive — treat it like a password. Never share it publicly.
-- User sessions are stored locally in `platforms/telegram/.telegram_bot_tokens.json` (gitignored).
+- User sessions are stored locally in `connect/adapters/channels/platforms/telegram/.telegram_bot_tokens.json` (gitignored).
 - The bot must be running for users to interact with it. Stop it with `Ctrl+C`.
 - To get a new token at any time, use `/revoke` in BotFather, then `/newbot` or `/mybots`.

@@ -7,7 +7,7 @@ from .state import get_user_data
 from .auth.handlers import on_login_username, on_login_password
 from .workflows.handlers import on_collect_param
 from .agents.handlers import on_agent_message
-from ..command_context import CommandContext
+from ...command_context import CommandContext
 
 _COMMAND_MODULES = [general_hr, auth_hr, workflows_hr, agents_hr]
 

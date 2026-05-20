@@ -14,8 +14,9 @@ These platforms are stable, tested, and ready for production use:
 |---|---|---|
 | **CLI** | Run commands in your terminal | [SETUP.md](platforms/cli/SETUP.md) |
 | **Email** | Monitor an inbox and reply via email | [SETUP.md](platforms/email/SETUP.md) |
-| **WeChat** | WeChat Official Account bot | [SETUP.md](platforms/wechat/SETUP.md) |
 | **Webhook** | Call a REST API from any system | [SETUP.md](platforms/webhook/SETUP.md) |
+| **Telegram** | Run a Telegram bot | [SETUP.md](platforms/telegram/SETUP.md) |
+| **Slack** | Install a Slack app | [SETUP.md](platforms/slack/SETUP.md) |
 
 ### Experimental Platforms
 
@@ -23,8 +24,7 @@ These platforms are functional but still under development. They may have rough 
 
 | Platform | How to start | Setup guide |
 |---|---|---|
-| **Telegram** | Run a Telegram bot | [SETUP.md](platforms/experimental/telegram/SETUP.md) |
-| **Slack** | Install a Slack app | [SETUP.md](platforms/experimental/slack/SETUP.md) |
+| **WeChat** | WeChat Official Account bot | [SETUP.md](platforms/experimental/wechat/SETUP.md) |
 | **Discord** | Add a Discord bot | [SETUP.md](platforms/experimental/discord/SETUP.md) |
 | **WhatsApp** | Connect via WhatsApp Business API | [SETUP.md](platforms/experimental/whatsapp/SETUP.md) |
 | **Microsoft Teams** | Deploy a Teams bot | [SETUP.md](platforms/experimental/teams/SETUP.md) |

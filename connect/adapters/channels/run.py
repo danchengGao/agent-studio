@@ -16,12 +16,12 @@ Launches any platform adapter by name.
 Production-Ready Platforms (stable, tested, ready for production):
   cli               Terminal CLI           (stdin/stdout)
   email             Email bot              (IMAP polling + SMTP replies, stdlib only)
-  wechat            WeChat Official Account bot (webhook, requires public URL)
+  telegram          Telegram bot           (long polling, no public URL needed)
+  slack             Slack app              (Socket Mode, no public URL needed)
   webhook           FastAPI REST adapter   (stateless HTTP, any external system)
 
 Experimental Platforms (functional but under development):
-  telegram          Telegram bot           (long polling, no public URL needed)
-  slack             Slack app              (Socket Mode, no public URL needed)
+  wechat            WeChat Official Account bot (webhook, requires public URL)
   discord           Discord bot            (WebSocket gateway, no public URL needed)
   whatsapp          WhatsApp Business API  (webhook, requires public URL)
   teams             Microsoft Teams bot    (webhook, requires public URL)
@@ -51,7 +51,7 @@ def main():
     base_package = __package__ or 'connect.adapters.channels'
 
     # List of production-ready platforms (located directly in platforms/)
-    production_platforms = {'cli', 'email', 'wechat', 'webhook'}
+    production_platforms = {'cli', 'email', 'telegram', 'slack', 'webhook'}
 
     # Determine the launcher module path based on platform type
     if platform in production_platforms:

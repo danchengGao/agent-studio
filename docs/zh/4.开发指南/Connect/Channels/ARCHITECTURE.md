@@ -1,0 +1,937 @@
+# 渠道 — 架构
+
+**版本:** 1.0
+**范围:** `channels/`系统的内部架构
+
+---
+
+## 目录
+
+1. [系统概述](#1-系统概述)
+2. [支持的平台](#2-支持的平台)
+3. [架构原则](#3-架构原则)
+4. [目录结构](#4-目录结构)
+5. [客户端层](#5-客户端层)
+6. [平台适配器](#6-平台适配器)
+7. [认证与会话模型](#7-认证与会话模型)
+8. [工作流执行流程](#8-工作流执行流程)
+9. [智能体执行流程](#9-智能体执行流程)
+10. [添加新平台](#10-添加新平台)
+11. [配置参考](#11-配置参考)
+12. [安全考虑](#12-安全考虑)
+
+---
+
+## 1. 系统概述
+
+从外部看，这种体验被称为"OpenJiuwen随处可达" — 即OpenJiuwen可在您所在的任何地方使用。在背后，这由一个名为channels的内部系统驱动。在最高层面，channels位于两者之间: 用户的平台(Slack、Telegram等)和OpenJiuwen后端。
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                        用户的世界                                  │
+│                                                                  │
+│  Slack  Telegram  Teams  WhatsApp  Discord  CLI  HTTP  Email  GA  │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │  消息 / 命令 / HTTP请求
+                             ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                    channels/ (本系统)                              │
+│                                                                   │
+│  ┌─────────────────────────────────────────────────────────┐      │
+│  │  platforms/                                             │      │
+│  │  薄适配器 — 将平台事件转换为                             │      │
+│  │  client/函数调用，格式化响应并返回                       │      │
+│  └──────────────────────────┬──────────────────────────────┘      │
+│                             │                                     │
+│  ┌──────────────────────────▼──────────────────────────────┐      │
+│  │  client/                                                │      │
+│  │  所有业务逻辑: 认证、令牌管理、                           │      │
+│  │  工作流执行、智能体执行、解析                             │      │
+│  └──────────────────────────┬──────────────────────────────┘      │
+└───────────────────────────────────────────────────────────────────┘
+                             │  HTTP + SSE
+                             ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                  OpenJiuwen后端 (API)                              │
+│                                                                   │
+│  /auth  /workflows  /agents  /execution/workflow  /execution/agent│
+└───────────────────────────────────────────────────────────────────┘
+```
+
+每个平台适配器:
+1. 从用户处接收消息或命令
+2. 提取用户ID和意图
+3. 调用相关的`client/`函数
+4. 格式化结果并发送回给用户
+
+所有后端通信都通过`client/`进行 — 没有任何适配器直接与OpenJiuwen后端通信。
+
+---
+
+## 2. 支持的平台
+
+### 生产就绪平台
+
+这些平台稳定、经过测试，可用于生产:
+
+| 平台 | 机制 | 连接类型 | 每用户认证 | 备注 |
+|------|------|---------|-----------|------|
+| **CLI** | argparse | stdin/stdout | 是 | 适合脚本和CI/CD |
+| **Email** | IMAP轮询 + SMTP | 轮询循环 | 是 | 仅标准库；无额外依赖 |
+| **Webhook** | FastAPI | HTTP | 灵活 | 无状态；可与任何系统集成 |
+| **Telegram** | Bot API | 长轮询 | 是 | 功能完整；命令覆盖最丰富 |
+| **Slack** | Bolt + Socket Mode | WebSocket(仅出站) | 是 | 无需公共URL |
+
+### 实验性平台
+
+这些平台功能可用但仍在开发中，可能存在一些不完善之处:
+
+| 平台 | 机制 | 连接类型 | 每用户认证 | 备注 |
+|------|------|---------|-----------|------|
+| **WeChat** | 微信开放平台 | Webhook(入站) | 是 | XML协议；同步回复 + 客服消息API |
+| **Discord** | discord.py | WebSocket网关 | 是 | 原生斜杠命令 |
+| **WhatsApp** | Meta Business API | Webhook(入站) | 静态令牌 | 需要公共URL + Meta验证 |
+| **Microsoft Teams** | Bot Framework | Webhook(入站) | 共享(Azure) | 需要Azure应用注册 |
+| **Facebook Messenger** | Meta Graph API | Webhook(入站) | 是 | 仅标准库；PSID作为user_id；无markdown |
+| **GitHub** | GitHub REST API | Webhook(入站) | 是 | Issue/PR评论中的斜杠命令 |
+| **Google Assistant** | Actions SDK v3 | Webhook(入站) | 共享 | 10秒响应超时；语音友好 |
+| **Twilio SMS** | Twilio REST API | Webhook(入站) | 是 | 仅标准库；1600字符SMS限制 |
+| **Amazon Alexa** | Alexa Skills Kit | Webhook(入站) | 共享 | 语音友好；无markdown；8秒超时 |
+
+---
+
+## 3. 架构原则
+
+### 3.1 严格分离: 客户端 vs. 平台
+
+`client/`中包含**零平台特定导入**。没有任何Telegram、Slack、Discord引用。
+
+这意味着:
+- 客户端逻辑无需任何机器人框架即可测试
+- 添加新平台无需触及client
+- 业务逻辑中的bug(如令牌刷新)修复一次即可在所有平台生效
+
+### 3.2 薄适配器
+
+每个平台适配器每个处理器只做三件事:
+1. **提取** — 从平台事件格式中提取用户ID、命令和参数
+2. **调用** — 调用相关的`client/`函数
+3. **回复** — 格式化并通过平台API发送结果回去
+
+适配器不包含业务逻辑。它们是I/O转换器。
+
+### 3.3 平台无关的参数收集
+
+多步骤工作流参数收集(逐一询问用户每个输入)在`client/workflows/param_collector.py`中实现为状态机(`ParamCollectionSession`)。每个支持交互式对话的平台都使用同一个类 — 只有存储位置和"发送消息"机制不同。
+
+### 3.4 单一入口点
+
+所有平台通过单一入口点启动:
+
+```bash
+python -m connect.adapters.channels.run <platform> [args...]
+```
+
+`run.py`动态导入`channels.platforms.<platform>.launcher`并调用`main()`。这使得添加新平台时无需更改顶层接口。
+
+### 3.5 灵活的认证模式
+
+系统支持三种认证模式，平台可以使用其中任何一种:
+- **每用户登录** — 每个用户单独认证(Telegram、Slack、Discord、CLI)
+- **共享静态令牌** — 所有用户共享一个后端令牌(适用于团队内部Webhook部署)
+- **每请求令牌** — 调用方每次请求提供令牌(Webhook适配器)
+
+---
+
+## 4. 目录结构
+
+```
+channels/
+├── run.py                          ← 通用入口点；按平台名称分发
+├── requirements.txt
+│
+├── client/                         ← 平台无关的业务逻辑
+│   ├── client.py                   ← OpenJiuwen后端的HTTP客户端包装器
+│   ├── config.py                   ← 从.env读取VITE_ENABLE_NEW_AUTH
+│   ├── platform_state.py           ← PlatformState类 — 所有平台使用的共享每用户状态
+│   ├── auth/
+│   │   ├── do_login.py             ← 编排用户名/密码 → 令牌交换
+│   │   ├── login.py                ← POST /auth/login
+│   │   ├── verify_token.py         ← GET  /auth/verify_access_token
+│   │   ├── refresh_token.py        ← POST /auth/refresh
+│   │   ├── get_spaces.py           ← GET  /spaces/
+│   │   ├── token_manager.py        ← verify_and_refresh() — 静默令牌续期逻辑
+│   │   └── token_storage/          ← 基于JSON文件的每用户令牌持久化
+│   ├── workflows/
+│   │   ├── list_workflows.py
+│   │   ├── search_workflows.py
+│   │   ├── get_workflow.py
+│   │   ├── execute_workflow.py     ← 从后端流式传输SSE
+│   │   ├── result_parser.py        ← 从SSE事件流提取输出
+│   │   └── param_collector.py      ← ParamCollectionSession状态机
+│   ├── agents/
+│   │   ├── list_agents.py
+│   │   ├── search_agents.py
+│   │   ├── execute_agent.py        ← 从后端流式传输SSE
+│   │   └── response_parser.py      ← 从SSE提取文本 + conversation_id
+│   └── general/
+│       └── health_check.py
+│
+└── platforms/
+    ├── base.py                     ← 添加新平台的开发者清单
+    │
+    ├── 生产就绪平台:
+    ├── cli/                        ← 终端接口(argparse)
+    ├── email/                      ← IMAP轮询 + SMTP回复(仅标准库)
+    ├── telegram/                   ← Telegram机器人(长轮询)
+    ├── slack/                      ← Slack应用(Socket Mode)
+    ├── webhook/                    ← FastAPI REST适配器(无状态HTTP)
+    │
+    └── experimental/               ← 实验性平台(功能可用但仍在开发)
+        ├── wechat/                 ← 微信公众号机器人(XML webhook)
+        ├── discord/                ← Discord机器人(WebSocket网关)
+        ├── whatsapp/               ← WhatsApp Business API webhook
+        ├── teams/                  ← Microsoft Teams机器人(Bot Framework)
+        ├── messenger/              ← Facebook Messenger机器人(Meta Graph API webhook)
+        ├── github/                 ← GitHub Issue/PR评论中的斜杠命令
+        ├── google_assistant/       ← Google Actions SDK v3实现webhook
+        ├── twilio/                 ← 通过Twilio REST API的SMS(aiohttp webhook)
+        └── alexa/                  ← Amazon Alexa技能实现webhook
+```
+
+每个`platforms/<name>/`和`platforms/experimental/<name>/`遵循相同的内部结构(见第6节)。
+
+---
+
+## 5. 客户端层
+
+### 5.1 OpenJiuwenClient (`client/client.py`)
+
+随处使用的单一HTTP包装器。它持有:
+- `base_url` — 后端URL
+- `token` — 当前访问令牌(登录或刷新后设置)
+- `space_id` — 用户的活动空间(大多数API调用需要)
+
+所有适配器都为每个用户创建一个`OpenJiuwenClient`实例(或在静态令牌模式下共享一个)。客户端函数将客户端实例作为第一个参数接收 — 它们自身从不管理客户端生命周期。
+
+### 5.2 认证 (`client/auth/`)
+
+**登录流程:**
+
+```
+do_login(client, username, password)
+    ├── login(client, username, password)       → POST /auth/login → access_token
+    ├── get_spaces(client)                      → GET  /spaces/    → 空间列表
+    └── 返回 {token, space_id, refresh_token}
+```
+
+登录后，调用方将这三个值保存到令牌存储(以用户ID为键)。
+
+**令牌续期流程 (`token_manager.verify_and_refresh`):**
+
+```
+verify_token(client)
+    ├── OK             → return (True, None)         ← 令牌仍然有效
+    ├── HTTP 401       → try refresh_token(client)
+    │       ├── 成功   → return (True, new_token)    ← 调用方必须保存新令牌
+    │       └── 失败   → return (False, None)        ← 强制重新登录
+    └── 其他错误       → return (True, None)          ← 乐观处理: 不强制登出
+```
+
+对非401错误的"乐观"处理是有意为之的: 网络故障和5xx后端错误不应让用户登出。只有确认的401才触发刷新尝试。
+
+### 5.3 令牌存储 (`client/auth/token_storage/`)
+
+令牌持久化在JSON文件中，每个用户一个条目。文件路径由每个launcher在任何导入运行之前通过`OJ_TOKEN_STORAGE`环境变量设置。
+
+各平台的默认路径:
+
+**生产就绪平台:**
+- `platforms/cli/.cli_tokens.json`
+- `platforms/email/.email_tokens.json`
+- `platforms/experimental/telegram/.telegram_bot_tokens.json`
+- `platforms/experimental/slack/.slack_bot_tokens.json`
+- (Webhook: 无持久令牌存储 — 令牌按请求传递)
+
+**实验性平台:**
+- `platforms/experimental/wechat/.wechat_tokens.json`
+- `platforms/experimental/discord/.discord_bot_tokens.json`
+- `platforms/experimental/whatsapp/.whatsapp_bot_tokens.json`
+- `platforms/experimental/teams/.teams_bot_tokens.json`
+- `platforms/experimental/messenger/.messenger_tokens.json`
+- `platforms/experimental/github/.github_tokens.json`
+- `platforms/experimental/google_assistant/.google_assistant_tokens.json`
+- `platforms/experimental/twilio/.twilio_tokens.json`
+- `platforms/experimental/alexa/.alexa_tokens.json`
+
+结构:
+```json
+{
+  "<user_id>": {
+    "token":         "eyJhbGci...",
+    "space_id":      "space_abc",
+    "refresh_token": "eyJhbGci..."
+  }
+}
+```
+
+用户ID是平台特定的(Telegram聊天ID、Slack用户ID、CLI的OS用户名等)。所有令牌存储函数都是纯读写 — 不含平台逻辑。
+
+### 5.4 工作流执行 (`client/workflows/`)
+
+**执行**调用`POST /execution/workflow`并以服务器发送事件(SSE)形式流式传输响应。流在HTTP调用内同步消耗，将所有事件收集到列表中。流结束后，`result_parser.py`检查事件以找到最终输出或错误消息。
+
+**参数收集 (`ParamCollectionSession`)** 是多轮输入收集的状态机:
+
+```
+状态: 待处理参数列表(按顺序)
+         ↓
+prompt_next()  → 格式化询问下一个参数的消息
+         ↓
+submit(text)   → 验证类型，存储值，前进到下一个参数
+  或
+skip()         → 如果是可选参数则跳过，如果是必填参数则拒绝
+         ↓
+[所有参数已回答]
+  → get_collected() → {param_name: value}字典
+  → 执行工作流
+```
+
+会话对象是可序列化的，可以存储在任何平台的每用户上下文中(Telegram的`context.user_data`、Slack的状态字典等)。
+
+### 5.5 智能体执行 (`client/agents/`)
+
+**执行**以用户消息和可选的`conversation_id`调用`POST /execution/agent`。SSE流被`response_parser.py`消耗和解析，它:
+- 提取最新的`conversation_id`(继续线程所需)
+- 找到最终回答文本
+- 返回`(text, conversation_id, error)`
+
+返回的`conversation_id`必须由平台适配器存储，并在下次调用时传入以继续对话线程。
+
+### 5.6 SSE流式传输
+
+工作流和智能体执行都使用相同的流式传输模式:
+
+```
+POST到/execution端点，stream=True
+    ↓
+逐行读取响应
+    ↓
+以"data:"开头的行 → 解析为JSON → 追加到事件列表
+    ↓
+流结束(或120秒超时) → 返回事件列表
+    ↓
+解析器检查事件中的输出/错误
+```
+
+流式传输在HTTP调用内同步发生。实时逐令牌向聊天平台流式传输未实现 — 先收集完整响应，然后再发送。
+
+---
+
+## 6. 平台适配器
+
+### 6.1 通用内部结构
+
+每个平台适配器遵循相同的布局:
+
+```
+platforms/<name>/
+├── launcher.py                 ← 框架初始化、处理器注册、事件循环启动
+├── client_session.py           ← 认证助手(获取或验证每用户后端客户端)
+├── handlers_registrator.py     ← 顶层注册，调用子模块注册器
+├── state.py                    ← 每用户内存状态(需要它的平台)
+├── auth/
+│   ├── commands.py             ← 命令名称常量(LOGIN, LOGOUT, STATUS, CANCEL)
+│   ├── handlers_registrator.py
+│   └── handlers/               ← login_start, login_password, logout, status, cancel
+├── agents/
+│   ├── commands.py
+│   ├── handlers_registrator.py
+│   └── handlers/               ← agents_list, agents_search, agent_execute,
+│                                   agent_chat_start, agent_chat_message, agent_chat_end
+├── workflows/
+│   ├── commands.py
+│   ├── handlers_registrator.py
+│   └── handlers/               ← workflows_list, workflows_search, workflow_execute,
+│                                   workflow_execute_collect, workflow_execute_cancel
+└── general/
+    ├── handlers_registrator.py
+    └── handlers/               ← health, help/start
+```
+
+### 6.2 Telegram
+
+**框架:** `python-telegram-bot` v20+
+**连接:** 长轮询(机器人向外连接到Telegram；无需入站端口)
+**认证模型:** 每用户；每个受保护处理器上使用`@require_login`装饰器
+
+多轮流程(登录序列、工作流参数收集)使用`ConversationHandler`实现，它将用户保持在特定状态直到流程完成或取消。
+
+`@require_login`装饰器:
+1. 检查存储的令牌
+2. 在`context.user_data`中创建并存储每用户`OpenJiuwenClient`
+3. 获取每用户异步锁(防止令牌刷新竞态条件)
+4. 在每次处理器调用前调用`verify_and_refresh()`
+5. 保存刷新期间颁发的任何新令牌
+
+### 6.3 Slack
+
+**框架:** `slack-bolt`
+**连接:** Socket Mode(WebSocket到Slack；无需公共URL)
+**认证模型:** 每用户；每个处理器开头调用`get_backend_client(user_id, respond)`
+
+Slack处理器接收依赖注入的参数(`ack`, `respond`, `command`, `body`)。每个斜杠命令处理器立即调用`ack()`(Slack要求在3秒内响应)，然后执行实际工作并以结果调用`respond()`。
+
+每用户状态(登录流程状态、工作流收集会话)存储在`state.py`中的模块级字典中，以Slack用户ID为键。
+
+### 6.4 Discord
+
+**框架:** `discord.py` v2+
+**连接:** WebSocket网关(与Discord的持久连接)
+**认证模型:** 每用户；`get_backend_client(user_id)`返回`(client, error)`元组
+
+命令使用Discord的应用命令树(`bot.tree.command()`)注册为斜杠命令。启动时，树与Discord服务器同步。处理器是异步的，对于长时间操作在`interaction.response.defer()`后使用`interaction.followup.send()`回复。
+
+### 6.5 WhatsApp
+
+**框架:** `aiohttp` HTTP服务器
+**连接:** Meta webhook(Meta将入站消息POST到公共URL)
+**认证模型:** 静态令牌；无每用户登录
+
+WhatsApp不像Telegram/Slack那样支持交互式机器人会话。适配器从Meta接收webhook负载，提取发件人的电话号码和消息文本，分发到命令处理器，并通过WhatsApp Business API(`graph.facebook.com`)发送回复。
+
+Meta在消息流动之前需要webhook验证步骤(带挑战的GET请求)。
+
+### 6.6 Microsoft Teams
+
+**框架:** `botbuilder-core`(Microsoft Bot Framework)
+**连接:** Azure webhook(Teams将入站消息POST到公共URL)
+**认证模型:** 共享Azure应用身份；本地不存储每用户登录
+
+适配器注册一个带有单一`on_turn()`方法的`OJTeamsBot`类。Bot Framework适配器处理每个入站请求的Azure OAuth令牌验证。`on_turn()`提取用户的AAD对象ID和消息文本，然后分发到命令处理器。
+
+### 6.7 Webhook
+
+**框架:** FastAPI + uvicorn
+**连接:** 无状态HTTP服务器
+**认证模型:** 灵活(请求体/请求头中的每请求令牌，或静态服务器令牌)
+
+Webhook适配器暴露任何外部系统都可以调用的REST API:
+
+```
+GET  /health
+POST /agents/list
+POST /agents/search
+POST /agents/execute
+POST /workflows/list
+POST /workflows/search
+POST /workflows/execute
+GET  /docs          ← 自动生成的OpenAPI文档
+```
+
+每个请求都是自包含的: 调用方提供后端令牌(或服务器使用配置的静态令牌)。没有会话状态。这使webhook适配器成为最通用的渠道 — 可以从Zapier、n8n、GitHub Actions、定时任务或任何HTTP客户端调用。
+
+可以配置可选的`WEBHOOK_API_KEY`来限制谁可以调用适配器。
+
+### 6.8 CLI
+
+**框架:** `argparse`
+**连接:** stdin/stdout
+**认证模型:** 每用户；令牌存储在`platforms/cli/.cli_tokens.json`中，以OS用户名为键
+
+CLI暴露分层命令结构:
+
+```
+channels.run cli login
+channels.run cli logout
+channels.run cli status
+channels.run cli workflow list
+channels.run cli workflow search <keyword>
+channels.run cli workflow execute <workflow_id>
+channels.run cli agent list
+channels.run cli agent search <keyword>
+channels.run cli agent execute <agent_id> <message>
+channels.run cli agent start <agent_id>
+```
+
+对于工作流执行，CLI使用与聊天平台相同的`ParamCollectionSession`交互式提示每个参数。这使其既适合脚本编写(非交互模式)，也适合手动探索(交互模式)。
+
+### 6.9 Email
+
+**框架:** 标准库(`imaplib`, `smtplib`, `email`)
+**连接:** IMAP轮询循环(机器人向外连接到IMAP服务器；无需入站端口)
+**认证模型:** 每用户；令牌以发件人邮件地址为键存储
+
+邮件适配器每N秒(可配置，默认10秒)轮询IMAP收件箱查找`UNSEEN`消息。对于每封未读邮件，它:
+1. 解码RFC 2047主题和正文
+2. 去除引用的回复文本(以`>`、`On ... wrote:`、`-----Original Message-----`开头的行)
+3. 提取第一个非空、非引用行作为命令
+4. 分发到命令处理器(与其他平台相同的处理器管道)
+5. 通过SMTP回复，使用`In-Reply-To`和`References`请求头将回复串联
+
+由于IMAP/SMTP是阻塞调用，轮询循环在普通`asyncio`循环中使用`asyncio.run()`运行。长时间运行的工作流或智能体执行会在其持续时间内阻塞轮询迭代。
+
+响应是纯文本(无markdown)，因为邮件客户端会字面显示`*bold*`和`_italic_`。
+
+用户ID是发件人的邮件地址，支持多个通信者的每用户令牌存储。
+
+### 6.10 Google Assistant
+
+**框架:** FastAPI + uvicorn
+**连接:** Webhook(Google每个用户回合POST到`/fulfillment`)
+**认证模型:** 每会话；令牌以Google会话ID为键存储
+
+Google Assistant(Actions SDK v3)使用包含以下内容的JSON负载调用实现webhook:
+- `handler.name` — 场景/意图处理器名称
+- `intent.query` — 用户的原始语音/文本输入
+- `session.id` — 当前对话会话的唯一ID
+
+适配器将`session.id`视为用户ID。多轮状态(登录流程、参数收集、智能体聊天)在Google会话持续期间保存在内存中。
+
+响应必须大声朗读，因此所有处理器生成不带markdown格式的自然语言文本。响应包装在Actions SDK v3格式中:
+
+```json
+{
+  "session": {"id": "..."},
+  "prompt": {
+    "firstSimple": {"speech": "...", "text": "..."}
+  }
+}
+```
+
+**10秒超时:** Google强制执行硬性响应截止时间。超过10秒的长时间运行工作流或智能体调用将在Google端导致超时错误。
+
+可以配置可选的`GA_API_KEY`来限制哪些客户端可以调用`/fulfillment`端点，因为该端点必须公开可访问。
+
+### 6.11 Twilio SMS
+
+**框架:** 标准库(`urllib`) + `aiohttp` HTTP服务器
+**连接:** Webhook(Twilio将入站SMS POST到`/sms`)
+**认证模型:** 每用户；令牌以发件人电话号码为键存储
+
+Twilio适配器在结构上与WhatsApp相同 — 两者都是来自特定平台消息服务的入站webhook。主要区别:
+
+- **无需SDK**: SMS发送直接通过`urllib`使用Twilio REST API(`POST /Accounts/{SID}/Messages`)
+- **回复格式**: `send_sms()`将响应截断为1600个字符(Twilio的10段限制)
+- **Webhook响应**: 立即返回空的`<Response/>`TwiML；实际回复通过REST API异步发送
+- **签名验证**: `X-Twilio-Signature` HMAC验证是可选的，但在生产中推荐使用(`--verify-signatures`标志)
+- **用户ID**: E.164格式的发件人电话号码(如`+15551234567`)
+- **无markdown**: SMS客户端显示原始文本；`strip_markdown()`在发送前去除格式
+
+### 6.12 GitHub
+
+**框架:** FastAPI + uvicorn
+**连接:** Webhook(GitHub将`issue_comment`事件POST到`/webhook`)
+**认证模型:** 每用户；令牌以GitHub用户名为键存储
+
+GitHub适配器是事件驱动而非对话式的。每当创建新的Issue或PR评论时，GitHub发送webhook负载。适配器:
+
+1. 使用配置的webhook密钥验证`X-Hub-Signature-256` HMAC请求头
+2. 忽略除`issue_comment`(操作: `created`)之外的所有事件类型，跳过机器人发件人
+3. 扫描评论正文中以`/`开头的第一行 — 这就是命令
+4. 分发到命令处理器管道(与其他平台相同)
+5. 通过REST API将结果作为新的GitHub评论发布
+
+`say()`闭包每个事件绑定到正确的`(repo_full_name, issue_number)`对，因此回复总是出现在正确的线程中。
+
+**多轮状态**(参数收集、智能体聊天)在同一会话的评论中持久化，以GitHub用户名为键。多个用户可以在同一Issue上同时运行独立的工作流。
+
+**Markdown感知响应**: GitHub在评论中渲染Markdown，因此响应适当使用`**bold**`、`` `code` ``和表格(与去除格式的邮件和SMS不同)。
+
+---
+
+### 6.13 Facebook Messenger
+
+**框架:** aiohttp(入站webhook)
+**连接:** Webhook(Meta将事件POST到`POST /webhook`，通过`GET /webhook`验证)
+**认证模型:** 每用户；令牌以Page-Scoped ID(PSID)为键存储
+
+Messenger适配器在结构上与WhatsApp相同 — 两者都是来自Meta Graph API的入站webhook。主要区别:
+
+- **单一令牌**: 只需要`PAGE_ACCESS_TOKEN`(无`phone_number_id`)
+- **用户ID**: 页面范围ID(`sender.id`在负载中)而非电话号码
+- **负载结构**: `entry[].messaging[]`而非`entry[].changes[].value.messages[]`
+- **回声过滤**: 忽略`is_echo: true`的消息(它们由页面本身发送)
+- **无需SDK**: 通过`urllib`向`graph.facebook.com/v18.0/me/messages`发送回复
+- **消息限制**: 2000个字符(截断并加`...`)
+
+验证握手(`GET /webhook`)匹配`hub.mode == 'subscribe'`并将`hub.verify_token`与配置的`--verify-token`参数比较。
+
+---
+
+### 6.14 微信公众号
+
+**框架:** aiohttp(入站webhook)
+**连接:** Webhook(微信将XML POST到`POST /webhook`，通过`GET /webhook`验证)
+**认证模型:** 每用户；令牌以OpenID为键存储
+
+微信使用与所有其他适配器完全不同的协议:
+
+- **XML协议**: 所有入站消息和出站回复都是XML(而非JSON)
+- **签名验证**: SHA1的`sorted([token, timestamp, nonce])`拼接 — 微信自己的方案
+- **同步回复模型**: 微信期望在5秒内返回XML响应体。第一个`say()`调用嵌入在HTTP响应中作为`<xml>...<Content>...</Content>...</xml>`。额外的回复使用客服消息API(需要AppID + AppSecret → access_token)
+- **Access token缓存**: `get_access_token()`使用60秒预过期缓冲在进程内缓存令牌；从`api.weixin.qq.com/cgi-bin/token`自动刷新
+- **无需SDK**: 所有HTTP调用使用`urllib`；XML解析使用`xml.etree.ElementTree`
+- **用户ID**: OpenID(XML负载中的`<FromUserName>`)
+
+launcher中的`say()`闭包同步捕获第一个回复，然后通过`asyncio.get_event_loop().run_in_executor()`路由额外回复以避免阻塞事件循环。
+
+---
+
+### 6.15 Amazon Alexa
+
+**框架:** FastAPI(入站实现webhook)
+**连接:** Webhook(Alexa将技能请求POST到`POST /`)
+**认证模型:** 每用户；令牌以`session.user.userId`为键存储(跨会话持久)
+
+Alexa适配器与Google Assistant在结构上相似。主要区别:
+
+- **Pydantic模型**: `AlexaSkillRequest`解析三种Alexa请求类型: `LaunchRequest`, `IntentRequest`, `SessionEndedRequest`
+- **命令提取**: `extract_command()`从`CommandIntent`(槽类型`AMAZON.SearchQuery`)的`Command`槽读取
+- **内置意图**: `AMAZON.StopIntent`/`AMAZON.CancelIntent`返回`shouldEndSession: true`；`AMAZON.HelpIntent`返回简短的口语摘要
+- **多轮**: `shouldEndSession: false`保持会话在各轮次之间存活
+- **语音友好**: `_strip_markdown()`在发送到TTS之前去除`**bold**`、`_italic_`、`#headers`、`[link](url)`
+- **用户ID持久性**: `session.user.userId`跨会话稳定(不像`session.sessionId`每次对话都变化)
+- **无需SDK**: 标准FastAPI JSON响应；无`ask-sdk`依赖
+
+---
+
+## 7. 认证与会话模型
+
+### 7.1 登录流程(交互式平台)
+
+```
+用户: /login
+    ↓
+平台发送: "请输入您的用户名"
+    ↓
+用户: michael@company.com
+    ↓
+[如果启用密码模式]
+平台发送: "请输入您的密码"
+用户: ••••••••
+    ↓
+client.auth.do_login(client, username, password)
+    → POST /auth/login           → access_token
+    → GET  /spaces/              → space_id
+    ↓
+set_user_data(user_id, token, space_id, refresh_token)
+    ↓
+平台发送: "✅ 登录成功"
+```
+
+### 7.2 令牌生命周期
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  每次受保护处理器调用:                                         │
+│                                                              │
+│  1. 从存储加载令牌                                           │
+│  2. verify_and_refresh(client, user_id, refresh_token)       │
+│       ├── 令牌有效           → 继续                          │
+│       ├── 401 + 刷新成功     → 保存新令牌，继续              │
+│       ├── 401 + 无刷新令牌   → "会话已过期，请/login"        │
+│       └── 其他错误           → 继续(乐观处理)               │
+│  3. 调用client.*函数                                         │
+│  4. 向用户返回结果                                          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 7.3 每用户状态
+
+聊天平台(Telegram、Slack、Discord、Email、Google Assistant)维护每用户状态字典:
+- 当前登录流程步骤(等待用户名，等待密码)
+- 工作流执行的活动`ParamCollectionSession`
+- 活动智能体聊天会话(智能体ID + 对话ID)
+
+状态保存在内存中(重启时丢失)。令牌存储(认证)持久化到磁盘并在重启后存活。
+
+**`PlatformState` — 共享实现 (`client/platform_state.py`)**
+
+所有需要每用户状态的平台在其`state.py`模块中实例化一个`PlatformState`对象:
+
+```python
+# platforms/<name>/state.py
+from ..client.platform_state import PlatformState as _PlatformState
+_state = _PlatformState()
+get_user_data  = _state.get_user_data
+set_app_config = _state.set_app_config
+get_app_config = _state.get_app_config
+```
+
+每个平台都有自己的`_state`实例，因此它们的用户数据字典是完全独立的。公共API(`get_user_data`, `set_app_config`, `get_app_config`)在所有平台中相同 — 处理器可以在平台之间移动或复制而无需更改。
+
+---
+
+## 8. 工作流执行流程
+
+```
+用户: /workflow_execute <workflow_id>
+    ↓
+client.workflows.get_workflow(client, workflow_id)
+    → 返回包含input_parameters列表的工作流定义
+    ↓
+┌── 无输入参数 ──────────────────────────────────────────────────┐
+│   client.workflows.execute_workflow(client, workflow_id, {})   │
+│   client.workflows.result_parser.parse_workflow_result(events) │
+│   平台发送: 结果文本                                           │
+└───────────────────────────────────────────────────────────────┘
+
+┌── 有输入参数 ──────────────────────────────────────────────────┐
+│   ParamCollectionSession(workflow_id, params)                  │
+│   平台发送: "请输入<param_1>(<type>)的值:"                     │
+│                                                               │
+│   [循环每个参数]                                              │
+│   用户输入值(或/workflow_skip跳过可选参数)                     │
+│   session.submit(text) 或 session.skip()                      │
+│       → 验证类型(string, int, float, bool)                    │
+│       → 如果必填+尝试跳过: 发送错误                           │
+│       → 如果全部完成: 退出循环                                │
+│       → 否则: 发送下一个提示                                  │
+│                                                               │
+│   client.workflows.execute_workflow(client, id, collected)    │
+│   client.workflows.result_parser.parse_workflow_result(events)│
+│   平台发送: 结果文本                                          │
+└───────────────────────────────────────────────────────────────┘
+
+用户: /workflow_cancel (在收集过程中的任何时候)
+    → 会话清理
+    → 平台发送: "❌ 工作流已取消"
+```
+
+---
+
+## 9. 智能体执行流程
+
+### 单次执行
+
+```
+用户: /agent_execute <agent_id> 你好，总结一下本周的新闻
+    ↓
+client.agents.execute_agent(client, agent_id, message, conversation_id="")
+    → 来自/execution/agent的SSE流
+    ↓
+client.agents.response_parser.parse_agent_response(events)
+    → 提取(text, conversation_id, error)
+    ↓
+平台发送: 文本响应
+```
+
+### 多轮聊天会话
+
+```
+用户: /agent_start_chat <agent_id>
+    ↓
+平台存储: {agent_id, conversation_id: ""}
+平台发送: "✅ 聊天已开始。每条消息都将发送给此智能体。"
+
+用户: <任意自由文本消息>
+    ↓
+execute_agent(client, agent_id, text, stored_conversation_id)
+    ↓
+parse_agent_response(events)
+    → 新的conversation_id(将此回复链接到线程)
+    ↓
+平台更新存储的conversation_id
+平台发送: 智能体回复
+
+[持续直到...]
+
+用户: /agent_end_chat
+    ↓
+平台清理存储的会话
+平台发送: "聊天已结束。"
+```
+
+`conversation_id`是在后端将消息链接到线程的关键。它从每轮的SSE响应事件中提取，必须存储并在下次调用时重新发送以继续对话线程。
+
+---
+
+## 10. 添加新平台
+
+`platforms/base.py`文件包含权威清单。概括而言:
+
+**步骤1 — Launcher**
+创建`platforms/<name>/launcher.py`。解析CLI参数或环境变量。在`client/`的任何导入之前设置`OJ_TOKEN_STORAGE`。初始化平台框架。调用`register_handlers()`。启动事件循环。在`run.py`中注册平台。
+
+**步骤2 — Auth助手**
+创建`platforms/<name>/client_session.py`。实现适合平台的认证模式:
+- 装饰器(`@require_login`) — 适用于支持每次调用处理器装饰的框架(如异步机器人框架)
+- 函数(`get_backend_client(user_id, ...)`) — 返回客户端或None，适用于简单情况
+- 直接调用 — 适用于无状态平台(Webhook、CLI)
+
+在所有情况下，都从`client/auth/`使用`get_user_token()`、`verify_and_refresh()`和`set_user_data()`。
+
+**步骤3 — 状态**
+如果平台支持多轮对话，创建`platforms/<name>/state.py` — 以用户ID为键的模块级字典。在此存储登录流程状态、`ParamCollectionSession`和智能体聊天会话。
+
+**步骤4 — 处理器**
+创建标准子目录结构(`auth/`, `agents/`, `workflows/`, `general/`)。对于每个处理器:
+1. 从平台事件中提取`user_id`和命令参数
+2. 调用`get_backend_client()` / 使用`@require_login`
+3. 调用相关的`client.*`函数
+4. 使用平台消息API格式化并发送响应
+
+**步骤5 — 注册**
+使用平台提供的任何机制(命令注册、路由注册、事件监听器等)在`handlers_registrator.py`文件中连接所有处理器。
+
+---
+
+## 11. 配置参考
+
+### 通用
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `BACKEND_URL` | OpenJiuwen后端基础URL | `http://localhost:8000` |
+| `ACCESS_TOKEN` | 共享静态后端令牌(跳过每用户登录) | _(无)_ |
+| `VITE_ENABLE_NEW_AUTH` | 启用基于密码的登录 | `False` |
+| `OJ_TOKEN_STORAGE` | 覆盖令牌文件路径(由launcher设置) | 平台特定 |
+
+### Telegram
+```bash
+python -m connect.adapters.channels.run telegram <BOT_TOKEN> [BACKEND_URL] [ACCESS_TOKEN]
+```
+
+### Slack
+```bash
+python -m connect.adapters.channels.run slack <BOT_TOKEN> <APP_TOKEN> [BACKEND_URL] [ACCESS_TOKEN]
+```
+
+### Discord
+```bash
+python -m connect.adapters.channels.run discord <BOT_TOKEN> [BACKEND_URL] [ACCESS_TOKEN]
+```
+
+### WhatsApp
+```bash
+WHATSAPP_ACCESS_TOKEN=... WHATSAPP_PHONE_NUMBER_ID=... \
+WHATSAPP_VERIFY_TOKEN=my_secret \
+python -m connect.adapters.channels.run whatsapp [BACKEND_URL] [ACCESS_TOKEN]
+```
+
+### Teams
+```bash
+python -m connect.adapters.channels.run teams <APP_ID> <APP_PASSWORD> [BACKEND_URL]
+```
+
+### Webhook
+```bash
+python -m connect.adapters.channels.run webhook \
+  --backend-url http://localhost:8000 \
+  --token <optional_static_token> \
+  --api-key <optional_server_key> \
+  --host 0.0.0.0 --port 8080
+```
+
+### CLI
+```bash
+python -m connect.adapters.channels.run cli login [--backend-url http://localhost:8000]
+python -m connect.adapters.channels.run cli workflow execute <id>
+python -m connect.adapters.channels.run cli agent execute <id> "message"
+```
+
+### Email
+```bash
+python -m connect.adapters.channels.run email <IMAP_HOST> <SMTP_HOST> <EMAIL_ADDRESS> <PASSWORD> \
+  [--imap-port 993] [--smtp-port 587] \
+  [--backend-url http://localhost:8000] \
+  [--access-token TOKEN] \
+  [--poll-interval 10]
+```
+
+### Google Assistant
+```bash
+python -m connect.adapters.channels.run google_assistant \
+  [--host 0.0.0.0] [--port 8080] \
+  [--backend-url http://localhost:8000] \
+  [--access-token TOKEN] \
+  [--api-key KEY]
+```
+
+### Twilio SMS
+```bash
+python -m connect.adapters.channels.run twilio <ACCOUNT_SID> <AUTH_TOKEN> <FROM_NUMBER> \
+  [--backend-url http://localhost:8000] \
+  [--access-token TOKEN] \
+  [--host 0.0.0.0] [--port 8080] \
+  [--verify-signatures]
+```
+
+### GitHub
+```bash
+python -m connect.adapters.channels.run github <GITHUB_TOKEN> \
+  [--webhook-secret SECRET] \
+  [--backend-url http://localhost:8000] \
+  [--access-token TOKEN] \
+  [--host 0.0.0.0] [--port 8080]
+```
+
+### Facebook Messenger
+```bash
+python -m connect.adapters.channels.run messenger <PAGE_ACCESS_TOKEN> \
+  [--verify-token TOKEN] \
+  [--backend-url http://localhost:8000] \
+  [--access-token-backend TOKEN] \
+  [--host 0.0.0.0] [--port 8080]
+```
+
+### 微信公众号
+```bash
+python -m connect.adapters.channels.run wechat <WECHAT_TOKEN> <APP_ID> <APP_SECRET> \
+  [--backend-url http://localhost:8000] \
+  [--access-token-backend TOKEN] \
+  [--host 0.0.0.0] [--port 8080]
+```
+
+### Amazon Alexa
+```bash
+python -m connect.adapters.channels.run alexa \
+  [--skill-id amzn1.ask.skill.xxx] \
+  [--backend-url http://localhost:8000] \
+  [--access-token TOKEN] \
+  [--host 0.0.0.0] [--port 8080]
+```
+
+平台特定环境变量:
+
+| 平台 | 变量 | 说明 |
+|------|------|------|
+| Email | `IMAP_PORT` | IMAP SSL端口(默认: 993) |
+| Email | `SMTP_PORT` | SMTP STARTTLS端口(默认: 587) |
+| Email | `EMAIL_POLL_INTERVAL` | 轮询间隔(秒，默认: 10) |
+| Google Assistant | `GA_HOST` | 绑定地址(默认: 0.0.0.0) |
+| Google Assistant | `GA_PORT` | 监听端口(默认: 8080) |
+| Google Assistant | `GA_API_KEY` | `/fulfillment`的可选API密钥 |
+| GitHub | `GITHUB_TOKEN` | GitHub个人访问令牌 |
+| GitHub | `GITHUB_WEBHOOK_SECRET` | webhook验证的HMAC密钥 |
+| Messenger | `MESSENGER_VERIFY_TOKEN` | Webhook验证令牌 |
+| Alexa | `ALEXA_HOST` | 绑定地址(默认: 0.0.0.0) |
+| Alexa | `ALEXA_PORT` | 监听端口(默认: 8080) |
+| Alexa | `ALEXA_SKILL_ID` | 可选的Alexa Skill ID用于验证 |
+
+---
+
+## 12. 安全考虑
+
+**静态令牌存储**
+令牌以明文JSON文件存储。在生产部署中，限制文件权限(`chmod 600`)，并考虑改用加密存储或令牌文件的密钥管理器。
+
+**令牌刷新**
+静默刷新仅在确认的HTTP 401时触发。瞬态错误(网络问题、后端5xx)不会触发登出 — 这是有意为之的，以避免虚假的"会话已过期"消息。
+
+**竞态条件**
+Telegram对令牌刷新使用每用户`asyncio.Lock`，以防止两个并发处理器调用同时尝试刷新。如果预期每用户高并发，其他平台应实现类似的序列化。
+
+**Webhook服务器保护**
+Webhook适配器支持可选的`WEBHOOK_API_KEY`。没有它，任何可以访问服务器的人都可以触发智能体和工作流执行。在生产中，始终在带TLS的反向代理后运行并配置API密钥。
+
+**WhatsApp和Teams入站Webhook**
+两个平台都对入站webhook负载进行签名。WhatsApp使用Meta验证令牌进行初始握手；Teams通过Bot Framework适配器使用Azure OAuth令牌验证。不要在没有各自验证的情况下暴露这些端点。
+
+**命令中不含敏感数据**
+避免将密钥(API密钥、密码)直接放在命令参数中 — 平台可能会记录它们。登录流程以交互方式询问凭据(而非作为命令参数)正是出于此原因。
+
+---
+
+*文档范围: 仅`channels/`。OpenJiuwen Studio后端架构另行介绍。*

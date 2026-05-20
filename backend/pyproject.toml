@@ -38,6 +38,12 @@ dependencies = [
     "apscheduler==3.10.4",
     "croniter==2.0.5",
     "click>=8.0",
+    # Connect feature dependencies
+    "python-telegram-bot>=20.0",
+    "slack-bolt>=1.18.0",
+    "discord.py>=2.3.0",
+    "botbuilder-core>=4.14.0",
+    "mcp>=1.26.0",
 ]
 
 [project.scripts]

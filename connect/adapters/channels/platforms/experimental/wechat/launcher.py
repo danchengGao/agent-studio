@@ -13,7 +13,7 @@ Setup:
     2. In Developer Settings, set server URL to https://<your-host>/webhook
     3. Set the token (WECHAT_TOKEN) — used for signature verification
     4. Enter your AppID and AppSecret
-    5. See platforms/wechat/SETUP.md for the full guide.
+    5. See platforms/experimental/wechat/SETUP.md for the full guide.
 
 Options:
     WECHAT_TOKEN    Verification token set in WeChat Official Account settings (positional, required)

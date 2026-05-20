@@ -1,6 +1,6 @@
 from .commands import CMD_WORKFLOWS, CMD_WORKFLOW
 from .handlers import workflows_list, workflows_search, workflow_execute
-from ...command_context import CommandContext
+from ....command_context import CommandContext
 
 
 async def handle_command(ctx: CommandContext) -> bool:

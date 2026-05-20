@@ -1,6 +1,6 @@
 from .commands import CMD_AGENTS, CMD_AGENT
 from .handlers import agents_list, agents_search, agent_execute, agent_chat_start, agent_chat_end
-from ...command_context import CommandContext
+from ....command_context import CommandContext
 
 
 async def handle_command(ctx: CommandContext) -> bool:

@@ -1,6 +1,6 @@
 from .commands import CMD_HELP, CMD_START, CMD_HEALTH
 from .handlers import help as help_handler, start, health
-from ...command_context import CommandContext
+from ....command_context import CommandContext
 
 
 async def handle_command(ctx: CommandContext) -> bool:
