@@ -1,5 +1,5 @@
-from .commands import AGENTS, AGENT, SEARCH, EXECUTE, START, END
-from .handlers import handle_list, handle_search, handle_run, handle_chat_start, handle_chat_end
+from .commands import AGENTS, AGENT, SEARCH, EXECUTE, START
+from .handlers import handle_list, handle_search, handle_run, handle_chat_start
 from ....command_context import CommandContext
 
 
@@ -15,8 +15,6 @@ async def handle_command(ctx: CommandContext) -> bool:
     elif ctx.cmd1 == AGENT and ctx.cmd2 == START:
         await handle_chat_start(ctx.user_id, ctx.say, ctx.user_data, agent_id=ctx.parts[2] if len(ctx.parts) > 2
         else "")
-    elif ctx.cmd1 == AGENT and ctx.cmd2 == END:
-        await handle_chat_end(ctx.user_id, ctx.say, ctx.user_data)
     else:
         return False
     return True

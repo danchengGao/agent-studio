@@ -1,6 +1,6 @@
 """Register agent command handlers for the Messenger platform."""
 from .commands import CMD_AGENTS, CMD_AGENT
-from .handlers import agents_list, agents_search, agent_execute, agent_chat_start, agent_chat_end
+from .handlers import agents_list, agents_search, agent_execute, agent_chat_start
 from ....command_context import CommandContext
 
 
@@ -16,9 +16,6 @@ async def handle_command(ctx: CommandContext) -> bool:
         if ctx.cmd2 == 'run':
             name = ' '.join(ctx.parts[2:]) if len(ctx.parts) > 2 else ''
             await agent_chat_start.handle(ctx.user_id, name, ctx.say, ctx.user_data)
-            return True
-        if ctx.cmd2 == 'end':
-            await agent_chat_end.handle(ctx.user_id, ctx.say, ctx.user_data)
             return True
         if ctx.cmd2 == 'execute':
             name = ' '.join(ctx.parts[2:]) if len(ctx.parts) > 2 else ''

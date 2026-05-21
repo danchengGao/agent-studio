@@ -99,8 +99,7 @@ Comment on any issue or PR:
 | `/agents` | List all agents |
 | `/agents search <query>` | Search agents by name |
 | `/agent run <id> <message>` | Run an agent with a single message |
-| `/agent start <id>` | Start a multi-turn agent chat |
-| `/agent end` | End the agent chat session |
+| `/agent chat <id>` | Start a multi-turn agent chat |
 | `/skip` | Skip an optional workflow parameter |
 
 ---

@@ -95,7 +95,6 @@ Once connected, users can send these commands in Messenger:
 | `workflow run <name>` | Run a workflow |
 | `agents` | List all agents |
 | `agent run <name>` | Start agent chat |
-| `agent end` | End agent chat |
 
 ## Troubleshooting
 

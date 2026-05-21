@@ -278,7 +278,7 @@ python -m channels.run cli workflow execute <workflow_id> -i key1=value1 -i key2
 python -m channels.run cli agent list
 python -m channels.run cli agent search <keyword>
 python -m channels.run cli agent execute <agent_id> <message>
-python -m channels.run cli agent start <agent_id>    # Interactive chat (type 'exit' to quit)
+python -m channels.run cli agent chat <agent_id>    # Interactive chat (type 'exit' to quit)
 ```
 
 **With custom backend URL** (`--backend-url` goes before the subcommand):

@@ -21,8 +21,7 @@ async def handle(user_id: str, name: str, say, user_data: dict) -> None:
         set_state(user_data, 'agent_chat')
         await say(
             f"Started chat with agent '{name}'.\n"
-            "Send your messages and the agent will respond.\n"
-            "Send 'agent end' to end the session."
+            "Send your messages and the agent will respond."
         )
     except Exception as e:
         await say(f"Failed to start agent: {e}")

@@ -452,7 +452,7 @@ channels.run cli workflow execute <workflow_id>
 channels.run cli agent list
 channels.run cli agent search <keyword>
 channels.run cli agent execute <agent_id> <message>
-channels.run cli agent start <agent_id>
+channels.run cli agent chat <agent_id>
 ```
 
 For workflow execution, the CLI prompts for each parameter interactively using the same `ParamCollectionSession` as the chat platforms. This makes it suitable for scripting (non-interactive mode) and for manual exploration (interactive mode).

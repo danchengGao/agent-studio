@@ -44,7 +44,7 @@ async def handle_message(user_id: str, text: str, say) -> None:
         return
     if ud.get("agent_chat"):
         low = text.lower()
-        if low in ("agent end", "end", "stop"):
+        if low in ("end", "stop"):
             await handle_agent_end_chat(user_id, text, say)
         else:
             await handle_agent_chat_message(user_id, text, say)

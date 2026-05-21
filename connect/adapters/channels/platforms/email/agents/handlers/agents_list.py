@@ -28,7 +28,7 @@ async def handle_list(user_id: str, say, user_data: dict) -> None:
                 lines.append(f"   {desc[:60]}{'...' if len(desc) > 60 else ''}")
         if total > 10:
             lines.append(f"...and {total - 10} more")
-        lines.append("\nTo chat: agent start <id>  |  Single message: agent execute <id> <msg>")
+        lines.append("\nTo chat: agent chat <id>  |  Single message: agent execute <id> <msg>")
         await say("\n".join(lines))
     except Exception as e:
         await say(f"Error: {e}")

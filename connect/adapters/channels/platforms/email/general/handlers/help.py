@@ -20,8 +20,7 @@ Agents
   agents                         List all agents
   agents search <query>          Search by keyword
   agent execute <id> <message>   Send a single message to an agent
-  agent start <id>               Start an interactive chat session
-  agent end                      End the current chat session
+  agent chat <id>                Start an interactive chat session
 
   help                           Show this message
 

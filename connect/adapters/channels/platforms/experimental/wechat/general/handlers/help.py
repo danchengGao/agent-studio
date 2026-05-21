@@ -15,6 +15,5 @@ async def handle(user_id: str, say, user_data: dict) -> None:
         "",
         "  agents        List agents",
         "  agent run <name>      Start agent chat",
-        "  agent end             End agent chat",
     ]
     await say("\n".join(lines))

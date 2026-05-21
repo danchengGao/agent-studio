@@ -95,7 +95,6 @@ Users can send these commands in WeChat:
 | `workflow run <name>` | Run a workflow |
 | `agents` | List all agents |
 | `agent run <name>` | Start agent chat |
-| `agent end` | End agent chat |
 
 ## Limitations
 

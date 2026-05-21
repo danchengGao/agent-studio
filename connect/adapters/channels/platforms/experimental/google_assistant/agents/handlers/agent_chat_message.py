@@ -8,7 +8,7 @@ async def on_agent_message(user_id, text, say, user_data):
     agent_id = chat_data.get("agent_id")
     if not agent_id:
         user_data["state"] = "idle"
-        await say("No active chat session. Say agent start followed by an ID to begin.")
+        await say("No active chat session. Say agent chat followed by an ID to begin.")
         return
     client, err = get_backend_client(user_id)
     if err:

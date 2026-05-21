@@ -21,8 +21,7 @@ Comment one of the following on any issue or PR:
 | `/agents` | List agents |
 | `/agents search <query>` | Search agents |
 | `/agent run <id> <message>` | Run agent with a message |
-| `/agent start <id>` | Start a multi-turn agent chat |
-| `/agent end` | End agent chat |
+| `/agent chat <id>` | Start a multi-turn agent chat |
 | `/skip` | Skip an optional workflow parameter |
 """
 

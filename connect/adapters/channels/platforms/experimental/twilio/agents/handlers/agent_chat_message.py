@@ -12,7 +12,7 @@ async def handle_agent_chat_message(user_id: str, text: str, say) -> None:
     agent_id = chat.get("agent_id", "")
     conv_id = chat.get("conversation_id", "")
     if not agent_id:
-        await say("No active chat. Send: agent start <agent_id>")
+        await say("No active chat. Send: agent chat <agent_id>")
         return
     client, err = await get_backend_client(user_id, say)
     if err:

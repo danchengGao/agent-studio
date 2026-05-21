@@ -1,6 +1,6 @@
-# Connect — MCP服务器
+# Connect — MCP服务端
 
-MCP服务器将您的OpenJiuwen智能体和工作流公开为**MCP(模型上下文协议)工具**，
+MCP服务端将您的OpenJiuwen智能体和工作流公开为**MCP(模型上下文协议)工具**，
 使任何兼容MCP的AI客户端 — 如**Claude Desktop**或**JiuwenClaw** —
 能够自主发现并调用它们。
 
@@ -103,7 +103,7 @@ python -m connect.adapters.mcp_server \
 
 ### JiuwenClaw
 
-JiuwenClaw是一个具有持久记忆的个人AI助手(与OpenJiuwen同产品系列)，支持MCP服务器连接。连接OpenJiuwen后，JiuwenClaw可以将您的智能体和工作流作为自身推理的一部分进行调用 — 使用结构化工作流处理原本需要逐步解决的任务。
+JiuwenClaw是一个具有持久记忆的个人AI助手(与OpenJiuwen同产品系列)，支持MCP服务端连接。连接OpenJiuwen后，JiuwenClaw可以将您的智能体和工作流作为自身推理的一部分进行调用 — 使用结构化工作流处理原本需要逐步解决的任务。
 
 在JiuwenClaw的MCP客户端设置中注册此服务器，使用与Claude Desktop示例相同的`command`、`args`和`cwd`。具体配置格式请参阅JiuwenClaw文档。
 

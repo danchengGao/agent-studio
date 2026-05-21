@@ -43,7 +43,7 @@ async def handle_command(user_id: str, command: str, say) -> None:
         return
     if ud.get("agent_chat"):
         low = command.lower()
-        if low in ("agent end", "end", "stop"):
+        if low in ("end", "stop"):
             await handle_agent_end_chat(user_id, command, say)
         else:
             await handle_agent_chat_message(user_id, command, say)

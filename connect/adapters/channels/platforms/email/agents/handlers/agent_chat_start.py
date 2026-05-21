@@ -4,7 +4,7 @@ from ...client_session import get_backend_client
 
 async def handle_chat_start(user_id: str, say, user_data: dict, agent_id: str = "") -> None:
     if not agent_id:
-        await say("Usage: agent start <agent-id>")
+        await say("Usage: agent chat <agent-id>")
         return
     client, err = get_backend_client(user_id)
     if err:
@@ -14,6 +14,5 @@ async def handle_chat_start(user_id: str, say, user_data: dict, agent_id: str = 
     user_data["state"] = "agent_chat"
     await say(
         f"Started chat with agent: {agent_id}\n"
-        "Reply to this email with your messages to chat.\n"
-        "Send: agent end  — to finish the session."
+        "Reply to this email with your messages to chat."
     )

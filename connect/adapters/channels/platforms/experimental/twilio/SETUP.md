@@ -92,8 +92,7 @@ python -m channels.run twilio <ACCOUNT_SID> <AUTH_TOKEN> <FROM_NUMBER> [OPTIONS]
 | `agents` | List agents |
 | `agents search <query>` | Search agents |
 | `agent run <id> <message>` | Run an agent once |
-| `agent start <id>` | Start a multi-turn agent chat |
-| `agent end` | End the chat session |
+| `agent chat <id>` | Start a multi-turn agent chat |
 | `skip` | Skip an optional workflow parameter |
 
 ---

@@ -20,7 +20,7 @@ async def handle_list(user_id, say, user_data):
             lines.append(f"{i}. {a.get('agent_name', 'Unnamed')} with ID {a.get('agent_id', 'N/A')}")
         if total > 10:
             lines.append(f"And {total - 10} more.")
-        lines.append("To chat, say: agent start followed by the ID.")
+        lines.append("To chat, say: agent chat followed by the ID.")
         await say("\n".join(lines))
     except Exception as e:
         await say(f"Error: {e}")

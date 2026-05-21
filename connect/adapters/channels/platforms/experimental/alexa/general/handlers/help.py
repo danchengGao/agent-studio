@@ -4,6 +4,6 @@ async def handle(user_id: str, say, user_data: dict) -> None:
         "help, start, health, "
         "login, logout, status, "
         "workflows, workflow run followed by name, "
-        "agents, agent run followed by name, agent end. "
+        "agents, agent run followed by name. "
         "What would you like to do?"
     )

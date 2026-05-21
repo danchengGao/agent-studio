@@ -120,7 +120,6 @@ Responses are optimized for speech:
 | workflow run [name] | Run a workflow |
 | agents | List all agents |
 | agent run [name] | Start agent chat |
-| agent end | End agent chat |
 
 ## Troubleshooting
 

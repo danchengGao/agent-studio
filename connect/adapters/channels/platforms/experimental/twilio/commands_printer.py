@@ -18,8 +18,7 @@ Available commands (send as SMS text):
   agents                       List agents
   agents search <query>        Search agents
   agent run <id> <message>     Run agent with a message
-  agent start <id>             Start an agent chat
-  agent end                    End agent chat
+  agent chat <id>             Start an agent chat
 
   help                         Show this message
 """

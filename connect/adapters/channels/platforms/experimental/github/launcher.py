@@ -36,7 +36,7 @@ Commands (comment on any issue or PR):
     /login /logout /status /cancel /health /help
     /workflows   /workflows search <q>   /workflow run <id>
     /agents      /agents search <q>      /agent run <id> <msg>
-    /agent start <id>    /agent end      /skip
+    /agent chat <id>    /skip
 
 Examples:
     python -m connect.adapters.channels.run github ghp_...
