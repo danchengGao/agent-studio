@@ -60,7 +60,14 @@ const CronConfigForm: React.FC<CronConfigFormProps> = ({ value, onChange, disabl
 
     if (dom === '*' && month === '*' && dow !== '*') {
       parsedFrequency = 'weekly'
-      const days = dow.split(',').map(d => parseInt(d)).filter(d => !isNaN(d))
+      const ABBR_TO_IDX: Record<string, number> = {
+        sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
+      }
+      const days = dow.split(',').map(d => {
+        const num = parseInt(d)
+        if (!isNaN(num)) return num
+        return ABBR_TO_IDX[d.toLowerCase()] ?? NaN
+      }).filter(d => !isNaN(d))
       if (days.length > 0) parsedDaysOfWeek = days
     } else if (dom !== '*' && month === '*' && dow === '*') {
       parsedFrequency = 'monthly'
@@ -97,6 +104,11 @@ const CronConfigForm: React.FC<CronConfigFormProps> = ({ value, onChange, disabl
       : utcOffsetHours > 0
         ? `UTC+${utcOffsetHours}`
         : `UTC${utcOffsetHours}`
+
+  // Day abbreviations matching POSIX index (0=Sun … 6=Sat).
+  // These are used when building the cron expression so APScheduler's
+  // from_crontab() correctly interprets Friday as Friday (not Saturday).
+  const DAY_ABBR = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
   const daysOfWeek = [
     { value: 0, label: 'Sunday' },
@@ -146,11 +158,15 @@ const CronConfigForm: React.FC<CronConfigFormProps> = ({ value, onChange, disabl
     switch (frequency) {
       case 'daily':
         return `${minute} ${hour} * * *`
-      case 'weekly':
+      case 'weekly': {
+        // Use 3-letter abbreviations so APScheduler from_crontab() maps
+        // them correctly (numeric POSIX 5 = Friday, but APScheduler-native
+        // 5 = Saturday, so names avoid the off-by-one bug).
         const days = selectedDaysOfWeek.length > 0
-          ? selectedDaysOfWeek.sort((a, b) => a - b).join(',')
-          : '1'
+          ? selectedDaysOfWeek.sort((a, b) => a - b).map(d => DAY_ABBR[d]).join(',')
+          : 'mon'
         return `${minute} ${hour} * * ${days}`
+      }
       case 'monthly':
         return `${minute} ${hour} ${dayOfMonth} * *`
       case 'custom':

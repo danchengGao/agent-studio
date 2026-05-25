@@ -7,6 +7,43 @@ from apscheduler.triggers.interval import IntervalTrigger
 from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.models.trigger import TriggerDB
 
+# POSIX cron day-of-week: 0=Sun, 1=Mon … 6=Sat (7=Sun alias)
+# APScheduler from_crontab() does NOT convert numeric values — it treats
+# them with its own 0=Mon convention, causing an off-by-one for all days.
+# Replacing numbers with 3-letter names makes from_crontab() unambiguous.
+_POSIX_DOW_NAMES = {
+    "0": "sun", "7": "sun",
+    "1": "mon", "2": "tue", "3": "wed",
+    "4": "thu", "5": "fri", "6": "sat",
+}
+
+
+def _normalize_dow_token(token: str) -> str:
+    """Replace a single dow token (number, range, step) with name equivalents."""
+    if "/" in token:
+        base, step = token.split("/", 1)
+        return f"{_normalize_dow_token(base)}/{step}"
+    if "-" in token:
+        start, end = token.split("-", 1)
+        return f"{_POSIX_DOW_NAMES.get(start, start)}-{_POSIX_DOW_NAMES.get(end, end)}"
+    return _POSIX_DOW_NAMES.get(token, token)
+
+
+def _normalize_posix_cron(cron_expr: str) -> str:
+    """
+    Convert the day-of-week field of a POSIX cron expression from numeric
+    values to 3-letter abbreviations so that APScheduler's from_crontab()
+    interprets them correctly (APScheduler numeric 0=Mon ≠ POSIX numeric 0=Sun).
+    """
+    parts = cron_expr.strip().split()
+    if len(parts) != 5:
+        return cron_expr
+    minute, hour, dom, month, dow = parts
+    if dow == "*":
+        return cron_expr
+    normalized_dow = ",".join(_normalize_dow_token(t) for t in dow.split(","))
+    return f"{minute} {hour} {dom} {month} {normalized_dow}"
+
 
 def _job_id(trigger: TriggerDB) -> str:
     return f"trigger_{trigger.trigger_id}"
@@ -25,7 +62,11 @@ def register_trigger_job(scheduler: AsyncIOScheduler, trigger: TriggerDB) -> str
 
     if trigger.trigger_type == "cron":
         cron_expr = config.get("cron_expr", "* * * * *")
-        ap_trigger = CronTrigger.from_crontab(cron_expr, timezone="UTC")
+        # Normalize POSIX numeric day-of-week to names before passing to
+        # APScheduler; from_crontab() does not convert POSIX 0=Sun numbering
+        # to its own 0=Mon convention, which causes an off-by-one for weekly.
+        cron_expr_normalized = _normalize_posix_cron(cron_expr)
+        ap_trigger = CronTrigger.from_crontab(cron_expr_normalized, timezone="UTC")
     elif trigger.trigger_type == "polling":
         interval = int(config.get("poll_interval_seconds", 300))
         ap_trigger = IntervalTrigger(seconds=interval, timezone="UTC")
