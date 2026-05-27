@@ -6,7 +6,7 @@ from typing import List
 from openjiuwen_studio.core.common import dsl
 from openjiuwen_studio.schemas.node import Node, BaseValue
 from openjiuwen_studio.core.manager.convertor.components.common import input_params_convert, exception_config_convert
-from openjiuwen_studio.core.common.dsl import ComponentType
+from openjiuwen_studio.core.common.dsl import ComponentType, ExceptConfig
 
 output_type_mapping = {
     "string": "string",
@@ -43,14 +43,12 @@ def _code_config_convert(node: Node) -> dsl.CodeConfig:
     data = node.data
     inputs = data.inputs
     exception_conf = data.exception_config
-    if exception_conf is None:
-        raise TypeError("exception config is none")
 
     return dsl.CodeConfig(
         language=inputs.language,
         code=inputs.code,
         output_params=_output_params_convert(node),
-        exception_config=exception_config_convert(exception_conf),
+        exception_config=exception_config_convert(exception_conf) if exception_conf is not None else ExceptConfig(),
     )
 
 

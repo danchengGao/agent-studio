@@ -8,85 +8,6 @@
       "retry": "重试"
     },
     "messages": {
-      "unknownError": "未知错误",
-      "networkError": "网络错误"
-    },
-    "deleting": "删除中...",
-    "buttons": {
-      "save": "保存",
-      "cancel": "取消",
-      "confirm": "确认",
-      "deleting": "删除中...",
-      "delete": "删除",
-      "edit": "编辑",
-      "view": "查看",
-      "create": "创建",
-      "createAndContinue": "创建并继续",
-      "update": "更新",
-      "search": "搜索",
-      "filter": "筛选",
-      "refresh": "刷新",
-      "export": "导出",
-      "import": "导入",
-      "copy": "复制",
-      "share": "分享",
-      "test": "测试",
-      "run": "运行",
-      "stop": "停止",
-      "start": "启动",
-      "publish": "发布",
-      "archive": "归档",
-      "restore": "恢复",
-      "back": "返回",
-      "next": "下一步",
-      "previous": "上一步",
-      "submit": "提交",
-      "reset": "重置",
-      "clear": "清空",
-      "select": "选择",
-      "selectAll": "全选",
-      "deselectAll": "取消全选",
-      "add": "添加",
-      "close": "关闭"
-    },
-    "tooltips": {
-      "clickToEditName": "点击编辑名称",
-      "clickToEditDescription": "点击编辑描述",
-      "stopAgent": "停止智能体",
-      "runAgent": "运行智能体",
-      "editAgent": "编辑智能体",
-      "copyAgent": "复制智能体",
-      "deleteAgent": "删除智能体",
-      "copyWorkflow": "复制工作流",
-      "deleteWorkflow": "删除工作流",
-      "save": "保存",
-      "cancel": "取消"
-    },
-    "view": {
-      "gridView": "网格视图",
-      "tableView": "表格视图",
-      "searchPlaceholder": "搜索..."
-    },
-    "card": {
-      "editedAgo": "编辑于"
-    },
-    "status": {
-      "active": "活跃",
-      "inactive": "非活跃",
-      "draft": "草稿",
-      "published": "已发布",
-      "archived": "已归档",
-      "deleted": "已删除",
-      "loading": "加载中...",
-      "saving": "保存中...",
-      "creating": "创建中...",
-      "success": "成功",
-      "error": "错误",
-      "warning": "警告",
-      "info": "信息",
-      "all": "所有状态"
-    },
-    "messages": {
       "noData": "暂无数据",
       "loading": "加载中...",
       "noDescription": "暂无描述",
@@ -151,10 +72,86 @@
       "executionFailed": "抱歉，处理您的请求时遇到了问题。请稍后再试",
       "sse": {
         "timeoutError": {
-          "title": "连接超时",
-          "content": "由于长时间未接收到数据，请求已超时。请检查网络连接后重试。"
+          "title": "超时取消",
+          "content": "由于长时间未操作或未接收到数据，对话已超时取消。请检查网络连接后重新提问。"
         }
       }
+    },
+    "deleting": "删除中...",
+    "buttons": {
+      "save": "保存",
+      "cancel": "取消",
+      "confirm": "确认",
+      "deleting": "删除中...",
+      "delete": "删除",
+      "edit": "编辑",
+      "view": "查看",
+      "create": "创建",
+      "createAndContinue": "创建并继续",
+      "update": "更新",
+      "search": "搜索",
+      "filter": "筛选",
+      "refresh": "刷新",
+      "export": "导出",
+      "import": "导入",
+      "copy": "复制",
+      "share": "分享",
+      "test": "测试",
+      "run": "运行",
+      "stop": "停止",
+      "stopResponse": "停止响应",
+      "start": "启动",
+      "publish": "发布",
+      "archive": "归档",
+      "restore": "恢复",
+      "back": "返回",
+      "next": "下一步",
+      "previous": "上一步",
+      "submit": "提交",
+      "reset": "重置",
+      "clear": "清空",
+      "select": "选择",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "add": "添加",
+      "close": "关闭"
+    },
+    "tooltips": {
+      "clickToEditName": "点击编辑名称",
+      "clickToEditDescription": "点击编辑描述",
+      "stopAgent": "停止智能体",
+      "runAgent": "运行智能体",
+      "editAgent": "编辑智能体",
+      "copyAgent": "复制智能体",
+      "deleteAgent": "删除智能体",
+      "copyWorkflow": "复制工作流",
+      "deleteWorkflow": "删除工作流",
+      "save": "保存",
+      "cancel": "取消"
+    },
+    "view": {
+      "gridView": "网格视图",
+      "tableView": "表格视图",
+      "searchPlaceholder": "搜索..."
+    },
+    "card": {
+      "editedAgo": "编辑于"
+    },
+    "status": {
+      "active": "活跃",
+      "inactive": "非活跃",
+      "draft": "草稿",
+      "published": "已发布",
+      "archived": "已归档",
+      "deleted": "已删除",
+      "loading": "加载中...",
+      "saving": "保存中...",
+      "creating": "创建中...",
+      "success": "成功",
+      "error": "错误",
+      "warning": "警告",
+      "info": "信息",
+      "all": "所有状态"
     },
     "pagination": {
       "previous": "上一页",
@@ -164,9 +161,10 @@
       "page": "第 {{current}} 页，共 {{total}} 页",
       "pagePrefix": "第",
       "pageSuffix": "/ {{total}} 页",
-      "total": "共 {{total}} 条记录",
+      "total": "共 {{total}} 条",
       "pageSize": "每页显示",
-      "items": "条"
+      "items": "条",
+      "itemsPerPage": "条/页"
     },
     "search": {
       "placeholder": "搜索...",
@@ -525,6 +523,10 @@
       "switchUser": "切换用户空间",
       "language": "Language",
       "currentLanguage": "中文",
+      "theme": "主题",
+      "themeLight": "浅色",
+      "themeDark": "深色",
+      "themeAuto": "跟随系统",
       "switchToEnglish": "English",
       "switchToChinese": "中文",
       "switchToNewVersion": "体验新版",
@@ -708,7 +710,6 @@
       "allConversations": "所有对话",
       "expandHistory": "展开对话历史",
       "collapseHistory": "收起对话历史",
-      "conversationInProgress": "对话进行中，请稍候...",
       "newConversation": "发起新对话",
       "conversationTimeout": "对话已超时，强制中断当前传输",
       "forceStop": "强制中断",
@@ -716,7 +717,8 @@
       "deepSearchServiceUnavailable": "DeepSearch 服务暂不可用，请前往",
       "deepSearchConfigRetry": "，参考文档进行配置后重试",
       "checkingDeepsearch": "正在检查 DeepSearch 服务状态...",
-      "deepsearchServiceDown": "DeepSearch 服务暂时不可用"
+      "deepsearchServiceDown": "DeepSearch 服务暂时不可用",
+      "stopDeepSearch": "停止 DeepSearch"
     },
     "picker": {
       "selectAgent": "选择智能体",
@@ -800,6 +802,27 @@
       "cancelledTip": "已取消",
       "unknownTip": "状态未知"
     },
+    "outlineInteraction": {
+      "researchOutline": "研究大纲",
+      "waitingForConfirm": "等待确认",
+      "confirmed": "已确认",
+      "cancelled": "已取消",
+      "modifyTip": "基于以上分析，我为您生成了一份研究大纲，您可以对大纲进行手动编辑或直接在下方对话框中输入修改意见。大纲确认无误后点击“开始研究”。",
+      "startResearch": "开始研究",
+      "edit": "编辑",
+      "editOutline": "大纲编辑",
+      "addSection": "新增章节",
+      "chapter": "第",
+      "chapterLabel": "第{{index}}章",
+      "sectionTitle": "标题",
+      "sectionDescription": "摘要",
+      "titlePlaceholder": "请输入章节标题",
+      "descriptionPlaceholder": "请输入章节摘要",
+      "cancelEdit": "取消",
+      "saveOutline": "保存",
+      "editAndRevisePrompt": "根据我编辑的内容，修改大纲",
+      "remainingRoundsWarning": "当前剩余修改次数：{{count}}次"
+    },
     "chart": {
       "mermaidError": "Mermaid 图表错误",
       "syntaxError": "Mermaid 语法错误",
@@ -815,7 +838,23 @@
       "createdAt": "创建时间",
       "contentEmpty": "报告内容为空",
       "loadingTimeout": "加载超时",
-      "timeoutMessage": "报告内容加载时间过长，请稍后重试"
+      "timeoutMessage": "报告内容加载时间过长，请稍后重试",
+      "viewToggle": {
+        "thinkingChain": "思维链",
+        "reportView": "报告",
+        "ariaLabel": "视图切换",
+        "comingSoon": "功能开发中，敬请期待..."
+      },
+      "edit": "编辑",
+      "exitEdit": "退出编辑",
+      "aiRewrite": "AI改写",
+      "aiPolish": "润色",
+      "aiExpand": "扩写",
+      "aiShrink": "缩写",
+      "howToRewrite": "你想如何改写？",
+      "send": "发送",
+      "thinking": "正在思考...",
+      "writing": "正在撰写..."
     },
     "user": {
       "defaultUsername": "用户"
@@ -839,19 +878,63 @@
         "general": "通用配置",
         "search": "搜索配置",
         "template": "模板配置",
+        "model": "模型配置",
         "generalDesc": "交互、规划等基础设置",
         "searchDesc": "联网增强引擎与结果设置",
         "templateDesc": "报告模板管理",
         "needsConfig": "需配置"
       },
+      "model": {
+        "general": {
+          "title": "基础配置",
+          "label": "通用模型",
+          "description": "建议使用综合能力较强的模型，适配全部模块",
+          "notSelected": "未选择模型",
+          "required": "通用模型为必选项"
+        },
+        "advanced": {
+          "title": "高级配置",
+          "expand": "展开配置",
+          "collapse": "收起配置",
+          "info": "未选择特定模型的模块，默认使用通用模型进行研究"
+        },
+        "outline": {
+          "label": "生成大纲",
+          "description": "",
+          "recommendation": "建议使用推理模型，理解用户意图，减少幻觉"
+        },
+        "infoCollecting": {
+          "label": "信息收集",
+          "description": "",
+          "recommendation": "简单模型即可，快速总结收集的信息"
+        },
+        "reportWriting": {
+          "label": "报告撰写",
+          "description": "",
+          "recommendation": "建议使用编程、数学能力较强的模型"
+        },
+        "useGeneral": "未选择",
+        "selectModel": "选择模型",
+        "clear": "清除选择",
+        "test": {
+          "success": "模型 {{modelName}} 测试成功",
+          "failed": "模型 {{modelName}} 测试失败，模型不可用"
+        }
+      },
       "general": {
         "interactionSettings": "交互设置",
-        "enableHumanInteraction": "启用人机交互",
-        "enableHumanInteractionDesc": "执行时询问确认",
+        "enableHumanInteraction": "启用问答交互",
+        "enableHumanInteractionDesc": "在问答过程中与用户交互确认",
+        "outlineInteractionEnabled": "启用大纲交互",
+        "outlineInteractionEnabledDesc": "允许用户在大纲阶段进行修改",
+        "executionModeEnabled": "启用依赖模式",
+        "executionModeEnabledDesc": "依赖模式可增强报告一致性，但会延长报告生成时间，请按需选择",
         "enableTraceability": "启用溯源",
         "enableTraceabilityDesc": "显示信息来源",
         "enableSourceTracerInfer": "启用溯源推理",
         "enableSourceTracerInferDesc": "生成溯源推理图谱",
+        "userFeedbackProcessorEnable": "启用用户反馈优化",
+        "userFeedbackProcessorEnableDesc": "生成报告后支持基于用户反馈的 AI 优化，关闭则报告不可编辑",
         "chapterCount": "章节数量",
         "chapterCountDesc": "控制报告最大章节数量"
       },
@@ -870,7 +953,15 @@
         "clickToConfig": "点击上方\"配置\"按钮添加联网增强引擎",
         "localKB": "本地知识库",
         "noKB": "暂无知识库配置",
-        "clickToAddKB": "点击上方\"添加知识库\"按钮选择"
+        "qpsTitle": "联网增强引擎请求速率",
+        "qpsDesc": "每秒发送的搜索请求数量",
+        "qpsUnlimited": "0 表示不限流，支持小数（如 0.5=每 2 秒 1 个请求）",
+        "qpsInputPlaceholder": "QPS",
+        "qpsInputSuffix": "条/秒",
+        "clickToAddKB": "点击上方\"配置\"按钮添加知识库",
+        "deepSearchKnowledgeBase": "配置 DeepSearch 知识库",
+        "refresh": "刷新",
+        "noDeepSearchKB": "暂无 DeepSearch 知识库，请先在知识库中同步至 Deep Search"
       },
       "validation": {
         "chapterCountRange": "规划章节数量必须在 1-10 之间",
@@ -878,7 +969,8 @@
         "webModeRequires": "联网增强模式下必须选择一个联网增强引擎",
         "localModeRequires": "本地搜索模式下必须选择至少一个知识库",
         "webResultCountRange": "联网增强结果数量必须在 1-10 之间",
-        "localResultCountRange": "本地搜索结果数量必须在 1-10 之间"
+        "localResultCountRange": "本地搜索结果数量必须在 1-10 之间",
+        "generalModelRequired": "通用模型为必选项，请先选择模型"
       },
       "engine": {
         "select": "选择联网增强引擎",
@@ -901,6 +993,17 @@
         "saving": "保存中...",
         "cancel": "取消",
         "confirm": "确认",
+        "status": {
+          "enabled": "启用",
+          "disabled": "禁用"
+        },
+        "action": {
+          "test": "测试",
+          "edit": "编辑",
+          "delete": "删除",
+          "enable": "启用",
+          "disable": "禁用"
+        },
         "error": {
           "selectType": "请选择一个联网增强引擎类型",
           "invalidName": "引擎名称必须是预设值之一",
@@ -908,7 +1011,7 @@
         },
         "presets": {
           "xunfei": "讯飞搜索",
-          "petal": "花瓣搜索",
+          "petal": "小艺AI问答\n联网增强",
           "tavily": "Tavily",
           "google": "Google",
           "custom": "自定义"
@@ -958,6 +1061,12 @@
         "loading": "加载中...",
         "confirm": "确认 ({{count}})",
         "cancel": "取消",
+        "refresh": "刷新",
+        "status": {
+          "ready": "已就绪",
+          "processing": "处理中",
+          "failed": "处理失败"
+        },
         "error": {
           "loadFailed": "获取知识库列表失败",
           "loadError": "加载知识库列表时出错",
@@ -1001,7 +1110,9 @@
         "templateDesc": "模板描述",
         "emptyTitle": "暂无可用模板",
         "emptyDescription": "上传模板后即可使用",
-        "uploadButton": "上传模板"
+        "uploadButton": "上传模板",
+        "invalidFileType": "不支持的文件类型，请上传 {{formats}} 格式的文件",
+        "fileTypeChanged": "已切换模式，原文件类型不再支持，请重新选择文件"
       }
     },
     "time": {
@@ -1035,7 +1146,12 @@
       "networkError": "网络连接失败，请检查网络"
     },
     "deepSearch": {
-      "informationCollection": "信息收集{{index}}",
+      "informationCollection": "任务{{sectionId}}.{{planIndex}}",
+      "planNode": "任务计划",
+      "subTask": "任务",
+      "subTaskDetail": "子任务详情",
+      "more": "更多...",
+      "clickToViewDetails": "点击查看详细信息...",
       "informationSummary": "信息总结",
       "researchOutline": "研究大纲",
       "generatingOutline": "正在生成大纲...",
@@ -1049,16 +1165,60 @@
       "collapse": "收起",
       "expand": "展开 {{count}} 项",
       "statusUnknown": "准完成",
+      "conversationCancelled": "对话已取消",
+      "conversationCancelledTip": "DeepSearch 对话已被手动中断",
       "collapseContent": "折叠内容",
       "expandContent": "展开内容",
+      "remainingRewriteRounds": "还可改写",
+      "times": "次",
+      "noRewriteRoundsLeft": "改写次数已用完",
       "status": {
         "pending": "待开始",
-        "inProgress": "报告生成中",
-        "completed": "报告已生成",
+        "inProgress": "进行中",
+        "reporting": "报告正在生成中",
+        "completed": "已完成",
         "failed": "生成失败",
-        "cancelled": "已手动结束",
+        "cancelled": "已取消",
         "unknown": "准完成",
         "default": "未知状态"
+      },
+      "mindMapStatus": {
+        "pending": "等待中",
+        "inProgress": "研究中",
+        "reporting": "报告正在生成中",
+        "completed": "已完成",
+        "failed": "失败",
+        "cancelled": "取消",
+        "unknown": "准完成",
+        "default": "状态未知"
+      },
+      "mindMap": {
+        "title": "思维链",
+        "sectionGraph": "章节图",
+        "taskGraph": "任务图",
+        "toggleGraphType": "切换图类型",
+        "toggleDirection": "切换布局方向",
+        "openMindMap": "查看思维链",
+        "viewMindMap": "思维链",
+        "noData": "暂无思维链数据",
+        "relayout": "重新布局",
+        "researchTopic": "研究主题",
+        "researchCompleted": "研究完成",
+        "finalReport": {
+          "waitingForWriting": "等待撰写",
+          "writingInProgress": "撰写中...",
+          "writingCompleted": "生成时间: {{time}}",
+          "writingException": "撰写异常",
+          "cancelled": "已取消"
+        },
+        "edge": {
+          "frameworkSupport": "框架支撑",
+          "basicDependence": "基础依赖",
+          "theoreticalGuidance": "理论指导",
+          "conclusionExtension": "结论延伸",
+          "informationIntegration": "信息整合",
+          "problemOriented": "问题导向"
+        }
       },
       "loading": "加载中...",
       "reportCard": "报告",
@@ -1068,9 +1228,9 @@
         "generating": "最终报告生成中",
         "summarizing": "正在汇总分析结果，请稍候...",
         "failed": "报告生成失败",
-        "unknownError": "未知异常",
-        "bothEmpty": "报告内容和异常信息均为空",
-        "noDataError": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
+        "exceptionError": "报告生成异常，详见：https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "unknownError": "报告生成异常，详见：https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "noDataError": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。详见：https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md"
       },
       "playback": {
         "panelTitle": "调试面板",
@@ -1128,7 +1288,7 @@
       "researchChapter": "研究章节 {{sectionIdx}}",
       "finalReport": "最终报告",
       "informationSummary": "信息总结",
-      "informationCollection": "信息收集{{index}}",
+      "informationCollection": "任务{{sectionId}}.{{planIndex}}",
       "searchResult": "搜索结果",
       "reportGenerationFailed": "报告生成失败：未收到最终报告数据。可能的原因包括：网络连接中断、服务端异常或任务被提前终止。"
     }
@@ -1137,6 +1297,25 @@
     "title": "工作流编排",
     "subtitle": "设计、管理和监控您的自动化工作流，构建高效的业务流程",
     "createWorkflow": "创建工作流",
+    "importWorkflow": "导入工作流",
+    "import": {
+      "title": "导入工作流",
+      "subtitle": "从JSON文件导入工作流（支持OpenJiuwen或n8n格式）",
+      "file": "工作流文件",
+      "dragDrop": "拖拽JSON文件到此处，或点击选择文件",
+      "selectFile": "选择文件",
+      "fileFormat": "支持格式：.json（OpenJiuwen原生格式或n8n格式）",
+      "validateStrict": "严格验证",
+      "validateStrictDesc": "验证工作流是否可以编译和执行",
+      "importButton": "导入工作流",
+      "importing": "导入中...",
+      "success": "工作流导入成功",
+      "errors": {
+        "noFile": "请选择要导入的文件",
+        "invalidFileType": "请选择有效的JSON文件",
+        "importFailed": "工作流导入失败"
+      }
+    },
     "workflowList": {
       "title": "工作流列表",
       "noWorkflows": "暂无工作流",
@@ -1179,6 +1358,9 @@
       "copySuccess": "工作流\"{{name}}\"复制成功！",
       "copyFailed": "工作流\"{{name}}\"复制失败",
       "copyError": "工作流\"{{name}}\"复制失败，请稍后重试",
+      "exportSuccess": "工作流导出成功",
+      "exportFailed": "工作流导出失败",
+      "exportError": "工作流\"{{name}}\"导出失败：{{error}}",
       "tagUpdateSuccess": "标签更新成功",
       "tagUpdateFailed": "标签更新失败",
       "tagLimitError": "每个工作流最多只能设置3个标签",
@@ -2156,6 +2338,10 @@
     "configInfo": "配置信息",
     "testCompletion": "测试完成",
     "testFailed": "测试失败",
+    "modelName": "模型",
+    "promptText": "提示词",
+    "averageResponseTime": "平均响应时间",
+    "unknownError": "未知错误",
     "modelList": {
       "title": "模型列表",
       "noModels": "暂无模型",
@@ -2194,14 +2380,14 @@
       "title": "模型配置",
       "basicInfo": {
         "charNum": "字符数: ",
-        "name": "模型友好名称",
-        "nameHint": "模型友好标识名称，用于界面显示区分（如 \"通用大模型v3\"）",
-        "embeddingNameHint": "Embedding 模型友好标识名称，用于界面显示区分（如 \"文本嵌入模型v2\"）",
+        "name": "模型名称",
+        "nameHint": "模型友好名称，用于界面显示区分（如 \"通用大模型v3\"）",
+        "embeddingNameHint": "Embedding 模型友好名称，用于界面显示区分（如 \"文本嵌入模型v2\"）",
         "nameError": "模型友好名称过长，请控制在100字符以内.",
         "provider": "API协议",
         "providerHint": "选择 API 调用协议类型，决定请求方式和响应解析规则",
         "embeddingProviderHint": "Embedding 模型仅支持 OpenAI 协议",
-        "type": "模型标识符",
+        "type": "模型ID",
         "typeHint": "调用API时指定的模型ID，需与服务端一致（如 \"deepseek-chat\"）",
         "embeddingTypeHint": "调用API时指定的 Embedding 模型ID，需与服务端一致（如 \"text-embedding\"）",
         "version": "版本",
@@ -2218,7 +2404,7 @@
         "apiKey": "API 密钥",
         "apiKeyHint": "模型服务的身份验证凭证，从对应平台控制台获取",
         "baseUrl": "基础服务地址",
-        "baseUrlHint": "模型 API 服务的根地址",
+        "baseUrlHint": "模型 API 服务的根地址（如：\"https://api.modelarts-maas.com/openai/v1\"）",
         "endpoint": "端点URL",
         "endpointError": "基础URL必须以 http:// 或 https:// 开头",
         "maxTokens": "最大Token数",
@@ -2456,7 +2642,74 @@
     "url": "插件链接",
     "tagsLabel": "标签",
     "basicInfo": {
-      "name": "插件名称"
+      "title": "基本信息",
+      "name": "插件名称",
+      "namePlaceholder": "请输入插件名称",
+      "version": "版本号",
+      "versionPlaceholder": "请输入版本号",
+      "description": "插件描述",
+      "descriptionPlaceholder": "请输入插件描述",
+      "author": "作者",
+      "authorPlaceholder": "请输入作者",
+      "icon": "图标",
+      "type": "类型",
+      "published": "已发布",
+      "unpublished": "未发布",
+      "publishStatus": "发布状态",
+      "homepage": "主页",
+      "homepagePlaceholder": "请输入主页地址",
+      "repository": "代码仓库",
+      "repositoryPlaceholder": "请输入代码仓库地址",
+      "license": "许可证",
+      "licensePlaceholder": "请输入许可证",
+      "keywords": "关键词",
+      "keywordsPlaceholder": "请输入关键词",
+      "readme": "说明文档",
+      "readmePlaceholder": "请输入说明文档",
+      "changelog": "更新日志",
+      "changelogPlaceholder": "请输入更新日志",
+      "typePlaceholder": "请选择插件类型",
+      "category": "插件分类",
+      "categoryPlaceholder": "请选择插件分类",
+      "tags": "标签",
+      "tagsPlaceholder": "请输入标签",
+      "iconPlaceholder": "请输入图标地址",
+      "banner": "横幅",
+      "bannerPlaceholder": "请输入横幅地址",
+      "screenshots": "截图",
+      "screenshotsPlaceholder": "请输入截图地址",
+      "video": "视频",
+      "videoPlaceholder": "请输入视频地址",
+      "demo": "演示",
+      "demoPlaceholder": "请输入演示地址",
+      "docs": "文档",
+      "docsPlaceholder": "请输入文档地址",
+      "support": "支持",
+      "supportPlaceholder": "请输入支持信息",
+      "community": "社区",
+      "communityPlaceholder": "请输入社区信息",
+      "contributing": "贡献",
+      "contributingPlaceholder": "请输入贡献指南",
+      "codeOfConduct": "行为准则",
+      "codeOfConductPlaceholder": "请输入行为准则",
+      "security": "安全",
+      "securityPlaceholder": "请输入安全信息",
+      "privacy": "隐私",
+      "privacyPlaceholder": "请输入隐私政策",
+      "terms": "条款",
+      "termsPlaceholder": "请输入服务条款",
+      "disclaimer": "免责声明",
+      "disclaimerPlaceholder": "请输入免责声明",
+      "warranty": "保修",
+      "warrantyPlaceholder": "请输入保修信息",
+      "liability": "责任",
+      "liabilityPlaceholder": "请输入责任信息",
+      "trademark": "商标",
+      "trademarkPlaceholder": "请输入商标信息",
+      "copyright": "版权",
+      "copyrightPlaceholder": "请输入版权信息",
+      "patent": "专利",
+      "patentPlaceholder": "请输入专利信息"
     },
     "basicInfoLabel": "基本信息",
     "usageStatsLabel": "使用统计",
@@ -2531,7 +2784,10 @@
         "downloadCount": "下载次数:",
         "currentStatus": "当前状态:",
         "tags": "标签",
-        "permissions": "权限要求"
+        "permissions": "权限要求",
+        "requiredConfiguration": "必要配置",
+        "headerName": "请求头名称",
+        "defaultValue": "默认值"
       },
       "publishPlugin": {
         "pluginId": "插件ID",
@@ -2541,7 +2797,32 @@
         "versionDescription": "版本描述",
         "versionDescPlaceholder": "描述此版本的更新内容...",
         "versionDescHelperText": "请详细描述此版本的更新内容、新功能或修复的问题"
+      },
+      "mcpPluginForm": {
+        "createTitle": "创建MCP插件",
+        "editTitle": "编辑MCP插件",
+        "namePlaceholder": "例如：GitHub MCP、文件系统MCP、浏览器MCP",
+        "descriptionPlaceholder": "详细描述MCP插件的功能、用途及适用场景...",
+        "url": "MCP服务器URL",
+        "urlPlaceholder": "输入MCP服务器地址（例如：http://localhost:3000/sse）",
+        "urlHelper": "请提供完整的MCP服务器地址，包含协议(http) ({{current}}/{{max}}字节)",
+        "openApiFileLabel": "OpenAPI规范文件",
+        "openApiFilePlaceholder": "输入OpenAPI规范文件路径（例如：/path/to/openapi.yaml）",
+        "openApiFileHelper": "提供OpenAPI规范文件（YAML或JSON）的文件系统路径",
+        "stdioPathLabel": "STDIO服务器可执行路径",
+        "stdioPathPlaceholder": "输入STDIO服务器可执行文件路径（例如：/usr/local/bin/mcp-server）",
+        "stdioPathHelper": "提供STDIO服务器可执行文件或脚本的文件系统路径",
+        "filePathInvalid": "请输入有效的文件路径",
+        "transport": "传输类型",
+        "transportHelper": "选择连接服务器时使用的MCP传输协议"
       }
+    },
+    "mcpTransport": {
+      "stdio": "STDIO",
+      "sse": "SSE",
+      "streamableHttp": "Streamable HTTP",
+      "openapi": "OpenAPI",
+      "playwright": "Playwright"
     },
     "messages": {
       "loading": "正在加载插件列表...",
@@ -2600,7 +2881,9 @@
       "pluginListRefreshed": "插件列表已刷新",
       "refreshPluginListFailed": "刷新插件列表失败",
       "refreshPluginListError": "刷新插件列表时发生错误",
-      "createPluginError": "插件创建出错"
+      "createPluginError": "插件创建出错",
+      "mcpPluginCreated": "MCP插件 {{name}} 创建成功",
+      "mcpCreateFailedRetry": "MCP插件创建失败，请重试"
     },
     "errors": {
       "deleteFailed": "删除失败",
@@ -2638,7 +2921,8 @@
     "types": {
       "cloud": "云侧服务",
       "ide": "本地代码插件",
-      "pluginTypeUnknown": "未知类型 ({{type}})"
+      "pluginTypeUnknown": "未知类型 ({{type}})",
+      "mcp": "MCP插件"
     },
     "tags": {
       "cloud": "云侧",
@@ -2776,9 +3060,11 @@
       "descriptionPlaceholder": "请输入参数描述",
       "nonRuntimeNeedsDefaultValue": "非运行时参数必须设置默认值",
       "addParam": "添加参数",
+      "noneParam": "无",
       "headerParam": "请求头参数",
       "queryParam": "查询参数",
       "bodyParam": "请求体参数",
+      "pathParam": "Path参数（路径参数）",
       "inputMethod": "传入方式",
       "nonRuntimeParam": "非运行时参数",
       "nonRuntimeParamDesc": "非运行时参数在配置时填写，工具执行期间保持固定",
@@ -2839,6 +3125,10 @@
       "editTool": "编辑工具",
       "deleteTool": "删除工具",
       "addNewTool": "添加新工具",
+      "discoverTools": "发现工具",
+      "discoveringTools": "发现中...",
+      "discoverSuccess": "工具发现成功",
+      "discoverFailed": "工具发现失败",
       "publishPlugin": "发布插件",
       "saveConfig": "保存配置",
       "pythonDescription": "适用于数据分析、机器学习、自动化脚本",
@@ -2901,7 +3191,9 @@
       "createFromService": "基于已有服务创建",
       "createFromServiceDescription": "基于云服务快速创建插件",
       "createFromIDE": "手动创建",
-      "createFromIDEDescription": "手动创建本地代码插件"
+      "createFromIDEDescription": "手动创建本地代码插件",
+      "createFromMCP": "MCP插件",
+      "createFromMCPDescription": "连接到MCP（模型上下文协议）服务器"
     },
     "confirmDelete": "确认删除",
     "confirmDeleteMessage": "确定要删除插件 \"{{name}}\" 吗？此操作无法撤销。",
@@ -3255,9 +3547,11 @@
     "toolConfig": {
       "noDescription": "暂无描述",
       "defaultValueLabel": "默认值",
+      "noneParam": "无",
       "headerParam": "Header参数",
       "queryParameter": "Query参数",
       "bodyParameter": "Body参数",
+      "pathParam": "Path参数（路径参数）",
       "thisRequiredField": "此字段为必填项",
       "required": "必填",
       "enterDefaultValue": "输入默认值",
@@ -3388,76 +3682,6 @@
       "versionDescription": "版本说明",
       "irreversibleAction": "此操作不可撤销",
       "deleteIrreversibleAction": "删除后，该版本的所有相关数据将被永久删除，无法恢复"
-    },
-    "basicInfo": {
-      "title": "基本信息",
-      "name": "插件名称",
-      "namePlaceholder": "请输入插件名称",
-      "version": "版本号",
-      "versionPlaceholder": "请输入版本号",
-      "description": "插件描述",
-      "descriptionPlaceholder": "请输入插件描述",
-      "author": "作者",
-      "authorPlaceholder": "请输入作者",
-      "icon": "图标",
-      "type": "类型",
-      "published": "已发布",
-      "unpublished": "未发布",
-      "publishStatus": "发布状态",
-      "homepage": "主页",
-      "homepagePlaceholder": "请输入主页地址",
-      "repository": "代码仓库",
-      "repositoryPlaceholder": "请输入代码仓库地址",
-      "license": "许可证",
-      "licensePlaceholder": "请输入许可证",
-      "keywords": "关键词",
-      "keywordsPlaceholder": "请输入关键词",
-      "readme": "说明文档",
-      "readmePlaceholder": "请输入说明文档",
-      "changelog": "更新日志",
-      "changelogPlaceholder": "请输入更新日志",
-      "typePlaceholder": "请选择插件类型",
-      "category": "插件分类",
-      "categoryPlaceholder": "请选择插件分类",
-      "tags": "标签",
-      "tagsPlaceholder": "请输入标签",
-      "iconPlaceholder": "请输入图标地址",
-      "banner": "横幅",
-      "bannerPlaceholder": "请输入横幅地址",
-      "screenshots": "截图",
-      "screenshotsPlaceholder": "请输入截图地址",
-      "video": "视频",
-      "videoPlaceholder": "请输入视频地址",
-      "demo": "演示",
-      "demoPlaceholder": "请输入演示地址",
-      "docs": "文档",
-      "docsPlaceholder": "请输入文档地址",
-      "support": "支持",
-      "supportPlaceholder": "请输入支持信息",
-      "community": "社区",
-      "communityPlaceholder": "请输入社区信息",
-      "contributing": "贡献",
-      "contributingPlaceholder": "请输入贡献指南",
-      "codeOfConduct": "行为准则",
-      "codeOfConductPlaceholder": "请输入行为准则",
-      "security": "安全",
-      "securityPlaceholder": "请输入安全信息",
-      "privacy": "隐私",
-      "privacyPlaceholder": "请输入隐私政策",
-      "terms": "条款",
-      "termsPlaceholder": "请输入服务条款",
-      "disclaimer": "免责声明",
-      "disclaimerPlaceholder": "请输入免责声明",
-      "warranty": "保修",
-      "warrantyPlaceholder": "请输入保修信息",
-      "liability": "责任",
-      "liabilityPlaceholder": "请输入责任信息",
-      "trademark": "商标",
-      "trademarkPlaceholder": "请输入商标信息",
-      "copyright": "版权",
-      "copyrightPlaceholder": "请输入版权信息",
-      "patent": "专利",
-      "patentPlaceholder": "请输入专利信息"
     },
     "defaultDescription": "{{name}}是一个功能强大的插件，为您的系统提供扩展功能"
   },
@@ -3724,6 +3948,7 @@
         "confirmDelete": "确认删除该消息吗？",
         "confirmDeleteButton": "确认删除",
         "stopResponse": "停止响应",
+        "emptyStateTitle": "Hi, 我是调试助手",
         "emptyStateText": "开始测试您的提示词",
         "emptyStateSubtext": "在下方输入框中发送消息进行测试"
       },
@@ -4014,8 +4239,9 @@
         "loading": "加载模型中...",
         "noModels": "暂无可用模型",
         "providedBy": "由{{vendor}}提供",
-        "systemBuiltIn": "系统内置",	 
-         "protocol": "协议"
+        "systemBuiltIn": "系统内置",
+        "protocol": "协议",
+        "validating": "模型连通性验证中..."
       },
       "quickOptimizeDialog": {
         "title": "快捷优化",
@@ -4185,13 +4411,16 @@
       "actions": "操作"
     },
     "searchPlaceholder": "搜索记忆库名称或描述...",
-    "searchMemory": "搜索记忆名称",
+    "searchMemory": "搜索记忆",
     "createButton": "创建记忆库",
     "memoryType": {
       "all": "全部",
       "longterm": "记忆片段",
       "variable": "变量记忆",
-      "summary": "历史摘要"
+      "summary": "历史摘要",
+      "profile": "用户画像",
+      "episodic": "情景记忆",
+      "semantic": "语义记忆"
     },
     "form": {
       "name": "记忆库名称",
@@ -4301,19 +4530,14 @@
       "memoryName": "记忆名称",
       "memoryType": "记忆类型",
       "memoryContent": "记忆内容",
-
       "noMemories": "暂无记忆",
       "addMemory": "添加记忆",
       "loadingMemories": "加载记忆列表...",
-
       "refreshMemoryStatus": "刷新记忆状态",
-
       "nameMaxLength": "记忆名称不能超过 {{max}} 个字符",
       "contentMaxLength": "记忆内容不能超过 {{max}} 个字符",
-
       "updateSuccess": "记忆更新成功",
       "updateFailed": "更新记忆失败",
-
       "deleteTitle": "删除记忆",
       "deleteMessage": "确定要删除记忆吗？此操作不可恢复。",
       "deleteMemory": "删除记忆",
@@ -4411,6 +4635,8 @@
     }
   },
   "knowledgeBases": {
+    "syncedBadge": "已同步",
+    "syncedBadgeTitle": "已同步到 DeepSearch",
     "title": "知识库管理",
     "description": "管理和组织您的知识库，支持文档上传、智能处理和高效检索",
     "tabs": {
@@ -4435,13 +4661,15 @@
     },
     "types": {
       "document": "文档知识库",
+      "weblink": "网页链接知识库",
+      "deepSearch": "DeepSearch知识库",
       "web": "网页知识库",
       "api": "API知识库",
       "database": "数据库知识库"
     },
     "embeddingModels": {
       "default": "默认模型",
-      "openai": "OpenAI",
+      "openapi": "OpenAPI",
       "huggingface": "HuggingFace"
     },
     "form": {
@@ -4494,23 +4722,61 @@
       "errorInfo": "错误信息",
       "createdAt": "创建时间",
       "documentAdded": "文档处理任务已提交",
+      "linkAdded": "链接处理任务已提交",
       "notFound": "知识库不存在",
       "fetchError": "获取知识库信息失败"
+    },
+    "syncToDeepSearch": {
+      "button": "同步至 Deep Search",
+      "title": "同步至 Deep Search",
+      "stepUpload": "创建知识库并上传文档",
+      "stepProcess": "创建索引（解析与分段）",
+      "uploadDescription": "将当前知识库的文件同步到 Deep Search，用于后续检索。",
+      "resyncStep1Hint": "再次同步时，仅在最后提交「创建索引」时才会更新 Deep Search 中的文件；在此之前关闭不会改动远端已有内容。",
+      "resyncStep1Ready": "已保存本次选择；请在下一步提交后才会将文件写入 Deep Search。",
+      "processDescription": "设置解析、分段与索引策略，并提交创建索引任务。",
+      "syncing": "同步中...",
+      "uploadSuccess": "文件同步完成",
+      "uploadFailed": "同步上传失败",
+      "uploadedCount": "已同步 {{count}} 个文件",
+      "uploadRequired": "请先完成文件同步",
+      "noDocuments": "当前知识库无文档，无需创建索引",
+      "noDocumentsToSync": "当前知识库没有可同步的文档，请先添加文档",
+      "processSuccess": "已提交创建索引任务",
+      "processSuccessNoDocs": "同步流程已完成（当前无可索引文档）",
+      "processFailed": "创建索引提交失败",
+      "complete": "完成并提交创建索引",
+      "success": "同步与创建索引任务已提交",
+      "abortFailed": "撤销同步失败，请稍后重试",
+      "embedderLabel": "Deep Search 嵌入模型",
+      "selectEmbedder": "请选择 Deep Search 嵌入模型",
+      "selectEmbedderPlaceholder": "请选择嵌入模型",
+      "noEmbedder": "暂无嵌入模型，请先在「模型」页签中配置嵌入模型后再同步。"
     },
     "editor": {
       "loading": "加载知识库信息...",
       "documentList": "文档列表",
+      "weblinkList": "链接列表",
       "autoRefresh": "自动刷新文档状态中",
+      "autoRefreshWeblinks": "自动刷新链接状态中",
       "stopAutoRefresh": "停止自动刷新文档状态",
+      "stopAutoRefreshWeblinks": "停止自动刷新链接状态",
       "startAutoRefresh": "开启自动刷新文档状态",
+      "startAutoRefreshWeblinks": "开启自动刷新链接状态",
       "noAutoRefreshHint": "没有处理中的文档，无需自动刷新",
+      "noAutoRefreshHintWeblinks": "没有处理中的链接，无需自动刷新",
       "refreshing": "刷新中...",
       "refreshStatus": "刷新状态",
       "processing": "文档处理中 ({{count}} 个文档)",
+      "processingWeblinks": "链接处理中 ({{count}} 个链接)",
       "loadingDocuments": "加载文档列表...",
+      "loadingWeblinks": "加载链接列表...",
       "noDocuments": "暂无文档",
+      "noWeblinks": "暂无链接",
       "addDocument": "添加文档",
+      "addWeblink": "添加链接",
       "documentName": "文档名称",
+      "weblinkName": "链接名称",
       "createdAt": "创建时间",
       "actions": "操作",
       "refreshDocumentStatus": "刷新文档状态",
@@ -4527,26 +4793,44 @@
       "graphEnhancement": "图增强",
       "maxLengthReached": "已达到最大长度",
       "nameMaxLength": "文档名称不能超过 {{max}} 个字符",
+      "nameMaxLengthWeblink": "链接名称不能超过 {{max}} 个字符",
       "updateSuccess": "文档名称更新成功",
       "updateFailed": "更新文档名称失败",
       "deleteTitle": "删除文档",
+      "deleteTitleWeblink": "删除链接",
       "deleteMessage": "确定要删除文档\"{{name}}\"吗？此操作不可恢复。",
+      "deleteMessageWeblink": "确定要删除链接\"{{name}}\"吗？此操作不可恢复。",
       "deleteDocument": "删除文档",
       "deleteSuccess": "文档删除成功",
+      "deleteSuccessWeblink": "链接删除成功",
       "deleteFailed": "删除文档失败",
+      "deleteFailedWeblink": "删除链接失败",
       "batchDeleteTitle": "批量删除文档",
+      "batchDeleteTitleWeblink": "批量删除链接",
       "batchDeleteMessage": "确定要删除选中的 {{count}} 个文档吗？此操作不可恢复。",
+      "batchDeleteMessageWeblink": "确定要删除选中的 {{count}} 个链接吗？此操作不可恢复。",
       "batchDeleteButton": "删除 {{count}} 个文档",
+      "batchDeleteButtonWeblink": "删除 {{count}} 个链接",
       "batchDeleteSuccess": "成功删除 {{count}} 个文档",
+      "batchDeleteSuccessWeblink": "成功删除 {{count}} 个链接",
       "batchDeleteFailed": "批量删除文档失败",
+      "batchDeleteFailedWeblink": "批量删除链接失败",
+      "updateSuccessWeblink": "链接名称更新成功",
+      "updateFailedWeblink": "更新链接名称失败",
       "selectAll": "全选",
       "deselectAll": "取消全选",
       "deleteSelected": "删除选中 ({{count}})",
       "refreshSuccess": "文档状态刷新成功",
+      "refreshSuccessWeblink": "链接状态刷新成功",
       "refreshFailed": "刷新文档状态失败",
+      "refreshFailedWeblink": "刷新链接状态失败",
       "refreshAllSuccess": "所有文档状态刷新成功",
+      "refreshAllSuccessWeblink": "所有链接状态刷新成功",
       "refreshAllFailed": "刷新所有文档状态失败",
-      "autoRefreshError": "自动刷新文档状态失败"
+      "refreshAllFailedWeblink": "刷新所有链接状态失败",
+      "autoRefreshError": "自动刷新文档状态失败",
+      "autoRefreshErrorWeblink": "自动刷新链接状态失败",
+      "refreshDocumentStatusWeblink": "刷新链接状态"
     },
     "addDocument": {
       "title": "添加文档",
@@ -4585,6 +4869,38 @@
       "fileSizeLimit": "文件大小限制：单个文件不超过 {{size}}",
       "filesExceedLimit": "以下文件大小超过 {{size}} 限制：",
       "oversizedTitle": "文件大小超出限制"
+    },
+    "addWeblink": {
+      "title": "添加网页链接",
+      "addButton": "添加链接",
+      "modelRequired": "构建文档图需要选择LLM模型",
+      "chunkOverlapPercent": "分段重叠百分比",
+      "selectedUrls": "已选择的URL",
+      "addedLabel": "已添加",
+      "allUrlsAdded": "所有URL已添加，可直接进入下一步",
+      "stepUrls": "输入URL",
+      "stepSettings": "链接参数",
+      "steps": {
+        "upload": "输入URL",
+        "settings": "链接参数"
+      },
+      "urlDescription": "添加链接到知识库，每行输入一个URL，支持 http:// 和 https://（如网页、微信公众号文章等）",
+      "urlPlaceholder": "https://example.com/page\nhttps://mp.weixin.qq.com/...",
+      "urlHint": "每个知识库最多 {{max}} 条链接（含已有）；单次请求不超过 {{max}} 行有效 URL",
+      "noUrls": "请输入至少一个URL",
+      "invalidUrls": "请确保所有URL以 http:// 或 https:// 开头",
+      "tooManyUrls": "超过知识库链接数量上限",
+      "exceedsKbLimit": "超过知识库链接上限：最多 {{max}} 条，当前知识库已有 {{existing}} 条，本次有效链接 {{adding}} 条。",
+      "addSuccess": "URL添加成功",
+      "addFailed": "URL添加失败",
+      "addAndNext": "添加并下一步",
+      "settingsDescription": "配置链接解析和索引参数",
+      "settingsSuccess": "链接参数设置成功",
+      "settingsFailed": "链接参数设置失败",
+      "noLinksToProcess": "没有可处理的URL",
+      "processSuccess": "链接处理任务已提交",
+      "processFailed": "链接处理失败",
+      "startProcess": "开始处理"
     },
     "edit": {
       "title": "编辑知识库",
@@ -4681,50 +4997,50 @@
       }
     }
   },
-  "utils": { 
-     "prompts": { 
-       "utils": { 
-         "validateVersionNumber": { 
-           "empty": "版本号不能为空", 
-           "invalidFormat": "版本号格式错误，请使用 主版本.次版本.修订版本 格式（如：1.2.3）" 
-         }, 
-         "formatDateTime": { 
-           "invalidTime": "无效时间", 
-           "formatError": "时间格式错误" 
-         }, 
-         "copyToClipboard": { 
-           "defaultSuccess": "已复制到剪贴板", 
-           "emptyContent": "复制内容为空", 
-           "autoCopyFailed": "自动复制失败，请手动复制内容", 
-           "copyUnavailable": "复制功能不可用，请手动复制内容" 
-         }, 
-         "toolFormatConverter": { 
-           "generateJsonSchemaFailed": "从parameters生成JSON Schema失败:", 
-           "tool": "工具", 
-           "parseStringFailed": "解析字符串失败", 
-           "saveJsonSchemaFailed": "保存JSON Schema失败", 
-           "parseFailed": "解析失败", 
-           "parseToolJsonSchemaFailed": "解析工具JSON Schema失败，使用默认转换:" 
-         }, 
-         "promptEditPageUtils": { 
-           "unknownError": "未知错误", 
-           "failKeyword": "失败", 
-           "requestFailed": "请求失败", 
-           "variableNameFormatError": "不符合格式要求", 
-           "variableNameTooLong": "变量名长度超过50个字符（当前长度：{{length}}）", 
-           "variableNameCannotStartWithNumber": "变量名不能以数字开头", 
-           "variableNameInvalidCharacters": "变量名只能包含字母、数字、下划线和连字符", 
-           "variableNameNoSpacesInNormalMode": "Normal模式下变量名前后不能有空格", 
-           "skipInvalidVariableName": "跳过提取的无效变量名: \"{{name}}\"，{{error}}", 
-           "targetMessageNotFound": "未找到目标消息", 
-           "baseGroup": "基准组", 
-           "controlGroup": "对照组{{id}}", 
-           "targetMessageNotFoundInGroup": "{{groupName}}中未找到目标消息", 
-           "existingCallNotFound": "索引 {{index}} 的现有调用不存在，跳过处理", 
-           "calculateSelectionIndicesFailed": "计算选中位置失败 - 缺少必要参数" 
-         } 
-       } 
-     }
+  "utils": {
+    "prompts": {
+      "utils": {
+        "validateVersionNumber": {
+          "empty": "版本号不能为空",
+          "invalidFormat": "版本号格式错误，请使用 主版本.次版本.修订版本 格式（如：1.2.3）"
+        },
+        "formatDateTime": {
+          "invalidTime": "无效时间",
+          "formatError": "时间格式错误"
+        },
+        "copyToClipboard": {
+          "defaultSuccess": "已复制到剪贴板",
+          "emptyContent": "复制内容为空",
+          "autoCopyFailed": "自动复制失败，请手动复制内容",
+          "copyUnavailable": "复制功能不可用，请手动复制内容"
+        },
+        "toolFormatConverter": {
+          "generateJsonSchemaFailed": "从parameters生成JSON Schema失败:",
+          "tool": "工具",
+          "parseStringFailed": "解析字符串失败",
+          "saveJsonSchemaFailed": "保存JSON Schema失败",
+          "parseFailed": "解析失败",
+          "parseToolJsonSchemaFailed": "解析工具JSON Schema失败，使用默认转换:"
+        },
+        "promptEditPageUtils": {
+          "unknownError": "未知错误",
+          "failKeyword": "失败",
+          "requestFailed": "请求失败",
+          "variableNameFormatError": "不符合格式要求",
+          "variableNameTooLong": "变量名长度超过50个字符（当前长度：{{length}}）",
+          "variableNameCannotStartWithNumber": "变量名不能以数字开头",
+          "variableNameInvalidCharacters": "变量名只能包含字母、数字、下划线和连字符",
+          "variableNameNoSpacesInNormalMode": "Normal模式下变量名前后不能有空格",
+          "skipInvalidVariableName": "跳过提取的无效变量名: \"{{name}}\"，{{error}}",
+          "targetMessageNotFound": "未找到目标消息",
+          "baseGroup": "基准组",
+          "controlGroup": "对照组{{id}}",
+          "targetMessageNotFoundInGroup": "{{groupName}}中未找到目标消息",
+          "existingCallNotFound": "索引 {{index}} 的现有调用不存在，跳过处理",
+          "calculateSelectionIndicesFailed": "计算选中位置失败 - 缺少必要参数"
+        }
+      }
+    }
   },
   "privacy": {
     "title": "隐私声明",

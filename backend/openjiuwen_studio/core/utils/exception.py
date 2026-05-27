@@ -99,6 +99,16 @@ def _extract_model_error_message(error_message: str) -> str:
     Returns:
         str: 用户友好的错误消息
     """
+    # 精准匹配 OpenAI 工具函数名称格式错误
+    if ("Invalid 'tools[" in error_message
+            and "string does not match pattern" in error_message
+            and "^[a-zA-Z0-9_-]+$" in error_message):
+        return _get_message(
+            "当前基础服务地址仅允许使用数字、字母、下划线（_）和连字符（-），请检查工具名称",
+            "The base url only allows letters, digits, underscores, and hyphens in tool names. "
+            "Please check the tool name."
+        )
+
     error_lower = error_message.lower()
     
     if "302" in error_message or "redirect" in error_lower:
@@ -106,7 +116,14 @@ def _extract_model_error_message(error_message: str) -> str:
             "模型服务地址重定向错误，请检查模型配置中的Base URL是否正确",
             "Model service URL redirect error, please check if the Base URL in model configuration is correct"
         )
-    
+
+    if "400" in error_message and "tool names" in error_lower:
+        return _get_message(
+            "当前基础服务地址仅允许使用数字、字母、下划线（_）和连字符（-），请检查工具名称",
+            "The base url only allows letters, digits, underscores, and hyphens in tool names. "
+            "Please check the tool name."
+        )
+
     if "401" in error_message or "invalid_api_key" in error_lower or "incorrect api key" in error_lower:
         return _get_message(
             "模型API Key无效或已过期，请检查模型配置中的API Key",

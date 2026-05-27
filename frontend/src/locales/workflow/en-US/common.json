@@ -40,7 +40,10 @@
     "Node": "Node",
     "Unknown": "Unknown",
     "Plugin": "Plugin",
-    "Workflow": "Workflow"
+    "Workflow": "Workflow",
+    "HttpRequest": "HTTP Request",
+    "ReactAgent": "React Agent",
+    "KnowledgeRetrieval": "Knowledge Retrieval"
   },
   "validators": {
     "workflowMustContainPath": "Workflow must contain a complete path from start node to end node",
@@ -76,6 +79,19 @@
     "fetchHistoryVersionFailed": "Failed to fetch history version",
     "versionHistory": "Version History"
   },
+  "exportChoice": {
+    "title": "Export workflow",
+    "intro": "Download the workflow as a JSON file. Pick the format that fits your use case.",
+    "canvasTitle": "Canvas data",
+    "canvasDesc": "Nodes, edges, and layout—the same as the toolbar export; restore via Import in this product.",
+    "canvasNotice": "Import supported",
+    "dslTitle": "Executable configuration",
+    "dslDesc": "Structured workflow definition (JSON) for the runtime—use for external integration or backup; not the same as canvas data.",
+    "dslNotice": "Import not supported yet",
+    "hint": "For backup or moving the canvas, choose Canvas data.",
+    "confirm": "Download",
+    "cancel": "Cancel"
+  },
   "ui": {
     "draft": "Draft",
     "switchedToVersion": "Switched to version {{version}}",
@@ -90,13 +106,16 @@
     "saveSuccessToConsole": "Workflow saved successfully! Workflow data has been saved to console.",
     "saveError": "Save failed: {{error}}",
     "exportSuccess": "Workflow exported successfully",
-    "exportError": "Export failed: {{error}}"
+    "exportError": "Export failed: {{error}}",
+    "exportPySuccess": "Python script downloaded successfully",
+    "exportPyError": "Failed to download Python script: {{error}}"
   },
   "category": {
     "llmAndWorkflow": "LLM & Workflow",
     "businessLogic": "Business Logic",
     "inputOutput": "Input & Output",
-    "components": "Components"
+    "components": "Components",
+    "data": "Data"
   },
   "nodePanel": {
     "searchPlaceholder": "Search nodes..."
@@ -112,6 +131,7 @@
     "save": "Save Workflow",
     "import": "Import Workflow",
     "export": "Export Workflow",
+    "exportPy": "Download as Python",
     "backToList": "Back to Workflow List"
   },
   "nodeMenu": {

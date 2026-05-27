@@ -224,6 +224,7 @@ export type { FrontendEmbeddingModelConfig } from './services/embeddingModelServ
 export { AuthService } from './services/authService'
 export { SpaceService } from './services/spaceService'
 export { AgentService } from './services/agentService'
+export { RuntimeService } from './services/runtime'
 export { RelatedMemberService } from './services/relatedMemberService'
 export { SelfOptService } from './services/selfOptService'
 export { FeedbackOptService } from './services/feedbackOptService'
@@ -282,6 +283,7 @@ export * from './hooks/useEmbeddingModels'
 export * from './hooks/useAuth'
 export * from './hooks/useSpace'
 export * from './hooks/useAgent'
+export * from './hooks/useRuntime'
 export * from './hooks/usePrompt'
 export * from './hooks/useRelatedMember'
 export * from './hooks/useSelfOpt'
@@ -354,6 +356,16 @@ export type {
   SearchKnowledgeBaseRequest,
   SearchKnowledgeBaseResponse,
   SearchKnowledgeBaseItem,
+  WeblinkItem,
+  AddWeblinksRequest,
+  AddWeblinksResponse,
+  GetWeblinksListRequest,
+  GetWeblinksListResponse,
+  ProcessWeblinksRequest,
+  ProcessWeblinksResponse,
+  UpdateWeblinkRequest,
+  DeleteWeblinksRequest,
+  GetWeblinkStatusRequest,
 } from './types/knowledgeBase'
 
 export type {

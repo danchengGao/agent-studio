@@ -73,14 +73,14 @@ generate_nginx_file() {
 
 generate_deepsearch_env_file() {
     local db_type="${RUNTIME_VARS["DB_TYPE"]}"
-    DEEPSERACH_ENV_VARS["DB_TYPE"]="${db_type}"
+    #DEEPSERACH_ENV_VARS["DB_TYPE"]="${db_type}"
 
     case "${db_type}" in
         mysql)
-            DEEPSERACH_ENV_VARS["DB_HOST"]="${RUNTIME_VARS["DB_HOST"]}"
-            DEEPSERACH_ENV_VARS["DB_PORT"]="${RUNTIME_VARS["DB_PORT"]}"
-            DEEPSERACH_ENV_VARS["DB_USER"]="${RUNTIME_VARS["DB_USER"]}"
-            DEEPSERACH_ENV_VARS["DB_PASSWORD"]="${RUNTIME_VARS["DB_PASSWORD"]}"
+            #DEEPSERACH_ENV_VARS["DB_HOST"]="${RUNTIME_VARS["DB_HOST"]}"
+            #DEEPSERACH_ENV_VARS["DB_PORT"]="${RUNTIME_VARS["DB_PORT"]}"
+            #DEEPSERACH_ENV_VARS["DB_USER"]="${RUNTIME_VARS["DB_USER"]}"
+            #DEEPSERACH_ENV_VARS["DB_PASSWORD"]="${RUNTIME_VARS["DB_PASSWORD"]}"
             DEEPSERACH_ENV_VARS["DEEPSEARCH_DB_NAME"]="${DEPLOY_VARS["DEEPSEARCH_DB_NAME"]}"
             ;;
         sqlite)

@@ -40,7 +40,10 @@
     "Node": "节点",
     "Unknown": "未知",
     "Plugin": "插件",
-    "Workflow": "工作流"
+    "Workflow": "工作流",
+    "HttpRequest": "HTTP请求",
+    "ReactAgent": "反应代理",
+    "KnowledgeRetrieval": "知识检索"
   },
   "validators": {
     "workflowMustContainPath": "工作流必须包含从开始节点到结束节点的完整路径",
@@ -76,6 +79,19 @@
     "fetchHistoryVersionFailed": "获取历史版本失败",
     "versionHistory": "版本历史"
   },
+  "exportChoice": {
+    "title": "导出工作流",
+    "intro": "将工作流下载为 JSON 文件，请按使用场景选择格式。",
+    "canvasTitle": "画布数据",
+    "canvasDesc": "包含节点、连线与布局；与编辑器工具栏导出一致，可在本系统内通过「导入」恢复。",
+    "canvasNotice": "支持本系统导入",
+    "dslTitle": "可执行配置",
+    "dslDesc": "供运行引擎使用的结构化工作流定义（JSON），适合对接外部系统或离线备份；与「画布数据」不是同一种文件。",
+    "dslNotice": "暂不支持本系统导入",
+    "hint": "备份或迁移画布时，建议选择「画布数据」。",
+    "confirm": "下载",
+    "cancel": "取消"
+  },
   "ui": {
     "draft": "草稿",
     "switchedToVersion": "已切换到版本 {{version}}",
@@ -90,13 +106,16 @@
     "saveSuccessToConsole": "工作流保存成功！工作流数据已保存到控制台。",
     "saveError": "保存失败：{{error}}",
     "exportSuccess": "工作流导出成功",
-    "exportError": "导出失败：{{error}}"
+    "exportError": "导出失败：{{error}}",
+    "exportPySuccess": "Python 脚本下载成功",
+    "exportPyError": "Python 脚本下载失败：{{error}}"
   },
   "category": {
     "llmAndWorkflow": "LLM与工作流",
     "businessLogic": "业务逻辑",
     "inputOutput": "输入&输出",
-    "components": "组件"
+    "components": "组件",
+    "data": "数据"
   },
   "nodePanel": {
     "searchPlaceholder": "搜索节点..."
@@ -112,6 +131,7 @@
     "save": "保存工作流",
     "import": "导入工作流",
     "export": "导出工作流",
+    "exportPy": "下载为 Python",
     "backToList": "返回工作流列表"
   },
   "nodeMenu": {

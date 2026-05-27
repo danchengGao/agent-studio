@@ -23,7 +23,7 @@
 
 #### 1. 获取安装脚本
 
-* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_linux_v2.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
+* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_linux.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
   * `setup.sh`：主安装脚本，串联整个安装流程
   * `utils.sh`：公共工具
   * `check_curl.sh`：检查 curl 是否安装，未安装则安装 curl
@@ -32,12 +32,12 @@
   * `check_python.sh`：检查 Python 是否安装，未安装则安装 Python
   * `check_mysql.sh`：检查 MySQL 是否安装，未安装则安装 MySQL
   * `config_mysql.sh`：配置 MySQL（创建数据库、用户等）
-  * `fetch_codes.sh`：克隆 agent-studio 代码仓库（支持指定分支）
-  * `user_config.sh`：用户配置文件（可选，包含代理、NVM 镜像、pip 源、npm 源配置）
+  * `manage_service.sh`：服务管理，管理 Runtime、后端与前端的启动、停止、重启与状态
+  * `user_config.sh`：用户配置文件（可选，包含代理、uv 源、NVM 镜像、npm 源、数据库连接地址等）
 
-#### 2. 配置代理、pip 源、NVM 镜像和 npm 源（可选）
+#### 2. 配置代理、uv 源、NVM 镜像、npm 源与数据库地址（可选）
 
-如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 pip 源、NVM Node.js 镜像或 npm 源，可以在 `user_config.sh` 文件中进行配置：
+如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 uv 源、NVM Node.js 镜像、npm 源，或需要指定数据库服务的主机与端口（例如远程 MySQL、Docker 映射端口），可以在 `user_config.sh` 文件中进行配置：
 
 * 打开 `user_config.sh` 文件，修改以下变量：
 
@@ -47,15 +47,19 @@
   HTTPS_PROXY=""  # HTTPS 代理地址，例如 http://127.0.0.1:7890
   SSL_VERIFY=""   # 可选：true/false（对应 git http.sslVerify）
 
-  # pip 源配置（可选）
-  PIP_INDEX_URL=""      # pip 源地址，例如 https://pypi.tuna.tsinghua.edu.cn/simple
-  PIP_TRUSTED_HOST=""   # 信任的主机地址，例如 pypi.tuna.tsinghua.edu.cn
+  # uv 源配置（可选）
+  UV_INDEX=""          # uv 源地址，例如 https://pypi.tuna.tsinghua.edu.cn/simple
+  UV_TRUSTED_HOST=""   # 信任的主机地址，例如 pypi.tuna.tsinghua.edu.cn
 
   # NVM Node.js 下载镜像（可选，安装 Node.js 时使用）
   NVM_NODEJS_ORG_MIRROR=""  # 例如 https://npmmirror.com/mirrors/node
 
   # npm 源配置（可选）
   NPM_REGISTRY=""       # npm 源地址，例如 https://registry.npmmirror.com
+
+  # 数据库连接配置（可选）
+  DB_HOST=""            # 留空默认 127.0.0.1
+  DB_PORT=""            # 留空默认 3306
   ```
 
 * 代理配置说明：
@@ -64,9 +68,9 @@
   * **带认证的代理**：支持用户名密码，例如 `http://user:pass@proxy.example.com:8080`
   * **SSL 验证**：`SSL_VERIFY` 设置为 `true` 或 `false`，`true` 表示开启 Git 的 SSL 证书验证，`false` 为不开启。
 
-* pip 源配置说明：
-  * **不需要配置 pip 源**：保持 `PIP_INDEX_URL` 和 `PIP_TRUSTED_HOST` 为空即可（脚本会自动跳过 pip 源配置，使用默认源）
-  * **需要配置 pip 源**：必须同时设置 `PIP_INDEX_URL` 和 `PIP_TRUSTED_HOST` 两个参数
+* uv 源配置说明：
+  * **不需要配置 uv 源**：保持 `UV_INDEX` 和 `UV_TRUSTED_HOST` 为空即可（脚本会使用 uv 默认源）
+  * **需要配置 uv 源**：建议同时设置 `UV_INDEX` 和 `UV_TRUSTED_HOST` 两个参数
   * **常用国内镜像源示例**：
     * 清华大学：`https://pypi.tuna.tsinghua.edu.cn/simple`，信任主机：`pypi.tuna.tsinghua.edu.cn`
     * 阿里云：`https://mirrors.aliyun.com/pypi/simple/`，信任主机：`mirrors.aliyun.com`
@@ -83,6 +87,9 @@
     * 淘宝镜像：`https://registry.npmmirror.com`
     * 腾讯云：`https://mirrors.cloud.tencent.com/npm/`
     * 华为云：`https://repo.huaweicloud.com/repository/npm/`
+
+* 数据库连接配置说明（`DB_HOST` / `DB_PORT`）：
+  * **作用**：使用的数据库在远程或非默认主机和端口时配置。
 
 #### 3. 运行安装脚本
 
@@ -135,13 +142,32 @@
 
 #### 1. 安装依赖（以下以 Ubuntu 22.04 为例）
 
-##### 1.1. 安装 Git
+##### 1.1. 安装与配置 Git
 
-* 运行以下命令安装Git：
+* 运行以下命令安装 Git：
 
   ```bash
   sudo apt update
   sudo apt install git
+  ```
+
+* 请确认已获取 <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer"> openJiuwen 代码仓</a> 的访问权限，若无权限请及时申请。
+
+* 在 gitcode 代码仓按照图示步骤 2 获取 Git 的全局配置，输入以下命令配置 Git：
+
+  ```bash
+  git config --global user.name your_username
+  git config --global user.email your_useremail
+  ```
+
+  ![image](../images/gitcode-token.png)
+
+* 按照图示步骤 3 获取个人访问令牌，克隆代码时需要输入 gitcode 账号以及个人访问令牌。
+
+* 安装过程需要多次 git 操作，建议配置凭证存储，避免认证错误：
+
+  ```bash
+  git config --global credential.helper store
   ```
 
 ##### 1.2. 安装 Node.js 和 npm
@@ -178,7 +204,7 @@
   > **注意**：若安装失败，请参考 <a href="https://uv.doczh.com/getting-started/installation/#_1" target="_blank" rel="nofollow noopener noreferrer"> uv 官方指导</a> 。
   
 
-##### 1.4. 安装 MySQL（可选组件）
+##### 1.4. 安装数据库
 
 * **SQLite vs MySQL**：
   * SQLite 无需额外安装和配置，适合开发和测试环境，但功能受限（如不支持高并发写入、无用户权限管理等）。
@@ -213,11 +239,14 @@
   # 新建数据库
   CREATE DATABASE openjiuwen_agent;
   CREATE DATABASE openjiuwen_ops;
+  # Runtime（agent-runtime）使用的数据库，库名以该仓库 .env.example 为准（常见为 jiuwen_runtime）
+  CREATE DATABASE jiuwen_runtime;
   # 新建 MySQL 用户
   CREATE USER 'your_user_name'@'localhost' IDENTIFIED BY 'your_password';
   # 用户授权并刷新
   GRANT ALL PRIVILEGES ON openjiuwen_agent.* TO 'your_user_name'@'localhost';
   GRANT ALL PRIVILEGES ON openjiuwen_ops.* TO 'your_user_name'@'localhost';
+  GRANT ALL PRIVILEGES ON jiuwen_runtime.* TO 'your_user_name'@'localhost';
   FLUSH PRIVILEGES;
   ```
 
@@ -229,34 +258,100 @@
   * Chroma 无需额外安装，配置简单，只需要获取向量模型，适合快速体验，适合开发和测试环境。 向量模型的获取可参考 [如何获取向量模型](#linux-embed-model)。
   * Milvus 功能更完善，能够满足复杂场景的需求，因此在实际工程和生产环境中更推荐使用。
 
-#### 2. openJiuwen 安装
+#### 2. 部署 Runtime 服务
 
-##### 2.1. 获取源码
+Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
 
-* 请确认已获取 <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer"> openJiuwen 代码仓</a> 的访问权限，若无权限请及时申请。
+##### 2.1. 获取 Runtime 源码
 
-* 在 gitcode 代码仓按照图示步骤 2 获取 Git 的全局配置，输入以下命令配置 Git：
+* 在终端执行以下命令克隆源码并进入源码根目录：
 
   ```bash
-  git config --global user.name your_username
-  git config --global user.email your_useremail
+  git clone -b main https://gitcode.com/openJiuwen/agent-runtime.git
+  cd agent-runtime
   ```
 
-  ![image](../images/gitcode-token.png)
+##### 2.2. 配置 `server` 目录下的环境
 
-* 按照图示步骤 3 获取个人访问令牌，克隆代码时需要输入 gitcode 账号以及个人访问令牌。
+* 进入 **`agent-runtime/server`** 目录。
+
+* 复制 *.env* 文件：
+
+  ```bash
+  cp .env.example .env
+  ```
+
+* 使用文本编辑器打开 *.env* 文件，请根据实际情况修改文件中以下变量的值（勿覆盖其他变量）：
+
+  > **说明**：`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 可替换为实际数据库信息，与上文 MySQL 步骤中新建的用户、密码等保持一致。若密码中包含特殊字符，可参考 [特殊字符转义表](#linux-special-char) 将特殊字符替换为 URL 编码。
+  
+
+  配置样例：
+
+  ```env
+   # 数据库类型（支持 mysql、sqlite）
+   DB_TYPE=mysql
+
+   # 配置数据库（样例）
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=root
+   DB_NAME=jiuwen_runtime
+
+   # 运行网络与路径（样例）
+   IP=127.0.0.1
+   LOWCODE_IMAGE=swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8
+   DEPLOY_DIR=/app/deploys
+   DIST_DIR=/app/dist
+   HOST=0.0.0.0
+   PORT=8186
+   ```
+
+  变量说明可参考如下表格。
+
+   | 变量名              | 变量说明                                                                 | 配置样例                                      |
+   |---------------------|--------------------------------------------------------------------------|-----------------------------------------------|
+   | **DB_TYPE**         | 数据库类型（支持 `mysql`、`sqlite`）                                     | `mysql`                                       |
+   | **DB_HOST**         | 数据库主机地址                                                           | `localhost`                                   |
+   | **DB_PORT**         | MySQL 服务监听端口                                                       | `3306`                                        |
+   | **DB_USER**         | 数据库登录用户名                                                         | `root`                                        |
+   | **DB_PASSWORD**     | 数据库登录密码                                                           | `root`                                        |
+   | **DB_NAME**         | 要连接的数据库名称                                                       | `jiuwen_runtime`                              |
+   | **IP**              | 低码 agent 与 runtime-server 运行主机 IP                                 | `127.0.0.1`                                   |
+   | **LOWCODE_IMAGE**   | 低码 agent 的容器镜像地址                                                | `swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8` |
+   | **DEPLOY_DIR**      | 部署目录（存放部署过程产物）                                             | `/app/deploys`                                |
+   | **DIST_DIR**        | 依赖包目录（存放运行低码 agent 所需 `.whl`）                             | `/app/dist`                                   |
+   | **HOST**            | 服务监听主机（`0.0.0.0` 表示允许所有网络地址访问）                       | `0.0.0.0`                                     |
+   | **PORT**            | 服务启动端口号                                                           | `8186`                                        |
+
+##### 2.3. 运行 `deploy.sh` 安装依赖并启动服务
+
+
+
+* **前置条件**：已安装 **Python 3.11**、**Git**，且可在终端执行 **`uv`**。`deploy.sh` 通常依赖 **`uv`** 创建虚拟环境并同步依赖。
+
+* 在 **`server`** 目录执行部署脚本（路径按你的克隆位置替换）：
+
+  ```bash
+  cd /path/to/agent-runtime/server
+  chmod +x deploy.sh
+  ./deploy.sh
+  ```
+
+
+#### 3. openJiuwen 安装
+
+##### 3.1. 获取源码
 
 * 执行以下命令克隆源码并进入源码根目录：
 
   ```bash
-  # 安装过程需要多次 git 操作，建议配置凭证存储，避免认证错误。
-  git config --global credential.helper store
-
   git clone https://gitcode.com/openJiuwen/agent-studio.git
   cd agent-studio
   ```
 
-##### 2.2. 生成 AES 密钥（可选）
+##### 3.2. 生成 AES 密钥（可选）
 
 * 如果不需要对关键字段加密存储，可跳过当前步骤
 * 运行以下命令生成密钥：
@@ -271,7 +366,7 @@
   ```
 * 注意，AES密钥需要保持稳定，中途更换密钥会导致已加密数据无法解密。
 
-##### 2.3. 启动 openJiuwen
+##### 3.3. 启动 openJiuwen
 
 * 进入源码根目录；
 
@@ -310,6 +405,10 @@
    # 配置插件服务（样例，启动插件服务详情请见[问题三：如何启用插件服务]）
    VITE_PLUGIN_SERVICE_URL=http://localhost:8185
    VITE_PLUGIN_CONFIG_PATH=/config.json
+
+   # Runtime 服务配置（样例）
+   RUNTIME_HOST=localhost
+   RUNTIME_PORT=8100
    ```
 
   变量说明可参考如下表格，如需选择 Milvus 启用记忆功能，请参考 [如何启用记忆及知识库功能](#linux-memory)，如果选择 Chroma 启用记忆功能，只需要获取向量模型，可参考 [如何获取向量模型](#linux-embed-model)。
@@ -328,6 +427,8 @@
    | **CODE_SANDBOX_URL**                 | 代码沙箱服务地址                          | `http://localhost:8188/run`                                                                    |
    | **VITE_PLUGIN_SERVICE_URL**                 | 插件服务地址                            | `http://localhost:8185`                                                                    |
    | **VITE_PLUGIN_CONFIG_PATH**                 | 前端使用的插件服务配置文件                     | `/config.json`                                                                    |
+   | **RUNTIME_HOST**                 | Runtime 服务访问主机（通常为本机 `localhost`）                     | `localhost`                                                                    |
+   | **RUNTIME_PORT**                 | Runtime 服务端口（需与 Runtime server 实际监听端口一致）                     | `8100`                                                                    |
 
 * 在源码根目录下，运行以下命令启动后端服务，并耐心等待：
    
@@ -386,7 +487,7 @@
 
   Network：*网络访问地址*
 
-##### 2.4. 访问系统
+##### 3.4. 访问系统
 
   * 若在本地查看，ctrl+左键单击 *本地访问地址* 可在本地浏览器查看到 openJiuwen 的界面；或者复制上述 *本地访问地址* 到浏览器地址栏，按下“回车键”将看到 openJiuwen 的界面。
   
@@ -469,49 +570,51 @@
 <a id="linux-sandbox"></a>
 ### 问题二：如何启用沙箱功能
 
-若要配置代码插件或在工作流中使用代码节点，需开启沙箱服务，需要进行如下操作：
+若要使用代码插件或在工作流中运行代码节点，需要先启用沙箱服务，按以下步骤操作：
 
-1. 参考 `sandbox_server/python_server/.env.example` 文件，在 `sandbox_server/python_server` 目录下创建 `.env` 文件，示例如下：
+1. **配置沙箱依赖环境**
+
+   沙箱服务通过统一配置指定执行代码时使用的 Python、JavaScript 解释器及依赖包。若不配置，将使用系统默认的 Python 与 JavaScript 环境。
+
+   依赖配置文件路径：
+
+   - Python：`sandbox_server/sandbox/openjiuwen_sandbox_server/conf/dependency/pyproject.toml`
+   - JavaScript：`sandbox_server/sandbox/openjiuwen_sandbox_server/conf/dependency/package.json`
+
+   在以上文件中配置好解释器版本与依赖列表后，在 `sandbox_server/sandbox` 目录执行以下命令构建并安装依赖环境：
+
+   ```bash
+   python -m openjiuwen_sandbox_server.app.build_dependency
+   ```
+
+   默认安装目录为 `/sandbox/dependencies`。若需指定其它目录，请在执行上述命令前设置环境变量 `DEPENDENCY_DIR`。
+
+2. **启动沙箱服务**
+
+   沙箱服务支持两种运行模式：
+
+   - **local 模式**：代码在宿主机上直接执行。
+   - **sandbox 模式**：代码在 bwrap 沙箱内执行，具备隔离与安全限制。
+
+   参考 `sandbox_server/sandbox/.env.example`，在 `sandbox_server/sandbox` 目录下创建 `.env` 文件，示例：
 
    ```env
    HOST=0.0.0.0
    PORT=5001
+   ENABLE_LINUX_SANDBOX=false
    ```
 
-   然后启动沙箱 Python 服务，即运行 `sandbox_server/python_server/openjiuwen_sandbox_pyserver/kernel.py` 脚本，其中 `HOST` 和 `PORT` 是沙箱 Python 服务运行的 IP 和端口。
-
-2. 启动沙箱 JS 服务，运行 `sandbox_server/js_server/kernel.js` 脚本，JS 服务的 IP 和端口参考如下代码：
-
-   ```javascript
-   const PORT = process.env.PORT || 5002;
-   server.listen(PORT, "0.0.0.0", () => {
-     console.log(`✅ JS sandbox listening on http://0.0.0.0:${PORT}`);
-   });
-   ```
-
-3. 参考 `sandbox_server/gateway/.env.example` 文件，在 `sandbox_server/gateway` 目录下创建 `.env` 文件，示例如下：
-
-   ```env
-   ENABLE_LINUX_SANDBOX=0
-   HOST=0.0.0.0
-   PORT=8188
-   PYTHON_SANDBOX_URL=http://localhost:5001/run
-   JS_SANDBOX_URL=http://localhost:5002/run
-   ```
-
-   其中 `ENABLE_LINUX_SANDBOX` 表示是否启动 bwrap 沙箱，`PYTHON_SANDBOX_URL` 和 `JS_SANDBOX_URL` 为前面两步启动的 Python 和 JS 服务 URL。
-
-   如果需要启动 bwrap 沙箱，请将 `ENABLE_LINUX_SANDBOX` 设置为1，并在 `sandbox_server/gateway/openjiuwen_sandbox_gateway/conf/sandbox_config.yaml` 中按需修改安全配置。目前支持 `seccomp` 、`namespace` 、`mount` 文件系统等配置参数。请确保 Python 解释器和 Js 解释器以及相关依赖都包的路径都在 `mount` 配置中，以及 `PATH` 环境变量中包含了 Python 解释器和 Js 解释器所在路径。示例如下：
+   `HOST` 与 `PORT` 为沙箱服务监听地址与端口；`ENABLE_LINUX_SANDBOX` 为 `true` 时启用 sandbox 模式。启用 sandbox 模式时，需编辑沙箱配置文件 `sandbox_server/sandbox/openjiuwen_sandbox_server/conf/sandbox_config.yaml`，示例配置如下：
 
    ```
    seccomp: # whitelist mode
      allow:
-       x86_64: ["epoll_wait", "getcwd", "wait4", "pread64", "set_tid_address", "prlimit64", "capget", "pipe2", "eventfd2", "pkey_alloc", "madvise", "sysinfo", "readlink", "geteuid", "getegid", "statx", "access", "clone", "arch_prctl", "clone3", "execve", "open", "lstat", "stat", "newfstatat", "lseek", "getdents64", "write", "close", "openat", "read", "futex", "mmap", "brk", "mprotect", "munmap", "rt_sigreturn", "mremap", "getgid", "getuid", "getpid", "getppid", "gettid", "exit", "exit_group", "rt_sigaction", "sched_yield", "set_robust_list", "get_robust_list", "rseq", "clock_gettime", "gettimeofday", "nanosleep", "epoll_create1", "epoll_ctl", "clock_nanosleep", "pselect6", "time", "rt_sigprocmask", "sigaltstack", "getrandom", "mkdirat", "mkdir", "socket", "connect", "bind", "listen", "accept", "sendto", "recvfrom", "getsockname", "recvmsg", "getpeername", "ppoll", "uname", "sendmsg", "sendmmsg", "fstat", "fcntl", "fstatfs", "poll", "epoll_pwait", 'ioctl']
+       x86_64: ["setsockopt", "mbind", "sched_getaffinity", "epoll_wait", "getcwd", "wait4", "pread64", "set_tid_address", "prlimit64", "capget", "pipe2", "eventfd2", "pkey_alloc", "madvise", "sysinfo", "readlink", "geteuid", "getegid", "statx", "access", "clone", "arch_prctl", "clone3", "execve", "open", "lstat", "stat", "newfstatat", "lseek", "getdents64", "write", "close", "openat", "read", "futex", "mmap", "brk", "mprotect", "munmap", "rt_sigreturn", "mremap", "getgid", "getuid", "getpid", "getppid", "gettid", "exit", "exit_group", "rt_sigaction", "sched_yield", "set_robust_list", "get_robust_list", "rseq", "clock_gettime", "gettimeofday", "nanosleep", "epoll_create1", "epoll_ctl", "clock_nanosleep", "pselect6", "time", "rt_sigprocmask", "sigaltstack", "getrandom", "mkdirat", "mkdir", "socket", "connect", "bind", "listen", "accept", "sendto", "recvfrom", "getsockname", "recvmsg", "getpeername", "ppoll", "uname", "sendmsg", "sendmmsg", "fstat", "fcntl", "fstatfs", "poll", "epoll_pwait", 'ioctl']
        aarch64: ["statx", "getcwd", "readlinkat", "madvise", "sysinfo", "clone", "eventfd2", "pipe2", "fcntl", "prlimit64", "set_tid_address", "faccessat", "execve", "write", "close", "openat", "read", "lseek", "getdents64", "futex", "mmap", "brk", "mprotect", "munmap", "rt_sigreturn", "rt_sigprocmask", "sigaltstack", "mremap", "getuid", "getgid", "geteuid", "getegid", "getpid", "getppid", "gettid", "exit", "exit_group", "rt_sigaction", "sched_yield", "get_robust_list", "set_robust_list", "rseq", "epoll_create1", "clock_gettime", "gettimeofday", "nanosleep", "epoll_ctl", "clock_nanosleep", "pselect6", "timerfd_create", "timerfd_settime", "timerfd_gettime", "getrandom", "mkdirat", "socket", "connect", "bind", "listen", "accept", "sendto", "recvfrom", "recvmsg", "getsockname", "getpeername", "ppoll", "uname", "sendmmsg", "newfstatat", "fstat", "fstatfs", "epoll_pwait", "ioctl"]
 
    namespace:
-     user: False
-     net: True
+     user: True
+     net: False
      pid: True
      ipc: True
      uts: True
@@ -524,27 +627,44 @@
        {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
        {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
        {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
+       {src: '/etc/resolv.conf', dst: '/etc/resolv.conf', mode: 'read'},
        {src: '/usr/share/nodejs', dst: '/usr/share/nodejs', mode: 'read'},
+       {src: '/dev/urandom', dst: '/dev/urandom', mode: 'dev'},
      ]
 
    sandbox:
      type: bubblewrap
      path: bwrap
 
-   # Please ensure that both the Python and JavaScript interpreters
-   # are already in the mount directory, and either provide their full
-   # paths or add those paths to the PATH environment variable.
-   interpreter:
-     python_path: python3
-     javascript_path: node
-
    environment:
      PATH: /bin:/usr/bin
+
+   timeout: 10
+
+   options: ['--proc', '/proc']
    ```
 
-   最后启动沙箱网关服务，即运行 `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` 脚本。
+   配置项说明：`seccomp` 为沙箱内进程允许使用的系统调用白名单；`namespace` 为需隔离的命名空间；`mount` 为主机与沙箱内的目录映射，模式 `read` / `write` / `dev` 分别表示只读、读写与设备映射；`sandbox` 指定沙箱类型与可执行路径（当前仅支持 `bubblewrap`）；`environment` 为沙箱内进程的环境变量；`timeout` 为单次任务最大执行时间（秒），超时将被强制终止；`options` 为传递给 `bwrap` 的额外命令行参数。
 
-4. 启动沙箱服务后请在`.env`文件中配置沙箱服务的路径，例如：`CODE_SANDBOX_URL=http://localhost:8188/run`
+   配置完成后，执行 `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py` 启动沙箱服务。
+
+3. **启动沙箱网关服务**
+
+   参考 `sandbox_server/gateway/.env.example`，在 `sandbox_server/gateway` 目录下创建 `.env` 文件，示例：
+
+   ```env
+   HOST=0.0.0.0
+   PORT=8188
+   SANDBOX_SERVER_URL=http://localhost:5001/run
+   ```
+
+   `HOST` 与 `PORT` 为网关服务监听地址与端口；`SANDBOX_SERVER_URL` 为第 2 步中已启动的沙箱服务运行地址。
+
+   然后执行 `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` 启动沙箱网关服务。
+
+4. **配置应用侧网关地址**
+
+   在项目的 `.env` 中配置沙箱网关调用地址，例如：`CODE_SANDBOX_URL=http://localhost:8188/run`。
 
 <a id="linux-plugin"></a>
 ### 问题三：如何启用插件服务

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Copy, Trash2, RefreshCw, History } from 'lucide-react'
+import { Copy, Trash2, RefreshCw, History, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/MentionPicker'
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
@@ -7,7 +7,8 @@ import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
 import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
-import { useConversationStore, MessageType, TaskStatus, AgentType, type MessageItems } from '../../stores/useConversationStore'
+import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, isTaskOngoing,
+  type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
 import SSERecorder from '../../utils/sseRecorder'
 import PlaybackPanel from '../../components/Conversation/PlaybackPanel'
@@ -19,15 +20,24 @@ import { copyToClipboard, STORAGE_KEYS, storage, getAgentConfigKeys } from './ut
 import { DEFAULT_DEEPSEARCH_CONFIG } from './utils/deepsearchConstants'
 import { getSuggestionsByAgent } from './constants/suggestions'
 import { TEXT_BASE, TEXT_SMALL, FONT_FAMILY } from './constants/styles'
-import type { Message } from './types'
+import type { Message, ReportRewriteParams } from './types'
 import { SystemMessageItem } from '../../components/Conversation'
 import ResultPanel from '../../components/Conversation/ResultPanel'
 import ConversationHistorySidebar from './components/ConversationHistorySidebar'
+import { MindMapPanel } from '../../components/Conversation/MindMap'
+import { TopToolbar, ViewType } from '../../components/Conversation'
 
 // ==================== 开发调试配置 ====================
 // 从环境变量读取，默认为 false（生产环境）
 // 在 .env 中设置 VITE_ENABLE_SSE_DEBUG=true 来启用
 const ENABLE_SSE_DEBUG = import.meta.env.VITE_ENABLE_SSE_DEBUG === 'true'
+
+// AI 改写操作标签映射
+const REWRITE_ACTION_LABELS: Record<string, string> = {
+  polish: '润色',
+  expand: '扩写',
+  shorten: '缩写',
+}
 
 // ==================== 主页面组件 ====================
 
@@ -51,6 +61,15 @@ const AppsPage: React.FC = () => {
   const [showPlaybackPanel, setShowPlaybackPanel] = useState(false)
   const [deepsearchServiceAvailable, setDeepsearchServiceAvailable] = useState<boolean | null>(null)
   const [checkingDeepsearch, setCheckingDeepsearch] = useState(false)
+
+  // ===== MindMap 思维链面板状态 =====
+  const [showMindMap, setShowMindMap] = useState(false)
+  const [mindMapMessageItemsId, setMindMapMessageItemsId] = useState<string | null>(null)
+  
+  // ===== 右侧面板状态管理 =====
+  const [currentMessageItemsId, setCurrentMessageItemsId] = useState<string | null>(null)
+  const [lastSelectedReportId, setLastSelectedReportId] = useState<string | null>(null)
+  const [currentGraphType, setCurrentGraphType] = useState<'sectionGraph' | 'taskGraph'>('sectionGraph')
 
   // ===== 对话限制对话框状态 =====
   const [limitDialogOpen, setLimitDialogOpen] = useState(false)
@@ -84,6 +103,8 @@ const AppsPage: React.FC = () => {
   const isLoading = useConversationStore(state => state.isLoading)
   const sseProcessingQueue = useConversationStore(state => state.sseProcessingQueue)
   const SESSION_CONVERSATION_ID = useConversationStore(state => state.SESSION_CONVERSATION_ID)
+  const getMessageItemsByConversationId = useConversationStore(state => state.getMessageItemsByConversationId)
+  const mindMapManagersMap = useConversationStore(state => state.mindMapManagersMap)
 
   // 订阅 conversation 来触发 messageItemsList 重新计算
   const conversation = useConversationStore(state =>
@@ -114,13 +135,37 @@ const AppsPage: React.FC = () => {
   const checkCreateConversationWarning = useConversationStore(state => state.checkCreateConversationWarning)
   const switchConversation = useConversationStore(state => state.switchConversation)
   const getConversationById = useConversationStore(state => state.getConversationById)
+  const getMessageById = useConversationStore(state => state.getMessageById)
   const addUserMessage = useConversationStore(state => state.addUserMessage)
   const addSystemMessage = useConversationStore(state => state.addSystemMessage)
+  const setConversationConfig = useConversationStore(state => state.setConversationConfig)
+  const clearConversationConfig = useConversationStore(state => state.clearConversationConfig)
   const setLoading = useConversationStore(state => state.setLoading)
   const setSelectedResultMessageId = useConversationStore(state => state.setSelectedResultMessageId)
   const clearAll = useConversationStore(state => state.clearAll)
   const clearCurrentConversation = useConversationStore(state => state.clearCurrentConversation)
   const initializeFromDB = useConversationStore(state => state.initializeFromDB)
+
+  // 计算当前选中消息的messageItemsId（用于兼容旧逻辑）
+  const getCurrentMessageItemsId = useMemo(() => {
+    if (!selectedResultMessageId) return null
+    
+    // 直接从选中的消息中获取messageItemsId
+    const message = getMessageById(selectedResultMessageId)
+    if (message) {
+      return message.messageItemsId
+    }
+    
+    // 兼容旧逻辑：通过遍历messageItems.messagesIds来查找
+    if (!currentConversationId) return null
+    const messageItemsList = getMessageItemsByConversationId(currentConversationId)
+    for (const messageItems of messageItemsList) {
+      if (messageItems.messagesIds.includes(selectedResultMessageId)) {
+        return messageItems.id
+      }
+    }
+    return null
+  }, [selectedResultMessageId, currentConversationId, getMessageItemsByConversationId, getMessageById])
 
   // ===== 处理创建对话前警告 =====
   const handleCreateConversation = async (title: string, config: any) => {
@@ -226,6 +271,28 @@ const AppsPage: React.FC = () => {
     return map
   }, [modelsData])
 
+  // 转换模型数据为 ModelSelector 需要的格式
+  const availableModels = React.useMemo(() => {
+    if (!modelsData?.items) return []
+    return modelsData.items.map(model => ({
+      tags: model.tags || [],
+      icon: '',
+      openModel: {
+        model_id: String(model.id),
+        name: model.name,
+        desc: model.description || '',
+        workspace_id: '',
+        param_config: { param_schemas: [] },
+      },
+      series: {
+        icon: '',
+        name: model.model_type || '',
+        vendor: model.provider || '',
+      },
+      model_from: model.is_system_model ? 'config' : 'db',
+    }))
+  }, [modelsData])
+
   // 从 localStorage 恢复对话状态和智能体配置
   useEffect(() => {
     const savedData = storage.get<{ messages: Message[], inputValue: string, hasConversation: boolean, selectedAgent: MentionItem | null }>(STORAGE_KEYS.APPS_PAGE_STATE)
@@ -244,6 +311,7 @@ const AppsPage: React.FC = () => {
   }, [])
 
   // 从 localStorage 恢复智能体配置（按 spaceId 隔离）
+  // 加载时合并默认值，确保未保存的字段使用最新的默认值
   useEffect(() => {
     const spaceId = user?.spaceId
     if (!spaceId) return
@@ -251,12 +319,37 @@ const AppsPage: React.FC = () => {
     const configKey = STORAGE_KEYS.AGENT_CONFIGS(spaceId)
     const savedConfigs = storage.get<Record<string, DeepSearchConfig>>(configKey)
     if (savedConfigs) {
-      setAgentConfigs(savedConfigs)
+      // 合并默认值：用户保存的字段覆盖默认值，未保存的字段使用默认值
+      const mergedConfigs = Object.keys(savedConfigs).reduce((acc, agentId) => {
+        acc[agentId] = {
+          ...DEFAULT_DEEPSEARCH_CONFIG,  // 先用默认值打底
+          ...savedConfigs[agentId],       // 再用保存的值覆盖
+        }
+        return acc
+      }, {} as Record<string, DeepSearchConfig>)
+      setAgentConfigs(mergedConfigs)
     } else {
       // 如果没有保存的配置，使用空配置
       setAgentConfigs({})
     }
   }, [user?.spaceId])
+
+  // 当 agentConfigs.deepsearch.generalModelId 变化时，同步到 selectedModelId（反向同步）
+  useEffect(() => {
+    const deepsearchConfig = agentConfigs['deepsearch']
+    if (deepsearchConfig?.generalModelId) {
+      const modelId = Number(deepsearchConfig.generalModelId)
+      if (modelId !== selectedModelId && modelId !== -1) {
+        setSelectedModelId(modelId)
+        // 同时需要更新 selectedModel 字符串
+        const modelName = Array.from(modelIdMap.entries())
+          .find(([_, id]) => id === modelId)?.[0]
+        if (modelName) {
+          setSelectedModel(modelName)
+        }
+      }
+    }
+  }, [agentConfigs['deepsearch']?.generalModelId, modelIdMap, selectedModelId])
 
   // 从 IndexDB 初始化对话数据
   useEffect(() => {
@@ -274,12 +367,29 @@ const AppsPage: React.FC = () => {
   }, [messages, inputValue, hasConversation, selectedAgent])
 
   // 保存智能体配置到 localStorage（按 spaceId 隔离）
+  // 只保存与默认值不同的字段，避免保存非用户配置的默认值
   useEffect(() => {
     const spaceId = user?.spaceId
     if (!spaceId) return
 
     const configKey = STORAGE_KEYS.AGENT_CONFIGS(spaceId)
-    storage.set(configKey, agentConfigs)
+    // 过滤：只保留与默认值不同的字段
+    const filteredConfigs = Object.keys(agentConfigs).reduce((acc, agentId) => {
+      const config = agentConfigs[agentId]
+      const defaultConfig = DEFAULT_DEEPSEARCH_CONFIG
+      const diffConfig = Object.keys(config).reduce((configAcc, key) => {
+        const k = key as keyof DeepSearchConfig
+        if (config[k] !== defaultConfig[k]) {
+          configAcc[k] = config[k]
+        }
+        return configAcc
+      }, {} as Partial<DeepSearchConfig>)
+      if (Object.keys(diffConfig).length > 0) {
+        acc[agentId] = diffConfig
+      }
+      return acc
+    }, {} as Record<string, Partial<DeepSearchConfig>>)
+    storage.set(configKey, filteredConfigs)
   }, [agentConfigs, user?.spaceId])
 
   // 当模型列表加载完成后，设置默认选中第一个模型
@@ -439,6 +549,25 @@ const AppsPage: React.FC = () => {
     }
   }, [isDeepSearchMode, hasConversation, isUserScrolled, messageItemsList.length])
 
+  // ===== 大纲交互接受事件监听 =====
+  const pendingOutlineInteraction = useConversationStore(state => state.pendingOutlineInteraction)
+  const clearPendingOutlineInteraction = useConversationStore(state => state.clearPendingOutlineInteraction)
+  
+  useEffect(() => {
+    if (!pendingOutlineInteraction) return
+
+    const { userMessage, backendMessage, interruptFeedback } = pendingOutlineInteraction
+
+    console.log('[AppsPage] Received outline-interaction-accept:', pendingOutlineInteraction)
+
+    clearPendingOutlineInteraction()
+
+    handleDeepSearchSend(userMessage, {
+      interrupt_feedback: interruptFeedback || 'accepted',
+      backend_message: backendMessage,
+    })
+  }, [pendingOutlineInteraction])
+
   // ===== SSE 回放事件监听 =====
   useEffect(() => {
     const handlePlaybackEvent = (event: Event) => {
@@ -512,7 +641,7 @@ const AppsPage: React.FC = () => {
   // ===== SSE超时检测: 页面加载时检查未完成消息 =====
   useEffect(() => {
     if (currentConversationId && isDeepSearchMode) {
-      const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsFailed()
+      const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsAbort()
       if (hasIncomplete) {
         console.log('[AppsPage] Marked incomplete messages as FAILED on page load')
       }
@@ -607,6 +736,255 @@ const AppsPage: React.FC = () => {
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion)
     chatInputRef.current?.focus()
+  }
+
+  /**
+   * 报告局部改写处理函数
+   * 复用 DeepSearch 配置，通过 SSE 流处理改写结果
+   * 将改写请求和结果集成到对话流中
+   */
+  const handleReportRewrite = async (params: ReportRewriteParams) => {
+    const { action, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
+
+    // 获取配置
+    const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
+
+    if (config.userFeedbackProcessorEnable === false) {
+      onStatusChange?.('error')
+      onError?.('用户反馈优化已关闭，当前报告不可编辑')
+      return
+    }
+
+    const token = getToken()
+
+    if (!token) {
+      onError('无法获取认证信息，请重新登录')
+      return
+    }
+
+    // 获取带 session 的 conversation_id（与主 DeepSearch 流程一致）
+    const sessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID
+    const backendConversationId = sessionConversationId || conversationId
+
+    // 【重要】在处理 rewrite 之前，先获取当前报告的剩余改写次数
+    // 这样才能正确计算递减，而不是每次都从新消息的 undefined 开始
+    const currentSelectedResultMessageId = useConversationStore.getState().selectedResultMessageId
+    const currentMessagesMap = useConversationStore.getState().messagesMap
+    const currentMessageItemsMap = useConversationStore.getState().messageItemsMap
+
+    let originalRemainingRewriteRounds: number | undefined = undefined
+    let originalMaxRewriteRounds: number | undefined = undefined
+
+    if (currentSelectedResultMessageId) {
+      const currentMessage = currentMessagesMap.get(currentSelectedResultMessageId)
+      if (currentMessage?.messageItemsId) {
+        const currentMessageItems = currentMessageItemsMap.get(currentMessage.messageItemsId)
+        originalRemainingRewriteRounds = currentMessageItems?.remainingRewriteRounds
+        originalMaxRewriteRounds = currentMessageItems?.maxRewriteRounds
+      }
+    }
+
+    // 1. 添加用户消息到对话流
+    const actionLabel = REWRITE_ACTION_LABELS[action] || action
+    const userMessageContent = userInstruction
+      ? `请帮我${actionLabel}这段文字：\n\n"${selectedText.slice(0, 100)}${selectedText.length > 100 ? '...' : ''}"\n\n${userInstruction}`
+      : `请帮我${actionLabel}这段文字：\n\n"${selectedText.slice(0, 100)}${selectedText.length > 100 ? '...' : ''}"`
+
+    addUserMessage(conversationId, userMessageContent)
+
+    // 构建改写消息 payload（参考 test_feedback1.py 格式）
+    const messagePayload = {
+      action,
+      selected_text: selectedText,
+      start_offset: startOffset,
+      end_offset: endOffset,
+      user_instruction: userInstruction || '',
+    }
+
+    // 构建 local_search_config
+    const local_search_config = (config.searchMode === 'local' || config.searchMode === 'all')
+      ? {
+          local_search_config_ids: config.selectedKnowledgeBaseIds || [],
+          max_local_search_results: config.localSearchResultCount,
+          recall_threshold: config.recallThreshold,
+        }
+      : undefined
+
+    // 构建 web_search_config
+    const web_search_config = (config.searchMode === 'web' || config.searchMode === 'all')
+      ? {
+          web_search_config_id: config.selectedWebSearchEngineId!,
+          max_web_search_results: config.webSearchResultCount,
+        }
+      : undefined
+
+    // 续写请求：复用 DeepSearch 配置，message 为 JSON 格式的改写指令
+    // 参考 test_feedback1.py 的 build_next_payload，续写时保留所有基础配置
+    try {
+      const response = await fetch('/api/v1/agent/deepsearch/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          space_id: user?.spaceId || getDefaultSpaceId(),
+          general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
+          message: JSON.stringify(messagePayload),
+          conversation_id: backendConversationId,
+          // 保留搜索配置（续写时后端会根据 conversation_id 恢复 workflow 状态）
+          search_mode: 'research',
+          web_search_config,
+          local_search_config,
+          // 报告局部改写配置
+          user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
+          user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+          execution_method: config.execution_method ?? DEFAULT_DEEPSEARCH_CONFIG.execution_method,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      // 处理 SSE 流
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      const FEEDBACK_AGENT = 'user_feedback_processor'
+      let finalResultMessageId: string | null = null
+      let hasReceivedContent = false  // 用于追踪是否已收到内容
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          onEnd()
+          break
+        }
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+
+          const raw = line.slice(6)
+          try {
+            const data = JSON.parse(raw)
+
+            // 处理 ALL END
+            if (data.agent === 'end' && data.content === 'ALL END') {
+              onStatusChange?.('idle')
+              onEnd()
+              return
+            }
+
+            // 处理 agent 响应
+            if (data.agent === FEEDBACK_AGENT && typeof data.content === 'string') {
+              try {
+                const content = JSON.parse(data.content)
+
+                // 处理错误信息
+                if (content.error) {
+                  console.error('[handleReportRewrite] Backend error:', content.error)
+                  onStatusChange?.('error')
+                  onError(content.error)
+                  return
+                }
+
+                // 后端同时返回 rewritten_text（增量）和 final_result.response_content（完整快照）
+                // 参考: user_feedback_processor.py 构建的 content_payload
+
+                // 1. 处理增量 delta（选中文本的改写结果）
+                if (typeof content.rewritten_text === 'string') {
+                  // 第一次收到内容时，切换状态为 writing
+                  if (!hasReceivedContent) {
+                    hasReceivedContent = true
+                    onStatusChange?.('writing')
+                  }
+
+                  onDelta({
+                    rewritten_text: content.rewritten_text,
+                    original_start_offset: content.original_start_offset,
+                    original_end_offset: content.original_end_offset,
+                  })
+                }
+
+                // 2. 处理完整快照（在 final_result 中），添加到对话流
+                if (content.final_result && typeof content.final_result.response_content === 'string') {
+                  onSnapshot({ response_content: content.final_result.response_content })
+
+                  // 添加 REPORT 消息到对话流（FINAL_REPORT 类型）
+                  const reportContent = {
+                    response_content: content.final_result.response_content,
+                    citation_messages: content.final_result.citation_messages || null,
+                    infer_messages: content.final_result.infer_messages || [],
+                  }
+
+                  // 如果还没有创建过 final_result 消息，创建一个新的
+                  if (!finalResultMessageId) {
+                    const newMessage = addSystemMessage(
+                      conversationId,
+                      MessageType.REPORT,
+                      JSON.stringify(reportContent),
+                      undefined,
+                      MESSAGE_TITLES.FINAL_REPORT,
+                      'deepsearch'
+                    )
+                    if (newMessage) {
+                      finalResultMessageId = newMessage.id
+                      // 自动选中新创建的报告
+                      setSelectedResultMessageId(newMessage.id)
+
+                      // user_feedback_processor 返回 final_result 后可能还会等待用户下一次输入
+                      // 所以需要在这里就更新状态为 COMPLETED，而不是等 ALL END
+
+                      // 计算剩余改写次数
+                      // 逻辑：最大3次时，第一次完成显示2/3，第二次显示1/3，第三次显示0/3（已用完）
+                      // 【重要】使用函数开头捕获的原始报告的 remainingRewriteRounds
+                      // 而不是新消息的值（新消息始终是 undefined）
+                      const maxInteractions = config.userFeedbackProcessorMaxInteractions ?? 3
+
+                      // 第一次改写时 originalRemainingRewriteRounds 为 undefined
+                      const isFirstRewrite = originalRemainingRewriteRounds === undefined
+                      const newRemaining = isFirstRewrite
+                        ? maxInteractions - 1  // 第一次完成后剩余 max-1
+                        : Math.max(0, (originalRemainingRewriteRounds ?? 0) - 1)
+
+                      useConversationStore.getState().updateMessage(
+                        newMessage.messageItemsId,
+                        newMessage.id,
+                        { status: TaskStatus.COMPLETED, isStreaming: false }
+                      )
+                      useConversationStore.getState().updateMessageItems(
+                        newMessage.messageItemsId,
+                        {
+                          status: TaskStatus.COMPLETED,
+                          remainingRewriteRounds: newRemaining,
+                          // 保持原始的最大次数，如果是第一次则使用配置值
+                          maxRewriteRounds: originalMaxRewriteRounds ?? maxInteractions
+                        }
+                      )
+                    }
+                  }
+                }
+              } catch {
+                // content 不是 JSON，忽略
+              }
+            }
+          } catch {
+            // JSON 解析失败，忽略
+          }
+        }
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : '请求失败')
+    }
   }
 
   // 处理智能体选择（首次配置弹出配置弹窗，非首次配置直接选中）
@@ -756,8 +1134,20 @@ const AppsPage: React.FC = () => {
   // 处理模型选择
   const handleModelSelect = (model: string) => {
     setSelectedModel(model)
-    setSelectedModelId(modelIdMap.get(model) || -1)
+    const modelId = modelIdMap.get(model) || -1
+    setSelectedModelId(modelId)
     setShowModelPicker(false)
+
+    // 同步到智能体配置的通用模型（仅对 deepsearch 智能体）
+    if (selectedAgent?.id === 'deepsearch' && modelId !== -1) {
+      setAgentConfigs(prev => ({
+        ...prev,
+        deepsearch: {
+          ...prev['deepsearch'],
+          generalModelId: String(modelId),
+        }
+      }))
+    }
   }
 
   // 发起新对话
@@ -777,6 +1167,171 @@ const AppsPage: React.FC = () => {
     setInputValue('')
   }
 
+  // 当selectedResultMessageId变化时，自动关闭思维链面板并更新currentMessageItemsId
+  useEffect(() => {
+    if (selectedResultMessageId) {
+      setShowMindMap(false)
+      setMindMapMessageItemsId(null)
+      // 更新currentMessageItemsId为当前报告所属的messageItemsId
+      const messageItemsId = getCurrentMessageItemsId
+      setCurrentMessageItemsId(messageItemsId)
+    }
+  }, [selectedResultMessageId, getCurrentMessageItemsId])
+
+  // 当思维链数据开始生成时，自动打开思维链视图
+  // 使用 messageItemsList 来获取当前对话中最新的 messageItemsId
+  const prevMindMapSizeRef = useRef(mindMapManagersMap.size)
+
+  useEffect(() => {
+    // 检查 mindMapManagersMap 是否有新增条目
+    if (mindMapManagersMap.size <= prevMindMapSizeRef.current) {
+      prevMindMapSizeRef.current = mindMapManagersMap.size
+      return
+    }
+    prevMindMapSizeRef.current = mindMapManagersMap.size
+
+    // 找到最新创建的 mindMap 对应的 messageItemsId
+    if (!currentConversationId || selectedResultMessageId) {
+      return
+    }
+
+    // 获取当前会话的 messageItems
+    const conversationMessageItems = getMessageItemsByConversationId(currentConversationId)
+    const latestMessageItems = conversationMessageItems
+      .sort((a, b) => b.createdAt - a.createdAt)[0]
+
+    if (!latestMessageItems) return
+
+    // 检查这个 messageItems 是否有 mindMap
+    if (mindMapManagersMap.has(latestMessageItems.id)) {
+      // 检查当前显示的思维链是否属于当前会话
+      // 如果不属于当前会话，需要先关闭再打开新的
+      const currentMindMapBelongsToCurrentConversation = mindMapMessageItemsId &&
+        conversationMessageItems.some(mi => mi.id === mindMapMessageItemsId)
+
+      if (showMindMap && !currentMindMapBelongsToCurrentConversation) {
+        setShowMindMap(false)
+        setMindMapMessageItemsId(null)
+        setCurrentMessageItemsId(null)
+        // 使用 setTimeout 确保状态更新后再打开
+        setTimeout(() => {
+          setMindMapMessageItemsId(latestMessageItems.id)
+          setCurrentMessageItemsId(latestMessageItems.id)
+          setShowMindMap(true)
+        }, 0)
+      } else if (!showMindMap) {
+        setMindMapMessageItemsId(latestMessageItems.id)
+        setCurrentMessageItemsId(latestMessageItems.id)
+        setShowMindMap(true)
+      }
+    }
+  }, [mindMapManagersMap, currentConversationId, selectedResultMessageId, showMindMap, mindMapMessageItemsId, getMessageItemsByConversationId])
+
+  // 打开思维链面板
+  const handleOpenMindMap = (messageItemsId: string) => {
+    // 如果当前已经在显示思维链且是同一个messageItemsId，关闭思维链面板
+    if (showMindMap && mindMapMessageItemsId === messageItemsId) {
+      setShowMindMap(false)
+      setMindMapMessageItemsId(null)
+      setCurrentMessageItemsId(null)
+      setLastSelectedReportId(null)
+    } else {
+      // 保存当前选中的报告ID
+      if (selectedResultMessageId) {
+        setLastSelectedReportId(selectedResultMessageId)
+      }
+      // 否则打开思维链面板
+      setMindMapMessageItemsId(messageItemsId)
+      setCurrentMessageItemsId(messageItemsId)
+      setShowMindMap(true)
+      setSelectedResultMessageId(null) // 清除报告选择，避免状态冲突
+    }
+  }
+
+  // 关闭思维链面板
+  const handleCloseMindMap = () => {
+    setShowMindMap(false)
+    setMindMapMessageItemsId(null)
+    setCurrentMessageItemsId(null)
+    setLastSelectedReportId(null)
+    setCurrentGraphType('sectionGraph')
+  }
+
+  // 关闭右侧面板（共用）
+  const handleCloseRightPanel = () => {
+    setShowMindMap(false)
+    setMindMapMessageItemsId(null)
+    setSelectedResultMessageId(null)
+    setCurrentMessageItemsId(null)
+    setLastSelectedReportId(null)
+    setCurrentGraphType('sectionGraph')
+  }
+
+  // ===== 视图切换逻辑 =====
+  // 派生当前视图类型
+  const activeView: ViewType = showMindMap ? 'thinking' : 'report'
+
+  // 视图切换处理函数
+  const handleViewChange = useCallback((view: ViewType) => {
+    const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
+    if (!currentId) return
+
+    if (view === 'thinking') {
+      // 切换到思维链
+      if (selectedResultMessageId) {
+        setLastSelectedReportId(selectedResultMessageId)
+      }
+      setMindMapMessageItemsId(currentId)
+      setCurrentMessageItemsId(currentId)
+      setShowMindMap(true)
+      setSelectedResultMessageId(null)
+    } else {
+      // 切换到报告
+      setShowMindMap(false)
+      setMindMapMessageItemsId(null)
+      setCurrentMessageItemsId(currentId)
+      if (lastSelectedReportId) {
+        setSelectedResultMessageId(lastSelectedReportId)
+      } else {
+        // 查找当前 messageItems 中的报告消息
+        const messageItems = messageItemsMap.get(currentId)
+        if (messageItems) {
+          const messages = messageItems.messagesIds.map(id => getMessageById(id)).filter((msg): msg is NonNullable<typeof msg> => msg !== undefined)
+          const reportMessage = messages.find(msg => msg.type === MessageType.REPORT)
+          if (reportMessage) {
+            setSelectedResultMessageId(reportMessage.id)
+          }
+        }
+      }
+    }
+  }, [mindMapMessageItemsId, currentMessageItemsId, getCurrentMessageItemsId, selectedResultMessageId, lastSelectedReportId, messageItemsMap, getMessageById])
+
+  // ===== TopToolbar 渲染条件（使用 useMemo 稳定渲染） =====
+  const toolbarState = useMemo(() => {
+    const currentId = mindMapMessageItemsId || currentMessageItemsId || getCurrentMessageItemsId
+    if (!currentId) return { show: false, disabledViews: [] as ViewType[] }
+
+    const messageItems = messageItemsMap.get(currentId)
+    const hasReport = messageItems?.messagesIds.some(id => {
+      const message = getMessageById(id)
+      return message && message.type === MessageType.REPORT
+    })
+    const hasMindMap = mindMapManagersMap.has(currentId)
+
+    // 显示 TopToolbar 的条件：有报告或有思维链
+    // 注意：AI 改写产生的报告没有 mindMap，所以不能只检查 hasMindMap
+    if (!hasReport && !hasMindMap) return { show: false, disabledViews: [] as ViewType[] }
+
+    return {
+      show: true,
+      // 如果没有报告，禁用报告视图；如果没有思维链，禁用思维链视图
+      disabledViews: [
+        ...(hasReport ? [] : ['report'] as ViewType[]),
+        ...(hasMindMap ? [] : ['thinking'] as ViewType[]),
+      ]
+    }
+  }, [mindMapMessageItemsId, currentMessageItemsId, getCurrentMessageItemsId, mindMapManagersMap, messageItemsMap, getMessageById])
+
   // 切换历史对话
   const handleConversationSelect = async (conversationId: string) => {
     // 如果有正在进行的 SSE，先中断
@@ -785,8 +1340,16 @@ const AppsPage: React.FC = () => {
       setAbortController(null)
     }
 
-    // 清除选择的结果面板（修复bug：切换对话时需要清除，否则会导致页面空白）
+    // 清除选择的结果面板和思维链面板（修复bug：切换对话时需要清除，否则会导致页面空白）
     setSelectedResultMessageId(null)
+    setShowMindMap(false)
+    setMindMapMessageItemsId(null)
+    setCurrentMessageItemsId(null)
+    setLastSelectedReportId(null)
+    setCurrentGraphType('sectionGraph')
+
+    // 重置思维链大小追踪 ref，防止切换会话后自动打开错误的思维链
+    prevMindMapSizeRef.current = mindMapManagersMap.size
 
     // 切换对话（异步加载）
     await switchConversation(conversationId)
@@ -796,7 +1359,7 @@ const AppsPage: React.FC = () => {
     if (conversation?.config?.agentType === 'deepsearch') {
       // 等待一帧，确保数据已加载
       requestAnimationFrame(() => {
-        const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsFailed()
+        const hasIncomplete = useConversationStore.getState().checkAndMarkIncompleteAsAbort()
         if (hasIncomplete) {
           console.log('[AppsPage] Marked incomplete messages as FAILED on conversation switch')
         }
@@ -805,10 +1368,14 @@ const AppsPage: React.FC = () => {
   }
 
   // ===== DeepSearch 插件：消息发送处理 =====
-  const handleDeepSearchSend = async (content: string) => {
+  const handleDeepSearchSend = async (
+    content: string,
+    options?: { interrupt_feedback?: string; backend_message?: string }
+  ) => {
     // 标记SSE是否正常完成（收到正常结束信号）
     // 需要在 try 块外定义，这样 finally 块也能访问
     let sseCompletedNormally = false
+    let recordingId: string | undefined
 
     // 如果没有 conversation，先创建一个
     let conversationId = currentConversationId
@@ -893,16 +1460,15 @@ const AppsPage: React.FC = () => {
         : undefined
 
       // ===== HITL 判断逻辑：判断是否是回复 HITL interrupt 消息 =====
-      let interrupt_feedback = ''  // 默认为空
+      let interrupt_feedback = options?.interrupt_feedback ?? ''  // 默认为空
 
-      const messageItemsList = useConversationStore.getState().getCurrentMessageItems()
-      console.log('[HITL Debug] messageItemsList length:', messageItemsList?.length)
+      const messageItemsList = useConversationStore.getState().getCurrentMessageItemsList()
 
       // ===== 判断是否是新的 deepsearch 运行 =====
       // 用于确定是否需要使用新的 session ID
-      let isNewDeepSearchRun = true  // 默认认为是新的运行
+      let isNewDeepSearchRun = !options?.interrupt_feedback  // 默认认为是新的运行
 
-      if (messageItemsList && messageItemsList.length > 0) {
+      if (!options?.interrupt_feedback && messageItemsList && messageItemsList.length > 0) {
         // 从后往前找最后一个系统消息（非用户消息）
         // 因为最后一个是刚添加的用户消息，所以要往前找
         let lastSystemMessageItems: MessageItems | undefined
@@ -915,30 +1481,16 @@ const AppsPage: React.FC = () => {
         }
 
         if (lastSystemMessageItems) {
-          console.log('[HITL Debug] lastSystemMessageItems:', {
-            id: lastSystemMessageItems.id,
-            isUser: useConversationStore.getState().getMessageItemsIsUser(lastSystemMessageItems),
-            agentType: lastSystemMessageItems.agentType,
-            messagesIds: lastSystemMessageItems.messagesIds
-          })
-
           // 获取最后一个 Message
           const lastMessageId = lastSystemMessageItems.messagesIds[lastSystemMessageItems.messagesIds.length - 1]
           const lastMessage = lastMessageId ? useConversationStore.getState().getMessageById(lastMessageId) : undefined
 
-          console.log('[HITL Debug] lastMessage:', {
-            id: lastMessage?.id,
-            type: lastMessage?.type,
-            status: lastMessage?.status
-          })
-
-          // 判断是否是 HITL interrupt 消息
+          // 判断是否是 HITL interrupt 消息（包括 INTERRUPT 和 OUTLINE_INTERACTION 类型）
           if (lastMessage &&
-              lastMessage.type === MessageType.INTERRUPT &&
-              (lastMessage.status === TaskStatus.IN_PROGRESS || lastMessage.status === TaskStatus.PENDING || lastMessage.status === TaskStatus.UNKNOWN)) {
-            // 这是 HITL 的第一次回复，判断 agent 是否匹配
+              (lastMessage.type === MessageType.INTERRUPT || lastMessage.type === MessageType.OUTLINE_INTERACTION) &&
+              (isTaskOngoing(lastMessage.status) || lastMessage.status === TaskStatus.UNKNOWN)) {
+            // 说明本次提问是 HITL 的第1次回复的再次提问，判断 agent 是否匹配
             const hitlAgent = lastSystemMessageItems.agentType  // 从 MessageItems 获取 agentType
-            console.log('[HITL Debug] Found HITL interrupt message. hitlAgent:', hitlAgent)
 
             if (hitlAgent === AgentType.DEEPSEARCH) {
               // Agent 匹配：更新 interrupt 消息状态为 COMPLETED，设置 interrupt_feedback
@@ -955,15 +1507,17 @@ const AppsPage: React.FC = () => {
                 lastSystemMessageItems.id,
                 { status: TaskStatus.COMPLETED }
               )
-              interrupt_feedback = 'accepted'
 
-              // 验证更新后的状态
-              const updatedMessage = useConversationStore.getState().getMessageById(lastMessage.id)
-              console.log('[HITL] After update - status:', updatedMessage?.status)
-              console.log('[HITL] Agent matched, setting interrupt_feedback=accepted')
+              // 根据消息类型设置不同的 interrupt_feedback
+              if (lastMessage.type === MessageType.OUTLINE_INTERACTION) {
+                // 大纲交互：用户在输入框输入的是修改意见
+                interrupt_feedback = 'revise_comment'
+              } else {
+                // 普通 INTERRUPT：用户反馈
+                interrupt_feedback = 'accepted'
+              }
             } else {
               // Agent 不匹配：更新 interrupt 消息状态为 CANCELLED
-              console.log('[HITL] Before cancel - status:', lastMessage.status)
               useConversationStore.getState().updateMessage(
                 lastSystemMessageItems.id,
                 lastMessage.id,
@@ -975,22 +1529,12 @@ const AppsPage: React.FC = () => {
                 { status: TaskStatus.CANCELLED }
               )
               interrupt_feedback = ''  // 保持为空
-
-              // 验证更新后的状态
-              const updatedMessage = useConversationStore.getState().getMessageById(lastMessage.id)
-              console.log('[HITL] After cancel - status:', updatedMessage?.status)
-              console.log('[HITL] Agent not matched, cancelling interrupt message. hitlAgent:', hitlAgent)
             }
           } else {
             // 不是 HITL interrupt 消息，清除 SESSION_CONVERSATION_ID
             useConversationStore.getState().setSessionConversationId(null)
-            console.log('[HITL Debug] Last message is not HITL interrupt. type:', lastMessage?.type, 'status:', lastMessage?.status)
           }
-        } else {
-          console.log('[HITL Debug] No system messageItems found')
         }
-      } else {
-        console.log('[HITL Debug] No messageItems found')
       }
 
       // ===== 计算 DeepSearch 运行 Session ID =====
@@ -999,18 +1543,19 @@ const AppsPage: React.FC = () => {
         useConversationStore.getState().getMessageItemsIsUser(items)
       ).length
 
-      console.log('[DeepSearch]:', '(user message count:', userMessageCount, ', isNewRun:', isNewDeepSearchRun, ')')
-
       // ===== 生成后端使用的 conversation_id =====
       // 如果是新的 deepsearch 运行，或者没有 SESSION_CONVERSATION_ID，则生成新的后端 conversation_id
       // 否则使用现有的 SESSION_CONVERSATION_ID
-      const backendConversationId = (isNewDeepSearchRun || !SESSION_CONVERSATION_ID)
+      // 注意：需要在函数内部获取最新的 SESSION_CONVERSATION_ID，而不是使用组件渲染时的值
+      const currentSessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID
+      const backendConversationId = (isNewDeepSearchRun || !currentSessionConversationId)
         ? `${conversationId}_${Math.random().toString(36).substring(2, 6)}_${String(userMessageCount).padStart(3, '0')}`
-        : SESSION_CONVERSATION_ID
-      console.log('[DeepSearch] Backend conversation_id:', backendConversationId, '(original:', conversationId, ')')
+        : currentSessionConversationId
+
+      // 立即保存到 Store 中，以便取消请求时使用
+      useConversationStore.getState().setSessionConversationId(backendConversationId)
 
       // ===== SSE 录制：开始录制（仅开发模式） =====
-      let recordingId: string | undefined
       if (ENABLE_SSE_DEBUG) {
         try {
           // 从 localStorage 读取压缩配置
@@ -1036,28 +1581,48 @@ const AppsPage: React.FC = () => {
         throw new Error('无法获取认证信息，请重新登录')
       }
 
+      const messageToBackend = options?.backend_message ?? content
+
+      // ===== 提取并保存配置参数 =====
+      const agentConfig = {
+        space_id: user?.spaceId || getDefaultSpaceId(),
+        general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
+        conversation_id: backendConversationId, // 使用带 session 的 conversation_id
+        search_mode: 'research', // DeepSearch 模式固定为 research
+        outliner_max_section_num: config.planChapterCount,
+        workflow_human_in_the_loop: config.enableHumanInteraction,
+        outline_interaction_enabled: config.outlineInteractionEnabled,
+        outline_interaction_max_rounds: config.outlineInteractionEnabled ? OUTLINE_INTERACTION_MAX_ROUNDS : undefined,
+        info_collector_search_method: config.searchMode,
+        source_tracer_research_trace_source_switch: config.enableTraceability,
+        source_tracer_source_tracer_infer_switch: config.enableSourceTracerInfer,
+        web_search_config,  // 可能是undefined
+        local_search_config,  // 新增：可能是undefined
+        template_id: config.selectedTemplateId ?? -1,
+        interrupt_feedback: interrupt_feedback,   // 中断反馈标识, 可填值: ['accepted', ''], 默认''
+        execution_method: config.execution_method ?? DEFAULT_DEEPSEARCH_CONFIG.execution_method,
+        // 高级配置模型 ID（可选，仅在有值时传递）
+        ...(config.planUnderstandingModelId && { plan_understanding_model_id: parseInt(config.planUnderstandingModelId) }),
+        ...(config.infoCollectingModelId && { info_collecting_model_id: parseInt(config.infoCollectingModelId) }),
+        ...(config.writingCheckingModelId && { writing_checking_model_id: parseInt(config.writingCheckingModelId) }),
+        // 用户反馈优化配置
+        user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
+        user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+        // 联网搜索QPS限制，0表示不限流
+        web_search_max_qps: config.webSearchMaxQps ?? 0,
+      };
+
+      // 保存到 store（用于 SSE Handler 读取）
+      setConversationConfig(conversationId, agentConfig);
+
+
       const response = await fetch('/api/v1/agent/deepsearch/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          space_id: user?.spaceId || getDefaultSpaceId(),
-          model_config_id: selectedModelId,
-          message: content,
-          conversation_id: backendConversationId, // 使用带 session 的 conversation_id
-          search_mode: 'research', // DeepSearch 模式固定为 research
-          outliner_max_section_num: config.planChapterCount,
-          workflow_human_in_the_loop: config.enableHumanInteraction,
-          info_collector_search_method: config.searchMode,
-          source_tracer_research_trace_source_switch: config.enableTraceability,
-          source_tracer_source_tracer_infer_switch: config.enableSourceTracerInfer,
-          web_search_config,  // 可能是undefined
-          local_search_config,  // 新增：可能是undefined
-          template_id: config.selectedTemplateId ?? -1,
-          interrupt_feedback: interrupt_feedback,   // 中断反馈标识, 可填值: ['accepted', ''], 默认''
-        }),
+        body: JSON.stringify({ ...agentConfig, message: messageToBackend }),
         signal: controller.signal,
       })
 
@@ -1186,6 +1751,80 @@ const AppsPage: React.FC = () => {
     }
   }
 
+  // ===== DeepSearch 停止请求处理 =====
+  const handleStopDeepSearch = async () => {
+    // 使用 SESSION_CONVERSATION_ID (带随机后缀的 ID)，如果为空则回退到 currentConversationId
+    // 必须与 handleDeepSearchSend 中生成的 backendConversationId 保持一致
+    const conversation_id = useConversationStore.getState().SESSION_CONVERSATION_ID || currentConversationId
+
+    if (!conversation_id) {
+      console.error('[DeepSearch Cancel] No conversationId found')
+      // 仍然尝试 abort 前端 SSE 流
+      if (abortController) {
+        abortController.abort()
+        setAbortController(null)
+      }
+      return
+    }
+
+    const token = getToken()
+    if (!token) {
+      console.error('[DeepSearch Cancel] No auth token')
+      return
+    }
+
+    // 【关键 1】立即更新 UI 状态，不等待后端响应
+    useConversationStore.getState().updateMessageItemsStatusToCancelled()
+
+    // 【关键 2】发送取消请求到后端
+    // 根据 DeepSearch 服务代码，取消请求只需要 space_id 和 conversation_id
+    // interrupt_feedback 必须是 "cancel"
+    const cancelAbortController = new AbortController()
+
+    console.log('[DeepSearch Cancel] Sending cancel request, conversation_id:', conversation_id)
+
+    // 获取 space_id（与发起请求时保持一致）
+    const space_id = user?.spaceId || getDefaultSpaceId()
+
+    fetch('/api/v1/agent/deepsearch/run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        space_id: space_id,
+        conversation_id: conversation_id,
+        message: '',  // 必填字段，取消请求时为空字符串
+        interrupt_feedback: 'cancel',  // DeepSearch 服务根据这个字段识别取消请求
+        general_model_config_id: -1, // 必填字段，但在取消请求中不使用
+      }),
+      signal: cancelAbortController.signal,
+    }).then(async (response) => {
+      if (!response.ok) {
+        console.error('[DeepSearch Cancel] Failed, status:', response.status)
+        const errorText = await response.text()
+        console.error('[DeepSearch Cancel] Error body:', errorText)
+      } else {
+        const data = await response.json()
+        console.log('[DeepSearch Cancel] Success:', data)
+      }
+    }).catch((error) => {
+      if (error.name === 'AbortError') {
+        console.log('[DeepSearch Cancel] Request aborted')
+      } else {
+        console.error('[DeepSearch Cancel] Error:', error)
+      }
+    })
+
+    // 【关键 3】立即 abort 前端的 SSE 流，不需要等待 cancel 请求完成
+    if (abortController) {
+      abortController.abort()
+      setAbortController(null)
+    }
+  }
+
+
   return (
     <div className={`${FONT_FAMILY} flex flex-col h-full w-full min-h-0`}>
       {/* SSE 回放浮动按钮（仅开发模式） */}
@@ -1213,7 +1852,7 @@ const AppsPage: React.FC = () => {
 
         {/* 右侧主内容区 */}
         <div
-          className={`flex-1 flex min-h-0 overflow-hidden ${selectedResultMessageId ? 'flex-row' : 'flex-col'}`}
+          className={`flex-1 flex min-h-0 overflow-hidden ${(selectedResultMessageId || showMindMap) ? 'flex-row' : 'flex-col'}`}
         >
           {/* 无对话状态 - 居中的输入框 */}
           {!hasConversation && !selectedResultMessageId && (
@@ -1254,6 +1893,7 @@ const AppsPage: React.FC = () => {
                   inputValue={inputValue}
                   onInputChange={setInputValue}
                   onPressEnter={handleSendMessage}
+                  onStopClick={handleStopDeepSearch}
                   inputRef={chatInputRef}
                   isStreaming={isStreaming}
                   selectedAgent={selectedAgent}
@@ -1307,11 +1947,15 @@ const AppsPage: React.FC = () => {
           {hasConversation && (
             <>
               {/* 对话区域 */}
-              <div className={`flex flex-col min-h-0 ${selectedResultMessageId ? 'w-2/5' : 'flex-1'}`}>
+              <div className={`flex flex-col min-h-0 ${(selectedResultMessageId || showMindMap) ? 'w-2/5' : 'flex-1'}`}>
                 <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
                 <div className="max-w-4xl mx-auto space-y-4">
                   {messageItemsList.map((messageItems) => (
-                    <SystemMessageItem key={messageItems.id} messageItems={messageItems} />
+                    <SystemMessageItem 
+                      key={messageItems.id} 
+                      messageItems={messageItems}
+                      onOpenMindMap={isDeepSearchMode ? handleOpenMindMap : undefined}
+                    />
                   ))}
 
                   {/* AI 正在输入指示器 */}
@@ -1337,6 +1981,7 @@ const AppsPage: React.FC = () => {
                     inputValue={inputValue}
                     onInputChange={setInputValue}
                     onPressEnter={handleSendMessage}
+                    onStopClick={handleStopDeepSearch}
                     inputRef={chatInputRef}
                     isStreaming={isStreaming}
                     selectedAgent={selectedAgent}
@@ -1358,10 +2003,33 @@ const AppsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 右侧：结果面板（分屏显示） */}
-            {selectedResultMessageId && (
-              <div className="w-3/5 h-full bg-white border border-gray-200 rounded-lg ml-4 overflow-hidden">
-                <ResultPanel />
+            {/* 右侧：结果面板或思维链面板（分屏显示） */}
+            {(selectedResultMessageId || showMindMap) && (
+              <div className="w-3/5 h-full bg-white border border-gray-200 rounded-lg ml-4 overflow-hidden flex flex-col">
+                {/* 顶部工具栏 */}
+                {toolbarState.show && (
+                  <TopToolbar
+                    activeView={activeView}
+                    onViewChange={handleViewChange}
+                    onClose={handleCloseRightPanel}
+                    disabledViews={toolbarState.disabledViews}
+                  />
+                )}
+
+                {/* 共用面板内容 */}
+                {showMindMap && mindMapMessageItemsId ? (
+                  <MindMapPanel
+                    messageItemsId={mindMapMessageItemsId}
+                    onClose={handleCloseMindMap}
+                    graphType={currentGraphType}
+                    onGraphTypeChange={setCurrentGraphType}
+                  />
+                ) : (
+                  <ResultPanel
+                    feedbackOptimizationEnabled={agentConfigs['deepsearch']?.userFeedbackProcessorEnable ?? DEFAULT_DEEPSEARCH_CONFIG.userFeedbackProcessorEnable}
+                    onReportRewrite={handleReportRewrite}
+                  />
+                )}
               </div>
             )}
           </>
@@ -1384,6 +2052,8 @@ const AppsPage: React.FC = () => {
         spaceId={user?.spaceId || getDefaultSpaceId()}
         modelConfigId={selectedModelId}
         isFirstConfig={isFirstConfigMode}
+        availableModels={availableModels}
+        modelsLoading={modelsLoading}
       />
 
       {/* 模型选择弹窗 */}

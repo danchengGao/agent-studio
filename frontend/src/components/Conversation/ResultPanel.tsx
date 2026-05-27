@@ -5,9 +5,14 @@ import { ReportMarkdown } from '@/pages/Apps/components/Markdown';
 import { X } from 'lucide-react';
 import { ReportPanel } from '@/pages/Apps/components/ReportPanel';
 import { buildReportFromDeepSearch, cleanReportContent } from '@/utils/reportUtils';
+import type { ReportRewriteParams } from '@/pages/Apps/types';
 
 interface ResultPanelProps {
   className?: string;
+  /** 是否允许用户反馈优化/编辑 */
+  feedbackOptimizationEnabled?: boolean;
+  /** 报告局部改写回调 */
+  onReportRewrite?: (params: ReportRewriteParams) => Promise<void>;
 }
 
 /**
@@ -19,13 +24,22 @@ interface ResultPanelProps {
  * 3. 支持实时更新（isStreaming 状态）
  * 4. 支持关闭面板
  */
-const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
+const ResultPanel: React.FC<ResultPanelProps> = ({
+  className = '',
+  feedbackOptimizationEnabled = true,
+  onReportRewrite
+}) => {
   // 从store获取选中的消息ID
   const selectedResultMessageId = useConversationStore(
     (state) => state.selectedResultMessageId
   );
   const setSelectedResultMessageId = useConversationStore(
     (state) => state.setSelectedResultMessageId
+  );
+
+  // 获取当前会话 ID
+  const currentConversationId = useConversationStore(
+    (state) => state.currentConversationId
   );
 
   // 获取messagesMap以监听message内容变化（用于流式更新）
@@ -39,7 +53,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
 
   // 解析 DeepSearch 结果（从 selectedMessage.content）
   const deepSearchResult = React.useMemo(() => {
-    if (!selectedMessage || !isFinalReportMessage(selectedMessage.title)) {
+    if (!selectedMessage || !isFinalReportMessage(selectedMessage)) {
       return null;
     }
 
@@ -88,7 +102,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
     }
 
     // 检查是否为最终报告
-    const isFinalReport = isFinalReportMessage(selectedMessage.title);
+    const isFinalReport = isFinalReportMessage(selectedMessage);
 
     if (isFinalReport) {
       // 最终报告：从DeepSearchResult获取完整数据
@@ -113,9 +127,9 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
       return {
         id: selectedMessage.id,
         title: selectedMessage.title || '报告',
-        response_content: contentString,
-        citation_messages: null, // 非最终报告没有citations
-        infer_messages: [], // 非最终报告没有推理图谱
+        content: contentString,
+        citations: null, // 非最终报告没有citations
+        inferMessages: [], // 非最终报告没有推理图谱
         createdAt: new Date(selectedMessage.createdAt || Date.now()).toISOString(),
       };
     }
@@ -132,7 +146,7 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
   // 如果是REPORT类型且有report对象，使用ReportPanel组件渲染
   if (isReportType) {
     // 对于最终报告但缺少DeepSearchResult的情况
-    if (isFinalReportMessage(selectedMessage.title) && !report) {
+    if (isFinalReportMessage(selectedMessage) && !report) {
       return (
         <div className={`w-full h-full flex items-center justify-center ${className}`}>
           <p className="text-gray-500 text-sm">正在加载报告数据...</p>
@@ -145,8 +159,11 @@ const ResultPanel: React.FC<ResultPanelProps> = ({ className = '' }) => {
       return (
         <ReportPanel
           report={report}
-          onClose={handleClose}
+          reportMessageId={selectedResultMessageId || undefined}
           className={className}
+          conversationId={currentConversationId || undefined}
+          feedbackOptimizationEnabled={feedbackOptimizationEnabled}
+          onReportRewrite={onReportRewrite}
         />
       );
     }

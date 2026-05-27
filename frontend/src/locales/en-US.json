@@ -8,85 +8,6 @@
       "retry": "Retry"
     },
     "messages": {
-      "unknownError": "Unknown error",
-      "networkError": "Network error"
-    },
-    "deleting": "Deleting...",
-    "buttons": {
-      "save": "Save",
-      "cancel": "Cancel",
-      "confirm": "Confirm",
-      "deleting": "Deleting...",
-      "delete": "Delete",
-      "edit": "Edit",
-      "view": "View",
-      "create": "Create",
-      "createAndContinue": "Create and Continue",
-      "update": "Update",
-      "search": "Search",
-      "filter": "Filter",
-      "refresh": "Refresh",
-      "export": "Export",
-      "import": "Import",
-      "copy": "Copy",
-      "share": "Share",
-      "test": "Test",
-      "run": "Run",
-      "stop": "Stop",
-      "start": "Start",
-      "publish": "Publish",
-      "archive": "Archive",
-      "restore": "Restore",
-      "back": "Back",
-      "next": "Next",
-      "previous": "Previous",
-      "submit": "Submit",
-      "reset": "Reset",
-      "clear": "Clear",
-      "select": "Select",
-      "selectAll": "Select All",
-      "deselectAll": "Deselect All",
-      "add": "Add",
-      "close": "Close"
-    },
-    "tooltips": {
-      "clickToEditName": "Click to edit name",
-      "clickToEditDescription": "Click to edit description",
-      "stopAgent": "Stop agent",
-      "runAgent": "Run agent",
-      "editAgent": "Edit agent",
-      "copyAgent": "Copy agent",
-      "deleteAgent": "Delete agent",
-      "copyWorkflow": "Copy workflow",
-      "deleteWorkflow": "Delete workflow",
-      "save": "Save",
-      "cancel": "Cancel"
-    },
-    "view": {
-      "gridView": "Grid view",
-      "tableView": "Table view",
-      "searchPlaceholder": "Search..."
-    },
-    "card": {
-      "editedAgo": "Edited"
-    },
-    "status": {
-      "active": "Active",
-      "inactive": "Inactive",
-      "draft": "Draft",
-      "published": "Published",
-      "archived": "Archived",
-      "deleted": "Deleted",
-      "loading": "Loading...",
-      "saving": "Saving...",
-      "creating": "Creating...",
-      "success": "Success",
-      "error": "Error",
-      "warning": "Warning",
-      "info": "Info",
-      "all": "All Status"
-    },
-    "messages": {
       "noData": "No data available",
       "loading": "Loading...",
       "noDescription": "No description",
@@ -151,10 +72,86 @@
       "executionFailed": "Sorry, an error occurred while processing your request. Please try again later",
       "sse": {
         "timeoutError": {
-          "title": "Connection Timeout",
-          "content": "The request timed out because no data was received for an extended period. Please check your network connection and try again."
+          "title": "Conversation Timeout",
+          "content": "The conversation has been cancelled due to inactivity or no data received for an extended period. Please check your network connection and ask your question again."
         }
       }
+    },
+    "deleting": "Deleting...",
+    "buttons": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "confirm": "Confirm",
+      "deleting": "Deleting...",
+      "delete": "Delete",
+      "edit": "Edit",
+      "view": "View",
+      "create": "Create",
+      "createAndContinue": "Create and Continue",
+      "update": "Update",
+      "search": "Search",
+      "filter": "Filter",
+      "refresh": "Refresh",
+      "export": "Export",
+      "import": "Import",
+      "copy": "Copy",
+      "share": "Share",
+      "test": "Test",
+      "run": "Run",
+      "stop": "Stop",
+      "stopResponse": "Stop response",
+      "start": "Start",
+      "publish": "Publish",
+      "archive": "Archive",
+      "restore": "Restore",
+      "back": "Back",
+      "next": "Next",
+      "previous": "Previous",
+      "submit": "Submit",
+      "reset": "Reset",
+      "clear": "Clear",
+      "select": "Select",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "add": "Add",
+      "close": "Close"
+    },
+    "tooltips": {
+      "clickToEditName": "Click to edit name",
+      "clickToEditDescription": "Click to edit description",
+      "stopAgent": "Stop agent",
+      "runAgent": "Run agent",
+      "editAgent": "Edit agent",
+      "copyAgent": "Copy agent",
+      "deleteAgent": "Delete agent",
+      "copyWorkflow": "Copy workflow",
+      "deleteWorkflow": "Delete workflow",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "view": {
+      "gridView": "Grid view",
+      "tableView": "Table view",
+      "searchPlaceholder": "Search..."
+    },
+    "card": {
+      "editedAgo": "Edited"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived",
+      "deleted": "Deleted",
+      "loading": "Loading...",
+      "saving": "Saving...",
+      "creating": "Creating...",
+      "success": "Success",
+      "error": "Error",
+      "warning": "Warning",
+      "info": "Info",
+      "all": "All Status"
     },
     "pagination": {
       "previous": "Previous",
@@ -164,9 +161,10 @@
       "page": "Page {{current}} of {{total}}",
       "pagePrefix": "Page ",
       "pageSuffix": "of {{total}}",
-      "total": "Total {{total}} records",
+      "total": "Total: {{total}} items",
       "pageSize": "Show per page",
-      "items": "items"
+      "items": "items",
+      "itemsPerPage": "items/page"
     },
     "search": {
       "placeholder": "Search...",
@@ -514,6 +512,10 @@
       "switchUser": "Switch Userspace",
       "language": "Language",
       "currentLanguage": "English",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeAuto": "System",
       "switchToEnglish": "English",
       "switchToChinese": "中文",
       "switchToNewVersion": "Try New Version",
@@ -697,7 +699,6 @@
       "allConversations": "All conversations",
       "expandHistory": "Expand conversation history",
       "collapseHistory": "Collapse conversation history",
-      "conversationInProgress": "Conversation in progress, please wait...",
       "newConversation": "Start new conversation",
       "conversationTimeout": "Conversation timed out, force stop current transmission",
       "forceStop": "Force stop",
@@ -705,7 +706,8 @@
       "deepSearchServiceUnavailable": "DeepSearch service is temporarily unavailable, please visit ",
       "deepSearchConfigRetry": ", refer to the documentation for configuration and try again",
       "checkingDeepsearch": "Checking DeepSearch service status...",
-      "deepsearchServiceDown": "DeepSearch service is temporarily unavailable"
+      "deepsearchServiceDown": "DeepSearch service is temporarily unavailable",
+      "stopDeepSearch": "Stop DeepSearch"
     },
     "picker": {
       "selectAgent": "Select Agent",
@@ -789,6 +791,27 @@
       "cancelledTip": "Cancelled",
       "unknownTip": "Unknown status"
     },
+    "outlineInteraction": {
+      "researchOutline": "Research Outline",
+      "waitingForConfirm": "Waiting for confirmation",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "modifyTip": "Based on the above analysis, I have generated a research outline. You can manually edit the outline or directly input your modifications in the dialog box below. Once the outline is confirmed, click \"Start Research\".",
+      "startResearch": "Start Research",
+      "edit": "Edit",
+      "editOutline": "Edit Outline",
+      "addSection": "Add Section",
+      "chapter": "Chapter",
+      "chapterLabel": "Chapter {{index}}",
+      "sectionTitle": "Title",
+      "sectionDescription": "Description",
+      "titlePlaceholder": "Enter section title",
+      "descriptionPlaceholder": "Enter section description",
+      "cancelEdit": "Cancel",
+      "saveOutline": "Save",
+      "editAndRevisePrompt": "Revise the outline based on my edits",
+      "remainingRoundsWarning": "Current remaining edit times: {{count}} times"
+    },
     "chart": {
       "mermaidError": "Mermaid chart error",
       "syntaxError": "Mermaid syntax error",
@@ -804,7 +827,23 @@
       "createdAt": "Created at",
       "contentEmpty": "Report content is empty",
       "loadingTimeout": "Loading timeout",
-      "timeoutMessage": "Report content is taking too long to load, please try again later"
+      "timeoutMessage": "Report content is taking too long to load, please try again later",
+      "viewToggle": {
+        "thinkingChain": "Thinking Chain",
+        "reportView": "Report",
+        "ariaLabel": "View toggle",
+        "comingSoon": "Feature coming soon..."
+      },
+      "edit": "Edit",
+      "exitEdit": "Exit Edit",
+      "aiRewrite": "AI Rewrite",
+      "aiPolish": "Polish",
+      "aiExpand": "Expand",
+      "aiShrink": "Shrink",
+      "howToRewrite": "How would you like to rewrite?",
+      "send": "Send",
+      "thinking": "Thinking...",
+      "writing": "Writing..."
     },
     "user": {
       "defaultUsername": "User"
@@ -828,19 +867,63 @@
         "general": "General",
         "search": "Search",
         "template": "Template",
+        "model": "Model",
         "generalDesc": "Interaction and planning settings",
         "searchDesc": "Online enhancement engine and result settings",
         "templateDesc": "Report template management",
         "needsConfig": "Needs Config"
       },
+      "model": {
+        "general": {
+          "title": "Basic Configuration",
+          "label": "General Model",
+          "description": "Recommended to use a comprehensive model that adapts to all modules",
+          "notSelected": "No model selected",
+          "required": "General model is required"
+        },
+        "advanced": {
+          "title": "Advanced Configuration",
+          "expand": "Expand",
+          "collapse": "Collapse",
+          "info": "Modules without a specific model selected will use the general model by default"
+        },
+        "outline": {
+          "label": "Outline Generation",
+          "description": "",
+          "recommendation": "Recommended to use reasoning models for better intent understanding and reduced hallucinations"
+        },
+        "infoCollecting": {
+          "label": "Information Collecting",
+          "description": "",
+          "recommendation": "Simple models are sufficient for quick summarization"
+        },
+        "reportWriting": {
+          "label": "Report Writing",
+          "description": "",
+          "recommendation": "Recommended to use models with strong programming and math capabilities"
+        },
+        "useGeneral": "Not Selected",
+        "selectModel": "Select Model",
+        "clear": "Clear",
+        "test": {
+          "success": "Model {{modelName}} test successful",
+          "failed": "Model {{modelName}} test failed, model unavailable"
+        }
+      },
       "general": {
         "interactionSettings": "Interaction Settings",
         "enableHumanInteraction": "Enable Human-in-the-Loop",
-        "enableHumanInteractionDesc": "Ask for confirmation during execution",
+        "enableHumanInteractionDesc": "Interact with users for confirmation during Q&A",
+        "outlineInteractionEnabled": "Enable Outline Interaction",
+        "outlineInteractionEnabledDesc": "Allow users to modify during outline phase",
+        "executionModeEnabled": "Enable Dependency Mode",
+        "executionModeEnabledDesc": "Dependency mode can enhance report consistency but may increase generation time, please choose as needed",
         "enableTraceability": "Enable Traceability",
         "enableTraceabilityDesc": "Show information sources",
         "enableSourceTracerInfer": "Enable Traceability Inference",
         "enableSourceTracerInferDesc": "Generate traceability inference graph",
+        "userFeedbackProcessorEnable": "Enable User Feedback Optimization",
+        "userFeedbackProcessorEnableDesc": "Support AI optimization based on user feedback",
         "chapterCount": "Chapter Count",
         "chapterCountDesc": "Control maximum report chapter count"
       },
@@ -859,7 +942,15 @@
         "clickToConfig": "Click \"Configure\" above to add online enhancement engine",
         "localKB": "Local Knowledge Base",
         "noKB": "No knowledge base configured",
-        "clickToAddKB": "Click \"Add Knowledge Base\" above to select"
+        "qpsTitle": "Online Enhancement Engine Request Rate",
+        "qpsDesc": "Number of search requests sent per second",
+        "qpsUnlimited": "0 means unlimited. Supports decimals (e.g. 0.5 = 1 request per 2 seconds)",
+        "qpsInputPlaceholder": "QPS",
+        "qpsInputSuffix": "req/s",
+        "clickToAddKB": "Click \"Configure\" above to add knowledge",
+        "deepSearchKnowledgeBase": "Configure DeepSearch Knowledge Base",
+        "refresh": "Refresh",
+        "noDeepSearchKB": "No DeepSearch knowledge base. Sync a knowledge base to DeepSearch first."
       },
       "validation": {
         "chapterCountRange": "Chapter count must be between 1-10",
@@ -867,7 +958,8 @@
         "webModeRequires": "Online enhancement mode requires an online enhancement engine",
         "localModeRequires": "Local search mode requires at least one knowledge base",
         "webResultCountRange": "Online enhancement result count must be between 1-10",
-        "localResultCountRange": "Local search result count must be between 1-10"
+        "localResultCountRange": "Local search result count must be between 1-10",
+        "generalModelRequired": "General model is required, please select a model"
       },
       "engine": {
         "select": "Select Online Enhancement Engine",
@@ -890,6 +982,17 @@
         "saving": "Saving...",
         "cancel": "Cancel",
         "confirm": "Confirm",
+        "status": {
+          "enabled": "Enabled",
+          "disabled": "Disabled"
+        },
+        "action": {
+          "test": "Test",
+          "edit": "Edit",
+          "delete": "Delete",
+          "enable": "Enable",
+          "disable": "Disable"
+        },
         "error": {
           "selectType": "Please select an online enhancement engine type",
           "invalidName": "Engine name must be one of the preset values",
@@ -897,7 +1000,7 @@
         },
         "presets": {
           "xunfei": "Xunfei Search",
-          "petal": "Petal Search",
+          "petal": "Network-assisted AI Q&A enhancement",
           "tavily": "Tavily",
           "google": "Google",
           "custom": "Custom"
@@ -947,6 +1050,12 @@
         "loading": "Loading...",
         "confirm": "Confirm ({{count}})",
         "cancel": "Cancel",
+        "refresh": "Refresh",
+        "status": {
+          "ready": "Ready",
+          "processing": "Processing",
+          "failed": "Failed"
+        },
         "error": {
           "loadFailed": "Failed to load knowledge bases",
           "loadError": "Error loading knowledge bases",
@@ -991,7 +1100,9 @@
         "optional": "(optional)",
         "emptyTitle": "No templates available",
         "emptyDescription": "Upload templates to use",
-        "uploadButton": "Upload Template"
+        "uploadButton": "Upload Template",
+        "invalidFileType": "Unsupported file type. Please upload files in {{formats}} format",
+        "fileTypeChanged": "Mode switched. The previous file type is no longer supported. Please select a new file"
       }
     },
     "time": {
@@ -1025,7 +1136,12 @@
       "networkError": "Network connection failed, please check your network"
     },
     "deepSearch": {
-      "informationCollection": "Information Collection {{index}}",
+      "informationCollection": "Task {{sectionId}}.{{planIndex}}",
+      "planNode": "Task Plan",
+      "subTask": "Task",
+      "subTaskDetail": "Sub-task Detail",
+      "more": "more...",
+      "clickToViewDetails": "Click to view details...",
       "informationSummary": "Information Summary",
       "researchOutline": "Research Outline",
       "generatingOutline": "Generating outline...",
@@ -1039,16 +1155,57 @@
       "collapse": "Collapse",
       "expand": "Expand {{count}} items",
       "statusUnknown": "Conditionally Complete",
+      "conversationCancelled": "Conversation Cancelled",
+      "conversationCancelledTip": "DeepSearch conversation has been manually interrupted",
       "collapseContent": "Collapse Content",
       "expandContent": "Expand Content",
       "status": {
         "pending": "Pending",
-        "inProgress": "Generating Report",
-        "completed": "Report Generated",
-        "failed": "Generation Failed",
-        "cancelled": "Manually Ended",
+        "inProgress": "In Progress",
+        "reporting": "Generating Report",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
         "unknown": "Conditionally Complete",
         "default": "Unknown Status"
+      },
+      "mindMapStatus": {
+        "pending": "Waiting",
+        "inProgress": "Researching",
+        "reporting": "Generating Report",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
+        "unknown": "Conditionally Complete",
+        "default": "Unknown Status"
+      },
+      "mindMap": {
+        "title": "Thought Chain",
+        "sectionGraph": "Section Graph",
+        "taskGraph": "Task Graph",
+        "toggleGraphType": "Toggle Graph Type",
+        "toggleDirection": "Toggle Layout Direction",
+        "openMindMap": "View Thought Chain",
+        "viewMindMap": "Mind Map",
+        "noData": "No thought chain data",
+        "relayout": "Re-layout",
+        "researchTopic": "Research Topic",
+        "researchCompleted": "Research Completed",
+        "finalReport": {
+          "waitingForWriting": "Waiting for writing",
+          "writingInProgress": "Writing...",
+          "writingCompleted": "Generated at: {{time}}",
+          "writingException": "Writing exception",
+          "cancelled": "Cancelled"
+        },
+        "edge": {
+          "frameworkSupport": "Framework Support",
+          "basicDependence": "Basic Dependence",
+          "theoreticalGuidance": "Theoretical Guidance",
+          "conclusionExtension": "Conclusion Extension",
+          "informationIntegration": "Information Integration",
+          "problemOriented": "Problem-Oriented"
+        }
       },
       "loading": "Loading...",
       "reportCard": "Report",
@@ -1058,9 +1215,9 @@
         "generating": "Generating final report",
         "summarizing": "Summarizing analysis results, please wait...",
         "failed": "Report generation failed",
-        "unknownError": "Unknown error",
-        "bothEmpty": "Both report content and exception info are empty",
-        "noDataError": "Report generation failed: No final report data received. Possible reasons include: Network connection interrupted, server error, or task was terminated prematurely."
+        "exceptionError": "Report generation error: https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "unknownError": "Report generation error: https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md",
+        "noDataError": "Report generation failed: No final report data received. Possible reasons include: Network connection interrupted, server error, or task was terminated prematurely. https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md"
       },
       "playback": {
         "panelTitle": "Debug Panel",
@@ -1152,6 +1309,25 @@
     "title": "Workflows",
     "subtitle": "Design, manage and monitor your automated workflows, build efficient business processes",
     "createWorkflow": "Create Workflow",
+    "importWorkflow": "Import Workflow",
+    "import": {
+      "title": "Import Workflow",
+      "subtitle": "Import a workflow from JSON file (OpenJiuwen or n8n format)",
+      "file": "Workflow File",
+      "dragDrop": "Drag and drop your JSON file here, or click to select",
+      "selectFile": "Select File",
+      "fileFormat": "Supported formats: .json (OpenJiuwen native or n8n)",
+      "validateStrict": "Strict Validation",
+      "validateStrictDesc": "Validate workflow can be compiled and executed",
+      "importButton": "Import Workflow",
+      "importing": "Importing...",
+      "success": "Workflow imported successfully",
+      "errors": {
+        "noFile": "Please select a file to import",
+        "invalidFileType": "Please select a valid JSON file",
+        "importFailed": "Failed to import workflow"
+      }
+    },
     "workflowList": {
       "title": "Workflow List",
       "noWorkflows": "No workflows available",
@@ -1194,6 +1370,9 @@
       "copySuccess": "Workflow \"{{name}}\" copied successfully!",
       "copyFailed": "Failed to copy workflow \"{{name}}\"",
       "copyError": "Failed to copy workflow \"{{name}}\", please try again later",
+      "exportSuccess": "Workflow exported successfully",
+      "exportFailed": "Failed to export workflow",
+      "exportError": "Failed to export workflow \"{{name}}\": {{error}}",
       "tagUpdateSuccess": "Tags updated successfully",
       "tagUpdateFailed": "Failed to update tags",
       "tagLimitError": "Each workflow can have a maximum of 3 tags",
@@ -2170,6 +2349,10 @@
     "configInfo": "Configuration Info",
     "testCompletion": "Test Completion",
     "testFailed": "Test Failed",
+    "modelName": "Model",
+    "promptText": "Prompt",
+    "averageResponseTime": "Average Response Time",
+    "unknownError": "Unknown Error",
     "modelList": {
       "title": "Model List",
       "noModels": "No models available",
@@ -2232,7 +2415,7 @@
         "apiKey": "API Key",
         "apiKeyHint": "API Key for authenticating requests to the Model API Service",
         "baseUrl": "Base URL",
-        "baseUrlHint": "Base URL of the Model API Service",
+        "baseUrlHint": "Base URL of the Model API Service（e.g., \"https://api.modelarts-maas.com/openai/v1\"）",
         "endpoint": "Endpoint URL",
         "endpointError": "Base URL must start with http:// or https://",
         "maxTokens": "Max Tokens",
@@ -2470,7 +2653,74 @@
     "url": "URL",
     "tagsLabel": "Tags",
     "basicInfo": {
-      "name": "Plugin Name"
+      "title": "Basic Information",
+      "name": "Plugin Name",
+      "namePlaceholder": "Enter plugin name",
+      "version": "Version Number",
+      "versionPlaceholder": "Enter version number",
+      "description": "Plugin Description",
+      "descriptionPlaceholder": "Enter plugin description",
+      "author": "Author",
+      "authorPlaceholder": "Enter author",
+      "icon": "Icon",
+      "type": "Type",
+      "published": "Published",
+      "unpublished": "Unpublished",
+      "publishStatus": "Publish Status",
+      "homepage": "Homepage",
+      "homepagePlaceholder": "Enter homepage URL",
+      "repository": "Repository",
+      "repositoryPlaceholder": "Enter repository URL",
+      "license": "License",
+      "licensePlaceholder": "Enter license",
+      "keywords": "Keywords",
+      "keywordsPlaceholder": "Enter keywords",
+      "readme": "Readme",
+      "readmePlaceholder": "Enter readme content",
+      "changelog": "Changelog",
+      "changelogPlaceholder": "Enter changelog",
+      "typePlaceholder": "Select plugin type",
+      "category": "Plugin Category",
+      "categoryPlaceholder": "Select plugin category",
+      "tags": "Tags",
+      "tagsPlaceholder": "Enter tags",
+      "iconPlaceholder": "Enter icon URL",
+      "banner": "Banner",
+      "bannerPlaceholder": "Enter banner URL",
+      "screenshots": "Screenshots",
+      "screenshotsPlaceholder": "Enter screenshots URL",
+      "video": "Video",
+      "videoPlaceholder": "Enter video URL",
+      "demo": "Demo",
+      "demoPlaceholder": "Enter demo URL",
+      "docs": "Documentation",
+      "docsPlaceholder": "Enter documentation URL",
+      "support": "Support",
+      "supportPlaceholder": "Enter support information",
+      "community": "Community",
+      "communityPlaceholder": "Enter community information",
+      "contributing": "Contributing",
+      "contributingPlaceholder": "Enter contributing guidelines",
+      "codeOfConduct": "Code of Conduct",
+      "codeOfConductPlaceholder": "Enter code of conduct",
+      "security": "Security",
+      "securityPlaceholder": "Enter security information",
+      "privacy": "Privacy",
+      "privacyPlaceholder": "Enter privacy policy",
+      "terms": "Terms",
+      "termsPlaceholder": "Enter terms of service",
+      "disclaimer": "Disclaimer",
+      "disclaimerPlaceholder": "Enter disclaimer",
+      "warranty": "Warranty",
+      "warrantyPlaceholder": "Enter warranty information",
+      "liability": "Liability",
+      "liabilityPlaceholder": "Enter liability information",
+      "trademark": "Trademark",
+      "trademarkPlaceholder": "Enter trademark information",
+      "copyright": "Copyright",
+      "copyrightPlaceholder": "Enter copyright information",
+      "patent": "Patent",
+      "patentPlaceholder": "Enter patent information"
     },
     "basicInfoLabel": "Basic Information",
     "usageStatsLabel": "Usage Statistics",
@@ -2545,7 +2795,10 @@
         "downloadCount": "Download Count:",
         "currentStatus": "Current Status:",
         "tags": "Tags",
-        "permissions": "Permissions Required"
+        "permissions": "Permissions Required",
+        "requiredConfiguration": "Required Configuration",
+        "headerName": "Header Name",
+        "defaultValue": "Default Value"
       },
       "publishPlugin": {
         "pluginId": "Plugin ID",
@@ -2555,7 +2808,32 @@
         "versionDescription": "Version Description",
         "versionDescPlaceholder": "Describe the updates in this version...",
         "versionDescHelperText": "Please describe in detail the updates, new features or fixes in this version"
+      },
+      "mcpPluginForm": {
+        "createTitle": "Create MCP Plugin",
+        "editTitle": "Edit MCP Plugin",
+        "namePlaceholder": "e.g.: GitHub MCP, Filesystem MCP, Browser MCP",
+        "descriptionPlaceholder": "Describe the MCP plugin's functionality, purpose and usage scenarios",
+        "url": "MCP Server URL",
+        "urlPlaceholder": "Enter the MCP server URL (e.g.: http://localhost:3000/sse)",
+        "urlHelper": "Provide the MCP server address including protocol (http) ({{current}}/{{max}} bytes)",
+        "openApiFileLabel": "OpenAPI specification file",
+        "openApiFilePlaceholder": "Enter path to OpenAPI spec file (e.g.: /path/to/openapi.yaml)",
+        "openApiFileHelper": "Provide the file system path to your OpenAPI specification file (YAML or JSON)",
+        "stdioPathLabel": "STDIO Server Runnable Path",
+        "stdioPathPlaceholder": "Enter path to STDIO server executable (e.g.: /usr/local/bin/mcp-server)",
+        "stdioPathHelper": "Provide the file system path to your STDIO server executable or script",
+        "filePathInvalid": "Please enter a valid file path",
+        "transport": "Transport Type",
+        "transportHelper": "Select the MCP transport protocol to use when connecting to the server"
       }
+    },
+    "mcpTransport": {
+      "stdio": "STDIO",
+      "sse": "SSE",
+      "streamableHttp": "Streamable HTTP",
+      "openapi": "OpenAPI",
+      "playwright": "Playwright"
     },
     "messages": {
       "loading": "Loading plugin list...",
@@ -2614,7 +2892,9 @@
       "pluginListRefreshed": "Plugin list refreshed",
       "refreshPluginListFailed": "Failed to refresh plugin list",
       "refreshPluginListError": "Error occurred while refreshing plugin list",
-      "createPluginError": "Plugin creation error"
+      "createPluginError": "Plugin creation error",
+      "mcpPluginCreated": "MCP plugin {{name}} created successfully",
+      "mcpCreateFailedRetry": "MCP plugin creation failed, please retry"
     },
     "errors": {
       "deleteFailed": "Delete failed",
@@ -2652,7 +2932,8 @@
     "types": {
       "cloud": "Cloud Service",
       "ide": "IDE Plugin",
-      "pluginTypeUnknown": "Unknown Type ({{type}})"
+      "pluginTypeUnknown": "Unknown Type ({{type}})",
+      "mcp": "MCP Plugin"
     },
     "tags": {
       "cloud": "Cloud",
@@ -2775,9 +3056,11 @@
       "add": "Add",
       "update": "Update",
       "delete": "Delete",
+      "noneParam": "None",
       "addSuccess": "Parameter added successfully",
       "updateSuccess": "Parameter updated successfully",
       "deleteSuccess": "Parameter deleted successfully",
+      "pathParam": "Path Parameter",
       "nameRequired": "Parameter name cannot be empty",
       "nonRuntimeValueRequired": "Non-runtime parameters must have a default value",
       "name": "Parameter Name",
@@ -2853,6 +3136,10 @@
       "editTool": "Edit Tool",
       "deleteTool": "Delete Tool",
       "addNewTool": "Add New Tool",
+      "discoverTools": "Discover Tools",
+      "discoveringTools": "Discovering...",
+      "discoverSuccess": "Tools discovered successfully",
+      "discoverFailed": "Tool discovery failed",
       "publishPlugin": "Publish Plugin",
       "saveConfig": "Save Configuration",
       "pythonDescription": "Suitable for data analysis, machine learning, automation scripts",
@@ -2915,7 +3202,9 @@
       "createFromService": "Create from existing service",
       "createFromServiceDescription": "Quickly create plugins based on cloud services",
       "createFromIDE": "Create in IDE",
-      "createFromIDEDescription": "Create plugins in integrated development environment"
+      "createFromIDEDescription": "Create plugins in integrated development environment",
+      "createFromMCP": "MCP Plugin",
+      "createFromMCPDescription": "Connect to an MCP (Model Context Protocol) server"
     },
     "confirmDelete": "Confirm Delete",
     "confirmDeleteMessage": "Are you sure you want to delete plugin \"{{name}}\"? This action cannot be undone.",
@@ -3269,9 +3558,11 @@
     "toolConfig": {
       "noDescription": "No description",
       "defaultValueLabel": "Default Value",
+      "noneParam": "None",
       "headerParam": "Header Parameter",
       "queryParameter": "Query Parameter",
       "bodyParameter": "Body Parameter",
+      "pathParam": "Path Parameter",
       "thisRequiredField": "This field is required",
       "required": "Required",
       "enterDefaultValue": "Enter default value",
@@ -3402,76 +3693,6 @@
       "versionDescription": "Version Description",
       "irreversibleAction": "This action cannot be undone",
       "deleteIrreversibleAction": "After deletion, all related data of this version will be permanently deleted and cannot be recovered"
-    },
-    "basicInfo": {
-      "title": "Basic Information",
-      "name": "Plugin Name",
-      "namePlaceholder": "Enter plugin name",
-      "version": "Version Number",
-      "versionPlaceholder": "Enter version number",
-      "description": "Plugin Description",
-      "descriptionPlaceholder": "Enter plugin description",
-      "author": "Author",
-      "authorPlaceholder": "Enter author",
-      "icon": "Icon",
-      "type": "Type",
-      "published": "Published",
-      "unpublished": "Unpublished",
-      "publishStatus": "Publish Status",
-      "homepage": "Homepage",
-      "homepagePlaceholder": "Enter homepage URL",
-      "repository": "Repository",
-      "repositoryPlaceholder": "Enter repository URL",
-      "license": "License",
-      "licensePlaceholder": "Enter license",
-      "keywords": "Keywords",
-      "keywordsPlaceholder": "Enter keywords",
-      "readme": "Readme",
-      "readmePlaceholder": "Enter readme content",
-      "changelog": "Changelog",
-      "changelogPlaceholder": "Enter changelog",
-      "typePlaceholder": "Select plugin type",
-      "category": "Plugin Category",
-      "categoryPlaceholder": "Select plugin category",
-      "tags": "Tags",
-      "tagsPlaceholder": "Enter tags",
-      "iconPlaceholder": "Enter icon URL",
-      "banner": "Banner",
-      "bannerPlaceholder": "Enter banner URL",
-      "screenshots": "Screenshots",
-      "screenshotsPlaceholder": "Enter screenshots URL",
-      "video": "Video",
-      "videoPlaceholder": "Enter video URL",
-      "demo": "Demo",
-      "demoPlaceholder": "Enter demo URL",
-      "docs": "Documentation",
-      "docsPlaceholder": "Enter documentation URL",
-      "support": "Support",
-      "supportPlaceholder": "Enter support information",
-      "community": "Community",
-      "communityPlaceholder": "Enter community information",
-      "contributing": "Contributing",
-      "contributingPlaceholder": "Enter contributing guidelines",
-      "codeOfConduct": "Code of Conduct",
-      "codeOfConductPlaceholder": "Enter code of conduct",
-      "security": "Security",
-      "securityPlaceholder": "Enter security information",
-      "privacy": "Privacy",
-      "privacyPlaceholder": "Enter privacy policy",
-      "terms": "Terms",
-      "termsPlaceholder": "Enter terms of service",
-      "disclaimer": "Disclaimer",
-      "disclaimerPlaceholder": "Enter disclaimer",
-      "warranty": "Warranty",
-      "warrantyPlaceholder": "Enter warranty information",
-      "liability": "Liability",
-      "liabilityPlaceholder": "Enter liability information",
-      "trademark": "Trademark",
-      "trademarkPlaceholder": "Enter trademark information",
-      "copyright": "Copyright",
-      "copyrightPlaceholder": "Enter copyright information",
-      "patent": "Patent",
-      "patentPlaceholder": "Enter patent information"
     },
     "defaultDescription": "{{name}} is a powerful plugin that extends your system functionality"
   },
@@ -3736,6 +3957,7 @@
         "confirmDelete": "Confirm to delete this message?",
         "confirmDeleteButton": "Confirm Delete",
         "stopResponse": "Stop Response",
+        "emptyStateTitle": "Hi, I'm the debug assistant",
         "emptyStateText": "Start testing your prompt",
         "emptyStateSubtext": "Send a message in the input box below to test"
       },
@@ -4027,7 +4249,8 @@
         "noModels": "No available models",
         "providedBy": "Provided by {{vendor}}",
         "systemBuiltIn": "System Built-in",
-        "protocol": "Protocol"
+        "protocol": "Protocol",
+        "validating": "Validating model connectivity..."
       },
       "quickOptimizeDialog": {
         "title": "Quick Optimize",
@@ -4182,6 +4405,8 @@
     }
   },
   "knowledgeBases": {
+    "syncedBadge": "Synced",
+    "syncedBadgeTitle": "Synced to DeepSearch",
     "title": "Knowledge Base Management",
     "description": "Manage and organize your knowledge bases with document upload, intelligent processing and efficient retrieval",
     "tabs": {
@@ -4206,13 +4431,15 @@
     },
     "types": {
       "document": "Document Knowledge Base",
+      "weblink": "URL Knowledge Base",
+      "deepSearch": "DeepSearch Knowledge Base",
       "web": "Web Knowledge Base",
       "api": "API Knowledge Base",
       "database": "Database Knowledge Base"
     },
     "embeddingModels": {
       "default": "Default Model",
-      "openai": "OpenAI",
+      "openapi": "OpenAPI",
       "huggingface": "HuggingFace"
     },
     "form": {
@@ -4289,23 +4516,61 @@
       "status": "Status",
       "errorInfo": "Error Info",
       "documentAdded": "Document processing task submitted",
+      "linkAdded": "URL processing task submitted",
       "notFound": "Knowledge base not found",
       "fetchError": "Failed to fetch knowledge base information"
+    },
+    "syncToDeepSearch": {
+      "button": "Sync to Deep Search",
+      "title": "Sync to Deep Search",
+      "stepUpload": "Create KB & upload documents",
+      "stepProcess": "Create index (parse & chunk)",
+      "uploadDescription": "Sync this knowledge base files to Deep Search for retrieval.",
+      "resyncStep1Hint": "When re-syncing, Deep Search files are updated only when you submit the final step. Closing the dialog before that leaves the remote knowledge base unchanged.",
+      "resyncStep1Ready": "Your choices are saved; files are written to Deep Search only after you submit the next step.",
+      "processDescription": "Set parsing, segmentation and indexing strategy, then submit indexing task.",
+      "syncing": "Syncing...",
+      "uploadSuccess": "File sync completed",
+      "uploadFailed": "Sync upload failed",
+      "uploadedCount": "{{count}} file(s) synced",
+      "uploadRequired": "Please complete file sync first",
+      "noDocuments": "No documents in this knowledge base; nothing to index",
+      "noDocumentsToSync": "No documents to sync. Please add documents first.",
+      "processSuccess": "Index creation task submitted",
+      "processSuccessNoDocs": "Sync completed (no documents to index)",
+      "processFailed": "Failed to submit index creation",
+      "complete": "Complete & submit index creation",
+      "success": "Sync and index creation task submitted",
+      "abortFailed": "Failed to cancel sync. Please try again later.",
+      "embedderLabel": "Deep Search embedder",
+      "selectEmbedder": "Please select a Deep Search embedder",
+      "selectEmbedderPlaceholder": "Select embedder",
+      "noEmbedder": "No embedder configured. Please add an embedding model in the Models page first, then sync."
     },
     "editor": {
       "loading": "Loading knowledge base information...",
       "documentList": "Document List",
+      "weblinkList": "URL List",
       "autoRefresh": "Auto-refreshing document status",
+      "autoRefreshWeblinks": "Auto-refreshing URL status",
       "stopAutoRefresh": "Stop auto-refreshing document status",
+      "stopAutoRefreshWeblinks": "Stop auto-refreshing URL status",
       "startAutoRefresh": "Start auto-refreshing document status",
+      "startAutoRefreshWeblinks": "Start auto-refreshing URL status",
       "noAutoRefreshHint": "No documents in processing, auto-refresh not needed",
+      "noAutoRefreshHintWeblinks": "No URLs in processing, auto-refresh not needed",
       "refreshing": "Refreshing...",
       "refreshStatus": "Refresh Status",
       "processing": "Documents processing ({{count}} documents)",
+      "processingWeblinks": "URLs processing ({{count}} URLs)",
       "loadingDocuments": "Loading document list...",
+      "loadingWeblinks": "Loading URL list...",
       "noDocuments": "No documents",
+      "noWeblinks": "No URLs",
       "addDocument": "Add Document",
+      "addWeblink": "Add URLs",
       "documentName": "Document Name",
+      "weblinkName": "URL",
       "createdAt": "Created At",
       "actions": "Actions",
       "refreshDocumentStatus": "Refresh document status",
@@ -4322,26 +4587,44 @@
       "graphEnhancement": "Graph Enhancement",
       "maxLengthReached": "Maximum length reached",
       "nameMaxLength": "Document name cannot exceed {{max}} characters",
+      "nameMaxLengthWeblink": "URL name cannot exceed {{max}} characters",
       "updateSuccess": "Document name updated successfully",
       "updateFailed": "Failed to update document name",
       "deleteTitle": "Delete Document",
+      "deleteTitleWeblink": "Delete URL",
       "deleteMessage": "Are you sure you want to delete document \"{{name}}\"? This action cannot be undone.",
+      "deleteMessageWeblink": "Are you sure you want to delete URL \"{{name}}\"? This action cannot be undone.",
       "deleteDocument": "Delete Document",
       "deleteSuccess": "Document deleted successfully",
+      "deleteSuccessWeblink": "URL deleted successfully",
       "deleteFailed": "Failed to delete document",
+      "deleteFailedWeblink": "Failed to delete URL",
       "batchDeleteTitle": "Batch Delete Documents",
+      "batchDeleteTitleWeblink": "Batch Delete URLs",
       "batchDeleteMessage": "Are you sure you want to delete {{count}} selected documents? This action cannot be undone.",
+      "batchDeleteMessageWeblink": "Are you sure you want to delete {{count}} selected URLs? This action cannot be undone.",
       "batchDeleteButton": "Delete {{count}} documents",
+      "batchDeleteButtonWeblink": "Delete {{count}} URLs",
       "batchDeleteSuccess": "Successfully deleted {{count}} documents",
+      "batchDeleteSuccessWeblink": "Successfully deleted {{count}} URLs",
       "batchDeleteFailed": "Failed to batch delete documents",
+      "batchDeleteFailedWeblink": "Failed to batch delete URLs",
+      "updateSuccessWeblink": "URL name updated successfully",
+      "updateFailedWeblink": "Failed to update URL name",
       "selectAll": "Select All",
       "deselectAll": "Deselect All",
       "deleteSelected": "Delete Selected ({{count}})",
       "refreshSuccess": "Document status refreshed successfully",
+      "refreshSuccessWeblink": "URL status refreshed successfully",
       "refreshFailed": "Failed to refresh document status",
+      "refreshFailedWeblink": "Failed to refresh URL status",
       "refreshAllSuccess": "All document statuses refreshed successfully",
+      "refreshAllSuccessWeblink": "All URL statuses refreshed successfully",
       "refreshAllFailed": "Failed to refresh all document statuses",
-      "autoRefreshError": "Failed to auto-refresh document status"
+      "refreshAllFailedWeblink": "Failed to refresh all URL statuses",
+      "autoRefreshError": "Failed to auto-refresh document status",
+      "autoRefreshErrorWeblink": "Failed to auto-refresh URL status",
+      "refreshDocumentStatusWeblink": "Refresh URL status"
     },
     "addDocument": {
       "title": "Add Document",
@@ -4359,8 +4642,8 @@
       "settingsSuccess": "Document parameters set successfully",
       "settingsFailed": "Document parameter setup failed",
       "fileSizeLimit": "File size limit: each file must not exceed {{size}}",
- 	    "filesExceedLimit": "The following files exceed the {{size}} limit:",
- 	    "oversizedTitle": "File size exceeds limit",
+      "filesExceedLimit": "The following files exceed the {{size}} limit:",
+      "oversizedTitle": "File size exceeds limit",
       "steps": {
         "upload": "Upload",
         "settings": "Parameters"
@@ -4403,11 +4686,15 @@
     },
     "searchPlaceholder": "Search by memory base name or description...",
     "createButton": "Create Memory Base",
+    "searchMemory": "Search Memory",
     "memoryType": {
       "all": "All Type",
       "longterm": "Memory Fragments",
       "variable": "Variable Memory",
-      "summary": "History Summary"
+      "summary": "History Summary",
+      "profile": "User Profile",
+      "episodic": "Episodic Memory",
+      "semantic": "Semantic Memory"
     },
     "search": {
       "searching": "Searching...",
@@ -4530,19 +4817,14 @@
       "memoryName": "Memory Name",
       "memoryType": "Memory Type",
       "memoryContent": "Memory Content",
-
       "noMemories": "No memories yet",
       "addMemory": "Add Memory",
       "loadingMemories": "Loading memory list...",
-
       "refreshMemoryStatus": "Refresh Memory Status",
-
       "nameMaxLength": "Memory name cannot exceed {{max}} characters",
       "contentMaxLength": "Memory content cannot exceed {{max}} characters",
-
       "updateSuccess": "Memory updated successfully",
       "updateFailed": "Failed to update memory",
-
       "deleteTitle": "Delete Memory",
       "deleteMessage": "Are you sure you want to delete memory? This action cannot be undone.",
       "deleteMemory": "Delete Memory",
@@ -4586,6 +4868,38 @@
       "step_over": "steps",
       "invalidFilesTitle": "Unsupported File Types",
       "invalidFilesDesc": "The following file types are not supported. Please upload PDF, DOCX, TXT, or Markdown files."
+    },
+    "addWeblink": {
+      "title": "Add URLs",
+      "addButton": "Add URLs",
+      "modelRequired": "Document graph construction requires an LLM model",
+      "chunkOverlapPercent": "Chunk Overlap Percent",
+      "selectedUrls": "Selected URLs",
+      "addedLabel": "Added",
+      "allUrlsAdded": "All URLs added, you can proceed to next step",
+      "stepUrls": "Enter URLs",
+      "steps": {
+        "upload": "Enter URLs",
+        "settings": "URL Parameters"
+      },
+      "stepSettings": "URL Parameters",
+      "urlDescription": "Add URLs to the knowledge base. Enter one URL per line. Supports http:// and https:// (e.g. web pages, WeChat articles).",
+      "urlPlaceholder": "https://example.com/page\nhttps://mp.weixin.qq.com/...",
+      "urlHint": "At most {{max}} links per weblink knowledge base (including existing); at most {{max}} URL lines per request",
+      "noUrls": "Please enter at least one URL",
+      "invalidUrls": "All URLs must start with http:// or https://",
+      "tooManyUrls": "Weblink count limit exceeded",
+      "exceedsKbLimit": "Exceeds knowledge base weblink limit: at most {{max}} links, this knowledge base already has {{existing}} links, {{adding}} valid URLs in this batch.",
+      "addSuccess": "URLs added successfully",
+      "addFailed": "Failed to add URLs",
+      "addAndNext": "Add & Next",
+      "settingsDescription": "Configure URL parsing and indexing parameters",
+      "settingsSuccess": "URL parameters set successfully",
+      "settingsFailed": "URL parameter setup failed",
+      "noLinksToProcess": "No URLs to process",
+      "processSuccess": "URL processing task submitted",
+      "processFailed": "URL processing failed",
+      "startProcess": "Start Processing"
     },
     "document": {
       "process": "Process Document",
@@ -4680,48 +4994,48 @@
       }
     }
   },
-  "utils": {	 
-    "prompts": {	 
-      "utils": {	 
-        "validateVersionNumber": {	 
-          "empty": "Version number cannot be empty",	 
-          "invalidFormat": "Invalid version format. Please use Major.Minor.Patch format (e.g., 1.2.3)"	 
-        },	 
-        "formatDateTime": {	 
-          "invalidTime": "Invalid time",	 
-          "formatError": "Time format error"	 
-        },	 
-        "copyToClipboard": {	 
-          "defaultSuccess": "Copied to clipboard",	 
-          "emptyContent": "Copy content is empty",	 
-          "autoCopyFailed": "Auto copy failed, please copy manually",	 
-          "copyUnavailable": "Copy function unavailable, please copy manually"	 
-        },	 
-        "toolFormatConverter": {	 
-          "generateJsonSchemaFailed": "Failed to generate JSON Schema from parameters:",	 
-          "tool": "Tool",	 
-          "parseStringFailed": "Failed to parse string",	 
-          "saveJsonSchemaFailed": "Failed to save JSON Schema",	 
-          "parseFailed": "Parse failed",	 
-          "parseToolJsonSchemaFailed": "Failed to parse tool JSON Schema, using default conversion:"	 
-        },	 
-        "promptEditPageUtils": {	 
-          "unknownError": "Unknown error",	 
-          "failKeyword": "失败",	 
-          "requestFailed": "Request failed",	 
-          "variableNameFormatError": "Does not meet format requirements",	 
-          "variableNameTooLong": "Variable name exceeds 50 characters (current length: {{length}})",	 
-          "variableNameCannotStartWithNumber": "Variable name cannot start with a number",	 
-          "variableNameInvalidCharacters": "Variable name can only contain letters, numbers, underscores, and hyphens",	 
-          "variableNameNoSpacesInNormalMode": "Variable name cannot have spaces before or after in Normal mode",	 
-          "skipInvalidVariableName": "Skipping invalid variable name: \"{{name}}\", {{error}}",	 
-          "targetMessageNotFound": "Target message not found",	 
-          "baseGroup": "Base Group",	 
-          "controlGroup": "Control Group {{id}}",	 
-          "targetMessageNotFoundInGroup": "Target message not found in {{groupName}}",	 
-          "existingCallNotFound": "Existing call at index {{index}} does not exist, skipping",	 
-          "calculateSelectionIndicesFailed": "Failed to calculate selection indices - missing required parameters"	 
-        }	 
+  "utils": {
+    "prompts": {
+      "utils": {
+        "validateVersionNumber": {
+          "empty": "Version number cannot be empty",
+          "invalidFormat": "Invalid version format. Please use Major.Minor.Patch format (e.g., 1.2.3)"
+        },
+        "formatDateTime": {
+          "invalidTime": "Invalid time",
+          "formatError": "Time format error"
+        },
+        "copyToClipboard": {
+          "defaultSuccess": "Copied to clipboard",
+          "emptyContent": "Copy content is empty",
+          "autoCopyFailed": "Auto copy failed, please copy manually",
+          "copyUnavailable": "Copy function unavailable, please copy manually"
+        },
+        "toolFormatConverter": {
+          "generateJsonSchemaFailed": "Failed to generate JSON Schema from parameters:",
+          "tool": "Tool",
+          "parseStringFailed": "Failed to parse string",
+          "saveJsonSchemaFailed": "Failed to save JSON Schema",
+          "parseFailed": "Parse failed",
+          "parseToolJsonSchemaFailed": "Failed to parse tool JSON Schema, using default conversion:"
+        },
+        "promptEditPageUtils": {
+          "unknownError": "Unknown error",
+          "failKeyword": "失败",
+          "requestFailed": "Request failed",
+          "variableNameFormatError": "Does not meet format requirements",
+          "variableNameTooLong": "Variable name exceeds 50 characters (current length: {{length}})",
+          "variableNameCannotStartWithNumber": "Variable name cannot start with a number",
+          "variableNameInvalidCharacters": "Variable name can only contain letters, numbers, underscores, and hyphens",
+          "variableNameNoSpacesInNormalMode": "Variable name cannot have spaces before or after in Normal mode",
+          "skipInvalidVariableName": "Skipping invalid variable name: \"{{name}}\", {{error}}",
+          "targetMessageNotFound": "Target message not found",
+          "baseGroup": "Base Group",
+          "controlGroup": "Control Group {{id}}",
+          "targetMessageNotFoundInGroup": "Target message not found in {{groupName}}",
+          "existingCallNotFound": "Existing call at index {{index}} does not exist, skipping",
+          "calculateSelectionIndicesFailed": "Failed to calculate selection indices - missing required parameters"
+        }
       }
     }
   },

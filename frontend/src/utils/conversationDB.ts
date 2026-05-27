@@ -80,6 +80,8 @@ export interface ConversationDocument {
   config: Conversation['config']
   messageItems: MessageItems[]
   messages: Record<string, Message>
+  thoughtGraphs?: Record<string, any>  // messageItemsId -> ThoughtGraph，用于持久化思维链数据
+  lastSessionConversationId?: string   // 连续对话系列的会话ID，用于 AI 改写功能
   estimatedSize: number
 }
 
@@ -572,6 +574,8 @@ class ConversationDB {
         config: data.conversation.config,
         messageItems: data.messageItems,
         messages: data.messages,
+        thoughtGraphs: data.thoughtGraphs,
+        lastSessionConversationId: data.conversation.lastSessionConversationId,
         estimatedSize
       }
 

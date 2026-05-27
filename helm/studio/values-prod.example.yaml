@@ -61,6 +61,7 @@ configmap:
     SMTP_USER: ""
     OBS_BUCKET: ""
     OBS_SERVER: ""
+    OBS_REGION: ""
     OBS_ACCESS_KEY_ID: ""
     OBS_SECRET_ACCESS_KEY: ""
     SERVER_AES_MASTER_KEY_ENV: "xxx"

@@ -111,8 +111,16 @@ class Agent:
         """
         logger.warning(f"Agent _fetch_from_mgr self.agent_config: {self.agent_config}")
 
-        # 1. 获取所有Workflow组件
+        # 1. 获取所有Workflow组件（去重）
+        seen_workflow_keys = set()
         for workflow_schema in self.agent_config.workflows:
+            # 创建唯一键用于去重
+            workflow_key = f"{workflow_schema.id}:{workflow_schema.version}"
+            if workflow_key in seen_workflow_keys:
+                logger.warning(f"Skipping duplicate workflow in agent_config: {workflow_key}")
+                continue
+            seen_workflow_keys.add(workflow_key)
+
             # 通过Workflow管理器获取具体的Workflow实例
             workflow_instance = await self.workflow_mgr.get_flow(
                 workflow_schema.id,
@@ -123,9 +131,17 @@ class Agent:
 
             self.workflows.append(workflow_instance)
 
-        # 2. 获取所有Plugin工具 (仅ReActAgent需要)
+        # 2. 获取所有Plugin工具 (仅ReActAgent需要，去重)
         if isinstance(self.agent_config, ReActAgentConfig):
+            seen_plugin_keys = set()
             for plugin_schema in self.agent_config.plugins:
+                # 创建唯一键用于去重
+                plugin_key = f"{plugin_schema.plugin_id}:{plugin_schema.id}:{plugin_schema.version}"
+                if plugin_key in seen_plugin_keys:
+                    logger.warning(f"Skipping duplicate plugin in agent_config: {plugin_key}")
+                    continue
+                seen_plugin_keys.add(plugin_key)
+
                 logger.warning(f"Agent _fetch_from_mgr plugin_schema: {plugin_schema}")
                 # 通过Plugin管理器获取具体的Plugin工具实例
                 plugin_tool = await self.plugin_mgr.get_tool(
@@ -203,9 +219,21 @@ class Agent:
 
         # 4. 编译并绑定所有Plugin工具
         tools: List[Tool] = []
+        seen_tool_names = set()  # 用于跟踪已添加的工具名称，避免重复
+
         for tool in self.plugins:
             # 编译单个Plugin工具
             compiled_tool = tool.compile()
+            tool_name = compiled_tool.card.name if hasattr(compiled_tool, 'card') else None
+
+            # 检查工具名称是否已存在（基于名称去重，避免OpenAI API报错）
+            if tool_name and tool_name in seen_tool_names:
+                logger.warning(f"Skipping tool with duplicate name in agent.py: {tool_name}")
+                continue
+
+            if tool_name:
+                seen_tool_names.add(tool_name)
+
             tools.append(compiled_tool)
 
         # 将所有编译后的工具绑定到Agent

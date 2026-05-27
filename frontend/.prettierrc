@@ -1,9 +1,9 @@
 {
   "singleQuote": true,
   "trailingComma": "all",
-  "semi": false,
+  "semi": true,
   "jsxSingleQuote": false,
-  "printWidth": 160,
+  "printWidth": 120,
   "arrowParens": "avoid",
   "singleAttributePerLine": false,
   "embeddedLanguageFormatting": "auto",
@@ -11,5 +11,5 @@
   "endOfLine": "auto",
   "tabWidth": 2,
   "bracketSpacing": true,
-  "jsxBracketSameLine": false
+  "bracketSameLine": false
 }

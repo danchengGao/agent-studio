@@ -30,6 +30,10 @@ export interface KnowledgeBaseItem {
   embedding_model_config_id?: number
   created_at: string
   updated_at: string
+  // DeepSearch 知识库 ID，未同步则为 null
+  ds_kb_id?: string | null
+  // 知识库状态：indexed=已就绪，其他=处理中/失败
+  status?: string
 }
 
 // 搜索结果知识库项
@@ -61,7 +65,7 @@ export interface KnowledgeBase {
   id: string
   name: string
   description?: string
-  type: 'document' | 'web' | 'api' | 'database'
+  type: 'document' | 'weblink' | 'web' | 'api' | 'database'
   status: 'active' | 'processing' | 'error' | 'inactive'
   documentCount: number
   size: number
@@ -212,11 +216,11 @@ export interface DeleteKnowledgeBaseRequest {
   kb_id: string
 }
 
-// 删除知识库响应
+// 删除知识库响应（data.deleted_kb_ids 为本次删除涉及的所有 kb_id，供前端从列表移除对应卡片）
 export interface DeleteKnowledgeBaseResponse {
   code: number
   message: string
-  data: null
+  data: { deleted_kb_ids?: string[] } | null
 }
 
 // 获取知识库详情请求
@@ -298,3 +302,172 @@ export interface SearchKnowledgeBaseResponse {
   }
 }
 
+// Weblink 相关类型
+export interface WeblinkItem {
+  name: string
+  id: string
+  url: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AddWeblinksRequest {
+  space_id: string
+  kb_id: string
+  urls: string[]
+}
+
+export interface AddWeblinksResponse {
+  code: number
+  message: string
+  data: {
+    success_count: number
+    failed_count: number
+    links: Array<{ id: string; url: string; name: string; status: string }>
+  }
+}
+
+export interface GetWeblinksListRequest {
+  space_id: string
+  kb_id: string
+  page: number
+  size: number
+}
+
+export interface GetWeblinksListResponse {
+  code: number
+  message: string
+  data: {
+    items: WeblinkItem[]
+    total: number
+    page: number
+    size: number
+  }
+}
+
+export interface ProcessWeblinksRequest {
+  space_id: string
+  kb_id: string
+  weblink_id_list: string[]
+  parsing_strategy: ParsingStrategy
+  segmentation_strategy: SegmentationStrategy
+  indexing_strategy: IndexingStrategy
+}
+
+export interface ProcessWeblinksResponse {
+  code: number
+  message: string
+  data: {
+    task_id: string
+    processed_count: number
+    failed_count: number
+    failed_links: string[]
+  }
+}
+
+export interface UpdateWeblinkRequest {
+  space_id: string
+  kb_id: string
+  weblink_id: string
+  weblink_name: string
+}
+
+export interface DeleteWeblinksRequest {
+  space_id: string
+  kb_id: string
+  weblink_ids: string[]
+}
+
+export interface GetWeblinkStatusRequest {
+  space_id: string
+  kb_id: string
+  weblink_id_list: string[]
+  refresh_names?: boolean
+}
+
+// 同步至 DeepSearch - 上传请求/响应
+export interface SyncUploadRequest {
+  space_id: string
+  kb_id: string
+  /** DeepSearch 侧嵌入模型配置 ID，同步时在 Deep Search 创建知识库使用 */
+  deepsearch_embedding_model_config_id?: number | null
+}
+
+export interface SyncUploadResponse {
+  code: number
+  message: string
+  data?: { ds_kb_id: string; uploaded_count: number; doc_id_list?: string[] }
+}
+
+// 同步至 DeepSearch - 处理/建索引请求
+export interface SyncProcessRequest {
+  space_id: string
+  ds_kb_id: string
+  /** 可为空：无可索引文档时服务端跳过 DeepSearch process */
+  doc_id_list: string[]
+  parsing_strategy?: { strategy_type: string; strategy_config?: Record<string, unknown> }
+  segmentation_strategy?: { strategy_type: string; strategy_config: Record<string, unknown> }
+  indexing_strategy?: { enable_graph_enhancement?: boolean; llm_model_id?: number }
+}
+
+export interface SyncProcessResponse {
+  code: number
+  message: string
+  data?: {
+    task_id?: string
+    processed_count?: number
+    failed_count?: number
+    failed_docs?: string[]
+    skipped?: boolean
+  }
+}
+
+// DeepSearch 知识库列表请求
+export interface DeepSearchKnowledgeBaseListRequest {
+  space_id: string
+  page: number
+  size: number
+}
+
+export interface DeepSearchKnowledgeBaseListItem {
+  id: string
+  name: string
+  desc?: string
+  status?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface DeepSearchKnowledgeBaseListResponse {
+  code: number
+  message: string
+  data?: {
+    items?: DeepSearchKnowledgeBaseListItem[]
+    total?: number
+    page?: number
+    size?: number
+  }
+}
+
+// DeepSearch 侧 Embedding 配置列表（供同步时选择嵌入模型）
+export interface DeepSearchEmbeddingConfigListRequest {
+  space_id: string
+  page?: number
+  size?: number
+}
+
+export interface DeepSearchEmbeddingConfigListItem {
+  id: number
+  model_name: string
+}
+
+export interface DeepSearchEmbeddingConfigListResponse {
+  code: number
+  message: string
+  data?: {
+    items?: DeepSearchEmbeddingConfigListItem[]
+    total?: number
+    page?: number
+    size?: number
+  }
+}

@@ -1,55 +1,59 @@
-import React from 'react'
-import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import MuiPagination from '@mui/material/Pagination';
 
 export interface PagerState {
-  total: number
-  currentPage: number
-  pageSize: number
-  pageSizeOptions?: number[]
+  total: number;
+  currentPage: number;
+  pageSize: number;
+  pageSizeOptions?: number[];
 }
 
-export type PagerChangeHandler = (page: number, pageSize: number) => void
+export type PagerChangeHandler = (page: number, pageSize: number) => void;
 
 interface PaginationProps {
-  pager: PagerState
-  loading?: boolean
-  error?: string | null
-  onPagerChange: PagerChangeHandler
+  pager: PagerState;
+  loading?: boolean;
+  error?: string | null;
+  onPagerChange: PagerChangeHandler;
 }
 
-const Pagination: React.FC<PaginationProps> = ({
-  pager,
-  loading = false,
-  error = null,
-  onPagerChange,
-}) => {
-  const { t } = useTranslation()
+const Pagination: React.FC<PaginationProps> = ({ pager, loading = false, error = null, onPagerChange }) => {
+  const { t } = useTranslation();
+  const { currentPage, total, pageSize, pageSizeOptions } = pager;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const [jumpPage, setJumpPage] = useState(String(currentPage));
 
-  const { currentPage, total, pageSize, pageSizeOptions } = pager
-  const totalPages = Math.ceil(total / pageSize)
+  useEffect(() => {
+    setJumpPage(String(currentPage));
+  }, [currentPage]);
 
-  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const page = parseInt(e.target.value)
-    if (page >= 1 && page <= totalPages) {
-      onPagerChange(page, pageSize)
+  const handleGoToPage = () => {
+    const parsedPage = Number(jumpPage);
+    if (Number.isNaN(parsedPage)) {
+      setJumpPage(String(currentPage));
+      return;
     }
-  }
 
-  const handlePageInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const targetPage = Math.min(totalPages, Math.max(1, Math.floor(parsedPage)));
+    onPagerChange(targetPage, pageSize);
+    setJumpPage(String(targetPage));
+  };
+
+  const handleJumpInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.currentTarget.blur()
+      handleGoToPage();
     }
-  }
+  };
 
   if (loading || error) {
-    return null
+    return null;
   }
 
   return (
-    <div className="flex items-center justify-end space-x-6">
-      <div className="flex items-center space-x-2">
-        <span className="text-sm text-gray-700">{t('common.pagination.pageSize')}</span>
+    <div className="flex items-center justify-end gap-3">
+      <span className="text-sm text-gray-700">{t('common.pagination.total', { total })}</span>
+      <div className="flex items-center gap-2">
         <select
           value={pageSize}
           onChange={e => onPagerChange(1, Number(e.target.value))}
@@ -61,67 +65,31 @@ const Pagination: React.FC<PaginationProps> = ({
             </option>
           ))}
         </select>
-        <span className="text-sm text-gray-700">{t('common.pagination.items')}</span>
+        <span className="text-sm text-gray-700">{t('common.pagination.itemsPerPage')}</span>
       </div>
-
-      {total > 0 && (
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-700">{t('common.pagination.total', { total })}</span>
-          <div className="flex items-center space-x-1">
-            <button
-              onClick={() => onPagerChange(1, pageSize)}
-              disabled={currentPage === 1}
-              className="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t('common.pagination.first')}
-            >
-              <ChevronsLeft className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => onPagerChange(currentPage - 1, pageSize)}
-              disabled={currentPage === 1}
-              className="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t('common.pagination.previous')}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <div className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-700">
-              <span>{t('common.pagination.pagePrefix')}</span>
-              <input
-                type="number"
-                value={currentPage}
-                onChange={handlePageInputChange}
-                onKeyPress={handlePageInputKeyPress}
-                min={1}
-                max={totalPages}
-                className="w-12 px-2 py-1 text-center text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <span>{t('common.pagination.pageSuffix', { total: totalPages })}</span>
-            </div>
-
-            <button
-              onClick={() => onPagerChange(currentPage + 1, pageSize)}
-              disabled={currentPage >= totalPages}
-              className="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t('common.pagination.next')}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => onPagerChange(totalPages, pageSize)}
-              disabled={currentPage >= totalPages}
-              className="p-2 text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={t('common.pagination.last')}
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      <MuiPagination
+        count={totalPages}
+        page={Math.min(currentPage, totalPages)}
+        shape="rounded"
+        onChange={(_, page) => onPagerChange(page, pageSize)}
+      />
+      <input
+        type="number"
+        value={jumpPage}
+        onChange={e => setJumpPage(e.target.value)}
+        onKeyDown={handleJumpInputKeyDown}
+        min={1}
+        max={totalPages}
+        className="w-16 px-2 py-1 text-center text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      />
+      <button
+        onClick={handleGoToPage}
+        className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+      >
+        Go
+      </button>
     </div>
-  )
-}
+  );
+};
 
-export default Pagination
+export default Pagination;

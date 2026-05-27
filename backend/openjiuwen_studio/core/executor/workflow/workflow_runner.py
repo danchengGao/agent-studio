@@ -4,6 +4,7 @@
 
 import asyncio
 import json
+import uuid
 from typing import Any, Dict, AsyncGenerator, Optional
 from builtins import id as builtinid
 
@@ -17,7 +18,7 @@ from openjiuwen.core.workflow import Session, create_workflow_session
 from openjiuwen.core.session.internal.workflow import WorkflowSession
 from openjiuwen.core.runner import Runner
 from openjiuwen.core.context_engine import ModelContext, ContextEngine, ContextEngineConfig
-
+from openjiuwen.core.context_engine.context.context import SessionModelContext
 import openjiuwen_studio.core.manager.workflow as mgr
 from openjiuwen_studio.core.executor.workflow.context import Context
 from openjiuwen_studio.core.common.status_code import StatusCode
@@ -29,6 +30,7 @@ from openjiuwen_studio.core.common.exceptions import JiuWenComponentException, J
 from openjiuwen_studio.core.manager.repositories.workflow_repository import workflow_repository
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager, \
     WorkflowExecutionRegistration
+from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
 
 
 def extract_component_names(schema_part, name_map, parent_path="", parent_component_ids=None):
@@ -172,13 +174,13 @@ async def _fetch_workflow_dl(
             code=StatusCode.WORKFLOW_DL_FETCH_FAILED.code,
             message=StatusCode.WORKFLOW_DL_FETCH_FAILED.errmsg.format(msg=str("fetch workflow failed"))
         )
-    logger.info(f"fetch workflow dl: {workflow_dl.model_dump_json()}")
+    logger.info(f"Successfully fetched workflow dl for workflow_id={workflow_id}, version={version}")
     return workflow_dl
 
 
 class WorkflowRunner(IWorkflowLoader):
-    def __init__(self) -> None:
-        pass
+    def __init__(self, plugin_mgr=None) -> None:
+        self.plugin_mgr = plugin_mgr
 
     def generate_component_name_map(self, workflow_dl: Any) -> Optional[Dict[str, str]]:
         """
@@ -200,7 +202,13 @@ class WorkflowRunner(IWorkflowLoader):
     async def get_flow(
             self, id: str, version: str, space_id: str, current_user: Dict[str, Any]
     ) -> Workflow:
-        flow = Workflow(await _fetch_workflow_dl(id, version, space_id, current_user), space_id, current_user)
+        flow = Workflow(
+            await _fetch_workflow_dl(id, version, space_id, current_user), 
+            space_id, 
+            current_user,
+            plugin_mgr=self.plugin_mgr,
+            workflow_mgr=self
+        )
         return flow
 
     async def get_compiled_workflow(
@@ -221,7 +229,7 @@ class WorkflowRunner(IWorkflowLoader):
             current_user: Dict[str, Any],
     ) -> AsyncGenerator[Any, None]:
 
-        # 检查当前conversation_id是否处于执行状态
+        # 检查当前 conversation_id 是否处于执行状态
         if workflow_execution_manager.is_executing(conversation_id):
             all_execution_infos = workflow_execution_manager.list_executions()
             logger.info(f"Now existing workflow executions: {all_execution_infos}")
@@ -229,7 +237,7 @@ class WorkflowRunner(IWorkflowLoader):
                 f"Workflow execution conflict detected: "
                 f"conversation_id={conversation_id}, workflow_id={id}"
             )
-            # 如果存在执行id, 可直接停止当前会话id
+            # 如果存在执行id, 可直接停止当前 conversation_id
             cancel_success = await workflow_execution_manager.cancel_execution(conversation_id)
             if not cancel_success:
                 raise JiuWenExecuteException(
@@ -263,12 +271,19 @@ class WorkflowRunner(IWorkflowLoader):
         try:
             # 编译工作流
             flow = await self.get_compiled_workflow(Context(), id, version, space_id, current_user)
-            # 创建 Session 用于 workflow 执行, session_id确保唯一性
+            # 创建 Session 用于 workflow 执行, 使用 conversation_id 作为 session_id 确保唯一性
             session = create_workflow_session(session_id=conversation_id)
 
             task = asyncio.current_task()
-            logger.info(f"Workflow task_id: {builtinid(task)}")
-            # 注册执行任务
+            logger.info(
+                "Workflow execution starting: "
+                "conversation_id=%s, workflow_id=%s, session_id=%s, task_id=%s",
+                conversation_id,
+                id,
+                session.get_session_id(),
+                builtinid(task),
+            )
+            # 注册执行任务（使用 conversation_id 作为执行键）
             registration = WorkflowExecutionRegistration(
                 conversation_id=conversation_id,
                 workflow_id=id,
@@ -278,17 +293,28 @@ class WorkflowRunner(IWorkflowLoader):
                 task=task
             )
             workflow_execution_manager.register_execution(registration)
+
+            # 共享 context：两次调用复用同一实例
+            context = SessionModelContext(
+                context_id=f"{id}_{version}",
+                session_id=conversation_id,
+                config=ContextEngineConfig(),
+                history_messages=[],
+                processors=[],
+            )
+
             # 使用 Runner.run_workflow_streaming() 执行工作流
             async for chunk in Runner.run_workflow_streaming(
                     workflow=flow,  # 传入已编译的 Workflow 实例
                     inputs=inputs,
                     session=session,
+                    context=context,
             ):
                 # 检查任务是否被取消
                 if task and task.cancelled():
                     logger.warning(f"Workflow execution has been cancelled: conversation_id={conversation_id}")
                     break
-                # 检查执行管理器中的取消标志
+                # 检查执行管理器中的取消标志（使用 conversation_id）
                 if workflow_execution_manager.is_cancelled(conversation_id):
                     logger.warning(
                         f"Workflow execution cancelled via execution manager: conversation_id={conversation_id}")
@@ -314,12 +340,23 @@ class WorkflowRunner(IWorkflowLoader):
                     logger.debug(f"workflow stream return rsp: {rsp}")
                     yield rsp
 
+            logger.info(
+                "Workflow execution stream finished: "
+                "conversation_id=%s, workflow_id=%s, last_chunk_type=%s",
+                conversation_id,
+                id,
+                type(last_chunk).__name__ if last_chunk is not None else None,
+            )
+
             if trace_logs:
                 await save_execution_traces(flow_index, trace_logs)
             # if trace_id is not None:
             #     trace_summary_repository.create_trace_summary_by_trace_id(trace_id)
         except asyncio.CancelledError:
-            logger.warning(f"Workflow execution cancelled: conversation_id={conversation_id}")
+            logger.warning(
+                f"Workflow execution cancelled: "
+                f"conversation_id={conversation_id}, workflow_id={id}"
+            )
             # task.cancel()
             # logger.warning(f"Workflow execution cancelled 1 : task.cancelled() {task.cancelled()} "
             #                f"taskid {builtinid(task)}")
@@ -346,6 +383,11 @@ class WorkflowRunner(IWorkflowLoader):
             ) from e
         finally:
             # 取消注册执行任务
+            logger.info(
+                "Workflow execution cleanup: conversation_id=%s, workflow_id=%s",
+                conversation_id,
+                id,
+            )
             workflow_execution_manager.unregister_execution(conversation_id)
 
     async def validate(
@@ -359,4 +401,4 @@ class WorkflowRunner(IWorkflowLoader):
         return True
 
 
-flow_mgr = WorkflowRunner()
+flow_mgr = WorkflowRunner(PluginManager())

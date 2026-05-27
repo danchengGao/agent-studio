@@ -254,7 +254,7 @@ Plugins are functional extension modules of agents. By integrating external serv
 
 ### Prerequisites
 
-- A knowledge base has been created and document indexing has been completed on the **Knowledge Base Management** page.
+- A knowledge base has been created and document/link indexing has been completed on the **Knowledge Base Management** page (document-type: complete document indexing; weblink-type: complete link indexing).
 - You can click the **+** button in the **Knowledge** section on the **Orchestration Configuration** page, then click **Create New Knowledge Base** in the dropdown to jump to the Knowledge Base Management page for knowledge base configuration. For how to configure knowledge bases, please refer to the Knowledge Base Management related sections.
 
   ![Create New Knowledge Base](../images/ScreenShot_2026-01-06_150759_187.png)
@@ -287,7 +287,7 @@ The retrieval configuration parameter descriptions are as follows:
 
 | Parameter Name    | Description            | Configuration Instructions                                                                                                                 |
 |---------|---------------|----------------------------------------------------------------------------------------------------------------------|
-| Enable Document Graph Retrieval | Whether to enable document graph retrieval function   | - **Function**: Controls the enabling of graph retrieval<br>- **Note**: Document graph retrieval can only be enabled when the knowledge base contains documents with graph-enhanced indexes                                                           |
+| Enable Document Graph Retrieval | Whether to enable document graph retrieval function   | - **Function**: Controls the enabling of graph retrieval<br>- **Note**: Document graph retrieval can only be enabled when the knowledge base contains documents or links with graph-enhanced indexes                                                           |
 | Document Graph Retrieval Strategy | Controls the execution method of document graph retrieval  | - **Base Mode**: Basic document graph retrieval<br>- **Agentic Mode**: Document graph retrieval with agent autonomous decision-making, takes longer but has better results                                            |
 | Maximum Recall Count  | Maximum number of documents returned in a single retrieval | - **Function**: Controls the number of retrieval results<br>- **Range**: 1-10<br>- **Recommendation**: Set according to actual needs. Too small may miss relevant information, too large may include too much noise                                       |
 | Minimum Match Score  | Minimum similarity threshold for retrieval results  | - **Function**: Filters retrieval results with similarity below the threshold to improve result quality<br>- **Range**: 0.0 - 1.0<br>- **Recommendation**: Usually set to 0.5-0.7, can be adjusted according to actual effects<br>- **Note**: When set to 1.0, there may be no returned results |

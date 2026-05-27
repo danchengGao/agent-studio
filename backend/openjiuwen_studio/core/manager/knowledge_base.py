@@ -8,7 +8,7 @@ import os
 import re
 import time
 import uuid
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, Union, Tuple, Optional
@@ -19,6 +19,7 @@ from openjiuwen.core.common.logging import logger
 from openjiuwen.core.retrieval.common.config import (
     KnowledgeBaseConfig,
     EmbeddingConfig,
+    StoreType,
     VectorStoreConfig,
 )
 from openjiuwen.core.retrieval.common.document import Document
@@ -29,6 +30,7 @@ from openjiuwen.core.retrieval.indexing.indexer.milvus_indexer import MilvusInde
 from openjiuwen.core.retrieval.indexing.processor.chunker.chunking import TextChunker
 from openjiuwen.core.retrieval.indexing.processor.extractor.triple_extractor import TripleExtractor
 from openjiuwen.core.retrieval.indexing.processor.parser.auto_file_parser import AutoFileParser
+from openjiuwen.core.retrieval.indexing.processor.parser.auto_link_parser import AutoLinkParser
 from openjiuwen.core.retrieval.simple_knowledge_base import SimpleKnowledgeBase
 from openjiuwen.core.retrieval.vector_store.chroma_store import ChromaVectorStore
 from openjiuwen.core.retrieval.vector_store.milvus_store import MilvusVectorStore
@@ -45,10 +47,12 @@ from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import g
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
     KBDetails,
     KBDocument,
+    KBWeblink,
 )
 from openjiuwen_studio.core.manager.repositories.knowledge_base_repository import (
     knowledge_base_repository,
 )
+from openjiuwen_studio.core.thirdparty_client import DeepSearchAgentClient
 from openjiuwen_studio.models.knowledge_base_document import DocumentStatus
 from openjiuwen_studio.ops.modules.llm.llm_manager import get_llm_client_by_protocol
 from openjiuwen_studio.schemas.common import ResponseModel
@@ -78,9 +82,38 @@ from openjiuwen_studio.schemas.knowledge_base import (
     TaskProgressRequest,
     TaskProgressResponse,
     TaskProgressItem,
+    WeblinkAddRequest,
+    WeblinkAddBatchResponse,
+    WeblinkAddItem,
+    WeblinkListRequest,
+    WeblinkListResponse,
+    WeblinkListItem,
+    WeblinkStatusRequest,
+    WeblinkProcessRequest,
+    WeblinkProcessResponse,
+    WeblinkUpdateRequest,
+    WeblinkDeleteRequest,
 )
 
 _CURR_INDEX_TYPE = os.getenv("INDEX_MANAGER_TYPE", "milvus")
+# 每个 weblink 类型知识库允许的最大链接条数（含已存在 + 本次提交）
+WEBLINK_KB_MAX_LINKS = 50
+
+
+@dataclass
+class WeblinkProcessContext:
+    space_id: str
+    kb_id: str
+    parsing_strategy: Any
+    segmentation_strategy: Any
+    indexing_strategy: Any
+
+
+@dataclass
+class WeblinkProcessTask:
+    weblink_id: str
+    url: str
+    process_info: dict
 
 
 class OBSDocumentManager:
@@ -96,9 +129,10 @@ class OBSDocumentManager:
             logger.warning("[OBS] OBS_BUCKET not set, skipping upload_document")
 
         server = os.getenv("OBS_SERVER")
+        region_name = os.getenv("OBS_REGION")
         access_key_id = SecurityUtils.get_decrypted_secret(
             "OBS_ACCESS_KEY_ID",
-            os.getenv("OBS_SECRET_KEY", None)
+            os.getenv("OBS_ACCESS_KEY_ID", None)
         )
         secret_access_key = SecurityUtils.get_decrypted_secret(
             "OBS_SECRET_ACCESS_KEY",
@@ -108,6 +142,7 @@ class OBSDocumentManager:
             server=server,
             access_key_id=access_key_id,
             secret_access_key=secret_access_key,
+            region_name=region_name,
         )
 
     @staticmethod
@@ -231,7 +266,7 @@ def _format_error_message_for_frontend(error_msg: str) -> str:
     改写规则：
     1. 固定错误消息保持不变
     2. 带前缀的错误：去掉前缀、状态码、箭头（替换为分号）
-    3. 在 "reason" 之前截断（如果存在）
+    3. 若含 ", reason:" 且其后有内容，保留其后（具体原因）；否则去掉 reason 段
     4. 确保首字母大写
 
     Args:
@@ -252,6 +287,8 @@ def _format_error_message_for_frontend(error_msg: str) -> str:
         "Document validation failed",
         "Processing failed with unknown error",
         "Failed to update status to INDEXED",
+        "Not found",  # weblink 状态查询时链接不存在
+        "Weblink status invalid",  # weblink 处理时状态无效
     }
 
     # 如果是固定错误消息，直接返回（首字母已大写）
@@ -278,12 +315,18 @@ def _format_error_message_for_frontend(error_msg: str) -> str:
     # 3. 去掉箭头 -> 和前后空格，用分号替换
     result = re.sub(r"\s*->\s*", "; ", result)
 
-    # 4. 在 "reason" 之前截断（如果存在）
-    # 匹配 ", reason:" 或 ",reason:" 或 " reason:" 等变体
-    reason_pattern = r",\s*reason\s*:"
+    # 4. StatusCode / LLM 错误模板多为 "... , reason: {具体原因}"，具体原因在 reason 之后；
+    #    若截断丢弃 reason 之后的内容，前端只能看到泛化前缀（用户无法排查限流、API 报错等）。
+    #    因此：若存在 ", reason:" 且其后有非空内容，优先展示其后内容；否则保留原逻辑。
+    reason_pattern = r",\s*reason\s*:\s*"
     match = re.search(reason_pattern, result, re.IGNORECASE)
     if match:
-        result = result[: match.start()].strip()
+        after_reason = result[match.end():].strip()
+        before_reason = result[:match.start()].strip()
+        if after_reason:
+            result = after_reason
+        else:
+            result = before_reason
 
     # 5. 清理多余的空格
     result = " ".join(result.split())
@@ -451,7 +494,74 @@ def _create_embed_model(kb_id: str, space_id: str) -> OpenAIEmbedding:
         db.close()
 
 
-# ==================== 异常处理装饰器 ====================
+def get_embed_model_config(kb_id: str, space_id: str) -> EmbeddingConfig:
+    """Return the EmbeddingConfig for a knowledge base.
+
+    Args:
+        kb_id: Knowledge base ID used to look up the embedding model config.
+        space_id: Space ID for scoping the database query.
+
+    Returns:
+        EmbeddingConfig instance.
+
+    Raises:
+        ValueError: If the knowledge base or embedding model config is not found.
+    """
+    db = SessionLocal()
+    try:
+        # 1. Query the knowledge base to obtain embedding_model_config_id
+        kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
+        kb_get = KnowledgeBaseGet(**asdict(kb_details))
+        kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+
+        if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+            raise ValueError(f"Knowledge base not found (KB: {kb_id}, Space: {space_id})")
+
+        embedding_model_config_id = kb_result.data.get("embedding_model_config_id")
+        if not embedding_model_config_id:
+            raise ValueError(f"Knowledge base {kb_id} has no embedding_model_config_id")
+
+        # 2. Query the embedding model configuration
+        embed_repo = EmbeddingModelConfigRepository(db)
+        embed_model_config = embed_repo.get_by_id(embedding_model_config_id)
+
+        if not embed_model_config:
+            raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
+
+        if not embed_model_config.is_active:
+            raise ValueError(
+                f"Embedding model config is not active (ID: {embedding_model_config_id})"
+            )
+
+        # 3. Decrypt the API key
+        security_utils = SecurityUtils()
+        api_key = None
+        if embed_model_config.api_key:
+            try:
+                api_key = security_utils.decrypt_api_key(embed_model_config.api_key)
+            except Exception as e:
+                raise ValueError(
+                    f"Failed to decrypt API key for model {embed_model_config.id}: {str(e)}"
+                ) from e
+
+        # 4. Build and return the EmbeddingConfig
+        embed_config = EmbeddingConfig(
+            model_name=embed_model_config.model_id,
+            api_key=api_key,
+            base_url=embed_model_config.api_base,
+        )
+
+        logger.debug(
+            f"[EMBED_CONFIG] Built EmbeddingConfig from database - "
+            f"KB: {kb_id}, Model: {embed_model_config.model_name} (ID: {embed_model_config.id})"
+        )
+        return embed_config
+
+    finally:
+        db.close()
+
+
+# ==================== 异常处理装饰器 ==
 
 
 def with_exception_handling(func):
@@ -692,15 +802,73 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 4. 删除知识库
-    delete_result = knowledge_base_repository.knowledge_base_delete(req)
+    # 4. 删除知识库：删「同步后的知识库」仅删该条并调 DS 接口；删「Studio 知识库」时同时删 DS 同步后的知识库
+    ds_kb_id: Optional[str] = None
+    ds_kb_id_resp = knowledge_base_repository.knowledge_base_get_ds_kb_id(
+        space_id=req.space_id, kb_id=req.kb_id
+    )
+    if ds_kb_id_resp.code == status.HTTP_200_OK and ds_kb_id_resp.data is not None:
+        ds_kb_id = ds_kb_id_resp.data
+    is_studio_row = bool(ds_kb_id and ds_kb_id != req.kb_id)
+    logger.info(f"[KB_DELETE] is_studio_row: {is_studio_row}, ds_kb_id: {ds_kb_id}, req.kb_id: {req.kb_id}")
 
-    if delete_result.code != status.HTTP_200_OK:
-        logger.error(f"[KB_DELETE] Delete failed - ID: {req.kb_id}, Error: {delete_result.message}")
-        return ResponseModel(
-            code=delete_result.code,
-            message=delete_result.message,
+    ds_client = DeepSearchAgentClient()
+    deleted_kb_ids: List[str] = []
+
+    if is_studio_row:
+        # 删除的是 Studio 知识库：先调 DS 删除同步后的知识库，再删 Studio 行和共享表里的 DS 行
+        try:
+            await ds_client.delete_knowledge_base(space_id=req.space_id, ds_kb_id=ds_kb_id)
+            logger.info(f"[KB_DELETE] DeepSearch KB deleted (Studio delete) - ds_kb_id: {ds_kb_id}")
+        except Exception as e:
+            logger.warning(
+                f"[KB_DELETE] DeepSearch delete failed (ds_kb_id={ds_kb_id}), continuing - Error: {str(e)}",
+                exc_info=True,
+            )
+        delete_result = knowledge_base_repository.knowledge_base_delete(req)
+        if delete_result.code != status.HTTP_200_OK:
+            return ResponseModel(
+                code=delete_result.code,
+                message=delete_result.message,
+            )
+        # 同步删除共享表中 kb_id=ds_kb_id 的 DeepSearch 行
+        ds_row_get = KnowledgeBaseGet(
+            space_id=req.space_id,
+            kb_id=ds_kb_id,
+            index_manager_type=_CURR_INDEX_TYPE,
         )
+        knowledge_base_repository.knowledge_base_delete(ds_row_get)
+        deleted_kb_ids = [req.kb_id, ds_kb_id]
+        logger.info(f"[KB_DELETE] Deleted Studio row and DS-created row - kb_id: {req.kb_id}, ds_kb_id: {ds_kb_id}")
+    else:
+        # 删除的是同步后的知识库：调 DS 删除、删当前行，并清空原始 Studio 行的 ds_kb_id，以便用户可再次点击同步
+        try:
+            await ds_client.delete_knowledge_base(space_id=req.space_id, ds_kb_id=req.kb_id)
+            logger.info(f"[KB_DELETE] DeepSearch KB deleted (synced KB only) - kb_id: {req.kb_id}")
+        except Exception as e:
+            logger.warning(
+                f"[KB_DELETE] DeepSearch delete failed (kb_id={req.kb_id}), continuing - Error: {str(e)}",
+                exc_info=True,
+            )
+        delete_result = knowledge_base_repository.knowledge_base_delete(req)
+        if delete_result.code not in (status.HTTP_200_OK, status.HTTP_404_NOT_FOUND):
+            return ResponseModel(
+                code=delete_result.code,
+                message=delete_result.message,
+            )
+        if delete_result.code == status.HTTP_404_NOT_FOUND:
+            logger.info(
+                f"[KB_DELETE] Local row already removed (likely by DeepSearch) - kb_id: {req.kb_id}"
+            )
+        # 清空原始知识库的 ds_kb_id，使再次同步时可新建 DS 知识库
+        clear_resp = knowledge_base_repository.knowledge_base_clear_ds_kb_id_by_ds_kb_id(
+            space_id=req.space_id, ds_kb_id=req.kb_id
+        )
+        if clear_resp.code == status.HTTP_200_OK:
+            logger.info(
+                f"[KB_DELETE] Cleared ds_kb_id on original KB (synced kb_id={req.kb_id}) for re-sync"
+            )
+        deleted_kb_ids = [req.kb_id]
 
     logger.info(
         f"[KB_DELETE] Knowledge base deleted - ID: {req.kb_id}, User: {user_id}, "
@@ -729,17 +897,12 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 6. 删除 Milvus | Chroma 向量索引（循环删除每个文档的索引）
+    # 6. Delete Milvus | Chroma vector collection (chunks + triples collections)
     try:
         index_result = await _delete_kb_indices(req.kb_id, req.space_id)
-        if index_result["success_count"] > 0:
-            logger.info(
-                f"[KB_DELETE] Indices successfully deleted - KB ID: {req.kb_id}, "
-                f"Success: {index_result['success_count']}, Failed: {index_result['failed_count']}"
-            )
         if index_result["errors"]:
             logger.warning(
-                f"[KB_DELETE] Some indices failed to delete - KB ID: {req.kb_id}, "
+                f"[KB_DELETE] Failed to delete indices - KB ID: {req.kb_id}, "
                 f"Errors: {index_result['errors']}"
             )
     except Exception as e:
@@ -749,9 +912,24 @@ async def knowledge_base_delete(req: KnowledgeBaseGet, current_user: dict) -> Re
             exc_info=True,
         )
 
-    # 7. 返回删除结果
+    # 7. 删除 knowledge_base_document 和 knowledge_base_weblink 行（索引已删，避免孤儿数据）
+    try:
+        knowledge_base_repository.delete_documents_by_kb_id(req.space_id, req.kb_id)
+        knowledge_base_repository.delete_weblinks_by_kb_id(req.space_id, req.kb_id)
+        logger.info(
+            f"[KB_DELETE] Document and weblink rows cleaned - KB ID: {req.kb_id}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_DELETE] Failed to clean document/weblink rows - KB ID: {req.kb_id}, Error: {str(e)}",
+            exc_info=True,
+        )
+
+    # 8. 返回删除结果（含 deleted_kb_ids 供前端从列表移除所有相关卡片）
     return ResponseModel(
-        code=status.HTTP_200_OK, message="delete knowledge base success", data=None
+        code=status.HTTP_200_OK,
+        message="delete knowledge base success",
+        data={"deleted_kb_ids": deleted_kb_ids},
     )
 
 
@@ -838,6 +1016,469 @@ def knowledge_base_update(req: KnowledgeBaseUpdateRequest, current_user: dict) -
     return ResponseModel(
         code=status.HTTP_200_OK, message="update knowledge base message success", data=None
     )
+
+
+@with_exception_handling
+async def knowledge_base_sync_upload(
+    space_id: str,
+    kb_id: str,
+    current_user: dict,
+    deepsearch_embedding_model_config_id: Optional[int] = None,
+) -> ResponseModel:
+    """同步上传：在 DeepSearch 创建/复用知识库，并上传 Studio 当前知识库下全部文档。
+    deepsearch_embedding_model_config_id: 可选，DeepSearch 侧嵌入模型配置 ID。
+    """
+    # 1. 验证用户空间权限
+    _ = check_user_space(space_id, current_user)
+
+    # 2. 检查知识库是否存在
+    kb_get = KnowledgeBaseGet(
+        space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found"
+        )
+    kb_data = kb_result.data
+
+    # 3. 获取 ds_kb_id，判断首次同步或更新同步
+    ds_kb_id = kb_data.get("ds_kb_id")
+    ds_kb_id_resp = knowledge_base_repository.knowledge_base_get_ds_kb_id(
+        space_id=space_id, kb_id=kb_id
+    )
+    if ds_kb_id_resp.code == status.HTTP_200_OK and ds_kb_id_resp.data is not None:
+        ds_kb_id = ds_kb_id_resp.data
+
+    embed_id = (
+        deepsearch_embedding_model_config_id
+        if deepsearch_embedding_model_config_id is not None
+        else (kb_data.get("embedding_model_config_id") or 0)
+    )
+    ds_name = f"deepsearch_{kb_data.get('name', '') or 'kb'}"
+    ds_client = DeepSearchAgentClient()
+
+    if not ds_kb_id:
+        # 4a. 首次同步：验证 embedding、创建 DS 知识库、更新 Studio、创建同步记录
+        db = SessionLocal()
+        try:
+            embed_repo = EmbeddingModelConfigRepository(db)
+            embed_model = embed_repo.get_by_id(embed_id)
+            if not embed_model:
+                return ResponseModel(
+                    code=status.HTTP_404_NOT_FOUND,
+                    message=f"Embedding model config not found: {embed_id}",
+                )
+            if not embed_model.is_active:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message=f"Embedding model config is not active: {embed_id}",
+                )
+            embed_model_config, llm_config = _build_ds_stored_kb_model_configs(embed_model)
+        finally:
+            db.close()
+
+        create_payload = {
+            "space_id": space_id,
+            "name": ds_name,
+            "description": kb_data.get("description") or "",
+            "embed_model_config": embed_model_config,
+            "llm_config": llm_config,
+            "config": kb_data.get("config") or {},
+            "index_manager_type": kb_data.get("index_manager_type") or _CURR_INDEX_TYPE,
+        }
+        try:
+            create_resp = await ds_client.create_knowledge_base(create_payload)
+        except Exception as e:
+            logger.error(
+                f"[KB_SYNC_UPLOAD] DeepSearch create KB failed - kb_id={kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch create knowledge base failed: {str(e)}",
+            )
+        data = create_resp.get("data") or create_resp
+        ds_kb_id = data.get("id")
+        if not ds_kb_id:
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message="DeepSearch did not return knowledge base id",
+            )
+
+        update_result = knowledge_base_repository.knowledge_base_update_ds_kb_id(
+            kb=KBDetails(
+                space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE
+            ),
+            ds_kb_id=ds_kb_id,
+        )
+        if update_result.code != status.HTTP_200_OK:
+            return ResponseModel(
+                code=update_result.code,
+                message=update_result.message or "Failed to save ds_kb_id",
+            )
+
+        synced_kb_data = {
+            "space_id": space_id,
+            "kb_id": ds_kb_id,
+            "ds_kb_id": ds_kb_id,
+            "name": ds_name,
+            "description": kb_data.get("description") or "",
+            "index_manager_type": kb_data.get("index_manager_type") or _CURR_INDEX_TYPE,
+            "embedding_model_config_id": embed_id,
+            "config": kb_data.get("config") or {},
+            "create_time": milliseconds(),
+            "update_time": milliseconds(),
+        }
+        create_synced_result = knowledge_base_repository.knowledge_base_create(
+            synced_kb_data
+        )
+        if create_synced_result.code != status.HTTP_200_OK:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] Failed to create synced KB row - ds_kb_id={ds_kb_id}, "
+                f"error={create_synced_result.message}"
+            )
+    else:
+        # 4b. 更新同步：更新 DS 知识库 config、清空 DS 侧文档
+        db = SessionLocal()
+        try:
+            embed_repo = EmbeddingModelConfigRepository(db)
+            embed_model = embed_repo.get_by_id(embed_id)
+            if embed_model and embed_model.is_active:
+                embed_model_config, llm_config = _build_ds_stored_kb_model_configs(
+                    embed_model
+                )
+                update_payload = {
+                    "space_id": space_id,
+                    "kb_id": ds_kb_id,
+                    "name": ds_name,
+                    "desc": kb_data.get("description") or "",
+                    "embed_model_config": embed_model_config,
+                    "llm_config": llm_config,
+                    "config": kb_data.get("config") or {},
+                }
+                try:
+                    await ds_client.update_knowledge_base(update_payload)
+                    logger.info(
+                        f"[KB_SYNC_UPLOAD] Updated DS KB config for overwrite - ds_kb_id={ds_kb_id}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"[KB_SYNC_UPLOAD] Failed to update DS KB config (continuing) - "
+                        f"ds_kb_id={ds_kb_id}, error={e}",
+                        exc_info=True,
+                    )
+            else:
+                logger.warning(
+                    f"[KB_SYNC_UPLOAD] Embedding not found/inactive (embed_id={embed_id}), "
+                    f"skip config update - ds_kb_id={ds_kb_id}"
+                )
+        finally:
+            db.close()
+
+        # 4b.2 清空 DS 侧文档（覆盖同步前需先清空）
+        try:
+            ds_doc_ids = []
+            page, size = 1, 100
+            while True:
+                ds_resp = await ds_client.list_documents(
+                    space_id=space_id, kb_id=ds_kb_id, page=page, size=size
+                )
+                ds_data = ds_resp.get("data") if isinstance(ds_resp, dict) else ds_resp or {}
+                items = ds_data.get("items") or []
+                total = ds_data.get("total") or 0
+                for doc in items:
+                    doc_id = doc.get("id") or doc.get("doc_id")
+                    if doc_id:
+                        ds_doc_ids.append(doc_id)
+                if len(ds_doc_ids) >= total or len(items) < size:
+                    break
+                page += 1
+            if ds_doc_ids:
+                await ds_client.delete_documents(
+                    space_id=space_id, kb_id=ds_kb_id, document_ids=ds_doc_ids
+                )
+                logger.info(
+                    f"[KB_SYNC_UPLOAD] Cleared {len(ds_doc_ids)} documents from DS KB - ds_kb_id={ds_kb_id}"
+                )
+        except Exception as e:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] Failed to clear DS KB documents (continuing) - "
+                f"ds_kb_id={ds_kb_id}, error={e}",
+                exc_info=True,
+            )
+
+    # 5. 获取待同步文档列表（空知识库也允许完成第一步：已创建/更新 DS，上传数为 0）
+    kbdoc = KBDocument(
+        kb=KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=None)
+    )
+    docs_result = knowledge_base_repository.document_list_all_for_sync(kbdoc)
+    if docs_result.code != status.HTTP_200_OK:
+        return ResponseModel(
+            code=docs_result.code,
+            message=docs_result.message or "Failed to list documents",
+        )
+    doc_list = docs_result.data or []
+    if not doc_list:
+        logger.warning(
+            f"[KB_SYNC_UPLOAD] No documents to sync - kb_id={kb_id}, ds_kb_id={ds_kb_id}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync upload success",
+            data={"ds_kb_id": ds_kb_id, "uploaded_count": 0, "doc_id_list": []},
+        )
+
+    # 6. 准备文件并上传到 DeepSearch
+    files_for_ds = []
+    doc_id_list = []
+    storage_path = _get_storage_path(space_id, kb_id)
+    for doc in doc_list:
+        studio_doc_id = doc.get("doc_id")
+        file_path_str = doc.get("file_path")
+        name = doc.get("name") or studio_doc_id
+        if not file_path_str:
+            continue
+        path = Path(file_path_str)
+        if not path.is_absolute():
+            path = storage_path / path.name
+        if not path.exists():
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] File not found, skip - doc_id={studio_doc_id}, path={path}"
+            )
+            continue
+        try:
+            content = path.read_bytes()
+        except Exception as e:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] Failed to read file, skip - doc_id={studio_doc_id}, error={e}"
+            )
+            continue
+        ext = path.suffix.lower() or ".bin"
+        ct = _get_mime_type(ext.lstrip(".")) if ext != ".bin" else "application/octet-stream"
+        files_for_ds.append((name, content, ct))
+        doc_id_list.append(str(uuid.uuid4()))
+
+    logger.info(
+        f"[KB_SYNC_UPLOAD] Files prepared - kb_id={kb_id}, ds_kb_id={ds_kb_id}, "
+        f"doc_count={len(doc_list)}, uploaded_count={len(files_for_ds)}"
+    )
+    if not files_for_ds:
+        if doc_list:
+            logger.warning(
+                f"[KB_SYNC_UPLOAD] All {len(doc_list)} document(s) skipped - kb_id={kb_id}"
+            )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync upload success",
+            data={"ds_kb_id": ds_kb_id, "uploaded_count": 0, "doc_id_list": []},
+        )
+
+    try:
+        await ds_client.upload_knowledge_base_files(
+            space_id=space_id,
+            ds_kb_id=ds_kb_id,
+            files=files_for_ds,
+            metadata={"doc_list": doc_id_list},
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_SYNC_UPLOAD] DeepSearch upload failed - ds_kb_id={ds_kb_id}, error={e}",
+            exc_info=True,
+        )
+        return ResponseModel(
+            code=status.HTTP_502_BAD_GATEWAY,
+            message=f"DeepSearch upload failed: {str(e)}",
+        )
+
+    # 7. 返回结果
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="sync upload success",
+        data={
+            "ds_kb_id": ds_kb_id,
+            "uploaded_count": len(files_for_ds),
+            "doc_id_list": doc_id_list,
+        },
+    )
+
+
+@with_exception_handling
+async def knowledge_base_sync_process(
+    payload: Dict[str, Any], current_user: dict
+) -> ResponseModel:
+    """同步处理/建索引：透传请求到 DeepSearch /api/kb/process。"""
+    space_id = payload.get("space_id")
+    if space_id:
+        check_user_space(space_id, current_user)
+    # DeepSearch 接口要求 kb_id，前端传的是 ds_kb_id
+    process_payload = {k: v for k, v in payload.items() if k != "ds_kb_id"}
+    process_payload["kb_id"] = payload.get("ds_kb_id") or payload.get("kb_id", "")
+    doc_ids = process_payload.get("doc_id_list") or []
+    if not doc_ids:
+        logger.info(
+            f"[KB_SYNC_PROCESS] No documents to process, skip DeepSearch - "
+            f"kb_id={process_payload.get('kb_id')}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync process skipped (no documents)",
+            data={"skipped": True, "processed_count": 0},
+        )
+    try:
+        _apply_ds_process_llm_config(process_payload, space_id)
+    except ValueError as e:
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=str(e),
+        )
+    ds_client = DeepSearchAgentClient()
+    try:
+        result = await ds_client.process_knowledge_base_documents(process_payload)
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="sync process success",
+            data=result.get("data") if isinstance(result, dict) else result,
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_SYNC_PROCESS] DeepSearch process failed - payload={payload}, error={e}",
+            exc_info=True,
+        )
+        return ResponseModel(
+            code=status.HTTP_502_BAD_GATEWAY,
+            message=f"DeepSearch process failed: {str(e)}",
+        )
+
+
+@with_exception_handling
+async def knowledge_base_ds_list(
+    space_id: str, page: int, size: int, current_user: dict
+) -> ResponseModel:
+    """DeepSearch 知识库列表，含索引状态；仅返回已同步到 DeepSearch 的项，不包含 Studio 原始知识库。"""
+    check_user_space(space_id, current_user)
+    ds_client = DeepSearchAgentClient()
+    try:
+        result = await ds_client.list_knowledge_bases(
+            {"space_id": space_id, "page": page, "size": size}
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get ds knowledge base list success",
+            data=result.get("data") if isinstance(result, dict) else result,
+        )
+    except Exception as e:
+        logger.error(
+            f"[KB_DS_LIST] DeepSearch list failed - space_id={space_id}, error={e}",
+            exc_info=True,
+        )
+        return ResponseModel(
+            code=status.HTTP_502_BAD_GATEWAY,
+            message=f"DeepSearch list failed: {str(e)}",
+        )
+
+
+def _ds_stored_llm_config_placeholder() -> dict:
+    """DeepSearch 知识库落库用的 llm_config 占位（空密钥，仅占结构）。"""
+    return {
+        "model_name": "",
+        "model_type": "openai",
+        "base_url": "",
+        "api_key": "",
+        "hyper_parameters": {},
+        "extension": {},
+    }
+
+
+def _build_ds_stored_embed_config_dict(embed_model) -> dict:
+    """从 Studio EmbeddingModelConfig 构建写入 DeepSearch 知识库的 embed_model_config。"""
+    security_utils = SecurityUtils()
+    api_key = ""
+    if embed_model.api_key:
+        try:
+            api_key = security_utils.decrypt_api_key(embed_model.api_key) or ""
+        except Exception as e:
+            logger.warning(f"[KB_SYNC] Failed to decrypt embedding api_key: {e}")
+    return {
+        "model_name": embed_model.model_id or embed_model.model_name or "",
+        "api_key": api_key,
+        "base_url": embed_model.api_base or "",
+        "max_batch_size": getattr(embed_model, "max_batch_size") or 8,
+    }
+
+
+def _build_ds_stored_kb_model_configs(embed_model) -> Tuple[dict, dict]:
+    """供 DeepSearch 建库/更新接口使用的 (embed_model_config, llm_config)。
+
+    llm_config 恒为占位；真实 LLM 仅出现在 process 请求体（见 _apply_ds_process_llm_config）。
+    """
+    return (
+        _build_ds_stored_embed_config_dict(embed_model),
+        _ds_stored_llm_config_placeholder(),
+    )
+
+
+def _build_ds_process_llm_config_dict(llm_model_id: int, space_id: str) -> dict:
+    """从 Studio model_configs 构建 DeepSearch /api/kb/process 请求体中的 llm_config（含解密 api_key）。"""
+    with get_db_jw() as db:
+        manager = ModelConfigManager(db)
+        model_config = manager.get_config_by_id(int(llm_model_id), space_id)
+    if not model_config.is_active:
+        raise ValueError(
+            f"LLM 模型未激活（id={llm_model_id}），请先在模型管理中启用后再进行图增强建索引。"
+        )
+    security_utils = SecurityUtils()
+    api_key = ""
+    if model_config.api_key:
+        try:
+            api_key = security_utils.decrypt_api_key(model_config.api_key) or ""
+        except Exception as e:
+            raise ValueError(
+                f"解密 LLM API Key 失败（model_id={llm_model_id}）: {e}"
+            ) from e
+    if not str(api_key).strip():
+        raise ValueError(
+            f"图增强建索引需要可用的 LLM API Key；请在模型管理中为模型（id={llm_model_id}）配置密钥。"
+        )
+    params = model_config.parameters if isinstance(model_config.parameters, dict) else {}
+    hyper_parameters: Dict[str, Any] = {}
+    for key in ("temperature", "top_p", "max_tokens"):
+        if key in params and params[key] is not None:
+            hyper_parameters[key] = params[key]
+    provider = (model_config.provider or "openai").strip().lower()
+    ds_model_type = "siliconflow" if provider == "siliconflow" else "openai"
+    deployment_name = (model_config.model_type or "").strip()
+    if not deployment_name:
+        raise ValueError(
+            f"LLM 未配置模型部署名（model_type 为空），无法在图增强中调用。请在模型管理中补全 model_id={llm_model_id} 的实际模型名。"
+        )
+    return {
+        "model_name": deployment_name,
+        "model_type": ds_model_type,
+        "base_url": model_config.base_url or "",
+        "api_key": api_key,
+        "hyper_parameters": hyper_parameters,
+        "extension": {},
+    }
+
+
+def _apply_ds_process_llm_config(
+    process_payload: dict, space_id: str
+) -> None:
+    """转发 DeepSearch process 前：若启用图增强，则写入解密后的 llm_config（与知识库存储占位无关）。"""
+    idx = process_payload.get("indexing_strategy")
+    if not isinstance(idx, dict):
+        return
+    if not idx.get("enable_graph_enhancement"):
+        return
+    llm_mid = idx.get("llm_model_id")
+    if llm_mid is None:
+        raise ValueError("已启用图增强建索引，但未提供 llm_model_id。")
+    try:
+        mid = int(llm_mid)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"无效的 llm_model_id: {llm_mid}") from e
+    process_payload["llm_config"] = _build_ds_process_llm_config_dict(mid, space_id)
 
 
 def _get_storage_path(space_id: str, kb_id: str) -> Path:
@@ -1004,6 +1645,24 @@ async def _parse_file(
                 )
 
 
+async def _parse_url(url: str, doc_id: str) -> List[Document]:
+    """解析 URL 为 Document 列表（weblink KB）"""
+    logger.debug(f"[PARSE] Parsing URL - url: {url}, doc_id: {doc_id}")
+    if not url or not url.strip():
+        raise ValueError("URL is empty")
+    url = url.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError("URL must start with http:// or https://")
+    parser = AutoLinkParser()
+    if not parser.supports(url):
+        raise ValueError(f"Parser does not support URL: {url}")
+    documents = await parser.parse(doc=url, doc_id=doc_id, verify=False)
+    if not documents:
+        raise ValueError(f"No content parsed from URL: {url}")
+    logger.debug(f"[PARSE] Parsed URL - url: {url}, documents: {len(documents)}")
+    return documents
+
+
 def _resolve_chunking_config(segmentation_strategy) -> tuple[int, float, Dict[str, bool]]:
     """提取分段配置，兼容前端字段命名"""
     cfg = segmentation_strategy.strategy_config or {}
@@ -1161,7 +1820,10 @@ def _get_chroma_data_dir() -> Path:
 
 def _default_index_config() -> VectorStoreConfig:
     """Default VectorStoreConfig for index manager."""
-    return VectorStoreConfig(collection_name="default", database_name="")
+    store_provider = StoreType.Chroma if _CURR_INDEX_TYPE == "chroma" else StoreType.Milvus
+    return VectorStoreConfig(
+        store_provider=store_provider, collection_name="default", database_name=""
+    )
 
 
 def _get_milvus_connection_params() -> Tuple[str, int, Optional[str]]:
@@ -1175,21 +1837,22 @@ def _get_milvus_connection_params() -> Tuple[str, int, Optional[str]]:
     return host, port, token
 
 
-def _create_milvus_index_manager() -> MilvusIndexer:
-    """Create Milvus index manager (used by _check_milvus_connection and _create_index_manager)."""
+def _create_milvus_index_manager(kb_id: str = "", doc_id: str = "") -> MilvusIndexer:
+    """Create Milvus index manager."""
     host, port, token = _get_milvus_connection_params()
     milvus_uri = f"http://{host}:{port}"
+    alias = f"idx_{kb_id}_{doc_id}" if kb_id else None
     return MilvusIndexer(
         config=_default_index_config(),
         milvus_uri=milvus_uri,
         milvus_token=token,
+        milvus_alias=alias,
     )
 
 
-def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
+def _create_index_manager(kb_id: str = "", doc_id: str = "") -> Union[MilvusIndexer, ChromaIndexer]:
     """
-    Creates either a Milvus or Chroma index manager
-    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+    Creates either a Milvus or Chroma index manager based on INDEX_MANAGER_TYPE.
     Returns:
         MilvusIndexer | ChromaIndexer
     """
@@ -1201,7 +1864,7 @@ def _create_index_manager() -> Union[MilvusIndexer, ChromaIndexer]:
             chroma_path=str(data_dir),
         )
     elif index_manager_type == "milvus":
-        return _create_milvus_index_manager()
+        return _create_milvus_index_manager(kb_id=kb_id, doc_id=doc_id)
     else:
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
 
@@ -1227,102 +1890,50 @@ def ensure_milvus_connection_for_indexing() -> None:
 
 
 async def _delete_kb_indices(kb_id: str, space_id: str) -> dict:
-    """删除知识库下所有文档的 chunks 和 triples 索引
-
-    获取知识库下的所有文档，然后循环删除每个文档的 chunks 和 triples 索引数据
-    """
+    """Delete the chunks and triples collection of the knowledge base"""
     result = {"success_count": 0, "failed_count": 0, "errors": []}
 
-    try:
-        # 获取知识库下的所有文档（分页获取，每页最多100条）
-        all_documents = []
-        page = 1
-        page_size = 100
+    chunk_index = f"kb_{kb_id}_chunks"
+    triple_index = f"kb_{kb_id}_triples"
 
-        while True:
-            doc_list_result = knowledge_base_repository.document_list(
-                KBDocument(
-                    KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE),
-                    doc_id=None,
-                    doc_status=None,
-                    process_info=None,
-                    index_name=None,
-                    chunk_count=None,
-                )
+    for collection_name in (chunk_index, triple_index):
+        try:
+            vector_store = _create_vector_store(
+                collection_name=collection_name, kb_id=kb_id,
             )
-
-            if doc_list_result.code != status.HTTP_200_OK or not doc_list_result.data:
-                break
-
-            items = doc_list_result.data.get("items", [])
-            if not items:
-                break
-
-            all_documents.extend(items)
-
-            # 如果返回的数量小于 page_size，说明已经是最后一页
-            if len(items) < page_size:
-                break
-
-            page += 1
-
-        if not all_documents:
-            logger.debug(f"[KB_DELETE] No documents to delete indices for KB {kb_id}")
-            return result
-
-        documents = all_documents
-        logger.info(f"[KB_DELETE] Deleting indices for {len(documents)} documents in KB {kb_id}")
-
-        # 创建索引管理器
-        index_manager = _create_index_manager()
-        chunk_index = f"kb_{kb_id}_chunks"
-        triple_index = f"kb_{kb_id}_triples"
-
-        # 循环删除每个文档的索引
-        for doc in documents:
-            doc_id = doc.get("doc_id") or doc.get("id")
-            if not doc_id:
-                continue
-
-            try:
-                # 删除 chunks 索引
-                await _delete_document_from_index(
-                    index_manager=index_manager,
-                    index_name=chunk_index,
-                    doc_id=doc_id,
-                    kb_id=kb_id,
-                    index_type="chunks",
+            await vector_store.delete_table(collection_name)
+            result["success_count"] += 1
+            logger.info(
+                f"[KB_DELETE] Collection {collection_name} dropped successfully"
+            )
+        except Exception as e:
+            error_msg = str(e)
+            # Collection not existing is not an error during deletion
+            if "not exist" in error_msg.lower() or "not found" in error_msg.lower():
+                logger.debug(
+                    f"[KB_DELETE] Collection {collection_name} does not exist, skipping"
                 )
-
-                # 删除 triples 索引（如果有图增强）
-                await _delete_document_from_index(
-                    index_manager=index_manager,
-                    index_name=triple_index,
-                    doc_id=doc_id,
-                    kb_id=kb_id,
-                    index_type="triples",
-                )
-
-                result["success_count"] += 1
-            except Exception as e:
+            else:
                 result["failed_count"] += 1
-                result["errors"].append(f"Doc {doc_id}: {str(e)}")
-                logger.warning(f"[KB_DELETE] Failed to delete index for doc {doc_id}: {e}")
+                result["errors"].append(f"Drop collection {collection_name}: {error_msg}")
+                logger.warning(
+                    f"[KB_DELETE] Failed to drop collection {collection_name}: {e}"
+                )
 
-        logger.info(
-            f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "
-            f"Success: {result['success_count']}, Failed: {result['failed_count']}"
-        )
-
-    except Exception as e:
-        error_msg = f"Failed to delete KB indices: {str(e)}"
-        result["errors"].append(error_msg)
-        logger.error(f"[KB_DELETE] {error_msg}", exc_info=True)
+    logger.info(
+        f"[KB_DELETE] Index deletion completed - KB: {kb_id}, "
+        f"Success: {result['success_count']}, Failed: {result['failed_count']}"
+    )
 
     return result
 
 
-def _create_vector_store(collection_name: str) -> Union[MilvusVectorStore, ChromaVectorStore]:
+def _create_vector_store(
+    collection_name: str,
+    kb_id: str = "",
+    doc_id: str = "",
+    for_retrieval: bool = False,
+) -> Union[MilvusVectorStore, ChromaVectorStore]:
     """
     Creates either a Milvus or Chroma vector store
     based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
@@ -1338,6 +1949,7 @@ def _create_vector_store(collection_name: str) -> Union[MilvusVectorStore, Chrom
     if index_manager_type == "chroma":
         data_dir = _get_chroma_data_dir()
         vector_store_config = VectorStoreConfig(
+            store_provider=StoreType.Chroma,
             collection_name=collection_name,
         )
         return ChromaVectorStore(config=vector_store_config, chroma_path=str(data_dir))
@@ -1355,11 +1967,88 @@ def _create_vector_store(collection_name: str) -> Union[MilvusVectorStore, Chrom
         milvus_uri = f"http://{milvus_host}:{milvus_port}"
 
         vector_store_config = VectorStoreConfig(
+            store_provider=StoreType.Milvus,
             collection_name=collection_name,
         )
+        alias = None
+        if kb_id:
+            alias = f"ret_{kb_id}_{collection_name}" if for_retrieval else f"vs_{kb_id}_{doc_id}_{collection_name}"
         return MilvusVectorStore(
-            config=vector_store_config, milvus_uri=milvus_uri, milvus_token=milvus_token
+            config=vector_store_config,
+            milvus_uri=milvus_uri,
+            milvus_token=milvus_token,
+            milvus_alias=alias,
         )
+
+    else:
+        raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
+
+
+def get_vector_store_config(collection_name: str) -> VectorStoreConfig:
+    """Return the VectorStoreConfig based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+
+    Args:
+        collection_name: Collection name
+
+    Returns:
+        VectorStoreConfig
+
+    Raises:
+        ValueError: If the configured INDEX_MANAGER_TYPE is not supported.
+    """
+    index_manager_type = _CURR_INDEX_TYPE
+
+    if index_manager_type == "chroma":
+        vector_store_config = VectorStoreConfig(
+            store_provider=StoreType.Chroma,
+            collection_name=collection_name,
+        )
+        return vector_store_config
+
+    elif index_manager_type == "milvus":
+        vector_store_config = VectorStoreConfig(
+            store_provider=StoreType.Milvus,
+            collection_name=collection_name,
+        )
+        return vector_store_config
+
+    else:
+        raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
+    
+    
+def get_vector_store_connection_config() -> Dict[str, Any]:
+    """Return the vector store connection parameters
+    based on the `INDEX_MANAGER_TYPE` variable set in `.env`.
+
+    Returns:
+        A dictionary containing backend-specific connection parameters
+
+    Raises:
+        ValueError: If the configured INDEX_MANAGER_TYPE is not supported.
+    """
+    index_manager_type = _CURR_INDEX_TYPE
+
+    if index_manager_type == "chroma":
+        data_dir = _get_chroma_data_dir()
+        connection_config = {
+            "chroma_path": str(data_dir),
+        }
+        return connection_config
+
+    elif index_manager_type == "milvus":
+        milvus_host = os.getenv("MILVUS_HOST", "localhost")
+        milvus_port = os.getenv("MILVUS_PORT", "19530")
+        milvus_token = SecurityUtils.get_decrypted_secret(
+            "MILVUS_TOKEN",
+            os.getenv("MILVUS_TOKEN", None),
+        )
+        milvus_uri = f"http://{milvus_host}:{milvus_port}"
+
+        connection_config = {
+            "milvus_uri": milvus_uri,
+            "milvus_token": milvus_token,
+        }
+        return connection_config
 
     else:
         raise ValueError(f"Un-supported {index_manager_type=} for env variable INDEX_MANAGER_TYPE")
@@ -1401,6 +2090,8 @@ async def create_knowledge_base_for_retrieval(
     chunk_index = f"kb_{kb_id}_chunks"
     vector_store = _create_vector_store(
         collection_name=chunk_index,
+        kb_id=kb_id,
+        for_retrieval=True,
     )
 
     # 5. 创建三元组提取器（如果使用图索引）
@@ -1531,21 +2222,37 @@ async def _index_documents(
     kb_id: str,
     doc_id: str,
     process_info: dict,
+    is_weblink: bool = False,
 ) -> dict:
+    kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
 
     # 1. 更新状态为INDEXING
-    update_indexing_result = knowledge_base_repository.document_update_status(
-        KBDocument(
-            kb=KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE),
-            doc_id=doc_id,
-            doc_status=DocumentStatus.INDEXING.value,
-            process_info={
-                **process_info,
-                "parsing_completed": True,
-                "document_count": len(documents),
-            },
+    if is_weblink:
+        update_indexing_result = knowledge_base_repository.weblink_update_status(
+            KBWeblink(
+                kb=kb_details,
+                weblink_id=doc_id,
+                doc_status=DocumentStatus.INDEXING.value,
+                process_info={
+                    **process_info,
+                    "parsing_completed": True,
+                    "document_count": len(documents),
+                },
+            )
         )
-    )
+    else:
+        update_indexing_result = knowledge_base_repository.document_update_status(
+            KBDocument(
+                kb=kb_details,
+                doc_id=doc_id,
+                doc_status=DocumentStatus.INDEXING.value,
+                process_info={
+                    **process_info,
+                    "parsing_completed": True,
+                    "document_count": len(documents),
+                },
+            )
+        )
 
     if update_indexing_result.code != status.HTTP_200_OK:
         raise Exception(f"Failed to update status to INDEXING: {update_indexing_result.message}")
@@ -1598,11 +2305,14 @@ async def _index_documents(
     )
 
     # 5.2 创建索引管理器
-    index_manager = _create_index_manager()
+    index_manager = _create_index_manager(kb_id=kb_id, doc_id=doc_id)
 
     # 5.3 创建向量存储
     vector_store = _create_vector_store(
         collection_name=chunk_index,
+        kb_id=kb_id,
+        doc_id=doc_id,
+        for_retrieval=False,
     )
 
     # 5.4 创建三元组提取器（如果使用图索引）
@@ -1647,48 +2357,41 @@ async def _index_documents(
         )
 
     # 8. 调用 add_documents 构建索引（会自动进行分块和索引构建）
+    doc_ids = await knowledge_base.add_documents(documents)
+
+    if not doc_ids:
+        raise RuntimeError("Index build failed: no document IDs returned")
+
+    # 获取实际创建的chunk数量
+    chunk_count = 0
     try:
-        doc_ids = await knowledge_base.add_documents(documents)
+        # 尝试通过分块器估算chunk数量
+        # 注意：这里只是估算，实际数量可能因为分块策略而有所不同
+        total_text_length = sum(len(doc.text) for doc in documents)
+        if chunker.chunk_size > 0:
+            # 粗略估算：总文本长度 / chunk_size（不考虑重叠）
+            estimated_chunks = max(1, total_text_length // chunker.chunk_size)
+            chunk_count = estimated_chunks
+            logger.debug(
+                f"[INDEX] Estimated chunk count: {chunk_count} "
+                f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})"
+            )
+    except Exception as e:
+        logger.warning(f"[INDEX] Failed to estimate chunk count: {str(e)}")
+        # 如果估算失败，使用文档数量作为fallback
+        chunk_count = len(documents)
 
-        if not doc_ids:
-            raise RuntimeError("Index build failed: no document IDs returned")
+    logger.debug(
+        f"[INDEX] Indexing completed - KB ID: {kb_id}, Doc ID: {doc_id}, "
+        f"Chunk index: {chunk_index}, Triple index: {triple_index}, "
+        f"Estimated chunks: {chunk_count}"
+    )
 
-        # 获取实际创建的chunk数量
-        chunk_count = 0
-        try:
-            # 尝试通过分块器估算chunk数量
-            # 注意：这里只是估算，实际数量可能因为分块策略而有所不同
-            total_text_length = sum(len(doc.text) for doc in documents)
-            if chunker.chunk_size > 0:
-                # 粗略估算：总文本长度 / chunk_size（不考虑重叠）
-                estimated_chunks = max(1, total_text_length // chunker.chunk_size)
-                chunk_count = estimated_chunks
-                logger.debug(
-                    f"[INDEX] Estimated chunk count: {chunk_count} "
-                    f"(text length: {total_text_length}, chunk_size: {chunker.chunk_size})"
-                )
-        except Exception as e:
-            logger.warning(f"[INDEX] Failed to estimate chunk count: {str(e)}")
-            # 如果估算失败，使用文档数量作为fallback
-            chunk_count = len(documents)
-
-        logger.debug(
-            f"[INDEX] Indexing completed - KB ID: {kb_id}, Doc ID: {doc_id}, "
-            f"Chunk index: {chunk_index}, Triple index: {triple_index}, "
-            f"Estimated chunks: {chunk_count}"
-        )
-
-        return {
-            "chunk_index": chunk_index,
-            "triple_index": triple_index,
-            "chunk_count": chunk_count,
-        }
-    finally:
-        # 清理资源
-        try:
-            await knowledge_base.close()
-        except Exception as e:
-            logger.warning(f"[INDEX] Failed to close knowledge base: {str(e)}")
+    return {
+        "chunk_index": chunk_index,
+        "triple_index": triple_index,
+        "chunk_count": chunk_count,
+    }
 
 
 async def process_single_document(
@@ -1932,6 +2635,141 @@ async def _process_documents_sequentially(
     )
 
 
+async def process_single_weblink(context: WeblinkProcessContext, task: WeblinkProcessTask):
+    """在后台异步处理单个链接"""
+    space_id = context.space_id
+    kb_id = context.kb_id
+    weblink_id = task.weblink_id
+    url = task.url
+    segmentation_strategy = context.segmentation_strategy
+    indexing_strategy = context.indexing_strategy
+    process_info = task.process_info
+    kb_details = KBDetails(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    parsed_name = None
+    try:
+        logger.info(
+            f"[WEBLINK_PROCESS_BG] Starting - Weblink ID: {weblink_id}, KB ID: {kb_id}"
+        )
+        documents = await _parse_url(url, weblink_id)
+        for d in documents:
+            if d.metadata and isinstance(d.metadata, dict):
+                t = d.metadata.get("title")
+                if t and isinstance(t, str) and t.strip():
+                    parsed_name = t.strip()
+                    break
+
+        index_result = await _index_documents(
+            documents=documents,
+            indexing_strategy=indexing_strategy,
+            segmentation_strategy=segmentation_strategy,
+            space_id=space_id,
+            kb_id=kb_id,
+            doc_id=weblink_id,
+            process_info=process_info,
+            is_weblink=True,
+        )
+        final_process_info = {
+            **process_info,
+            "chunking_completed": True,
+            "indexing_completed": True,
+            "index_result": index_result,
+        }
+        update_data = {
+            "doc_status": DocumentStatus.INDEXED.value,
+            "process_info": final_process_info,
+            "index_name": index_result.get("chunk_index"),
+            "chunk_count": index_result.get("chunk_count"),
+        }
+        update_result = knowledge_base_repository.weblink_update_status(
+            KBWeblink(
+                kb=kb_details,
+                weblink_id=weblink_id,
+                doc_status=DocumentStatus.INDEXED.value,
+                process_info=final_process_info,
+                index_name=index_result.get("chunk_index"),
+                chunk_count=index_result.get("chunk_count"),
+            )
+        )
+        if update_result.code != status.HTTP_200_OK:
+            raise Exception("Failed to update status to INDEXED")
+        if parsed_name:
+            knowledge_base_repository.weblink_update(
+                KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                name=parsed_name,
+            )
+        logger.info(
+            f"[WEBLINK_PROCESS_BG] Completed - Weblink ID: {weblink_id}, KB ID: {kb_id}"
+        )
+    except Exception as e:
+        error_message = str(e)
+        logger.error(
+            f"[WEBLINK_PROCESS_BG] Failed - Weblink ID: {weblink_id}, KB ID: {kb_id}, Error: {error_message}",
+            exc_info=True,
+        )
+        try:
+            knowledge_base_repository.weblink_update_status(
+                KBWeblink(
+                    kb=kb_details,
+                    weblink_id=weblink_id,
+                    doc_status=DocumentStatus.FAILED.value,
+                    process_info={
+                        **process_info,
+                        "error": error_message,
+                        "failed_time": milliseconds(),
+                    },
+                )
+            )
+            # 即使索引失败，若解析阶段已提取到标题，也更新名称便于列表展示
+            if parsed_name:
+                try:
+                    knowledge_base_repository.weblink_update(
+                        KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                        name=parsed_name,
+                    )
+                except Exception:
+                    pass
+        except Exception as update_error:
+            logger.error(
+                f"[WEBLINK_PROCESS_BG] Failed to update FAILED status - Weblink ID: {weblink_id}, Error: {update_error}"
+            )
+
+
+async def _process_weblinks_sequentially(
+    context: WeblinkProcessContext,
+    weblinks: list[dict],
+    task_id: str,
+    process_info_base: dict,
+):
+    """串行处理多个链接"""
+    kb_id = context.kb_id
+    logger.info(
+        f"[WEBLINK_PROCESS_SEQ] Starting - Task ID: {task_id}, KB ID: {kb_id}, Total: {len(weblinks)}"
+    )
+    for idx, w in enumerate(weblinks, 1):
+        weblink_id = w.get("weblink_id")
+        url = w.get("url")
+        try:
+            process_info = {
+                **process_info_base,
+                "task_id": task_id,
+                "current_index": idx,
+                "total_count": len(weblinks),
+            }
+            await process_single_weblink(
+                context=context,
+                task=WeblinkProcessTask(
+                    weblink_id=weblink_id,
+                    url=url,
+                    process_info=process_info,
+                ),
+            )
+        except Exception as e:
+            logger.error(
+                f"[WEBLINK_PROCESS_SEQ] Failed - Weblink ID: {weblink_id}, Error: {str(e)}",
+                exc_info=True,
+            )
+
+
 async def document_upload(
     space_id: str,
     kb_id: str,
@@ -1953,12 +2791,80 @@ async def document_upload(
     # 1. 验证用户空间权限
     _ = check_user_space(space_id, current_user)
 
-    # 2. 验证知识库是否存在
+    # 2. 判断知识库来源：kb_id == ds_kb_id 时为 DeepSearch 知识库，转发到 DS 上传接口
     kb_get = KnowledgeBaseGet(space_id=space_id, kb_id=kb_id, index_manager_type=_CURR_INDEX_TYPE)
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_UPLOAD] Knowledge base not found - KB ID: {kb_id}, User: {user_id}")
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
+    )
+    if not kb_data or is_ds_kb:
+        # DeepSearch 知识库：转发到 DeepSearch 上传接口
+        try:
+            file_parts: List[Tuple[str, bytes, str]] = []
+            for file in files:
+                content = await file.read()
+                fn = file.filename or "unnamed"
+                ct = file.content_type or "application/octet-stream"
+                file_parts.append((fn, content, ct))
+            if not file_parts:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message="No file content to upload",
+                )
+            ds_client = DeepSearchAgentClient()
+            ds_resp = await ds_client.upload_knowledge_base_files(
+                space_id=space_id,
+                ds_kb_id=kb_id,
+                files=file_parts,
+                metadata=metadata,
+            )
+            if not isinstance(ds_resp, dict):
+                return ResponseModel(
+                    code=status.HTTP_502_BAD_GATEWAY,
+                    message="DeepSearch upload returned invalid response",
+                )
+            if ds_resp.get("code") not in (None, status.HTTP_200_OK):
+                return ResponseModel(
+                    code=ds_resp.get("code", status.HTTP_502_BAD_GATEWAY),
+                    message=ds_resp.get("message", "DeepSearch upload failed"),
+                )
+            data = ds_resp.get("data") or {}
+            docs = data.get("documents") or []
+            uploaded_docs = [
+                DocumentUploadResponse(
+                    doc_id=d.get("id") or d.get("doc_id", ""),
+                    name=d.get("name", ""),
+                    file_size=int(d.get("file_size", 0)),
+                    status=d.get("status", DocumentStatus.UPLOADED.value),
+                )
+                for d in docs
+            ]
+            response_data = DocumentUploadBatchResponse(
+                success_count=data.get("success_count", len(uploaded_docs)),
+                failed_count=data.get("failed_count", 0),
+                documents=uploaded_docs,
+            )
+            logger.info(
+                f"[DOC_UPLOAD] Upload (DeepSearch) - KB ID: {kb_id}, "
+                f"Success: {response_data.success_count}, Failed: {response_data.failed_count}, User: {user_id}"
+            )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Upload completed: {response_data.success_count} success, {response_data.failed_count} failed",
+                data=response_data.model_dump(by_alias=False),
+            )
+        except Exception as e:
+            logger.warning(
+                f"[DOC_UPLOAD] DeepSearch upload failed - KB ID: {kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch upload failed: {str(e)}",
+            )
 
     # 3. 获取存储路径
     storage_path = _get_storage_path(space_id, kb_id)
@@ -2256,25 +3162,33 @@ def knowledge_base_list(req: KnowledgeBaseListRequest, current_user: dict) -> Re
             ).model_dump(by_alias=False),
         )
 
-    # 3. 转换数据格式，并检查是否有图增强文档
+    # 3. 转换数据格式，并检查是否有图增强
     items = []
     for kb_data in list_result.data.get("items", []):
         kb_id = kb_data.get("kb_id", "")
-        # 检查是否有图增强文档
-        has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
-            space_id=req.space_id, kb_id=kb_id
-        )
+        config = kb_data.get("config") or {}
+        kb_type = config.get("type", "document")
+        # 按 KB 类型检查图增强：weblink 查 weblink 表，document 查 document 表
+        if kb_type == "weblink":
+            has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_weblinks(
+                space_id=req.space_id, kb_id=kb_id
+            )
+        else:
+            has_graph_enhancement = knowledge_base_repository.has_graph_enhancement_documents(
+                space_id=req.space_id, kb_id=kb_id
+            )
 
         items.append(
             KnowledgeBaseListItem(
                 name=kb_data.get("name", ""),
                 desc=kb_data.get("description"),
                 id=kb_id,
-                type="text",
+                type=kb_type,
                 embedding_model_config_id=kb_data.get("embedding_model_config_id"),
                 created_at=_timestamp_to_date_str(kb_data.get("create_time")),
                 updated_at=_timestamp_to_date_str(kb_data.get("update_time")),
                 has_graph_enhancement=has_graph_enhancement,
+                ds_kb_id=kb_data.get("ds_kb_id"),
             )
         )
 
@@ -2301,8 +3215,8 @@ def knowledge_base_list(req: KnowledgeBaseListRequest, current_user: dict) -> Re
 
 
 @with_exception_handling
-def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel:
-    """获取知识库文档列表（支持分页）"""
+async def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel:
+    """获取知识库文档列表（支持分页）。Studio 知识库从 Studio 表取；DeepSearch 知识库从 DeepSearch 接口取。"""
     start_time = time.time()
     user_id = current_user.get("user_id", "unknown")
 
@@ -2314,58 +3228,133 @@ def document_list(req: DocumentListRequest, current_user: dict) -> ResponseModel
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 验证知识库是否存在
+    # 2. 验证知识库是否存在且判断来源：kb_id == ds_kb_id 时为 DS 知识库，文档从 DS 接口拉取；否则从 Studio 表获取
     kb_get = KnowledgeBaseGet(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(f"[DOC_LIST] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}")
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
-
-    # 3. 从数据库获取文档列表
-    list_result = knowledge_base_repository.document_list(
-        KBDocument(
-            KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE),
-        ),
-        page=req.page,
-        size=req.size,
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
     )
 
-    if list_result.code != status.HTTP_200_OK:
-        logger.error(
-            f"[DOC_LIST] Database query failed - Space ID: {req.space_id}, "
-            f"KB ID: {req.kb_id}, Error: {list_result.message}"
+    if kb_data and not is_ds_kb:
+        # Studio 知识库：从 Studio 数据库获取文档列表
+        list_result = knowledge_base_repository.document_list(
+            KBDocument(
+                KBDetails(
+                    space_id=req.space_id,
+                    kb_id=req.kb_id,
+                    index_manager_type=_CURR_INDEX_TYPE,
+                ),
+            ),
+            page=req.page,
+            size=req.size,
+        )
+        if list_result.code != status.HTTP_200_OK:
+            logger.error(
+                f"[DOC_LIST] Studio document list failed - Space ID: {req.space_id}, "
+                f"KB ID: {req.kb_id}, Error: {list_result.message}"
+            )
+            return ResponseModel(
+                code=list_result.code,
+                message=list_result.message,
+                data={"items": [], "total": 0, "page": req.page, "size": req.size},
+            )
+
+        # 转换数据格式
+        items = []
+        for doc_data in list_result.data.get("items", []):
+            items.append(
+                DocumentListItem(
+                    name=doc_data.get("name", ""),
+                    id=doc_data.get("doc_id", ""),
+                    created_at=_timestamp_to_date_str(doc_data.get("create_time")),
+                    updated_at=_timestamp_to_date_str(doc_data.get("update_time")),
+                )
+            )
+        total = list_result.data.get("total", 0)
+        response_data = DocumentListResponse(
+            items=items, total=total, page=req.page, size=req.size
+        )
+        logger.info(
+            f"[DOC_LIST] Document list (Studio) - Space ID: {req.space_id}, "
+            f"KB ID: {req.kb_id}, Count: {len(items)}/{total}, User: {user_id}, "
+            f"Duration: {time.time() - start_time:.3f}s"
         )
         return ResponseModel(
-            code=list_result.code,
-            message=list_result.message,
-            data={"items": [], "total": 0, "page": req.page, "size": req.size},
+            code=status.HTTP_200_OK,
+            message="get documents success",
+            data=response_data.model_dump(by_alias=False),
         )
 
-    # 4. 转换数据格式
+    # 3. DeepSearch 知识库（kb_id == ds_kb_id 或未在 Studio 找到）：从 DeepSearch 接口拉取文档列表
+    try:
+        ds_client = DeepSearchAgentClient()
+        ds_resp = await ds_client.list_documents(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            page=req.page,
+            size=req.size,
+        )
+    except Exception as e:
+        logger.warning(
+            f"[DOC_LIST] DeepSearch document list failed - space_id={req.space_id}, "
+            f"kb_id={req.kb_id}, error={e}"
+        )
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message="Knowledge base not found or document list unavailable",
+        )
+
+    if not isinstance(ds_resp, dict):
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message="Knowledge base not found or document list unavailable",
+        )
+    if ds_resp.get("code") not in (None, status.HTTP_200_OK):
+        return ResponseModel(
+            code=ds_resp.get("code", status.HTTP_404_NOT_FOUND),
+            message=ds_resp.get("message", "Knowledge base not found or document list unavailable"),
+        )
+    data = ds_resp.get("data")
+    if not isinstance(data, dict):
+        return ResponseModel(
+            code=status.HTTP_404_NOT_FOUND,
+            message="Knowledge base not found or document list unavailable",
+        )
+
+    ds_items = data.get("items") or []
+    total = data.get("total", 0)
     items = []
-    for doc_data in list_result.data.get("items", []):
+    for doc in ds_items:
+        doc_id = doc.get("id") or doc.get("doc_id") or ""
+        created_at = doc.get("created_at") or ""
+        updated_at = doc.get("updated_at") or ""
+        if not created_at and doc.get("create_time") is not None:
+            created_at = _timestamp_to_date_str(doc.get("create_time"))
+        if not updated_at and doc.get("update_time") is not None:
+            updated_at = _timestamp_to_date_str(doc.get("update_time"))
         items.append(
             DocumentListItem(
-                name=doc_data.get("name", ""),
-                id=doc_data.get("doc_id", ""),
-                created_at=_timestamp_to_date_str(doc_data.get("create_time")),
-                updated_at=_timestamp_to_date_str(doc_data.get("update_time")),
+                name=doc.get("name", ""),
+                id=doc_id,
+                created_at=created_at,
+                updated_at=updated_at,
             )
         )
 
-    # 5. 构建响应数据
-    total = list_result.data.get("total", 0)
-    response_data = DocumentListResponse(items=items, total=total, page=req.page, size=req.size)
-
-    logger.info(
-        f"[DOC_LIST] Document list retrieved - Space ID: {req.space_id}, "
-        f"KB ID: {req.kb_id}, Count: {len(items)}/{total}, "
-        f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    response_data = DocumentListResponse(
+        items=items, total=total, page=req.page, size=req.size
     )
-
-    # 6. 返回列表结果
+    logger.info(
+        f"[DOC_LIST] Document list (DeepSearch) - Space ID: {req.space_id}, "
+        f"KB ID: {req.kb_id}, Count: {len(items)}/{total}, User: {user_id}, "
+        f"Duration: {time.time() - start_time:.3f}s"
+    )
+    # 4. 返回列表结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get documents success",
@@ -2451,16 +3440,54 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 验证知识库是否存在
+    # 2. 判断知识库来源：kb_id == ds_kb_id 时为 DeepSearch 知识库，转发到 DS 删除接口
     kb_get = KnowledgeBaseGet(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(
-            f"[DOC_DELETE] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
-        )
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
+    )
+    if not kb_data or is_ds_kb:
+        # DeepSearch 知识库：转发到 DeepSearch 删除接口
+        try:
+            ds_client = DeepSearchAgentClient()
+            ds_resp = await ds_client.delete_documents(
+                space_id=req.space_id,
+                kb_id=req.kb_id,
+                document_ids=req.document_ids,
+            )
+            if not isinstance(ds_resp, dict):
+                return ResponseModel(
+                    code=status.HTTP_502_BAD_GATEWAY,
+                    message="DeepSearch delete returned invalid response",
+                )
+            if ds_resp.get("code") not in (None, status.HTTP_200_OK):
+                return ResponseModel(
+                    code=ds_resp.get("code", status.HTTP_502_BAD_GATEWAY),
+                    message=ds_resp.get("message", "DeepSearch delete failed"),
+                )
+            logger.info(
+                f"[DOC_DELETE] Delete (DeepSearch) - KB ID: {req.kb_id}, "
+                f"Doc IDs: {len(req.document_ids)}, User: {user_id}"
+            )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Documents deleted successfully",
+                data=None,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[DOC_DELETE] DeepSearch delete failed - KB ID: {req.kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch delete failed: {str(e)}",
+            )
 
     # 3. 批量删除文档
     success_count = 0
@@ -2545,7 +3572,7 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
                 )
 
                 # 创建索引管理器并删除索引数据
-                index_manager = _create_index_manager()
+                index_manager = _create_index_manager(kb_id=req.kb_id)
 
                 # 删除chunk索引中的数据
                 chunk_index = f"kb_{req.kb_id}_chunks"
@@ -2591,8 +3618,8 @@ async def document_delete(req: DocumentDeleteRequest, current_user: dict) -> Res
 
 
 @with_exception_handling
-def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) -> ResponseModel:
-    """批量查询文档状态"""
+async def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) -> ResponseModel:
+    """批量查询文档状态。Studio 知识库查 Studio 表；DeepSearch 知识库调 DeepSearch 接口。"""
     start_time = time.time()
     user_id = current_user.get("user_id", "unknown")
     logger.info(
@@ -2603,78 +3630,119 @@ def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) ->
     # 1. 验证用户空间权限
     _ = check_user_space(req.space_id, current_user)
 
-    # 2. 批量查询文档状态
-    status_items = []
-    for doc_id in req.doc_id_list:
-        doc_result = knowledge_base_repository.document_get(
-            KBDocument(
-                KBDetails(
-                    space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
-                ),
-                doc_id=doc_id,
-            )
-        )
+    # 2. 判断是否为 Studio 知识库
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
 
-        if doc_result.code == status.HTTP_200_OK and doc_result.data:
-            doc_data = doc_result.data
-            status_value = doc_data.get("status", DocumentStatus.UPLOADING.value)
-            doc_name = doc_data.get("name")
-
-            # 从 process_info 中提取错误信息和图增强标识
-            error_msg = None
-            enable_graph_enhancement = None
-            process_info = doc_data.get("process_info")
-            if isinstance(process_info, dict):
-                # 优先查找 "error" 字段（文档处理失败时设置），如果没有则查找 "message" 字段（导入时设置）
-                error_msg = process_info.get("error") or process_info.get("message")
-                # 从 indexing_strategy 中提取 enable_graph_enhancement
-                indexing_strategy = process_info.get("indexing_strategy")
-                if isinstance(indexing_strategy, dict):
-                    enable_graph_enhancement = indexing_strategy.get(
-                        "enable_graph_enhancement", False
-                    )
-
-            # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
-            if status_value == DocumentStatus.FAILED.value and not error_msg:
-                error_msg = "Processing failed with unknown error"
-            
-            # 格式化错误信息供前端显示
-            if error_msg:
-                error_msg = _format_error_message_for_frontend(error_msg)
-
-            # 格式化错误信息供前端显示
-            if error_msg:
-                error_msg = _format_error_message_for_frontend(error_msg)
-
-            status_items.append(
-                DocumentStatusResponse(
-                    id=doc_id,
-                    status=status_value,
-                    name=doc_name,
-                    error_msg=error_msg,
-                    enable_graph_enhancement=enable_graph_enhancement,
-                )
-            )
-        else:
-            # 文档不存在，仍然返回但状态为空或标记为不存在
-            logger.warning(
-                f"[DOC_STATUS] Document not found - Space ID: {req.space_id}, "
-                f"KB ID: {req.kb_id}, Doc ID: {doc_id}, User: {user_id}"
-            )
-            # 可以选择跳过不存在的文档，或者返回一个标记状态
-            # 这里选择跳过，只返回存在的文档
-
-    # 3. 构建响应数据
-    response_data = DocumentStatusListResponse(items=status_items)
-
-    logger.info(
-        f"[DOC_STATUS] Document status batch retrieved - Space ID: {req.space_id}, "
-        f"KB ID: {req.kb_id}, Requested: {len(req.doc_id_list)}, "
-        f"Found: {len(status_items)}, User: {user_id}, "
-        f"Duration: {time.time() - start_time:.3f}s"
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
     )
 
-    # 4. 返回查询结果
+    if kb_data and not is_ds_kb:
+        # Studio 知识库：从 Studio 文档表查状态
+        status_items = []
+        for doc_id in req.doc_id_list:
+            doc_result = knowledge_base_repository.document_get(
+                KBDocument(
+                    KBDetails(
+                        space_id=req.space_id,
+                        kb_id=req.kb_id,
+                        index_manager_type=_CURR_INDEX_TYPE,
+                    ),
+                    doc_id=doc_id,
+                )
+            )
+            if doc_result.code == status.HTTP_200_OK and doc_result.data:
+                doc_data = doc_result.data
+                status_value = doc_data.get("status", DocumentStatus.UPLOADING.value)
+                doc_name = doc_data.get("name")
+                error_msg = None
+                enable_graph_enhancement = None
+                process_info = doc_data.get("process_info")
+                if isinstance(process_info, dict):
+                    error_msg = process_info.get("error") or process_info.get("message")
+                    indexing_strategy = process_info.get("indexing_strategy")
+                    if isinstance(indexing_strategy, dict):
+                        enable_graph_enhancement = indexing_strategy.get(
+                            "enable_graph_enhancement", False
+                        )
+                if status_value == DocumentStatus.FAILED.value and not error_msg:
+                    error_msg = "Processing failed with unknown error"
+                if error_msg:
+                    error_msg = _format_error_message_for_frontend(error_msg)
+                status_items.append(
+                    DocumentStatusResponse(
+                        id=doc_id,
+                        status=status_value,
+                        name=doc_name,
+                        error_msg=error_msg,
+                        enable_graph_enhancement=enable_graph_enhancement,
+                    )
+                )
+        response_data = DocumentStatusListResponse(items=status_items)
+        logger.info(
+            f"[DOC_STATUS] Document status (Studio) - Space ID: {req.space_id}, "
+            f"KB ID: {req.kb_id}, Requested: {len(req.doc_id_list)}, Found: {len(status_items)}, "
+            f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get document status success",
+            data=response_data.model_dump(by_alias=False),
+        )
+
+    # 3. DeepSearch 知识库：调 DeepSearch 文档状态接口
+    try:
+        ds_client = DeepSearchAgentClient()
+        ds_resp = await ds_client.get_document_status(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            doc_id_list=req.doc_id_list,
+        )
+    except Exception as e:
+        logger.warning(
+            f"[DOC_STATUS] DeepSearch document status failed - space_id={req.space_id}, "
+            f"kb_id={req.kb_id}, error={e}"
+        )
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get document status success",
+            data=DocumentStatusListResponse(items=[]).model_dump(by_alias=False),
+        )
+
+    if not isinstance(ds_resp, dict) or ds_resp.get("code") not in (None, status.HTTP_200_OK):
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="get document status success",
+            data=DocumentStatusListResponse(items=[]).model_dump(by_alias=False),
+        )
+    data = ds_resp.get("data")
+    if not isinstance(data, dict):
+        data = {}
+    ds_items = data.get("items") or []
+    status_items = []
+    for item in ds_items:
+        doc_id = item.get("id") or item.get("doc_id") or ""
+        status_items.append(
+            DocumentStatusResponse(
+                id=doc_id,
+                status=item.get("status", DocumentStatus.UPLOADING.value),
+                name=item.get("name"),
+                error_msg=item.get("error_msg"),
+                enable_graph_enhancement=item.get("enable_graph_enhancement"),
+            )
+        )
+    response_data = DocumentStatusListResponse(items=status_items)
+    logger.info(
+        f"[DOC_STATUS] Document status (DeepSearch) - Space ID: {req.space_id}, "
+        f"KB ID: {req.kb_id}, Requested: {len(req.doc_id_list)}, Found: {len(status_items)}, "
+        f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    )
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="get document status success",
@@ -2684,7 +3752,7 @@ def document_get_status_batch(req: DocumentStatusRequest, current_user: dict) ->
 
 @with_exception_handling
 async def document_process(req: DocumentProcessRequest, current_user: dict) -> ResponseModel:
-    """启动文档处理流程，使用 agentcore 的解析/分段/索引能力"""
+    """启动文档处理流程。Studio 知识库走本地 _process_documents_sequentially；DeepSearch 知识库转发到 DeepSearch /api/kb/process 建索引。"""
     start_time = time.time()
     user_id = current_user.get("user_id", "unknown")
 
@@ -2695,15 +3763,74 @@ async def document_process(req: DocumentProcessRequest, current_user: dict) -> R
 
     _ = check_user_space(req.space_id, current_user)
 
+    # 判断知识库来源：kb_id == ds_kb_id 时为 DeepSearch 知识库，转发到 DS 建索引接口
     kb_get = KnowledgeBaseGet(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
     kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
-    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
-        logger.warning(
-            f"[DOC_PROCESS] Knowledge base not found - KB ID: {req.kb_id}, User: {user_id}"
-        )
-        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_data = kb_result.data if (kb_result.code == status.HTTP_200_OK and kb_result.data) else None
+    is_ds_kb = (
+        kb_data is not None
+        and kb_data.get("kb_id")
+        and kb_data.get("kb_id") == kb_data.get("ds_kb_id")
+    )
+    if not kb_data or is_ds_kb:
+        # DeepSearch 知识库：转发到 DeepSearch 建索引接口
+        try:
+            process_payload = {
+                "space_id": req.space_id,
+                "kb_id": req.kb_id,
+                "doc_id_list": req.doc_id_list,
+                "parsing_strategy": req.parsing_strategy.model_dump()
+                if hasattr(req.parsing_strategy, "model_dump")
+                else (req.parsing_strategy or {}),
+                "segmentation_strategy": req.segmentation_strategy.model_dump()
+                if hasattr(req.segmentation_strategy, "model_dump")
+                else (req.segmentation_strategy or {}),
+                "indexing_strategy": req.indexing_strategy.model_dump()
+                if hasattr(req.indexing_strategy, "model_dump")
+                else (req.indexing_strategy or {}),
+            }
+            try:
+                _apply_ds_process_llm_config(
+                    process_payload, req.space_id
+                )
+            except ValueError as e:
+                return ResponseModel(
+                    code=status.HTTP_400_BAD_REQUEST,
+                    message=str(e),
+                )
+            ds_client = DeepSearchAgentClient()
+            result = await ds_client.process_knowledge_base_documents(process_payload)
+            if not isinstance(result, dict):
+                return ResponseModel(
+                    code=status.HTTP_502_BAD_GATEWAY,
+                    message="DeepSearch process returned invalid response",
+                )
+            if result.get("code") not in (None, status.HTTP_200_OK):
+                return ResponseModel(
+                    code=result.get("code", status.HTTP_502_BAD_GATEWAY),
+                    message=result.get("message", "DeepSearch process failed"),
+                )
+            data = result.get("data") or {}
+            logger.info(
+                f"[DOC_PROCESS] DeepSearch process submitted - KB ID: {req.kb_id}, "
+                f"task_id: {data.get('task_id')}, User: {user_id}"
+            )
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message="Document process submitted",
+                data=data,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[DOC_PROCESS] DeepSearch process failed - KB ID: {req.kb_id}, error={e}",
+                exc_info=True,
+            )
+            return ResponseModel(
+                code=status.HTTP_502_BAD_GATEWAY,
+                message=f"DeepSearch process failed: {str(e)}",
+            )
 
     processed_count = 0
     failed_count = 0
@@ -2964,12 +4091,23 @@ def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel
     kb_details = KBDetails(
         space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
     )
-    # 3. 查询该任务ID下的所有文档
-    list_result = knowledge_base_repository.document_list(
-        kbdoc=KBDocument(kb=kb_details),
-        page=1,
-        size=1000,
-    )  # 假设一个任务不会超过1000个文档
+    # 3. 按 KB 类型查询：weblink 查 weblink_list，否则查 document_list
+    config = kb_result.data.get("config") or {}
+    kb_type = config.get("type", "document")
+    if kb_type == "weblink":
+        list_result = knowledge_base_repository.weblink_list(
+            kb_weblink=KBWeblink(kb=kb_details),
+            page=1,
+            size=1000,
+        )
+        id_key = "weblink_id"
+    else:
+        list_result = knowledge_base_repository.document_list(
+            kbdoc=KBDocument(kb=kb_details),
+            page=1,
+            size=1000,
+        )
+        id_key = "doc_id"
 
     if list_result.code != status.HTTP_200_OK:
         logger.error(
@@ -2992,7 +4130,7 @@ def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel
         process_info = doc_data.get("process_info", {})
         if isinstance(process_info, dict) and process_info.get("task_id") == req.task_id:
             total_count += 1
-            doc_id = doc_data.get("doc_id", "")
+            doc_id = doc_data.get(id_key, doc_data.get("doc_id", ""))
             doc_name = doc_data.get("name", "")
             doc_status = doc_data.get("status", "")
 
@@ -3039,4 +4177,455 @@ def task_progress(req: TaskProgressRequest, current_user: dict) -> ResponseModel
         code=status.HTTP_200_OK,
         message="get task progress success",
         data=response_data.model_dump(by_alias=False),
+    )
+
+
+# ==================== Weblink Manager ====================
+
+
+@with_exception_handling
+def weblink_add(req: WeblinkAddRequest, current_user: dict) -> ResponseModel:
+    """添加链接到知识库"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_ADD] Adding weblinks - User: {user_id}, KB ID: {req.kb_id}, URLs: {len(req.urls)}"
+    )
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    config = kb_result.data.get("config") or {}
+    if config.get("type") != "weblink":
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Knowledge base is not a weblink type",
+        )
+    if len(req.urls) > WEBLINK_KB_MAX_LINKS:
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message=(
+                f"At most {WEBLINK_KB_MAX_LINKS} URL lines per request "
+                f"(received {len(req.urls)})"
+            ),
+        )
+    valid_urls: list[str] = []
+    for url in req.urls:
+        u = (url or "").strip()
+        if not u or not u.lower().startswith(("http://", "https://")):
+            continue
+        valid_urls.append(u)
+    if valid_urls:
+        list_result = knowledge_base_repository.weblink_list(
+            KBWeblink(
+                kb=KBDetails(
+                    space_id=req.space_id,
+                    kb_id=req.kb_id,
+                    index_manager_type=_CURR_INDEX_TYPE,
+                )
+            ),
+            page=1,
+            size=1,
+        )
+        existing = 0
+        if list_result.code == status.HTTP_200_OK and list_result.data:
+            existing = int(list_result.data.get("total") or 0)
+        if existing + len(valid_urls) > WEBLINK_KB_MAX_LINKS:
+            return ResponseModel(
+                code=status.HTTP_400_BAD_REQUEST,
+                message=(
+                    f"Weblink knowledge base allows at most {WEBLINK_KB_MAX_LINKS} links "
+                    f"({existing} existing; cannot add {len(valid_urls)} in this batch)"
+                ),
+            )
+    links = []
+    success_count = 0
+    failed_count = 0
+    for url in req.urls:
+        url = (url or "").strip()
+        if not url:
+            failed_count += 1
+            continue
+        if not url.lower().startswith(("http://", "https://")):
+            failed_count += 1
+            continue
+        weblink_id = str(uuid.uuid4())
+        weblink_data = {
+            "space_id": req.space_id,
+            "kb_id": req.kb_id,
+            "weblink_id": weblink_id,
+            "url": url,
+            "name": url,
+            "status": DocumentStatus.UPLOADED.value,
+            "index_manager_type": _CURR_INDEX_TYPE,
+        }
+        create_result = knowledge_base_repository.weblink_create(weblink_data)
+        if create_result.code == status.HTTP_200_OK:
+            success_count += 1
+            links.append(
+                WeblinkAddItem(
+                    id=weblink_id,
+                    url=url,
+                    name=url,
+                    status=DocumentStatus.UPLOADED.value,
+                )
+            )
+        else:
+            failed_count += 1
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="add weblinks success",
+        data=WeblinkAddBatchResponse(
+            success_count=success_count,
+            failed_count=failed_count,
+            links=links,
+        ).model_dump(by_alias=False),
+    )
+
+
+@with_exception_handling
+def weblink_list(req: WeblinkListRequest, current_user: dict) -> ResponseModel:
+    """获取链接列表"""
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    list_result = knowledge_base_repository.weblink_list(
+        KBWeblink(kb=KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)),
+        page=req.page,
+        size=req.size,
+    )
+    if list_result.code != status.HTTP_200_OK:
+        return ResponseModel(
+            code=list_result.code,
+            message=list_result.message,
+            data={"items": [], "total": 0, "page": req.page, "size": req.size},
+        )
+    data = list_result.data
+    items = [
+        WeblinkListItem(
+            name=w.get("name", ""),
+            id=w.get("weblink_id", ""),
+            url=w.get("url", ""),
+            created_at=_timestamp_to_date_str(w.get("create_time")),
+            updated_at=_timestamp_to_date_str(w.get("update_time")),
+        )
+        for w in data.get("items", [])
+    ]
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="get weblink list success",
+        data=WeblinkListResponse(
+            items=items,
+            total=data.get("total", 0),
+            page=data.get("page", req.page),
+            size=data.get("size", req.size),
+        ).model_dump(by_alias=False),
+    )
+
+
+@with_exception_handling
+async def weblink_process(req: WeblinkProcessRequest, current_user: dict) -> ResponseModel:
+    """处理链接（解析并索引）"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_PROCESS] Starting weblink processing - User: {user_id}, "
+        f"KB ID: {req.kb_id}, Links: {len(req.weblink_id_list)}"
+    )
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    config = kb_result.data.get("config") or {}
+    if config.get("type") != "weblink":
+        return ResponseModel(
+            code=status.HTTP_400_BAD_REQUEST,
+            message="Knowledge base is not a weblink type",
+        )
+    task_id = str(uuid.uuid4())
+    process_info_base = {
+        "task_id": task_id,
+        "parsing_strategy": req.parsing_strategy.model_dump(),
+        "segmentation_strategy": req.segmentation_strategy.model_dump(),
+        "indexing_strategy": req.indexing_strategy.model_dump(),
+        "start_time": milliseconds(),
+    }
+    valid_weblinks = []
+    failed_count = 0
+    failed_links = []
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    for weblink_id in req.weblink_id_list:
+        get_result = knowledge_base_repository.weblink_get(KBWeblink(kb=kb_details, weblink_id=weblink_id))
+        if get_result.code != status.HTTP_200_OK or not get_result.data:
+            failed_count += 1
+            failed_links.append(weblink_id)
+            continue
+        w = get_result.data
+        if w.get("status") != DocumentStatus.UPLOADED.value:
+            failed_count += 1
+            failed_links.append(weblink_id)
+            # 状态无效时更新为 FAILED
+            try:
+                knowledge_base_repository.weblink_update_status(
+                    KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                    doc_status=DocumentStatus.FAILED.value,
+                    process_info={
+                        **process_info_base,
+                        "error": "Weblink status invalid",
+                        "failed_time": milliseconds(),
+                    },
+                )
+            except Exception:
+                pass
+            continue
+        knowledge_base_repository.weblink_update_status(
+            KBWeblink(
+                kb=kb_details,
+                weblink_id=weblink_id,
+                doc_status=DocumentStatus.PROCESSING.value,
+                process_info=process_info_base,
+            )
+        )
+        valid_weblinks.append({"weblink_id": weblink_id, "url": w.get("url", "")})
+    asyncio.create_task(
+        _process_weblinks_sequentially(
+            context=WeblinkProcessContext(
+                space_id=req.space_id,
+                kb_id=req.kb_id,
+                parsing_strategy=req.parsing_strategy,
+                segmentation_strategy=req.segmentation_strategy,
+                indexing_strategy=req.indexing_strategy,
+            ),
+            weblinks=valid_weblinks,
+            task_id=task_id,
+            process_info_base=process_info_base,
+        )
+    )
+    logger.info(
+        f"[WEBLINK_PROCESS] Weblink processing tasks started - Task ID: {task_id}, "
+        f"KB ID: {req.kb_id}, User: {user_id}, "
+        f"Processed: {len(valid_weblinks)}, Failed: {failed_count}, "
+        f"Duration: {time.time() - start_time:.3f}s"
+    )
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Weblink processing started",
+        data=WeblinkProcessResponse(
+            task_id=task_id,
+            processed_count=len(valid_weblinks),
+            failed_count=failed_count,
+            failed_links=failed_links,
+        ).model_dump(by_alias=False),
+    )
+
+
+def _name_needs_refresh(name: str, url: str) -> bool:
+    """判断链接名称是否需要从 URL 重新解析（当前仍是 URL 或空）"""
+    if not name or not name.strip():
+        return True
+    n, u = (name or "").strip(), (url or "").strip()
+    if n == u:
+        return True
+    if n.lower().startswith(("http://", "https://")):
+        return True
+    return False
+
+
+@with_exception_handling
+async def weblink_get_status_batch(req: WeblinkStatusRequest, current_user: dict) -> ResponseModel:
+    """批量查询链接状态"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_STATUS] Getting weblink status batch - User: {user_id}, "
+        f"Space ID: {req.space_id}, KB ID: {req.kb_id}, Weblink IDs: {len(req.weblink_id_list)}"
+    )
+    _ = check_user_space(req.space_id, current_user)
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    items = []
+    for weblink_id in req.weblink_id_list:
+        get_result = knowledge_base_repository.weblink_get(
+            KBWeblink(kb=kb_details, weblink_id=weblink_id)
+        )
+        if get_result.code == status.HTTP_200_OK and get_result.data:
+            w = get_result.data
+            display_name = w.get("name") or ""
+
+            # 仅当用户点击刷新且名称仍为 URL 时，从 URL 解析标题
+            if req.refresh_names:
+                url = w.get("url", "")
+                if url and _name_needs_refresh(display_name, url):
+                    try:
+                        documents = await asyncio.wait_for(
+                            _parse_url(url, weblink_id),
+                            timeout=10.0,
+                        )
+                        for d in documents:
+                            if d.metadata and isinstance(d.metadata, dict):
+                                t = d.metadata.get("title")
+                                if t and isinstance(t, str) and t.strip():
+                                    display_name = t.strip()
+                                    knowledge_base_repository.weblink_update(
+                                        KBWeblink(kb=kb_details, weblink_id=weblink_id),
+                                        name=display_name,
+                                    )
+                                    break
+                    except Exception as e:
+                        logger.debug(f"[WEBLINK_STATUS] Failed to refresh name for {weblink_id}: {e}")
+                    if not display_name:
+                        display_name = url
+            if not display_name:
+                display_name = w.get("url", "")
+
+            process_info = w.get("process_info") or {}
+            error_msg = (
+                process_info.get("error") or process_info.get("message")
+                if isinstance(process_info, dict)
+                else None
+            )
+            status_value = w.get("status", "")
+            # 如果状态是 FAILED 但没有错误信息，提供默认错误信息
+            if status_value == DocumentStatus.FAILED.value and not error_msg:
+                error_msg = "Processing failed with unknown error"
+            # 格式化错误信息供前端显示
+            if error_msg:
+                error_msg = _format_error_message_for_frontend(error_msg)
+            # 从 indexing_strategy 中提取图增强标识
+            enable_graph_enhancement = None
+            if isinstance(process_info, dict):
+                indexing_strategy = process_info.get("indexing_strategy")
+                if isinstance(indexing_strategy, dict):
+                    enable_graph_enhancement = indexing_strategy.get("enable_graph_enhancement", False)
+            items.append(
+                DocumentStatusResponse(
+                    id=weblink_id,
+                    status=status_value,
+                    name=display_name,
+                    error_msg=error_msg,
+                    enable_graph_enhancement=enable_graph_enhancement,
+                )
+            )
+        else:
+            items.append(
+                DocumentStatusResponse(
+                    id=weblink_id,
+                    status=DocumentStatus.FAILED.value,
+                    error_msg=_format_error_message_for_frontend("Not found"),
+                )
+            )
+    logger.info(
+        f"[WEBLINK_STATUS] Weblink status batch retrieved - Space ID: {req.space_id}, "
+        f"KB ID: {req.kb_id}, Requested: {len(req.weblink_id_list)}, "
+        f"Found: {len(items)}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    )
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="get weblink status success",
+        data=DocumentStatusListResponse(items=items).model_dump(by_alias=False),
+    )
+
+
+@with_exception_handling
+def weblink_update(req: WeblinkUpdateRequest, current_user: dict) -> ResponseModel:
+    """更新链接名称"""
+    _ = check_user_space(req.space_id, current_user)
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    update_result = knowledge_base_repository.weblink_update(
+        KBWeblink(kb=kb_details, weblink_id=req.weblink_id),
+        name=req.weblink_name,
+    )
+    if update_result.code != status.HTTP_200_OK:
+        return ResponseModel(code=update_result.code, message=update_result.message)
+    return ResponseModel(code=status.HTTP_200_OK, message="update weblink success")
+
+
+@with_exception_handling
+async def weblink_delete(req: WeblinkDeleteRequest, current_user: dict) -> ResponseModel:
+    """批量删除链接"""
+    start_time = time.time()
+    user_id = current_user.get("user_id", "unknown")
+    logger.info(
+        f"[WEBLINK_DELETE] Deleting weblinks - User: {user_id}, "
+        f"Space ID: {req.space_id}, KB ID: {req.kb_id}, Weblink IDs: {req.weblink_ids}"
+    )
+
+    _ = check_user_space(req.space_id, current_user)
+    kb_get = KnowledgeBaseGet(
+        space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE
+    )
+    kb_result = knowledge_base_repository.knowledge_base_get(kb_get)
+    if kb_result.code != status.HTTP_200_OK or not kb_result.data:
+        return ResponseModel(code=status.HTTP_404_NOT_FOUND, message="Knowledge base not found")
+    kb_details = KBDetails(space_id=req.space_id, kb_id=req.kb_id, index_manager_type=_CURR_INDEX_TYPE)
+    success_count = 0
+    failed_count = 0
+    failed_weblink_ids = []
+    index_manager = _create_index_manager()
+    chunk_index = f"kb_{req.kb_id}_chunks"
+    triple_index = f"kb_{req.kb_id}_triples"
+    for weblink_id in req.weblink_ids:
+        get_result = knowledge_base_repository.weblink_get(
+            KBWeblink(kb=kb_details, weblink_id=weblink_id)
+        )
+        if get_result.code != status.HTTP_200_OK or not get_result.data:
+            failed_count += 1
+            failed_weblink_ids.append(weblink_id)
+            continue
+        w = get_result.data
+        process_info = w.get("process_info") or {}
+        indexing_strategy = (
+            process_info.get("indexing_strategy", {}) if isinstance(process_info, dict) else {}
+        )
+        use_graph = (
+            indexing_strategy.get("enable_graph_enhancement", False)
+            if isinstance(indexing_strategy, dict)
+            else False
+        )
+        try:
+            await _delete_document_from_index(
+                index_manager=index_manager,
+                index_name=chunk_index,
+                doc_id=weblink_id,
+                kb_id=req.kb_id,
+                index_type="chunks",
+            )
+            if use_graph:
+                await _delete_document_from_index(
+                    index_manager=index_manager,
+                    index_name=triple_index,
+                    doc_id=weblink_id,
+                    kb_id=req.kb_id,
+                    index_type="triples",
+                )
+        except Exception as e:
+            logger.warning(f"[WEBLINK_DELETE] Index delete failed - Weblink ID: {weblink_id}, Error: {e}")
+        knowledge_base_repository.weblink_delete_batch(
+            space_id=req.space_id,
+            kb_id=req.kb_id,
+            weblink_ids=[weblink_id],
+            index_manager_type=_CURR_INDEX_TYPE,
+        )
+        success_count += 1
+
+    logger.info(
+        f"[WEBLINK_DELETE] Weblink deletion completed - KB ID: {req.kb_id}, "
+        f"Success: {success_count}, Failed: {failed_count}, "
+        f"User: {user_id}, Duration: {time.time() - start_time:.3f}s"
+    )
+    if success_count > 0:
+        return ResponseModel(code=status.HTTP_200_OK, message="delete weblinks success")
+    return ResponseModel(
+        code=status.HTTP_400_BAD_REQUEST,
+        message=f"Failed to delete weblinks: {failed_weblink_ids}",
+        data=None,
     )

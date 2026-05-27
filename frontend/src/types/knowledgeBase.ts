@@ -13,6 +13,7 @@ export interface KnowledgeBase {
   embedding_model_config_id?: number // Embedding 模型配置ID
   desc?: string // 兼容字段
   embeddingModel?: string
+  ds_kb_id?: string | null // DeepSearch 知识库 ID；当 kb_id === ds_kb_id 时为 DeepSearch 知识库，否则为原始文档知识库
 }
 
 export interface KnowledgeBaseDocument {
@@ -108,5 +109,6 @@ export interface KnowledgeBaseItem {
   embedding_model_config_id?: number
   created_at: string
   updated_at: string
+  ds_kb_id?: string | null
 }
 

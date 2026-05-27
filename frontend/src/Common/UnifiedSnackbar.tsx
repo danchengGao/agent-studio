@@ -37,7 +37,13 @@ const UnifiedSnackbar: React.FC<UnifiedSnackbarProps> = ({ snackbar, onClose, an
   const safeMessage = typeof message === 'string' ? message : String(message || '操作失败')
 
   return (
-    <Snackbar open={open} autoHideDuration={duration} onClose={handleSnackbarClose} anchorOrigin={anchorOrigin}>
+    <Snackbar
+      open={open}
+      autoHideDuration={duration}
+      onClose={handleSnackbarClose}
+      anchorOrigin={anchorOrigin}
+      sx={{ zIndex: theme => Math.max(theme.zIndex.modal, theme.zIndex.snackbar) + 1 }}
+    >
       <Alert severity={severity} onClose={handleAlertClose} sx={{ width: '100%' }}>
         {safeMessage}
       </Alert>

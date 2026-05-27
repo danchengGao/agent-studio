@@ -179,9 +179,16 @@ const AgentModelSelector = (props: {
   // 记忆配置状态
   const [memoryVariables, setMemoryVariables] = useState<MemoryVariable[]>([])
   const [longTermMemoryEnabled, setLongTermMemoryEnabled] = useState<boolean>(false)
+  const [userProfileEnabled, setUserProfileEnabled] = useState<boolean>(false)
+  const [semanticMemoryEnabled, setSemanticMemoryEnabled] = useState<boolean>(false)
+  const [episodicMemoryEnabled, setEpisodicMemoryEnabled] = useState<boolean>(false)
+  const [summaryMemoryEnabled, setSummaryMemoryEnabled] = useState<boolean>(false)
   const [newVariableName, setNewVariableName] = useState<string>('')
   const [newVariableDescription, setNewVariableDescription] = useState<string>('')
   const [duplicateVariableWarning, setDuplicateVariableWarning] = useState<string>('')
+  // 记忆选项下拉框状态
+  const [memoryOptionsOpen, setMemoryOptionsOpen] = useState<boolean>(false)
+  const [memoryOptionsAnchorEl, setMemoryOptionsAnchorEl] = useState<HTMLElement | null>(null)
 
   // 限制配置状态
   const [maxIteration, setMaxIteration] = useState<number>(5)
@@ -304,7 +311,11 @@ const AgentModelSelector = (props: {
 
       // 获取记忆配置数据
       const initVariables = saveAgentRequest?.memory?.variable_config || []
-      const initLongTermMemory = saveAgentRequest?.memory?.longterm_memory_config || false
+      const initLongTermMemory = saveAgentRequest?.memory?.longterm_memory_config || true
+      const initUserProfile = saveAgentRequest?.memory?.user_profile_config || true
+      const initSemanticMemory = saveAgentRequest?.memory?.semantic_memory_config || true
+      const initEpisodicMemory = saveAgentRequest?.memory?.episodic_memory_config || true
+      const initSummaryMemory = saveAgentRequest?.memory?.summary_memory_config || true
 
       setMemoryVariables(
         initVariables.map((v: { id?: string; name?: string; description?: string; enabled?: boolean }, index: number) => ({
@@ -315,6 +326,10 @@ const AgentModelSelector = (props: {
         })),
       )
       setLongTermMemoryEnabled(initLongTermMemory)
+      setUserProfileEnabled(initUserProfile)
+      setSemanticMemoryEnabled(initSemanticMemory)
+      setEpisodicMemoryEnabled(initEpisodicMemory)
+      setSummaryMemoryEnabled(initSummaryMemory)
 
       // 初始化限制配置
       const initMaxIteration = saveAgentRequest?.constraint?.max_iteration ?? 5
@@ -470,11 +485,15 @@ const AgentModelSelector = (props: {
               setMemoryBaseObject(null);
               if (saveAgentRequest?.memory) {
                 updateMemoryConfig({
-                  max_tokens: 1000,
-                  variable_config: memoryVariables,
-                  longterm_memory_config: longTermMemoryEnabled,
-                  memory_base: undefined, // ✅ 清空
-                });
+                max_tokens: 1000,
+                variable_config: memoryVariables,
+                longterm_memory_config: longTermMemoryEnabled,
+                user_profile_config: userProfileEnabled,
+                semantic_memory_config: semanticMemoryEnabled,
+                episodic_memory_config: episodicMemoryEnabled,
+                summary_memory_config: summaryMemoryEnabled,
+                memory_base: undefined, // ✅ 清空
+              });
               }
             }
           } else {
@@ -489,7 +508,7 @@ const AgentModelSelector = (props: {
     } else {
       setMemoryBaseObject(null); // ✅ 初始为空
     }
-  }, [agentDetailResponse, saveAgentRequest?.memory?.memory_bases]);
+  }, [agentDetailResponse]);
 
   useEffect(() => {
     if (selectedModelName && modelsList.length > 0 && !selectedModel) {
@@ -836,6 +855,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
           max_tokens: 1000,
           variable_config: memoryVariables,
           longterm_memory_config: longTermMemoryEnabled,
+          user_profile_config: userProfileEnabled,
+          semantic_memory_config: semanticMemoryEnabled,
+          episodic_memory_config: episodicMemoryEnabled,
+          summary_memory_config: summaryMemoryEnabled,
           memory_base: undefined, // ✅ 清空
         });
       }
@@ -877,6 +900,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
         max_tokens: 1000,
         variable_config: memoryVariables,
         longterm_memory_config: longTermMemoryEnabled,
+        user_profile_config: userProfileEnabled,
+        semantic_memory_config: semanticMemoryEnabled,
+        episodic_memory_config: episodicMemoryEnabled,
+        summary_memory_config: summaryMemoryEnabled,
         memory_base: newMemoryBase, // ✅ 绑定单个对象
       });
     }
@@ -893,6 +920,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
           max_tokens: 1000,
           variable_config: memoryVariables,
           longterm_memory_config: longTermMemoryEnabled,
+          user_profile_config: userProfileEnabled,
+          semantic_memory_config: semanticMemoryEnabled,
+          episodic_memory_config: episodicMemoryEnabled,
+          summary_memory_config: summaryMemoryEnabled,
           memory_base: undefined, // ✅ 清空
         });
       }
@@ -963,6 +994,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
         max_tokens: 1000,
         variable_config: updatedVariables,
         longterm_memory_config: longTermMemoryEnabled,
+        user_profile_config: userProfileEnabled,
+        semantic_memory_config: semanticMemoryEnabled,
+        episodic_memory_config: episodicMemoryEnabled,
+        summary_memory_config: summaryMemoryEnabled,
         memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
       }
 
@@ -986,6 +1021,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
       max_tokens: 1000,
       variable_config: updatedVariables,
       longterm_memory_config: longTermMemoryEnabled,
+      user_profile_config: userProfileEnabled,
+      semantic_memory_config: semanticMemoryEnabled,
+      episodic_memory_config: episodicMemoryEnabled,
+      summary_memory_config: summaryMemoryEnabled,
       memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
     }
     try {
@@ -1013,6 +1052,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
       max_tokens: 1000,
       variable_config: updatedVariables,
       longterm_memory_config: longTermMemoryEnabled,
+      user_profile_config: userProfileEnabled,
+      semantic_memory_config: semanticMemoryEnabled,
+      episodic_memory_config: episodicMemoryEnabled,
+      summary_memory_config: summaryMemoryEnabled,
       memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
     }
 
@@ -1035,6 +1078,10 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
       max_tokens: 1000,
       variable_config: memoryVariables,
       longterm_memory_config: !longTermMemoryEnabled,
+      user_profile_config: userProfileEnabled,
+      semantic_memory_config: semanticMemoryEnabled,
+      episodic_memory_config: episodicMemoryEnabled,
+      summary_memory_config: summaryMemoryEnabled,
       memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
     }
 
@@ -1043,7 +1090,120 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } }; message?: string }
       console.error(error.response?.data?.detail || error.message)
+      // 失败时回滚状态
+      setLongTermMemoryEnabled(longTermMemoryEnabled)
     }
+  }
+
+  const handleUserProfileToggle = async () => {
+    const next = !userProfileEnabled
+    setUserProfileEnabled(next)
+
+    const req = {
+      max_tokens: 1000,
+      variable_config: memoryVariables,
+      longterm_memory_config: longTermMemoryEnabled,
+      user_profile_config: !userProfileEnabled,
+      semantic_memory_config: semanticMemoryEnabled,
+      episodic_memory_config: episodicMemoryEnabled,
+      summary_memory_config: summaryMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
+    }
+
+    try {
+      await updateMemoryConfig(req)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      console.error(error.response?.data?.detail || error.message)
+      // 失败时回滚状态
+      setUserProfileEnabled(userProfileEnabled)
+    }
+  }
+
+  const handleSemanticMemoryToggle = async () => {
+    const next = !semanticMemoryEnabled
+    setSemanticMemoryEnabled(next)
+
+    const req = {
+      max_tokens: 1000,
+      variable_config: memoryVariables,
+      longterm_memory_config: longTermMemoryEnabled,
+      user_profile_config: userProfileEnabled,
+      semantic_memory_config: !semanticMemoryEnabled,
+      episodic_memory_config: episodicMemoryEnabled,
+      summary_memory_config: summaryMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
+    }
+
+    try {
+      await updateMemoryConfig(req)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      console.error(error.response?.data?.detail || error.message)
+      // 失败时回滚状态
+      setSemanticMemoryEnabled(semanticMemoryEnabled)
+    }
+  }
+
+  const handleEpisodicMemoryToggle = async () => {
+    const next = !episodicMemoryEnabled
+    setEpisodicMemoryEnabled(next)
+
+    const req = {
+      max_tokens: 1000,
+      variable_config: memoryVariables,
+      longterm_memory_config: longTermMemoryEnabled,
+      user_profile_config: userProfileEnabled,
+      semantic_memory_config: semanticMemoryEnabled,
+      episodic_memory_config: !episodicMemoryEnabled,
+      summary_memory_config: summaryMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
+    }
+
+    try {
+      await updateMemoryConfig(req)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      console.error(error.response?.data?.detail || error.message)
+      // 失败时回滚状态
+      setEpisodicMemoryEnabled(episodicMemoryEnabled)
+    }
+  }
+
+  const handleSummaryMemoryToggle = async () => {
+    const next = !summaryMemoryEnabled
+    setSummaryMemoryEnabled(next)
+
+    const req = {
+      max_tokens: 1000,
+      variable_config: memoryVariables,
+      longterm_memory_config: longTermMemoryEnabled,
+      user_profile_config: userProfileEnabled,
+      semantic_memory_config: semanticMemoryEnabled,
+      episodic_memory_config: episodicMemoryEnabled,
+      summary_memory_config: !summaryMemoryEnabled,
+      memory_base: saveAgentRequest?.memory?.memory_base, // 保持记忆库绑定
+    }
+
+    try {
+      await updateMemoryConfig(req)
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      console.error(error.response?.data?.detail || error.message)
+      // 失败时回滚状态
+      setSummaryMemoryEnabled(summaryMemoryEnabled)
+    }
+  }
+
+  // 记忆选项下拉框处理函数
+  const handleMemoryOptionsClick = (event: React.MouseEvent<HTMLElement>) => {
+    setMemoryOptionsAnchorEl(event.currentTarget)
+    setMemoryOptionsOpen(true)
+  }
+
+  const handleMemoryOptionsClose = () => {
+    setMemoryOptionsOpen(false)
+    setMemoryOptionsAnchorEl(null)
   }
 
   // 检查是否有绑定记忆库
@@ -1461,6 +1621,85 @@ const handleMemoryBaseConfirm = async (selectedId: string | null) => { // ✅ �
               <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
                 {t('orchestrationPage.memory.longTermDescription')}
               </Typography>
+              
+              {/* 记忆类型下拉框 */}
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={handleMemoryOptionsClick}
+                  disabled={readonly || !hasMemoryBases}
+                  sx={{ textTransform: 'none', display: 'flex', alignItems: 'center', gap: 1 }}
+                >
+                  {t('orchestrationPage.memory.memoryOptions')}
+                  <ArrowForwardIosSharpIcon sx={{ fontSize: '0.9rem' }} />
+                </Button>
+                <Popover
+                  open={memoryOptionsOpen}
+                  anchorEl={memoryOptionsAnchorEl}
+                  onClose={handleMemoryOptionsClose}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                >
+                  <Box sx={{ p: 2, minWidth: 300 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch 
+                          checked={userProfileEnabled} 
+                          onChange={handleUserProfileToggle} 
+                          disabled={readonly || !hasMemoryBases || !longTermMemoryEnabled} 
+                        />
+                      }
+                      label={t('orchestrationPage.memory.userProfileToggleLabel')}
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 2, mb: 1 }}>
+                      {t('orchestrationPage.memory.userProfileDescription')}
+                    </Typography>
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch 
+                          checked={semanticMemoryEnabled} 
+                          onChange={handleSemanticMemoryToggle} 
+                          disabled={readonly || !hasMemoryBases || !longTermMemoryEnabled} 
+                        />
+                      }
+                      label={t('orchestrationPage.memory.semanticMemoryToggleLabel')}
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 2, mb: 1 }}>
+                      {t('orchestrationPage.memory.semanticMemoryDescription')}
+                    </Typography>
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch 
+                          checked={episodicMemoryEnabled} 
+                          onChange={handleEpisodicMemoryToggle} 
+                          disabled={readonly || !hasMemoryBases || !longTermMemoryEnabled} 
+                        />
+                      }
+                      label={t('orchestrationPage.memory.episodicMemoryToggleLabel')}
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 2, mb: 1 }}>
+                      {t('orchestrationPage.memory.episodicMemoryDescription')}
+                    </Typography>
+                    
+                    <FormControlLabel
+                      control={
+                        <Switch 
+                          checked={summaryMemoryEnabled} 
+                          onChange={handleSummaryMemoryToggle} 
+                          disabled={readonly || !hasMemoryBases || !longTermMemoryEnabled} 
+                        />
+                      }
+                      label={t('orchestrationPage.memory.summaryMemoryToggleLabel')}
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 2, mb: 1 }}>
+                      {t('orchestrationPage.memory.summaryMemoryDescription')}
+                    </Typography>
+                  </Box>
+                </Popover>
+              </Box>
+              
               {!hasMemoryBases && (
                 <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
                   {t('orchestrationPage.memory.memoryBase.longTerm')}

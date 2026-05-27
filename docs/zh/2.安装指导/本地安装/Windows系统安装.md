@@ -21,7 +21,7 @@
 
 #### 1. 获取安装脚本
 
-* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows_v2.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
+* 下载 <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows.zip" target="_blank" rel="nofollow noopener noreferrer"> 安装包脚本</a>，安装包脚本包含以下文件：
   * `setup.ps1`：主安装脚本，串联整个安装流程
   * `utils.ps1`：公共工具
   * `check_git.ps1`：检查 Git 是否安装，未安装则安装 Git
@@ -29,42 +29,49 @@
   * `check_python.ps1`：检查 Python 是否安装，未安装则安装 Python
   * `check_mysql.ps1`：检查 MySQL 是否安装，未安装则安装 MySQL
   * `config_mysql.ps1`：配置 MySQL（创建数据库、用户等）
-  * `fetch_codes.ps1`：克隆 agent-studio 代码仓库（支持指定分支）
-  * `user_config.ps1`：用户配置文件（可选，包含代理、pip 源、npm 源配置）
+  * `manage_service.ps1`：服务管理，管理 Runtime、后端与前端的启动、停止、重启与状态
+  * `user_config.ps1`：用户配置文件（可选，包含代理、uv 源、npm 源、数据库连接地址等）
 
-#### 2. 配置代理、pip源和npm源（可选）
+#### 2. 配置代理、uv 源、npm 源与数据库地址（可选）
 
-如果您的网络环境需要通过代理访问外网，或者需要使用自定义的pip源或npm源，可以在 `user_config.ps1` 文件中进行配置：
+如果您的网络环境需要通过代理访问外网，或者需要使用自定义的 uv 源、npm 源，或需要指定数据库服务的主机与端口（例如远程 MySQL、Docker 映射端口），可以在 `user_config.ps1` 文件中进行配置：
 
 * 打开 `user_config.ps1` 文件，修改以下变量：
 
   ```powershell
-  # 用户填写的代理配置
+  # 代理配置
   $HTTP_PROXY=""  # HTTP 代理地址，例如 http://127.0.0.1:7890
   $HTTPS_PROXY=""  # HTTPS 代理地址，例如 http://127.0.0.1:7890
   $SSL_VERIFY=""  # 可选：true/false（对应 git http.sslVerify）
 
-  # pip 源配置（可选）
-  $PIP_INDEX_URL=""      # pip 源地址，例如 https://pypi.tuna.tsinghua.edu.cn/simple
-  $PIP_TRUSTED_HOST=""   # 信任的主机地址，例如 pypi.tuna.tsinghua.edu.cn
+  # 代理应用开关（可选，默认 true）
+  $ENABLE_SESSION_ENV_PROXY="true"  # 是否设置当前 PowerShell 会话环境变量 HTTP_PROXY/HTTPS_PROXY
+  $ENABLE_GIT_PROXY_CONFIG="true"   # 是否写入 git proxy/ssl 配置
+  $ENABLE_NPM_PROXY_CONFIG="true"   # 是否写入 npm proxy/strict-ssl 配置
+
+  # uv 源配置（可选）
+  $UV_INDEX=""          # uv 默认包索引，例如 https://pypi.tuna.tsinghua.edu.cn/simple
+  $UV_TRUSTED_HOST=""   # uv 信任主机，例如 pypi.tuna.tsinghua.edu.cn
 
   # npm 源配置（可选）
   $NPM_REGISTRY=""       # npm 源地址，例如 https://registry.npmmirror.com
+
+  # 数据库连接配置（可选）
+  $DB_HOST=""            # 留空默认 127.0.0.1
+  $DB_PORT=""            # 留空默认 3306
   ```
 
 * 代理配置说明：
   * **不需要代理**：保持变量为空即可（脚本会自动跳过代理配置）
   * **需要代理**：填写完整代理地址，例如 `http://127.0.0.1:7890`
   * **带认证的代理**：支持用户名密码，例如 `http://user:pass@proxy.example.com:8080`
-  * **SSL 验证**：`$SSL_VERIFY` 设置为 `true` 或 `false`，`true`表示开启Git的SSL证书验证，`false`为不开启。
+  * **SSL 验证**：`$SSL_VERIFY` 设置为 `true` 或 `false`，`true` 表示开启 Git SSL 证书验证，`false` 表示关闭。
+  * **代理应用开关**：`$ENABLE_SESSION_ENV_PROXY`、`$ENABLE_GIT_PROXY_CONFIG`、`$ENABLE_NPM_PROXY_CONFIG` 默认为 `true`，可按需关闭某一类代理配置写入。
 
-* pip 源配置说明：
-  * **不需要配置 pip 源**：保持 `$PIP_INDEX_URL` 和 `$PIP_TRUSTED_HOST` 为空即可（脚本会自动跳过 pip 源配置，使用默认源）
-  * **需要配置 pip 源**：必须同时设置 `$PIP_INDEX_URL` 和 `$PIP_TRUSTED_HOST` 两个参数
-  * **常用国内镜像源示例**：
-    * 清华大学：`https://pypi.tuna.tsinghua.edu.cn/simple`，信任主机：`pypi.tuna.tsinghua.edu.cn`
-    * 阿里云：`https://mirrors.aliyun.com/pypi/simple/`，信任主机：`mirrors.aliyun.com`
-    * 中科大：`https://pypi.mirrors.ustc.edu.cn/simple/`，信任主机：`pypi.mirrors.ustc.edu.cn`
+* uv 源配置说明：
+  * **不需要配置 uv 源**：保持 `$UV_INDEX`、`$UV_TRUSTED_HOST` 为空即可（脚本会使用 uv 默认源）
+  * **需要配置 uv 源**：建议同时设置 `$UV_INDEX` 和 `$UV_TRUSTED_HOST`
+  * **示例**：`$UV_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"`，`$UV_TRUSTED_HOST="pypi.tuna.tsinghua.edu.cn"`
 
 * npm 源配置说明：
   * **不需要配置 npm 源**：保持 `$NPM_REGISTRY` 为空即可（脚本会自动跳过 npm 源配置，使用默认源）
@@ -73,6 +80,8 @@
     * 淘宝镜像：`https://registry.npmmirror.com`
     * 腾讯云：`https://mirrors.cloud.tencent.com/npm/`
     * 华为云：`https://repo.huaweicloud.com/repository/npm/`
+* 数据库连接配置说明（`DB_HOST` / `DB_PORT`）：
+  * **作用**：使用的数据库在远程或非默认主机和端口时配置。
 
 #### 3. 运行安装脚本
 * 以管理员身份运行 PowerShell，设置执行策略：
@@ -117,17 +126,33 @@
 
 ### 方法二：手动安装全部依赖
 
-进行正式安装前需先完成依赖的安装，再执行源码获取和安装等后续步骤。
 
 #### 1. 安装依赖
 
-进行正式安装前需先完成依赖的安装，再执行源码获取和安装等后续步骤。
-
-##### 1.1. 安装 Git
+##### 1.1. 安装与配置 Git
 
 * 下载 <a href="https://mirrors.huaweicloud.com/git-for-windows/v2.51.0.windows.1/Git-2.51.0-64-bit.exe" target="_blank" rel="nofollow noopener noreferrer"> Git</a> 安装包，若下载耗时较长，请切换网络后重试。
 
 * 安装完成后，打开 “PowerShell”，输入：`git --version`，若安装成功会输出 git 版本号。
+
+* 请确认已获取 <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer"> openJiuwen 代码仓</a> 的访问权限，若无权限请及时申请。
+
+* 在 gitcode 代码仓按照图示步骤 2 获取 Git 的全局配置，输入以下命令配置 Git：
+
+  ```bash
+  git config --global user.name your_username
+  git config --global user.email your_useremail
+  ```
+
+  ![image](../images/gitcode-token.png)
+
+* 按照图示步骤 3 获取个人访问令牌，克隆代码时需要输入 gitcode 账号以及个人访问令牌。
+
+* 安装过程需要多次 git 操作，建议配置凭证存储，避免认证错误：
+
+  ```bash
+  git config --global credential.helper store
+  ```
 
 ##### 1.2. 安装 Node.js 和 npm
 
@@ -145,7 +170,7 @@
 
 * 安装完成后，输入：`uv --version`，若安装成功会输出 uv 版本号。
 
-##### 1.4. 安装 MySQL（可选组件）
+##### 1.4. 安装数据库
 
 * **SQLite vs MySQL**：
   * SQLite 无需额外安装和配置，适合开发和测试环境，但功能受限（如不支持高并发写入、无用户权限管理等）。
@@ -188,11 +213,13 @@
   # 新建数据库
   CREATE DATABASE openjiuwen_agent;
   CREATE DATABASE openjiuwen_ops;
+  CREATE DATABASE jiuwen_runtime;
   # 新建 MySQL 用户
   CREATE USER 'your_user_name'@'localhost' IDENTIFIED BY 'your_password';
   # 用户授权并刷新
   GRANT ALL PRIVILEGES ON openjiuwen_agent.* TO 'your_user_name'@'localhost';
   GRANT ALL PRIVILEGES ON openjiuwen_ops.* TO 'your_user_name'@'localhost';
+  GRANT ALL PRIVILEGES ON jiuwen_runtime.* TO 'your_user_name'@'localhost';
   FLUSH PRIVILEGES;
   ```
 
@@ -202,34 +229,96 @@
 * **Chroma vs Milvus**：
   * Chroma 无需额外安装，配置简单，只需要获取向量模型，适合快速体验，适合开发和测试环境。 向量模型的获取可参考 [如何获取向量模型](#windows-embed-model)。
   * Milvus 功能更完善，能够满足复杂场景的需求，因此在实际工程和生产环境中更推荐使用。
-#### 2. openJiuwen 安装
 
-##### 2.1. 获取源码
+#### 2. 部署Runtime服务
 
-* 请确认已获取 <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer"> openJiuwen 代码仓</a> 的访问权限，若无权限请及时申请。
+Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
 
-* 在 gitcode 代码仓按照图示步骤 2 获取 Git 的全局配置，输入以下命令配置 Git：
+##### 2.1. 获取 Runtime 源码
 
-  ```bash
-  git config --global user.name your_username
-  git config --global user.email your_useremail
+* 打开**PowerShell**，执行以下命令克隆源码并进入源码根目录：
+
+  ```powershell
+  git clone -b main https://gitcode.com/openJiuwen/agent-runtime.git
+  cd agent-runtime
   ```
 
-  ![image](../images/gitcode-token.png)
+##### 2.2. 配置 `server` 目录下的环境
 
-* 按照图示步骤 3 获取个人访问令牌，克隆代码时需要输入 gitcode 账号以及个人访问令牌。
+* 在 **`agent-runtime\server`** 目录打开 “PowerShell”。
+
+* 复制 *.env* 文件：
+
+  ```bash
+  copy .env.example .env
+  ```
+
+* 使用文本编辑器打开 *.env* 文件，请根据实际情况修改文件中以下变量的值（勿覆盖其他变量）：
+
+  > **说明**：`DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME` 可替换为实际数据库信息，与上文 MySQL 步骤中新建的用户、密码等保持一致。若密码中包含特殊字符，可参考 [特殊字符转义表](#windows-special-char) 将特殊字符替换为 URL 编码。
+
+  配置样例：
+  ```env
+   # 数据库类型（支持 mysql、sqlite）
+   DB_TYPE=mysql
+
+   # 配置数据库（样例）
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=root
+   DB_NAME=jiuwen_runtime
+
+   # 运行网络与路径（样例）
+   IP=127.0.0.1
+   LOWCODE_IMAGE=swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8
+   DEPLOY_DIR=/app/deploys
+   DIST_DIR=/app/dist
+   HOST=0.0.0.0
+   PORT=8186
+   ```
+
+  变量说明可参考如下表格。
+
+   | 变量名              | 变量说明                                                                 | 配置样例                                      |
+   |---------------------|--------------------------------------------------------------------------|-----------------------------------------------|
+   | **DB_TYPE**         | 数据库类型（支持 `mysql`、`sqlite`）                                     | `mysql`                                       |
+   | **DB_HOST**         | 数据库主机地址                                                           | `localhost`                                   |
+   | **DB_PORT**         | MySQL 服务监听端口                                                       | `3306`                                        |
+   | **DB_USER**         | 数据库登录用户名                                                         | `root`                                        |
+   | **DB_PASSWORD**     | 数据库登录密码                                                           | `root`                                        |
+   | **DB_NAME**         | 要连接的数据库名称                                                       | `jiuwen_runtime`                              |
+   | **IP**              | 低码 agent 与 runtime-server 运行主机 IP                                 | `127.0.0.1`                                   |
+   | **LOWCODE_IMAGE**   | 低码 agent 的容器镜像地址                                                | `swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8` |
+   | **DEPLOY_DIR**      | 部署目录（存放部署过程产物）                                             | `/app/deploys`                                |
+   | **DIST_DIR**        | 依赖包目录（存放运行低码 agent 所需 `.whl`）                             | `/app/dist`                                   |
+   | **HOST**            | 服务监听主机（`0.0.0.0` 表示允许所有网络地址访问）                       | `0.0.0.0`                                     |
+   | **PORT**            | 服务启动端口号                                                           | `8186`                                        |
+
+##### 2.3. 运行 `deploy.bat` 安装依赖并启动服务
+
+* **前置条件**：已安装 **Python 3.11**、**Git**，且可在终端执行 **`uv`**。`deploy.bat` 通常依赖 **`uv`** 创建虚拟环境并同步依赖。
+
+* 在 **`server`** 目录打开 **cmd** 或 **PowerShell**，执行仓库提供的部署脚本（路径按你的克隆位置替换）：
+
+  ```powershell
+  cd \path\to\agent-runtime\server
+  .\deploy.bat
+  ```
+
+
+#### 3. openJiuwen 安装
+
+##### 3.1. 获取源码
 
 * 新建 openJiuwen 目录，在 openJiuwen 目录打开 “PowerShell”，执行以下命令克隆源码并进入源码根目录：
 
   ```bash
-  # 安装过程需要多次 git 操作，建议配置凭证存储，避免认证错误。
-  git config --global credential.helper store
-
   git clone https://gitcode.com/openJiuwen/agent-studio.git
   cd agent-studio
   ```
 
-##### 2.2. 生成 AES 密钥（可选）
+##### 3.2. 生成 AES 密钥（可选）
 
 * 如果不需要对关键字段加密存储，可跳过当前步骤
 * 在源码根目录打开 “Git Bash”，运行以下命令生成密钥：
@@ -260,7 +349,7 @@
 
 * 注意，AES密钥需要保持稳定，中途更换密钥会导致已加密数据无法解密。
 
-##### 2.3. 启动 openJiuwen
+##### 3.3. 启动 openJiuwen
 
 * 在源码根目录打开 “PowerShell”；
 
@@ -300,6 +389,10 @@
    # 配置插件服务（样例，启动插件服务详情请见[问题三：如何启用插件服务]）
    VITE_PLUGIN_SERVICE_URL=http://localhost:8185
    VITE_PLUGIN_CONFIG_PATH=/config.json
+
+   # Runtime 服务配置（样例）
+   RUNTIME_HOST=localhost
+   RUNTIME_PORT=8100
    ```
 
   变量说明可参考如下表格，如需选择 Milvus 启用记忆功能，请参考 [如何启用记忆及知识库功能](#windows-memory)，如果选择 Chroma 启用记忆功能，只需要获取向量模型，可参考 [如何获取向量模型](#windows-embed-model)。
@@ -318,6 +411,8 @@
    | **CODE_SANDBOX_URL**                 | 代码沙箱服务地址                          | `http://localhost:8188/run`                                                                    |
    | **VITE_PLUGIN_SERVICE_URL**                 | 插件服务地址                            | `http://localhost:8185`                                                                    |
    | **VITE_PLUGIN_CONFIG_PATH**                 | 前端使用的插件服务配置文件                     | `/config.json`                                                                    |
+   | **RUNTIME_HOST**                 | Runtime 服务访问主机（通常为本机 `localhost`）                     | `localhost`                                                                    |
+   | **RUNTIME_PORT**                 | Runtime 服务端口（需与 Runtime server 实际监听端口一致）                     | `8100`                                                                    |
 
 * 在源码根目录下打开 “PowerShell”，运行以下命令启动后端服务，并耐心等待：
    
@@ -376,7 +471,7 @@
 
 * 启动成功后会输出 Local access：*访问地址*。
 
-##### 2.4. 访问系统
+##### 3.4. 访问系统
 
 复制上述 *访问地址* 到浏览器地址栏，按下 “回车键” 将看到 openJiuwen 的界面。
 
@@ -503,38 +598,54 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
 <a id="windows-sandbox"></a>
 ### 问题二：如何启用沙箱功能
 
-若要配置代码插件或在工作流中使用代码节点，需开启沙箱服务，需要进行如下操作：
+若要使用代码插件或在工作流中运行代码节点，需要先启用沙箱服务，按以下步骤操作：
 
-1. 参考 `sandbox_server/python_server/.env.example` 文件，在 `sandbox_server/python_server` 目录下创建 `.env` 文件，示例如下：
+1. **配置沙箱依赖环境**
+
+   沙箱服务通过统一配置指定执行代码时使用的 Python、JavaScript 解释器及依赖包。若不配置，将使用系统默认的 Python 与 JavaScript 环境。
+
+   依赖配置文件路径：
+
+   - Python：`sandbox_server\sandbox\openjiuwen_sandbox_server\conf\dependency\pyproject.toml`
+   - JavaScript：`sandbox_server\sandbox\openjiuwen_sandbox_server\conf\dependency\package.json`
+
+   在以上文件中配置好解释器版本与依赖列表后，在 `sandbox_server\sandbox` 目录执行以下命令构建并安装依赖环境：
+
+   ```bash
+   python -m openjiuwen_sandbox_server.app.build_dependency
+   ```
+
+   默认安装目录为 `%LOCALAPPDATA%\sandbox\dependencies`。若需指定其它目录，请在执行上述命令前设置环境变量 `DEPENDENCY_DIR`。
+
+2. **启动沙箱服务**
+
+   目前在 MacOS 平台上仅支持 local 执行模式，即代码在宿主机上直接执行。参考 `sandbox_server\sandbox\.env.example`，在 `sandbox_server\sandbox` 目录下创建 `.env` 文件，示例：
 
    ```env
    HOST=0.0.0.0
    PORT=5001
+   ENABLE_LINUX_SANDBOX=false
    ```
 
-   然后启动沙箱 Python 服务，即运行 `sandbox_server/python_server/openjiuwen_sandbox_pyserver/kernel.py` 脚本，其中 `HOST` 和 `PORT` 是沙箱 Python 服务运行的 IP 和端口。
+   配置完成后，执行 `sandbox_server\sandbox\openjiuwen_sandbox_server\server.py` 启动沙箱服务。
 
-2. 启动沙箱 JS 服务，运行 `sandbox_server/js_server/kernel.js` 脚本，JS 服务的 IP 和端口参考如下代码：
+3. **启动沙箱网关服务**
 
-   ```javascript
-   const PORT = process.env.PORT || 5002;
-   server.listen(PORT, "0.0.0.0", () => {
-     console.log(`✅ JS sandbox listening on http://0.0.0.0:${PORT}`);
-   });
-   ```
-
-3. 参考 `sandbox_server/gateway/.env.example` 文件，在 `sandbox_server/gateway` 目录下创建 `.env` 文件，示例如下：
+   参考 `sandbox_server\gateway\.env.example`，在 `sandbox_server\gateway` 目录下创建 `.env` 文件，示例：
 
    ```env
    HOST=0.0.0.0
    PORT=8188
-   PYTHON_SANDBOX_URL=http://localhost:5001/run
-   JS_SANDBOX_URL=http://localhost:5002/run
+   SANDBOX_SERVER_URL=http://localhost:5001/run
    ```
 
-   其中 `PYTHON_SANDBOX_URL` 和 `JS_SANDBOX_URL` 为前面两步启动的 Python 和 JS 服务 URL，然后启动沙箱网关服务，即运行 `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` 脚本。
+   `HOST` 与 `PORT` 为网关服务监听地址与端口；`SANDBOX_SERVER_URL` 为第 2 步中已启动的沙箱服务运行地址。
 
-4. 启动沙箱服务后请在`.env`文件中配置沙箱服务的路径，例如：`CODE_SANDBOX_URL=http://localhost:8188/run`
+   然后执行 `sandbox_server\gateway\openjiuwen_sandbox_gateway\server.py` 启动沙箱网关服务。
+
+4. **配置应用侧网关地址**
+
+   在项目的 `.env` 中配置沙箱网关调用地址，例如：`CODE_SANDBOX_URL=http://localhost:8188/run`。
 
 <a id="windows-plugin"></a>
 ### 问题三：如何启用插件服务

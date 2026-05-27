@@ -2,7 +2,7 @@
  * 报告相关工具函数
  */
 
-import type { InferMessage, DeepSearchResult, Report } from '@/pages/Apps/types';
+import type { DeepSearchResult, Report } from '@/pages/Apps/types';
 import { MESSAGE_TITLES } from '@/stores/useConversationStore';
 
 // ==================== 内容清理 ====================
@@ -83,10 +83,9 @@ export function buildReportFromDeepSearch(
   messageCreatedAt: number,
   deepSearchResult: DeepSearchResult
 ): Report {
-  // 清理内容中的引用标记
-  const responseContent = cleanReportContent(deepSearchResult.response_content || '');
+  const rawResponseContent = deepSearchResult.response_content || '';
+  const responseContent = cleanReportContent(rawResponseContent);
 
-  // 提取标题，如果没有则使用语言无关的常量标识
   const extractedTitle = extractTitleFromMarkdown(responseContent);
   const title = extractedTitle || MESSAGE_TITLES.FINAL_REPORT;
 
@@ -94,8 +93,9 @@ export function buildReportFromDeepSearch(
     id: messageId,
     title,
     createdAt: new Date(messageCreatedAt || Date.now()).toISOString(),
-    response_content: responseContent,
-    citation_messages: deepSearchResult.citation_messages || null,
-    infer_messages: deepSearchResult.infer_messages || [],
+    content: responseContent,
+    citations: deepSearchResult.citation_messages || null,
+    inferMessages: deepSearchResult.infer_messages || [],
+    rawContent: rawResponseContent,
   };
 }

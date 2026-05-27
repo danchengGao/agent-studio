@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import 'katex/dist/katex.min.css'
 import type { Components } from 'react-markdown'
 import type { MarkdownProps } from './types'
@@ -17,6 +18,7 @@ import { CitationLink } from '../CitationPanel/CitationLink'
 import { InferenceLink } from '../InferenceGraph'
 import { SmartImage } from './SmartImage'
 import { MermaidChart } from './MermaidChart/index'
+import { normalizeProblematicStrongPercentForRender } from '@/utils/markdownCleaner'
 
 /**
  * Markdown 核心渲染器
@@ -26,7 +28,12 @@ export const MarkdownRenderer: React.FC<{
   content: string
   citations?: MarkdownProps['citations']
   inferMessages?: MarkdownProps['inferMessages']
-}> = ({ content, citations, instanceId, inferMessages }) => {
+}> = ({ content, citations, instanceId }) => {
+  const normalizedContent = useMemo(
+    () => normalizeProblematicStrongPercentForRender(content),
+    [content]
+  )
+
   // 构建默认组件映射
   const defaultComponents = useMemo(() => {
     const markdownComponents: Components = {
@@ -43,8 +50,8 @@ export const MarkdownRenderer: React.FC<{
           return (
             <InferenceLink
               key={`${instanceId || 'no-id'}-inference-${childrenText}`}
-              href={href}
-              instanceId={instanceId}
+              href={href ?? ''}
+              instanceId={instanceId ?? 'no-id'}
             >
               {children}
             </InferenceLink>
@@ -56,7 +63,7 @@ export const MarkdownRenderer: React.FC<{
           return (
             <CitationLink
               key={`${instanceId || 'no-id'}-citation-${childrenText}`}
-              href={href}
+              href={href ?? ''}
               citations={citations}
               markdownInstanceId={instanceId}
             >
@@ -105,13 +112,28 @@ export const MarkdownRenderer: React.FC<{
     return markdownComponents
   }, [citations, instanceId])
 
+  const sanitizeSchema = useMemo(
+    () => ({
+      ...defaultSchema,
+      attributes: {
+        ...defaultSchema.attributes,
+        span: [...(defaultSchema.attributes?.span || []), 'className', 'style'],
+        div: [...(defaultSchema.attributes?.div || []), 'className', 'style'],
+      },
+      tagNames: (defaultSchema.tagNames || []).filter(
+        tag => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'textarea'].includes(tag)
+      ),
+    }),
+    []
+  )
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
-      rehypePlugins={[rehypeRaw, rehypeKatex]}
+      rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
       components={defaultComponents}
     >
-      {content}
+      {normalizedContent}
     </ReactMarkdown>
   )
 }

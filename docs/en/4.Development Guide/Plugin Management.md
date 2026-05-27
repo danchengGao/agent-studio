@@ -1,9 +1,9 @@
 # Plugin Management
 
-In the openJiuwen platform, plugins are a key method for extending the capabilities of workflows and agents. The platform supports three types of plugins: local custom plugin servers, external API calls, and code plugins. Each plugin can include multiple tools, and these tools must belong to the same domain. Each tool corresponds to an independent API.
+In the openJiuwen platform, plugins are a key method for extending the capabilities of workflows and agents. The platform supports four types of plugins: RESTful API cloud plugins, local custom plugin servers, and code plugins. Each plugin can include multiple tools, and these tools must belong to the same domain. Each tool corresponds to an independent API.
 
 # Add Plugin and Tool
-In openJiuwen, you can add plugins in the following two ways:
+In openJiuwen, you can add plugins in the following three ways:
 
 `Cloud Plugin-Create plugin based on existing service`: Create from an existing service
 Connect to an existing service, which can be either a custom plugin service you are running locally via [Running the Plugin Service in the Background](#run-plugin-service-in-background), or an external API that follows the RESTful format.

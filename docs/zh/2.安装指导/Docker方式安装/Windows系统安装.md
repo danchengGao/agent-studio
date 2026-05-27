@@ -86,6 +86,12 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
 
 * 如需修改前端页面服务的端口号，请参考[这里](../../../../scripts/README.md#如何修改前端页面服务的端口号)。
 
+* 在部署工具所在目录中，找到并编辑 .env.custom 配置文件，根据实际运行环境添加以下配置项：
+
+```
+IP=<运行部署工具的本机 IP 地址>
+```
+
 * 输入以下命令启动 openJiuwen：
 
   ```bash

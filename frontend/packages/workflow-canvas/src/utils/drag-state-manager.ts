@@ -4,6 +4,8 @@
  */
 
 export class DragStateManager {
+  private modalWhitelistSelector =
+    '.workflow-selector-modal, .plugin-selector-modal, .ant-modal-wrap, .ant-modal, .MuiPopover-root, .MuiMenu-paper, .MuiPickersPopper-root'
   private static instance: DragStateManager
   private isDragActive: boolean = false
   private modalOpen: boolean = false
@@ -83,9 +85,8 @@ export class DragStateManager {
    * 处理模态框交互期间的文档鼠标释放事件
    */
   private handleDocumentMouseUp(e: MouseEvent): void {
-    // Only prevent the event if it's not targeting the modal itself
     const target = e.target as Element
-    if (!target.closest('.workflow-selector-modal, .ant-modal-wrap, .ant-modal')) {
+    if (!target.closest(this.modalWhitelistSelector)) {
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()
@@ -97,9 +98,8 @@ export class DragStateManager {
    * 处理模态框交互期间的文档鼠标按下事件
    */
   private handleDocumentMouseDown(e: MouseEvent): void {
-    // Only prevent the event if it's not targeting the modal itself
     const target = e.target as Element
-    if (!target.closest('.workflow-selector-modal, .ant-modal-wrap, .ant-modal')) {
+    if (!target.closest(this.modalWhitelistSelector)) {
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()

@@ -56,3 +56,14 @@ export const TRANSITION_DURATION = 'duration-200'
 
 // 焦点环样式
 export const FOCUS_RING = 'focus:outline-none focus:ring-2 focus:ring-blue-400'
+
+/**
+ * 渐变样式常量 (Gradients)
+ * 统一的品牌色渐变，从蓝色到紫色
+ */
+
+// 主按钮渐变 - 用于编辑按钮、主要操作按钮
+export const GRADIENT_BUTTON = 'linear-gradient(100.11deg, #1A56F8, #9628FF 100%)'
+
+// 水平渐变 - 用于卡片、节点等
+export const GRADIENT_HORIZONTAL = 'linear-gradient(90deg, #1A56F8 0%, #9628FF 100%)'

@@ -5,6 +5,7 @@ from .db_fun_base import Base
 from .embedding_model_config import EmbeddingModelConfig
 from .knowledge_base import KnowledgeBaseDB
 from .knowledge_base_document import KnowledgeBaseDocumentDB
+from .knowledge_base_weblink import KnowledgeBaseWeblinkDB
 from .model_config import ModelConfig, ModelUsageLog
 from .plugin import PluginBaseDB, PluginPublishDB, ToolBaseDB
 from .prompt_relation import PromptRelationDB
@@ -17,11 +18,37 @@ from .user import SpaceDB, SpaceUserDB, UserDB
 from .workflow import WorkflowBaseDB, WorkflowPublishDB
 from .workflow_execution import WorkflowExecutionDB, WorkflowExecutionDetailsDB
 from .memory_base import MemoryBaseDB
+from .runtime_info import RuntimeInfoDB
 
-__all__ = ["ModelConfig", "ModelUsageLog", "EmbeddingModelConfig", "Base", "WorkflowBaseDB", "WorkflowPublishDB",
-           "AgentBaseDB", "AgentPublishDB", "PromptRelationDB", "TagDB", "UserDB", "SpaceDB", "SpaceUserDB",
-           "PluginBaseDB", "PluginPublishDB", "ToolBaseDB", "WorkflowExecutionDB", "WorkflowExecutionDetailsDB",
-           "AgentExecutionDB", "AgentExecutionDetailsDB", "AgentWorkflowRelationDB", "ReferenceDB",
-           "TraceDetailDB", "KnowledgeBaseDB", "KnowledgeBaseDocumentDB", "SystemEmbeddingModelDB", "SystemLLMModelDB",
-           "MemoryBaseDB"
-           ]
+__all__ = [
+    "ModelConfig",
+    "ModelUsageLog",
+    "EmbeddingModelConfig",
+    "Base",
+    "WorkflowBaseDB",
+    "WorkflowPublishDB",
+    "AgentBaseDB",
+    "AgentPublishDB",
+    "PromptRelationDB",
+    "TagDB",
+    "UserDB",
+    "SpaceDB",
+    "SpaceUserDB",
+    "PluginBaseDB",
+    "PluginPublishDB",
+    "ToolBaseDB",
+    "WorkflowExecutionDB",
+    "WorkflowExecutionDetailsDB",
+    "AgentExecutionDB",
+    "AgentExecutionDetailsDB",
+    "AgentWorkflowRelationDB",
+    "ReferenceDB",
+    "TraceDetailDB",
+    "KnowledgeBaseDB",
+    "KnowledgeBaseDocumentDB",
+    "KnowledgeBaseWeblinkDB",
+    "SystemEmbeddingModelDB",
+    "SystemLLMModelDB",
+    "MemoryBaseDB",
+    "RuntimeInfoDB"
+]

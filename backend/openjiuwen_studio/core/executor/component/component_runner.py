@@ -32,10 +32,10 @@ from openjiuwen.core.common.logging import logger
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponseType, ExecuteResponse
 
-CAN_SINGLE_COMP_RUN = [ComponentType.COMPONENT_TYPE_LLM, ComponentType.COMPONENT_TYPE_LOOP,
-                       ComponentType.COMPONENT_TYPE_PLUGIN, ComponentType.COMPONENT_TYPE_TEXT_EDITOR,
-                       ComponentType.COMPONENT_TYPE_CODE, ComponentType.COMPONENT_TYPE_INTENT,
-                       ComponentType.COMPONENT_TYPE_QUESTION, ComponentType.COMPONENT_TYPE_SUB_WORKFLOW]
+CAN_SINGLE_COMP_RUN = [ComponentType.COMPONENT_TYPE_LLM, ComponentType.COMPONENT_TYPE_PLUGIN,
+                       ComponentType.COMPONENT_TYPE_TEXT_EDITOR, ComponentType.COMPONENT_TYPE_CODE,
+                       ComponentType.COMPONENT_TYPE_HTTP_REQUEST, ComponentType.COMPONENT_TYPE_REACT_AGENT,
+                       ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL]
 
 
 class ComponentExecutor(WorkflowRunner):
@@ -112,6 +112,8 @@ class ComponentExecutor(WorkflowRunner):
                 ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: "变量聚合",
                 ComponentType.COMPONENT_TYPE_SET_VARIABLE: "设置变量",
                 ComponentType.COMPONENT_TYPE_PLUGIN: "插件",
+                ComponentType.COMPONENT_TYPE_HTTP_REQUEST: "HTTP请求",
+                ComponentType.COMPONENT_TYPE_REACT_AGENT: "React智能体",
             }
             return m.get(t, str(t))
 

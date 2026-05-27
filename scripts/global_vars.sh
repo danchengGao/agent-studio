@@ -54,10 +54,10 @@ declare -A NAMES=(
     ["PLUGIN_SERVER_DOCKER"]="jiuwen-plugin-server"
     ["SANDBOX_GATEWAY_SERVICE"]="sandbox-gateway"
     ["SANDBOX_GATEWAY_DOCKER"]="jiuwen-sandbox-gateway"
-    ["PYTHON_SERVER_SERVICE"]="python-server"
-    ["PYTHON_SERVER_DOCKER"]="jiuwen-python-server"
-    ["JS_SERVER_SERVICE"]="js-server"
-    ["JS_SERVER_DOCKER"]="jiuwen-js-server"
+    ["SANDBOX_SERVER_SERVICE"]="sandbox-server"
+    ["SANDBOX_SERVER_DOCKER"]="jiuwen-sandbox-server"
+    ["RUNTIME_SERVICE"]="runtime-server"
+    ["RUNTIME_DOCKER"]="jiuwen-runtime-server"
 )
 
 # ===== Host port variables to allocate for services (dynamic assignment) =====
@@ -72,9 +72,9 @@ declare -ga PORTS=(
     BACKEND_HOST_PORT
     PLUGIN_SERVER_HOST_PORT
     SANDBOX_GATEWAY_HOST_PORT
-    PYTHON_SERVER_HOST_PORT
-    JS_SERVER_HOST_PORT
+    SANDBOX_SERVER_HOST_PORT
     DEEPSEARCH_HOST_PORT
+    RUNTIME_HOST_PORT
 )
 
 # ===== Container/service name variables for network address resolution =====
@@ -95,12 +95,12 @@ declare -ga CONTAINERS_ADDRS=(
     PLUGIN_SERVER_DOCKER
     SANDBOX_GATEWAY_SERVICE
     SANDBOX_GATEWAY_DOCKER
-    PYTHON_SERVER_SERVICE
-    PYTHON_SERVER_DOCKER
-    JS_SERVER_SERVICE
-    JS_SERVER_DOCKER
+    SANDBOX_SERVER_SERVICE
+    SANDBOX_SERVER_DOCKER
     DEEPSEARCH_SERVICE
     DEEPSEARCH_DOCKER
+    RUNTIME_SERVICE
+    RUNTIME_DOCKER
 )
 
 # ==== Global deploy associative array ====
@@ -112,18 +112,19 @@ declare -A DEPLOY_VARS=(
     ["HAS_DEEPSEARCH"]="false"
     ["HAS_JIUWEN"]="false"
     ["HAS_UPGRADE"]="false"
+    ["HAS_RUNTIME"]="false"
     ["IS_UP_MYSQL"]="false"
     ["IS_UP_ETCD"]="false"
     ["IS_UP_MINIO"]="false"
     ["IS_UP_MILVUS"]="false"
     ["IS_UP_PLUGIN_SERVER"]="false"
-    ["IS_UP_PYTHON_SERVER"]="false"
-    ["IS_UP_JS_SERVER"]="false"
+    ["IS_UP_SANDBOX_SERVER"]="false"
     ["IS_UP_SANDBOX_GATEWAY"]="false"
     ["IS_UP_DEEPSEARCH"]="false"
     ["IS_UP_BACKEND"]="false"
     ["IS_UP_FRONTEND"]="false"
     ["IS_UP_UPGRADE_TOOL"]="false"
+    ["IS_UP_RUNTIME"]="false"
     ["IS_UPGRADE_MYSQL"]="false"
     ["IS_UPGRADE_MILVUS"]="false"
 
@@ -156,7 +157,7 @@ declare -ga AVAILABLE_PORTS=()
 declare -ga ALLOCATED_PORTS=()
 
 # ==== All available modules ====
-declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN")
+declare -ga ALL_MODULES=("UPGRADE" "MYSQL" "MILVUS" "PLUGIN" "SANDBOX" "DEEPSEARCH" "JIUWEN" "RUNTIME")
 
 # ==== components of module ====
 declare -A COMPONENTS=(
@@ -164,9 +165,10 @@ declare -A COMPONENTS=(
     ["MYSQL"]="MYSQL"
     ["MILVUS"]="ETCD MINIO MILVUS"
     ["PLUGIN"]="PLUGIN_SERVER"
-    ["SANDBOX"]="PYTHON_SERVER JS_SERVER SANDBOX_GATEWAY"
+    ["SANDBOX"]="SANDBOX_SERVER SANDBOX_GATEWAY"
     ["DEEPSEARCH"]="DEEPSEARCH"
     ["JIUWEN"]="BACKEND FRONTEND"
+    ["RUNTIME"]="RUNTIME"
 )
 
 
@@ -179,6 +181,7 @@ declare -A COMPOSE_TEMPLATE_FILES=(
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.template.yml"
     ["DEEPSEARCH"]="${SCRIPT_DIR}/conf/docker-deepsearch.template.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.template.yml"
+    ["RUNTIME"]="${SCRIPT_DIR}/conf/docker-runtime.template.yml"
 )
 
 # ==== Paths to final generated Docker Compose files per module ==== 
@@ -190,6 +193,7 @@ declare -A COMPOSE_FILES=(
     ["SANDBOX"]="${SCRIPT_DIR}/conf/docker-sandbox.yml"
     ["DEEPSEARCH"]="${SCRIPT_DIR}/conf/docker-deepsearch.yml"
     ["JIUWEN"]="${SCRIPT_DIR}/conf/docker-jiuwen.yml"
+    ["RUNTIME"]="${SCRIPT_DIR}/conf/docker-runtime.yml"
 )
 
 

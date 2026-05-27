@@ -48,6 +48,11 @@ class KnowledgeBaseDBMixin:
         JSON, nullable=True, comment="知识库配置信息"
     )
 
+    # DeepSearch 知识库 ID（同步到 DeepSearch 后由 DS 返回并存储，用于关联）
+    ds_kb_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, comment="DeepSearch 知识库 ID，关联 Studio 与 DS 知识库"
+    )
+
     # 扩展字段
     _rest_: Mapped[Dict | None] = mapped_column(
         JSON, nullable=True, comment="扩展字段，存储其他未定义的数据"

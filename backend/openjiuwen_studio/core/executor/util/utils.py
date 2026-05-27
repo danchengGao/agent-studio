@@ -24,7 +24,7 @@ def _truncate_data(data: Any, max_length: int = MAX_OUTPUT_LENGTH) -> str:
     """
     if data is None:
         return ""
-    
+
     try:
         if isinstance(data, str):
             text = data
@@ -32,11 +32,11 @@ def _truncate_data(data: Any, max_length: int = MAX_OUTPUT_LENGTH) -> str:
             text = json.dumps(data, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
         text = str(data)
-    
+
     if len(text) > max_length:
         truncation_warning = f"\n...[Content truncated: exceeded {max_length} characters]"
         text = text[:max_length - len(truncation_warning)] + truncation_warning
-    
+
     return text
 from openjiuwen.core.session.stream import TraceSchema, OutputSchema
 from openjiuwen.core.session.tracer.span import TraceAgentSpan, TraceWorkflowSpan
@@ -62,7 +62,7 @@ def _workflowspan_2_tracedetail(business_type: str, workflowspan: TraceWorkflowS
     span_name = workflowspan.component_name
     if mapping and workflowspan.invoke_id in mapping:
         span_name = mapping[workflowspan.invoke_id]
-    
+
     return TraceDetail(
         space_id="",
         business_id="",  # 填入agent/workflow名字
@@ -93,7 +93,7 @@ def _agentspan_2_tracedetail(business_type: str, agentspan: TraceAgentSpan, mapp
     span_name = agentspan.name
     if mapping and agentspan.invoke_type in mapping:
         span_name = mapping[agentspan.invoke_type]
-    
+
     return TraceDetail(
         space_id="",
         business_id="",  # 填入agent/workflow名字
@@ -134,9 +134,12 @@ def get_trace_workflow_output(data):
             # 第一种格式: {'output': 'value'}
             if isinstance(item, dict) and 'output' in item:
                 text_parts.append(str(item['output']))
-
-            # 第二种格式: {'type': 'end node stream', 'index': 0, 'payload': {'response': 'value'}}
-            # 第三种格式: {'type': 'output', 'index': 0, 'payload': {'output': '111', 'result_type': 'answer'}}
+            # 第二种格式: {'response': 'value'}
+            elif isinstance(item, dict) and 'response' in item:
+                text_parts.append(str(item['response']))
+                output_key = "response"
+            # 第三种格式: {'type': 'end node stream', 'index': 0, 'payload': {'response': 'value'}}
+            # 第四种格式: {'type': 'output', 'index': 0, 'payload': {'output': '111', 'result_type': 'answer'}}
             elif isinstance(item, dict) and 'payload' in item:
                 payload = item.get('payload', {})
                 if isinstance(payload, dict):
@@ -193,6 +196,17 @@ def get_trace_workflow_input(data, output_value=None):
     return inputs_value
 
 
+def map_trace_execute_status(status: Optional[str]) -> ExecuteStatus:
+    """将底层 trace status 映射为前端可识别执行状态。"""
+    if status == "start":
+        return ExecuteStatus.Start
+    if status in "interrupted":
+        return ExecuteStatus.Interrupted
+    if status == "agent":
+        return ExecuteStatus.Agent
+    return ExecuteStatus.Finish
+
+
 def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, str]] = None) -> tuple[None, None] | tuple[Any, TraceWorkflowSpan, TraceDetail] | \
                                                       tuple[Any, TraceAgentSpan, TraceDetail] | tuple[Any, None, None] | \
                                                       tuple[Any, None]:
@@ -202,7 +216,7 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
     """
     # Workflow Trace
     if isinstance(chunk, TraceSchema) and chunk.type == "tracer_workflow":
-        logger.debug(f"get chunk.type == tracer_workflow, chunk: {chunk}")
+        logger.info(f"get chunk.type == tracer_workflow, chunk: {chunk}")
         data = TraceWorkflowSpan.model_validate(chunk.payload)
         if EMPTY_NODE_ID_PREFIX in data.invoke_id:
             return None, None, None
@@ -216,7 +230,7 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
         component_name = data.component_name
         if mapping and data.invoke_id in mapping:
             component_name = mapping[data.invoke_id]
-        
+
         # 将映射后的组件名称设置回data中，确保trace log使用正确的名称
         data.component_name = component_name
 
@@ -228,7 +242,7 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                 version="",
                 description="",
 
-                status=ExecuteStatus.Start if data.status == "start" else ExecuteStatus.Finish,
+                status=map_trace_execute_status(data.status),
 
                 inputs=input_value,
                 outputs=output_value,
@@ -302,8 +316,13 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
             for nid in mapping:
                 if chunk.payload.get("node_id") == nid:
                     chunk.payload["node_name"] = mapping.get(nid)
+        # 添加 component_type 标识，让前端能够识别并单独显示输出组件的内容
+        chunk.payload["component_type"] = "output"
         logger.debug(f"chunk.type == output return chunk.payload: {chunk.payload}")
-        return ExecuteResponse(type=ExecuteResponseType.Workflow, payload=chunk.payload).model_dump(), None, None
+        response_type = ExecuteResponseType.Workflow
+        if business_type == "AGENT":
+            response_type = ExecuteResponseType.Agent
+        return ExecuteResponse(type=response_type, payload=chunk.payload).model_dump(), None, None
 
     # Streaming output
     if isinstance(chunk, OutputSchema) and chunk.type == "end node stream":
@@ -368,11 +387,10 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
         return ExecuteResponse(type=response_type, payload=transformed_payload).model_dump(), None, None
 
     # Agent workflow run result
-    # not processing workflow_final type
     if isinstance(chunk, OutputSchema) and chunk.type == "workflow_final":
         if business_type == "AGENT":
             answer_value = None
-            # 处理 output 情况
+            # 首先检查是否有直接的 output 或 response
             if chunk.payload.get("output"):
                 output_data = chunk.payload.get("output")
                 # 如果 output 是字典，转换为 key: value 格式的字符串
@@ -397,6 +415,26 @@ def result_convert(chunk: Any, business_type: str, mapping: Optional[Dict[str, s
                     answer_value = "\n".join(formatted_items)
                 else:
                     answer_value = str(response_data)
+            
+            # 如果没有找到 output 或 response，但 payload 本身是字符串或字典，直接使用它
+            if answer_value is None:
+                if isinstance(chunk.payload, str):
+                    answer_value = chunk.payload
+                elif isinstance(chunk.payload, dict):
+                    # 如果是字典，尝试找到可能包含答案的字段
+                    for key, value in chunk.payload.items():
+                        if value and key not in ("index", "node_id", "node_name", "result_type"):
+                            if isinstance(value, str):
+                                answer_value = value
+                                break
+                            elif isinstance(value, dict) or isinstance(value, list):
+                                try:
+                                    answer_value = json.dumps(value, ensure_ascii=False)
+                                    break
+                                except (TypeError, ValueError) as e:
+                                    logger.warning(f"Failed to serialize value for key {key}: {e}")
+                                    continue
+            
             # 仅对最终答案做后处理
             if answer_value and answer_value.lstrip().startswith("#"):
                 answer_value = "\n\n" + answer_value
@@ -445,7 +483,7 @@ async def save_trace_details(index: WorkflowId | AgentId, tracedetails: List[Tra
     """
     if not tracedetails:
         return
-    
+
     # 设置space_id和business_id
     for tracedetail in tracedetails:
         tracedetail.space_id = index.space_id
@@ -453,7 +491,7 @@ async def save_trace_details(index: WorkflowId | AgentId, tracedetails: List[Tra
             tracedetail.business_id = index.workflow_id
         else:
             tracedetail.business_id = index.agent_id
-    
+
     # 使用批量保存
     trace_detail_repository.create_trace_details(tracedetails)
 

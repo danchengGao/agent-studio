@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { History, X, FileText, Tag, Loader2, Trash2 } from 'lucide-react'
+import { History, X, FileText, Loader2, Trash2 } from 'lucide-react'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import { getDefaultSpaceId } from '@/utils/spaceUtils'
 import { AgentService, AgentVersionListRequest, AgentVersionListResponse } from '@test-agentstudio/api-client'
 import dayjs from 'dayjs'
 import { useScopedTranslation } from '@/i18n'
+import PublishStatusTag from '@/components/Runtime/PublishStatusTag'
 
 export interface VersionListItem {
   id: string
@@ -12,6 +13,7 @@ export interface VersionListItem {
   description?: string
   createdAt?: string
   createdTs?: number
+  published_flag?: 'false' | 'pending' | 'running' | 'stopped' | 'failed'
 }
 
 interface AgentVersionListPanelProps {
@@ -152,6 +154,7 @@ const AgentVersionListPanel: React.FC<AgentVersionListPanelProps> = ({
             description: v.version_description || t('description.empty'),
             createdAt: formatTimestamp(v.create_time),
             createdTs: createdTs ?? undefined,
+            published_flag: v.published_flag,
           }
         })
         const sortedItems = [...items].sort((a, b) => (b.createdTs ?? 0) - (a.createdTs ?? 0))
@@ -203,6 +206,7 @@ const AgentVersionListPanel: React.FC<AgentVersionListPanelProps> = ({
               description: v.version_description || t('description.empty'),
               createdAt: formatTimestamp(v.create_time),
               createdTs: createdTs ?? undefined,
+              published_flag: v.published_flag,
             }
           })
           // 按创建时间倒序排序（最新在前），无时间的排在末尾
@@ -327,13 +331,22 @@ const VersionCard: React.FC<{
           <span className="font-semibold text-gray-900 tracking-tight truncate max-w-[180px]" title={item.version}>
             {item.version}
           </span>
+          {item.published_flag && item.published_flag !== 'false' && (
+            <PublishStatusTag status={item.published_flag} className="shrink-0" withTooltip />
+          )}
         </div>
         {item.createdAt && (
           <span
             className={`inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border leading-4 ${isActive ? 'border-green-200 bg-green-50/70 text-green-700' : 'border-gray-200 bg-gray-50/70 text-gray-700'}`}
           >
-            {switchingVersion === item.version ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
-            {switchingVersion === item.version ? t('actions.switching') : item.createdAt}
+            {switchingVersion === item.version ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {t('actions.switching')}
+              </>
+            ) : (
+              item.createdAt
+            )}
           </span>
         )}
       </div>

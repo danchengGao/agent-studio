@@ -5,7 +5,6 @@ import {
   CreateKnowledgeBaseResponse,
   GetKnowledgeBasesRequest,
   GetKnowledgeBasesResponse,
-  KnowledgeBase,
   UpdateKnowledgeBaseRequest,
   UpdateKnowledgeBaseResponse,
   DeleteKnowledgeBaseRequest,
@@ -28,6 +27,23 @@ import {
   GetDocumentStatusResponse,
   SearchKnowledgeBaseRequest,
   SearchKnowledgeBaseResponse,
+  AddWeblinksRequest,
+  AddWeblinksResponse,
+  GetWeblinksListRequest,
+  GetWeblinksListResponse,
+  ProcessWeblinksRequest,
+  ProcessWeblinksResponse,
+  UpdateWeblinkRequest,
+  DeleteWeblinksRequest,
+  GetWeblinkStatusRequest,
+  SyncUploadRequest,
+  SyncUploadResponse,
+  SyncProcessRequest,
+  SyncProcessResponse,
+  DeepSearchKnowledgeBaseListRequest,
+  DeepSearchKnowledgeBaseListResponse,
+  DeepSearchEmbeddingConfigListRequest,
+  DeepSearchEmbeddingConfigListResponse,
 } from '../types/knowledgeBase'
 
 // 知识库服务
@@ -221,6 +237,134 @@ export class KnowledgeBaseService {
     } catch (error) {
       console.error('搜索知识库API调用失败:', error)
       throw new Error(`搜索知识库失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 添加链接
+  static async addWeblinks(request: AddWeblinksRequest): Promise<AddWeblinksResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<AddWeblinksResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_ADD, request)
+      return response.data
+    } catch (error) {
+      console.error('添加链接API调用失败:', error)
+      if (error instanceof Error && error.message) {
+        throw error
+      }
+      throw new Error(`添加链接失败: ${String(error)}`)
+    }
+  }
+
+  // 获取链接列表
+  static async getWeblinksList(request: GetWeblinksListRequest): Promise<GetWeblinksListResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<GetWeblinksListResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_LIST, request)
+      return response.data
+    } catch (error) {
+      console.error('获取链接列表API调用失败:', error)
+      throw new Error(`获取链接列表失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 处理链接
+  static async processWeblinks(request: ProcessWeblinksRequest): Promise<ProcessWeblinksResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<ProcessWeblinksResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_PROCESS, request)
+      return response.data
+    } catch (error) {
+      console.error('处理链接API调用失败:', error)
+      throw new Error(`处理链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 查询链接状态
+  static async getWeblinkStatus(request: GetWeblinkStatusRequest): Promise<GetDocumentStatusResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<GetDocumentStatusResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_STATUS, request)
+      return response.data
+    } catch (error) {
+      console.error('查询链接状态API调用失败:', error)
+      throw new Error(`查询链接状态失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 更新链接
+  static async updateWeblink(request: UpdateWeblinkRequest): Promise<UpdateDocumentResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<UpdateDocumentResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_UPDATE, request)
+      return response.data
+    } catch (error) {
+      console.error('更新链接API调用失败:', error)
+      throw new Error(`更新链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 删除链接
+  static async deleteWeblinks(request: DeleteWeblinksRequest): Promise<DeleteDocumentsResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<DeleteDocumentsResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.WEBLINKS_DELETE, request)
+      return response.data
+    } catch (error) {
+      console.error('删除链接API调用失败:', error)
+      throw new Error(`删除链接失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 同步至 DeepSearch - 第一步：文件同步
+  static async syncUpload(request: SyncUploadRequest): Promise<SyncUploadResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<SyncUploadResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.SYNC_UPLOAD, request)
+      return response.data
+    } catch (error) {
+      console.error('同步上传至 DeepSearch 失败:', error)
+      throw new Error(`同步上传失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 同步至 DeepSearch - 第二步：文档参数设置/建索引
+  static async syncProcess(request: SyncProcessRequest): Promise<SyncProcessResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<SyncProcessResponse>(API_ENDPOINTS.KNOWLEDGE_BASES.SYNC_PROCESS, request)
+      return response.data
+    } catch (error) {
+      console.error('DeepSearch 文档处理失败:', error)
+      throw new Error(`文档处理失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  // 获取 DeepSearch 知识库列表
+  static async getDeepSearchKnowledgeBasesList(request: DeepSearchKnowledgeBaseListRequest): Promise<DeepSearchKnowledgeBaseListResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<DeepSearchKnowledgeBaseListResponse>(API_ENDPOINTS.DEEPSEARCH_KNOWLEDGE_BASES.LIST, request)
+      return response.data
+    } catch (error) {
+      console.error('获取 DeepSearch 知识库列表失败:', error)
+      throw new Error(`获取列表失败: ${error instanceof Error ? error.message : '未知错误'}`)
+    }
+  }
+
+  /** 获取 Studio 侧当前空间已配置的 Embedding 模型列表（供同步到 DeepSearch 时选择嵌入模型） */
+  static async getDeepSearchEmbeddingConfigsList(
+    request: DeepSearchEmbeddingConfigListRequest
+  ): Promise<DeepSearchEmbeddingConfigListResponse> {
+    try {
+      const apiClient = getApiClient()
+      const response = await apiClient.post<DeepSearchEmbeddingConfigListResponse>(
+        API_ENDPOINTS.DEEPSEARCH_KNOWLEDGE_BASES.EMBEDDING_CONFIGS_LIST,
+        { space_id: request.space_id, page: request.page ?? 1, size: request.size ?? 100 }
+      )
+      return response.data
+    } catch (error) {
+      console.error('获取 Deep Search 嵌入模型列表失败:', error)
+      throw new Error(`获取嵌入模型列表失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 }

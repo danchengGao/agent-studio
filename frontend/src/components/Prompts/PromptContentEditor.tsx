@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, FormControl, Select, MenuItem, IconButton, Tooltip, TextField, Typography } from '@mui/material'
 import { Plus, Settings, Code, GripVertical, Zap, Wrench, Copy, Trash2 } from 'lucide-react'
-import FormattedPromptEditor from './AdvancedCodeMirrorEditor'
+import AdvancedCodeMirrorEditor from './AdvancedCodeMirrorEditor'
 import { PromptMessage } from '@/types/promptType'
 
 export interface PromptContentEditorProps {
@@ -1090,8 +1090,9 @@ const PromptContentEditor: React.FC<PromptContentEditorProps> = ({
                     }}
                   />
                 ) : (
-                  <div style={{ width: '100%', overflow: 'hidden' }}>
-                    <FormattedPromptEditor
+                  <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
+                    <AdvancedCodeMirrorEditor
+                      key={`${message.id}-${templateEngine}`}
                       fullWidth
                       minRows={message.role === 'system' ? 20 : 1}
                       maxRows={message.role === 'system' ? 25 : undefined}

@@ -12,7 +12,8 @@ from openjiuwen_studio.schemas.user import (
     SendCodeRequest,
     RegisterRequest,
     ResetPasswordRequest,
-    RefreshTokenRequest
+    RefreshTokenRequest,
+    GetTokenRequest,
 )
 
 auth_router = APIRouter()
@@ -21,8 +22,9 @@ auth_router = APIRouter()
 @auth_router.post("/send-code", response_model=ResponseModel[dict])
 async def send_code(req: SendCodeRequest, background_tasks: BackgroundTasks):
     """发送注册验证码"""
-    code = await AuthService.get_registration_code(req.email)
-    background_tasks.add_task(EmailUtils.send_verification_code, req.email, code)
+    email = str(req.email)
+    code = await AuthService.get_registration_code(email)
+    background_tasks.add_task(EmailUtils.send_verification_code, email, code)
 
     return ResponseModel(code=200, message="验证码已发送", data={})
 
@@ -56,8 +58,9 @@ async def register(req: RegisterRequest, request: Request):
 @auth_router.post("/send-reset-code", response_model=ResponseModel[dict])
 async def send_reset_code(req: SendCodeRequest, background_tasks: BackgroundTasks):
     """发送重置密码验证码"""
-    code = await AuthService.get_reset_code(req.email)
-    background_tasks.add_task(EmailUtils.send_reset_code, req.email, code)
+    email = str(req.email)
+    code = await AuthService.get_reset_code(email)
+    background_tasks.add_task(EmailUtils.send_reset_code, email, code)
  
     return ResponseModel(code=200, message="重置验证码已发送", data={})
 
@@ -91,6 +94,24 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     SecurityManager.login_rate_limit(request.client.host)
     result = await AuthService.login_user(form_data)
     return ResponseModel(code=200, message="登录成功", data=result)
+
+
+@auth_router.post("/get_token", response_model=ResponseModel[dict])
+async def get_token(request: Request, req: GetTokenRequest):
+    """
+    通过 email + password 获取 access_token
+    """
+    SecurityManager.login_rate_limit(request.client.host)
+    form_data = OAuth2PasswordRequestForm(username=str(req.email), password=req.password)
+    result = await AuthService.login_user(form_data)
+    return ResponseModel(
+        code=status.HTTP_200_OK,
+        message="Get access token successfully.",
+        data={
+            "access_token": result["access_token"],
+            "token_type": result["token_type"],
+        },
+    )
 
 
 @auth_router.post("/logout", response_model=ResponseModel[dict])

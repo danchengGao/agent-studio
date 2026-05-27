@@ -103,6 +103,12 @@ class UserUpdate(UserTag):
         return _validate_password_strength(v)
 
 
+class GetTokenRequest(BaseModel):
+    """get-token 接口请求：email + password"""
+    email: EmailStr
+    password: str
+
+
 class RefreshTokenRequest(BaseModel):
     refreshToken: str
 

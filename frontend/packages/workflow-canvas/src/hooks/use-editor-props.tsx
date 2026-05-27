@@ -12,6 +12,7 @@ import { createMinimapPlugin } from '@flowgram.ai/minimap-plugin'
 import { createFreeSnapPlugin } from '@flowgram.ai/free-snap-plugin'
 import { createFreeNodePanelPlugin } from '@flowgram.ai/free-node-panel-plugin'
 import { createFreeLinesPlugin } from '@flowgram.ai/free-lines-plugin'
+import { createFreeStackPlugin } from '@flowgram.ai/free-stack-plugin'
 import { FlowNodeBaseType, FreeLayoutProps, WorkflowNodeLinesData } from '@flowgram.ai/free-layout-editor'
 import { createContainerNodePlugin } from '@flowgram.ai/free-container-plugin'
 import { createTypePresetPlugin } from '../form-materials'
@@ -155,6 +156,12 @@ export function useEditorProps(
         ) {
           return false
         }
+        /** Allow circular connections for condition nodes (type '4')
+        * This enables condition nodes to connect back to previous nodes in the workflow
+        */
+        if (fromPort.node.flowNodeType === '4') { // Condition node type
+          return true
+        }
         /**
          * 线条环检测，不允许连接到前面的节点
          * Line loop detection, which is not allowed to connect to the node in front of it
@@ -307,6 +314,11 @@ export function useEditorProps(
         console.log('---- Playground Dispose ----')
       },
       plugins: () => [
+        /**
+         * Stacking context plugin
+         * 为线条/图层提供堆叠上下文能力
+         */
+        createFreeStackPlugin({}),
         /**
          * Line render plugin
          * 连线渲染插件

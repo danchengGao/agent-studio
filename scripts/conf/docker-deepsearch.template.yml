@@ -8,6 +8,7 @@ services:
     environment:
       - LLM_SSL_VERIFY=False
       - TOOL_SSL_VERIFY=False
+      - EMBEDDING_SSL_VERIFY=False
       - HTTP_PROXY
       - HTTPS_PROXY
       - https_proxy
@@ -16,6 +17,7 @@ services:
       - <<NO_PROXY_STR>>
     env_file:
       - ../.envs/env.deepsearch.<<NAME_SUFFIX>>
+      - ../.envs/env.runtime.<<NAME_SUFFIX>>
     volumes:
       - ../log-dirs/logs-<<NAME_SUFFIX>>/deepsearch:/app/output
     restart: unless-stopped

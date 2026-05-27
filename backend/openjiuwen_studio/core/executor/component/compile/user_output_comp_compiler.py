@@ -13,7 +13,7 @@ from openjiuwen.core.common.logging import logger
 
 
 def find_llm_to_stream_out(target_comp_id, inputs, stream_output_dict):
-    pattern = r'(?:llm|questioner)_\w+'
+    pattern = r'(?:llm|workflow)_\w+'
     for key, value in inputs.items():
         match = re.search(pattern, value)
         if match:
@@ -33,7 +33,7 @@ def find_llm_to_stream_out(target_comp_id, inputs, stream_output_dict):
 
 
 def change_stream_input(inputs):
-    pattern = r'(?:llm|questioner)_\w+'
+    pattern = r'(?:llm|workflow)_\w+'
     stream_inputs = {}
     new_inputs = {}
     for key, value in inputs.items():

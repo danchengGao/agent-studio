@@ -73,9 +73,10 @@ class AgentRepository():
     '''
     @with_exception_handling
     def patch_agent_id(self, agent_id: AgentId, db_session: Session | None = None) -> AgentId:
-        if not agent_id.agent_version:
-            # 如果是draft版本，补全_version字段
+        if not agent_id.agent_version or agent_id.agent_version == "draft":
+            # 如果是draft版本或显式指定"draft"，补全_version字段
             agent_id.agent_version = agent.AgentBaseDB.__version_none__
+            logger.info(f"Using draft version for agent {agent_id.agent_id}")
         elif agent_id.agent_version == agent.AgentPublishDB.__latest_publish_version__:
             with get_db_jw(db_session) as db: 
                 # 如果是最后的发布版本

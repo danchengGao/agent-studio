@@ -37,3 +37,5 @@ The Workflow component is a feature provided by openJiuwen that allows users to 
 You can see the execution results of the sub-workflow on the canvas.
 
 ![image](../../../images/93b283ad-f759-4c1a-919a-f1596566b2b1.png)
+
+> **Note**: Only support **stream sub-workflow + stream main-workflow** and **invoke sub-workflow + invoke main-workflow** these two scenario.

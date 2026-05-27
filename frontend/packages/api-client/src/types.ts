@@ -121,18 +121,13 @@ export interface SaveAgentRequest {
   memory: {
     max_tokens: number
     longterm_memory_config?: boolean
-    memory_bases?: Array<{
- 	      mdb_id: string
-        name: string
-        status: string
-        description?: string
-        embedding_model_config_id?: number
-        llm_model_config_id?: number
- 	     }>
+    user_profile_config?: boolean
+    semantic_memory_config?: boolean
+    episodic_memory_config?: boolean
+    summary_memory_config?: boolean
     memory_base?: {
  	      mdb_id: string
         name: string
-        status: string
         description?: string
         embedding_model_config_id?: number
         llm_model_config_id?: number
@@ -1634,6 +1629,17 @@ export interface AgentDetailResponse {
       memory: {
         max_tokens: number
         longterm_memory_config?: boolean
+        user_profile_config?: boolean
+        semantic_memory_config?: boolean
+        episodic_memory_config?: boolean
+        summary_memory_config?: boolean
+        memory_base?: {
+          mdb_id: string
+          name: string
+          description?: string
+          embedding_model_config_id?: number
+          llm_model_config_id?: number
+        }
         variable_config?: Array<{
           id: string
           name: string
@@ -1693,6 +1699,7 @@ export enum ParamSendMethod {
   HEADER = 1,
   QUERY = 2,
   BODY = 3,
+  PATH = 4,
 }
 
 // 插件参数类型枚举
@@ -1722,6 +1729,7 @@ export interface PluginCreateRequest {
   plugin_type: PluginType | number
   url?: string
   icon_uri?: string
+  mcp_transport?: number
 }
 
 export interface PluginCreateResponse {
@@ -1750,6 +1758,7 @@ export interface PluginInfo {
   url?: string
   icon_uri?: string
   request_params?: PluginRequestParam[]
+  mcp_transport?: number
 }
 
 export interface PluginGetResponse {
@@ -1862,6 +1871,7 @@ export interface PluginApiParam {
 export interface PluginApiHeader {
   name: string
   value: string
+  description?: string
 }
 
 export interface PluginApiInfo extends PluginApiBase {
@@ -2127,6 +2137,56 @@ export interface PluginGetCodeResponse {
 
 export interface PluginListCodeResponse extends PluginCodeInfoResponse {}
 
+// Plugin MCP 相关类型
+export interface PluginMcpInfo {
+  tool_id: string
+  space_id: string
+  plugin_id: string
+  name: string
+  desc: string
+  transport?: number | string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  url?: string
+  headers?: Record<string, string>
+  mcp_tool_name?: string
+  request_params?: PluginApiParam[]
+  response_params?: PluginApiParam[]
+  available?: boolean
+  plugin_version?: string
+}
+
+export interface PluginMcpInfoResponse {
+  code: number
+  message: string
+  data: {
+    mcp_info: PluginMcpInfo[]
+    total: number
+  }
+}
+
+export interface PluginListMcpToolsRequest {
+  space_id: string
+  plugin_id: string
+  page?: number
+  size?: number
+  plugin_version?: string
+}
+
+export interface PluginDiscoverMcpToolsRequest {
+  space_id: string
+  plugin_id: string
+}
+
+export interface PluginDiscoverMcpToolsResponse {
+  code: number
+  message: string
+  data: {
+    tool_ids: string[]
+  }
+}
+
 // Plugin Publish 相关类型
 export interface PluginPublishRequest {
   space_id: string
@@ -2284,6 +2344,110 @@ export interface AgentPublishResponse {
   }
 }
 
+// Runtime 部署请求类型
+export interface RuntimeDeployRequest {
+  agent_id: string
+  agent_name: string
+  agent_version: string
+  space_id: string
+  port?: string
+}
+
+// Runtime 部署结果类型
+export interface RuntimeDeployData {
+  deployment_id: string
+  type: string
+  name: string
+  status: string
+  url: string
+  port: number
+}
+
+// Runtime 部署响应类型
+export interface RuntimeDeployResponse {
+  code: number
+  message: string
+  data: RuntimeDeployData
+}
+
+// Runtime 部署详情请求类型
+export interface RuntimeDetailRequest {
+  agent_id: string
+  space_id: string
+}
+
+// Runtime 部署详情项
+export interface RuntimeDetailItem {
+  deployment_id: string
+  name: string
+  status: string
+  url: string
+  port: number
+  type: string
+  created_at: string
+  updated_at: string
+}
+
+// Runtime 部署详情响应类型
+export interface RuntimeDetailResponse {
+  code: number
+  message?: string
+  msg?: string
+  data: {
+    deploy_details: RuntimeDetailItem[]
+  }
+}
+
+// Runtime 下架请求类型
+export interface RuntimeRemoveRequest {
+  agent_id: string
+  space_id: string
+}
+
+// Runtime 下架响应类型
+export interface RuntimeRemoveResponse {
+  code: number
+  message?: string
+  msg?: string
+  data: Record<string, never>
+}
+
+// Runtime 重置会话请求类型
+export interface RuntimeResetConversationRequest {
+  target_url: string
+  space_id: string
+  conversation_id: string
+}
+
+// Runtime 重置会话响应类型
+export interface RuntimeResetConversationResponse {
+  code: number
+  message?: string
+  msg?: string
+  data?: {
+    status?: string
+    message?: string
+  }
+}
+
+// Runtime 已部署智能体详情请求类型
+export interface RuntimeAgentDetailRequest {
+  target_url: string
+  space_id: string
+}
+
+// Runtime 已部署智能体详情响应类型（透传 runtime 返回结构）
+export interface RuntimeAgentDetailResponse {
+  code: number
+  message?: string
+  msg?: string
+  data?: {
+    status?: string
+    message?: string
+    data?: Record<string, unknown>
+  } | Record<string, unknown>
+}
+
 // Agent版本列表请求类型
 export interface AgentVersionListRequest {
   agent_id: string
@@ -2295,6 +2459,7 @@ export interface AgentVersionInfo {
   agent_version: string
   version_description: string
   create_time: number
+  published_flag?: 'false' | 'pending' | 'running' | 'stopped' | 'failed'
 }
 
 // Agent版本列表响应类型

@@ -11,9 +11,10 @@ import shutil
 import time
 import uuid
 import zipfile
+import asyncio
 from pathlib import Path
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Callable, Type, Set, Any, Dict, Optional, Union, Tuple
+from typing import TYPE_CHECKING, Callable, Type, Set, Any, Dict, List, Optional, Union, Tuple
 
 from fastapi import status
 from openjiuwen.core.common.logging import logger
@@ -37,6 +38,7 @@ from openjiuwen_studio.core.manager.internal.agent import (
     AgentWorkflowListNode,
     SingleAgentData,
 )
+from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.core.manager.model_manager.managers import ModelConfigManager
 from openjiuwen_studio.core.manager.reference_extractor import extract_agent_references
@@ -122,6 +124,9 @@ from openjiuwen_studio.schemas.knowledge_base import (
 )
 from openjiuwen_studio.core.manager.convertor.components.plugin import (
     param_type_mapping,
+)
+from openjiuwen_studio.core.manager.runtime import (
+    get_deploy_info, get_agent_deploy_detail
 )
 
 if TYPE_CHECKING:
@@ -747,7 +752,23 @@ def agent_save(
         f"[AGENT_SAVE] Agent saved - ID: {req.agent_id}, User: {user_id}, Duration: {time.time() - start_time:.3f}s"
     )
 
-    # 6. 返回保存结果
+    # 6. 清除agent实例缓存，确保下次运行时使用最新配置
+    try:
+        from openjiuwen_studio.core.executor.agent.agent_runner import agent_mgr
+        cleared_count = agent_mgr.clear_agent_cache_for_all_conversations(
+            agent_id=req.agent_id,
+            agent_version="draft"  # 保存时总是draft版本
+        )
+        logger.info(
+            f"[AGENT_SAVE] Cleared {cleared_count} cached agent instances for agent {req.agent_id}"
+        )
+    except Exception as e:
+        logger.error(
+            f"[AGENT_SAVE] Failed to clear agent cache for agent {req.agent_id}: {e}"
+        )
+        # 缓存清除失败不影响保存结果
+
+    # 7. 返回保存结果
     return ResponseModel(
         code=status.HTTP_200_OK,
         message="save agent success",
@@ -815,8 +836,67 @@ def agent_meta_update(
     )
 
 
+async def get_agent_publish_status(agent_id: str, user_id: str, space_id: str) -> Dict[str, Any]:
+    """从runtime中获取当前agent_id发布情况"""
+    try:
+        res = {}
+        # 获取agent id对应deployment id和版本
+        deploy_infos = await get_deploy_info(agent_id, space_id)
+        for deploy_info in deploy_infos:
+            version = deploy_info.get("version")
+
+            # 从runtime获取最新发布状态, 正常情况下，同一个agentid能且只能发布一次
+            # 同一个agentid发布多次且同时存在，res里会有多条数据，取create_at最晚那条数据
+            if deploy_info.get("deployment_id"):
+                deploy_detail = await get_agent_deploy_detail(deploy_info.get("deployment_id"), user_id, space_id)
+                published_flag = deploy_detail.get("status")
+            else:
+                published_flag = deploy_info.get("status")
+            res[agent_id] = {
+                'version': version,
+                'published_flag': published_flag
+            }
+        return res
+    except Exception as e:
+        logger.warning(f"Failed to get runtime publish status for agent {agent_id}: {e}")
+        # 出现异常时返回未发布状态
+        return {
+            agent_id: {
+                'version': None,
+                'published_flag': "false"
+            }
+        }
+
+
+def map_agent_publish_status(
+        agent_id: str,
+        agent_version: str,
+        is_version_detail: str,
+        agent_publish_status_payload: Dict[str, Any],
+) -> str:
+    """判断当前 agent 与 version 是否发布。
+
+    支持 get_agent_publish_status 的返回格式：{agent_id: {version, published_flag}}；
+    亦兼容列表 [{agent_id, version, published_flag}, ...]。
+    """
+    if isinstance(agent_publish_status_payload, dict):
+        entry = agent_publish_status_payload.get(agent_id)
+        if isinstance(entry, dict):
+            if is_version_detail == "1":
+                if agent_version == entry.get("version"):
+                    return entry.get("published_flag") or "false"
+            else:
+                return entry.get("published_flag") or "false"
+    return "false"
+
+
+async def get_agent_version_publish_status(agent_id: str, version: str, user_id: str, space_id: str) -> str:
+    runtime_result = await get_agent_publish_status(agent_id, user_id, space_id)
+    return map_agent_publish_status(agent_id, version, "0", runtime_result)
+
+
 @with_exception_handling
-def agent_get_list(
+async def agent_get_list(
         req: AgentList,
         current_user: dict
 ) -> ResponseModel:
@@ -891,6 +971,8 @@ def agent_get_list(
             create_time=item_data.get("create_time"),
             update_time=item_data.get("update_time"),
             api_endpoint=item_data.get("api_endpoint", "test"),
+            published_flag=await get_agent_version_publish_status(
+                item_data.get("agent_id"), item_data.get("agent_version"), user_id, req.space_id),
         )
 
         items.append(item)
@@ -1326,12 +1408,17 @@ def agent_search(
 
 
 @with_exception_handling
-def agent_version_list(
+async def agent_version_list(
         req: AgentVersionListRequest,
         current_user: dict
 ) -> ResponseModel:
     """获取智能体的发布版本列表"""
     _ = check_user_space(req.space_id, current_user)
+
+    # 从runtime中获取发布情况
+    data = current_user.get("data", {})
+    user_id = data.get("user_id_str", "")
+    runtime_result = await get_agent_publish_status(req.agent_id, user_id, req.space_id)
 
     # 调用repository获取版本列表
     version_result = agent_repository.get_agent_publish_list(req.model_dump())
@@ -1365,6 +1452,8 @@ def agent_version_list(
                 agent_version=version_info.get("agent_version", ""),
                 version_description=version_info.get("version_description", ""),
                 create_time=version_info.get("create_time", 0),
+                published_flag=map_agent_publish_status(
+                    req.agent_id, version_info.get("agent_version", ""), "1", runtime_result)
             )
         )
 
@@ -1421,6 +1510,7 @@ def _collect_workflow_dependencies(
     processed_workflow_ids: Set[str],
     plugins: list,
     processed_plugin_ids: Set[str],
+    workflow_version: str = None,
 ):
     """递归收集Workflow依赖（包括子工作流和插件）"""
     if workflow_id in processed_workflow_ids:
@@ -1429,7 +1519,7 @@ def _collect_workflow_dependencies(
     from openjiuwen_studio.schemas.workflow import WorkflowId
 
     wf_query = WorkflowId(
-        space_id=space_id, workflow_id=workflow_id, workflow_version=None
+        space_id=space_id, workflow_id=workflow_id, workflow_version=workflow_version
     )
 
     wf_result = workflow_repository.workflow_get(wf_query)
@@ -1651,6 +1741,8 @@ def _create_plugin_and_tools(
 
         # 转换为字典并添加额外字段
         tool_dict = tool_info.model_dump(by_alias=True)
+        # 导入时写入工具 available：沿用导出字段，缺省为 True
+        tool_dict["available"] = bool(t.get("available", True))
 
         # 处理方法转换（字符串到枚举）
         if isinstance(tool_dict.get("method"), str):
@@ -1837,6 +1929,8 @@ def _import_plugin_tools(
 
         # 转换为字典并添加额外字段
         tool_dict = tool_info.model_dump(by_alias=True)
+        # 导入时写入工具 available：沿用导出字段，缺省为 True
+        tool_dict["available"] = bool(tool.get("available", True))
 
         # 处理方法转换（字符串到枚举）
         if isinstance(tool_dict.get("method"), str):
@@ -2568,10 +2662,7 @@ async def agent_export(
         space_id=req.space_id, agent_id=req.agent_id, agent_version=req.agent_version
     )
     # 优先获取发布版本，如果没有指定版本，获取draft
-    if req.agent_version:
-        get_result = agent_repository.get_agent_publish_db(agent_query)
-    else:
-        get_result = agent_repository.get_agent_db(agent_query)
+    get_result = agent_repository.get_agent_db(agent_query)
 
     if get_result.code != status.HTTP_200_OK:
         return ResponseModel(code=get_result.code, message=get_result.message)
@@ -2600,8 +2691,9 @@ async def agent_export(
         # 3.1 处理直接依赖的Workflows
         agent_workflows = agent_data.get("workflows", []) or []
         for wf in agent_workflows:
-            # 兼容处理：尝试获取 "id" 或 "workflow_id"
+            # 兼容处理：尝试获取 "id" 或 "workflow_id" 以及 "workflow_version"
             wf_id = wf.get("id") or wf.get("workflow_id")
+            wf_version = wf.get("workflow_version")  # 获取工作流版本
             if wf_id and wf_id not in processed_workflow_ids:
                 _collect_workflow_dependencies(
                     wf_id,
@@ -2610,6 +2702,7 @@ async def agent_export(
                     processed_workflow_ids,
                     plugins,
                     processed_plugin_ids,
+                    workflow_version=wf_version,  # 传递工作流版本
                 )
 
         # 3.2 处理直接依赖的Plugins
@@ -2921,10 +3014,24 @@ async def agent_export(
             logger.warning(f"[AGENT_EXPORT] Failed to process workflow schema: {e}")
 
     # 6. 构建导出数据
+    # 导出兼容：如果 prompt_template 为空，但 configs.system_prompt 存在，
+    # 则自动补齐 prompt_template，确保 Runtime 侧可直接识别。
+    export_agent_data = dict(agent_data) if isinstance(agent_data, dict) else agent_data
+    if isinstance(export_agent_data, dict):
+        prompt_template = export_agent_data.get("prompt_template", [])
+        if isinstance(prompt_template, str):
+            prompt_template = [{"role": "system", "content": prompt_template}]
+        if not prompt_template:
+            system_prompt = (export_agent_data.get("configs") or {}).get("system_prompt")
+            if isinstance(system_prompt, str) and system_prompt.strip():
+                export_agent_data["prompt_template"] = [
+                    {"role": "system", "content": system_prompt}
+                ]
+
     version = get_current_project_version()
     export_data = AgentExportData(
         version=version,  # 暂定和代码发布版本相同
-        agent=agent_data,
+        agent=export_agent_data,
         dependencies=AgentDependencies(
             workflows=workflows,
             plugins=plugins,
@@ -4236,3 +4343,166 @@ def _update_node_model_recursive(node: dict, model_id_map: dict, wf_id: str):
                 _update_node_model_recursive(sub_node, model_id_map, wf_id)
         except Exception as e:
             logger.warning(f"[AGENT_IMPORT] Failed to update sub-workflow node {node_id}: {e}")
+
+
+async def agent_get_model_api_keys(
+        req: AgentExportRequest, current_user: dict
+) -> dict:
+    """获取智能体关联的所有大模型的 model_type 和 api_key
+
+    复用 agent_export 的依赖收集逻辑，仅提取大模型相关数据
+    返回格式：{model_type: api_key}
+    """
+    data = current_user.get("data", {})
+    user_id = (
+        data.get("user_id_str", "unknown") if isinstance(data, dict) else "unknown"
+    )
+
+    logger.info(f"[AGENT_GET_MODEL_API_KEYS] Getting model API keys - User: {user_id}, ID: {req.agent_id}")
+
+    # 2. 获取 Agent 基础配置
+    agent_query = AgentId(
+        space_id=req.space_id, agent_id=req.agent_id, agent_version=req.agent_version
+    )
+    get_result = agent_repository.get_agent_db(agent_query)
+
+    if get_result.code != status.HTTP_200_OK:
+        return ResponseModel(code=get_result.code, message=get_result.message)
+
+    if not get_result.data:
+        return {}
+
+    agent_data = get_result.data
+
+    # 3. 递归获取依赖项（仅 workflows，其他依赖忽略）
+    workflows = []
+
+    try:
+        processed_workflow_ids: Set[str] = set()
+        processed_plugin_ids: Set[str] = set()
+
+        # 3.1 处理直接依赖的 Workflows
+        agent_workflows = agent_data.get("workflows", []) or []
+        for wf in agent_workflows:
+            wf_id = wf.get("id") or wf.get("workflow_id")
+            wf_version = wf.get("workflow_version")  # 获取工作流版本
+            if wf_id and wf_id not in processed_workflow_ids:
+                _collect_workflow_dependencies(
+                    wf_id,
+                    req.space_id,
+                    workflows,
+                    processed_workflow_ids,
+                    plugins=[],
+                    processed_plugin_ids=processed_plugin_ids,
+                    workflow_version=wf_version,  # 传递工作流版本
+                )
+    except Exception as e:
+        logger.error(f"[AGENT_GET_MODEL_API_KEYS] Dependency collection failed: {e}", exc_info=True)
+
+    # 4. 收集模型引用信息并解密 API Key
+    model_api_keys: Dict[str, str] = {}
+    processed_model_ids: Set[int] = set()
+
+    # 初始化 SecurityUtils 用于解密 API Key
+    security_utils = SecurityUtils()
+
+    def _collect_and_decrypt_model_from_config(model_config):
+        """收集模型配置并解密 API Key"""
+        if not model_config:
+            return
+
+        model_id = getattr(model_config, 'id', None)
+        if model_id and model_id in processed_model_ids:
+            return
+
+        # 解密 API Key
+        api_key = None
+        if hasattr(model_config, 'api_key') and model_config.api_key:
+            try:
+                api_key = security_utils.decrypt_api_key(model_config.api_key)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to decrypt API key for model {model_id}: {e}")
+                api_key = model_config.api_key
+
+        # 以 model_type 作为 key，如果存在多个相同 model_type 的模型，使用第一个
+        model_type = model_config.model_type
+        if model_type and model_type not in model_api_keys:
+            model_api_keys[model_type] = api_key or ""
+            logger.info(
+                f"[AGENT_GET_MODEL_API_KEYS] Collected model: {model_type} -> API Key: {'*' * len(api_key) if api_key else 'None'}")
+
+        if model_id:
+            processed_model_ids.add(int(model_id))
+
+    def _collect_and_decrypt_model_from_node(node: dict, wf_id: str, parent_path: str = ""):
+        """从节点中收集模型引用并解密 API Key（递归处理嵌套节点）"""
+        node_id = node.get("id", "unknown")
+        node_type = str(node.get("type", ""))
+        current_path = f"{parent_path}/{node_id}" if parent_path else node_id
+
+        # 处理使用模型的节点类型
+        # 节点类型："3"=LLM 大模型，"6"=Intent 意图识别，"7"=Questioner 提问器
+        if node_type in ["3", "6", "7"]:
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                llm_param = inputs.get("llmParam", {})
+                model_info = llm_param.get("model", {})
+                model_id = model_info.get("id")
+
+                if model_id:
+                    model_id_int = int(model_id)
+                    if model_id_int in processed_model_ids:
+                        return
+
+                    with get_db_agent_session() as db:
+                        model_mgr = ModelConfigManager(db)
+                        model_config = model_mgr.get_config_by_id(model_id_int, req.space_id)
+                        _collect_and_decrypt_model_from_config(model_config)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to get model reference for node {node_id}: {e}")
+
+        # 递归处理循环组件内的子节点 (type="8" 表示循环组件)
+        if node_type == "8":
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                loop_children = inputs.get("loopChildren", [])
+                for child_node in loop_children:
+                    _collect_and_decrypt_model_from_node(child_node, wf_id, current_path)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to process loop node {node_id}: {e}")
+
+        # 递归处理子工作流 (type="10" 表示子工作流)
+        if node_type == "10":
+            try:
+                inputs = node.get("data", {}).get("inputs", {})
+                sub_wf_schema = inputs.get("subWorkflow", {})
+                sub_wf_nodes = sub_wf_schema.get("nodes", [])
+                for sub_node in sub_wf_nodes:
+                    _collect_and_decrypt_model_from_node(sub_node, wf_id, current_path)
+            except Exception as e:
+                logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to process sub-workflow node {node_id}: {e}")
+
+    # 5.1 收集 Agent 主模型引用并解密 API Key
+    if agent_data.get("model_id"):
+        try:
+            with get_db_agent_session() as db:
+                model_mgr = ModelConfigManager(db)
+                model_config = model_mgr.get_config_by_id(agent_data["model_id"], req.space_id)
+                _collect_and_decrypt_model_from_config(model_config)
+        except Exception as e:
+            logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to get model reference for agent: {e}")
+
+    # 5.2 收集所有 Workflow 节点模型引用并解密 API Key（包括嵌套节点）
+    for wf in workflows:
+        try:
+            wf_id = wf.get("workflow_id") or wf.get("id", "unknown")
+            schema = json.loads(wf.get("schema", "{}"))
+            nodes = schema.get("nodes", [])
+
+            for node in nodes:
+                _collect_and_decrypt_model_from_node(node, wf_id)
+
+        except Exception as e:
+            logger.warning(f"[AGENT_GET_MODEL_API_KEYS] Failed to process workflow schema: {e}")
+
+    return model_api_keys

@@ -65,6 +65,44 @@ export interface Report {
   citations?: CitationMessages | null
   /** 推理图谱消息列表（原始数据，保留完整信息） */
   inferMessages?: InferMessage[]
+  /** 原始响应内容（未清理，用于 offsets 基线） */
+  rawContent?: string
+}
+
+/** 报告局部改写操作类型 */
+export type ReportRewriteAction = 'expand' | 'polish' | 'shorten'
+
+/** AI 改写状态类型 */
+export type RewriteStatus = 'idle' | 'thinking' | 'writing' | 'error'
+
+/**
+ * 报告改写参数
+ */
+export interface ReportRewriteParams {
+  /** 改写操作类型 */
+  action: 'polish' | 'expand' | 'shorten'
+  /** 选中的文本 */
+  selectedText: string
+  /** 起始偏移量（code point） */
+  startOffset: number
+  /** 结束偏移量（code point） */
+  endOffset: number
+  /** 用户自定义指令 */
+  userInstruction?: string
+  /** 会话 ID */
+  conversationId: string
+  /** 正在改写的块 ID（用于动画） */
+  blockId?: string
+  /** 状态变化回调 */
+  onStatusChange?: (status: RewriteStatus) => void
+  /** 增量更新回调 */
+  onDelta?: (delta: { rewritten_text: string; original_start_offset: number; original_end_offset: number }) => void
+  /** 完整快照回调 */
+  onSnapshot?: (snapshot: { response_content: string }) => void
+  /** 完成回调 */
+  onEnd?: () => void
+  /** 错误回调 */
+  onError?: (error: string) => void
 }
 
 /**

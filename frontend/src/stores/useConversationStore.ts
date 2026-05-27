@@ -2,53 +2,64 @@ import { create } from 'zustand'
 import { conversationDB, conversationEventEmitter } from '../utils/conversationDB'
 import i18n from '../i18n'
 
+// ===== 从共享类型文件导入（供内部使用）=====
+import {
+  MessageType,
+  TaskStatus,
+  AgentType,
+  DeepsearchExecutionMethod,
+  // 基础接口
+  AbortMessageConfig,
+  // 消息相关类型
+  LinkContent,
+  JSONObject,
+  MessageContent,
+  Message,
+  // 数据容器类型
+  MessageItems,
+  Conversation,
+  ConversationData,
+  ConversationsIndex,
+  ThoughtGraphType,
+  MindMapManagers,
+} from '../types/conversationTypes';
+
+// ===== 思维链相关导入 =====
+import {
+  MindMapManager,
+  createMindMapManager
+} from './handlers/deepsearchMindMapHandler';
+
+// ===== 重新导出（保持向后兼容）=====
+export {
+  MessageType,
+  TaskStatus,
+  AgentType,
+  DeepsearchExecutionMethod,
+};
+
+export type {
+  // 基础接口
+  AbortMessageConfig,
+  // 消息相关类型
+  LinkContent,
+  JSONObject,
+  MessageContent,
+  Message,
+  // 数据容器类型
+  MessageItems,
+  Conversation,
+  ConversationData,
+  ConversationsIndex,
+  ThoughtGraphType,
+  MindMapManagers,
+};
+
 // ===== LocalStorage 键名常量 =====
 const STORAGE_KEYS = {
   CONVERSATION_DATA_PREFIX: 'conv_data_',
   CONVERSATIONS_INDEX: 'conv_index',
 } as const
-
-// ===== 枚举定义 =====
-// 消息的类型定义
-export enum MessageType {
-  // 基础类型
-  TEXT = 'text',              // 普通文本/Markdown
-  REPORT = 'report',          // 报告类型, 其他数据和TEXT一样，只是前端使用报告的模板进行显示
-  LINK = 'link',              // 外部链接（网页）
-  DETAIL_LINK = 'detail_link',// 详情链接（打开右侧面板）
-
-  // 任务类型（带子任务）
-  TASK = 'task',              // 任务容器
-
-  // 特殊类型
-  ERROR = 'error',            // 错误信息
-  INTERRUPT = 'interrupt',    // 中断等待用户输入
-}
-
-export enum TaskStatus {
-  PENDING = 'pending',        // 未开始
-  IN_PROGRESS = 'in_progress', // 进行中
-  COMPLETED = 'completed',    // 完成
-  FAILED = 'failed',          // 失败
-  CANCELLED = 'cancelled',    // 手动结束
-  UNKNOWN = 'unknown',        // 未知/提示状态, 有时后端api可能缺少某些流程的数据，导致消息的状态未知
-}
-
-// 对话过程中，某次发问所选择的agent类型
-export enum AgentType {
-  ORDINARY = 'ordinary',   // 普通agent
-  DEEPSEARCH = 'deepsearch', // 深度研究
-}
-
-// ===== 错误消息配置 =====
-/**
- * 错误消息配置接口
- * 用于在消息处理失败时添加错误提示
- */
-export interface ErrorMessageConfig {
-  title: string;
-  content: string;
-}
 
 // ===== 消息标题常量 =====
 // 用于程序判断，与语言环境无关
@@ -64,120 +75,54 @@ const LEGACY_FINAL_REPORT_TITLES = ['最终报告', 'Final Report'] as const;
 // SSE超时时间（分钟）- 超过这个时间没有收到SSE事件，将标记未完成消息为FAILED
 export const SSE_TIMEOUT_MINUTES = 30;
 
+// ===== 大纲交互常量 =====
+// 大纲最大修改次数限制
+export const OUTLINE_INTERACTION_MAX_ROUNDS = 100;
+// 大纲交互提醒阈值（剩余次数小于等于该值时提醒）
+export const OUTLINE_INTERACTION_WARNING_THRESHOLD = 3;
+
 /**
  * 判断消息是否为最终报告
  * 兼容新旧数据：
- * - 新数据：使用 MESSAGE_TITLES.FINAL_REPORT（'FINAL_REPORT'）
- * - 旧数据：使用国际化文本（'最终报告'、'Final Report'）
+ * - 新数据：使用 type=REPORT + indexPath="0-0-0"
+ * - 旧数据：使用 MESSAGE_TITLES.FINAL_REPORT（'FINAL_REPORT'）或国际化文本（'最终报告'、'Final Report'）
  *
- * @param title - 消息标题
+ * @param message - 消息对象
  * @returns 是否为最终报告
  */
-export function isFinalReportMessage(title: string | undefined): boolean {
+export function isFinalReportMessage(message: Message): boolean {
+  // 新数据：优先使用 type + indexPath 判断
+  if (message.type === MessageType.REPORT && message.indexPath === "0-0-0") {
+    return true;
+  }
+
+  // 旧数据：回退到 title 判断（兼容历史数据）
+  const title = message.title;
   if (!title) return false;
   return title === MESSAGE_TITLES.FINAL_REPORT ||
          LEGACY_FINAL_REPORT_TITLES.includes(title as any);
 }
 
-
-export interface LinkContent {
-  url: string;                 // 链接地址
-  title: string;               // 链接标题
-  query?: string;              // 搜索词（collector_info_retrieval返回）
-  description?: string;        // 简短描述
-  source?: string;             // 来源（如：网页、知识库）
-  publishTime?: string;        // 发布时间
-  cardStyle?: 'text' | 'card'; // 展示样式
+/**
+ * 判断任务状态是否为进行中状态
+ * 进行中状态包括：PENDING、IN_PROGRESS、REPORTING
+ *
+ * @param status - 任务状态
+ * @returns true=进行中, false=非进行中
+ *
+ * @example
+ * ```ts
+ * if (isTaskOngoing(message.status)) {
+ *   // 处理进行中的消息
+ * }
+ * ```
+ */
+export function isTaskOngoing(status: TaskStatus): boolean {
+  return status === TaskStatus.PENDING ||
+         status === TaskStatus.IN_PROGRESS ||
+         status === TaskStatus.REPORTING;
 }
 
-// JSON 对象类型定义
-export type JSONObject = Record<string, unknown>;
-
-// Message 内容的类型定义
-export type MessageContent = string | LinkContent | JSONObject;
-
-export interface Message {
-  // ===== 必选字段 =====
-  id: string;                  // 消息唯一标识，格式：task_1[_{section}[_{plan}[_{step}]]]
-  type: MessageType;           // 消息类型
-  status: TaskStatus;          // 状态
-  content: MessageContent;     // 数据内容
-                               // - TEXT/REPORT: Markdown字符串或JSONObject
-                               // - LINK/DETAIL_LINK: LinkContent对象
-
-  // ===== 可选字段 =====
-  title?: string;              // 标题（可选）
-  icon?: string;               // 图标标识
-
-  // ===== 元数据字段 =====
-  parentMessageId?: string;    // 父消息ID（用于构建树形结构）
-  childMessageIds?: string[];     // 子任务ID列表（只存ID，不存对象）
-
-  // ===== 外键字段（用于关联和快速查找） =====
-  messageItemsId: string;      // 所属 MessageItems 的 ID
-  conversationId: string;       // 所属 Conversation 的 ID
-
-  // ===== 时间字段 =====
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
-
-  // ===== SSE流式相关 =====
-  isStreaming?: boolean;       // 是否正在接收
-
-  // TASK类型数据相关
-  sectionIdx?: number;         // 作用于task类型消息中，用于章节索引：0=主任务, 1-10=章节，用于标识任务在层级结构中的位置
-}
-
-export interface MessageItems {
-  id: string;                  // MessageItems唯一标识
-  status: TaskStatus;          // 状态
-  messagesIds: string[];       // 消息Message的id list, 如果是task的message，只写入根节点的id(子节点由根节点去索引)
-
-  // ===== 时间字段 =====
-  createdAt: number;           // 创建时间戳
-  updatedAt: number;           // 最后更新时间戳
-
-  // ===== 其他 =====
-  conversationId: string;      // 会话ID
-
-  // ===== 配置信息 =====
-  isUser: boolean;             // 是否用户消息
-  agentType?: AgentType;       // Agent类型，用于HITL场景判断agent匹配
-  llm?: string;                // 大模型名称
-  agentConfig?: { [key: string]: any }; // agent的参数配置项
-}
-
-export interface Conversation {
-  id: string;                  // Conversation的id
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-  config: {
-    agentType: string;         // agent类型：deepsearch|travel|...
-    [key: string]: any;
-  };
-  messageItemsIds: string[];    // 消息MessageItems的id列表
-  last_session_conversation_id?: string; // 连续对话系列中的上一个会话ID，用于恢复对话上下文；连续对话类型包括：deepsearch,
-}
-
-// ===== 数据导出类型 =====
-
-export interface ConversationData {
-  conversation: Conversation;
-  messageItems: MessageItems[];
-  messages: Record<string, Message>;  // Map转对象以便序列化
-}
-
-export interface ConversationsIndex {
-  conversations: Record<string, {
-    id: string;
-    title: string;
-    createdAt: number;
-    updatedAt: number;
-    config: Conversation['config'];
-  }>;
-  lastUpdated: number;
-}
 
 export interface ConversationStore {
   // ===== 核心数据存储 =====
@@ -207,6 +152,20 @@ export interface ConversationStore {
   // ========== 连续对话系列状态 ==========
   SESSION_CONVERSATION_ID: string | null;  // 连续对话系列的conversationId（null表示非连续对话）
 
+  // ========== 大纲交互状态 ==========
+  pendingOutlineInteraction: {
+    messageId: string;
+    userMessage: string;
+    backendMessage?: string;
+    interruptFeedback: string;
+  } | null;  // 待处理的大纲交互接受请求
+
+  // ========== 对话配置映射 ==========
+  conversationConfigs: Map<string, { [key: string]: any }>;  // conversationId -> agentConfig
+
+  // ========== 思维链图状态 ==========
+  mindMapManagersMap: Map<string, MindMapManagers>;  // messageItemsId -> { sectionGraph, taskGraph } (思维链图管理器集合)
+
   // ========== Conversation 层级：查询函数 ==========
 
   /**
@@ -227,7 +186,12 @@ export interface ConversationStore {
   /**
    * 获取当前 Conversation 的所有 MessageItems
    */
-  getCurrentMessageItems: () => MessageItems[];
+  getCurrentMessageItemsList: () => MessageItems[];
+
+  /**
+   * 获取当前 Conversation 的最后一个 MessageItems
+   */
+  getLastMessageItems: () => MessageItems | undefined;
 
   /**
    * 获取当前对话的完整数据（用于序列化保存）
@@ -274,6 +238,23 @@ export interface ConversationStore {
    * 获取子消息列表
    */
   getChildMessages: (messageId: string) => Message[];
+
+  // ========== 对话配置管理 ==========
+
+  /**
+   * 设置对话的 agent 配置
+   */
+  setConversationConfig: (conversationId: string, config: { [key: string]: any }) => void;
+
+  /**
+   * 获取对话的 agent 配置
+   */
+  getConversationConfig: (conversationId: string) => { [key: string]: any } | undefined;
+
+  /**
+   * 清除对话的 agent 配置
+   */
+  clearConversationConfig: (conversationId: string) => void;
 
   // ========== Conversation 操作函数 ==========
 
@@ -329,6 +310,23 @@ export interface ConversationStore {
    */
   deleteMessageItems: (messageItemsId: string) => void;
 
+  // ========== 思维链图操作函数 ==========
+
+  /**
+   * 获取或创建思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @returns MindMapManager 实例
+   */
+  getOrCreateMindMapManager: (messageItemsId: string) => MindMapManagers;
+
+  /**
+   * 获取思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @param graphType 可选的图类型，指定后返回对应的图管理器
+   * @returns MindMapManager 实例或 undefined
+   */
+  getMindMapManager: (messageItemsId: string, graphType?: ThoughtGraphType) => MindMapManager | undefined;
+
   // ========== Message 操作函数 ==========
 
   /**
@@ -345,6 +343,8 @@ export interface ConversationStore {
   /**
    * 添加系统消息（快捷方法）
    * @param agentType Agent类型（如：deepsearch），用于设置MessageItems.agentType，用于HITL场景匹配
+   * @param indexPath 位置索引路径，格式："section-plan-step"，如 "0-1-2"
+   * @returns 返回创建的 Message，如果对话已取消则返回 null
    */
   addSystemMessage: (
     conversationId: string,
@@ -352,8 +352,9 @@ export interface ConversationStore {
     content: any,
     parentId?: string,
     title?: string,
-    agentType?: string
-  ) => Message;
+    agentType?: string,
+    indexPath?: string
+  ) => Message | null;
 
   /**
    * 添加 Message 到 MessageItems
@@ -388,13 +389,15 @@ export interface ConversationStore {
 
   /**
    * 添加子消息到父消息（构建树形结构）
+   * @param indexPath 位置索引路径，格式："section-plan-step"，如 "0-1-2"
    */
   addMessageAsChild: (
     messageItemsId: string,
     parentId: string,
     type: MessageType,
     content: any,
-    title?: string
+    title?: string,
+    indexPath?: string
   ) => Message;
 
   // ========== 流式消息处理 =====
@@ -499,19 +502,40 @@ export interface ConversationStore {
    * 检查并标记当前对话中未完成的MessageItems为FAILED
    * @returns 是否标记了失败的消息
    */
-  checkAndMarkIncompleteAsFailed: () => boolean;
+  checkAndMarkIncompleteAsAbort: () => boolean;
 
   /**
-   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为FAILED
-   * @param errorMessage 可选的错误消息配置，如果提供则添加错误消息到MessageItems中
+   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为中止状态
+   * @param abortMessage 可选的中止消息配置，如果提供则添加中止消息到MessageItems中
    */
-  markCurrentConversationIncompleteAsFailed: (errorMessage?: ErrorMessageConfig | null) => void;
+  markCurrentConversationIncompleteAsAbort: (abortMessage?: AbortMessageConfig | null) => void;
 
   /**
    * 设置 SESSION_CONVERSATION_ID
    * @param conversationId 连续对话系列的conversationId
    */
   setSessionConversationId: (conversationId: string | null) => void;
+
+  /**
+   * 触发大纲交互接受
+   * @param messageId 消息ID
+   * @param userMessage 用户消息
+   * @param backendMessage 发送给后端 message 字段的数据
+   * @param interruptFeedback 中断反馈标识
+   */
+  triggerOutlineInteractionAccept: (messageId: string, userMessage: string, backendMessage?: string, interruptFeedback?: string) => void;
+
+  /**
+   * 清除待处理的大纲交互
+   */
+  clearPendingOutlineInteraction: () => void;
+
+  /**
+   * 更新当前 MessageItems 状态为 CANCELLED（用于 DeepSearch 取消功能）
+   * 同时更新所有子消息的状态，确保 UI 正确显示取消状态
+   * 如果没有 INTERRUPT 消息，会创建一个 CANCELLED 状态的 INTERRUPT 消息用于显示取消提示
+   */
+  updateMessageItemsStatusToCancelled: () => void;
 }
 
 // ===== Store实现 =====
@@ -551,6 +575,9 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   lastSSEEventTime: null,
   sseTimeoutCheckInterval: null,
   SESSION_CONVERSATION_ID: null,
+  pendingOutlineInteraction: null,
+  conversationConfigs: new Map<string, { [key: string]: any }>(),
+  mindMapManagersMap: new Map<string, MindMapManagers>(),
 
   // ========== Conversation 层级：查询函数 ==========
 
@@ -570,10 +597,15 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       .filter((conv): conv is Conversation => conv !== undefined);
   },
 
-  getCurrentMessageItems: () => {
+  getCurrentMessageItemsList: () => {
     const { currentConversationId } = get();
     if (!currentConversationId) return [];
     return get().getMessageItemsByConversationId(currentConversationId);
+  },
+
+  getLastMessageItems: () => {
+    const list = get().getCurrentMessageItemsList();
+    return list[list.length - 1];
   },
 
   getCurrentConversationData: () => {
@@ -610,10 +642,24 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       });
     });
 
+    // 收集思维链数据
+    const thoughtGraphsMap: Record<string, any> = {};
+    messageItems.forEach(items => {
+      const managers = state.mindMapManagersMap.get(items.id);
+      if (managers) {
+        // 保存两个图：章节图和任务图
+        thoughtGraphsMap[items.id] = {
+          sectionGraph: managers.sectionGraph.getGraph(),
+          taskGraph: managers.taskGraph.getGraph(),
+        };
+      }
+    });
+
     return {
       conversation,
       messageItems,
       messages: messagesMap,
+      thoughtGraphs: thoughtGraphsMap,
     };
   },
 
@@ -681,6 +727,28 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     return message.childMessageIds
       .map(id => get().messagesMap.get(id))
       .filter((msg): msg is Message => msg !== undefined);
+  },
+
+  // ========== 对话配置管理函数 ==========
+
+  setConversationConfig: (conversationId: string, config: { [key: string]: any }) => {
+    set((state) => {
+      const newConfigs = new Map(state.conversationConfigs);
+      newConfigs.set(conversationId, config);
+      return { conversationConfigs: newConfigs };
+    });
+  },
+
+  getConversationConfig: (conversationId: string) => {
+    return get().conversationConfigs.get(conversationId);
+  },
+
+  clearConversationConfig: (conversationId: string) => {
+    set((state) => {
+      const newConfigs = new Map(state.conversationConfigs);
+      newConfigs.delete(conversationId);
+      return { conversationConfigs: newConfigs };
+    });
   },
 
   // ========== Conversation 操作函数 ==========
@@ -980,6 +1048,73 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     });
   },
 
+  // ========== 思维链图操作函数 ==========
+
+  /**
+   * 获取或创建思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @returns MindMapManager 实例
+   */
+  getOrCreateMindMapManager: (messageItemsId: string) => {
+    const state = get();
+    let managers = state.mindMapManagersMap.get(messageItemsId);
+
+    if (!managers) {
+      const messageItems = state.messageItemsMap.get(messageItemsId);
+      if (!messageItems) {
+        console.warn('[getOrCreateMindMapManager] MessageItems not found:', messageItemsId);
+        throw new Error(`MessageItems not found: ${messageItemsId}`);
+      }
+
+      // 创建新的思维链图管理器集合（包含章节图和任务图）
+      const newManagers: MindMapManagers = {
+        sectionGraph: createMindMapManager(
+          undefined,
+          messageItemsId,
+          messageItems.conversationId
+        ),
+        taskGraph: createMindMapManager(
+          undefined,
+          messageItemsId,
+          messageItems.conversationId
+        ),
+      };
+
+      // 保存到状态中
+      set((state) => {
+        const newManagersMap = new Map(state.mindMapManagersMap);
+        newManagersMap.set(messageItemsId, newManagers);
+        return {
+          mindMapManagersMap: newManagersMap,
+        };
+      });
+
+      return newManagers;
+    }
+
+    return managers;
+  },
+
+  /**
+   * 获取思维链图管理器
+   * @param messageItemsId MessageItems ID
+   * @returns MindMapManager 实例或 undefined
+   */
+  getMindMapManager: (messageItemsId: string, graphType?: ThoughtGraphType) => {
+    const managers = get().mindMapManagersMap.get(messageItemsId);
+    if (!managers) return undefined;
+    
+    // 如果指定了 graphType，返回对应的图管理器
+    if (graphType === ThoughtGraphType.SECTION) {
+      return managers.sectionGraph;
+    } else if (graphType === ThoughtGraphType.TASK) {
+      return managers.taskGraph;
+    }
+    
+    // 默认返回整个 managers 对象（向后兼容）
+    return managers;
+  },
+
   // ========== Message 操作函数 ==========
 
   addUserMessage: (conversationId: string, content: string) => {
@@ -995,7 +1130,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
     const message: Message = {
       id: messageId,
-      type: MessageType.REPORT,
+      type: MessageType.TEXT,
       status: TaskStatus.COMPLETED,
       content,
       messageItemsId,
@@ -1033,11 +1168,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     return messageItems;
   },
 
-  addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string) => {
+  addSystemMessage: (conversationId: string, type: MessageType, content: any, parentId?: string, title?: string, agentType?: string, indexPath?: string) => {
     const messageId = get().generateMessageId();
 
+    // 自动读取配置
+    const agentConfig = get().getConversationConfig(conversationId);
+
     // 查找当前正在进行中的MessageItems，如果没有则创建新的
-    const currentMessageItemsList = get().getCurrentMessageItems();
+    const currentMessageItemsList = get().getCurrentMessageItemsList();
     let lastMessageItems = currentMessageItemsList[currentMessageItemsList.length - 1];
     let messageItemsId: string;
 
@@ -1053,10 +1191,16 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         createdAt: Date.now(),
         updatedAt: Date.now(),
         agentType: agentType === 'deepsearch' ? AgentType.DEEPSEARCH : AgentType.ORDINARY,  // 保存 agent 类型到 MessageItems（用于HITL场景匹配）
+        agentConfig,  // 自动保存配置
       };
 
       get().addMessageItems(lastMessageItems, conversationId);
     } else {
+      // 检查最后一个非用户 MessageItems 是否已被取消，如果是则不应该添加新消息
+      if (lastMessageItems.status === TaskStatus.CANCELLED) {
+        console.log('[addSystemMessage] MessageItems is cancelled, skipping adding message');
+        return null;
+      }
       messageItemsId = lastMessageItems.id;
       // 添加到现有的MessageItems
       const newMessageItemsMap = new Map(get().messageItemsMap);
@@ -1068,6 +1212,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           updatedAt: Date.now(),
           // 如果传入了 agentType 且当前 MessageItems 没有 agentType，则保存
           ...(agentType && !existingItems.agentType ? { agentType: agentType === 'deepsearch' ? AgentType.DEEPSEARCH : AgentType.ORDINARY } : {}),
+          // 如果存在配置且当前 MessageItems 没有配置，则保存
+          ...(agentConfig && !existingItems.agentConfig ? { agentConfig } : {}),
         });
         set({ messageItemsMap: newMessageItemsMap });
       }
@@ -1087,6 +1233,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       isStreaming: true,
       parentMessageId: parentId,
       childMessageIds: type === MessageType.TASK ? [] : undefined,
+      indexPath,
     };
 
     // 添加 message 到 messagesMap
@@ -1173,8 +1320,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             } else if (childMessages.some(child => child.status === TaskStatus.CANCELLED)) {
               finalUpdates.status = TaskStatus.CANCELLED;
             } else if (childMessages.some(child =>
-              child.status === TaskStatus.PENDING ||
-              child.status === TaskStatus.IN_PROGRESS ||
+              isTaskOngoing(child.status) ||
               child.status === TaskStatus.UNKNOWN
             )) {
               finalUpdates.status = TaskStatus.UNKNOWN;
@@ -1182,7 +1328,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             // 其他情况保持 COMPLETED
             break;
 
-          // PENDING / IN_PROGRESS / FAILED / CANCELLED 保持不变
+          // PENDING / IN_PROGRESS / REPORTING / FAILED / CANCELLED 保持不变
           default:
             break;
         }
@@ -1190,12 +1336,12 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         // 在根消息的直接子消息状态变为终态时，保存到 IndexDB
         // 条件：1. 是子消息（有 parentMessageId）
         //       2. 父消息是根消息（父消息没有 parentMessageId）
-        //       3. 状态变为 COMPLETED/FAILED/CANCELLED（非 PENDING/IN_PROGRESS）
+        //       3. 状态变为 COMPLETED/FAILED/CANCELLED（非 PENDING/IN_PROGRESS/REPORTING）
         //       4. 状态确实发生了变化
         if (
           existingMessage.parentMessageId &&  // 是子消息
           finalUpdates.status &&
-          ![TaskStatus.PENDING, TaskStatus.IN_PROGRESS].includes(finalUpdates.status) &&
+          !isTaskOngoing(finalUpdates.status) &&
           finalUpdates.status !== existingMessage.status  // 状态确实发生了变化
         ) {
           // 检查父消息是否是根消息
@@ -1328,7 +1474,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     });
   },
 
-  addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string) => {
+  addMessageAsChild: (messageItemsId: string, parentId: string, type: MessageType, content: any, title?: string, indexPath?: string) => {
     const messageId = get().generateMessageId();
 
     // 获取 messageItems 以获得 conversationId
@@ -1351,6 +1497,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       isStreaming: false,
       parentMessageId: parentId,
       childMessageIds: type === MessageType.TASK ? [] : undefined,
+      indexPath,
     };
 
     set((state) => {
@@ -1441,17 +1588,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return;
       }
 
-      // 获取当前 MessageItems
-      const getCurrentMessageItems = () => {
-        const currentList = get().getCurrentMessageItems();
-        return currentList[currentList.length - 1];
-      };
-
       // 动态导入 deepsearch 处理器
       import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
         const handler = new DeepsearchSSEHandler(
           {
-            getCurrentMessageItems: getCurrentMessageItems,
+            getLastMessageItems: get().getLastMessageItems,
             addSystemMessage: get().addSystemMessage,
             addMessageAsChild: get().addMessageAsChild,
             updateMessage: get().updateMessage,
@@ -1461,8 +1602,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             getMessageById: get().getMessageById,
             getMessageTree: get().getMessageTree,
             getChildMessages: get().getChildMessages,
+            getMessageItemsById: get().getMessageItemsById,
             getMessageItemsIsUser: get().getMessageItemsIsUser,
             setSessionConversationId: get().setSessionConversationId,
+            saveConversationToDB: get().saveConversationToDB,
+            getOrCreateMindMapManager: get().getOrCreateMindMapManager,
           },
           {
             get: (key: string) => get().sseStreamCache.get(key),
@@ -1486,6 +1630,12 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
         // 批量处理事件
         eventsToProcess.forEach(event => {
+          // 在处理每个事件之前，检查是否已取消
+          const currentMessageItems = get().getLastMessageItems();
+          if (currentMessageItems && currentMessageItems.status === TaskStatus.CANCELLED) {
+            console.log('[SSE Processor] MessageItems cancelled during processing, skipping event');
+            return;  // 跳过此事件
+          }
           // 使用类型断言，因为 useConversationStore 不应该知道具体的 SSE 数据结构
           handler.handleSSEMessage(event.sseData as any);
         });
@@ -1805,8 +1955,27 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         return;
       }
 
-      // 获取对话的完整数据
-      const conversationData = state.getConversationData(conversationId);
+      // 将 SESSION_CONVERSATION_ID 持久化到 conversation.lastSessionConversationId
+      const sessionConversationId = state.SESSION_CONVERSATION_ID;
+      const shouldUpdateSessionId = sessionConversationId && sessionConversationId !== conversation.lastSessionConversationId;
+
+      if (shouldUpdateSessionId) {
+        // Zustand 的 set 是同步的，更新后 get() 立即返回新状态
+        set((s) => {
+          const existingConversation = s.conversationsMap.get(conversationId);
+          if (!existingConversation) return s;
+
+          const newConversationsMap = new Map(s.conversationsMap);
+          newConversationsMap.set(conversationId, {
+            ...existingConversation,
+            lastSessionConversationId: sessionConversationId,
+          });
+          return { conversationsMap: newConversationsMap };
+        });
+        console.log('[saveConversationToDB] Saved SESSION_CONVERSATION_ID to lastSessionConversationId:', sessionConversationId);
+      }
+
+      const conversationData = get().getConversationData(conversationId);
 
       if (!conversationData) {
         console.warn('[saveConversationToDB] Failed to get conversation data:', conversationId);
@@ -1815,6 +1984,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       // 保存到 IndexDB
       await conversationDB.saveConversation(conversationData);
+      console.log('[saveConversationToDB] Saved to IndexDB, lastSessionConversationId:',
+        conversationData.conversation.lastSessionConversationId);
     } catch (error) {
       console.error('[saveConversationToDB] Failed to save conversation:', error);
     }
@@ -1954,9 +2125,43 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           });
         }
 
+        // 恢复思维链管理器
+        const newMindMapManagersMap = new Map(state.mindMapManagersMap);
+        if (doc.thoughtGraphs) {
+          Object.entries(doc.thoughtGraphs).forEach(([messageItemsId, graphs]) => {
+            // graphs 包含 sectionGraph 和 taskGraph 两个 ThoughtGraph
+            const managers: MindMapManagers = {
+              sectionGraph: createMindMapManager(
+                graphs.sectionGraph as any,
+                messageItemsId,
+                conversationId
+              ),
+              taskGraph: createMindMapManager(
+                graphs.taskGraph as any,
+                messageItemsId,
+                conversationId
+              ),
+            };
+            newMindMapManagersMap.set(messageItemsId, managers);
+          });
+          console.log(`[loadConversationFullData] Restored ${Object.keys(doc.thoughtGraphs).length} mind map manager collections`);
+        }
+
+        // 恢复 SESSION_CONVERSATION_ID（用于 AI 改写功能）
+        // 注意：lastSessionConversationId 在 ConversationDocument 顶层，不是在 conversation 中
+        const sessionConversationId = doc.lastSessionConversationId;
+        if (sessionConversationId) {
+          console.log('[loadConversationFullData] Restored SESSION_CONVERSATION_ID:', sessionConversationId);
+          // 使用 setTimeout 避免在 reducer 中直接调用 set
+          setTimeout(() => {
+            get().setSessionConversationId(sessionConversationId);
+          }, 0);
+        }
+
         return {
           messageItemsMap: newMessageItemsMap,
           messagesMap: newMessagesMap,
+          mindMapManagersMap: newMindMapManagersMap,
           conversationsMap: newConversationsMap,
         };
       });
@@ -2043,10 +2248,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       // 检查是否超时
       if (lastSSEEventTime && timeSinceLastEvent > timeoutMs) {
-        // 标记未完成消息为失败，并添加超时错误消息
-        get().markCurrentConversationIncompleteAsFailed({
+        // 标记未完成消息为取消，并添加超时取消消息
+        get().markCurrentConversationIncompleteAsAbort({
           title: i18n.t('common.messages.sse.timeoutError.title'),
           content: i18n.t('common.messages.sse.timeoutError.content'),
+          abortType: TaskStatus.CANCELLED,  // 超时取消
         });
         // 停止监控
         get().stopSSETimeoutMonitor();
@@ -2075,15 +2281,15 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   /**
-   * 检查并标记当前对话中未完成的MessageItems为FAILED
+   * 检查并标记当前对话中未完成的MessageItems为FAILED 或 CANCELLED
    */
-  checkAndMarkIncompleteAsFailed: () => {
+  checkAndMarkIncompleteAsAbort: () => {
     const { currentConversationId } = get();
     if (!currentConversationId) {
       return false;
     }
 
-    const messageItemsList = get().getCurrentMessageItems();
+    const messageItemsList = get().getCurrentMessageItemsList();
     if (messageItemsList.length === 0) {
       return false;
     }
@@ -2096,11 +2302,25 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       return false;
     }
 
-    // 检查状态是否为 PENDING 或 IN_PROGRESS
-    if (lastMessageItems.status === TaskStatus.PENDING ||
-        lastMessageItems.status === TaskStatus.IN_PROGRESS) {
-      console.warn('[SSE Timeout] 检测到超时的未完成消息，标记为FAILED');
-      get().markCurrentConversationIncompleteAsFailed();
+    // 检查状态是否为进行中
+    if (isTaskOngoing(lastMessageItems.status)) {
+      const hasInterruptLikeMessage = lastMessageItems.messagesIds.some((msgId) => {
+        const msg = get().getMessageById(msgId);
+        return msg?.type === MessageType.INTERRUPT || msg?.type === MessageType.OUTLINE_INTERACTION;
+      });
+
+      if (hasInterruptLikeMessage) {
+        console.warn('[SSE Timeout] 检测到超时的 interrupt/outline_interaction 消息，标记为CANCELLED');
+        get().updateMessageItemsStatusToCancelled();
+        return true;
+      }
+
+      console.warn('[SSE Timeout] 检测到超时的未完成消息，标记为CANCELLED');
+      get().markCurrentConversationIncompleteAsAbort({
+        title: i18n.t('common.messages.sse.timeoutError.title'),
+        content: i18n.t('common.messages.sse.timeoutError.content'),
+        abortType: TaskStatus.CANCELLED,  // 页面刷新/切换会话导致的超时取消
+      });
       return true;
     }
 
@@ -2108,23 +2328,78 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   /**
-   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为FAILED
-   * @param errorMessage 可选的错误消息配置，如果提供则添加错误消息到MessageItems中
+   * 标记当前对话中最后一个MessageItems（及其所有未完成的消息）为中止状态
+   * @param abortMessage 可选的中止消息配置，如果提供则添加中止消息到MessageItems中
    */
-  markCurrentConversationIncompleteAsFailed: (errorMessage?: ErrorMessageConfig | null) => {
+  markCurrentConversationIncompleteAsAbort: (abortMessage?: AbortMessageConfig | null) => {
     const { currentConversationId } = get();
     if (!currentConversationId) {
       return;
     }
 
-    const messageItemsList = get().getCurrentMessageItems();
+    const messageItemsList = get().getCurrentMessageItemsList();
     if (messageItemsList.length === 0) {
       return;
     }
 
     const lastMessageItems = messageItemsList[messageItemsList.length - 1];
 
-    // 动态导入 handler
+    // 【新增】发送取消请求到后端（不阻塞 UI 更新）
+    // 立即调用 API，异步处理，不等待响应
+    const cancelAbortController = new AbortController();
+    const sessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID || currentConversationId;
+    import('@/pages/Apps/components/services/deepsearchApi').then(({ DeepSearchApiService }) => {
+      DeepSearchApiService.cancelConversation(sessionConversationId, cancelAbortController.signal);
+    }).catch((error) => {
+      console.error('[markCurrentConversationIncompleteAsAbort] Failed to load deepsearchApi:', error);
+    });
+
+    // 根据 abortType 决定目标状态
+    const targetStatus = abortMessage?.abortType ?? TaskStatus.CANCELLED;
+
+    // ========== 辅助函数：添加中止消息 ==========
+    const addAbortMessage = () => {
+      if (!abortMessage) return;
+
+      // 如果是取消状态，尝试复用已有的 INTERRUPT 消息
+      if (abortMessage.abortType === TaskStatus.CANCELLED) {
+        const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
+        const lastMessage = get().getMessageById(lastMessageId);
+
+        if (lastMessage && lastMessage.type === MessageType.INTERRUPT) {
+          // 复用：直接更新 title 和 content
+          get().updateMessage(lastMessageItems.id, lastMessage.id, {
+            title: abortMessage.title,
+            content: abortMessage.content,
+            status: TaskStatus.CANCELLED,
+            updatedAt: Date.now(),
+          });
+          // 手动保存到 IndexDB
+          get().saveConversationToDB(lastMessageItems.conversationId);
+          return;
+        }
+      }
+
+      // 没有可复用的 INTERRUPT 消息，创建新的
+      const abortMsg: Message = {
+        id: get().generateMessageId(),
+        type: abortMessage.abortType === TaskStatus.FAILED
+          ? MessageType.ERROR      // 错误用 ERROR 类型
+          : MessageType.INTERRUPT, // 取消用 INTERRUPT 类型
+        status: abortMessage.abortType,
+        content: abortMessage.content,
+        title: abortMessage.title,
+        messageItemsId: lastMessageItems.id,
+        conversationId: lastMessageItems.conversationId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      get().addMessage(lastMessageItems.id, abortMsg, true);
+      // 手动保存到 IndexDB
+      get().saveConversationToDB(lastMessageItems.conversationId);
+    };
+
+    // ========== 动态导入 handler ==========
     import('./handlers/deepsearchSSEHandler').then(({ DeepsearchSSEHandler }) => {
       const handler = new DeepsearchSSEHandler(
         // 传入空的 dependencies，我们只使用 markAllIncompleteMessages 方法
@@ -2132,28 +2407,13 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         {} as any,
         lastMessageItems.conversationId
       );
-      // 调用公共方法标记为失败
-      handler.markAllIncompleteMessages(lastMessageItems, false);  // false = 标记为 FAILED
+      // 调用公共方法标记为中止状态
+      handler.markAllIncompleteMessages(lastMessageItems, targetStatus);
 
-      // 添加错误消息（如果提供）
-      if (errorMessage) {
-        const errorMsg: Message = {
-          id: get().generateMessageId(),
-          type: MessageType.ERROR,
-          status: TaskStatus.FAILED,
-          content: errorMessage.content,
-          title: errorMessage.title,
-          messageItemsId: lastMessageItems.id,
-          conversationId: lastMessageItems.conversationId,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        get().addMessage(lastMessageItems.id, errorMsg, true);
-        // 手动保存到 IndexDB
-        get().saveConversationToDB(lastMessageItems.conversationId);
-      }
+      // 添加中止消息
+      addAbortMessage();
     }).catch((error) => {
-      console.error('[markCurrentConversationIncompleteAsFailed] Failed to load handler:', error);
+      console.error('[markCurrentConversationIncompleteAsAbort] Failed to load handler:', error);
 
       // 降级处理: 直接遍历所有消息并标记
       const markRecursively = (messageId: string) => {
@@ -2166,33 +2426,18 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         }
 
         // 标记未完成的消息
-        if (msg.status === TaskStatus.PENDING || msg.status === TaskStatus.IN_PROGRESS) {
-          get().updateMessage(lastMessageItems.id, msg.id, { status: TaskStatus.FAILED });
+        if (isTaskOngoing(msg.status)) {
+          get().updateMessage(lastMessageItems.id, msg.id, { status: targetStatus });
         }
       };
 
       lastMessageItems.messagesIds.forEach(msgId => markRecursively(msgId));
 
       // 更新 MessageItems 状态
-      get().updateMessageItems(lastMessageItems.id, { status: TaskStatus.FAILED });
+      get().updateMessageItems(lastMessageItems.id, { status: targetStatus });
 
-      // 添加错误消息（如果提供）
-      if (errorMessage) {
-        const errorMsg: Message = {
-          id: get().generateMessageId(),
-          type: MessageType.ERROR,
-          status: TaskStatus.FAILED,
-          content: errorMessage.content,
-          title: errorMessage.title,
-          messageItemsId: lastMessageItems.id,
-          conversationId: lastMessageItems.conversationId,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        get().addMessage(lastMessageItems.id, errorMsg, true);
-        // 手动保存到 IndexDB
-        get().saveConversationToDB(lastMessageItems.conversationId);
-      }
+      // 添加中止消息
+      addAbortMessage();
     });
   },
 
@@ -2201,6 +2446,271 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
    */
   setSessionConversationId: (conversationId: string | null) => {
     set({ SESSION_CONVERSATION_ID: conversationId });
+  },
+
+  triggerOutlineInteractionAccept: (messageId: string, userMessage: string, backendMessage?: string, interruptFeedback: string = 'accepted') => {
+    set({ pendingOutlineInteraction: { messageId, userMessage, backendMessage, interruptFeedback } });
+  },
+
+  clearPendingOutlineInteraction: () => {
+    set({ pendingOutlineInteraction: null });
+  },
+
+  /**
+   * 更新当前 MessageItems 状态为 CANCELLED（用于 DeepSearch 取消功能）
+   * 同时更新所有子消息的状态，确保 UI 正确显示取消状态
+   * 如果没有 MessageItems（SSE 还未返回数据），会创建一个 CANCELLED 状态的 INTERRUPT 消息
+   * 如果没有 INTERRUPT 消息，会创建一个 CANCELLED 状态的 INTERRUPT 消息用于显示取消提示
+   */
+  updateMessageItemsStatusToCancelled: () => {
+    const { getCurrentMessageItemsList, updateMessageItems, updateMessage, getMessageById, getChildMessages, getCurrentConversation, saveConversationToDB, addMessageItems } = get();
+    const messageItemsList = getCurrentMessageItemsList();
+
+    // 清空 SSE 队列，防止取消后仍有事件被处理
+    set({ sseEventQueue: [] });
+
+    // 场景 1：没有任何 MessageItems（SSE 还未返回数据）
+    if (!messageItemsList || messageItemsList.length === 0) {
+      const currentConversation = getCurrentConversation();
+      if (currentConversation) {
+        // 创建新的 MessageItems
+        const messageItemsId = get().generateMessageItemsId();
+        const messageId = get().generateMessageId();
+
+        // 创建 CANCELLED 状态的 INTERRUPT 消息
+        const interruptMessage: Message = {
+          id: messageId,
+          type: MessageType.INTERRUPT,
+          status: TaskStatus.CANCELLED,
+          content: '',
+          title: undefined,
+          messageItemsId,
+          conversationId: currentConversation.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isStreaming: false,
+          parentMessageId: undefined,
+          childMessageIds: undefined,
+        };
+
+        // 创建 MessageItems
+        const newMessageItems: MessageItems = {
+          id: messageItemsId,
+          isUser: false,
+          status: TaskStatus.CANCELLED,
+          messagesIds: [messageId],
+          conversationId: currentConversation.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          agentType: AgentType.DEEPSEARCH,
+        };
+
+        // 添加到 stores
+        set((state) => {
+          const newMessagesMap = new Map(state.messagesMap);
+          newMessagesMap.set(messageId, interruptMessage);
+
+          const newMessageItemsMap = new Map(state.messageItemsMap);
+          newMessageItemsMap.set(messageItemsId, newMessageItems);
+
+          return {
+            messagesMap: newMessagesMap,
+            messageItemsMap: newMessageItemsMap,
+          };
+        });
+
+        // 添加到 conversation 的 messageItemsIds
+        set((state) => {
+          const conversation = state.conversationsMap.get(currentConversation.id);
+          if (conversation) {
+            const updatedConversation = {
+              ...conversation,
+              messageItemsIds: [...conversation.messageItemsIds, messageItemsId],
+              updatedAt: Date.now(),
+            };
+            const newConversationsMap = new Map(state.conversationsMap);
+            newConversationsMap.set(currentConversation.id, updatedConversation);
+            return { conversationsMap: newConversationsMap };
+          }
+          return state;
+        });
+      }
+      return;
+    }
+
+    // 场景 2：已有 MessageItems（SSE 已返回数据，可能已经有消息）
+    const lastMessageItems = messageItemsList[messageItemsList.length - 1];
+
+    // 检查最后一个 MessageItems 是否是用户消息
+    // 如果是用户消息，需要创建一个新的系统 MessageItems 来显示取消状态
+    const isLastMessageUser = lastMessageItems.isUser === true;
+
+    if (isLastMessageUser) {
+      // 用户消息后面没有系统消息，创建一个新的系统 MessageItems
+      const currentConversation = getCurrentConversation();
+      if (currentConversation) {
+        const messageItemsId = get().generateMessageItemsId();
+        const messageId = get().generateMessageId();
+
+        // 创建 CANCELLED 状态的 INTERRUPT 消息
+        const interruptMessage: Message = {
+          id: messageId,
+          type: MessageType.INTERRUPT,
+          status: TaskStatus.CANCELLED,
+          content: '',
+          title: undefined,
+          messageItemsId,
+          conversationId: currentConversation.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          isStreaming: false,
+          parentMessageId: undefined,
+          childMessageIds: undefined,
+        };
+
+        // 创建系统 MessageItems
+        const newMessageItems: MessageItems = {
+          id: messageItemsId,
+          isUser: false,
+          status: TaskStatus.CANCELLED,
+          messagesIds: [messageId],
+          conversationId: currentConversation.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          agentType: AgentType.DEEPSEARCH,
+        };
+
+        // 添加到 stores
+        set((state) => {
+          const newMessagesMap = new Map(state.messagesMap);
+          newMessagesMap.set(messageId, interruptMessage);
+
+          const newMessageItemsMap = new Map(state.messageItemsMap);
+          newMessageItemsMap.set(messageItemsId, newMessageItems);
+
+          return {
+            messagesMap: newMessagesMap,
+            messageItemsMap: newMessageItemsMap,
+          };
+        });
+
+        // 添加到 conversation 的 messageItemsIds
+        set((state) => {
+          const conversation = state.conversationsMap.get(currentConversation.id);
+          if (conversation) {
+            const updatedConversation = {
+              ...conversation,
+              messageItemsIds: [...conversation.messageItemsIds, messageItemsId],
+              updatedAt: Date.now(),
+            };
+            const newConversationsMap = new Map(state.conversationsMap);
+            newConversationsMap.set(currentConversation.id, updatedConversation);
+            return { conversationsMap: newConversationsMap };
+          }
+          return state;
+        });
+      }
+      // 场景 2a 结束：已为用户消息创建新的系统 MessageItems
+    } else {
+      // 场景 2b：最后一个 MessageItems 是系统消息，继续原来的逻辑
+      // 1. 更新 MessageItems 状态为 CANCELLED（无论当前状态是什么）
+      updateMessageItems(lastMessageItems.id, { status: TaskStatus.CANCELLED });
+
+      // 2. 递归更新所有子消息的状态为 CANCELLED
+      const updateMessageToCancelled = (messageId: string) => {
+        const message = getMessageById(messageId);
+        if (message) {
+          // 只要消息状态是进行中的，都更新为 CANCELLED
+          if (isTaskOngoing(message.status)) {
+            updateMessage(lastMessageItems.id, messageId, {
+              status: TaskStatus.CANCELLED,
+              isStreaming: false,  // 清除流式标志
+            });
+          }
+        }
+        // 递归处理子消息
+        const children = getChildMessages(messageId);
+        children?.forEach(child => updateMessageToCancelled(child.id));
+      };
+
+      // 遍历所有顶级消息
+      lastMessageItems.messagesIds.forEach(messageId => {
+        updateMessageToCancelled(messageId);
+      });
+
+      // 3. 检查是否存在 INTERRUPT 消息，如果存在则更新其状态为 CANCELLED，如果不存在则创建
+      const hasInterruptMessage = lastMessageItems.messagesIds.some(messageId => {
+        const message = getMessageById(messageId);
+        return message?.type === MessageType.INTERRUPT;
+      });
+
+      if (hasInterruptMessage) {
+        // 找到 INTERRUPT 消息并更新其状态为 CANCELLED
+        lastMessageItems.messagesIds.forEach(messageId => {
+          const message = getMessageById(messageId);
+          if (message?.type === MessageType.INTERRUPT) {
+            updateMessage(lastMessageItems.id, messageId, {
+              status: TaskStatus.CANCELLED,
+              isStreaming: false,
+            });
+          }
+        });
+      } else {
+        // 创建 INTERRUPT 消息（用于显示"对话已取消"提示）
+        // 直接添加消息到当前 MessageItems，不检查状态
+        const currentConversation = getCurrentConversation();
+        if (currentConversation) {
+          // 手动创建消息，绕过 addSystemMessage 的状态检查
+          const messageId = get().generateMessageId();
+          const messageItemsId = lastMessageItems.id;
+
+          // 创建消息
+          const interruptMessage: Message = {
+            id: messageId,
+            type: MessageType.INTERRUPT,
+            status: TaskStatus.CANCELLED,  // 直接设置为 CANCELLED
+            content: '',
+            title: undefined,
+            messageItemsId,
+            conversationId: currentConversation.id,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            isStreaming: false,
+            parentMessageId: undefined,
+            childMessageIds: undefined,
+          };
+
+          // 添加到 messagesMap
+          set((state) => {
+            const newMessagesMap = new Map(state.messagesMap);
+            newMessagesMap.set(messageId, interruptMessage);
+            return { messagesMap: newMessagesMap };
+          });
+
+          // 添加到 MessageItems 的 messagesIds 数组
+          set((state) => {
+            const newMessageItemsMap = new Map(state.messageItemsMap);
+            const existingItems = newMessageItemsMap.get(messageItemsId);
+            if (existingItems) {
+              newMessageItemsMap.set(messageItemsId, {
+                ...existingItems,
+                messagesIds: [...existingItems.messagesIds, messageId],
+                updatedAt: Date.now(),
+              });
+            } else {
+              console.warn('[updateMessageItemsStatusToCancelled] MessageItems not found in map:', messageItemsId);
+            }
+            return { messageItemsMap: newMessageItemsMap };
+          });
+        }
+      }
+    }
+
+    // 4. 确保保存到 IndexDB
+    const finalMessageItemsList = get().getCurrentMessageItemsList();
+    if (finalMessageItemsList && finalMessageItemsList.length > 0) {
+      saveConversationToDB(lastMessageItems.conversationId);
+    }
   },
 }));
 // ===== 监听 IndexDB 删除事件，同步删除内存中的对话 =====

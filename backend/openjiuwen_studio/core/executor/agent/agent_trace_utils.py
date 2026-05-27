@@ -136,6 +136,12 @@ async def process_chunk_trace(
             trace_context.agent_ouput = {'outputs': payload.get('output')}
         return None
 
+    if isinstance(chunk, OutputSchema) and chunk.type == "output":
+        payload = chunk.payload
+        if 'output' in payload:
+            trace_context.agent_ouput = {'outputs': payload.get('output')}
+        # 继续处理，不要直接返回 None，而是让 result_convert 继续处理并返回响应
+
     # 转换chunk为响应格式和追踪信息
     rsp, trace_data, trace_detail = result_convert(chunk, business_type=business_type, mapping=trace_context.mapping)
 

@@ -27,6 +27,11 @@ def outputs_convert(outputs: Outputs) -> Dict[str, str]:
 def base_value_convert(value: BaseValue) -> str:
     value_type = value.type
     content = value.content
+    # Handle empty/uninitialized BaseValue (e.g., end node result set to {})
+    if not value_type:
+        if content is not None:
+            return content
+        return ""
     if value_type == "ref":
         if not isinstance(content, List):
             raise TypeError("type is ref, but content type is not list")
@@ -39,6 +44,10 @@ def base_value_convert(value: BaseValue) -> str:
         if value.schema.type == "string":
             return str(content)
         elif value.schema.type == "object" or value.schema.type == "array":
+            if content is None or content == "":
+                return {} if value.schema.type == "object" else []
+            if isinstance(content, (dict, list)):
+                return content
             return ast.literal_eval(str(content).replace('true', 'True').replace('false', 'False'))
         else:
             return content

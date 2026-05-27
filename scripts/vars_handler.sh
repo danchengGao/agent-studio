@@ -145,12 +145,7 @@ configure_module_env() {
                 DEPLOY_VARS["HAS_SANDBOX"]="true"
                 DEPLOY_VARS["IS_UP_SANDBOX_GATEWAY"]="true"
                 RUNTIME_VARS["CODE_SANDBOX_URL"]="http://${gateway_service}:${gateway_port}/run"
-
-                local els="${DEPLOY_VARS["ENABLE_LINUX_SANDBOX"],,}"
-                if [ "${els}" == "false" ]; then
-                    DEPLOY_VARS["IS_UP_PYTHON_SERVER"]="true"
-                    DEPLOY_VARS["IS_UP_JS_SERVER"]="true"
-                fi
+                DEPLOY_VARS["IS_UP_SANDBOX_SERVER"]="true"
                 ;;
             JIUWEN)
                 if [ -n "${RUNTIME_VARS["VITE_API_PROXY_TARGET"]:-}" ]; then
@@ -173,6 +168,20 @@ configure_module_env() {
                 DEPLOY_VARS["IS_UP_DEEPSEARCH"]="true"
                 RUNTIME_VARS["DEEPSEARCH_AGENT_HOST"]=${DEPLOY_VARS["DEEPSEARCH_SERVICE"]}
                 RUNTIME_VARS["DEEPSEARCH_AGENT_PORT"]="8000"
+                ;;
+            RUNTIME)
+                if [ -n "${RUNTIME_VARS["RUNTIME_HOST"]:-}" ]; then
+                    DEPLOY_VARS["HAS_RUNTIME"]="false"
+                    continue
+                fi
+                if [ -z "${DEPLOY_VARS["IP"]:-}" ]; then
+                    error "Please define IP in .env.custom"
+                fi
+                DEPLOY_VARS["HAS_RUNTIME"]="true"
+                DEPLOY_VARS["IS_UP_RUNTIME"]="true"
+                RUNTIME_VARS["RUNTIME_HOST"]=${DEPLOY_VARS["RUNTIME_SERVICE"]}
+                RUNTIME_VARS["RUNTIME_PORT"]="8186"
+                ;;
         esac
     done
 }

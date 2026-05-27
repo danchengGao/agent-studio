@@ -1,0 +1,43 @@
+services:
+  <<RUNTIME_SERVICE>>:
+    image: <<RUNTIME_IMAGE>>
+    pull_policy: if_not_present
+    container_name: <<RUNTIME_DOCKER>>
+    ports:
+      - "<<RUNTIME_HOST_PORT>>:<<RUNTIME_PORT>>"
+    environment:
+      - HTTP_PROXY
+      - HTTPS_PROXY
+      - https_proxy
+      - http_proxy
+      - <<no_proxy_str>>
+      - <<NO_PROXY_STR>>
+      - DB_TYPE=<<DB_TYPE>>
+      - DB_HOST=<<DB_HOST>>
+      - DB_PORT=<<DB_PORT>>
+      - DB_USER=<<DB_USER>>
+      - DB_PASSWORD=<<DB_PASSWORD>>
+      - DB_NAME=<<RUNTIME_DB_NAME>>
+      - IP=<<IP>>
+      - LOWCODE_IMAGE=<<LOWCODE_IMAGE>>
+      - DEPLOY_DIR=/app/deploys
+      - DIST_DIR=/app/dist
+      - HOST=0.0.0.0
+      - PORT=<<RUNTIME_PORT>>
+      - UV_EXTRA_ARGS=<<UV_EXTRA_ARGS>>
+      - DEPLOY_TYPE=docker
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - <<JIUWEN_NETWORK_NAME>>
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:<<RUNTIME_PORT>>/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+networks:
+  <<JIUWEN_NETWORK_NAME>>:
+    driver: bridge

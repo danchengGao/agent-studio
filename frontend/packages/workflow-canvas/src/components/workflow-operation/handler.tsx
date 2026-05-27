@@ -6,11 +6,13 @@
 import React, { useRef } from 'react'
 
 import { useClientContext, useService, HistoryService } from '@flowgram.ai/free-layout-editor'
-import { useSaveWorkflow } from '@test-agentstudio/api-client'
+import { useSaveWorkflow, WorkflowService } from '@test-agentstudio/api-client'
 import { Toast, Modal } from '@douyinfe/semi-ui'
 import { CheckCircle, XCircle, Info } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { t } from '../../i18n'
+import { getDefaultSpaceId } from '@/utils/spaceUtils'
+import { buildWorkflowExportEnrichment, mergeWorkflowExportDocument, unwrapWorkflowImportPayload } from '../../utils/workflow-export-enrichment'
 
 interface WorkflowOperationsHandlerProps {
   workflowId: string | undefined
@@ -29,7 +31,6 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
 
   // 从 store 读取只读状态和选中的版本
   const panelReadonly = useWorkflowStore(s => s.panelReadonly)
-  const selectedVersion = useWorkflowStore(s => s.selectedVersion)
 
   // Toast 显示函数
   const showToast = React.useCallback((message: string, type: 'success' | 'error' | 'info') => {
@@ -109,7 +110,7 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
       const workflowData = context.document.toJSON()
 
       if (workflowId && canvasData) {
-        const finalSpaceId = spaceId || canvasData?.space_id || '1'
+        const finalSpaceId = (spaceId && String(spaceId).trim()) || (canvasData?.space_id && String(canvasData.space_id).trim()) || getDefaultSpaceId() || '1'
 
         await saveWorkflowMutation.mutateAsync({
           workflow_id: workflowId,
@@ -149,10 +150,15 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
     })
   }
 
-  const handleExportWorkflow = () => {
+  const handleExportWorkflowCanvas = async () => {
     try {
       const workflowData = context.document.toJSON()
-      const dataStr = JSON.stringify(workflowData, null, 2)
+      const finalSpaceId = (spaceId && String(spaceId).trim()) || (canvasData?.space_id && String(canvasData.space_id).trim()) || getDefaultSpaceId() || '1'
+
+      const enrichment = await buildWorkflowExportEnrichment(workflowData, finalSpaceId)
+      const payload = mergeWorkflowExportDocument(workflowData, enrichment)
+
+      const dataStr = JSON.stringify(payload, null, 2)
       const dataBlob = new Blob([dataStr], { type: 'application/json' })
       const link = document.createElement('a')
       link.href = URL.createObjectURL(dataBlob)
@@ -169,6 +175,76 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
     }
   }
 
+  const handleExportWorkflowDsl = async () => {
+    if (!workflowId) {
+      showToast(t('workflowCanvas.workflow.notFound'), 'error')
+      return
+    }
+    try {
+      const finalSpaceId = (spaceId && String(spaceId).trim()) || (canvasData?.space_id && String(canvasData.space_id).trim()) || getDefaultSpaceId() || '1'
+      const rawVersion = useWorkflowStore.getState().selectedVersion
+      const workflow_version = rawVersion && String(rawVersion).trim() ? rawVersion : 'draft'
+
+      const response = await WorkflowService.exportWorkflow({
+        workflow_id: workflowId,
+        space_id: finalSpaceId,
+        workflow_version,
+      })
+
+      if (response.code !== 200 || !response.data) {
+        showToast(response.message || t('workflowCanvas.ui.exportError', { error: 'unknown' }), 'error')
+        return
+      }
+
+      const dataStr = JSON.stringify(response.data, null, 2)
+      const dataBlob = new Blob([dataStr], { type: 'application/json' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(dataBlob)
+      const workflowName = canvasData?.name || (response.data as { name?: string }).name || 'workflow'
+      link.download = `${workflowName}-dsl-export-${Date.now()}.json`
+      link.click()
+      URL.revokeObjectURL(link.href)
+
+      showToast(t('workflowCanvas.ui.exportSuccess'), 'success')
+    } catch (error: unknown) {
+      console.error('DSL export failed:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      showToast(t('workflowCanvas.ui.exportError', { error: errorMessage }), 'error')
+    }
+  }
+
+  // 使用 ref 避免事件监听闭包过期（保存/导出需读取最新画布与 spaceId）
+  const saveRef = React.useRef(handleSaveWorkflowWithHook)
+  const importRef = React.useRef(handleImportWorkflow)
+  const exportCanvasRef = React.useRef(handleExportWorkflowCanvas)
+  const exportDslRef = React.useRef(handleExportWorkflowDsl)
+  saveRef.current = handleSaveWorkflowWithHook
+  importRef.current = handleImportWorkflow
+  exportCanvasRef.current = handleExportWorkflowCanvas
+  exportDslRef.current = handleExportWorkflowDsl
+  const handleExportWorkflowPy = async () => {
+    if (!workflowId) {
+      showToast(t('workflowCanvas.workflow.notFound'), 'error')
+      return
+    }
+    try {
+      const result = await WorkflowService.exportWorkflowPy(workflowId, spaceId)
+      const workflowName = canvasData?.name || result.workflow_id || 'workflow'
+      const filename = `${workflowName.replace(/\s+/g, '_')}.py`
+      const blob = new Blob([result.python_code], { type: 'text/x-python' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(link.href)
+      showToast(t('workflowCanvas.ui.exportPySuccess'), 'success')
+    } catch (error: unknown) {
+      console.error('Export Python failed:', error)
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      showToast(t('workflowCanvas.ui.exportPyError', { error: errorMessage }), 'error')
+    }
+  }
+
   // Expose the save function through ref for the WorkflowControl component
   React.useEffect(() => {
     if (onSaveRef) {
@@ -179,19 +255,25 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
   // Listen for custom events from the main Editor component
   React.useEffect(() => {
     const handleSaveEvent = () => {
-      handleSaveWorkflowWithHook()
+      void saveRef.current()
     }
-    const handleImportEvent = () => handleImportWorkflow()
-    const handleExportEvent = () => handleExportWorkflow()
+    const handleImportEvent = () => importRef.current()
+    const handleExportCanvasEvent = () => void exportCanvasRef.current()
+    const handleExportDslEvent = () => void exportDslRef.current()
+    const handleExportPyEvent = () => handleExportWorkflowPy()
 
     window.addEventListener('workflow-save', handleSaveEvent)
     window.addEventListener('workflow-import', handleImportEvent)
-    window.addEventListener('workflow-export', handleExportEvent)
+    window.addEventListener('workflow-export-canvas', handleExportCanvasEvent)
+    window.addEventListener('workflow-export-dsl', handleExportDslEvent)
+    window.addEventListener('workflow-export-py', handleExportPyEvent)
 
     return () => {
       window.removeEventListener('workflow-save', handleSaveEvent)
       window.removeEventListener('workflow-import', handleImportEvent)
-      window.removeEventListener('workflow-export', handleExportEvent)
+      window.removeEventListener('workflow-export-canvas', handleExportCanvasEvent)
+      window.removeEventListener('workflow-export-dsl', handleExportDslEvent)
+      window.removeEventListener('workflow-export-py', handleExportPyEvent)
       // Clean up global reference
       delete (window as any).__saveWorkflowFunction
     }
@@ -211,11 +293,12 @@ export const WorkflowOperationsHandler = ({ workflowId, canvasData, spaceId, onS
             const reader = new FileReader()
             reader.onload = e => {
               try {
-                const importedData = JSON.parse(e.target?.result as string)
+                const raw = JSON.parse(e.target?.result as string)
+                const importedData = unwrapWorkflowImportPayload(raw)
 
                 historyService.stop()
                 context.document.clear()
-                context.document.fromJSON(importedData)
+                context.document.fromJSON(importedData as Record<string, unknown>)
                 historyService.start()
 
                 showToast(t('workflowCanvas.ui.importSuccess'), 'success')

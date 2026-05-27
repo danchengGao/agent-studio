@@ -111,6 +111,9 @@ export const API_ENDPOINTS = {
     ENTER_EXECUTION_DEBUG: '/workflows/enter_execution_logs_debug',
     GET_UPLOAD_URL: '/workflows/get_upload_url',
     GET_DOWNLOAD_URL: '/workflows/get_download_url',
+    IMPORT: '/workflows/import',
+    EXPORT: '/workflows/export',
+    EXPORT_PY: '/workflows/export_py',
   },
 
   // 执行管理
@@ -127,6 +130,19 @@ export const API_ENDPOINTS = {
     COMPONENT_CANCEL: '/execution/component/cancel',
     GET_TRACE_SUMMARY_LIST: '/execution/get_trace_summary_list',
     GET_TRACE_SUMMARY_BY_TRACE_ID: '/execution/get_trace_summary_by_trace_id',
+  },
+
+  // 运行时部署
+  RUNTIME: {
+    DEPLOY: '/runtime/deploy',
+    DETAIL: '/runtime/detail',
+    REMOVE: '/runtime/remove',
+    /** 经中台转发至已部署 Runtime /query（SSE），避免浏览器 CORS */
+    QUERY: '/runtime/query',
+    /** 经中台转发至已部署 Runtime /reset_conversation，避免浏览器 CORS */
+    RESET_CONVERSATION: '/runtime/reset_conversation',
+    /** 经中台转发至已部署 Runtime /agent_detail，避免浏览器 CORS */
+    AGENT_DETAIL: '/runtime/agent_detail',
   },
 
   // 代理管理
@@ -294,6 +310,9 @@ export const API_ENDPOINTS = {
     DELETE_CODE: '/plugin/delete_code',
     GET_CODE: '/plugin/get_code',
     LIST_CODE: '/plugin/list_code',
+    LIST_MCP_TOOLS: '/plugin/list_mcp_tools',
+    GET_MCP_TOOL: '/plugin/get_mcp_tool',
+    DISCOVER_MCP_TOOLS: '/plugin/discover_mcp_tools',
   },
 
   // 可观测性管理
@@ -314,15 +333,27 @@ export const API_ENDPOINTS = {
     STATISTICS: '/knowledge-bases/statistics',
     UPLOAD: '/knowledge-base/upload',
     PROCESS: '/knowledge-base/process',
+    SYNC_UPLOAD: '/knowledge-base/sync/upload',
+    SYNC_PROCESS: '/knowledge-base/sync/process',
     STATUS: '/knowledge-base/documents/status',
     FILE_SETTINGS: '/knowledge-base/filesettings',
     DOCUMENTS_LIST: '/knowledge-base/documents/list',
+    WEBLINKS_ADD: '/knowledge-base/weblinks/add',
+    WEBLINKS_LIST: '/knowledge-base/weblinks/list',
+    WEBLINKS_STATUS: '/knowledge-base/weblinks/status',
+    WEBLINKS_PROCESS: '/knowledge-base/weblinks/process',
+    WEBLINKS_UPDATE: '/knowledge-base/weblinks/update',
+    WEBLINKS_DELETE: '/knowledge-base/weblinks/delete',
     DOCUMENTS: '/knowledge-bases/:id/documents',
     DOCUMENT_DELETE: '/knowledge-bases/:id/documents/:documentId',
     REPROCESS: '/knowledge-bases/:id/reprocess',
     EXPORT: '/knowledge-bases/:id/export',
     SHARE: '/knowledge-bases/:id/share',
     UNSHARE: '/knowledge-bases/:id/share/:userId',
+  },
+  DEEPSEARCH_KNOWLEDGE_BASES: {
+    LIST: '/deepsearch-knowledge-base/knowledge-base/list',
+    EMBEDDING_CONFIGS_LIST: '/deepsearch-knowledge-base/embedding-configs/list',
   },
   // 记忆库管理
   MEMORY_BASES: {

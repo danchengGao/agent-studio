@@ -11,13 +11,9 @@ import { LanguageProvider } from './contexts/LanguageContext'
 
 // 立即加载的核心页面（用户可能立即访问）- 统一使用新版
 import LoginPage from './pages/Auth/LoginPage'
-import DashboardPage from './pages/Dashboard/DashboardPage'
 import AppsPage from './pages/Apps/AppsPage'
-import AgentsPage from './pages/Agents/AgentsPage'
 import AgentsPageNew from './pages/Agents/AgentsPageNew'
-import WorkflowsPage from './pages/Workflows/WorkflowsPage'
 import WorkflowsPageNew from './pages/Workflows/WorkflowsPageNew'
-import PromptsPage from './pages/Prompts/PromptsPage'
 import PromptsPageNew from './pages/Prompts/PromptsPageNew'
 import KnowledgeBasePageNew from './pages/KnowledgeBase/KnowledgeBasePageNew'
 import MemoryBasePageNew from './pages/MemoryBase/MemoryBasePageNew'
@@ -41,6 +37,7 @@ const PluginMarketPageNew = React.lazy(() => import('./pages/Plugins/PluginMarke
 const PluginConfigurationPage = React.lazy(() => import('./pages/Plugins/PluginConfigurationPage'))
 const PluginVersionPage = React.lazy(() => import('./pages/Plugins/PluginVersionPage'))
 const ToolConfigurationPage = React.lazy(() => import('./pages/Plugins/ToolConfigurationPage'))
+const AgentPublishPage = React.lazy(() => import('./pages/Runtime/AgentPublishPage'))
 
 // 懒加载workflow-canvas组件
 const WorkflowCanvas = React.lazy(() => import('@test-agentstudio/workflow-canvas').then(module => ({ default: module.WorkflowCanvas })))
@@ -124,6 +121,14 @@ const App: React.FC = () => {
               element={
                 <Suspense fallback={<LoadingFallback />}>
                   <AgentEditorEditPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="agents/:id/publish"
+              element={
+                <Suspense fallback={<LoadingFallback />}>
+                  <AgentPublishPage />
                 </Suspense>
               }
             />

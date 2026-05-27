@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Save, Upload, Download, ArrowLeft, Tag, History } from 'lucide-react'
+import { Save, Upload, Download, FileCode2, ArrowLeft, Tag, History } from 'lucide-react'
 import { Tooltip, Divider, IconButton, Toast, Typography } from '@douyinfe/semi-ui'
 import { WorkflowOperationContainer, WorkflowControlSection } from './styles'
 import { HistoryVersionTag } from '../../styles/styles'
@@ -17,13 +17,14 @@ interface WorkflowControlProps {
   onSave: () => void
   onImport: () => void
   onExport: () => void
+  onExportPy: () => void
   workflowId?: string
   spaceId?: string
   asyncSaveRef?: React.RefObject<(() => Promise<void>) | null>
   canvasData?: any
 }
 
-export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceId, asyncSaveRef, canvasData }: WorkflowControlProps) => {
+export const WorkflowControl = ({ onSave, onImport, onExport, onExportPy, workflowId, spaceId, asyncSaveRef, canvasData }: WorkflowControlProps) => {
   const navigate = useNavigate()
   const [showPublishDialog, setShowPublishDialog] = useState(false)
   const selectedVersion = useWorkflowStore(s => s.selectedVersion)
@@ -142,6 +143,16 @@ export const WorkflowControl = ({ onSave, onImport, onExport, workflowId, spaceI
 
           <Tooltip content={t('workflowCanvas.workflow.export')}>
             <IconButton type="tertiary" theme="borderless" icon={<Download size={16} />} onClick={onExport} />
+          </Tooltip>
+
+          <Tooltip content={t('workflowCanvas.workflow.exportPy')}>
+            <IconButton
+              type="tertiary"
+              theme="borderless"
+              icon={<FileCode2 size={16} />}
+              onClick={onExportPy}
+              disabled={!workflowId || !spaceId}
+            />
           </Tooltip>
 
           <Divider layout="vertical" style={{ height: '16px' }} margin={3} />

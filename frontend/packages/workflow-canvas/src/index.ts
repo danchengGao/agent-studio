@@ -4,3 +4,5 @@
  */
 
 export { Editor as WorkflowCanvas } from './editor'
+export { WorkflowExportChoiceDialog, type WorkflowExportChoiceMode } from './components/workflow-operation/export-choice-dialog'
+export { buildWorkflowExportEnrichment, mergeWorkflowExportDocument } from './utils/workflow-export-enrichment'

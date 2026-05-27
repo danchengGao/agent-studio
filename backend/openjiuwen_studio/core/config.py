@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     deepsearch_agent_host: str = ""
     deepsearch_agent_port: int = 6000
 
+    # runtime 配置
+    runtime_host: str = ""
+    runtime_port: int = 8100
+    # Runtime部署超时时间
+    runtime_deploy_timeout_seconds: float = 600.0
+    runtime_deploy_connect_timeout_seconds: float = 30.0
+
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     algorithm: str = "HS256"

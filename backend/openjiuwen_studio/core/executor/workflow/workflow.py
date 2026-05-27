@@ -13,6 +13,7 @@ from openjiuwen.core.workflow.workflow import Workflow as InvokableWorkflow
 from openjiuwen.core.workflow import WorkflowCard
 from openjiuwen.core.workflow import ComponentAbility
 
+from openjiuwen_studio.core.common.dsl import McpConfig as DlMcpConfig
 from openjiuwen_studio.core.common.dsl import PluginCodeConfig as DlPluginCodeConfig
 from openjiuwen_studio.core.common.dsl import PluginType
 from openjiuwen_studio.core.common.dsl import RestfulApiSchema as DlRestfulApiSchema
@@ -22,14 +23,20 @@ from openjiuwen_studio.core.common.dsl import Workflow as DlWorkflow, Component,
 from openjiuwen_studio.core.executor.component.compile.intent_detection_comp_compiler import IntentDetectionCompCompiler
 from openjiuwen_studio.core.executor.component.compile.llm_comp_compiler import LLMCompCompiler
 from openjiuwen_studio.core.executor.component.compile.questioner_comp_compiler import QuestionerCompCompiler
+from openjiuwen_studio.core.executor.component.compile.react_agent_comp_compiler import ReactAgentCompCompiler
 from openjiuwen_studio.core.executor.component.compile.branch_comp_compiler import BranchCompCompiler
 from openjiuwen_studio.core.executor.component.compile.code_comp_compiler import CodeCompCompiler
+from openjiuwen_studio.core.executor.component.compile.http_request_comp_compiler import HttpRequestCompCompiler
 from openjiuwen_studio.core.executor.component.component_impl.empty_comp import EmptyComponent
 from openjiuwen_studio.core.executor.component.compile.text_editor_comp_compiler import TextEditorCompCompiler
 from openjiuwen_studio.core.executor.component.compile.user_input_comp_compiler import UserInputCompCompiler
 from openjiuwen_studio.core.executor.component.compile.user_output_comp_compiler import UserOutputCompCompiler, \
     find_llm_to_stream_out, change_stream_input
 from openjiuwen_studio.core.executor.component.compile.variable_merge_comp_compiler import VariableMergeCompCompiler
+from openjiuwen_studio.core.executor.plugin.plugin_tools import ServiceTool, CodeTool, McpTool
+from openjiuwen_studio.core.executor.component.compile.knowledge_retrieval_comp_compiler import (
+    KnowledgeRetrievalCompCompiler,
+)
 from openjiuwen_studio.core.executor.plugin.plugin_tools import ServiceTool, CodeTool
 from openjiuwen_studio.core.executor.workflow.context import Context
 from openjiuwen_studio.core.executor.workflow.pregel_graph_adapter import PregelGraphAdapter
@@ -108,6 +115,9 @@ class Workflow:
         ComponentType.COMPONENT_TYPE_TEXT_EDITOR: '_compile_text_editor_component',
         ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: '_compile_variable_merge_component',
         ComponentType.COMPONENT_TYPE_CODE: '_compile_code_component',
+        ComponentType.COMPONENT_TYPE_HTTP_REQUEST: '_compile_http_request_component',
+        ComponentType.COMPONENT_TYPE_REACT_AGENT: '_compile_react_agent_component',
+        ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: '_compile_knowledge_retrieval_component',
     }
 
     # 特殊组件类型（需要异步处理或特殊参数）
@@ -130,7 +140,9 @@ class Workflow:
             self,
             dl_workflow: DlWorkflow,
             space_id: str,
-            current_user: Dict[str, Any]
+            current_user: Dict[str, Any],
+            plugin_mgr=None,
+            workflow_mgr=None
     ) -> None:
         logger.info(f"first dsl: {dl_workflow.model_dump_json()}")
         for component in dl_workflow.components:
@@ -149,6 +161,8 @@ class Workflow:
         self.space_id = space_id
         self.current_user = current_user
         self.need_stream_output_comp = {}
+        self.plugin_mgr = plugin_mgr
+        self.workflow_mgr = workflow_mgr
 
     async def process_components(
             self,
@@ -303,6 +317,34 @@ class Workflow:
         code_compiler = CodeCompCompiler(comp.id, comp.configs, workflow_dl.connections)
         return code_compiler.compile()
 
+    async def _compile_http_request_component(self, comp: Component, workflow_dl: BaseFlow):
+        """编译HTTP请求组件"""
+        http_request_compiler = HttpRequestCompCompiler(comp.id, comp.configs, workflow_dl.connections)
+        return http_request_compiler.compile()
+
+    async def _compile_react_agent_component(self, comp: Component, workflow_dl: BaseFlow):
+        """编译React智能体组件"""
+        logger.warning(f"_compile_react_agent_component called for: {comp.id}")
+        logger.warning(f"  self.plugin_mgr: {self.plugin_mgr is not None}")
+        logger.warning(f"  self.workflow_mgr: {self.workflow_mgr is not None}")
+        logger.warning(f"  self.space_id: {self.space_id}")
+        compiler = ReactAgentCompCompiler(
+            comp.configs,
+            plugin_mgr=self.plugin_mgr,
+            workflow_mgr=self.workflow_mgr,
+            space_id=self.space_id,
+            current_user=self.current_user
+        )
+        logger.warning(f"Calling compiler.compile()...")
+        result = await compiler.compile()
+        logger.warning(f"compiler.compile() completed successfully")
+        return result
+
+    async def _compile_knowledge_retrieval_component(self, comp: Component, workflow_dl: BaseFlow):
+        """编译知识检索组件"""
+        kr_compiler = KnowledgeRetrievalCompCompiler(comp.id, comp.configs, self.space_id)
+        return kr_compiler.compile()
+
     async def _compile_special_component(self, context: Context, workflow_dl: BaseFlow, comp: Component, loader):
         """处理特殊组件（保持原有逻辑）"""
         if comp.type == ComponentType.COMPONENT_TYPE_IF:
@@ -310,7 +352,7 @@ class Workflow:
             return branch_compiler.compile()
 
         elif comp.type == ComponentType.COMPONENT_TYPE_SUB_WORKFLOW:
-            return await self._create_exec_sub_workflow_component(context, comp.configs, loader)
+            return await self._create_exec_sub_workflow_component(context, comp.configs, loader, comp.id)
 
         elif comp.type == ComponentType.COMPONENT_TYPE_LOOP:
             return await self._create_loop_component(context, comp.configs, comp.outputs, loader)
@@ -325,6 +367,8 @@ class Workflow:
         tool_config = ToolCompConfig.model_validate(comp.configs)
         if tool_config.type == PluginType.SERVICE:
             plugin_tool = ServiceTool(DlRestfulApiSchema.model_validate(tool_config.tool)).compile()
+        elif tool_config.type == PluginType.MCP:
+            plugin_tool = McpTool(DlMcpConfig.model_validate(tool_config.tool)).compile()
         else:
             plugin_tool = CodeTool(DlPluginCodeConfig.model_validate(tool_config.tool)).compile()
         tool_config = ToolComponentConfig(tool_id=comp.id)
@@ -339,10 +383,10 @@ class Workflow:
 
             if isinstance(target_id, list):
                 for tid in target_id:
-                    logger.debug(f"add_stream_connection source_id: {source_id}, target_id: {tid}")
+                    logger.info(f"add_stream_connection source_id: {source_id}, target_id: {tid}")
                     flow.add_stream_connection(source_id, tid)
             else:
-                logger.debug(f"add_stream_connection source_id: {source_id}, target_id: {target_id}")
+                logger.info(f"add_stream_connection source_id: {source_id}, target_id: {target_id}")
                 flow.add_stream_connection(source_id, target_id)
 
         return flow
@@ -354,7 +398,7 @@ class Workflow:
                 skip_connection = True
                 break
         if not skip_connection:
-            logger.debug(f"add_connection source: {source}, target: {target}")
+            logger.info(f"add_connection source: {source}, target: {target}")
             flow.add_connection(source, target)
         return flow
 
@@ -382,7 +426,7 @@ class Workflow:
                     flow = await self.do_add_connection(flow, conn.source, conn.target)
             else:
                 # 如果 source 不在 need_stream_output_comp 中，直接添加连接
-                logger.debug(f"add_connection source: {conn.source}, target: {conn.target}")
+                logger.info(f"add_connection source: {conn.source}, target: {conn.target}")
                 flow.add_connection(conn.source, conn.target)
         return flow
 
@@ -390,14 +434,21 @@ class Workflow:
             self,
             context: Context,
             configs: Any,
-            loader: Optional[IWorkflowLoader]
+            loader: Optional[IWorkflowLoader],
+            comp_id: str,
     ) -> Any:
         sub_wf_info = ExecSubWfConfig.model_validate(configs).sub_workflow_info
         sub_id = sub_wf_info.id
         sub_version = sub_wf_info.version
         sub_workflow = await loader.get_compiled_workflow(Context(context),
                                                           sub_id, sub_version, self.space_id, self.current_user)
-        return SubWorkflowComponent(sub_workflow)
+        cache_stream = False
+        if self.need_stream_output_comp:
+            if comp_id in self.need_stream_output_comp.keys():
+                cache_stream = True
+                logger.info(f"sub workflow cache stream : comp_id: {comp_id}, cache_stream: {cache_stream}")
+
+        return SubWorkflowComponent(sub_workflow, cache_stream=cache_stream)
 
     async def _create_loop_component(
             self,

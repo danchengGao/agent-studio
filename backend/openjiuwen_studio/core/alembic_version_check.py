@@ -142,7 +142,7 @@ class AlembicVersionChecker:
 
         # 检查 alembic_version 表是否存在
         if "alembic_version" not in inspector.get_table_names():
-            logger.warning("❌ %s 数据库: 未找到 alembic_version 表", db_name)
+            logger.warning("%s 数据库: 未找到 alembic_version 表", db_name)
             latest_version = self._get_latest_version(db_name, db_type)
             return {
                 "up_to_date": False,

@@ -20,6 +20,16 @@ post_start_setup(){
 
     local container="$2"
     wait_for_container_healthy "${container}"
+
+    if [ "${module}" == "RUNTIME" ]; then
+        lowcode_image=${DEPLOY_VARS["LOWCODE_IMAGE"]}
+        if ! docker image inspect "${lowcode_image}" >/dev/null 2>&1; then
+            exec_cmd "docker pull ${lowcode_image}"
+        else
+            info "Image already exists, skip pulling: ${lowcode_image}"
+        fi
+        return
+    fi
 }
 
 # Check if the specified module exists in the ARGS_MODULES
@@ -97,4 +107,5 @@ process_all_services() {
     process_service "JIUWEN" "BACKEND"
     upgrade_sqlite
     process_service "JIUWEN" "FRONTEND"
+    process_services "RUNTIME"
 }

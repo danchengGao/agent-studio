@@ -72,9 +72,13 @@ class Settings(BaseSettings):
                 if field_value is None:
                     raise ValueError(f"【SQLite】字段 {field_name} 为必选，请配置环境变量")
 
+        # 无数据库场景：不需要校验
+        elif db_type == "none":
+            pass
+
         # 不支持的数据库类型
         else:
-            raise ValueError(f"不支持的数据库类型：{self.DB_TYPE}，仅支持 mysql/sqlite")
+            raise ValueError(f"不支持的数据库类型：{self.DB_TYPE}，仅支持 mysql/sqlite/none")
 
         return self
 

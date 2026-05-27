@@ -80,8 +80,23 @@ class AgentMessageProcessor implements MessageProcessor {
   }
 
   processTracePayload(payload: any): any {
-    // 提取智能体响应中的outputs.output.result到output_text
-    if (payload.outputs && payload.outputs.output && payload.outputs.output.result) {
+    // 处理输出组件的情况：payload 直接包含 output 字段
+    if (payload.output && typeof payload.output === 'string') {
+      return {
+        ...payload,
+        output_text: payload.output,
+      }
+    }
+    // 处理 trace 类型的输出组件消息：outputs.output 是字符串，且 name 为 "输出"
+    if (payload.name === '输出' && payload.outputs && payload.outputs.output && typeof payload.outputs.output === 'string') {
+      return {
+        ...payload,
+        output_text: payload.outputs.output,
+        component_type: 'output', // 添加标记以便前端识别
+      }
+    }
+    // 提取智能体响应中的outputs.output.result到output_text（仅当没有 name 或者是最终结果时）
+    if (payload.outputs && payload.outputs.output && payload.outputs.output.result && !payload.name) {
       return {
         ...payload,
         output_text: payload.outputs.output.result,
@@ -92,8 +107,10 @@ class AgentMessageProcessor implements MessageProcessor {
 
   createExecutionEvent(processedPayload: any): AgentExecutionEvent {
     // 智能体事件创建逻辑 - 简化为主要包含output字段
+    // 优先使用 output_text，如果没有则使用 output
+    const outputValue = processedPayload.output_text || processedPayload.output
     return {
-      output: processedPayload.output,
+      output: outputValue,
       // 保留基础字段以便与WorkflowExecutionEvent兼容
       id: processedPayload.id,
       version: processedPayload.version,
@@ -351,15 +368,22 @@ export class ExecutionService {
                     const payload = messageData.payload
 
                     // 使用对应的处理器处理payload
-                    const executionEvent = messageProcessor.createExecutionEvent(messageProcessor.processTracePayload(payload))
-                    // WorkflowExecutionEvent类型，直接使用
-                    onEvent(executionEvent as WorkflowExecutionEvent)
+                    const processedPayload = messageProcessor.processTracePayload(payload)
+                    const executionEvent = messageProcessor.createExecutionEvent(processedPayload)
+                    // WorkflowExecutionEvent类型，直接使用，但添加 _streamPayload
+                    const enrichedEvent: WorkflowExecutionEvent = {
+                      ...(executionEvent as WorkflowExecutionEvent),
+                      type: messageData.type,
+                      _streamPayload: processedPayload,
+                    }
+                    onEvent(enrichedEvent)
                   } else if (messageData.type === 'agent') {
                     // agent 类型：payload 包含执行事件字段
                     const payload = messageData.payload
 
                     // 使用对应的处理器处理payload
-                    const executionEvent = messageProcessor.createExecutionEvent(messageProcessor.processTracePayload(payload))
+                    const processedPayload = messageProcessor.processTracePayload(payload)
+                    const executionEvent = messageProcessor.createExecutionEvent(processedPayload)
                     // 根据返回类型决定是否需要转换
                     if ('output' in executionEvent) {
                       // AgentExecutionEvent类型，需要转换为WorkflowExecutionEvent
@@ -377,6 +401,7 @@ export class ExecutionService {
                         // 添加交互中断相关字段
                         interaction_node: executionEvent.interaction_node,
                         interaction_msg: executionEvent.interaction_msg,
+                        _streamPayload: processedPayload,
                       }
                       onEvent(workflowEvent)
                     } else {
@@ -384,6 +409,7 @@ export class ExecutionService {
                       const enrichedEvent: WorkflowExecutionEvent = {
                         ...(executionEvent as WorkflowExecutionEvent),
                         type: messageData.type,
+                        _streamPayload: processedPayload,
                       }
                       onEvent(enrichedEvent)
                     }

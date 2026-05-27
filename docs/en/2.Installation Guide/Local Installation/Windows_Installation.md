@@ -31,7 +31,7 @@ The one-click script automates tool checks, code fetch, environment setup, and s
 
 #### 1. Get the Installation Script
 
-* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows_v2.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
+* Download the <a href="https://openjiuwen-ci.obs.cn-north-4.myhuaweicloud.com/agentstudio/setup_scripts/setup_scripts_windows.zip" target="_blank" rel="nofollow noopener noreferrer">installation script package</a>. The package includes:
   * `setup.ps1` – Main installation script that runs the full flow
   * `utils.ps1` – Common utilities
   * `check_git.ps1` – Check/install Git
@@ -39,12 +39,12 @@ The one-click script automates tool checks, code fetch, environment setup, and s
   * `check_python.ps1` – Check/install Python
   * `check_mysql.ps1` – Check/install MySQL
   * `config_mysql.ps1` – Configure MySQL (create database, user, etc.)
-  * `fetch_codes.ps1` – Clone the agent-studio repository (supports specifying a branch)
-  * `user_config.ps1` – User configuration (optional: proxy, pip index, npm registry)
+  * `manage_service.ps1` – Service management: start, stop, restart Runtime, backend, and frontend, and show status
+  * `user_config.ps1` – User configuration (optional: proxy, uv index, npm registry, database host/port)
 
-#### 2. Configure Proxy, pip Index, and npm Registry (Optional)
+#### 2. Configure Proxy, uv Index, npm Registry, and Database Address (Optional)
 
-If you need a proxy to access the internet or want to use a custom pip index or npm registry, edit `user_config.ps1`:
+If you need a proxy to access the internet or want to use a custom uv index or npm registry, or you need to set the database service host and port (for example, remote MySQL or a Docker-mapped port), edit `user_config.ps1`:
 
 * Open `user_config.ps1` and set the following variables as needed:
 
@@ -54,17 +54,32 @@ If you need a proxy to access the internet or want to use a custom pip index or 
   $HTTPS_PROXY=""  # e.g. http://127.0.0.1:7890
   $SSL_VERIFY=""   # optional: true/false (maps to git http.sslVerify)
 
-  # pip index (optional)
-  $PIP_INDEX_URL=""      # e.g. https://pypi.tuna.tsinghua.edu.cn/simple
-  $PIP_TRUSTED_HOST=""   # e.g. pypi.tuna.tsinghua.edu.cn
+  # Proxy apply switches (optional, default true)
+  $ENABLE_SESSION_ENV_PROXY="true"  # apply HTTP_PROXY/HTTPS_PROXY to current PowerShell session env
+  $ENABLE_GIT_PROXY_CONFIG="true"   # write git proxy/ssl settings
+  $ENABLE_NPM_PROXY_CONFIG="true"   # write npm proxy/strict-ssl settings
+
+  # uv index (optional)
+  $UV_INDEX=""          # e.g. https://pypi.tuna.tsinghua.edu.cn/simple
+  $UV_TRUSTED_HOST=""   # e.g. pypi.tuna.tsinghua.edu.cn
 
   # npm registry (optional)
   $NPM_REGISTRY=""       # e.g. https://registry.npmmirror.com
+
+  # Database connection (optional)
+  $DB_HOST=""            # Leave empty for default 127.0.0.1
+  $DB_PORT=""            # Leave empty for default 3306
   ```
 
-* **Proxy**: Leave variables empty to skip proxy; set full URL (e.g. `http://127.0.0.1:7890`) when needed. Authenticated proxy is supported (e.g. `http://user:pass@proxy.example.com:8080`). `$SSL_VERIFY`: `true` enables Git SSL verification, `false` disables it.
-* **pip**: Leave `$PIP_INDEX_URL` and `$PIP_TRUSTED_HOST` empty to use default index; when using a mirror, set both.
-* **npm**: Leave `$NPM_REGISTRY` empty to use default; set to your registry URL when needed.
+* **Proxy**: Leave variables empty to skip proxy; set full URL (e.g. `http://127.0.0.1:7890`) when needed. Authenticated proxy is supported (e.g. `http://user:pass@proxy.example.com:8080`). `$SSL_VERIFY`: `true` enables Git SSL verification, `false` disables it. `$ENABLE_SESSION_ENV_PROXY`, `$ENABLE_GIT_PROXY_CONFIG`, and `$ENABLE_NPM_PROXY_CONFIG` default to `true` and can be turned off independently.
+* **uv**: Leave `$UV_INDEX` and `$UV_TRUSTED_HOST` empty to use default uv index; when using a mirror, set both. Example: `$UV_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"`, `$UV_TRUSTED_HOST="pypi.tuna.tsinghua.edu.cn"`.
+* **npm**: Leave `$NPM_REGISTRY` empty to use default; set to your registry URL when needed. Common examples:
+  * npmmirror: `https://registry.npmmirror.com`
+  * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
+  * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
+
+* **Database connection (`$DB_HOST` / `$DB_PORT`)**:
+  * **Purpose**: Configure these when the database is on a remote host or uses a non-default host/port.
 
 #### 3. Run the Installation Script
 
@@ -113,11 +128,30 @@ Complete dependency installation first, then perform source retrieval and instal
 
 #### 1. Install Dependencies
 
-##### 1.1. Install Git
+##### 1.1. Install and Configure Git
 
 * Download the <a href="https://mirrors.huaweicloud.com/git-for-windows/v2.51.0.windows.1/Git-2.51.0-64-bit.exe" target="_blank" rel="nofollow noopener noreferrer">Git</a> installer. If the download is slow, switch networks and try again.
 
 * After installation, open PowerShell and run: `git --version`. If successful, it will print the Git version.
+
+* Ensure you have access to the <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer">openJiuwen code repositories</a>. If not, request access.
+
+* In the GitCode repository, follow step 2 in the screenshot to configure global Git settings, then run:
+
+  ```bash
+  git config --global user.name your_username
+  git config --global user.email your_useremail
+  ```
+
+  ![image](../images/gitcode-token.png)
+
+* Follow step 3 in the screenshot to obtain a personal access token. When cloning, you will enter your GitCode account and token.
+
+* You will run Git many times during installation; storing credentials helps avoid repeated authentication prompts:
+
+  ```bash
+  git config --global credential.helper store
+  ```
 
 ##### 1.2. Install Node.js and npm
 
@@ -178,11 +212,13 @@ Complete dependency installation first, then perform source retrieval and instal
   -- Create databases
   CREATE DATABASE openjiuwen_agent;
   CREATE DATABASE openjiuwen_ops;
+  CREATE DATABASE jiuwen_runtime;
   -- Create MySQL user
   CREATE USER 'your_user_name'@'localhost' IDENTIFIED BY 'your_password';
   -- Grant privileges and refresh
   GRANT ALL PRIVILEGES ON openjiuwen_agent.* TO 'your_user_name'@'localhost';
   GRANT ALL PRIVILEGES ON openjiuwen_ops.* TO 'your_user_name'@'localhost';
+  GRANT ALL PRIVILEGES ON jiuwen_runtime.* TO 'your_user_name'@'localhost';
   FLUSH PRIVILEGES;
   ```
 
@@ -194,34 +230,95 @@ Complete dependency installation first, then perform source retrieval and instal
   * Chroma requires no additional installation and boasts a simple configuration. All you need to do is obtain the vector model, making it ideal for quick experimentation and suitable for development and testing environments. For obtaining the vector model, refer to [How to Obtain the Vector Model](#windows-embed-model).
   * Milvus has more comprehensive functions and can meet the needs of complex scenarios, so it is more recommended for use in practical engineering and production environments.
 
-#### 2. openJiuwen Installation
+#### 2. Deploy Runtime Service
 
-##### 2.1. Get the Source Code
+Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separate repository.
 
-* Ensure you have access to the <a href="https://gitcode.com/org/openJiuwen" target="_blank" rel="nofollow noopener noreferrer">openJiuwen code repositories</a>. If not, request access.
+##### 2.1. Get the Runtime Source Code
 
-* In the GitCode repository, follow step 2 in the screenshot to get the global Git config, then set Git with:
+* Open **PowerShell** and run the following to clone the repository and enter its root:
 
-  ```bash
-  git config --global user.name your_username
-  git config --global user.email your_useremail
+  ```powershell
+  git clone -b main https://gitcode.com/openJiuwen/agent-runtime.git
+  cd agent-runtime
   ```
 
-  ![image](../images/gitcode-token.png)
+##### 2.2. Configure the `server` Environment
 
-* Follow step 3 in the screenshot to obtain a personal access token. You will need to enter your GitCode account and token when cloning.
+* Open **PowerShell** in **`agent-runtime\server`**.
 
-* Create an openJiuwen directory, open PowerShell in it, then clone the code and go to the project root:
+* Copy the *.env* file:
 
   ```bash
-  # You will perform multiple git operations; configuring credential storage helps avoid authentication errors.
-  git config --global credential.helper store
+  copy .env.example .env
+  ```
 
+* Open *.env* in a text editor and adjust the variables below as needed (do not overwrite unrelated entries):
+
+  > **Note**: Replace `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME` with your actual database settings; keep them consistent with the MySQL user, password, and databases you created above. If the password contains special characters, see the [Special Character Escape Table](#windows-special-char) and replace them with URL encoding.
+
+  Example configuration:
+
+  ```env
+   # Database type (supports mysql, sqlite)
+   DB_TYPE=mysql
+
+   # Database connection (example)
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=root
+   DB_NAME=jiuwen_runtime
+
+   # Runtime network and paths (example)
+   IP=127.0.0.1
+   LOWCODE_IMAGE=swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8
+   DEPLOY_DIR=/app/deploys
+   DIST_DIR=/app/dist
+   HOST=0.0.0.0
+   PORT=8186
+   ```
+
+  See the table below for variable descriptions. For more detail, refer to **`server/.env.example`** and the README in the **agent-runtime** repository.
+
+   | Variable Name       | Description                                                                 | Example                                                                      |
+   |---------------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------------|
+   | **DB_TYPE**         | Database type (supports `mysql`, `sqlite`)                                 | `mysql`                                                                      |
+   | **DB_HOST**         | Database host                                                               | `localhost`                                                                  |
+   | **DB_PORT**         | MySQL service port                                                          | `3306`                                                                       |
+   | **DB_USER**         | Database login username                                                     | `root`                                                                       |
+   | **DB_PASSWORD**     | Database login password                                                     | `root`                                                                       |
+   | **DB_NAME**         | Database name used by Runtime                                               | `jiuwen_runtime`                                                             |
+   | **IP**              | Host IP where low-code agent and runtime-server run                         | `127.0.0.1`                                                                  |
+   | **LOWCODE_IMAGE**   | Container image for low-code agent                                          | `swr.cn-north-4.myhuaweicloud.com/openjiuwen/studio-lowercode-agent-amd64:8.8.8` |
+   | **DEPLOY_DIR**      | Deployment directory for generated artifacts                                | `/app/deploys`                                                               |
+   | **DIST_DIR**        | Dependency package directory for low-code agent `.whl` files                | `/app/dist`                                                                  |
+   | **HOST**            | Service bind host (`0.0.0.0` allows all network addresses)                 | `0.0.0.0`                                                                    |
+   | **PORT**            | Service startup port                                                        | `8186`                                                                       |
+
+##### 2.3. Run `deploy.bat` to Install Dependencies and Start Services
+
+* **Prerequisites**: **Python 3.11**, **Git**, and **`uv`** available in the terminal. `deploy.bat` typically uses **`uv`** to create the virtual environment and sync dependencies.
+
+* In **`server`**, open **cmd** or **PowerShell** and run the deployment script (adjust the path to your clone):
+
+  ```powershell
+  cd \path\to\agent-runtime\server
+  .\deploy.bat
+  ```
+
+#### 3. openJiuwen Installation
+
+##### 3.1. Get the Source Code
+
+* Create an **openJiuwen** directory, open PowerShell in it, then clone the code and go to the project root:
+
+  ```bash
   git clone https://gitcode.com/openJiuwen/agent-studio.git
   cd agent-studio
   ```
 
-##### 2.2. Generate an AES Key (Optional)
+##### 3.2. Generate an AES Key (Optional)
 
 * If you do not need to encrypt sensitive fields at rest, skip this step.
 * In the project root, open GitBash and run:
@@ -252,7 +349,7 @@ Complete dependency installation first, then perform source retrieval and instal
 
 * **Note**: The AES key must remain unchanged. Changing it later will make previously encrypted data impossible to decrypt.
 
-##### 2.3. Start openJiuwen
+##### 3.3. Start openJiuwen
 
 * Open PowerShell in the project root.
 
@@ -292,6 +389,10 @@ Complete dependency installation first, then perform source retrieval and instal
    # Plugin server configuration (example, please see [Question 3: How to Enable the Plugin Server] to learn more)
    VITE_PLUGIN_SERVICE_URL=http://localhost:8185
    VITE_PLUGIN_CONFIG_PATH=/config.json
+
+   # Runtime service configuration (example)
+   RUNTIME_HOST=localhost
+   RUNTIME_PORT=8100
    ```
 
    For variable descriptions, please refer to the table below. If you choose to enable the memory function for Milvus, please refer to [How to Enable the Memory and Knowledge Base Functions](#windows-memory). If you choose to enable the memory function for Chroma, you only need to obtain the vector model. For details, please refer to [How to Obtain the Vector Model](#windows-embed-model).
@@ -310,6 +411,8 @@ Complete dependency installation first, then perform source retrieval and instal
    | **CODE_SANDBOX_URL**             | Code Sandbox url                                            | `http://localhost:8188/run`                                                                    |
    | **VITE_PLUGIN_SERVICE_URL**      | Plugin Server url                                           | `http://localhost:8185`                                                                    |
    | **VITE_PLUGIN_CONFIG_PATH**      | Plugin configuration file path for web                      | `/config.json`                                                                    |
+   | **RUNTIME_HOST**                 | Runtime service host (usually local `localhost`)            | `localhost`                                                                    |
+   | **RUNTIME_PORT**                 | Runtime service port (must match runtime server listen port) | `8100`                                                                    |
 
 * In the project root, open PowerShell and run the following to start the backend. Please wait patiently:
 
@@ -370,7 +473,7 @@ Complete dependency installation first, then perform source retrieval and instal
 
 * On success, it will print Local access: *access URL*.
 
-##### 2.4. Access the System
+##### 3.4. Access the System
 
 Copy the *access URL* from above into your browser’s address bar and press Enter. You should see the openJiuwen UI.
 
@@ -489,40 +592,56 @@ The memory and knowledge base features require an embedding model. The steps bel
 
 * Click “API Key Management” and follow the instructions to obtain an API.
 
-### <a id="windows-sandbox"></a> Question 2: How to enable the sandbox feature
+### <a id="windows-sandbox"></a> Question 2: How to Enable the Sandbox Feature
 
-If you need to enable code node or code plugin tool, the sandbox service is required, do the following:
+To use code plugins or run code nodes in workflows, you must enable the sandbox service. Follow these steps:
 
-1. Refer to `sandbox_server/python_server/.env.example`, and create a `.env` file under `sandbox_server/python_server`, for example:
+1. **Configure the sandbox dependency environment**
+
+   The sandbox service uses a single configuration to specify the Python and JavaScript interpreters and dependencies used when executing code. If you skip this step, the system default Python and JavaScript environments are used.
+
+   Dependency configuration files:
+
+   - Python: `sandbox_server/sandbox/openjiuwen_sandbox_server/conf/dependency/pyproject.toml`
+   - JavaScript: `sandbox_server/sandbox/openjiuwen_sandbox_server/conf/dependency/package.json`
+
+   After setting the interpreter versions and dependency lists in these files, run the following command from the `sandbox_server/sandbox` directory to build and install the dependency environment:
+
+   ```bash
+   python -m openjiuwen_sandbox_server.app.build_dependency
+   ```
+
+   The default install directory is `%LOCALAPPDATA%\sandbox\dependencies`. To use a different directory, set the `DEPENDENCY_DIR` environment variable before running the command above.
+
+2. **Start the sandbox service**
+
+   On Windows, only **local** execution mode is supported: code runs directly on the host. Using `sandbox_server/sandbox/.env.example` as a reference, create a `.env` file under `sandbox_server/sandbox`. Example:
 
    ```env
    HOST=0.0.0.0
    PORT=5001
+   ENABLE_LINUX_SANDBOX=false
    ```
 
-   Then start the Python sandbox service by running the `sandbox_server/python_server/openjiuwen_sandbox_pyserver/kernel.py` script. `HOST` and `PORT` are the IP and port for the Python sandbox service.
+   After saving the config, start the sandbox service by running `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py`.
 
-2. Start the JS sandbox service by running the `sandbox_server/js_server/kernel.js` script. The IP and port can be set as follows:
+3. **Start the sandbox gateway**
 
-   ```javascript
-   const PORT = process.env.PORT || 5002;
-   server.listen(PORT, "0.0.0.0", () => {
-     console.log(`✅ JS sandbox listening on http://0.0.0.0:${PORT}`);
-   });
-   ```
-
-3. Refer to `sandbox_server/gateway/.env.example`, and create a `.env` file under `sandbox_server/gateway`, for example:
+   Using `sandbox_server/gateway/.env.example` as a reference, create a `.env` file under `sandbox_server/gateway`. Example:
 
    ```env
    HOST=0.0.0.0
    PORT=8188
-   PYTHON_SANDBOX_URL=http://localhost:5001/run
-   JS_SANDBOX_URL=http://localhost:5002/run
+   SANDBOX_SERVER_URL=http://localhost:5001/run
    ```
 
-   `PYTHON_SANDBOX_URL` and `JS_SANDBOX_URL` should point to the Python and JS sandbox services you started earlier. Then start the sandbox gateway service by running the `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` script.
+   `HOST` and `PORT` are the gateway bind address and port; `SANDBOX_SERVER_URL` is the URL of the sandbox service started in step 2.
 
-4. After running the sandbox service, please configure sandbox's url in `.env`, such as: `CODE_SANDBOX_URL=http://localhost:8188/run`.
+   Then run `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` to start the sandbox gateway.
+
+4. **Configure the application-side gateway URL**
+
+   In your project’s `.env`, set the sandbox gateway URL, for example: `CODE_SANDBOX_URL=http://localhost:8188/run`.
 
 ### <a id="windows-plugin"></a> Question 3: How to Enable the Plugin Server
 

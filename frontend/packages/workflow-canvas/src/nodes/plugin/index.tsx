@@ -36,6 +36,7 @@ export const handlePluginNodesSelection = (
       type: nodeType,
       data: {
         title: pluginInfo.title,
+        pluginName: pluginInfo.plugin?.name || pluginInfo.title || '',
         pluginId: pluginInfo.id,
         plugin: pluginInfo.plugin, // 保存完整的插件对象
       },
@@ -139,7 +140,7 @@ const formatPluginOutputData = (toolInfo: PluginApiInfo | null | undefined) => {
 
 // 创建插件选择器弹窗
 const showPluginSelector = (allowMultiple: boolean = true) => {
-  return new Promise<{ id: string; title: string; plugin: PluginInfo; selectedTool?: PluginApiInfo }[] | null>(resolve => {
+  return new Promise<{ id: string; title: string; plugin: PluginInfo; selectedTool?: PluginApiInfo; selectedVersion?: string }[] | null>(resolve => {
     try {
       dragStateManager.openModal()
 
@@ -242,17 +243,22 @@ export const PluginNodeRegistry: FlowNodeRegistry = {
     description: t('workflowCanvas.nodes.plugin.description'),
   }),
   // 使用异步方法，支持多选插件创建多个节点
-  onAdd: async (ctx: FreeLayoutPluginContext) => {
+  onAdd: (async (ctx: FreeLayoutPluginContext) => {
     try {
-      // 显示插件选择器并等待用户选择（支持多选）
-      const result = await showPluginSelector(true)
+      // 检查是否处于连线添加场景
+      const dragState = dragStateManager.getDragState()
+      const isViaConnection = dragState.isDragActive
+      const allowMultiple = !isViaConnection
+
+      // 显示插件选择器并等待用户选择
+      const result = await showPluginSelector(allowMultiple)
 
       if (!result || result.length === 0) {
         return null
       }
 
       // 如果选择了多个工具，我们需要手动创建多个节点
-      if (result.length > 1) {
+      if (result.length > 1 && allowMultiple) {
         // 为每个选中的工具创建节点，位置稍微错开避免重叠
         result.forEach((toolInfo, index) => {
           const nodeId = `plugin_${customNanoid(5)}`
@@ -275,6 +281,7 @@ export const PluginNodeRegistry: FlowNodeRegistry = {
             type: WorkflowNodeType.Plugin,
             data: {
               title: selectedTool?.name || plugin.name || 'Plugin',
+              pluginName: plugin.name || `Plugin ${plugin.plugin_id.slice(-5)}`,
               inputs: formattedInputs,
               outputs: {
                 type: 'object',
@@ -337,6 +344,7 @@ export const PluginNodeRegistry: FlowNodeRegistry = {
         type: WorkflowNodeType.Plugin,
         data: {
           title: selectedTool?.name || plugin.name || 'Plugin',
+          pluginName: plugin.name || `Plugin ${plugin.plugin_id.slice(-5)}`,
           inputs: formattedInputs,
           outputs: {
             type: 'object',
@@ -369,5 +377,5 @@ export const PluginNodeRegistry: FlowNodeRegistry = {
       dragStateManager.reset()
       return null
     }
-  },
+  }) as any,
 }

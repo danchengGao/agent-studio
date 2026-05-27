@@ -1,13 +1,16 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+ARG INDEX_URL
+
 WORKDIR /root
 COPY backend /root/backend
 
 RUN source /usr/local/miniconda3/etc/profile.d/conda.sh \
     && conda activate py3114 \
-    && pip install uv \
+    && pip install uv -i ${INDEX_URL} \
     && cd backend \
+    && sed -i "s#url = \"[^\"]*\"#url = \"${INDEX_URL}\"#g" pyproject.toml \
     && uv sync --group dev
 
 CMD ["bash", "-c", "source /usr/local/miniconda3/etc/profile.d/conda.sh && conda activate py3114 && /bin/bash"]

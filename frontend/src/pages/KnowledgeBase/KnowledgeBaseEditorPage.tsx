@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Settings, Upload, FileText, ChevronLeft, ChevronRight, Edit, Trash2, Save, X, RefreshCw, CheckSquare, Square, AlertCircle, CloudUpload } from 'lucide-react'
 import {
   KnowledgeBase,
   DocumentItem,
@@ -17,6 +17,10 @@ import { ENV_CONFIG } from '@/config/environment'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '@/Common/UnifiedSnackbar'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import AddDocumentDialog from './components/AddDocumentDialog'
+import AddWeblinkDialog from './components/AddWeblinkDialog'
+import SyncToDeepSearchDialog from './components/SyncToDeepSearchDialog'
+import { DocumentErrorMessageCell, getStatusErrorMessage } from './components/DocumentErrorMessageCell'
+import { KnowledgeBaseEditorCellTooltip } from './components/KnowledgeBaseEditorCellTooltip'
 
 const KnowledgeBaseEditorPage: React.FC = () => {
   const { t } = useTranslation()
@@ -26,6 +30,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   const { user } = useAuthStore()
   const { snackbar, showSuccess, showError, closeSnackbar } = useUnifiedSnackbar()
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showSyncDialog, setShowSyncDialog] = useState(false)
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -80,6 +85,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   // 从路由状态获取知识库数据，如果没有则从状态管理中获取
   const stateKnowledgeBase = location.state?.knowledgeBase as KnowledgeBase
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase | null>(stateKnowledgeBase || null)
+  const isWeblink = knowledgeBase?.type === 'weblink'
   const [isLoadingKnowledgeBase, setIsLoadingKnowledgeBase] = useState(false)
 
   // 如果路由状态中没有数据，尝试从状态管理中获取
@@ -185,6 +191,27 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       try {
         const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
 
+        let result: { items: DocumentItem[]; total: number; page: number }
+        if (knowledgeBase.type === 'weblink') {
+          const weblinkResponse = await KnowledgeBaseService.getWeblinksList({
+            space_id: spaceId,
+            kb_id: knowledgeBase.id,
+            page,
+            size: pageSize,
+          })
+          result = {
+            items: weblinkResponse.data.items as DocumentItem[],
+            total: weblinkResponse.data.total,
+            page: weblinkResponse.data.page,
+          }
+          setDocuments(result.items)
+          setTotalDocuments(result.total)
+          setCurrentPage(result.page)
+          if (!skipStatusFetch && result.items.length > 0) {
+            const ids = result.items.map(item => item.id)
+            fetchDocumentStatuses(ids, true).catch(() => {})
+          }
+        } else {
         const request: GetDocumentsListRequest = {
           space_id: spaceId,
           kb_id: knowledgeBase.id,
@@ -193,28 +220,29 @@ const KnowledgeBaseEditorPage: React.FC = () => {
         }
 
         const response = await KnowledgeBaseService.getDocumentsList(request)
-        
+        result = {
+          items: response.data.items,
+          total: response.data.total,
+          page: response.data.page,
+        }
         // 先设置文档列表，立即显示
-        setDocuments(response.data.items)
-        setTotalDocuments(response.data.total)
-        setCurrentPage(response.data.page)
+        setDocuments(result.items)
+        setTotalDocuments(result.total)
+        setCurrentPage(result.page)
         
         // 只有在不跳过状态查询时才查询当前页文档的状态
         if (!skipStatusFetch) {
-          const docIds = response.data.items.map(doc => doc.id)
+          const docIds = result.items.map(doc => doc.id)
           if (docIds.length > 0) {
             fetchDocumentStatuses(docIds, true).catch(error => {
               console.error(`[fetchDocuments] ⚠️  页面 ${page} 状态查询失败:`, error)
             })
           }
         }
+        }
 
         // 返回响应数据，供调用方使用
-        return {
-          items: response.data.items,
-          total: response.data.total,
-          page: response.data.page,
-        }
+        return result
       } catch (error) {
         // 不显示错误提示，因为没有文档是正常情况
         throw error // 重新抛出错误，让调用方知道请求失败
@@ -267,6 +295,40 @@ const KnowledgeBaseEditorPage: React.FC = () => {
         const size = 100 // 每页获取100个，减少请求次数
 
         // 步骤1: 先获取第一页，获取总数和第一页数据
+        if (knowledgeBase.type === 'weblink') {
+          const firstPageResponse = await KnowledgeBaseService.getWeblinksList({
+            space_id: spaceId,
+            kb_id: knowledgeBase.id,
+            page: 1,
+            size,
+          })
+          total = firstPageResponse.data.total
+          firstPageItems = firstPageResponse.data.items.slice(0, pageSize) as DocumentItem[]
+          allDocIds.push(...firstPageResponse.data.items.map((doc: { id: string }) => doc.id))
+          if (total <= size) {
+            return { allDocIds, firstPageItems, total }
+          }
+          const totalPages = Math.ceil(total / size)
+          const remainingPages = Array.from({ length: totalPages - 1 }, (_, i) => i + 2)
+          for (let i = 0; i < remainingPages.length; i += 3) {
+            const batch = remainingPages.slice(i, i + 3)
+            const batchResponses = await Promise.all(
+              batch.map(p =>
+                KnowledgeBaseService.getWeblinksList({
+                  space_id: spaceId,
+                  kb_id: knowledgeBase.id,
+                  page: p,
+                  size,
+                })
+              )
+            )
+            batchResponses.forEach(r => {
+              r.data.items.forEach((item: { id: string }) => allDocIds.push(item.id))
+            })
+          }
+          return { allDocIds, firstPageItems, total }
+        }
+
         const firstPageRequest: GetDocumentsListRequest = {
           space_id: spaceId,
           kb_id: knowledgeBase.id,
@@ -296,11 +358,11 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           const batch = remainingPages.slice(i, i + BATCH_SIZE)
 
           // 并行请求当前批次
-          const batchPromises = batch.map(page => {
+          const batchPromises = batch.map(p => {
             const request: GetDocumentsListRequest = {
               space_id: spaceId,
               kb_id: knowledgeBase.id,
-              page,
+              page: p,
               size,
             }
             return KnowledgeBaseService.getDocumentsList(request)
@@ -336,43 +398,59 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     return requestPromise
   }
 
-  // 查询文档状态
-  const fetchDocumentStatuses = async (docIds: string[], mergeWithExisting: boolean = true) => {
+  // 查询文档/链接状态
+  // refreshNames: 仅 weblink 有效，为 true 时从 URL 解析标题并更新（初次加载/刷新按钮）
+  const fetchDocumentStatuses = async (
+    docIds: string[],
+    mergeWithExisting: boolean = true,
+    refreshNames: boolean = false,
+  ) => {
     if (!knowledgeBase || docIds.length === 0) return
 
     try {
       const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
       const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
-
-      const request: GetDocumentStatusRequest = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        doc_id_list: docIds,
+      let response: { data: { items: DocumentStatusItem[] } }
+      if (knowledgeBase.type === 'weblink') {
+        response = await KnowledgeBaseService.getWeblinkStatus({
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          weblink_id_list: docIds,
+          refresh_names: refreshNames,
+        })
+      } else {
+        response = await KnowledgeBaseService.getDocumentStatus({
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          doc_id_list: docIds,
+        })
       }
 
-      const response = await KnowledgeBaseService.getDocumentStatus(request)
-
-      // 将状态数据转换为以文档ID为键的对象
+      // 将状态数据转换为以文档/链接ID为键的对象
       const statusMap: Record<string, DocumentStatusItem> = {}
       response.data.items.forEach(statusItem => {
-        if (statusItem.doc_id) {
-          statusMap[statusItem.doc_id] = statusItem
+        const id = statusItem.id || (statusItem as any).doc_id
+        if (id) {
+          statusMap[id] = { ...statusItem, doc_id: statusItem.id || (statusItem as any).doc_id }
         }
       })
 
       if (mergeWithExisting) {
-        // 只更新传入的文档ID的状态，保留其他文档的状态
-        setDocumentStatuses(prev => ({
-          ...prev,
-          ...statusMap,
-        }))
+        setDocumentStatuses(prev => ({ ...prev, ...statusMap }))
       } else {
-        // 完全替换状态（用于初次加载）
         setDocumentStatuses(statusMap)
+      }
+      // weblink 且有 refreshNames 时，同步更新列表中的名称
+      if (knowledgeBase.type === 'weblink' && refreshNames && response.data?.items) {
+        setDocuments(docs =>
+          docs.map(d => {
+            const s = statusMap[d.id]
+            return s?.name ? { ...d, name: s.name } : d
+          }),
+        )
       }
     } catch (error) {
       console.error('Failed to fetch document statuses:', error)
-      // 不显示错误信息，因为状态查询失败不影响基本功能
     }
   }
 
@@ -393,9 +471,10 @@ const KnowledgeBaseEditorPage: React.FC = () => {
               .then(({ allDocIds }) => {
                 // 步骤3: 查询所有文档的状态（包括第一页），更新首页状态栏
                 if (allDocIds.length > 0) {
-                  fetchDocumentStatuses(allDocIds, false).catch(error => {
-                    console.error('Failed to fetch document statuses:', error)
-                  })
+                  // 初次加载 / 重新打开 tab 时刷新名称（仅 weblink）
+                  fetchDocumentStatuses(allDocIds, false, knowledgeBase?.type === 'weblink').catch(
+                    error => console.error('Failed to fetch document statuses:', error),
+                  )
                 }
               })
               .catch(error => {
@@ -501,23 +580,32 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
       const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
 
-      const request = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        doc_id_list: [documentId],
-      }
+      const response = knowledgeBase.type === 'weblink'
+        ? await KnowledgeBaseService.getWeblinkStatus({
+            space_id: spaceId,
+            kb_id: knowledgeBase.id,
+            weblink_id_list: [documentId],
+            refresh_names: true,
+          })
+        : await KnowledgeBaseService.getDocumentStatus({
+            space_id: spaceId,
+            kb_id: knowledgeBase.id,
+            doc_id_list: [documentId],
+          })
 
-      const response = await KnowledgeBaseService.getDocumentStatus(request)
-
-      // 更新状态数据 - 使用fetchDocumentStatuses保持一致性
       if (response.data?.items?.length > 0) {
-        await fetchDocumentStatuses([documentId], true) // 只更新这个文档的状态
+        const item = response.data.items[0]
+        const statusMap = { [documentId]: { ...item, doc_id: item.id || (item as any).doc_id } }
+        setDocumentStatuses(prev => ({ ...prev, ...statusMap }))
+        if (isWeblink && item?.name) {
+          setDocuments(docs => docs.map(d => (d.id === documentId ? { ...d, name: item.name! } : d)))
+        }
       }
 
-      showSuccess(t('knowledgeBases.editor.refreshSuccess'))
+      showSuccess(isWeblink ? t('knowledgeBases.editor.refreshSuccessWeblink') : t('knowledgeBases.editor.refreshSuccess'))
     } catch (error) {
       console.error('Failed to refresh document status:', error)
-      showError(t('knowledgeBases.editor.refreshFailed'))
+      showError(isWeblink ? t('knowledgeBases.editor.refreshFailedWeblink') : t('knowledgeBases.editor.refreshFailed'))
     } finally {
       setRefreshingStatuses(prev => {
         const newSet = new Set(prev)
@@ -535,34 +623,44 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     try {
       const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
       const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
-
       const docIds = documents.map(doc => doc.id)
-      const request = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        doc_id_list: docIds,
-      }
 
-      const response = await KnowledgeBaseService.getDocumentStatus(request)
+      const response = knowledgeBase.type === 'weblink'
+        ? await KnowledgeBaseService.getWeblinkStatus({
+            space_id: spaceId,
+            kb_id: knowledgeBase.id,
+            weblink_id_list: docIds,
+            refresh_names: true,
+          })
+        : await KnowledgeBaseService.getDocumentStatus({
+            space_id: spaceId,
+            kb_id: knowledgeBase.id,
+            doc_id_list: docIds,
+          })
 
-      // 更新所有状态数据
       if (response.data?.items) {
         const statusMap: Record<string, DocumentStatusItem> = {}
         response.data.items.forEach(statusItem => {
-          if (statusItem.doc_id) {
-            statusMap[statusItem.doc_id] = statusItem
+          const id = statusItem.id || (statusItem as any).doc_id
+          if (id) {
+            statusMap[id] = { ...statusItem, doc_id: statusItem.id || (statusItem as any).doc_id }
           }
         })
-        setDocumentStatuses(prev => ({
-          ...prev,
-          ...statusMap,
-        }))
+        setDocumentStatuses(prev => ({ ...prev, ...statusMap }))
+        if (isWeblink) {
+          setDocuments(docs =>
+            docs.map(d => {
+              const s = statusMap[d.id]
+              return s?.name ? { ...d, name: s.name } : d
+            }),
+          )
+        }
       }
 
-      showSuccess(t('knowledgeBases.editor.refreshAllSuccess'))
+      showSuccess(isWeblink ? t('knowledgeBases.editor.refreshAllSuccessWeblink') : t('knowledgeBases.editor.refreshAllSuccess'))
     } catch (error) {
       console.error('Failed to refresh all document statuses:', error)
-      showError(t('knowledgeBases.editor.refreshAllFailed'))
+      showError(isWeblink ? t('knowledgeBases.editor.refreshAllFailedWeblink') : t('knowledgeBases.editor.refreshAllFailed'))
     } finally {
       setIsRefreshingAllStatuses(false)
     }
@@ -646,8 +744,14 @@ const KnowledgeBaseEditorPage: React.FC = () => {
     }
   }
 
-  // 开始编辑文档名称
+  // 开始编辑文档名称（weblink 名称常为完整 URL，含多个点号，不能按「扩展名」拆分）
   const handleEditDocument = (document: DocumentItem) => {
+    if (isWeblink) {
+      setEditingDocumentId(document.id)
+      setEditingDocumentName(document.name)
+      setEditingDocumentExtension('')
+      return
+    }
     const { name, extension } = splitFileName(document.name)
     setEditingDocumentId(document.id)
     setEditingDocumentName(name)
@@ -658,28 +762,42 @@ const KnowledgeBaseEditorPage: React.FC = () => {
   const handleSaveDocumentName = async (documentId: string) => {
     if (!knowledgeBase || !editingDocumentName.trim()) return
 
-    // 验证文件名长度（不含后缀）
+    // 文档：主文件名长度；weblink：整段 URL
     if (editingDocumentName.trim().length > MAX_DOCUMENT_NAME_LENGTH) {
-      showError(t('knowledgeBases.editor.nameMaxLength', { max: MAX_DOCUMENT_NAME_LENGTH }))
+      showError(
+        isWeblink
+          ? t('knowledgeBases.editor.nameMaxLengthWeblink', { max: MAX_DOCUMENT_NAME_LENGTH })
+          : t('knowledgeBases.editor.nameMaxLength', { max: MAX_DOCUMENT_NAME_LENGTH })
+      )
       return
     }
 
-    // 重新组合文件名和后缀
-    const fullName = editingDocumentName.trim() + editingDocumentExtension
+    // 文档类型：主名 + 扩展名；weblink：整段为显示名（常为 URL）
+    const fullName = isWeblink
+      ? editingDocumentName.trim()
+      : editingDocumentName.trim() + editingDocumentExtension
 
     setIsUpdating(true)
     try {
       const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
       const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
 
-      const request: UpdateDocumentRequest = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        document_id: documentId,
-        document_name: fullName,
+      if (knowledgeBase.type === 'weblink') {
+        await KnowledgeBaseService.updateWeblink({
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          weblink_id: documentId,
+          weblink_name: fullName,
+        })
+      } else {
+        const request: UpdateDocumentRequest = {
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          document_id: documentId,
+          document_name: fullName,
+        }
+        await KnowledgeBaseService.updateDocument(request)
       }
-
-      await KnowledgeBaseService.updateDocument(request)
 
       // 更新本地状态
       setDocuments(docs => docs.map(doc => (doc.id === documentId ? { ...doc, name: fullName } : doc)))
@@ -687,10 +805,10 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       setEditingDocumentId(null)
       setEditingDocumentName('')
       setEditingDocumentExtension('')
-      showSuccess(t('knowledgeBases.editor.updateSuccess'))
+      showSuccess(isWeblink ? t('knowledgeBases.editor.updateSuccessWeblink') : t('knowledgeBases.editor.updateSuccess'))
     } catch (error) {
       console.error('Failed to update document:', error)
-      showError(t('knowledgeBases.editor.updateFailed'))
+      showError(isWeblink ? t('knowledgeBases.editor.updateFailedWeblink') : t('knowledgeBases.editor.updateFailed'))
     } finally {
       setIsUpdating(false)
     }
@@ -730,15 +848,22 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
       const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
 
-      const request: DeleteDocumentsRequest = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        document_ids: [deleteDialog.documentId],
+      if (knowledgeBase.type === 'weblink') {
+        await KnowledgeBaseService.deleteWeblinks({
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          weblink_ids: [deleteDialog.documentId],
+        })
+      } else {
+        const request: DeleteDocumentsRequest = {
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          document_ids: [deleteDialog.documentId],
+        }
+        await KnowledgeBaseService.deleteDocuments(request)
       }
 
-      await KnowledgeBaseService.deleteDocuments(request)
-
-      showSuccess(t('knowledgeBases.editor.deleteSuccess'))
+      showSuccess(isWeblink ? t('knowledgeBases.editor.deleteSuccessWeblink') : t('knowledgeBases.editor.deleteSuccess'))
 
       // 保存删除前的页码
       const pageBeforeDelete = currentPage
@@ -753,7 +878,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to delete document:', error)
-      showError(t('knowledgeBases.editor.deleteFailed'))
+      showError(isWeblink ? t('knowledgeBases.editor.deleteFailedWeblink') : t('knowledgeBases.editor.deleteFailed'))
     } finally {
       setIsDeletingDocument(false)
       handleCloseDeleteDialog()
@@ -812,20 +937,31 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       const { KnowledgeBaseService } = await import('@test-agentstudio/api-client')
       const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
 
-      const request: DeleteDocumentsRequest = {
-        space_id: spaceId,
-        kb_id: knowledgeBase.id,
-        document_ids: Array.from(selectedDocumentIds),
+      if (knowledgeBase.type === 'weblink') {
+        await KnowledgeBaseService.deleteWeblinks({
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          weblink_ids: Array.from(selectedDocumentIds),
+        })
+      } else {
+        const request: DeleteDocumentsRequest = {
+          space_id: spaceId,
+          kb_id: knowledgeBase.id,
+          document_ids: Array.from(selectedDocumentIds),
+        }
+        await KnowledgeBaseService.deleteDocuments(request)
       }
-
-      await KnowledgeBaseService.deleteDocuments(request)
 
       const deletedCount = selectedDocumentIds.size
 
       // 清空选中列表
       setSelectedDocumentIds(new Set())
 
-      showSuccess(t('knowledgeBases.editor.batchDeleteSuccess', { count: deletedCount }))
+      showSuccess(
+        isWeblink
+          ? t('knowledgeBases.editor.batchDeleteSuccessWeblink', { count: deletedCount })
+          : t('knowledgeBases.editor.batchDeleteSuccess', { count: deletedCount })
+      )
 
       // 保存删除前的页码
       const pageBeforeDelete = currentPage
@@ -840,7 +976,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to batch delete documents:', error)
-      showError(t('knowledgeBases.editor.batchDeleteFailed'))
+      showError(isWeblink ? t('knowledgeBases.editor.batchDeleteFailedWeblink') : t('knowledgeBases.editor.batchDeleteFailed'))
     } finally {
       setIsBatchDeleting(false)
       handleCloseBatchDeleteDialog()
@@ -931,10 +1067,21 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                 </h1>
               </div>
             </div>
-            <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
-              <Upload className="w-4 h-4 mr-2" />
-              {t('knowledgeBases.settings.addDocument')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
+                <Upload className="w-4 h-4 mr-2" />
+                {isWeblink ? t('knowledgeBases.addWeblink.addButton') || '添加链接' : t('knowledgeBases.settings.addDocument')}
+              </button>
+              {!isWeblink && !(knowledgeBase.ds_kb_id && knowledgeBase.id === knowledgeBase.ds_kb_id) && (
+                <button
+                  onClick={() => setShowSyncDialog(true)}
+                  className="px-4 py-2 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center"
+                >
+                  <CloudUpload className="w-4 h-4 mr-2" />
+                  {t('knowledgeBases.syncToDeepSearch.button')}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -946,7 +1093,11 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           <div className="mb-6 bg-white rounded-lg shadow p-4">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-medium text-gray-700">{t('knowledgeBases.editor.processing', { count: processingDocIds.length })}</span>
+              <span className="text-sm font-medium text-gray-700">
+                {isWeblink
+                  ? t('knowledgeBases.editor.processingWeblinks', { count: processingDocIds.length })
+                  : t('knowledgeBases.editor.processing', { count: processingDocIds.length })}
+              </span>
             </div>
           </div>
         )}
@@ -957,11 +1108,13 @@ const KnowledgeBaseEditorPage: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
-                  <h2 className="text-lg font-medium text-gray-900">{t('knowledgeBases.editor.documentList')}</h2>
+                  <h2 className="text-lg font-medium text-gray-900">
+                    {isWeblink ? t('knowledgeBases.editor.weblinkList') : t('knowledgeBases.editor.documentList')}
+                  </h2>
                   {autoRefreshEnabled && processingDocIds.length > 0 && (
                     <div className="flex items-center text-sm text-green-600">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                      {t('knowledgeBases.editor.autoRefresh')}
+                      {isWeblink ? t('knowledgeBases.editor.autoRefreshWeblinks') : t('knowledgeBases.editor.autoRefresh')}
                     </div>
                   )}
                 </div>
@@ -985,9 +1138,15 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                         ? 'bg-gray-500 text-white hover:bg-gray-600'
                         : 'bg-blue-500 text-white hover:bg-blue-600'
                     }`}
-                    title={processingDocIds.length === 0 ? t('knowledgeBases.editor.noAutoRefreshHint') : ''}
+                    title={
+                      processingDocIds.length === 0
+                        ? (isWeblink ? t('knowledgeBases.editor.noAutoRefreshHintWeblinks') : t('knowledgeBases.editor.noAutoRefreshHint'))
+                        : ''
+                    }
                   >
-                    {autoRefreshEnabled ? t('knowledgeBases.editor.stopAutoRefresh') : t('knowledgeBases.editor.startAutoRefresh')}
+                    {autoRefreshEnabled
+                      ? (isWeblink ? t('knowledgeBases.editor.stopAutoRefreshWeblinks') : t('knowledgeBases.editor.stopAutoRefresh'))
+                      : (isWeblink ? t('knowledgeBases.editor.startAutoRefreshWeblinks') : t('knowledgeBases.editor.startAutoRefresh'))}
                   </button>
                   <button
                     onClick={handleRefreshAllStatuses}
@@ -1003,24 +1162,39 @@ const KnowledgeBaseEditorPage: React.FC = () => {
               {isDocumentsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  <span className="ml-2 text-gray-600">{t('knowledgeBases.editor.loadingDocuments')}</span>
+                  <span className="ml-2 text-gray-600">
+                    {isWeblink ? t('knowledgeBases.editor.loadingWeblinks') : t('knowledgeBases.editor.loadingDocuments')}
+                  </span>
                 </div>
               ) : documents.length === 0 ? (
-                <div className="text-center py-8">
+                  <div className="text-center py-8">
                   <FileText className="mx-auto w-12 h-12 text-gray-300 mb-4" />
-                  <p className="text-gray-500 mb-4">{t('knowledgeBases.editor.noDocuments')}</p>
-                  <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center mx-auto">
-                    <Upload className="w-4 h-4 mr-2" />
-                    {t('knowledgeBases.editor.addDocument')}
-                  </button>
+                  <p className="text-gray-500 mb-4">
+                    {isWeblink ? t('knowledgeBases.editor.noWeblinks') : t('knowledgeBases.editor.noDocuments')}
+                  </p>
+                  <div className="flex items-center justify-center gap-2">
+                    <button onClick={handleAddDocument} className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
+                      <Upload className="w-4 h-4 mr-2" />
+                      {isWeblink ? t('knowledgeBases.editor.addWeblink') : t('knowledgeBases.editor.addDocument')}
+                    </button>
+                    {!isWeblink && !(knowledgeBase.ds_kb_id && knowledgeBase.id === knowledgeBase.ds_kb_id) && (
+                      <button
+                        onClick={() => setShowSyncDialog(true)}
+                        className="px-4 py-2 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 flex items-center"
+                      >
+                        <CloudUpload className="w-4 h-4 mr-2" />
+                        {t('knowledgeBases.syncToDeepSearch.button')}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
+                  <div className="border border-gray-200 rounded-lg max-w-full overflow-x-auto">
+                    <table className="w-full min-w-[72rem] table-fixed divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12 align-middle shrink-0">
                             <button
                               onClick={handleSelectAll}
                               className="flex items-center justify-center p-1 rounded hover:bg-gray-200 transition-colors"
@@ -1037,21 +1211,27 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                               )}
                             </button>
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('knowledgeBases.editor.documentName')}</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-0 w-[30%] align-middle">
+                            {isWeblink ? t('knowledgeBases.editor.weblinkName') : t('knowledgeBases.editor.documentName')}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40 align-middle">
                             {t('knowledgeBases.settings.status')}
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('knowledgeBases.editor.createdAt')}</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-44 whitespace-nowrap align-middle">
+                            {t('knowledgeBases.editor.createdAt')}
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[12.5rem] w-[26%] align-top">
                             {t('knowledgeBases.settings.errorInfo')}
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('knowledgeBases.editor.actions')}</th>
+                          <th className="px-6 py-3 pr-7 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8.5rem] min-w-[8.5rem] whitespace-nowrap align-middle">
+                            {t('knowledgeBases.editor.actions')}
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {documents.map(doc => (
                           <tr key={doc.id} className={`hover:bg-gray-50 ${selectedDocumentIds.has(doc.id) ? 'bg-blue-50' : ''}`}>
-                            <td className="px-4 py-4 whitespace-nowrap w-12">
+                            <td className="px-4 py-4 whitespace-nowrap w-12 align-middle">
                               <button
                                 onClick={() => handleSelectDocument(doc.id)}
                                 className="flex items-center justify-center p-1 rounded hover:bg-gray-200 transition-colors"
@@ -1063,14 +1243,14 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                 )}
                               </button>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
+                            <td className="px-6 py-4 min-w-0 align-middle">
+                              <div className="flex items-center min-w-0">
                                 <FileText className="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
                                 {editingDocumentId === doc.id ? (
-                                  <div className="flex items-center space-x-2 flex-1">
-                                    <div className="flex-1 flex items-center space-x-2">
-                                      <div className="flex-1">
-                                        <div className="flex items-center space-x-2">
+                                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                    <div className="flex-1 flex items-center space-x-2 min-w-0">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center space-x-2 min-w-0">
                                           <input
                                             type="text"
                                             value={editingDocumentName}
@@ -1089,7 +1269,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                               }
                                             }}
                                             maxLength={MAX_DOCUMENT_NAME_LENGTH}
-                                            className={`flex-1 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                            className={`min-w-0 flex-1 max-w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                                               editingDocumentName.length >= MAX_DOCUMENT_NAME_LENGTH ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'
                                             }`}
                                             autoFocus
@@ -1124,48 +1304,34 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                     </button>
                                   </div>
                                 ) : (
-                                  <span
-                                    onClick={() => handleEditDocument(doc)}
-                                    className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 flex-1 block truncate max-w-xs md:max-w-sm lg:max-w-md"
-                                    title={doc.name}
-                                  >
-                                    {doc.name}
-                                  </span>
+                                  <KnowledgeBaseEditorCellTooltip title={doc.name}>
+                                    <span
+                                      onClick={() => handleEditDocument(doc)}
+                                      className="text-sm font-medium text-gray-900 cursor-pointer hover:text-blue-600 min-w-0 flex-1 truncate block"
+                                    >
+                                      {doc.name}
+                                    </span>
+                                  </KnowledgeBaseEditorCellTooltip>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm align-middle">
                               <StatusBadge
                                 status={documentStatuses[doc.id]?.status || 'unknown'}
                                 documentId={doc.id}
                                 enableGraphEnhancement={documentStatuses[doc.id]?.enable_graph_enhancement}
                               />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 align-middle">
                               {doc.created_at || '-'}
                             </td>
-                            <td className="px-6 py-4 text-sm">
-                              {documentStatuses[doc.id]?.error_msg ? (
-                                <span 
-                                  className="text-red-600 cursor-help break-words" 
-                                  title={documentStatuses[doc.id]?.error_msg}
-                                  style={{ 
-                                    maxWidth: '400px',
-                                    display: 'inline-block',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word'
-                                  }}
-                                >
-                                  {documentStatuses[doc.id]?.error_msg.length > 100 
-                                    ? `${documentStatuses[doc.id]?.error_msg.substring(0, 100)}...` 
-                                    : documentStatuses[doc.id]?.error_msg}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
+                            <td className="px-6 py-4 text-sm min-w-[12.5rem] align-top">
+                              <DocumentErrorMessageCell
+                                message={getStatusErrorMessage(documentStatuses[doc.id])}
+                              />
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <div className="flex items-center space-x-2">
+                            <td className="px-6 py-4 pr-7 whitespace-nowrap text-sm align-middle">
+                              <div className="flex items-center justify-start gap-2">
                                 <button
                                   onClick={() => handleEditDocument(doc)}
                                   className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
@@ -1177,7 +1343,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
                                   onClick={() => handleRefreshSingleStatus(doc.id)}
                                   className="text-green-600 hover:text-green-800 disabled:opacity-50"
                                   disabled={refreshingStatuses.has(doc.id)}
-                                  title={t('knowledgeBases.editor.refreshDocumentStatus')}
+                                  title={isWeblink ? t('knowledgeBases.editor.refreshDocumentStatusWeblink') : t('knowledgeBases.editor.refreshDocumentStatus')}
                                 >
                                   <RefreshCw className={`w-4 h-4 ${refreshingStatuses.has(doc.id) ? 'animate-spin' : ''}`} />
                                 </button>
@@ -1270,8 +1436,62 @@ const KnowledgeBaseEditorPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 添加文档对话框 */}
+      {/* 同步至 Deep Search 对话框 */}
+      {showSyncDialog && knowledgeBase && (
+        <SyncToDeepSearchDialog
+          open={showSyncDialog}
+          knowledgeBase={knowledgeBase}
+          onClose={() => setShowSyncDialog(false)}
+          onSuccess={() => {
+            setShowSyncDialog(false)
+            showSuccess(t('knowledgeBases.syncToDeepSearch.success'))
+            setCurrentPage(1)
+            fetchDocuments(1).catch(console.error)
+          }}
+          onAbort={() => {
+            const spaceId = user?.spaceId || ENV_CONFIG.DEFAULT_SPACE_ID
+            if (!id) return
+            fetchKnowledgeBases(spaceId, 1, 100)
+              .then(() => {
+                const { knowledgeBases: list } = useKnowledgeBaseStore.getState()
+                const kb = list.find(k => k.id === id)
+                if (kb) setKnowledgeBase(kb)
+              })
+              .catch(console.error)
+          }}
+        />
+      )}
+
+      {/* 添加文档/链接对话框 */}
       {showAddDialog && knowledgeBase && (
+        isWeblink ? (
+        <AddWeblinkDialog
+          open={showAddDialog}
+          knowledgeBase={knowledgeBase}
+          existingWeblinkCount={totalDocuments}
+          onClose={() => setShowAddDialog(false)}
+          onWeblinksAdded={() => {
+            setCurrentPage(1)
+            fetchDocuments(1).catch(() => {})
+          }}
+          onSuccess={async (weblinkIds?: string[]) => {
+            setShowAddDialog(false)
+            showSuccess(isWeblink ? t('knowledgeBases.settings.linkAdded') : t('knowledgeBases.settings.documentAdded'))
+            setCurrentPage(1)
+            fetchDocuments(1).then(() => {
+              if (weblinkIds && weblinkIds.length > 0) {
+                setTimeout(() => {
+                  const currentPageDocIds = new Set(documentsRef.current.map(doc => doc.id))
+                  const newIdsNotInPage = weblinkIds.filter(id => !currentPageDocIds.has(id))
+                  if (newIdsNotInPage.length > 0) {
+                    fetchDocumentStatuses(newIdsNotInPage, true).catch(() => {})
+                  }
+                }, 100)
+              }
+            }).catch(() => {})
+          }}
+        />
+      ) : (
         <AddDocumentDialog
           open={showAddDialog}
           knowledgeBase={knowledgeBase}
@@ -1289,8 +1509,8 @@ const KnowledgeBaseEditorPage: React.FC = () => {
           }}
           onSuccess={async (docIds?: string[]) => {
             setShowAddDialog(false)
-            showSuccess(t('knowledgeBases.settings.documentAdded'))
-            // 上传文档后重置到第一页
+            showSuccess(isWeblink ? t('knowledgeBases.settings.linkAdded') : t('knowledgeBases.settings.documentAdded'))
+            // 上传文档/添加链接后重置到第一页
             setCurrentPage(1)
             
             // 优化：直接使用 fetchDocuments(1) 获取第一页数据，避免遍历所有页面
@@ -1323,6 +1543,7 @@ const KnowledgeBaseEditorPage: React.FC = () => {
             })
           }}
         />
+      )
       )}
 
       {/* 删除确认对话框 */}
@@ -1330,8 +1551,12 @@ const KnowledgeBaseEditorPage: React.FC = () => {
         isOpen={deleteDialog.isOpen}
         onClose={handleCloseDeleteDialog}
         onConfirm={confirmDeleteDocument}
-        title={t('knowledgeBases.editor.deleteTitle')}
-        message={t('knowledgeBases.editor.deleteMessage', { name: deleteDialog.documentName })}
+        title={isWeblink ? t('knowledgeBases.editor.deleteTitleWeblink') : t('knowledgeBases.editor.deleteTitle')}
+        message={
+          isWeblink
+            ? t('knowledgeBases.editor.deleteMessageWeblink', { name: deleteDialog.documentName })
+            : t('knowledgeBases.editor.deleteMessage', { name: deleteDialog.documentName })
+        }
         confirmButtonText={t('knowledgeBases.editor.deleteDocument')}
         cancelButtonText="取消"
         isLoading={isDeletingDocument}
@@ -1343,9 +1568,17 @@ const KnowledgeBaseEditorPage: React.FC = () => {
         isOpen={batchDeleteDialog.isOpen}
         onClose={handleCloseBatchDeleteDialog}
         onConfirm={confirmBatchDelete}
-        title={t('knowledgeBases.editor.batchDeleteTitle')}
-        message={t('knowledgeBases.editor.batchDeleteMessage', { count: batchDeleteDialog.count })}
-        confirmButtonText={t('knowledgeBases.editor.batchDeleteButton', { count: batchDeleteDialog.count })}
+        title={isWeblink ? t('knowledgeBases.editor.batchDeleteTitleWeblink') : t('knowledgeBases.editor.batchDeleteTitle')}
+        message={
+          isWeblink
+            ? t('knowledgeBases.editor.batchDeleteMessageWeblink', { count: batchDeleteDialog.count })
+            : t('knowledgeBases.editor.batchDeleteMessage', { count: batchDeleteDialog.count })
+        }
+        confirmButtonText={
+          isWeblink
+            ? t('knowledgeBases.editor.batchDeleteButtonWeblink', { count: batchDeleteDialog.count })
+            : t('knowledgeBases.editor.batchDeleteButton', { count: batchDeleteDialog.count })
+        }
         cancelButtonText="取消"
         isLoading={isBatchDeleting}
         iconType="danger"

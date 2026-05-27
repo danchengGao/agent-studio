@@ -29,7 +29,7 @@ interface FormatMenuProps {
 /**
  * 格式图标映射
  */
-const FORMAT_ICONS: Record<DownloadFormat, React.ReactNode> = {
+export const FORMAT_ICONS: Record<DownloadFormat, React.ReactNode> = {
   markdown: <span className="text-sm font-mono font-bold">M↓</span>,
   html: <span className="text-sm font-bold">&lt;/&gt;</span>,
   docx: <span className="text-sm font-bold">W</span>,

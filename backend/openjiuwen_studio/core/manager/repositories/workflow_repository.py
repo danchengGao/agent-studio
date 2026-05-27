@@ -68,8 +68,8 @@ class WorkflowRepository():
     '''
     @with_exception_handling
     def patch_workflow_id(self, workflow_id: WorkflowId, db_session: Session | None = None) -> WorkflowId:
-        if not workflow_id.workflow_version:
-            # 如果是draft版本，补全_version字段
+        if not workflow_id.workflow_version or workflow_id.workflow_version == "draft":
+            # 如果是draft版本或显式指定"draft"，补全_version字段
             workflow_id.workflow_version = WorkflowBaseDB.__version_none__
         elif workflow_id.workflow_version == WorkflowPublishDB.__latest_publish_version__:
             with get_db_jw(db_session) as db: 

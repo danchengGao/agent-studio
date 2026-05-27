@@ -79,6 +79,11 @@ Make sure your machine meets the following requirements:
 
 - To modify the port number of the frontend page service, please refer to [here](../../../../scripts/README.md#如何修改前端页面服务的端口号).
 
+- Locate and edit the .env.custom file in the deployment tool directory, then add the following configuration item according to your actual runtime environment:
+```
+IP=<local IP address of the machine running the deployment tool>
+```
+
 - Run the following command to start openJiuwen:
 
   ```bash

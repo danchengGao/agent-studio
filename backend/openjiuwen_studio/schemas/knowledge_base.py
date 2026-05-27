@@ -168,6 +168,7 @@ class KnowledgeBaseListItem(BaseModel):
     created_at: str = Field(..., description="创建时间，格式：YYYY-MM-DD")
     updated_at: str = Field(..., description="更新时间，格式：YYYY-MM-DD")
     has_graph_enhancement: Optional[bool] = Field(None, description="是否有图增强构建的文档")
+    ds_kb_id: Optional[str] = Field(None, description="DeepSearch 知识库 ID，未同步则为 null")
 
 
 class KnowledgeBaseListResponse(BaseModel):
@@ -177,6 +178,31 @@ class KnowledgeBaseListResponse(BaseModel):
     total: int = Field(..., description="总记录数")
     page: int = Field(..., description="当前页码")
     size: int = Field(..., description="每页大小")
+
+
+class SyncUploadRequest(BaseModel):
+    """同步上传到 DeepSearch 请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="Studio 知识库ID")
+    deepsearch_embedding_model_config_id: Optional[int] = Field(
+        None,
+        description="DeepSearch 侧 Embedding 模型配置 ID，同步时在 Deep Search 创建知识库使用",
+    )
+
+
+class SyncProcessRequest(BaseModel):
+    """同步至 DeepSearch 处理/建索引请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    ds_kb_id: str = Field(..., min_length=1, max_length=100, description="DeepSearch 知识库 ID")
+    doc_id_list: list[str] = Field(
+        default_factory=list,
+        description="文档ID列表；为空时表示无可索引文档，服务端跳过调用 DeepSearch process",
+    )
+    parsing_strategy: Optional[Dict[str, Any]] = Field(None, description="解析策略")
+    segmentation_strategy: Optional[Dict[str, Any]] = Field(None, description="分段策略")
+    indexing_strategy: Optional[Dict[str, Any]] = Field(None, description="索引策略")
 
 
 class DocumentGetRequest(BaseModel):
@@ -372,3 +398,110 @@ class RetrievalSourceType(IntEnum):
     RETRIEVAL_SOURCE_HYBRID = (1,)
     RETRIEVAL_SOURCE_CHUNKS = (2,)
     RETRIEVAL_SOURCE_TRIPLES = (3,)
+
+
+# ==================== Weblink schemas ====================
+
+
+class WeblinkAddRequest(BaseModel):
+    """添加链接请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
+    urls: list[str] = Field(..., min_length=1, max_length=50, description="URL列表（最多50条）")
+
+
+class WeblinkAddItem(BaseModel):
+    """单个链接添加结果"""
+
+    id: str = Field(..., description="链接ID（weblink_id）")
+    url: str = Field(..., description="源URL")
+    name: str = Field(..., description="展示名")
+    status: str = Field(..., description="链接状态")
+
+
+class WeblinkAddBatchResponse(BaseModel):
+    """批量添加链接响应"""
+
+    success_count: int = Field(..., description="成功添加的链接数量")
+    failed_count: int = Field(..., description="添加失败的链接数量")
+    links: list[WeblinkAddItem] = Field(..., description="添加结果列表")
+
+
+class WeblinkListRequest(BaseModel):
+    """链接列表请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
+    page: int = Field(1, ge=1, description="页码，默认1")
+    size: int = Field(10, ge=1, le=100, description="每页大小，默认10")
+
+
+class WeblinkListItem(BaseModel):
+    """链接列表项"""
+
+    name: str = Field(..., description="展示名")
+    id: str = Field(..., description="链接ID")
+    url: str = Field(..., description="源URL")
+    created_at: str = Field(..., description="创建时间")
+    updated_at: str = Field(..., description="更新时间")
+
+
+class WeblinkListResponse(BaseModel):
+    """链接列表响应"""
+
+    items: list[WeblinkListItem] = Field(..., description="链接列表")
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    size: int = Field(..., description="每页大小")
+
+
+class WeblinkStatusRequest(BaseModel):
+    """批量查询链接状态请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
+    weblink_id_list: list[str] = Field(..., min_length=1, description="链接ID列表")
+    refresh_names: bool = Field(False, description="是否从 URL 重新解析标题并更新名称（仅用户点击刷新时传 true）")
+
+
+class WeblinkProcessRequest(BaseModel):
+    """链接处理请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
+    weblink_id_list: list[str] = Field(..., min_length=1, description="链接ID列表")
+    parsing_strategy: ParsingStrategy = Field(..., description="解析策略")
+    segmentation_strategy: SegmentationStrategy = Field(..., description="分段策略")
+    indexing_strategy: IndexingStrategy = Field(..., description="索引策略")
+
+
+class WeblinkProcessResponse(BaseModel):
+    """链接处理响应"""
+
+    task_id: str = Field(..., description="处理任务ID")
+    processed_count: int = Field(..., description="已启动处理的链接数量")
+    failed_count: int = Field(..., description="启动失败的链接数量")
+    failed_links: list[str] = Field(default_factory=list, description="启动失败的链接ID列表")
+
+
+class WeblinkUpdateRequest(BaseModel):
+    """更新链接请求"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
+    weblink_id: str = Field(..., min_length=1, max_length=100, description="链接ID")
+    weblink_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="新的展示名",
+    )
+
+
+class WeblinkDeleteRequest(BaseModel):
+    """删除链接请求（支持批量删除）"""
+
+    space_id: str = Field(..., min_length=1, max_length=100, description="空间ID")
+    kb_id: str = Field(..., min_length=1, max_length=100, description="知识库ID")
+    weblink_ids: list[str] = Field(..., min_length=1, description="链接ID列表")
