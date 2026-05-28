@@ -1,16 +1,21 @@
+from dataclasses import dataclass
 from functools import wraps
 from typing import Dict, Any, Callable
 import httpx
 from httpx import HTTPStatusError
 from fastapi import APIRouter, Depends, status, HTTPException
 from fastapi.responses import StreamingResponse, JSONResponse
+from sqlalchemy.orm import Session
 
 from openjiuwen.core.common.logging import logger
 
+from openjiuwen_studio.core.database import get_db
 from openjiuwen_studio.core.thirdparty_client import DeepSearchAgentClient
 from openjiuwen_studio.core.manager.convertor.components.llm import get_model_config
 from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
+from openjiuwen_studio.core.manager.model_manager.managers.vlm_model_config_manager import VLMModelConfigManager
+from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 from openjiuwen_studio.core.common.exceptions import DeepSearchClientError
 from openjiuwen_studio.core.config import settings
 from openjiuwen_studio.schemas.common import ResponseModel
@@ -45,6 +50,16 @@ from openjiuwen_studio.routers.deepsearch_logger import (
 deepsearch_router = APIRouter()
 
 
+@dataclass
+class DeepSearchModelConfigQuery:
+    general_model_id: int
+    space_id: str
+    plan_understanding_model_id: int | None = None
+    info_collecting_model_id: int | None = None
+    writing_checking_model_id: int | None = None
+    vlm_model_config_id: int | None = None
+
+
 # 依赖注入（或直接使用单例）
 def get_agent_client():
     return DeepSearchAgentClient()  # 或全局单例
@@ -67,25 +82,64 @@ def build_single_model_config(model_id, space_id):
     }
 
 
-def get_model_configs(
-    general_model_id,
-    space_id,
-    plan_understanding_model_id=None,
-    info_collecting_model_id=None,
-    writing_checking_model_id=None
-):
+def build_single_vlm_model_config(model_id: int, space_id: str, db: Session):
+    """Build the VLM model config DeepSearch expects for chart generation."""
+    model_config = VLMModelConfigManager(db).get_config_by_id(model_id, space_id)
+    if not model_config.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VLM model config is inactive",
+        )
+
+    api_key = model_config.api_key
+    if api_key:
+        api_key = SecurityUtils().decrypt_api_key(api_key)
+
+    return {
+        "model_name": model_config.model_id,
+        "model_type": model_config.provider,
+        "base_url": model_config.base_url,
+        "api_key": api_key,
+        "hyper_parameters": {
+            "timeout": model_config.timeout,
+            "retry_count": model_config.retry_count,
+        }
+    }
+
+
+def get_model_configs(query: DeepSearchModelConfigQuery, db: Session = None):
     """构建 llm_config 结构，高级配置仅在有值时添加"""
     # llm_config = build_single_model_config(general_model_id, space_id)
     llm_config = {}
-    llm_config["general"] = build_single_model_config(general_model_id, space_id)
+    llm_config["general"] = build_single_model_config(query.general_model_id, query.space_id)
 
     # 高级配置：仅在有值时添加
-    if plan_understanding_model_id:
-        llm_config["plan_understanding"] = build_single_model_config(plan_understanding_model_id, space_id)
-    if info_collecting_model_id:
-        llm_config["info_collecting"] = build_single_model_config(info_collecting_model_id, space_id)
-    if writing_checking_model_id:
-        llm_config["writing_checking"] = build_single_model_config(writing_checking_model_id, space_id)
+    if query.plan_understanding_model_id:
+        llm_config["plan_understanding"] = build_single_model_config(
+            query.plan_understanding_model_id,
+            query.space_id,
+        )
+    if query.info_collecting_model_id:
+        llm_config["info_collecting"] = build_single_model_config(
+            query.info_collecting_model_id,
+            query.space_id,
+        )
+    if query.writing_checking_model_id:
+        llm_config["writing_checking"] = build_single_model_config(
+            query.writing_checking_model_id,
+            query.space_id,
+        )
+    if query.vlm_model_config_id:
+        if db is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database session is required for VLM model config",
+            )
+        llm_config["vlm_chart_generating"] = build_single_vlm_model_config(
+            query.vlm_model_config_id,
+            query.space_id,
+            db,
+        )
 
     return llm_config
 
@@ -119,7 +173,8 @@ def handle_deepsearch_errors(func: Callable[..., Any]) -> Callable[..., Any]:
 async def run(
         request: DeepSearchRequest,
         client: DeepSearchAgentClient = Depends(get_agent_client),
-        current_user: dict = Depends(get_current_user)
+        current_user: dict = Depends(get_current_user),
+        db: Session = Depends(get_db),
 ) -> StreamingResponse:
     # 使用 request.model_dump() 保留前端传递的所有字段（除了 *_model_config_id）
     payload = request.model_dump(
@@ -129,26 +184,43 @@ async def run(
             'plan_understanding_model_id',
             'info_collecting_model_id',
             'writing_checking_model_id',
+            'vlm_model_config_id',
         }
     )
+    
+    # 先检查用户权限
+    _ = check_user_space(payload["space_id"], current_user)
+    
     # 取消请求不需要获取模型配置，直接转发到 deepsearch 服务
     if request.interrupt_feedback == "cancel":
         logger.info(f"[DeepSearch Cancel] Received cancel request for conversation_id={payload.get('conversation_id')}")
         # 取消请求：不需要 llm_config，直接转发
         pass
     else:
+        if (
+            request.vlm_chart_generator_enable
+            and request.vlm_chart_generator_max_iterations > 0
+            and not request.vlm_model_config_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="VLM model config is required when VLM chart generator is enabled with iterations > 0",
+            )
+
         # 构建完整的 llm_config（包含 general, plan_understanding 等）
         model_config = get_model_configs(
-            request.general_model_config_id,
-            request.space_id,
-            request.plan_understanding_model_id,
-            request.info_collecting_model_id,
-            request.writing_checking_model_id
+            DeepSearchModelConfigQuery(
+                general_model_id=request.general_model_config_id,
+                space_id=request.space_id,
+                plan_understanding_model_id=request.plan_understanding_model_id,
+                info_collecting_model_id=request.info_collecting_model_id,
+                writing_checking_model_id=request.writing_checking_model_id,
+                vlm_model_config_id=request.vlm_model_config_id,
+            ),
+            db,
         )
         # 用构建好的 model_config 覆盖 llm_config
         payload["llm_config"] = model_config
-
-    _ = check_user_space(payload["space_id"], current_user)
 
     # 获取 conversation_id
     conversation_id = payload.get("conversation_id", "")
@@ -200,15 +272,22 @@ async def import_template(
         current_user: dict = Depends(get_current_user)
 ):
     """导入模板"""
+    # 先检查用户权限
+    _ = check_user_space(request.space_id, current_user)
+    
     # 构建 llm_config（模板导入只需要 general 模型配置）
-    model_config = get_model_configs(request.model_config_id, request.space_id)
+    model_config = get_model_configs(
+        DeepSearchModelConfigQuery(
+            general_model_id=request.model_config_id,
+            space_id=request.space_id,
+        )
+    )
 
     # 使用 request.model_dump() 保留前端传递的所有字段（除了 model_config_id）
     payload = request.model_dump(exclude={'model_config_id'})
     # 用构建好的 model_config 覆盖 llm_config
     payload["llm_config"] = model_config
 
-    _ = check_user_space(payload["space_id"], current_user)
     result = await client.import_templates(payload)
     # 直接返回，FastAPI 会自动校验并序列化为 TemplateImportResponse
     return result
@@ -363,7 +442,10 @@ async def report_convert(
 
 
 @deepsearch_router.get("/heartbeat")
-async def deepsearch_heartbeat():
+@handle_deepsearch_errors
+async def deepsearch_heartbeat(
+        current_user: dict = Depends(get_current_user)
+):
     """检查 DeepSearch 服务是否可用"""
     try:
         # 检查配置

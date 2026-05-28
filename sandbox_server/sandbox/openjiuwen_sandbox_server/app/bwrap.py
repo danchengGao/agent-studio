@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import os
 import platform
+import pwd
+import shutil
 import tempfile
 
 import pyseccomp
 
 from .base import BaseSandbox
+from .network_guard import apply_internal_network_guard
 from .util import ExecutionResult, generate_eval_command, merge_environments
 
 SECCOMP_BPF_FILENAME = 'seccomp.bpf'
+BWRAP_RUN_USER = os.getenv('BWRAP_RUN_USER', 'sandbox-exec')
 
 MOUNT_MODES = {
     'read': '--ro-bind',
@@ -80,6 +84,9 @@ class BubbleWrapRunner(BaseSandbox, sandbox_type='bubblewrap'):
         if arch not in ('x86_64', 'aarch64'):
             raise RuntimeError(f"Unsupported architecture: {arch}")
 
+        if not sandbox_config.allow_internal_network_access:
+            apply_internal_network_guard(BWRAP_RUN_USER)
+
         allowed = sandbox_config.seccomp['allow'].get(arch, [])
         if not allowed:
             sandbox_config.seccomp_bpf = None
@@ -109,7 +116,7 @@ class BubbleWrapRunner(BaseSandbox, sandbox_type='bubblewrap'):
                     dep_envs, dep_paths = self._dep_mngr.get_dependency_setting(lang, dep_name)
                     envs = merge_environments(envs, dep_envs)
 
-                cmd = [self._sandbox_config.sandbox['path'], '--die-with-parent']
+                cmd = self._sandbox_command()
                 cmd += self._mount_params(workdir, dst_code_dir, dep_paths)
                 cmd += self._namespace_params()
                 if self._sandbox_config.options:
@@ -159,6 +166,30 @@ class BubbleWrapRunner(BaseSandbox, sandbox_type='bubblewrap'):
             params += ['--ro-bind', path, path]
 
         return params
+
+    def _sandbox_command(self):
+        cmd = [self._sandbox_config.sandbox['path'], '--die-with-parent']
+        if self._sandbox_config.allow_internal_network_access:
+            return cmd
+
+        setpriv = shutil.which('setpriv')
+        if not setpriv:
+            raise RuntimeError(
+                'setpriv is required when allow_internal_network_access is false.'
+            )
+
+        try:
+            user = pwd.getpwnam(BWRAP_RUN_USER)
+        except KeyError as e:
+            raise RuntimeError(f'Cannot find bwrap run user: {BWRAP_RUN_USER}') from e
+
+        return [
+            setpriv,
+            '--reuid', str(user.pw_uid),
+            '--regid', str(user.pw_gid),
+            '--clear-groups',
+            *cmd,
+        ]
 
     def _namespace_params(self):
         return [

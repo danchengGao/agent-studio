@@ -91,7 +91,9 @@ export function useTestExecution(options: UseTestExecutionOptions): UseTestExecu
         if (nodeId) {
           if (response.code === 200) {
             let outputData = null
-            if (response.data?.output?.result) {
+            if (response.data?.payload?.output !== undefined) {
+              outputData = response.data.payload.output
+            } else if (response.data?.output?.result) {
               outputData = response.data.output.result
             } else if (response.data?.response) {
               outputData = response.data.response

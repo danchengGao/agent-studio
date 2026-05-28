@@ -19,6 +19,7 @@ from openjiuwen_studio.routers import (
     tags,
     knowledge_base,
     embedding_models,
+    vlm_models,
     prompt_router,
     prompt_debug_router,
     prompt_tuning_router,
@@ -28,6 +29,8 @@ from openjiuwen_studio.routers import (
     deepsearch_knowledge_base,
     runtimes
 )
+from openjiuwen_studio.routers.triggers import triggers_router, triggers_inbound_router
+from openjiuwen_studio.routers.evaluation import evaluation_router
 
 api_router = APIRouter()
 
@@ -45,6 +48,7 @@ def router_register(app: FastAPI):
     v1_router.include_router(space.space_router, prefix="/spaces", tags=["Space"])
     v1_router.include_router(models.models_router, prefix="/models", tags=["Models"])
     v1_router.include_router(embedding_models.embedding_models_router, tags=["Embedding Models"])
+    v1_router.include_router(vlm_models.vlm_models_router, tags=["VLM Models"])
     v1_router.include_router(agents.agents_router, prefix="/agents", tags=["Agents"])
     v1_router.include_router(execution.execution_router, prefix="/execution", tags=["Execution"])
     v1_router.include_router(workflows.workflows_router, prefix="/workflows", tags=["Workflows"])
@@ -61,6 +65,9 @@ def router_register(app: FastAPI):
     v1_router.include_router(system_model.system_router, prefix="/system", tags=["System"])
     v1_router.include_router(memory_base.memory_base_router, prefix="/memory", tags=["Memory Base"])
     v1_router.include_router(runtimes.runtime_router, prefix="/runtime", tags=["RunTime"])
+    v1_router.include_router(triggers_router, prefix="/triggers", tags=["Triggers"])
+    v1_router.include_router(triggers_inbound_router, prefix="/triggers", tags=["Triggers Inbound"])
+    v1_router.include_router(evaluation_router, prefix="/evaluation", tags=["Evaluation"])
 
     # Add health check endpoint directly to api_router (not v1_router)
     @api_router.get("/health")

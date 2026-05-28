@@ -1,0 +1,165 @@
+# Calculator Workflow Benchmark
+# Tests a simple "add" workflow: receives {a, b} and returns {result: a+b}.
+# No pattern_type is set — this benchmark validates output only, not structure.
+#
+# Expected workflow behaviour:
+#   Input:  {"a": <number>, "b": <number>}
+#   Output: {"result": <number>}   (result == a + b)
+#
+# Two graders per task:
+#   1. state_check  — checks output["result"] equals the expected value (exact)
+#   2. output_check — checks that the output is not empty (sanity guard)
+
+suite:
+  suite_name: "Calculator — Add Function"
+  description: "Validates a calculator workflow that sums two numbers and returns {result: <sum>}. Use this to confirm your workflow handles integers, floats, zeros, and negative inputs correctly."
+
+tasks:
+  - task_id: "calc_add_basic"
+    task_name: "Basic integer addition (2 + 4)"
+    description: "The simplest possible add: two small positive integers."
+    difficulty: 0  # EASY
+    tags: ["calculator", "add", "integer"]
+    trials: 1
+    input_data:
+      a: 2
+      b: 4
+    expected_output:
+      result: "6"
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "result_equals_6"
+        config:
+          check_type: "state"      # alias for state_check: checks a path inside final_output
+          path: "output.result.result"           # look at output["result"]
+          expected_value: "6"
+          condition: "eq"
+      - type: 0  # DETERMINISTIC
+        name: "output_not_empty"
+        config:
+          check_type: "output"     # alias for output_check: checks entire final_output
+          condition: "is_not_empty"
+          expected_value: null
+
+  - task_id: "calc_add_zero_operand"
+    task_name: "Addition with zero (0 + 5)"
+    description: "Adding zero should return the other operand unchanged."
+    difficulty: 0  # EASY
+    tags: ["calculator", "add", "zero", "edge-case"]
+    trials: 1
+    input_data:
+      a: 0
+      b: 5
+    expected_output:
+      result: "5"
+    graders_config:
+      - type: 0
+        name: "result_equals_5"
+        config:
+          check_type: "state"
+          path: "output.result.result"
+          expected_value: "5"
+          condition: "eq"
+      - type: 0
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: null
+
+  - task_id: "calc_add_negative"
+    task_name: "Addition with negative number (-3 + 10)"
+    description: "One operand is negative; result should be positive."
+    difficulty: 0  # EASY
+    tags: ["calculator", "add", "negative", "edge-case"]
+    trials: 1
+    input_data:
+      a: -3
+      b: 10
+    expected_output:
+      result: "7"
+    graders_config:
+      - type: 0
+        name: "result_equals_7"
+        config:
+          check_type: "state"
+          path: "output.result.result"
+          expected_value: "7"
+          condition: "eq"
+      - type: 0
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: null
+
+  - task_id: "calc_add_large"
+    task_name: "Large number addition (100 + 250)"
+    description: "Ensures the workflow handles larger integers correctly."
+    difficulty: 0  # EASY
+    tags: ["calculator", "add", "integer", "large"]
+    trials: 1
+    input_data:
+      a: 100
+      b: 250
+    expected_output:
+      result: "350"
+    graders_config:
+      - type: 0
+        name: "result_equals_350"
+        config:
+          check_type: "state"
+          path: "output.result.result"
+          expected_value: "350"
+          condition: "eq"
+      - type: 0
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: null
+
+  - task_id: "calc_add_both_negative"
+    task_name: "Both operands negative (-5 + -3)"
+    description: "Edge case: both operands are negative; result should be -8."
+    difficulty: 1  # MEDIUM
+    tags: ["calculator", "add", "negative", "edge-case"]
+    trials: 2
+    input_data:
+      a: -5
+      b: -3
+    expected_output:
+      result: "-8"
+    graders_config:
+      - type: 0
+        name: "result_equals_minus_8"
+        config:
+          check_type: "state"
+          path: "output.result.result"
+          expected_value: "-8"
+          condition: "eq"
+      - type: 0
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: null
+      - type: 2  # CODE_BASED — demonstrates the code grader
+        name: "result_is_negative"
+        config:
+          code: |
+            def grade(trace, expected):
+                output = trace.get("final_output") or {}
+                result = output.get("result")
+                try:
+                    result = int(result)
+                except:
+                    pass
+
+                passed = result is not None and result < 0
+                return {
+                    "passed": passed,
+                    "score": 1.0 if passed else 0.0,
+                    "feedback": f"result={result} should be negative",
+                }
+          function_name: "grade"

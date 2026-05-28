@@ -1,0 +1,5 @@
+AGENTS = "agents"
+AGENT = "agent"
+SEARCH = "search"
+EXECUTE = "execute"
+START = "chat"

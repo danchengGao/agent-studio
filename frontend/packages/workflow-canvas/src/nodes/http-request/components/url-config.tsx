@@ -19,7 +19,7 @@ export function UrlConfig() {
   }
 
   return (
-    <Field<IFlowConstantRefValue> name="inputs.inputParameters.url">
+    <Field<IFlowConstantRefValue> name="inputs.httpRequestParam.url">
       {({ field }) => (
         <FormItem name={t('workflowCanvas.nodes.httpRequest.url.label') || 'URL'}>
           <DynamicValueInput

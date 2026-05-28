@@ -22,6 +22,8 @@ export interface ModelConfigTabProps extends ConfigTabProps {
   modelsLoading: boolean
   /** 空间 ID，用于模型测试 */
   spaceId?: string
+  availableVLMModels?: Model[]
+  vlmModelsLoading?: boolean
 }
 
 // 模型配置项类型
@@ -104,7 +106,15 @@ const ModelConfigItem: React.FC<{
 /**
  * 模型配置标签组件
  */
-export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateConfig, availableModels, modelsLoading, spaceId }) => {
+export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({
+  config,
+  updateConfig,
+  availableModels,
+  modelsLoading,
+  spaceId,
+  availableVLMModels = [],
+  vlmModelsLoading = false,
+}) => {
   const { t } = useTranslation()
 
   // 模型测试状态
@@ -151,6 +161,11 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
     return availableModels.find(m => m.openModel.model_id === modelId) || null
   }
 
+  const getVLMModelById = (modelId: string | undefined): Model | null => {
+    if (!modelId) return null
+    return availableVLMModels.find(m => m.openModel.model_id === modelId) || null
+  }
+
   // 带验证的模型选择处理函数
   const handleModelSelectWithTest = useCallback(
     async (model: Model | null, configKey: 'generalModelId' | 'planUnderstandingModelId' | 'infoCollectingModelId' | 'writingCheckingModelId') => {
@@ -162,7 +177,7 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
 
       // 检查是否已经有 spaceId
       if (!spaceId) {
-        showError('缺少 spaceId，无法测试模型')
+        showError(t('apps.config.model.test.missingSpaceId'))
         return
       }
 
@@ -188,7 +203,7 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
         // 调用测试接口，发送"你好"作为测试 prompt
         const result = await testModelMutation.mutateAsync({
           id: model.openModel.model_id,
-          prompt: '你好',
+          prompt: t('apps.config.model.test.prompt'),
           spaceId: spaceId,
           parameters: { temperature: 0.7, max_tokens: 100 },
         })
@@ -196,15 +211,13 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
         if (result.success) {
           // 测试通过，正式选中模型
           updateConfig(configKey, model.openModel.model_id)
-          showSuccess('模型可用性验证通过')
+          showSuccess(t('apps.config.model.test.validationPassed'))
         } else {
-          // 测试失败，显示错误提示
-          showError(`模型不可用：${result.error || '未知错误'}`)
+          showError(t('apps.config.model.test.unavailable', { error: result.error || t('apps.errors.unknownError') }))
         }
       } catch (error: any) {
-        // 测试异常，显示错误提示
-        const errorMessage = error?.response?.data?.message || error?.message || '模型测试失败'
-        showError(`模型不可用：${errorMessage}`)
+        const errorMessage = error?.response?.data?.message || error?.message || t('apps.config.model.test.testFailed')
+        showError(t('apps.config.model.test.unavailable', { error: errorMessage }))
       } finally {
         // 清除测试状态
         setTestingModelId(null)
@@ -270,6 +283,20 @@ export const ModelConfigTab: React.FC<ModelConfigTabProps> = ({ config, updateCo
                 isOtherTesting={!!testingModelId && testingConfigKey !== modelConfig.configKey}
               />
             ))}
+
+            <ModelConfigItem
+              label={t('apps.config.model.vlmChart.label', { defaultValue: 'VLM 图表生成模型' })}
+              description={t('apps.config.model.vlmChart.description', { defaultValue: '用于 DeepSearch 图表生成后的视觉模型迭代优化' })}
+              recommendation={t('apps.config.model.vlmChart.recommendation', { defaultValue: '建议选择支持图像输入的多模态模型' })}
+              availableModels={availableVLMModels}
+              selectedModel={getVLMModelById(config.vlmChartModelId)}
+              modelsLoading={vlmModelsLoading}
+              onModelChange={model => updateConfig('vlmChartModelId', model?.openModel.model_id)}
+              placeholder={t('apps.config.model.useGeneral')}
+              required={config.vlmChartGeneratorEnable && config.vlmChartGeneratorMaxIterations > 0}
+              isCurrentTesting={false}
+              isOtherTesting={!!testingModelId}
+            />
           </div>
         </ConfigSection>
       </div>

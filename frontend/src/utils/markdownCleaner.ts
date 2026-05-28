@@ -1,11 +1,26 @@
 /**
- * Markdown preprocessing and visible-text projection helpers.
+ * Markdown cleaning and projection helpers for the report editor.
  *
- * The report editor renders a cleaned markdown document in BlockNote, while the
- * backend still expects offsets in the original raw markdown. These helpers keep
- * the cleaned/raw offset map and also provide a "visible text" projection that
- * removes markdown syntax markers while preserving a mapping back to raw offsets.
+ * Normal flow:
+ * raw markdown -> mdast cleanup -> cleaned markdown + cleaned/raw offset map
+ * cleaned markdown -> hast projection -> visible text + visible/raw offset map
+ *
+ * The backend still expects offsets in the raw markdown, while BlockNote renders
+ * cleaned markdown and the user selects visible text. This module keeps those
+ * layers aligned through AST-based transforms instead of regex/string heuristics.
  */
+
+import type { Element as HastElement, Root as HastRoot, Text as HastText } from 'hast'
+import type { Link as MdastLink, Parent as MdastParent, Root as MdastRoot } from 'mdast'
+import rehypeRaw from 'rehype-raw'
+import remarkCjkFriendly from 'remark-cjk-friendly'
+import remarkCjkFriendlyGfmStrikethrough from 'remark-cjk-friendly-gfm-strikethrough'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import { unified } from 'unified'
+import type { Node as UnistNode, Parent as UnistParent } from 'unist'
 
 export interface PreprocessResult {
   cleaned: string
@@ -25,169 +40,220 @@ export interface VisibleProjectionResult {
   visibleToOriginalMap: number[]
 }
 
-const CITATION_PATTERN = /^\[\[(\d+)\]\]\([^)]+\)/
-const INFERENCE_PATTERN = /^\[([^\]]*)\]\(#inference:\d+\)/
-
-const BLOCK_PREFIX_PATTERNS = [
-  /^ {0,3}(?:[-+*])\s+\[[ xX]\]\s+/,
-  /^ {0,3}#{1,6}\s+/,
-  /^ {0,3}>\s?/,
-  /^ {0,3}\d+[.)]\s+/,
-  /^ {0,3}[-+*]\s+/,
-]
-
-const HORIZONTAL_RULE_PATTERN = /^ {0,3}(?:[-*_])(?:\s*[-*_]){2,}\s*$/
-const INLINE_STYLE_MARKERS = ['**', '__', '~~', '`', '*', '_']
-
-/**
- * Work around a markdown emphasis edge case in the current parser stack:
- * strong segments that end with `%` can be mis-parsed in long CJK paragraphs.
- * Converting only those risky segments to literal `<strong>` tags keeps the
- * visible output unchanged while bypassing the broken delimiter pairing.
- */
-export function normalizeProblematicStrongPercentForRender(markdown: string): string {
-  const parts: string[] = []
-  let i = 0
-
-  while (i < markdown.length) {
-    if (markdown.startsWith('```', i)) {
-      const closingFenceIndex = markdown.indexOf('\n```', i + 3)
-      if (closingFenceIndex === -1) {
-        parts.push(markdown.slice(i))
-        break
-      }
-
-      parts.push(markdown.slice(i, closingFenceIndex + 4))
-      i = closingFenceIndex + 4
-      continue
-    }
-
-    if (markdown[i] === '`') {
-      let closingCodeIndex = i + 1
-      while (closingCodeIndex < markdown.length) {
-        if (markdown[closingCodeIndex] === '\\') {
-          closingCodeIndex += 2
-          continue
-        }
-
-        if (markdown[closingCodeIndex] === '`') {
-          break
-        }
-
-        closingCodeIndex += 1
-      }
-
-      if (closingCodeIndex >= markdown.length) {
-        parts.push(markdown.slice(i))
-        break
-      }
-
-      parts.push(markdown.slice(i, closingCodeIndex + 1))
-      i = closingCodeIndex + 1
-      continue
-    }
-
-    const marker = markdown.startsWith('**', i)
-      ? '**'
-      : markdown.startsWith('__', i)
-        ? '__'
-        : null
-
-    if (!marker) {
-      parts.push(markdown[i])
-      i += 1
-      continue
-    }
-
-    let closingIndex = -1
-    let cursor = i + marker.length
-
-    while (cursor < markdown.length) {
-      if (markdown[cursor] === '\\') {
-        cursor += 2
-        continue
-      }
-
-      if (markdown.startsWith(marker, cursor)) {
-        closingIndex = cursor
-        break
-      }
-
-      if (markdown[cursor] === '\n') {
-        break
-      }
-
-      cursor += 1
-    }
-
-    if (closingIndex === -1) {
-      parts.push(markdown[i])
-      i += 1
-      continue
-    }
-
-    const innerContent = markdown.slice(i + marker.length, closingIndex)
-    const shouldNormalize = /(^|[^\\])%$/.test(innerContent)
-
-    if (shouldNormalize) {
-      parts.push(`<strong>${innerContent}</strong>`)
-    } else {
-      parts.push(markdown.slice(i, closingIndex + marker.length))
-    }
-
-    i = closingIndex + marker.length
-  }
-
-  return parts.join('')
+export interface MarkdownProjectionResult extends PreprocessResult, VisibleProjectionResult {
+  raw: string
 }
 
-export function preprocessMarkdown(markdown: string): PreprocessResult {
-  const offsetMap: number[] = []
-  const result: string[] = []
-  let i = 0
+type SourceRange = {
+  start: number
+  end: number
+}
 
-  while (i < markdown.length) {
-    const citationMatch = markdown.slice(i).match(CITATION_PATTERN)
-    const inferenceMatch = markdown.slice(i).match(INFERENCE_PATTERN)
+type ReplacementSegment = {
+  start: number
+  end: number
+  replacement: string
+  replacementToOriginalMap: number[]
+}
 
-    if (citationMatch) {
-      i += citationMatch[0].length
-      continue
-    }
+type VisibleProjectionState = {
+  textParts: string[]
+  visibleToOriginalMap: number[]
+}
 
-    if (inferenceMatch) {
-      const text = inferenceMatch[1] || ''
-      const fullMatch = inferenceMatch[0]
-      const inferenceStart = i
-      const inferenceEnd = i + fullMatch.length
-      const isSingleChar = text.length === 1
+type VisibleProjectionOptions = {
+  parentTagName?: string
+  preserveWhitespace?: boolean
+}
 
-      for (let j = 0; j < text.length; j++) {
-        if (j === 0) {
-          offsetMap.push(inferenceStart)
-        } else if (j === text.length - 1 && !isSingleChar) {
-          offsetMap.push(inferenceEnd - 1)
-        } else {
-          offsetMap.push(inferenceStart + 1 + j)
-        }
-        result.push(text[j])
-      }
+const createBaseMarkdownProcessor = () =>
+  unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkCjkFriendly)
+    .use(remarkCjkFriendlyGfmStrikethrough)
+    .use(remarkMath, { singleDollarTextMath: true })
 
-      i = inferenceEnd
-      continue
-    }
+const markdownAstProcessor = createBaseMarkdownProcessor()
 
-    offsetMap.push(i)
-    result.push(markdown[i])
-    i += 1
+const visibleProjectionProcessor = createBaseMarkdownProcessor()
+  .use(remarkRehype, { allowDangerousHtml: true })
+  .use(rehypeRaw)
+
+const INVISIBLE_WHITESPACE_PARENT_TAGS = new Set([
+  'root',
+  'ul',
+  'ol',
+  'blockquote',
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+])
+
+const TABLE_CELL_TAGS = new Set(['td', 'th'])
+
+const isTextNode = (node: UnistNode): node is HastText => node.type === 'text'
+
+const isElementNode = (node: UnistNode): node is HastElement => node.type === 'element'
+
+const hasChildren = (node: UnistNode): node is UnistParent =>
+  Array.isArray((node as UnistParent).children)
+
+const isMdastParent = (node: UnistNode): node is MdastParent =>
+  Array.isArray((node as MdastParent).children)
+
+const isMdastLink = (node: UnistNode): node is MdastLink => node.type === 'link'
+
+const getSourceRange = (node: UnistNode | null | undefined): SourceRange | null => {
+  const start = node?.position?.start?.offset
+  const end = node?.position?.end?.offset
+
+  if (typeof start !== 'number' || typeof end !== 'number' || end <= start) {
+    return null
   }
 
-  const cleaned = result.join('')
+  return { start, end }
+}
+
+const collectIdentitySlice = (
+  source: string,
+  start: number,
+  end: number,
+  textParts: string[],
+  offsetMap: number[]
+) => {
+  for (let index = start; index < end; index++) {
+    textParts.push(source[index])
+    offsetMap.push(index)
+  }
+}
+
+const getNodeChildrenRange = (node: MdastParent): SourceRange | null => {
+  const firstChild = node.children[0]
+  const lastChild = node.children[node.children.length - 1]
+  const firstRange = getSourceRange(firstChild)
+  const lastRange = getSourceRange(lastChild)
+
+  if (!firstRange || !lastRange || lastRange.end <= firstRange.start) {
+    return null
+  }
 
   return {
-    cleaned,
+    start: firstRange.start,
+    end: lastRange.end,
+  }
+}
+
+const isCitationLink = (node: MdastLink) =>
+  node.url != null &&
+  node.children.length === 1 &&
+  node.children[0]?.type === 'text' &&
+  /^\[\d+\]$/.test((node.children[0] as HastText).value)
+
+const isInferenceLink = (node: MdastLink) => /^#inference:\d+$/.test(node.url ?? '')
+
+const buildReplacementSegment = (
+  source: string,
+  node: MdastLink
+): ReplacementSegment | null => {
+  const nodeRange = getSourceRange(node)
+  if (!nodeRange) {
+    return null
+  }
+
+  if (isCitationLink(node)) {
+    return {
+      start: nodeRange.start,
+      end: nodeRange.end,
+      replacement: '',
+      replacementToOriginalMap: [],
+    }
+  }
+
+  if (!isInferenceLink(node)) {
+    return null
+  }
+
+  const labelRange = getNodeChildrenRange(node)
+  if (!labelRange) {
+    return {
+      start: nodeRange.start,
+      end: nodeRange.end,
+      replacement: '',
+      replacementToOriginalMap: [],
+    }
+  }
+
+  const replacement = source.slice(labelRange.start, labelRange.end)
+  const replacementToOriginalMap: number[] = []
+  const isSingleChar = replacement.length === 1
+
+  for (let index = 0; index < replacement.length; index++) {
+    if (index === 0) {
+      replacementToOriginalMap.push(nodeRange.start)
+    } else if (index === replacement.length - 1 && !isSingleChar) {
+      replacementToOriginalMap.push(nodeRange.end - 1)
+    } else {
+      replacementToOriginalMap.push(labelRange.start + index)
+    }
+  }
+
+  return {
+    start: nodeRange.start,
+    end: nodeRange.end,
+    replacement,
+    replacementToOriginalMap,
+  }
+}
+
+const collectReplacementSegments = (
+  node: UnistNode,
+  source: string,
+  segments: ReplacementSegment[]
+) => {
+  if (isMdastLink(node)) {
+    const segment = buildReplacementSegment(source, node)
+    if (segment) {
+      segments.push(segment)
+      return
+    }
+  }
+
+  if (!isMdastParent(node)) {
+    return
+  }
+
+  for (const child of node.children) {
+    collectReplacementSegments(child, source, segments)
+  }
+}
+
+const buildCleanedMarkdown = (
+  source: string,
+  segments: ReplacementSegment[]
+) => {
+  const cleanedParts: string[] = []
+  const offsetMap: number[] = []
+  let cursor = 0
+
+  for (const segment of segments.sort((left, right) => left.start - right.start)) {
+    if (segment.start < cursor) {
+      continue
+    }
+
+    collectIdentitySlice(source, cursor, segment.start, cleanedParts, offsetMap)
+    cleanedParts.push(segment.replacement)
+    offsetMap.push(...segment.replacementToOriginalMap)
+    cursor = segment.end
+  }
+
+  collectIdentitySlice(source, cursor, source.length, cleanedParts, offsetMap)
+
+  return {
+    cleaned: cleanedParts.join(''),
     offsetMap,
-    blockOffsets: computeBlockOffsets(cleaned, offsetMap),
   }
 }
 
@@ -230,6 +296,33 @@ function computeBlockOffsets(cleaned: string, offsetMap: number[]): BlockOffset[
   }
 
   return blockOffsets
+}
+
+const preprocessMarkdownAst = (markdown: string): PreprocessResult => {
+  try {
+    const mdast = markdownAstProcessor.runSync(markdownAstProcessor.parse(markdown)) as MdastRoot
+    const replacementSegments: ReplacementSegment[] = []
+
+    collectReplacementSegments(mdast, markdown, replacementSegments)
+
+    const { cleaned, offsetMap } = buildCleanedMarkdown(markdown, replacementSegments)
+
+    return {
+      cleaned,
+      offsetMap,
+      blockOffsets: computeBlockOffsets(cleaned, offsetMap),
+    }
+  } catch (error) {
+    console.warn('[markdownCleaner] Failed to preprocess markdown via AST, falling back to identity map', error)
+
+    const offsetMap = Array.from({ length: markdown.length }, (_, index) => index)
+
+    return {
+      cleaned: markdown,
+      offsetMap,
+      blockOffsets: computeBlockOffsets(markdown, offsetMap),
+    }
+  }
 }
 
 export function mapCleanedOffsetToOriginal(
@@ -288,75 +381,221 @@ export function getOriginalTextFromCleaned(
 const pushVisibleChar = (
   ch: string,
   cleanedIndex: number,
-  visibleText: string[],
-  visibleToOriginalMap: number[],
-  offsetMap: number[]
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[]
 ) => {
-  visibleText.push(ch)
-  visibleToOriginalMap.push(offsetMap[cleanedIndex] ?? cleanedIndex)
+  state.textParts.push(ch)
+  state.visibleToOriginalMap.push(cleanedToOriginalMap[cleanedIndex] ?? cleanedIndex)
 }
 
-const findMatchingParen = (content: string, openParenIndex: number) => {
-  let depth = 0
+const locateValueStartInRange = (
+  source: string,
+  range: SourceRange,
+  value: string
+) => {
+  if (!value) {
+    return range.start
+  }
 
-  for (let i = openParenIndex; i < content.length; i++) {
-    const ch = content[i]
+  const rangeContent = source.slice(range.start, range.end)
+  const relativeIndex = rangeContent.indexOf(value)
 
-    if (ch === '\\') {
-      i += 1
-      continue
-    }
+  return relativeIndex === -1 ? range.start : range.start + relativeIndex
+}
 
-    if (ch === '(') {
-      depth += 1
-      continue
-    }
+const appendPreservedValue = (
+  value: string,
+  range: SourceRange,
+  source: string,
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[]
+) => {
+  if (!value) {
+    return
+  }
 
-    if (ch === ')') {
-      depth -= 1
-      if (depth === 0) {
-        return i
+  const valueStart = locateValueStartInRange(source, range, value)
+  const maxIndex = Math.max(range.start, range.end - 1)
+
+  for (let i = 0; i < value.length; i++) {
+    const cleanedIndex = Math.min(valueStart + i, maxIndex)
+    pushVisibleChar(value[i], cleanedIndex, state, cleanedToOriginalMap)
+  }
+}
+
+const appendCollapsedValue = (
+  value: string,
+  range: SourceRange,
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[]
+) => {
+  let whitespaceStart: number | null = null
+  const maxIndex = Math.max(range.start, range.end - 1)
+
+  for (let i = 0; i < value.length; i++) {
+    const cleanedIndex = Math.min(range.start + i, maxIndex)
+    const ch = value[i]
+
+    if (/\s/.test(ch)) {
+      if (whitespaceStart === null) {
+        whitespaceStart = cleanedIndex
       }
-    }
-  }
-
-  return -1
-}
-
-const parseMarkdownLink = (content: string, startIndex: number) => {
-  const isImage = content[startIndex] === '!' && content[startIndex + 1] === '['
-  const labelStart = isImage ? startIndex + 2 : startIndex + 1
-
-  if (content[labelStart - 1] !== '[') {
-    return null
-  }
-
-  let labelEnd = -1
-  for (let i = labelStart; i < content.length; i++) {
-    const ch = content[i]
-    if (ch === '\\') {
-      i += 1
       continue
     }
-    if (ch === ']') {
-      labelEnd = i
-      break
+
+    if (whitespaceStart !== null) {
+      pushVisibleChar(' ', whitespaceStart, state, cleanedToOriginalMap)
+      whitespaceStart = null
+    }
+
+    pushVisibleChar(ch, cleanedIndex, state, cleanedToOriginalMap)
+  }
+
+  if (whitespaceStart !== null) {
+    pushVisibleChar(' ', whitespaceStart, state, cleanedToOriginalMap)
+  }
+}
+
+const appendNewline = (
+  range: SourceRange,
+  source: string,
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[]
+) => {
+  const gap = source.slice(range.start, range.end)
+
+  for (let i = 0; i < gap.length; i++) {
+    if (gap[i] === '\n') {
+      pushVisibleChar('\n', range.start + i, state, cleanedToOriginalMap)
+      return
     }
   }
 
-  if (labelEnd === -1 || content[labelEnd + 1] !== '(') {
-    return null
+  pushVisibleChar('\n', Math.max(range.start, range.end - 1), state, cleanedToOriginalMap)
+}
+
+const appendSiblingGap = (
+  previousNode: UnistNode | null,
+  nextNode: UnistNode,
+  source: string,
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[]
+) => {
+  const previousRange = getSourceRange(previousNode)
+  const nextRange = getSourceRange(nextNode)
+  const previousIsTableCell =
+    previousNode !== null && isElementNode(previousNode) && TABLE_CELL_TAGS.has(previousNode.tagName)
+
+  if (!previousRange || !nextRange || nextRange.start < previousRange.end) {
+    return
   }
 
-  const urlEnd = findMatchingParen(content, labelEnd + 1)
-  if (urlEnd === -1) {
-    return null
+  if (previousIsTableCell && nextRange.start === previousRange.end) {
+    pushVisibleChar('\t', previousRange.end - 1, state, cleanedToOriginalMap)
+    return
   }
 
-  return {
-    labelStart,
-    labelEnd,
-    urlEnd,
+  const gapRange = {
+    start: previousRange.end,
+    end: nextRange.start,
+  }
+  const gap = source.slice(gapRange.start, gapRange.end)
+
+  if (gap.includes('\n')) {
+    appendNewline(gapRange, source, state, cleanedToOriginalMap)
+    return
+  }
+
+  if (previousIsTableCell) {
+    pushVisibleChar('\t', Math.max(gapRange.start, gapRange.end - 1), state, cleanedToOriginalMap)
+  }
+}
+
+const projectVisibleNode = (
+  node: UnistNode,
+  source: string,
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[],
+  options: VisibleProjectionOptions = {},
+  fallbackRange?: SourceRange
+) => {
+  if (isTextNode(node)) {
+    const range = getSourceRange(node) ?? fallbackRange
+    if (!range) {
+      return
+    }
+
+    if (options.preserveWhitespace) {
+      appendPreservedValue(node.value, range, source, state, cleanedToOriginalMap)
+      return
+    }
+
+    if (!node.value.trim() && options.parentTagName && INVISIBLE_WHITESPACE_PARENT_TAGS.has(options.parentTagName)) {
+      return
+    }
+
+    appendCollapsedValue(node.value, range, state, cleanedToOriginalMap)
+    return
+  }
+
+  if (isElementNode(node)) {
+    if (['script', 'style', 'input', 'img', 'hr'].includes(node.tagName)) {
+      return
+    }
+
+    if (node.tagName === 'br') {
+      const range = getSourceRange(node) ?? fallbackRange
+      if (range) {
+        appendNewline(range, source, state, cleanedToOriginalMap)
+      }
+      return
+    }
+
+    const preserveWhitespace = options.preserveWhitespace || node.tagName === 'pre' || node.tagName === 'code'
+    const childFallbackRange =
+      node.tagName === 'pre' || node.tagName === 'code'
+        ? getSourceRange(node) ?? fallbackRange
+        : undefined
+
+    projectVisibleChildren(
+      node.children,
+      source,
+      state,
+      cleanedToOriginalMap,
+      {
+        parentTagName: node.tagName,
+        preserveWhitespace,
+      },
+      childFallbackRange
+    )
+    return
+  }
+
+  if (hasChildren(node)) {
+    projectVisibleChildren(node.children, source, state, cleanedToOriginalMap, options, fallbackRange)
+  }
+}
+
+const projectVisibleChildren = (
+  children: UnistNode[],
+  source: string,
+  state: VisibleProjectionState,
+  cleanedToOriginalMap: number[],
+  options: VisibleProjectionOptions = {},
+  childFallbackRange?: SourceRange
+) => {
+  let previousPositionedNode: UnistNode | null = null
+
+  for (const child of children) {
+    if (getSourceRange(child)) {
+      appendSiblingGap(previousPositionedNode, child, source, state, cleanedToOriginalMap)
+    }
+
+    projectVisibleNode(child, source, state, cleanedToOriginalMap, options, childFallbackRange)
+
+    if (getSourceRange(child)) {
+      previousPositionedNode = child
+    }
   }
 }
 
@@ -364,100 +603,43 @@ export function buildVisibleProjection(
   cleanedContent: string,
   offsetMap: number[]
 ): VisibleProjectionResult {
-  const visibleText: string[] = []
-  const visibleToOriginalMap: number[] = []
-  let i = 0
-  let lineStart = true
-
-  while (i < cleanedContent.length) {
-    const ch = cleanedContent[i]
-
-    if (ch === '\r') {
-      i += 1
-      continue
+  try {
+    const hastTree = visibleProjectionProcessor.runSync(
+      visibleProjectionProcessor.parse(cleanedContent)
+    ) as HastRoot
+    const state: VisibleProjectionState = {
+      textParts: [],
+      visibleToOriginalMap: [],
     }
 
-    if (ch === '\n') {
-      pushVisibleChar('\n', i, visibleText, visibleToOriginalMap, offsetMap)
-      i += 1
-      lineStart = true
-      continue
+    projectVisibleChildren(hastTree.children, cleanedContent, state, offsetMap, {
+      parentTagName: 'root',
+    })
+
+    return {
+      visibleText: state.textParts.join(''),
+      visibleToOriginalMap: state.visibleToOriginalMap,
     }
+  } catch (error) {
+    console.warn('[markdownCleaner] Failed to build visible projection via AST, falling back to cleaned text', error)
 
-    if (lineStart) {
-      const lineEnd = cleanedContent.indexOf('\n', i)
-      const currentLine = cleanedContent.slice(i, lineEnd === -1 ? cleanedContent.length : lineEnd)
-
-      if (currentLine.startsWith('```')) {
-        i += currentLine.length
-        lineStart = false
-        continue
-      }
-
-      if (HORIZONTAL_RULE_PATTERN.test(currentLine)) {
-        i += currentLine.length
-        lineStart = false
-        continue
-      }
-
-      let skippedPrefix = false
-
-      for (const pattern of BLOCK_PREFIX_PATTERNS) {
-        const match = currentLine.match(pattern)
-        if (match) {
-          i += match[0].length
-          skippedPrefix = true
-          break
-        }
-      }
-
-      if (skippedPrefix) {
-        lineStart = false
-        continue
-      }
+    return {
+      visibleText: cleanedContent,
+      visibleToOriginalMap: offsetMap.slice(0, cleanedContent.length),
     }
-
-    if (ch === '\\' && i + 1 < cleanedContent.length) {
-      pushVisibleChar(cleanedContent[i + 1], i + 1, visibleText, visibleToOriginalMap, offsetMap)
-      i += 2
-      lineStart = false
-      continue
-    }
-
-    const link = ch === '[' || (ch === '!' && cleanedContent[i + 1] === '[')
-      ? parseMarkdownLink(cleanedContent, i)
-      : null
-
-    if (link) {
-      for (let j = link.labelStart; j < link.labelEnd; j++) {
-        const labelChar = cleanedContent[j]
-        if (labelChar === '\\' && j + 1 < link.labelEnd) {
-          j += 1
-          pushVisibleChar(cleanedContent[j], j, visibleText, visibleToOriginalMap, offsetMap)
-        } else {
-          pushVisibleChar(labelChar, j, visibleText, visibleToOriginalMap, offsetMap)
-        }
-      }
-
-      i = link.urlEnd + 1
-      lineStart = false
-      continue
-    }
-
-    const inlineMarker = INLINE_STYLE_MARKERS.find(marker => cleanedContent.startsWith(marker, i))
-    if (inlineMarker) {
-      i += inlineMarker.length
-      lineStart = false
-      continue
-    }
-
-    pushVisibleChar(ch, i, visibleText, visibleToOriginalMap, offsetMap)
-    i += 1
-    lineStart = false
   }
+}
+
+export function projectMarkdown(markdown: string): MarkdownProjectionResult {
+  const preprocessResult = preprocessMarkdownAst(markdown)
+  const visibleProjection = buildVisibleProjection(preprocessResult.cleaned, preprocessResult.offsetMap)
 
   return {
-    visibleText: visibleText.join(''),
-    visibleToOriginalMap,
+    raw: markdown,
+    cleaned: preprocessResult.cleaned,
+    offsetMap: preprocessResult.offsetMap,
+    blockOffsets: preprocessResult.blockOffsets,
+    visibleText: visibleProjection.visibleText,
+    visibleToOriginalMap: visibleProjection.visibleToOriginalMap,
   }
 }

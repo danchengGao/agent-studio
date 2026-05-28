@@ -40,9 +40,9 @@ export const VariableMergeNodeRegistry: FlowNodeRegistry = {
               name: 'Group1',
               type: 'string',
               items: ['input1'],
+              mode: 'firstNonNull',
             },
           ],
-          mergeStrategy: 'firstNonNull',
           inputParameters: {
             input1: {
               type: 'ref',

@@ -149,10 +149,16 @@ async def process_chunk_trace(
     if trace_detail:
         # 保存最后一个trace chunk，用于错误处理
         trace_context.last_chunk = chunk
-        trace_context.trace_details.append(trace_detail)
         if trace_context.trace_id is None:
             trace_context.trace_id = trace_detail.trace_id
             logger.debug(f"Set trace_id: {trace_context.trace_id}")
+        # Write immediately so running execution appears in Executions panel
+        try:
+            await save_trace_details(trace_context.agent_id, [trace_detail])
+        except Exception as e:
+            # Fall back to buffering for finalize
+            trace_context.trace_details.append(trace_detail)
+            logger.warning(f"Failed to save trace detail incrementally: {e}")
 
     # 收集追踪日志（TraceAgentSpan），用于构建执行日志
     if trace_data and isinstance(trace_data, TraceAgentSpan):
@@ -232,11 +238,11 @@ async def finalize_trace(trace_context: TraceContext) -> None:
     logger.info(f"Finalizing trace for agent: {trace_context.agent_id.agent_id}, "
                f"details size: {len(trace_context.trace_details)}, logs size: {len(trace_context.trace_logs)}")
 
-    # 批量保存所有收集的trace details
+    # Save any trace details that failed incremental write (buffered fallback)
     if trace_context.trace_details:
         try:
             await save_trace_details(trace_context.agent_id, trace_context.trace_details)
-            logger.debug(f"Successfully saved {len(trace_context.trace_details)} trace details")
+            logger.debug(f"Successfully saved {len(trace_context.trace_details)} remaining trace details")
         except Exception as e:
             logger.error(f"Failed to save trace details: {e}")
 

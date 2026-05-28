@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Eye, Download, Check, AlertTriangle } from 'lucide-react'
 import { PluginInfo } from '@agent-studio/api-client'
+import { resolvePluginIconUrl } from '../../utils/pluginConfig'
 
 interface Plugin extends PluginInfo {
   // Extend PluginInfo with UI-specific fields
@@ -62,14 +63,19 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
     iconUri: string,
     className: string = 'w-12 h-12 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-r from-blue-50 to-indigo-100 border border-blue-200',
   ) => {
+    const resolvedIcon = resolvePluginIconUrl(iconUri)
     const isUrl =
-      typeof iconUri === 'string' && (iconUri.startsWith('http://') || iconUri.startsWith('https://') || iconUri.startsWith('/') || iconUri.includes('.'))
+      typeof resolvedIcon === 'string' &&
+      (resolvedIcon.startsWith('http://') ||
+        resolvedIcon.startsWith('https://') ||
+        resolvedIcon.startsWith('//') ||
+        resolvedIcon.startsWith('/'))
 
     if (isUrl) {
       return (
         <div className={className}>
           <img
-            src={iconUri}
+            src={resolvedIcon}
             alt="Plugin icon"
             className="w-full h-full object-cover rounded-xl"
             onError={e => {
@@ -84,7 +90,7 @@ const MarketPluginCard: React.FC<MarketPluginCardProps> = ({ plugin, viewMode, i
       )
     }
 
-    return <div className={className}>{iconUri}</div>
+    return <div className={className}>{resolvedIcon || '📦'}</div>
   }
 
   const handleInstall = async () => {

@@ -1,0 +1,855 @@
+{
+  "name": "Autonomous Multi-Agent Market Analyst",
+  "desc": "Fully autonomous multi-agent system that fetches market data, computes technical indicators, analyzes news sentiment, generates consensus analysis from multiple AI agents, stores long-term memory, and interacts via Slack with self-improvement capabilities.",
+  "icon_uri": "📊",
+  "url": "market_analyst_v1",
+  "schema": {
+    "nodes": [
+      {
+        "id": "1_c5f579b8",
+        "type": "1",
+        "meta": {"position": {"x": 212, "y": 136.75}},
+        "data": {
+          "title": "Start",
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "mode": {"type": "string", "default": "auto", "description": "auto = daily analysis, slack_command = interactive Slack request"},
+              "tickers": {"type": "string", "default": "AAPL,GOOGL,MSFT,TSLA,BTC-USD", "description": "Comma-separated ticker list (auto mode)"},
+              "analysis_date": {"type": "string", "default": "", "description": "Analysis date timestamp"},
+              "slack_channel": {"type": "string", "default": "#market-analysis", "description": "Target Slack channel"},
+              "slack_command": {"type": "string", "default": "", "description": "Slack command: explain / compare / whatif"},
+              "ticker": {"type": "string", "default": "", "description": "Single ticker for Slack commands"},
+              "user_query": {"type": "string", "default": "", "description": "User question text for Slack"}
+            },
+            "required": ["mode"]
+          }
+        }
+      },
+      {
+        "id": "4_173b8bb9",
+        "type": "4",
+        "meta": {"position": {"x": 704, "y": 112.75}},
+        "data": {
+          "title": "Auto or Slack Mode?",
+          "inputs": {
+            "inputParameters": {
+              "mode": {"type": "ref", "content": ["1_c5f579b8", "mode"]}
+            }
+          },
+          "branches": [
+            {
+              "branchId": "branch_auto",
+              "logic": 0,
+              "conditions": [
+                {
+                  "operator": "=",
+                  "left": {"type": "ref", "content": ["1_c5f579b8", "mode"]},
+                  "right": {"type": "constant", "content": "auto"}
+                }
+              ]
+            },
+            {
+              "branchId": "branch_slack",
+              "logic": 0,
+              "conditions": [
+                {
+                  "operator": "!=",
+                  "left": {"type": "ref", "content": ["1_c5f579b8", "mode"]},
+                  "right": {"type": "constant", "content": "auto"}
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "10_a1854c1b",
+        "type": "10",
+        "meta": {"position": {"x": 1164, "y": 0}},
+        "data": {
+          "title": "Split Tickers Into Array",
+          "inputs": {
+            "inputParameters": {
+              "ticker_string": {"type": "ref", "content": ["1_c5f579b8", "tickers"]}
+            },
+            "language": "python3",
+            "code": "def main(ticker_string):\n    tickers = [t.strip() for t in ticker_string.split(',') if t.strip()]\n    return {'ticker_list': tickers, 'ticker_count': len(tickers)}"
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "ticker_list": {"type": "array"},
+              "ticker_count": {"type": "integer"}
+            },
+            "required": ["ticker_list"]
+          }
+        }
+      },
+      {
+        "id": "5_a4d5361d",
+        "type": "5",
+        "meta": {"position": {"x": 212, "y": 328.75}},
+        "data": {
+          "title": "Process Each Ticker",
+          "inputs": {
+            "loopParam": {
+              "loopArray": {
+                "items": {
+                  "type": "ref",
+                  "content": ["10_a1854c1b", "ticker_list"]
+                }
+              },
+              "intermediateVar": {
+                "ticker_results": {"type": "constant", "content": [], "schema": {"type": "array"}}
+              }
+            }
+          },
+          "blocks": [
+            {
+              "id": "block_start_ticker",
+              "type": "15",
+              "meta": {"position": {"x": 50, "y": 50}},
+              "data": {"title": "Block Start"}
+            },
+            {
+              "id": "http_fetch_market_data",
+              "type": "20",
+              "meta": {"position": {"x": 300, "y": 50}},
+              "data": {
+                "title": "Fetch OHLCV Market Data",
+                "inputs": {
+                  "httpRequestParam": {
+                    "url": {"type": "template", "content": "https://query1.finance.yahoo.com/v8/finance/chart/{{items}}?interval=1d&range=60d"},
+                    "method": "GET",
+                    "headers": {},
+                    "queryParams": {},
+                    "auth": {"authType": "none"},
+                    "response": {
+                      "responseFormat": "json",
+                      "successStatusCodes": [200],
+                      "responseMode": "full"
+                    },
+                    "advanced": {
+                      "timeout": 60,
+                      "retry": {
+                        "enabled": true,
+                        "maxRetries": 3,
+                        "retryOnStatusCodes": [429, 500, 502, 503, 504],
+                        "retryDelayMs": 1000,
+                        "backoffType": "exponential"
+                      }
+                    }
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {
+                    "response": {"type": "object"},
+                    "statusCode": {"type": "integer"}
+                  }
+                }
+              }
+            },
+            {
+              "id": "code_compute_indicators",
+              "type": "10",
+              "meta": {"position": {"x": 600, "y": 50}},
+              "data": {
+                "title": "Compute Technical Indicators",
+                "inputs": {
+                  "inputParameters": {
+                    "market_response": {"type": "ref", "content": ["http_fetch_market_data", "response"]},
+                    "ticker": {"type": "ref", "content": ["5_a4d5361d", "items"]}
+                  },
+                  "language": "python3",
+                  "code": "import json\nimport statistics\n\ndef compute_rsi(prices, period=14):\n    if len(prices) < period + 1:\n        return 50.0\n    deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]\n    gains = [d if d > 0 else 0 for d in deltas]\n    losses = [-d if d < 0 else 0 for d in deltas]\n    avg_gain = sum(gains[-period:]) / period\n    avg_loss = sum(losses[-period:]) / period\n    if avg_loss == 0:\n        return 100.0\n    rs = avg_gain / avg_loss\n    return round(100 - (100 / (1 + rs)), 2)\n\ndef compute_macd(prices, fast=12, slow=26, signal=9):\n    if len(prices) < slow:\n        return {'macd': 0, 'signal': 0, 'histogram': 0}\n    ema_fast = prices[-1] * (2/(fast+1)) + prices[-fast] * (1 - 2/(fast+1))\n    ema_slow = prices[-1] * (2/(slow+1)) + prices[-slow] * (1 - 2/(slow+1))\n    macd = ema_fast - ema_slow\n    signal_line = macd * (2/(signal+1))\n    return {'macd': round(macd, 2), 'signal': round(signal_line, 2), 'histogram': round(macd - signal_line, 2)}\n\ndef main(market_response, ticker):\n    try:\n        data = market_response if isinstance(market_response, dict) else json.loads(str(market_response))\n        chart_data = data.get('chart', {}).get('result', [{}])[0]\n        quote = chart_data.get('indicators', {}).get('quote', [{}])[0]\n        close_prices = [p for p in quote.get('close', []) if p is not None]\n        volumes = [v for v in quote.get('volume', []) if v is not None]\n        if len(close_prices) < 2:\n            return {'error': 'Insufficient data', 'ticker': ticker}\n        cur = close_prices[-1]\n        ma_20 = sum(close_prices[-20:]) / min(20, len(close_prices))\n        ma_50 = sum(close_prices[-50:]) / min(50, len(close_prices))\n        momentum_5d = ((cur / close_prices[-6]) - 1) * 100 if len(close_prices) >= 6 else 0\n        returns = [(close_prices[i] / close_prices[i-1] - 1) for i in range(1, len(close_prices))]\n        volatility = statistics.stdev(returns) * 100 if len(returns) > 1 else 0\n        return {\n            'ticker': ticker,\n            'current_price': round(cur, 2),\n            'ma_20': round(ma_20, 2),\n            'ma_50': round(ma_50, 2),\n            'rsi_14': compute_rsi(close_prices),\n            'macd': compute_macd(close_prices),\n            'momentum_5d_pct': round(momentum_5d, 2),\n            'volatility_pct': round(volatility, 4),\n            'avg_volume_20d': int(sum(volumes[-20:]) / min(20, len(volumes))) if volumes else 0,\n            'trend': 'bullish' if cur > ma_20 > ma_50 else ('bearish' if cur < ma_20 < ma_50 else 'neutral')\n        }\n    except Exception as e:\n        return {'error': str(e), 'ticker': ticker}"
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {
+                    "ticker": {"type": "string"},
+                    "current_price": {"type": "number"},
+                    "ma_20": {"type": "number"},
+                    "ma_50": {"type": "number"},
+                    "rsi_14": {"type": "number"},
+                    "macd": {"type": "object"},
+                    "momentum_5d_pct": {"type": "number"},
+                    "volatility_pct": {"type": "number"},
+                    "trend": {"type": "string"}
+                  }
+                }
+              }
+            },
+            {
+              "id": "http_fetch_news",
+              "type": "20",
+              "meta": {"position": {"x": 900, "y": 50}},
+              "data": {
+                "title": "Fetch Recent News Headlines",
+                "inputs": {
+                  "httpRequestParam": {
+                    "url": {"type": "template", "content": "https://newsapi.org/v2/everything?q={{items}}&sortBy=publishedAt&pageSize=5&apiKey=demo"},
+                    "method": "GET",
+                    "headers": {},
+                    "auth": {"authType": "none"},
+                    "response": {"responseFormat": "json", "successStatusCodes": [200]},
+                    "advanced": {"timeout": 30, "retry": {"enabled": true, "maxRetries": 2}}
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {"response": {"type": "object"}}
+                }
+              }
+            },
+            {
+              "id": "llm_sentiment_score",
+              "type": "3",
+              "meta": {"position": {"x": 1200, "y": 50}},
+              "data": {
+                "title": "Generate Sentiment Score",
+                "inputs": {
+                  "llmParam": {
+                    "systemPrompt": {
+                      "type": "template",
+                      "content": "You are a financial news sentiment analyzer. Output ONLY valid JSON: {\"sentiment_score\": <-100 to 100>, \"tone\": \"<bullish|bearish|neutral>\", \"key_themes\": [\"theme1\"], \"catalyst_detected\": <true|false>}"
+                    },
+                    "prompt": {
+                      "type": "template",
+                      "content": "Ticker: {{ticker}}\nHeadlines: {{news_response}}\nJSON only."
+                    },
+                    "model": {"id": "", "name": ""}
+                  },
+                  "inputParameters": {
+                    "ticker": {"type": "ref", "content": ["5_a4d5361d", "items"]},
+                    "news_response": {"type": "ref", "content": ["http_fetch_news", "response"]}
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {"output": {"type": "string"}}
+                },
+                "output_format": "json"
+              }
+            },
+            {
+              "id": "llm_agent_technical",
+              "type": "3",
+              "meta": {"position": {"x": 1500, "y": 50}},
+              "data": {
+                "title": "Agent 1: Technical Analyst",
+                "inputs": {
+                  "llmParam": {
+                    "systemPrompt": {
+                      "type": "template",
+                      "content": "# Role: Technical Analyst Agent\nYou are a quantitative technical analyst. Interpret price indicators and output JSON only:\n{\"trend_direction\": \"<bullish|bearish|neutral>\", \"trend_strength\": \"<strong|moderate|weak>\", \"key_levels\": {\"support\": 0, \"resistance\": 0}, \"technical_notes\": \"<summary>\", \"confidence\": 0.0}"
+                    },
+                    "prompt": {
+                      "type": "template",
+                      "content": "Ticker: {{ticker}}\nIndicators: {{indicators}}\nJSON only."
+                    },
+                    "model": {"id": "", "name": ""}
+                  },
+                  "inputParameters": {
+                    "ticker": {"type": "ref", "content": ["5_a4d5361d", "items"]},
+                    "indicators": {"type": "ref", "content": ["code_compute_indicators", "output"]}
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {"output": {"type": "string"}}
+                },
+                "output_format": "json"
+              }
+            },
+            {
+              "id": "llm_agent_sentiment",
+              "type": "3",
+              "meta": {"position": {"x": 1800, "y": 50}},
+              "data": {
+                "title": "Agent 2: News & Sentiment Analyst",
+                "inputs": {
+                  "llmParam": {
+                    "systemPrompt": {
+                      "type": "template",
+                      "content": "# Role: News & Sentiment Analyst Agent\nInterpret headlines and sentiment scores. Output JSON only:\n{\"sentiment_interpretation\": \"<summary>\", \"catalysts\": [\"c1\"], \"risks\": [\"r1\"], \"news_driven_bias\": \"<bullish|bearish|neutral>\", \"confidence\": 0.0}"
+                    },
+                    "prompt": {
+                      "type": "template",
+                      "content": "Ticker: {{ticker}}\nSentiment: {{sentiment}}\nJSON only."
+                    },
+                    "model": {"id": "", "name": ""}
+                  },
+                  "inputParameters": {
+                    "ticker": {"type": "ref", "content": ["5_a4d5361d", "items"]},
+                    "sentiment": {"type": "ref", "content": ["llm_sentiment_score", "output"]}
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {"output": {"type": "string"}}
+                },
+                "output_format": "json"
+              }
+            },
+            {
+              "id": "llm_agent_risk",
+              "type": "3",
+              "meta": {"position": {"x": 2100, "y": 50}},
+              "data": {
+                "title": "Agent 3: Risk Manager",
+                "inputs": {
+                  "llmParam": {
+                    "systemPrompt": {
+                      "type": "template",
+                      "content": "# Role: Risk Manager Agent\nEvaluate volatility and risk factors. Output JSON only:\n{\"risk_level\": \"<low|medium|high>\", \"volatility_assessment\": \"<stable|elevated|extreme>\", \"risk_factors\": [\"f1\"], \"caution_notes\": \"<summary>\", \"confidence\": 0.0}"
+                    },
+                    "prompt": {
+                      "type": "template",
+                      "content": "Ticker: {{ticker}}\nIndicators: {{indicators}}\nSentiment: {{sentiment}}\nJSON only."
+                    },
+                    "model": {"id": "", "name": ""}
+                  },
+                  "inputParameters": {
+                    "ticker": {"type": "ref", "content": ["5_a4d5361d", "items"]},
+                    "indicators": {"type": "ref", "content": ["code_compute_indicators", "output"]},
+                    "sentiment": {"type": "ref", "content": ["llm_sentiment_score", "output"]}
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {"output": {"type": "string"}}
+                },
+                "output_format": "json"
+              }
+            },
+            {
+              "id": "llm_agent_strategist",
+              "type": "3",
+              "meta": {"position": {"x": 2400, "y": 50}},
+              "data": {
+                "title": "Agent 4: Lead Strategist",
+                "inputs": {
+                  "llmParam": {
+                    "systemPrompt": {
+                      "type": "template",
+                      "content": "# Role: Lead Strategist Agent\nSynthesize Technical, Sentiment, and Risk agent outputs into a final consensus. Output JSON only:\n{\"final_category\": \"<BUY_WATCHLIST|NEUTRAL_HOLD|CAUTION_TRIM>\", \"explanation\": \"<3-5 sentences>\", \"confidence_score\": 0.0, \"recommendation\": \"<action>\"}"
+                    },
+                    "prompt": {
+                      "type": "template",
+                      "content": "Ticker: {{ticker}}\nTechnical: {{technical}}\nSentiment: {{sentiment}}\nRisk: {{risk}}\nJSON only."
+                    },
+                    "model": {"id": "", "name": ""}
+                  },
+                  "inputParameters": {
+                    "ticker": {"type": "ref", "content": ["5_a4d5361d", "items"]},
+                    "technical": {"type": "ref", "content": ["llm_agent_technical", "output"]},
+                    "sentiment": {"type": "ref", "content": ["llm_agent_sentiment", "output"]},
+                    "risk": {"type": "ref", "content": ["llm_agent_risk", "output"]}
+                  }
+                },
+                "outputs": {
+                  "type": "object",
+                  "properties": {"output": {"type": "string"}}
+                },
+                "output_format": "json"
+              }
+            },
+            {
+              "id": "block_end_ticker",
+              "type": "16",
+              "meta": {"position": {"x": 2700, "y": 50}},
+              "data": {"title": "Block End"}
+            }
+          ],
+          "edges": [
+            {"sourceNodeID": "block_start_ticker", "targetNodeID": "http_fetch_market_data"},
+            {"sourceNodeID": "http_fetch_market_data", "targetNodeID": "code_compute_indicators"},
+            {"sourceNodeID": "code_compute_indicators", "targetNodeID": "http_fetch_news"},
+            {"sourceNodeID": "http_fetch_news", "targetNodeID": "llm_sentiment_score"},
+            {"sourceNodeID": "llm_sentiment_score", "targetNodeID": "llm_agent_technical"},
+            {"sourceNodeID": "llm_agent_technical", "targetNodeID": "llm_agent_sentiment"},
+            {"sourceNodeID": "llm_agent_sentiment", "targetNodeID": "llm_agent_risk"},
+            {"sourceNodeID": "llm_agent_risk", "targetNodeID": "llm_agent_strategist"},
+            {"sourceNodeID": "llm_agent_strategist", "targetNodeID": "block_end_ticker"}
+          ]
+        }
+      },
+      {
+        "id": "10_3a0f3f5f",
+        "type": "10",
+        "meta": {"position": {"x": 704, "y": 465.75}},
+        "data": {
+          "title": "Categorize All Results",
+          "inputs": {
+            "inputParameters": {
+              "loop_output": {"type": "ref", "content": ["5_a4d5361d", "output"]}
+            },
+            "language": "python3",
+            "code": "import json\n\ndef main(loop_output):\n    results = loop_output if isinstance(loop_output, list) else [loop_output]\n    buy, hold, caution = [], [], []\n    for item in results:\n        try:\n            sig = item.get('llm_agent_strategist_output', '{}')\n            if isinstance(sig, str):\n                sig = json.loads(sig)\n            ticker = item.get('ticker', item.get('items', 'UNKNOWN'))\n            cat = sig.get('final_category', 'NEUTRAL_HOLD')\n            entry = {'ticker': ticker, 'category': cat, 'confidence': sig.get('confidence_score', 0.5), 'explanation': sig.get('explanation', ''), 'recommendation': sig.get('recommendation', '')}\n            if cat == 'BUY_WATCHLIST': buy.append(entry)\n            elif cat == 'CAUTION_TRIM': caution.append(entry)\n            else: hold.append(entry)\n        except: pass\n    return {'buy_watchlist': buy, 'neutral_hold': hold, 'caution_trim': caution, 'total_analyzed': len(results)}"
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "buy_watchlist": {"type": "array"},
+              "neutral_hold": {"type": "array"},
+              "caution_trim": {"type": "array"},
+              "total_analyzed": {"type": "integer"}
+            }
+          }
+        }
+      },
+      {
+        "id": "3_3bd8dd96",
+        "type": "3",
+        "meta": {"position": {"x": 212, "y": 828.75}},
+        "data": {
+          "title": "Meta Evaluator - Self-Improvement",
+          "inputs": {
+            "llmParam": {
+              "systemPrompt": {
+                "type": "template",
+                "content": "# Role: Meta Evaluator Agent\nReview today's analysis results and suggest system improvements. Output JSON only:\n{\"system_performance\": \"<excellent|good|fair|poor>\", \"avg_confidence\": 0.0, \"suggested_adjustments\": [{\"parameter\": \"name\", \"current\": 0, \"suggested\": 0, \"reason\": \"why\"}], \"prompt_refinements\": [\"suggestion\"], \"reflection\": \"<2-3 sentence assessment>\"}"
+              },
+              "prompt": {
+                "type": "template",
+                "content": "Today's results:\n🟢 Buy: {{buy_count}}\n⚪ Hold: {{hold_count}}\n🔴 Caution: {{caution_count}}\nDetails: {{results}}\nJSON only."
+              },
+              "model": {"id": "", "name": ""}
+            },
+            "inputParameters": {
+              "buy_count": {"type": "ref", "content": ["10_3a0f3f5f", "buy_watchlist"]},
+              "hold_count": {"type": "ref", "content": ["10_3a0f3f5f", "neutral_hold"]},
+              "caution_count": {"type": "ref", "content": ["10_3a0f3f5f", "caution_trim"]},
+              "results": {"type": "ref", "content": ["10_3a0f3f5f", "output"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          },
+          "output_format": "json"
+        }
+      },
+      {
+        "id": "10_41bf7ec0",
+        "type": "10",
+        "meta": {"position": {"x": 704, "y": 846.75}},
+        "data": {
+          "title": "Format Slack Daily Report",
+          "inputs": {
+            "inputParameters": {
+              "categorized": {"type": "ref", "content": ["10_3a0f3f5f", "output"]},
+              "meta_eval": {"type": "ref", "content": ["3_3bd8dd96", "output"]}
+            },
+            "language": "python3",
+            "code": "import json\nfrom datetime import datetime\n\ndef main(categorized, meta_eval):\n    try:\n        cat = categorized if isinstance(categorized, dict) else json.loads(str(categorized))\n        meta = meta_eval if isinstance(meta_eval, dict) else json.loads(str(meta_eval))\n    except:\n        cat = {'buy_watchlist': [], 'neutral_hold': [], 'caution_trim': []}\n        meta = {'reflection': 'Analysis complete', 'system_performance': 'good'}\n    date_str = datetime.now().strftime('%Y-%m-%d')\n    msg = f'📊 *Daily Market Analysis — {date_str}*\\n\\n'\n    msg += f'🟢 *BUY WATCHLIST* ({len(cat.get(\"buy_watchlist\", []))})\\n'\n    for i in cat.get('buy_watchlist', []):\n        msg += f'  • *{i[\"ticker\"]}* ({i[\"confidence\"]:.0%}) — {i[\"explanation\"][:80]}...\\n'\n    msg += f'\\n⚪ *NEUTRAL HOLD* ({len(cat.get(\"neutral_hold\", []))})\\n'\n    for i in cat.get('neutral_hold', []):\n        msg += f'  • {i[\"ticker\"]} ({i[\"confidence\"]:.0%})\\n'\n    msg += f'\\n🔴 *CAUTION / TRIM* ({len(cat.get(\"caution_trim\", []))})\\n'\n    for i in cat.get('caution_trim', []):\n        msg += f'  • *{i[\"ticker\"]}* ({i[\"confidence\"]:.0%}) — {i[\"explanation\"][:80]}...\\n'\n    msg += f'\\n🧠 *System Reflection:* {meta.get(\"reflection\", \"\")}\\n'\n    msg += f'📈 *Market Mood:* {meta.get(\"system_performance\", \"good\").upper()}\\n'\n    return {'slack_message': msg, 'total_stocks': cat.get('total_analyzed', 0)}"
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "slack_message": {"type": "string"},
+              "total_stocks": {"type": "integer"}
+            }
+          }
+        }
+      },
+      {
+        "id": "20_fdaa338a",
+        "type": "20",
+        "meta": {"position": {"x": 2544, "y": 620.25}},
+        "data": {
+          "title": "Send Daily Report to Slack",
+          "inputs": {
+            "httpRequestParam": {
+              "url": {"type": "constant", "content": "https://slack.com/api/chat.postMessage"},
+              "method": "POST",
+              "headers": {
+                "Authorization": {"type": "constant", "content": "Bearer {{env.SLACK_BOT_TOKEN}}"},
+                "Content-Type": {"type": "constant", "content": "application/json"}
+              },
+              "body": {
+                "contentType": "application/json",
+                "content": {"type": "template", "content": "{\"channel\": \"{{slack_channel}}\", \"text\": \"{{slack_message}}\"}"}
+              },
+              "auth": {"authType": "none"},
+              "response": {"responseFormat": "json", "successStatusCodes": [200]},
+              "advanced": {"timeout": 30}
+            },
+            "inputParameters": {
+              "slack_channel": {"type": "ref", "content": ["1_c5f579b8", "slack_channel"]},
+              "slack_message": {"type": "ref", "content": ["10_41bf7ec0", "slack_message"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"response": {"type": "object"}}
+          }
+        }
+      },
+      {
+        "id": "20_e25bd089",
+        "type": "20",
+        "meta": {"position": {"x": 3004, "y": 622.25}},
+        "data": {
+          "title": "Store Analysis in Memory",
+          "inputs": {
+            "httpRequestParam": {
+              "url": {"type": "constant", "content": "http://localhost:8000/api/v1/memory/store"},
+              "method": "POST",
+              "headers": {
+                "Content-Type": {"type": "constant", "content": "application/json"}
+              },
+              "body": {
+                "contentType": "application/json",
+                "content": {"type": "ref", "content": ["10_3a0f3f5f", "output"]}
+              },
+              "auth": {"authType": "none"},
+              "response": {"responseFormat": "json"},
+              "advanced": {"timeout": 30}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"response": {"type": "object"}}
+          }
+        }
+      },
+      {
+        "id": "11_83c4a560",
+        "type": "11",
+        "meta": {"position": {"x": 3464, "y": 620.25}},
+        "data": {
+          "title": "Auto Analysis Result",
+          "inputs": {
+            "inputParameters": {
+              "total": {"type": "ref", "content": ["10_41bf7ec0", "total_stocks"]}
+            },
+            "textEditorParam": {
+              "editType": "StringConcatenation",
+              "concatenateFormat": {"type": "template", "content": "✅ Daily analysis complete. Analyzed {{total}} tickers. Report sent to Slack and memory stored."}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          }
+        }
+      },
+      {
+        "id": "4_9a7206cb",
+        "type": "4",
+        "meta": {"position": {"x": 1164, "y": 224}},
+        "data": {
+          "title": "Route Slack Command",
+          "inputs": {
+            "inputParameters": {
+              "command": {"type": "ref", "content": ["1_c5f579b8", "slack_command"]}
+            }
+          },
+          "branches": [
+            {
+              "branchId": "branch_explain",
+              "logic": 0,
+              "conditions": [
+                {
+                  "operator": "contains",
+                  "left": {"type": "ref", "content": ["1_c5f579b8", "slack_command"]},
+                  "right": {"type": "constant", "content": "explain"}
+                }
+              ]
+            },
+            {
+              "branchId": "branch_compare",
+              "logic": 0,
+              "conditions": [
+                {
+                  "operator": "contains",
+                  "left": {"type": "ref", "content": ["1_c5f579b8", "slack_command"]},
+                  "right": {"type": "constant", "content": "compare"}
+                }
+              ]
+            },
+            {
+              "branchId": "branch_whatif",
+              "logic": 0,
+              "conditions": [
+                {
+                  "operator": "contains",
+                  "left": {"type": "ref", "content": ["1_c5f579b8", "slack_command"]},
+                  "right": {"type": "constant", "content": "whatif"}
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "3_2911de17",
+        "type": "3",
+        "meta": {"position": {"x": 2084, "y": 39}},
+        "data": {
+          "title": "Explain Stock Agent",
+          "inputs": {
+            "llmParam": {
+              "systemPrompt": {
+                "type": "template",
+                "content": "You are an expert stock explainer. Given a user query and ticker symbol, provide a clear, detailed explanation of the stock's current state, using common financial knowledge. Be concise and actionable."
+              },
+              "prompt": {
+                "type": "template",
+                "content": "User query: {{user_query}}\nTicker: {{ticker}}\n\nProvide a detailed explanation of this stock's current situation, covering: recent trend, key risks, and what the user should watch for."
+              },
+              "model": {"id": "", "name": ""}
+            },
+            "inputParameters": {
+              "user_query": {"type": "ref", "content": ["1_c5f579b8", "user_query"]},
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          }
+        }
+      },
+      {
+        "id": "20_f99d00fa",
+        "type": "20",
+        "meta": {"position": {"x": 1624, "y": 483.25}},
+        "data": {
+          "title": "Fetch 7-Day History",
+          "inputs": {
+            "httpRequestParam": {
+              "url": {"type": "template", "content": "http://localhost:8000/api/v1/memory/search?ticker={{ticker}}&days=7"},
+              "method": "GET",
+              "auth": {"authType": "none"},
+              "response": {"responseFormat": "json"},
+              "advanced": {"timeout": 30}
+            },
+            "inputParameters": {
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"response": {"type": "object"}}
+          }
+        }
+      },
+      {
+        "id": "3_6e069cf7",
+        "type": "3",
+        "meta": {"position": {"x": 2084, "y": 466.25}},
+        "data": {
+          "title": "Compare to Last Week",
+          "inputs": {
+            "llmParam": {
+              "systemPrompt": {
+                "type": "template",
+                "content": "You are a trend comparison analyst. Compare the historical weekly data and highlight: trend changes, signal changes, and notable indicator shifts."
+              },
+              "prompt": {
+                "type": "template",
+                "content": "Ticker: {{ticker}}\nLast 7 days of data: {{history}}\n\nSummarize: 1) How trend changed 2) Signal changes 3) Key shifts 4) Outlook"
+              },
+              "model": {"id": "", "name": ""}
+            },
+            "inputParameters": {
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]},
+              "history": {"type": "ref", "content": ["20_f99d00fa", "response"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          }
+        }
+      },
+      {
+        "id": "10_7d10f72e",
+        "type": "10",
+        "meta": {"position": {"x": 1624, "y": 234.25}},
+        "data": {
+          "title": "What-If Scenario Simulation",
+          "inputs": {
+            "inputParameters": {
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]},
+              "user_query": {"type": "ref", "content": ["1_c5f579b8", "user_query"]}
+            },
+            "language": "python3",
+            "code": "import re\n\ndef main(ticker, user_query):\n    pct = 10.0\n    match = re.search(r'([+-]?\\d+(?:\\.\\d+)?)\\s*%', str(user_query))\n    if match:\n        pct = float(match.group(1))\n    return {\n        'ticker': ticker,\n        'price_change_pct': pct,\n        'scenario_description': f'{ticker} moves {pct:+.1f}%',\n        'implied_new_rsi': min(100, max(0, 50 + pct * 1.5)),\n        'momentum_impact': 'strengthened' if pct > 0 else 'weakened',\n        'vol_impact': 'increased volatility expected' if abs(pct) > 5 else 'moderate volatility'\n    }"
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {
+              "ticker": {"type": "string"},
+              "price_change_pct": {"type": "number"},
+              "scenario_description": {"type": "string"}
+            }
+          }
+        }
+      },
+      {
+        "id": "3_55dc104c",
+        "type": "3",
+        "meta": {"position": {"x": 2084, "y": 724.25}},
+        "data": {
+          "title": "Scenario Analyst Agent",
+          "inputs": {
+            "llmParam": {
+              "systemPrompt": {
+                "type": "template",
+                "content": "You are a what-if scenario analyst. Given a hypothetical price move and its simulated impact on indicators, explain what the new picture would look like for the stock."
+              },
+              "prompt": {
+                "type": "template",
+                "content": "Ticker: {{ticker}}\nScenario: {{scenario}}\n\nAnalyze: 1) Would the signal change? 2) Key implications 3) Risk under this scenario"
+              },
+              "model": {"id": "", "name": ""}
+            },
+            "inputParameters": {
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]},
+              "scenario": {"type": "ref", "content": ["10_7d10f72e", "output"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          }
+        }
+      },
+      {
+        "id": "3_d3110bee",
+        "type": "3",
+        "meta": {"position": {"x": 2544, "y": 360.25}},
+        "data": {
+          "title": "Compose Slack Reply",
+          "inputs": {
+            "llmParam": {
+              "systemPrompt": {
+                "type": "template",
+                "content": "You are a Slack message formatter. Take one of the analysis responses provided (explain, compare, or scenario) and format it as a clear, concise Slack message using markdown. Include the ticker symbol prominently."
+              },
+              "prompt": {
+                "type": "template",
+                "content": "Command: {{command}}\nTicker: {{ticker}}\nExplain response: {{explain_out}}\nCompare response: {{compare_out}}\nScenario response: {{scenario_out}}\n\nFormat the relevant response as a Slack message."
+              },
+              "model": {"id": "", "name": ""}
+            },
+            "inputParameters": {
+              "command": {"type": "ref", "content": ["1_c5f579b8", "slack_command"]},
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]},
+              "explain_out": {"type": "ref", "content": ["3_2911de17", "output"]},
+              "compare_out": {"type": "ref", "content": ["3_6e069cf7", "output"]},
+              "scenario_out": {"type": "ref", "content": ["3_55dc104c", "output"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          }
+        }
+      },
+      {
+        "id": "20_73cbc39c",
+        "type": "20",
+        "meta": {"position": {"x": 3004, "y": 378.25}},
+        "data": {
+          "title": "Send Slack Reply",
+          "inputs": {
+            "httpRequestParam": {
+              "url": {"type": "constant", "content": "https://slack.com/api/chat.postMessage"},
+              "method": "POST",
+              "headers": {
+                "Authorization": {"type": "constant", "content": "Bearer {{env.SLACK_BOT_TOKEN}}"},
+                "Content-Type": {"type": "constant", "content": "application/json"}
+              },
+              "body": {
+                "contentType": "application/json",
+                "content": {"type": "template", "content": "{\"channel\": \"{{slack_channel}}\", \"text\": \"{{reply_text}}\"}"}
+              },
+              "auth": {"authType": "none"},
+              "response": {"responseFormat": "json", "successStatusCodes": [200]},
+              "advanced": {"timeout": 30}
+            },
+            "inputParameters": {
+              "slack_channel": {"type": "ref", "content": ["1_c5f579b8", "slack_channel"]},
+              "reply_text": {"type": "ref", "content": ["3_d3110bee", "output"]}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"response": {"type": "object"}}
+          }
+        }
+      },
+      {
+        "id": "11_86818a0b",
+        "type": "11",
+        "meta": {"position": {"x": 3464, "y": 378.25}},
+        "data": {
+          "title": "Slack Interaction Result",
+          "inputs": {
+            "inputParameters": {
+              "command": {"type": "ref", "content": ["1_c5f579b8", "slack_command"]},
+              "ticker": {"type": "ref", "content": ["1_c5f579b8", "ticker"]}
+            },
+            "textEditorParam": {
+              "editType": "StringConcatenation",
+              "concatenateFormat": {"type": "template", "content": "✅ Slack command '{{command}}' for {{ticker}} handled. Reply sent."}
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "properties": {"output": {"type": "string"}}
+          }
+        }
+      },
+      {
+        "id": "2_c6e62eca",
+        "type": "2",
+        "meta": {"position": {"x": 3924, "y": 573}},
+        "data": {
+          "title": "End",
+          "inputs": {
+            "inputParameters": {
+              "auto_result": {"type": "ref", "content": ["11_83c4a560", "output"]},
+              "slack_result": {"type": "ref", "content": ["11_86818a0b", "output"]}
+            },
+            "streaming": false,
+            "content": {
+              "type": "template",
+              "content": "{{auto_result}}{{slack_result}}"
+            }
+          }
+        }
+      }
+    ],
+    "edges": [
+      {"sourceNodeID": "1_c5f579b8",  "targetNodeID": "4_173b8bb9"},
+      {"sourceNodeID": "4_173b8bb9",  "targetNodeID": "10_a1854c1b", "sourcePortID": "branch_auto"},
+      {"sourceNodeID": "4_173b8bb9",  "targetNodeID": "4_9a7206cb",  "sourcePortID": "branch_slack"},
+      {"sourceNodeID": "10_a1854c1b", "targetNodeID": "5_a4d5361d"},
+      {"sourceNodeID": "5_a4d5361d",  "targetNodeID": "10_3a0f3f5f"},
+      {"sourceNodeID": "10_3a0f3f5f", "targetNodeID": "3_3bd8dd96"},
+      {"sourceNodeID": "3_3bd8dd96",  "targetNodeID": "10_41bf7ec0"},
+      {"sourceNodeID": "10_41bf7ec0", "targetNodeID": "20_fdaa338a"},
+      {"sourceNodeID": "20_fdaa338a", "targetNodeID": "20_e25bd089"},
+      {"sourceNodeID": "20_e25bd089", "targetNodeID": "11_83c4a560"},
+      {"sourceNodeID": "11_83c4a560", "targetNodeID": "2_c6e62eca"},
+      {"sourceNodeID": "4_9a7206cb",  "targetNodeID": "3_2911de17",  "sourcePortID": "branch_explain"},
+      {"sourceNodeID": "4_9a7206cb",  "targetNodeID": "20_f99d00fa", "sourcePortID": "branch_compare"},
+      {"sourceNodeID": "4_9a7206cb",  "targetNodeID": "10_7d10f72e", "sourcePortID": "branch_whatif"},
+      {"sourceNodeID": "3_2911de17",  "targetNodeID": "3_d3110bee"},
+      {"sourceNodeID": "20_f99d00fa", "targetNodeID": "3_6e069cf7"},
+      {"sourceNodeID": "3_6e069cf7",  "targetNodeID": "3_d3110bee"},
+      {"sourceNodeID": "10_7d10f72e", "targetNodeID": "3_55dc104c"},
+      {"sourceNodeID": "3_55dc104c",  "targetNodeID": "3_d3110bee"},
+      {"sourceNodeID": "3_d3110bee",  "targetNodeID": "20_73cbc39c"},
+      {"sourceNodeID": "20_73cbc39c", "targetNodeID": "11_86818a0b"},
+      {"sourceNodeID": "11_86818a0b", "targetNodeID": "2_c6e62eca"}
+    ]
+  }
+}

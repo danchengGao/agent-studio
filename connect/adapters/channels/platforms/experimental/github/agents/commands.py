@@ -1,0 +1,5 @@
+AGENTS_LIST = "agents"
+AGENTS_SEARCH = "agents search"
+AGENT_EXECUTE = "agent run"
+AGENT_START_CHAT = "agent chat"
+AGENT_CHAT_MESSAGE = "_agent_chat_message"

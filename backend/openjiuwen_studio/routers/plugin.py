@@ -11,17 +11,36 @@ from openjiuwen_studio.core.common import dsl
 from openjiuwen_studio.core.manager.login_manager.user import get_current_user
 from openjiuwen_studio.routers.common import handle_response
 import openjiuwen_studio.core.manager.plugin as mgr
-# 插件相关模型
-from openjiuwen_studio.schemas.plugin import (
-    PluginCreate, PluginId, PluginInfoResponse, PluginApiBase,
-    PluginApiInfoResponse, PluginListTool, PluginApiInfo, PluginApiInfoCreate, PluginListResponse,
-    PluginList, PluginInfo, PluginToolId, ToolId, PluginCodeBase,
-    PluginCodeInfo, PluginCodeInfoResponse, PluginPublishResponse, PluginPublish, PluginPublishListResponse,
-    PluginPublishInfoResponse, PluginMcpBase, PluginMcpInfo, PluginMcpInfoResponse
-)
 from openjiuwen_studio.schemas.common import ResponseModel
+from openjiuwen_studio.schemas.plugin import (
+    PluginApiBase, PluginApiInfo, PluginApiInfoCreate, PluginApiInfoResponse,
+    PluginCodeBase, PluginCodeInfo, PluginCodeInfoResponse, PluginCreate,
+    PluginId, PluginInfo, PluginInfoResponse, PluginList, PluginListResponse,
+    PluginListTool, PluginMarketDetailRequest, PluginMarketInstallRequest,
+    PluginMcpBase, PluginMcpInfo, PluginMcpInfoResponse, PluginPublish,
+    PluginPublishInfoResponse, PluginPublishListResponse, PluginPublishResponse,
+    PluginToolId, ToolId,
+)
+
 
 plugin_router = APIRouter()
+
+
+@plugin_router.post("/install_market_plugin", response_model=ResponseModel[PluginId])
+async def plugin_install_market_plugin(
+        request: PluginMarketInstallRequest,
+        current_user: dict = Depends(get_current_user)
+):
+    try:
+        logger.info("plugin install_market_plugin start")
+        market_source = (request.market_source or "local").strip().lower()
+        if market_source == "agent-tools":
+            res = mgr.install_agent_tools_plugin(request, current_user)
+        else:
+            res = mgr.plugin_create_market_plugin(request, current_user)
+        return handle_response(res)
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed") from e
 
 
 @plugin_router.post("/create", response_model=ResponseModel[PluginId])
@@ -41,7 +60,11 @@ async def plugin_create(
     """
     try:
         logger.info(f"🔧 Plugin create start")
-        logger.info(f"   Request data: {request.model_dump()}")
+        logger.info(f"   Plugin type: {request.plugin_type}")
+        if request.plugin_type == 3:  # MCP plugin
+            logger.info(f"   MCP transport: {request.mcp_transport}")
+            logger.info(f"   External type: {request.external_plugin_type}")
+            logger.info(f"   URL provided: {'Yes' if request.url else 'No'}")
         logger.info(f"   User: {current_user.get('email', 'unknown')}")
         res = mgr.plugin_create(request, current_user)
         logger.info(f"✅ Plugin create successful")
@@ -50,9 +73,28 @@ async def plugin_create(
         logger.error(f"❌ Plugin create validation failed")
         logger.error(f"   Errors: {e.errors()}")
         logger.error(f"   Request data: {request.model_dump() if hasattr(request, 'model_dump') else 'N/A'}")
+        # Extract user-friendly error messages
+        error_details = []
+        for err in e.errors():
+            field = ".".join(str(loc) for loc in err["loc"])
+            msg = err["msg"]
+            error_details.append(f"{field}: {msg}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Request validation failed: {e.errors()}"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "Request validation failed",
+                "errors": error_details,
+                "details": e.errors()
+            }
+        ) from e
+    except ValueError as e:
+        # Catch ValueError from model_post_init validation
+        logger.error(f"❌ Plugin create validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": str(e)
+            }
         ) from e
     except Exception as e:
         logger.error(f"❌ Plugin create failed with unexpected error: {str(e)}")
@@ -548,7 +590,24 @@ async def plugin_read_json_file(
     """
     try:
         logger.info(f"plugin read json file start")
-        res = mgr.plugin_read_market_json(request, current_user)
+        market_source = (request.market_source or "local").strip().lower()
+        if market_source == "agent-tools":
+            res = mgr.plugin_read_market_json_by_source(request, current_user)
+        else:
+            res = mgr.plugin_read_market_json(request, current_user)
+        return handle_response(res)
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed") from e
+
+
+@plugin_router.post("/get_market_detail", response_model=ResponseModel[str])
+async def plugin_read_market_detail(
+    request: PluginMarketDetailRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        logger.info(f"plugin read market detail start")
+        res = mgr.plugin_read_market_detail(request, current_user)
         return handle_response(res)
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed") from e

@@ -37,27 +37,32 @@ def _http_request_config_convert(node: Node) -> dsl.HttpRequestConfig:
     if inputs is None:
         raise TypeError("inputs is none")
 
-    if inputs.input_parameters is None:
-        raise TypeError("input_parameters is none")
-
     if exception_conf is None:
         raise TypeError("exception config is none")
 
-    input_params = inputs.input_parameters
+    http_params = inputs.http_request_param
 
-    # Extract method from inputs (separate from inputParameters)
-    # Method is stored as inputs.method, not in inputParameters
+    # Extract method
     method_param = getattr(inputs, 'method', None)
     logger.info(f"HTTP Request Converter - method_param: {method_param}")
     if method_param is None:
         raise TypeError("method parameter is missing")
 
-    # Extract values from inputParameters (each is a BaseValue)
-    url_param = input_params.get("url")
-    headers_param = input_params.get("headers")
-    query_params_param = input_params.get("query")
-    body_param = input_params.get("body")
-    auth_param = input_params.get("auth")
+    if http_params is not None:
+        # Read from httpRequestParam (new structure)
+        url_param = http_params.url
+        headers_param = http_params.headers
+        query_params_param = http_params.query_params
+        body_param = http_params.body
+        auth_param = http_params.auth
+    else:
+        # Fallback: read from inputParameters (legacy structure)
+        input_params = inputs.input_parameters or {}
+        url_param = input_params.get("url")
+        headers_param = input_params.get("headers")
+        query_params_param = input_params.get("query")
+        body_param = input_params.get("body")
+        auth_param = input_params.get("auth")
 
     logger.info(f"HTTP Request Converter - url_param: {url_param}")
     if url_param is None:
@@ -67,10 +72,37 @@ def _http_request_config_convert(node: Node) -> dsl.HttpRequestConfig:
     url = base_value_convert(url_param)
     method = base_value_convert(method_param)
     logger.info(f"HTTP Request Converter - converted URL: {url}, Method: {method}")
-    headers = base_value_convert(headers_param) if headers_param else {}
-    query_params = base_value_convert(query_params_param) if query_params_param else {}
-    body = base_value_convert(body_param) if body_param else None
-    auth = base_value_convert(auth_param) if auth_param else {"type": "none"}
+
+    if http_params is not None:
+        # httpRequestParam: headers/queryParams are plain dicts, body has contentType/content, auth uses authType
+        headers = headers_param if headers_param else {}
+        query_params = query_params_param if query_params_param else {}
+
+        # Convert body from HttpBodyConfig format
+        body = None
+        if body_param is not None:
+            body_content = body_param.content if hasattr(body_param, 'content') else body_param
+            body = base_value_convert(body_content) if isinstance(body_content, BaseValue) else body_content
+
+        # Convert auth from HttpAuthenticationConfig format
+        if auth_param is not None:
+            auth = {
+                "type": getattr(auth_param, 'auth_type', 'none'),
+                "username": getattr(auth_param, 'username', ''),
+                "password": getattr(auth_param, 'password', ''),
+                "token": getattr(auth_param, 'token', ''),
+                "api_key": getattr(auth_param, 'api_key', ''),
+                "api_key_location": getattr(auth_param, 'api_key_location', 'header'),
+                "api_key_param_name": getattr(auth_param, 'api_key_param_name', 'X-API-Key'),
+            }
+        else:
+            auth = {"type": "none"}
+    else:
+        # Legacy: convert from BaseValue wrappers
+        headers = base_value_convert(headers_param) if headers_param else {}
+        query_params = base_value_convert(query_params_param) if query_params_param else {}
+        body = base_value_convert(body_param) if body_param else None
+        auth = base_value_convert(auth_param) if auth_param else {"type": "none"}
 
     # Convert headers and query_params from dict to list of HttpRequestParamConfig
     headers_list = _http_request_params_convert(headers)
@@ -103,36 +135,71 @@ def _http_request_config_convert(node: Node) -> dsl.HttpRequestConfig:
                 content=body,
             )
 
-    # Use default values for response handling, retry, rate limit, and advanced options
-    # These can be extended later if needed in the UI
-    response_handling = dsl.HttpResponseHandlingConfig(
-        response_format=dsl.HttpResponseFormat(dsl.HttpResponseFormat.AUTO),
-        success_status_codes=[200, 201, 202, 204],
-        failure_status_codes=[],
-        response_mode="full",
-        data_property=None,
-    )
+    # Build response handling, retry, rate limit, and advanced from httpRequestParam when available
+    if http_params is not None:
+        resp = http_params.response
+        # Map frontend response format to DSL enum values
+        response_format_str = resp.response_format
+        if response_format_str == "auto":
+            response_format_str = "autodetect"
+        response_handling = dsl.HttpResponseHandlingConfig(
+            response_format=dsl.HttpResponseFormat(response_format_str),
+            success_status_codes=resp.success_status_codes,
+            failure_status_codes=resp.failure_status_codes,
+            response_mode=resp.response_mode,
+            data_property=resp.data_property,
+        )
 
-    retry_config = dsl.HttpRetryConfig(
-        enabled=False,
-        max_retries=3,
-        retry_on_status_codes=[429, 500, 502, 503, 504],
-        retry_delay_ms=1000,
-        backoff_type=dsl.BackoffType("exponential"),
-    )
+        adv = http_params.advanced
+        retry_config = dsl.HttpRetryConfig(
+            enabled=adv.retry.enabled,
+            max_retries=adv.retry.max_retries,
+            retry_on_status_codes=adv.retry.retry_on_status_codes,
+            retry_delay_ms=adv.retry.retry_delay_ms,
+            backoff_type=dsl.BackoffType(adv.retry.backoff_type),
+        )
 
-    rate_limit_config = dsl.HttpRateLimitConfig(
-        enabled=False,
-        requests_per_unit=10,
-        unit="minute",
-    )
+        rate_limit_config = dsl.HttpRateLimitConfig(
+            enabled=adv.rate_limit.enabled,
+            requests_per_unit=adv.rate_limit.requests_per_unit,
+            unit=adv.rate_limit.unit,
+        )
 
-    advanced_config = dsl.HttpAdvancedOptionsConfig(
-        follow_redirects=True,
-        ignore_ssl_issues=False,
-        proxy_url=None,
-        timeout=60,
-    )
+        advanced_config = dsl.HttpAdvancedOptionsConfig(
+            follow_redirects=adv.follow_redirects,
+            ignore_ssl_issues=adv.ignore_ssl_issues,
+            proxy_url=adv.proxy_url,
+            timeout=adv.timeout,
+        )
+    else:
+        response_handling = dsl.HttpResponseHandlingConfig(
+            response_format=dsl.HttpResponseFormat(dsl.HttpResponseFormat.AUTO),
+            success_status_codes=[200, 201, 202, 204],
+            failure_status_codes=[],
+            response_mode="full",
+            data_property=None,
+        )
+
+        retry_config = dsl.HttpRetryConfig(
+            enabled=False,
+            max_retries=3,
+            retry_on_status_codes=[429, 500, 502, 503, 504],
+            retry_delay_ms=1000,
+            backoff_type=dsl.BackoffType("exponential"),
+        )
+
+        rate_limit_config = dsl.HttpRateLimitConfig(
+            enabled=False,
+            requests_per_unit=10,
+            unit="minute",
+        )
+
+        advanced_config = dsl.HttpAdvancedOptionsConfig(
+            follow_redirects=True,
+            ignore_ssl_issues=False,
+            proxy_url=None,
+            timeout=60,
+        )
 
     return dsl.HttpRequestConfig(
         url=url,

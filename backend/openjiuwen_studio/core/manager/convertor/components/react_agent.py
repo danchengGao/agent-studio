@@ -132,7 +132,7 @@ def react_agent_convert(node: Node, space_id: str) -> dsl.Component:
                         plugin_schema = dsl.PluginSchema(
                             id=plugin.get('id', ''),
                             plugin_id=plugin.get('plugin_id', plugin.get('id', '')),  # Prefer plugin_id if available
-                            version=plugin.get('version', 'v1.0.0'),
+                            version=plugin.get('version', 'draft'),
                             name=plugin.get('name', ''),
                             description=plugin.get('description', ''),
                             inputs={},
@@ -148,7 +148,7 @@ def react_agent_convert(node: Node, space_id: str) -> dsl.Component:
                     if isinstance(workflow, dict):
                         workflow_schema = dsl.WorkflowSchema(
                             id=workflow.get('id', ''),
-                            version=workflow.get('version', 'v1.0.0'),
+                            version=workflow.get('version', 'draft'),
                             name=workflow.get('name', ''),
                             description=workflow.get('description', ''),
                             inputs={},

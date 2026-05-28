@@ -4,15 +4,14 @@
  */
 
 import { FormRenderProps, Field, FormMeta, ValidateTrigger } from '@flowgram.ai/free-layout-editor'
-import { Select } from '@douyinfe/semi-ui'
 
 import { IFlowValue, InputsValues, provideJsonSchemaOutputs, syncVariableTitle, DisplaySchemaTag } from '../../form-materials'
 import { useScopeAvailable } from '@flowgram.ai/editor'
 import { validation } from './validation'
-import { FormHeader, FormContent, FormItem, FormDisplay } from '../../form-components'
+import { FormHeader, FormContent, FormDisplay } from '../../form-components'
 import { useIsSidebar } from '../../hooks'
 import { VariableGroupManager } from './components'
-import { VariableMergeNodeJSON, MergeStrategy, VariableGroup } from './types'
+import { VariableMergeNodeJSON, VariableGroup } from './types'
 import { useTranslation } from '../../i18n'
 
 export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNodeJSON>) => {
@@ -29,7 +28,7 @@ export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNode
       inputParameters = form.getValueIn('inputs.inputParameters') || {}
     }
 
-    return exportGroups.map((group, groupIndex) => {
+    return exportGroups.map((group, _groupIndex) => {
       const originalItems: string[] = []
 
       group.items.forEach(inputName => {
@@ -45,6 +44,19 @@ export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNode
         name: group.name,
         type: group.type,
         items: originalItems,
+        mode: group.mode,
+        combineBy: group.combineBy,
+        matchField1: group.matchField1,
+        matchField2: group.matchField2,
+        outputType: group.outputType,
+        keepUnpaired: group.keepUnpaired,
+        fuzzyCompare: group.fuzzyCompare,
+        clashWhenClash: group.clashWhenClash,
+        clashMergingNested: group.clashMergingNested,
+        clashMinimizeEmptyFields: group.clashMinimizeEmptyFields,
+        chooseIndex: group.chooseIndex,
+        sqlQuery: group.sqlQuery,
+        appendInputCount: group.appendInputCount,
       }
     })
   }
@@ -64,6 +76,19 @@ export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNode
         name: group.name,
         type: group.type,
         items: transformedItems,
+        mode: group.mode,
+        combineBy: group.combineBy,
+        matchField1: group.matchField1,
+        matchField2: group.matchField2,
+        outputType: group.outputType,
+        keepUnpaired: group.keepUnpaired,
+        fuzzyCompare: group.fuzzyCompare,
+        clashWhenClash: group.clashWhenClash,
+        clashMergingNested: group.clashMergingNested,
+        clashMinimizeEmptyFields: group.clashMinimizeEmptyFields,
+        chooseIndex: group.chooseIndex,
+        sqlQuery: group.sqlQuery,
+        appendInputCount: group.appendInputCount,
       })
     })
 
@@ -152,16 +177,6 @@ export const VariableMergeFormRender = (props: FormRenderProps<VariableMergeNode
     <>
       <FormHeader />
       <FormContent>
-        <Field<MergeStrategy> name={`inputs.mergeStrategy`}>
-          {({ field }) => (
-            <FormItem name={t('workflowCanvas.nodes.variableMerge.aggregationStrategy')}>
-              <Select style={{ width: '100%' }} value={field.value || MergeStrategy.FIRST_NON_NULL} onChange={value => field.onChange(value as MergeStrategy)}>
-                <Select.Option value={MergeStrategy.FIRST_NON_NULL}>{t('workflowCanvas.nodes.variableMerge.firstNonNull')}</Select.Option>
-              </Select>
-            </FormItem>
-          )}
-        </Field>
-
         <Field<VariableGroup[]> name={`inputs.variableMerge`} defaultValue={[]}>
           {({ field }) => (
             <VariableGroupManager

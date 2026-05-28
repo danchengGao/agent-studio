@@ -44,24 +44,24 @@ The one-click script automates tool checks, code fetch, environment setup, and s
 
 #### 2. Configure Proxy, uv Index, npm Registry, and Database Address (Optional)
 
-If you need a proxy to access the internet or want to use a custom uv index or npm registry, or you need to set the database service host and port (for example, remote MySQL or a Docker-mapped port), edit `user_config.ps1`:
+If your network requires a proxy to access the internet, or you need a custom uv index or npm registry, or you must set the database service host and port (for example, remote MySQL or a Docker-mapped port), configure these in `user_config.ps1`:
 
 * Open `user_config.ps1` and set the following variables as needed:
 
   ```powershell
-  # Proxy (optional)
-  $HTTP_PROXY=""   # e.g. http://127.0.0.1:7890
-  $HTTPS_PROXY=""  # e.g. http://127.0.0.1:7890
+  # Proxy configuration
+  $HTTP_PROXY=""   # HTTP proxy URL, e.g. http://127.0.0.1:7890
+  $HTTPS_PROXY=""  # HTTPS proxy URL, e.g. http://127.0.0.1:7890
   $SSL_VERIFY=""   # optional: true/false (maps to git http.sslVerify)
 
   # Proxy apply switches (optional, default true)
-  $ENABLE_SESSION_ENV_PROXY="true"  # apply HTTP_PROXY/HTTPS_PROXY to current PowerShell session env
-  $ENABLE_GIT_PROXY_CONFIG="true"   # write git proxy/ssl settings
-  $ENABLE_NPM_PROXY_CONFIG="true"   # write npm proxy/strict-ssl settings
+  $ENABLE_SESSION_ENV_PROXY="true"  # Whether to set HTTP_PROXY/HTTPS_PROXY for the current PowerShell session
+  $ENABLE_GIT_PROXY_CONFIG="true"   # Whether to write git proxy/ssl configuration
+  $ENABLE_NPM_PROXY_CONFIG="true"   # Whether to write npm proxy/strict-ssl configuration
 
   # uv index (optional)
-  $UV_INDEX=""          # e.g. https://pypi.tuna.tsinghua.edu.cn/simple
-  $UV_TRUSTED_HOST=""   # e.g. pypi.tuna.tsinghua.edu.cn
+  $UV_INDEX=""          # uv default package index, e.g. https://pypi.tuna.tsinghua.edu.cn/simple
+  $UV_TRUSTED_HOST=""   # uv trusted host, e.g. pypi.tuna.tsinghua.edu.cn
 
   # npm registry (optional)
   $NPM_REGISTRY=""       # e.g. https://registry.npmmirror.com
@@ -71,19 +71,32 @@ If you need a proxy to access the internet or want to use a custom uv index or n
   $DB_PORT=""            # Leave empty for default 3306
   ```
 
-* **Proxy**: Leave variables empty to skip proxy; set full URL (e.g. `http://127.0.0.1:7890`) when needed. Authenticated proxy is supported (e.g. `http://user:pass@proxy.example.com:8080`). `$SSL_VERIFY`: `true` enables Git SSL verification, `false` disables it. `$ENABLE_SESSION_ENV_PROXY`, `$ENABLE_GIT_PROXY_CONFIG`, and `$ENABLE_NPM_PROXY_CONFIG` default to `true` and can be turned off independently.
-* **uv**: Leave `$UV_INDEX` and `$UV_TRUSTED_HOST` empty to use default uv index; when using a mirror, set both. Example: `$UV_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"`, `$UV_TRUSTED_HOST="pypi.tuna.tsinghua.edu.cn"`.
-* **npm**: Leave `$NPM_REGISTRY` empty to use default; set to your registry URL when needed. Common examples:
-  * npmmirror: `https://registry.npmmirror.com`
-  * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
-  * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
+* Proxy configuration notes:
+  * **No proxy**: Leave the variables empty (the script skips proxy configuration automatically).
+  * **Proxy required**: Set the full proxy URL, e.g. `http://127.0.0.1:7890`.
+  * **Authenticated proxy**: Supported, e.g. `http://user:pass@proxy.example.com:8080`.
+  * **SSL verification**: Set `$SSL_VERIFY` to `true` or `false`; `true` enables Git SSL certificate verification, `false` disables it.
+  * **Proxy apply switches**: `$ENABLE_SESSION_ENV_PROXY`, `$ENABLE_GIT_PROXY_CONFIG`, and `$ENABLE_NPM_PROXY_CONFIG` default to `true`; turn off any one if you do not want that category applied.
 
-* **Database connection (`$DB_HOST` / `$DB_PORT`)**:
-  * **Purpose**: Configure these when the database is on a remote host or uses a non-default host/port.
+* uv index notes:
+  * **Default uv index**: Leave `$UV_INDEX` and `$UV_TRUSTED_HOST` empty (the script uses the default uv index).
+  * **Custom uv index**: Set both `$UV_INDEX` and `$UV_TRUSTED_HOST`.
+  * **Example**: `$UV_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"`, `$UV_TRUSTED_HOST="pypi.tuna.tsinghua.edu.cn"`.
+
+* npm registry notes:
+  * **Default npm registry**: Leave `$NPM_REGISTRY` empty (the script skips npm registry configuration and uses the default).
+  * **Custom registry**: Set `$NPM_REGISTRY` to your registry URL.
+  * **Common mirror examples (China)**:
+    * npmmirror: `https://registry.npmmirror.com`
+    * Tencent Cloud: `https://mirrors.cloud.tencent.com/npm/`
+    * Huawei Cloud: `https://repo.huaweicloud.com/repository/npm/`
+
+* Database connection notes (`$DB_HOST` / `$DB_PORT`):
+  * **Purpose**: Use when the database is on a remote host or uses a non-default host/port.
 
 #### 3. Run the Installation Script
 
-* Run PowerShell as Administrator and set the execution policy:
+* Run **PowerShell** as Administrator and set the execution policy:
 
   ```powershell
   Set-ExecutionPolicy Unrestricted -Scope CurrentUser
@@ -123,8 +136,6 @@ If you need a proxy to access the internet or want to use a custom uv index or n
   ```
 
 ### Method 2: Manual Installation of All Dependencies
-
-Complete dependency installation first, then perform source retrieval and installation.
 
 #### 1. Install Dependencies
 
@@ -169,7 +180,7 @@ Complete dependency installation first, then perform source retrieval and instal
 
 * After installation, run: `uv --version`. If successful, it will print the uv version.
 
-##### 1.4. Install MySQL (Optional Component)
+##### 1.4. Install Database
 
 * **SQLite vs MySQL**:
   * SQLite requires no extra setup and is suitable for development and testing, but it has limitations (e.g., no support for concurrent writes, no user permission management).
@@ -224,10 +235,10 @@ Complete dependency installation first, then perform source retrieval and instal
 
 ##### 1.5. Milvus (Optional Component)
 
-* **Note**：`.env.example` uses Chroma by default. Simply keep `INDEX_MANAGER_TYPE` set to `chroma` to directly start the backend service without additional installation or configuration. If you need to use Milvus, please change `INDEX_MANAGER_TYPE` in `.env.example` to `milvus` and refer to [How to enable memory and knowledge base features](#windows-memory) to complete the installation and configuration of Milvus.
+* **Note**: `.env.example` uses Chroma by default. Simply keep `INDEX_MANAGER_TYPE` set to `chroma` to directly start the backend service without additional installation or configuration. If you need Milvus, change `INDEX_MANAGER_TYPE` in `.env.example` to `milvus` and follow [How to Enable Memory and Knowledge Base Features](#windows-memory) to install and configure it.
 
-* **Chroma vs Milvus**：
-  * Chroma requires no additional installation and boasts a simple configuration. All you need to do is obtain the vector model, making it ideal for quick experimentation and suitable for development and testing environments. For obtaining the vector model, refer to [How to Obtain the Vector Model](#windows-embed-model).
+* **Chroma vs Milvus**:
+  * Chroma requires no extra installation; configuration is simple—you only need the embedding model, which suits quick trials and dev/test. See [How to Obtain the Embedding Model](#windows-embed-model).
   * Milvus has more comprehensive functions and can meet the needs of complex scenarios, so it is more recommended for use in practical engineering and production environments.
 
 #### 2. Deploy Runtime Service
@@ -279,7 +290,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    PORT=8186
    ```
 
-  See the table below for variable descriptions. For more detail, refer to **`server/.env.example`** and the README in the **agent-runtime** repository.
+  See the table below for variable descriptions.
 
    | Variable Name       | Description                                                                 | Example                                                                      |
    |---------------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------------|
@@ -296,15 +307,13 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    | **HOST**            | Service bind host (`0.0.0.0` allows all network addresses)                 | `0.0.0.0`                                                                    |
    | **PORT**            | Service startup port                                                        | `8186`                                                                       |
 
-##### 2.3. Run `deploy.bat` to Install Dependencies and Start Services
+##### 2.3. Run `run-server.ps1` to Install Dependencies and Start the Service
 
-* **Prerequisites**: **Python 3.11**, **Git**, and **`uv`** available in the terminal. `deploy.bat` typically uses **`uv`** to create the virtual environment and sync dependencies.
-
-* In **`server`**, open **cmd** or **PowerShell** and run the deployment script (adjust the path to your clone):
+* Open **PowerShell** and run the deployment script:
 
   ```powershell
-  cd \path\to\agent-runtime\server
-  .\deploy.bat
+  cd \path\to\agent-runtime\
+  .\scripts\run-server.ps1
   ```
 
 #### 3. openJiuwen Installation
@@ -320,50 +329,51 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
 
 ##### 3.2. Generate an AES Key (Optional)
 
-* If you do not need to encrypt sensitive fields at rest, skip this step.
-* In the project root, open GitBash and run:
+* If you do not need to encrypt critical fields at rest, skip this step.
+
+* Open **Git Bash** in the project root and run:
 
   ```bash
   cd scripts
   bash build_AES_master_key.sh
   ```
 
-* When the script finishes, it will print the key. Use it as needed. It’s recommended to set it as an environment variable and store it separately.
+* When the script finishes, it prints the key to the console. Use it as needed; exporting it as an environment variable and saving it elsewhere is recommended.
 
   ```bash
-  # If your installation/deployment is executed in Git Bash
+  # If you run installation/deployment in Git Bash
   export SERVER_AES_MASTER_KEY_ENV=your_aes_key
     
-  # If your installation/deployment is executed in PowerShell
-  # Method 1: Set a temporary environment variable in PowerShell
+  # If you run installation/deployment in PowerShell
+  # Method 1: set a temporary environment variable in PowerShell
   $env:SERVER_AES_MASTER_KEY_ENV="your_aes_key"
-  # Method 2: Add it as a Windows system environment variable
+  # Method 2: add a Windows system or user environment variable
   """
-    1. Press Win + R, type sysdm.cpl, and press Enter.
-    2. Click on the 'Advanced' tab, then click 'Environment Variables'.
-    3. Under 'System variables' or 'User variables', add:
-         Variable name: SERVER_AES_MASTER_KEY_ENV
-         Variable value: your_aes_key
+    1. Press Win + R, enter sysdm.cpl
+    2. Open the Advanced tab, then Environment Variables
+    3. Under System variables or User variables, add:
+         Name: SERVER_AES_MASTER_KEY_ENV
+         Value: your_aes_key
   """
   ```
 
-* **Note**: The AES key must remain unchanged. Changing it later will make previously encrypted data impossible to decrypt.
+* **Note**: The AES key must remain stable. Changing it later will prevent decrypting data that was encrypted with the previous key.
 
 ##### 3.3. Start openJiuwen
 
-* Open PowerShell in the project root.
+* Open **PowerShell** in the project root.
 
-* Copy the .env file:
+* Copy the *.env* file:
 
   ```bash
   copy .env.example .env
   ```
 
-* Open .env in a text editor and update the following variables according to your environment (do not overwrite other variables):
+* Open *.env* in a text editor and update the following variables according to your environment (do not overwrite other variables):
 
-  > **Note**: Replace DB_HOST, DB_PORT, etc. with your actual database information. DB_USER and DB_PASSWORD are the MySQL user and password you created above. If the password contains special characters, see the [Special Character Escape Table](#windows-special-char) to replace them with URL encoding.
+  > **Note**: Replace DB_HOST, DB_PORT, and other fields with your actual database settings. DB_USER and DB_PASSWORD are the MySQL user and password you created above. If the password contains special characters, see the [Special Character Escape Table](#windows-special-char) and use URL encoding.
   >
-  > **OBS config**: For standalone/local deployment without object storage, OBS-related variables (OBS_BUCKET, OBS_SERVER, etc.) are left empty in `.env.example`; after copying to `.env` you do not need to fill them. Only fill real values when using object storage (e.g. distributed deployment). See [Distributed Installation](../Distributed%20Installation/README.md).
+  > **OBS configuration**: For standalone/local deployment without object storage, OBS-related entries (OBS_BUCKET, OBS_SERVER, etc.) are left empty in `.env.example`; after copying to `.env` you do not need to fill them. Only provide real values when using object storage (e.g. distributed deployment). See [Distributed Installation](../Distributed%20Installation/README.md).
 
   ```env
    # Database config (example)
@@ -378,7 +388,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    # Memory data storage path (example, default value: memory-data, can be modified according to actual situation)
    MEMORY_DATA_PATH=memory-data
 
-   # Milvus configuration (example, only when INDEX_MANAGER_TYPE=milvus)
+   # Milvus configuration (example)
    MILVUS_HOST=127.0.0.1
    MILVUS_PORT=19530
    MILVUS_COLLECTION_NAME=memory_vector
@@ -395,7 +405,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    RUNTIME_PORT=8100
    ```
 
-   For variable descriptions, please refer to the table below. If you choose to enable the memory function for Milvus, please refer to [How to Enable the Memory and Knowledge Base Functions](#windows-memory). If you choose to enable the memory function for Chroma, you only need to obtain the vector model. For details, please refer to [How to Obtain the Vector Model](#windows-embed-model).
+   See the table below for variable descriptions. To use Milvus for memory and knowledge base features, follow [How to Enable Memory and Knowledge Base Features](#windows-memory). To use Chroma, you only need to obtain the embedding model—see [How to Obtain the Embedding Model](#windows-embed-model).
  
    | Variable Name             | Description                                                         | Example                                                                       |
    |---------------------------|---------------------------------------------------------------------|--------------------------------------------------------------------------------|
@@ -414,7 +424,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
    | **RUNTIME_HOST**                 | Runtime service host (usually local `localhost`)            | `localhost`                                                                    |
    | **RUNTIME_PORT**                 | Runtime service port (must match runtime server listen port) | `8100`                                                                    |
 
-* In the project root, open PowerShell and run the following to start the backend. Please wait patiently:
+* In the project root, open **PowerShell** and run the following to start the backend. Please wait patiently:
 
   ```bash
   cd backend
@@ -422,7 +432,7 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
   uv sync
   ```
 
-* Execute database version stamp commands to facilitate subsequent database operations:
+* Run the database version stamp commands for subsequent database operations:
   ```bash
   # Agent database
   alembic -n alembic_mysql_agent stamp head
@@ -433,11 +443,11 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
   alembic -n alembic_sqlite_ops stamp head
   ```
 
-  > Description: The above commands are used to mark that the current database is already the latest version, facilitating subsequent database operations. Need to be executed separately for agent and ops databases. If using MySQL, execute `alembic -n alembic_mysql_agent stamp head` and `alembic -n alembic_mysql_ops stamp head`. For alembic usage methods, refer to [DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE_EN.md)
+  > **Note**: The above commands mark the current database schema as up to date for subsequent operations. Run them separately for the agent and ops databases. For MySQL, run `alembic -n alembic_mysql_agent stamp head` and `alembic -n alembic_mysql_ops stamp head`. For Alembic usage, see [DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md](../../../../backend/DATABASE_MIGRATION_DEVELOPMENT_GUIDE.md).
 
-  > **Note**: If it hangs for more than 20 minutes, press Ctrl + C, then try editing the url of [[tool.uv.index]] in pyproject.toml to another available mirror, and re-run uv sync.
+  > **Note**: If it stalls for more than 20 minutes, press “Ctrl + C”, change the `url` under `[[tool.uv.index]]` in `pyproject.toml` in this directory to another working index, then run `uv sync` again.
 
-  > **Note**: If uv sync fails, try: `uv sync --native-tls` to force using the system native TLS library (fix HTTPS download compatibility issues).
+  > **Note**: If `uv sync` fails, try `uv sync --native-tls` to force the system native TLS stack (helps with some HTTPS download issues).
 
 * Create log directory and start backend service
   ```bash
@@ -453,15 +463,15 @@ Runtime (`agent-runtime`) provides the Agent runtime capabilities and is a separ
 
   When startup succeeds, you will see "Application startup complete".
 
-  > **Tip**: If you need to enable code node or code plugin tool that require the code sandbox service, refer to [How to Enable the Sandbox Feature](#windows-sandbox) to complete the sandbox setup. And if you need to enable plugins that require the plugin server, which refer to [How to Enable the Plugin Server](#windows-plugin).
+  > **Note**: To use the code execution sandbox service, follow [How to Enable the Sandbox Feature](#windows-sandbox) to start and configure it. To use the plugin server, follow [How to Enable the Plugin Server](#windows-plugin).
 
-* Open another PowerShell in the project root and install frontend dependencies:
+* Open another **PowerShell** window in the project root and install frontend dependencies:
 
   ```bash
   cd frontend
   npm install
   ```
-  > **Note**: The vulnerability notices shown are known npm advisories and do not affect subsequent operation.
+  > **Note**: The vulnerabilities shown are known npm issues and do not affect running the application.
 
   ![image](../images/npm-error.png)
 
@@ -479,11 +489,12 @@ Copy the *access URL* from above into your browser’s address bar and press Ent
 
 ## III. Frequently Asked Questions (FAQ)
 
-### <a id="windows-memory"></a> Question 1: How to Enable the Memory and Knowledge Base Features
+<a id="windows-memory"></a>
+### Question 1: How to Enable the Memory and Knowledge Base Features
 
-The effectiveness of memory feature depends on the scale of the LLM used.
+The quality of the memory experience depends on the scale of the LLM parameters.
 
-The memory and knowledge base function supports two vector databases: Chroma and Milvus. If Milvus is chosen, Docker is recommended for installation on Windows systems. Specific installation steps are provided below.
+The memory and knowledge base features support Chroma and Milvus. For Milvus on Windows, Docker installation is recommended; follow the steps below.
 
 #### 1. Install Docker Desktop
 It is recommended to use WSL 2 (Windows Subsystem for Linux 2) as the virtualization backend when running Docker Desktop on Windows. Compared with LinuxKit, it offers better compatibility and lower resource consumption, and can avoid the known zombie container bugs.
@@ -515,7 +526,7 @@ Older Windows versions do not support the full automation of this one-click comm
 
 * Docker Desktop installation is now complete.
 
-> Note: If you encounter errors during installation, refer to the <a href="https://docs.docker.com/desktop/setup/install/windows-install/" target="_blank" rel="nofollow noopener noreferrer">Docker Desktop official installation guide</a>.
+> **Note**: If you encounter errors during installation, refer to the <a href="https://docs.docker.com/desktop/setup/install/windows-install/" target="_blank" rel="nofollow noopener noreferrer">Docker Desktop official installation guide</a>.
 
 #### 2. Start Milvus
 
@@ -525,7 +536,7 @@ Older Windows versions do not support the full automation of this one-click comm
  	  	 
 * In the left-hand sidebar, select “Resources“ to enter the Resources configuration page. 
  	  	 
-* Click “File sharing“, type the *Milvus installation directory* (e.g., `D:\Milvus*`) into the text box, and then click the “➕“ button to add it.
+* Click “File sharing“, type the Milvus installation directory (e.g., `D:\Milvus`) into the text box, then click “➕” to add it.
 
 * Click Apply & restart to restart Docker Desktop.
 
@@ -592,30 +603,31 @@ The memory and knowledge base features require an embedding model. The steps bel
 
 * Click “API Key Management” and follow the instructions to obtain an API.
 
-### <a id="windows-sandbox"></a> Question 2: How to Enable the Sandbox Feature
+<a id="windows-sandbox"></a>
+### Question 2: How to Enable the Sandbox Feature
 
-To use code plugins or run code nodes in workflows, you must enable the sandbox service. Follow these steps:
+To use code plugins or run code nodes in workflows, enable the sandbox service first. Follow these steps:
 
 1. **Configure the sandbox dependency environment**
 
-   The sandbox service uses a single configuration to specify the Python and JavaScript interpreters and dependencies used when executing code. If you skip this step, the system default Python and JavaScript environments are used.
+   The sandbox uses one configuration to choose the Python and JavaScript interpreters and dependencies for executed code. If you skip this, the system default Python and JavaScript environments are used.
 
    Dependency configuration files:
 
-   - Python: `sandbox_server/sandbox/openjiuwen_sandbox_server/conf/dependency/pyproject.toml`
-   - JavaScript: `sandbox_server/sandbox/openjiuwen_sandbox_server/conf/dependency/package.json`
+   - Python: `sandbox_server\sandbox\openjiuwen_sandbox_server\conf\dependency\pyproject.toml`
+   - JavaScript: `sandbox_server\sandbox\openjiuwen_sandbox_server\conf\dependency\package.json`
 
-   After setting the interpreter versions and dependency lists in these files, run the following command from the `sandbox_server/sandbox` directory to build and install the dependency environment:
+   After you set interpreter versions and dependencies in those files, run the following from the `sandbox_server\sandbox` directory to build and install the dependency environment:
 
    ```bash
    python -m openjiuwen_sandbox_server.app.build_dependency
    ```
 
-   The default install directory is `%LOCALAPPDATA%\sandbox\dependencies`. To use a different directory, set the `DEPENDENCY_DIR` environment variable before running the command above.
+   The default install directory is `%LOCALAPPDATA%\sandbox\dependencies`. To use another directory, set the `DEPENDENCY_DIR` environment variable before running the command.
 
 2. **Start the sandbox service**
 
-   On Windows, only **local** execution mode is supported: code runs directly on the host. Using `sandbox_server/sandbox/.env.example` as a reference, create a `.env` file under `sandbox_server/sandbox`. Example:
+   On Windows, only **local** execution mode is supported: code runs on the host. Using `sandbox_server\sandbox\.env.example` as a reference, create a `.env` file under `sandbox_server\sandbox`. Example:
 
    ```env
    HOST=0.0.0.0
@@ -623,11 +635,11 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
    ENABLE_LINUX_SANDBOX=false
    ```
 
-   After saving the config, start the sandbox service by running `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py`.
+   When configuration is complete, run `sandbox_server\sandbox\openjiuwen_sandbox_server\server.py` to start the sandbox service.
 
 3. **Start the sandbox gateway**
 
-   Using `sandbox_server/gateway/.env.example` as a reference, create a `.env` file under `sandbox_server/gateway`. Example:
+   Using `sandbox_server\gateway\.env.example` as a reference, create a `.env` file under `sandbox_server\gateway`. Example:
 
    ```env
    HOST=0.0.0.0
@@ -635,23 +647,25 @@ To use code plugins or run code nodes in workflows, you must enable the sandbox 
    SANDBOX_SERVER_URL=http://localhost:5001/run
    ```
 
-   `HOST` and `PORT` are the gateway bind address and port; `SANDBOX_SERVER_URL` is the URL of the sandbox service started in step 2.
+   `HOST` and `PORT` are the gateway listen address and port; `SANDBOX_SERVER_URL` is the running address of the sandbox service from step 2.
 
-   Then run `sandbox_server/gateway/openjiuwen_sandbox_gateway/server.py` to start the sandbox gateway.
+   Then run `sandbox_server\gateway\openjiuwen_sandbox_gateway\server.py` to start the sandbox gateway.
 
-4. **Configure the application-side gateway URL**
+4. **Configure the application gateway URL**
 
-   In your project’s `.env`, set the sandbox gateway URL, for example: `CODE_SANDBOX_URL=http://localhost:8188/run`.
+   In the project `.env`, set the sandbox gateway URL, for example: `CODE_SANDBOX_URL=http://localhost:8188/run`.
 
-### <a id="windows-plugin"></a> Question 3: How to Enable the Plugin Server
+<a id="windows-plugin"></a>
+### Question 3: How to Enable the Plugin Server
 
-If you need plugins, the plugin server is required, please do the following:
+To use plugins, enable the plugin server as follows:
 
-1. Refer to `plugin_server/openjiuwen_plugin_server` files, create plugin services as you need. Then start the plugin server by running the script `plugin_server/openjiuwen_plugin_server/run_restful.py`.
+1. Refer to `plugin_server/openjiuwen_plugin_server`, create the plugins you need, then start the plugin server by running `plugin_server/openjiuwen_plugin_server/run_restful.py`. The listen host and port are defined by `uvicorn.run(app, host="0.0.0.0", port=8185)` in that script.
 
-2. After running the plugin server, please configure plugin server's url in `.env`, such as: `VITE_PLUGIN_SERVICE_URL=http://localhost:8185`.
+2. After the plugin server is running, set the plugin service URL in `.env`, for example: `VITE_PLUGIN_SERVICE_URL=http://localhost:8185`.
 
-### <a id="windows-special-char"></a> Question 4: Special character escape table
+<a id="windows-special-char"></a>
+### Question 4: Special Character Escape Table
 
 | Character | URL Encoding | Character | URL Encoding | Character | URL Encoding | Character | URL Encoding | Character | URL Encoding |
 |-----------|--------------|-----------|--------------|-----------|--------------|-----------|--------------|-----------|--------------|

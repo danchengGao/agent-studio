@@ -1,0 +1,5 @@
+WORKFLOWS_LIST = "workflows"
+WORKFLOWS_SEARCH = "workflows search"
+WORKFLOW_EXECUTE = "workflow run"
+WORKFLOW_COLLECT = "_workflow_collect"
+WORKFLOW_CANCEL = "workflow cancel"

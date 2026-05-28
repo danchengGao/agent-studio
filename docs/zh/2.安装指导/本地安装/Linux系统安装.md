@@ -15,6 +15,15 @@
   * Ubuntu：最低 Ubuntu 20.04，推荐 Ubuntu 22.04 (Jammy) 及以上
     > **注意**：Ubuntu 官方与主流软件源已停止支持 Ubuntu 20.04 (Focal) 及以下版本系统。
 
+* 软件（具体安装方式见下文）：
+  * Git：2.40 及以上
+  * Node.js：20.0 及以上
+  * npm：10.0 及以上
+  * Python：3.11 及以上
+  * uv：0.5.0 及以上
+  * MySQL：8.0 及以上
+  * Milvus：2.6.2 及以上
+
 ## 二、安装方法
 
 ### 方法一：使用一键安装部署脚本
@@ -325,18 +334,15 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
    | **HOST**            | 服务监听主机（`0.0.0.0` 表示允许所有网络地址访问）                       | `0.0.0.0`                                     |
    | **PORT**            | 服务启动端口号                                                           | `8186`                                        |
 
-##### 2.3. 运行 `deploy.sh` 安装依赖并启动服务
+##### 2.3. 运行 `run-server.sh` 安装依赖并启动服务
 
 
-
-* **前置条件**：已安装 **Python 3.11**、**Git**，且可在终端执行 **`uv`**。`deploy.sh` 通常依赖 **`uv`** 创建虚拟环境并同步依赖。
-
-* 在 **`server`** 目录执行部署脚本（路径按你的克隆位置替换）：
+  * 执行部署脚本：
 
   ```bash
-  cd /path/to/agent-runtime/server
+  cd /path/to/agent-runtime/
   chmod +x deploy.sh
-  ./deploy.sh
+  ./scripts/run-server.sh
   ```
 
 
@@ -596,6 +602,17 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
    - **local 模式**：代码在宿主机上直接执行。
    - **sandbox 模式**：代码在 bwrap 沙箱内执行，具备隔离与安全限制。
 
+   若启用 sandbox 模式，请先安装所需系统软件，并创建 bwrap 子进程使用的执行用户：
+
+   ```bash
+   sudo apt update
+   sudo apt install -y bubblewrap iptables libcap2-bin nodejs util-linux
+   sudo useradd --create-home --shell /usr/sbin/nologin sandbox-exec || true
+   if [ -f /usr/sbin/xtables-nft-multi ]; then sudo setcap cap_net_admin+ep /usr/sbin/xtables-nft-multi; fi
+   if [ -f /usr/sbin/xtables-legacy-multi ]; then sudo setcap cap_net_admin+ep /usr/sbin/xtables-legacy-multi; fi
+   sudo setcap cap_setuid,cap_setgid+ep /usr/bin/setpriv
+   ```
+
    参考 `sandbox_server/sandbox/.env.example`，在 `sandbox_server/sandbox` 目录下创建 `.env` 文件，示例：
 
    ```env
@@ -620,6 +637,8 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
      uts: True
      cgroup: True
 
+   allow_internal_network_access: false
+
    mount:
      [
        {src: '/lib', dst: '/lib', mode: 'read'},
@@ -627,6 +646,8 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
        {src: '/usr/bin', dst: '/usr/bin', mode: 'read'},
        {src: '/usr/lib', dst: '/usr/lib', mode: 'read'},
        {src: '/usr/lib64', dst: '/usr/lib64', mode: 'read'},
+       {src: '/usr/local/bin', dst: '/usr/local/bin', mode: 'read'},
+       {src: '/usr/local/lib', dst: '/usr/local/lib', mode: 'read'},
        {src: '/etc/resolv.conf', dst: '/etc/resolv.conf', mode: 'read'},
        {src: '/usr/share/nodejs', dst: '/usr/share/nodejs', mode: 'read'},
        {src: '/dev/urandom', dst: '/dev/urandom', mode: 'dev'},
@@ -637,14 +658,14 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
      path: bwrap
 
    environment:
-     PATH: /bin:/usr/bin
+     PATH: /bin:/usr/bin:/usr/local/bin
 
    timeout: 10
 
    options: ['--proc', '/proc']
    ```
 
-   配置项说明：`seccomp` 为沙箱内进程允许使用的系统调用白名单；`namespace` 为需隔离的命名空间；`mount` 为主机与沙箱内的目录映射，模式 `read` / `write` / `dev` 分别表示只读、读写与设备映射；`sandbox` 指定沙箱类型与可执行路径（当前仅支持 `bubblewrap`）；`environment` 为沙箱内进程的环境变量；`timeout` 为单次任务最大执行时间（秒），超时将被强制终止；`options` 为传递给 `bwrap` 的额外命令行参数。
+   配置项说明：`seccomp` 为沙箱内进程允许使用的系统调用白名单；`namespace` 为需隔离的命名空间；`allow_internal_network_access` 控制 bwrap 子进程是否允许访问内网/私网地址。设置为 `false` 时，沙箱服务会为 `sandbox-exec` 用户安装 `iptables`/`ip6tables` owner-match 规则，阻止访问私网、loopback 与 link-local 地址，同时保留 DNS 访问，且不影响沙箱服务进程自身访问内网；`mount` 为主机与沙箱内的目录映射，模式 `read` / `write` / `dev` 分别表示只读、读写与设备映射；`sandbox` 指定沙箱类型与可执行路径（当前仅支持 `bubblewrap`）；`environment` 为沙箱内进程的环境变量；`timeout` 为单次任务最大执行时间（秒），超时将被强制终止；`options` 为传递给 `bwrap` 的额外命令行参数。
 
    配置完成后，执行 `sandbox_server/sandbox/openjiuwen_sandbox_server/server.py` 启动沙箱服务。
 

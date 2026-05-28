@@ -1,10 +1,11 @@
 /**
- * Markdown 核心渲染组件
- * 使用 react-markdown 进行渲染，支持自定义组件
+ * Core markdown renderer built on react-markdown.
  */
 
 import React, { useMemo } from 'react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
+import remarkCjkFriendly from 'remark-cjk-friendly'
+import remarkCjkFriendlyGfmStrikethrough from 'remark-cjk-friendly-gfm-strikethrough'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -18,34 +19,48 @@ import { CitationLink } from '../CitationPanel/CitationLink'
 import { InferenceLink } from '../InferenceGraph'
 import { SmartImage } from './SmartImage'
 import { MermaidChart } from './MermaidChart/index'
-import { normalizeProblematicStrongPercentForRender } from '@/utils/markdownCleaner'
+import {
+  createVLMChartReference,
+  getChartDataUrl,
+  getChartIdFromReference,
+  insertVLMChartsIntoReportContent,
+  isVLMChartReference,
+} from '@/utils/reportUtils'
 
-/**
- * Markdown 核心渲染器
- */
 export const MarkdownRenderer: React.FC<{
   instanceId?: MarkdownProps['instanceId']
   content: string
   citations?: MarkdownProps['citations']
   inferMessages?: MarkdownProps['inferMessages']
-}> = ({ content, citations, instanceId }) => {
-  const normalizedContent = useMemo(
-    () => normalizeProblematicStrongPercentForRender(content),
-    [content]
+  chartMessages?: MarkdownProps['chartMessages']
+}> = ({ content, citations, instanceId, chartMessages }) => {
+  const chartDataUrlMap = useMemo(() => {
+    const entries = (chartMessages || [])
+      .map(chart => {
+        const dataUrl = getChartDataUrl(chart)
+        return dataUrl ? [chart.chart_id, dataUrl] as const : null
+      })
+      .filter((entry): entry is readonly [string, string] => entry !== null)
+
+    return new Map(entries)
+  }, [chartMessages])
+
+  const renderableContent = useMemo(
+    () => insertVLMChartsIntoReportContent(
+      content,
+      chartMessages,
+      chart => createVLMChartReference(chart.chart_id)
+    ),
+    [chartMessages, content]
   )
 
-  // 构建默认组件映射
   const defaultComponents = useMemo(() => {
     const markdownComponents: Components = {
-      // 处理 a 标签
-      a: ({ node, href, children, ...rest }) => {
+      a: ({ href, title, children, ...rest }) => {
         const childrenText = children !== undefined && children !== null ? children.toString() : ''
-
-        // 判断链接类型
         const isInferenceLink = /#inference:\d+/.test(href || '')
         const isCitation = /^\[(\d+)\]$/.test(childrenText)
 
-        // 推理图链接 → InferenceLink
         if (isInferenceLink) {
           return (
             <InferenceLink
@@ -58,21 +73,19 @@ export const MarkdownRenderer: React.FC<{
           )
         }
 
-        // 引用链接 → CitationLink
         if (isCitation) {
           return (
             <CitationLink
               key={`${instanceId || 'no-id'}-citation-${childrenText}`}
               href={href ?? ''}
+              title={title}
               citations={citations}
-              markdownInstanceId={instanceId}
             >
               {children}
             </CitationLink>
           )
         }
 
-        // 普通链接 → MarkdownLink
         return (
           <MarkdownLink key={`${instanceId || 'no-id'}-link-${childrenText}`} href={href ?? '#'} {...rest}>
             {children}
@@ -80,14 +93,22 @@ export const MarkdownRenderer: React.FC<{
         )
       },
 
-      // 处理 img 标签
-      img: ({ node, src, alt, ...rest }) => {
+      img: ({ src, alt, ...rest }) => {
+        if (src && isVLMChartReference(src)) {
+          const chartId = getChartIdFromReference(src)
+          const resolvedSrc = chartDataUrlMap.get(chartId)
+
+          if (!resolvedSrc) {
+            return null
+          }
+
+          return <SmartImage src={resolvedSrc} alt={alt || ''} {...rest} />
+        }
+
         return <SmartImage src={src || ''} alt={alt || ''} {...rest} />
       },
 
-      // 处理代码块（pre 标签）
-      pre: ({ node, children, ...rest }) => {
-        // 检查是否是 mermaid 代码块
+      pre: ({ children, ...rest }) => {
         if (React.isValidElement(children)) {
           const childElement = children as React.ReactElement<any>
           if (childElement.props?.className?.includes('language-mermaid')) {
@@ -96,11 +117,11 @@ export const MarkdownRenderer: React.FC<{
             return <MermaidChart code={code.replace(/\n$/, '')} />
           }
         }
+
         return <pre {...rest}>{children}</pre>
       },
 
-      // 处理行内代码
-      code({ node, className, children, ...rest }) {
+      code({ className, children, ...rest }) {
         return (
           <code className={className} {...rest}>
             {children}
@@ -110,7 +131,7 @@ export const MarkdownRenderer: React.FC<{
     }
 
     return markdownComponents
-  }, [citations, instanceId])
+  }, [chartDataUrlMap, citations, instanceId])
 
   const sanitizeSchema = useMemo(
     () => ({
@@ -123,17 +144,42 @@ export const MarkdownRenderer: React.FC<{
       tagNames: (defaultSchema.tagNames || []).filter(
         tag => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'textarea'].includes(tag)
       ),
+      protocols: {
+        ...defaultSchema.protocols,
+        src: [...(defaultSchema.protocols?.src || []), 'data', 'vlm-chart'],
+      },
     }),
+    []
+  )
+
+  const urlTransform = useMemo(
+    () => (url: string, key: string, node: { tagName?: string }) => {
+      if (
+        key === 'src' &&
+        node.tagName === 'img' &&
+        (url.startsWith('data:image/') || isVLMChartReference(url))
+      ) {
+        return url
+      }
+
+      return defaultUrlTransform(url)
+    },
     []
   )
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
+      remarkPlugins={[
+        remarkGfm,
+        remarkCjkFriendly,
+        remarkCjkFriendlyGfmStrikethrough,
+        [remarkMath, { singleDollarTextMath: true }],
+      ]}
       rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeKatex]}
       components={defaultComponents}
+      urlTransform={urlTransform}
     >
-      {normalizedContent}
+      {renderableContent}
     </ReactMarkdown>
   )
 }

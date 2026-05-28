@@ -7,6 +7,7 @@ interface UIState {
   pluginViewMode: 'grid' | 'list' // 保留用于旧版页面
   pluginManagementViewMode: 'grid' | 'list' // 插件管理页面（新版）
   pluginMarketViewMode: 'grid' | 'list' // 插件市场页面（新版）
+  pluginMarketSource: 'local' | 'agent-tools' // 插件市场数据源
   // 智能体页面显示模式
   agentViewMode: 'grid' | 'table'
   // 工作流页面显示模式
@@ -29,6 +30,7 @@ interface UIActions {
   setPluginViewMode: (mode: 'grid' | 'list') => void // 保留用于旧版页面
   setPluginManagementViewMode: (mode: 'grid' | 'list') => void // 插件管理页面（新版）
   setPluginMarketViewMode: (mode: 'grid' | 'list') => void // 插件市场页面（新版）
+  setPluginMarketSource: (source: 'local' | 'agent-tools') => void // 插件市场数据源
   // 智能体显示模式操作
   setAgentViewMode: (mode: 'grid' | 'table') => void
   // 工作流显示模式操作
@@ -57,6 +59,7 @@ const initialState: UIState = {
   pluginViewMode: 'grid', // 默认为网格模式（旧版页面）
   pluginManagementViewMode: 'grid', // 默认为网格模式（插件管理页面）
   pluginMarketViewMode: 'grid', // 默认为网格模式（插件市场页面）
+  pluginMarketSource: 'local',
   agentViewMode: 'grid', // 默认为网格模式
   workflowViewMode: 'grid', // 默认为网格模式
   promptsViewMode: 'grid', // 默认为网格模式
@@ -88,6 +91,11 @@ export const useUIStore = create<UIState & UIActions>()(
       setPluginMarketViewMode: (mode: 'grid' | 'list') => {
         console.log(`🎨 [UIStore] Plugin market view mode changed to: ${mode}`)
         set({ pluginMarketViewMode: mode })
+      },
+
+      // 设置插件市场数据源
+      setPluginMarketSource: (source: 'local' | 'agent-tools') => {
+        set({ pluginMarketSource: source })
       },
 
       // 设置智能体显示模式
@@ -124,6 +132,24 @@ export const useUIStore = create<UIState & UIActions>()(
       setTheme: (theme: 'light' | 'dark' | 'auto') => {
         console.log(`🎨 [UIStore] Theme changed to: ${theme}`)
         set({ theme })
+
+        // 同步更新 ThemeContext 使用的 localStorage 键
+        localStorage.setItem('theme', theme)
+
+        // 应用 dark class 到 HTML 元素以支持 Tailwind CSS 的深色模式
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark')
+        } else if (theme === 'light') {
+          document.documentElement.classList.remove('dark')
+        } else {
+          // auto 模式 - 检查系统偏好
+          const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (isDark) {
+            document.documentElement.classList.add('dark')
+          } else {
+            document.documentElement.classList.remove('dark')
+          }
+        }
       },
 
       // 设置侧边栏折叠状态
@@ -151,6 +177,7 @@ export const useUIStore = create<UIState & UIActions>()(
         pluginViewMode: state.pluginViewMode,
         pluginManagementViewMode: state.pluginManagementViewMode,
         pluginMarketViewMode: state.pluginMarketViewMode,
+        pluginMarketSource: state.pluginMarketSource,
         agentViewMode: state.agentViewMode,
         workflowViewMode: state.workflowViewMode,
         promptsViewMode: state.promptsViewMode,
@@ -162,6 +189,21 @@ export const useUIStore = create<UIState & UIActions>()(
       version: 1, // 版本号，用于状态迁移
       onRehydrateStorage: () => state => {
         console.log('🎨 [UIStore] UI state rehydrated from storage:', state)
+        // 应用主题到 HTML 元素
+        if (state?.theme) {
+          if (state.theme === 'dark') {
+            document.documentElement.classList.add('dark')
+          } else if (state.theme === 'light') {
+            document.documentElement.classList.remove('dark')
+          } else if (state.theme === 'auto') {
+            const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+            if (isDark) {
+              document.documentElement.classList.add('dark')
+            } else {
+              document.documentElement.classList.remove('dark')
+            }
+          }
+        }
       },
     },
   ),
@@ -187,6 +229,13 @@ export const usePluginMarketViewMode = () => {
   const setViewMode = useUIStore(state => state.setPluginMarketViewMode)
 
   return [viewMode, setViewMode] as const
+}
+
+export const usePluginMarketSource = () => {
+  const source = useUIStore(state => state.pluginMarketSource)
+  const setSource = useUIStore(state => state.setPluginMarketSource)
+
+  return [source, setSource] as const
 }
 
 export const useAgentViewMode = () => {

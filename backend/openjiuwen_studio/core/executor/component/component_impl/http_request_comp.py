@@ -84,7 +84,7 @@ class HttpRequestComponent(WorkflowComponent):
 
         try:
             # Convert studio config to agent-core config
-            core_config = self._convert_to_core_config(inputs)
+            core_config = self._convert_to_core_config(inputs, session)
 
             # Validate URL before making request
             logger.info(
@@ -127,7 +127,7 @@ class HttpRequestComponent(WorkflowComponent):
             final_result = self._process_error(error_body, exception_config)
             return final_result
 
-    def _convert_to_core_config(self, inputs: Input) -> CoreHttpComponentConfig:
+    def _convert_to_core_config(self, inputs: Input, session: Session) -> CoreHttpComponentConfig:
         """Convert studio HttpRequestConfig to agent-core HttpComponentConfig"""
         from openjiuwen.core.workflow.components.tool.http.http_request_component import (
             HttpAuthConfig,
@@ -143,6 +143,8 @@ class HttpRequestComponent(WorkflowComponent):
         method = self.conf.method.value if hasattr(self.conf.method, 'value') else str(self.conf.method)
 
         url = inputs.get("url", self.conf.url)
+        # Resolve ${node_id.field} DSL template patterns in URL
+        url = self._replace_dsl_variables(url, inputs, session)
 
         # Convert headers: merge static config with runtime inputs
         headers = inputs.get("headers", {})
@@ -165,7 +167,15 @@ class HttpRequestComponent(WorkflowComponent):
         # Convert body (only for methods that support a body)
         body_config = None
         body_content = inputs.get("body")
+        # Fallback to static config body when not provided via runtime inputs
+        if (not body_content or body_content == {}) and self.conf.body:
+            body_content = self.conf.body.content
+            # Unwrap BaseValue-style dict {"type": "constant", "content": "..."}
+            if isinstance(body_content, dict) and "content" in body_content and "type" in body_content:
+                body_content = body_content["content"]
         if body_content and body_content != {} and method.upper() in ('POST', 'PUT', 'PATCH'):
+            if isinstance(body_content, str):
+                body_content = self._replace_variables(body_content, inputs)
             body_config = HttpRequestBodyConfig(
                 content_type=HttpContentType.JSON,
                 json_data=self.parse_body_content(body_content)
@@ -248,20 +258,69 @@ class HttpRequestComponent(WorkflowComponent):
 
     @staticmethod
     def _replace_variables(text: str, inputs: Input) -> str:
-        """Replace {{variable}} placeholders with values from inputs"""
+        """Replace {{variable}} placeholders with values from inputs.
+
+        Matches ``{{identifier}}`` patterns produced by the PromptEditor's
+        variable-insertion UI.  Only replaces when the identifier exists as a
+        key in *inputs* so that JSON structural braces are left untouched.
+        """
         if not isinstance(text, str):
             return text
 
-        # Find all {{variable}} patterns
-        pattern = r'\$\{(?:[^}.]+\.)?([^}.]+)\}'
-        matches = re.findall(pattern, text)
+        pattern = r'\{\{([a-zA-Z_][a-zA-Z0-9_.]*)\}\}'
 
-        for match in matches:
-            name = match.strip()
-            value = inputs.get(name, f"{{{{{name}}}}}")
-            text = value if isinstance(value, str) else str(value)
+        def _replacer(match: re.Match) -> str:
+            var_name = match.group(1)
+            value = inputs.get(var_name)
+            if value is not None:
+                return value if isinstance(value, str) else json.dumps(value)
+            return match.group(0)
 
-        return text
+        return re.sub(pattern, _replacer, text)
+
+    @staticmethod
+    def _replace_dsl_variables(text: str, inputs: Input, session: Session = None) -> str:
+        """Replace ${node_id.field} DSL template patterns with values from inputs or session state.
+
+        The graph engine resolves these in component inputs but not in configs.
+        This method handles resolution for config fields (url, etc.).
+        """
+        if not isinstance(text, str):
+            return text
+
+        # Match ${anything} patterns
+        pattern = r'\$\{([^}]+)\}'
+
+        def _replacer(match: re.Match) -> str:
+            ref = match.group(1)
+            # ref format: "node_id.field" — try direct lookup first
+            value = inputs.get(ref)
+            if value is not None:
+                return value if isinstance(value, str) else json.dumps(value)
+            # Try the field part after the dot (e.g. "start_MMzQa.dest" -> look for "dest")
+            if '.' in ref:
+                field = ref.split('.', 1)[1]
+                value = inputs.get(field)
+                if value is not None:
+                    return value if isinstance(value, str) else json.dumps(value)
+                # Try to get from session state (previous node outputs)
+                if session is not None:
+                    node_id = ref.split('.', 1)[0]
+                    try:
+                        node_outputs = session.get_global_state(node_id)
+                        if isinstance(node_outputs, dict):
+                            value = node_outputs.get(field)
+                            if value is not None:
+                                return value if isinstance(value, str) else json.dumps(value)
+                    except Exception as e:
+                        logger.error(
+                            f"HTTP Request Component [{node_id}] error: "
+                            f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+                        )
+
+            return match.group(0)
+
+        return re.sub(pattern, _replacer, text)
 
     @staticmethod
     def _process_response(response: Dict[str, Any]) -> Dict[str, Any]:

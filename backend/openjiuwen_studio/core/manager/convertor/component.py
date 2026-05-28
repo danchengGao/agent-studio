@@ -33,16 +33,16 @@ from openjiuwen_studio.core.common.status_code import StatusCode
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 
 
-def _loop_sub_components_convert(node: Node, space_id: str) -> List[dsl.Component]:
+def _loop_sub_components_convert(node: Node, space_id: str, export_raw_auth: bool = False) -> List[dsl.Component]:
     blocks = node.blocks
     if not blocks:
         raise ValueError("loop blocks is empty")
     nodes = [Node(**block) for block in blocks]
-    return component_convert(node.edges, nodes, space_id, True)
+    return component_convert(node.edges, nodes, space_id, True, export_raw_auth=export_raw_auth)
 
 
-def _loop_configs_convert(node: Node, space_id: str) -> dsl.LoopConfig:
-    sub_components = _loop_sub_components_convert(node, space_id)
+def _loop_configs_convert(node: Node, space_id: str, export_raw_auth: bool = False) -> dsl.LoopConfig:
+    sub_components = _loop_sub_components_convert(node, space_id, export_raw_auth=export_raw_auth)
 
     start_id: List[str] = []
     end_id: List[str] = []
@@ -69,7 +69,13 @@ def _loop_configs_convert(node: Node, space_id: str) -> dsl.LoopConfig:
     )
 
 
-def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_convert: bool) -> List[dsl.Component]:
+def component_convert(
+        edges: List[Edge],
+        nodes: list[Node],
+        space_id: str,
+        sub_convert: bool,
+        export_raw_auth: bool = False
+) -> List[dsl.Component]:
     try:
         components: List[dsl.Component] = []
 
@@ -77,7 +83,7 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             if sub_convert:
                 raise TypeError("loop component can not contain sub loop component")
             c = loop_convert(node)
-            configs = _loop_configs_convert(node, space_id)
+            configs = _loop_configs_convert(node, space_id, export_raw_auth=export_raw_auth)
             c.configs = configs.model_dump()
             return c
 
@@ -100,7 +106,9 @@ def component_convert(edges: List[Edge], nodes: list[Node], space_id: str, sub_c
             dsl.ComponentType.COMPONENT_TYPE_CODE: lambda n, s, sub: code_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_VARIABLE_MERGE: lambda n, s, sub: variable_merge_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_SET_VARIABLE: lambda n, s, sub: set_variable_convert(n),
-            dsl.ComponentType.COMPONENT_TYPE_PLUGIN: lambda n, s, sub: plugin_convert(n, s),
+            dsl.ComponentType.COMPONENT_TYPE_PLUGIN: (
+                lambda n, s, sub: plugin_convert(n, s, export_raw_auth=export_raw_auth)
+            ),
             dsl.ComponentType.COMPONENT_TYPE_HTTP_REQUEST: lambda n, s, sub: http_request_convert(n),
             dsl.ComponentType.COMPONENT_TYPE_REACT_AGENT: lambda n, s, sub: react_agent_convert(n, s),
             dsl.ComponentType.COMPONENT_TYPE_KNOWLEDGE_RETRIEVAL: lambda n, s, sub: knowledge_retrieval_convert(n, s),

@@ -1,0 +1,6 @@
+AGENTS = 'agents'
+AGENT = 'agent'
+SEARCH = 'search'
+EXECUTE = 'execute'
+START = 'start'
+END = 'end'

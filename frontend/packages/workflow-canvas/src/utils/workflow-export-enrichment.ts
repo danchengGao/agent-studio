@@ -377,6 +377,7 @@ export async function fetchPluginExportLikeAgentDeps(
       space_id: pi.space_id,
       icon_uri: pi.icon_uri ?? '',
       plugin_type: pi.plugin_type,
+      auth: pi.auth ?? null,
       tools: null,
       inputs: pi.request_params ?? [],
       tool_list,

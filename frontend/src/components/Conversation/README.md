@@ -15,7 +15,7 @@ src/
         ├── UserMessageItem.tsx           # 用户消息组件
         ├── SystemMessageItem.tsx         # 系统消息组件
         ├── ResultPanel.tsx               # 右侧结果面板
-        ├── PlaybackPanel.tsx             # SSE回放控制面板
+        ├── RecordingPanel.tsx           # SSE回放控制面板
         ├── ErrorBoundary.tsx             # 错误边界组件
         ├── utils/                        # 工具函数
         │   ├── formatDuration.ts         # 时间格式化工具
@@ -182,14 +182,14 @@ function MyPage() {
 }
 ```
 
-### 5. PlaybackPanel - SSE回放控制面板
+### 5. RecordingPanel - SSE录制与回放面板
 
 **功能：**
 - 显示所有SSE录制记录
 - 支持回放历史对话
-- 支持调整回放速度（1x/2x/5x/10x）
+- 支持 Mock 模式回放 AI 改写
+- 支持导入 Markdown 调试报告
 - 支持下载和删除录制记录
-- 支持压缩录制以节省存储空间
 
 ### 6. ErrorBoundary - 错误边界
 

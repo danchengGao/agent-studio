@@ -1,0 +1,174 @@
+# Memory Usage Pattern Benchmark
+# Tests workflows that leverage SetVariable/VariableMerge for stateful execution.
+# Pattern type: 5 (MEMORY_USAGE)
+
+suite:
+  suite_name: "Memory Usage Pattern Benchmark"
+  description: "Validates workflows that use variable storage (SetVariable/VariableMerge components) to maintain and accumulate state across execution steps."
+
+tasks:
+  - task_id: "memory_conversation_context"
+    task_name: "Maintain conversation context across turns"
+    description: >
+      Workflow should remember context from previous turns using memory components
+      and provide contextually relevant responses that reference earlier information.
+    difficulty: 1  # MEDIUM
+    pattern_type: 5  # MEMORY_USAGE
+    tags: ["memory", "context", "conversation", "stateful"]
+    trials: 3
+    input_data:
+      conversation:
+        - role: "user"
+          content: "My name is Alice and I work as a data scientist."
+        - role: "assistant"
+          content: "Nice to meet you, Alice! Data science is a fascinating field."
+        - role: "user"
+          content: "What tools would you recommend for my job?"
+    expected_output:
+      references_alice: true
+      references_data_science: true
+      has_recommendations: true
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "references_name"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "Alice"
+          weight: 0.7
+      - type: 1  # MODEL_BASED
+        name: "context_aware_response"
+        config:
+          model_id: null
+          rubric: >
+            The response recommends tools appropriate for a data scientist (e.g., Python,
+            pandas, scikit-learn, TensorFlow, Jupyter notebooks, etc.) and demonstrates
+            awareness of the context established earlier in the conversation (Alice is a data scientist).
+          passing_score: 0.75
+          weight: 1.0
+
+  - task_id: "memory_accumulate_results"
+    task_name: "Accumulate and aggregate results across steps"
+    description: >
+      Workflow processes multiple items sequentially, stores intermediate results
+      in variables, and produces a final aggregated summary.
+    difficulty: 1  # MEDIUM
+    pattern_type: 5  # MEMORY_USAGE
+    tags: ["memory", "accumulation", "aggregation", "stateful"]
+    trials: 3
+    input_data:
+      items:
+        - name: "Product A"
+          sales: 150
+          region: "North"
+        - name: "Product B"
+          sales: 230
+          region: "South"
+        - name: "Product C"
+          sales: 89
+          region: "East"
+      aggregate_by: "total_sales"
+    expected_output:
+      total_sales: 469
+      best_product: "Product B"
+      has_summary: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "aggregation_correctness"
+        config:
+          model_id: null
+          rubric: >
+            The output correctly aggregates sales data: total sales of 469 units,
+            identifies Product B (230 units) as the best performer,
+            and provides a summary covering all three products across different regions.
+          passing_score: 0.75
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "contains_total"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "469"
+          weight: 0.5
+
+  - task_id: "memory_stateful_task_tracking"
+    task_name: "Track task completion state"
+    description: >
+      Workflow manages a to-do list using memory, marking items complete as it
+      processes them, and reports final completion status.
+    difficulty: 2  # HARD
+    pattern_type: 5  # MEMORY_USAGE
+    tags: ["memory", "state-tracking", "tasks", "completion"]
+    trials: 3
+    input_data:
+      tasks:
+        - id: 1
+          title: "Analyze customer feedback"
+          priority: "high"
+        - id: 2
+          title: "Generate monthly report"
+          priority: "medium"
+        - id: 3
+          title: "Update dashboard"
+          priority: "low"
+      process_all: true
+    expected_output:
+      all_completed: true
+      completion_count: 3
+      has_status_report: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "task_completion_report"
+        config:
+          model_id: null
+          rubric: >
+            The output shows that all three tasks were processed and completed:
+            customer feedback analysis, monthly report generation, and dashboard update.
+            The response includes a status report indicating 3/3 tasks completed
+            with their respective priorities noted.
+          passing_score: 0.7
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: ""
+          weight: 0.3
+
+  - task_id: "memory_cross_step_state"
+    task_name: "Pass computed state between workflow steps"
+    description: >
+      Workflow computes a value in step 1, stores it in a variable,
+      and uses that stored value to make a decision in step 3.
+    difficulty: 1  # MEDIUM
+    pattern_type: 5  # MEMORY_USAGE
+    tags: ["memory", "variables", "state-passing", "cross-step"]
+    trials: 3
+    input_data:
+      initial_value: 42
+      operations:
+        - {step: 1, op: "multiply", factor: 3}
+        - {step: 2, op: "store_as_variable", var_name: "result"}
+        - {step: 3, op: "compare_and_route", threshold: 100}
+    expected_output:
+      computed_value: 126
+      routed_to: "above_threshold"
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "correct_computed_value"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "126"
+          weight: 0.7
+      - type: 1  # MODEL_BASED
+        name: "state_management_correct"
+        config:
+          model_id: null
+          rubric: >
+            The workflow correctly computes 42 * 3 = 126, stores it, compares with threshold 100,
+            and routes to the 'above threshold' path since 126 > 100.
+            The response demonstrates that computed state was properly maintained and used across steps.
+          passing_score: 0.8
+          weight: 0.8

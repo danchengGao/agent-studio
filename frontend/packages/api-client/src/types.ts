@@ -970,6 +970,27 @@ export interface ExecutionLogCreateInfo {
   create_time: string
 }
 
+export interface TraceSummaryBriefWithStatus {
+  trace_id: string
+  business_id: string
+  business_name?: string
+  business_version?: string
+  business_type: 'WORKFLOW' | 'AGENT'
+  create_time: string
+  elapsed_ms?: number
+  duration?: number
+  status?: string
+}
+
+export interface ActiveExecution {
+  conversation_id: string
+  workflow_id: string
+  workflow_name?: string
+  workflow_version?: string
+  space_id: string
+  start_time?: number
+}
+
 export interface InvokeExecuteInfo {
   invokeId: string
   invoke_id?: string // 下划线命名格式
@@ -1729,7 +1750,13 @@ export interface PluginCreateRequest {
   plugin_type: PluginType | number
   url?: string
   icon_uri?: string
+  auth?: Record<string, unknown>
+  request_params?: PluginRequestParam[]
+  header_configuration?: Array<{ name: string; value: string; description?: string; type?: string; send_method?: string }>
   mcp_transport?: number
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
 }
 
 export interface PluginCreateResponse {
@@ -1737,6 +1764,7 @@ export interface PluginCreateResponse {
   message: string
   data: {
     plugin_id: string
+    plugin_version?: string
   }
 }
 
@@ -1757,8 +1785,21 @@ export interface PluginInfo {
   published: boolean
   url?: string
   icon_uri?: string
+  auth?: Record<string, unknown>
   request_params?: PluginRequestParam[]
   mcp_transport?: number
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  external_plugin_type?: string
+  original_market_plugin_id?: string
+  category?: string
+  category_name?: string
+  market_source?: string
+  ready?: boolean
+  tags?: string[]
+  status?: string
+  config?: Record<string, unknown>
 }
 
 export interface PluginGetResponse {
@@ -1792,7 +1833,22 @@ export interface PluginUpdateRequest {
   published?: boolean
   url?: string
   icon_uri?: string
+  auth?: Record<string, unknown>
   request_params?: PluginRequestParam[]
+  header_configuration?: Array<{ name: string; value: string; description?: string }>
+  mcp_transport?: number
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  external_plugin_type?: string
+  original_market_plugin_id?: string
+  market_source?: string
+  category?: string
+  category_name?: string
+  tags?: string[]
+  author?: string
+  detail_desc?: string
+  config?: Record<string, unknown>
 }
 
 export interface PluginUpdateResponse {
@@ -1819,12 +1875,34 @@ export interface PluginGetMarketRequest {
   space_id: string
   page?: number
   size?: number
+  market_source?: string
 }
 
 export interface PluginGetMarketResponse {
   code: number
   message: string
   data: string
+}
+
+export interface PluginGetMarketDetailRequest {
+  space_id: string
+  plugin_id: string
+  plugin_version?: string
+  market_source?: string
+  include_contract?: boolean
+}
+
+export interface PluginGetMarketDetailResponse {
+  code: number
+  message: string
+  data: string
+}
+
+export interface PluginInstallMarketRequest {
+  space_id: string
+  plugin_id: string
+  plugin_version?: string
+  market_source?: string
 }
 
 // Plugin API 相关类型

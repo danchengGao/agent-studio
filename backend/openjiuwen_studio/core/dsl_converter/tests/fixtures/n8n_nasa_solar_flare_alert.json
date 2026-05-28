@@ -1,0 +1,91 @@
+{
+  "name": "NASA DONKI Solar Flare Tutorial",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "interval": 24
+            }
+          ]
+        }
+      },
+      "id": "node_schedule_001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "donkiSolarFlare",
+        "additionalFields": {
+          "startDate": "={{ $now.minus({ days: 30 }).toISODate() }}"
+        }
+      },
+      "id": "node_nasa_001",
+      "name": "NASA DONKI",
+      "type": "n8n-nodes-base.nasa",
+      "typeVersion": 1,
+      "position": [670, 300],
+      "credentials": {
+        "nasaApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "NASA API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.classType }}",
+              "operation": "contains",
+              "value2": "X"
+            }
+          ]
+        }
+      },
+      "id": "node_if_001",
+      "name": "Filter Class X",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [890, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "NASA DONKI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NASA DONKI": {
+      "main": [
+        [
+          {
+            "node": "Filter Class X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC"
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": "default"
+  }
+}

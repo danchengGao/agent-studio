@@ -239,7 +239,7 @@ export function ReactAgentFormSkills() {
                       if (selectedWorkflows && selectedWorkflows.length > 0) {
                         const newWorkflows: SkillItem[] = selectedWorkflows.map(workflow => ({
                           id: workflow.workflow_id,
-                          version: workflow.version || 'v1.0.0',  // Add version
+                          version: workflow.version || 'draft',  // Add version
                           name: workflow.name || workflow.workflow_id,
                           type: 'workflow' as const,
                         }))

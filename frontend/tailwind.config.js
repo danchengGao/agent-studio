@@ -1,5 +1,10 @@
+/*
+ * Copyright (c) 2026 OpenJiuwen Project
+ * Licensed under the MIT License
+ */
+
 /** @type {import('tailwindcss').Config} */
-const tailwindExtend = require('./src/styles/tailwind.extend')
+const tailwindExtend = require('./src/styles/tailwind.extend');
 
 module.exports = {
   darkMode: 'class',
@@ -68,4 +73,4 @@ module.exports = {
     },
   },
   plugins: [require('@tailwindcss/typography')],
-}
+};

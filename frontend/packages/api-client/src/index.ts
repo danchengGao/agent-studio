@@ -18,7 +18,6 @@ export {
 } from './utils/apiClientFactory'
 export type { StreamOptions } from './utils/apiClientFactory'
 export { isApiError, getErrorMessage, getErrorResponse } from './utils/errorHandling'
-export type { ApiError } from './utils/errorHandling'
 
 // 配置
 export { API_CONFIG, API_ENDPOINTS, HTTP_STATUS, ERROR_TYPES, updateApiConfig, setApiBaseUrl } from './config'
@@ -42,6 +41,20 @@ export type {
   EmbeddingModelApiResponse,
   EmbeddingModelApiError,
 } from './types/embeddingModelTypes'
+export type {
+  VLMModelConfigBase,
+  VLMModelConfigCreate,
+  VLMModelConfigUpdate,
+  VLMModelConfigResponse,
+  VLMModelConfigList,
+  VLMModelConfigRequest,
+  VLMModelTestRequest,
+  VLMModelTestResponse,
+  VLMModelConfigUpdateRequest,
+  VLMModelConfigQueryParams,
+  VLMModelApiResponse,
+  VLMModelApiError,
+} from './types/vlmModelTypes'
 export type {
   ModelParameters as ModelConfigParameters,
   ModelUsageStats,
@@ -220,7 +233,9 @@ export { WorkflowService } from './services/workflowService'
 export { ExecutionService } from './services/executionService'
 export { ModelService, modelService } from './services/modelService'
 export { EmbeddingModelService, embeddingModelService } from './services/embeddingModelService'
+export { VLMModelService, vlmModelService } from './services/vlmModelService'
 export type { FrontendEmbeddingModelConfig } from './services/embeddingModelService'
+export type { FrontendVLMModelConfig } from './services/vlmModelService'
 export { AuthService } from './services/authService'
 export { SpaceService } from './services/spaceService'
 export { AgentService } from './services/agentService'
@@ -233,8 +248,11 @@ export { PromptService } from './services/promptService'
 export { PluginService } from './services/pluginService'
 export { TagService } from './services/tagService'
 export { TraceService, traceService } from './services/traceService'
+export { ExecutionPanelService } from './services/executionPanelService'
 export { KnowledgeBaseService } from './services/knowledgeBaseService'
 export { MemoryBaseService } from './services/memoryBaseService'
+export { TriggerService } from './services/triggerService'
+export type { TriggerApiResponse } from './services/triggerService'
 export { deepsearchTemplateService, deepsearchHeartbeatService, fileToBase64 } from './services/deepsearchTemplateService'
 export { webSearchEngineService } from './services/webSearchEngineService'
 export type { FrontendModelConfig } from './services/modelService'
@@ -258,7 +276,7 @@ export type {
   WebSearchEngineDeleteResponse,
   WebSearchEngineUpdateRequest,
   WebSearchEngineUpdateResponse,
-  WebSearchEngineDetailResponse,
+  WebSearchEngineGetResponse,
   WebSearchEngineTestRequest,
   WebSearchEngineTestResponse
 } from './services/webSearchEngineService'
@@ -280,6 +298,7 @@ export type {
 } from './types'
 export * from './hooks/useModels'
 export * from './hooks/useEmbeddingModels'
+export * from './hooks/useVLMModels'
 export * from './hooks/useAuth'
 export * from './hooks/useSpace'
 export * from './hooks/useAgent'
@@ -293,6 +312,7 @@ export * from './hooks/usePrompt'
 export * from './hooks/usePlugin'
 export * from './hooks/useTags'
 export * from './hooks/useTrace'
+export * from './hooks/useTrigger'
 
 // Export delete workflow types
 export type { DeleteWorkflowRequest, DeleteWorkflowResponse } from './types'

@@ -1,0 +1,533 @@
+# Task Templates for OpenJiuwen Evaluation System
+#
+# These templates provide starting points for common evaluation scenarios.
+# Users select a template when creating a task, and the template pre-fills
+# graders, trials, and other configuration.
+#
+# Usage: Import into frontend/src/constants/taskTemplates.ts
+
+templates:
+  - id: simple_output_check
+    name: Simple Output Check
+    description: Checks if output exactly matches expected value
+    icon: "✓"
+    difficulty: easy
+    use_case: Deterministic workflows with exact output (calculators, formatters, converters)
+
+    default_config:
+      trials: 1
+      difficulty: 0  # EASY
+      pattern_type: null
+      graders_config:
+        - name: output_matches_expected
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: output_check
+            condition: eq
+            expected_value: null  # User fills this
+
+    example:
+      task_name: "Check calculator adds 2+2"
+      input_data:
+        a: 2
+        b: 2
+      expected_output:
+        result: 4
+      # Grader auto-filled to check output == expected_output
+
+  # ---------------------------------------------------------------------------
+
+  - id: field_value_check
+    name: Field Value Check
+    description: Checks if a specific field in output equals a value
+    icon: "🎯"
+    difficulty: easy
+    use_case: When you only care about one field in the output (e.g., status code, result value)
+
+    default_config:
+      trials: 3
+      difficulty: 0  # EASY
+      pattern_type: null
+      graders_config:
+        - name: field_check
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: state_check
+            path: ""  # User fills: e.g., "result" or "data.user.email"
+            condition: eq
+            expected_value: null  # User fills
+
+    example:
+      task_name: "Verify sentiment is positive"
+      input_data:
+        message: "I love this product!"
+      expected_output:
+        sentiment: "positive"
+        confidence: 0.95
+      # Grader checks path="sentiment", expected_value="positive"
+
+  # ---------------------------------------------------------------------------
+
+  - id: quality_assessment
+    name: Quality Assessment (AI Judge)
+    description: Uses AI to judge response quality against a rubric
+    icon: "🤖"
+    difficulty: medium
+    use_case: Subjective quality checks, coherence, helpfulness, tone
+
+    default_config:
+      trials: 3
+      difficulty: 1  # MEDIUM
+      pattern_type: null
+      graders_config:
+        - name: quality_check
+          grader_type: 1  # MODEL_BASED
+          weight: 1.0
+          config:
+            model_id: "claude-sonnet-4.5"  # Default model
+            rubric: ""  # User fills
+            passing_score: 0.7
+            assertions: []
+
+    example:
+      task_name: "Customer support response quality"
+      input_data:
+        message: "My order hasn't arrived"
+      expected_output: {}  # Not used by model-based grader
+      # Grader rubric: "Response acknowledges the issue, asks for order number, provides next steps"
+
+  # ---------------------------------------------------------------------------
+
+  - id: tool_usage_verification
+    name: Tool Usage Verification
+    description: Verifies that specific tools were called during execution
+    icon: "🔧"
+    difficulty: medium
+    use_case: Ensure workflow used the right tools (search, calculator, email sender)
+
+    default_config:
+      trials: 3
+      difficulty: 1  # MEDIUM
+      pattern_type: null
+      graders_config:
+        - name: required_tools
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: tool_call_check
+            expected_tools: []  # User fills: ["search_web", "send_email"]
+
+    example:
+      task_name: "Research workflow uses search tool"
+      input_data:
+        query: "What is the capital of France?"
+      expected_output: {}
+      # Grader checks that "search_web" tool was called
+
+  # ---------------------------------------------------------------------------
+
+  - id: numeric_threshold
+    name: Numeric Threshold Check
+    description: Checks if a number meets a minimum/maximum threshold
+    icon: "📊"
+    difficulty: easy
+    use_case: Performance metrics, scores, confidence levels
+
+    default_config:
+      trials: 3
+      difficulty: 0  # EASY
+      pattern_type: null
+      graders_config:
+        - name: threshold_check
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: state_check
+            path: ""  # User fills: e.g., "confidence" or "score"
+            condition: ge  # Greater or equal
+            expected_value: null  # User fills: e.g., 0.8
+
+    example:
+      task_name: "Sentiment confidence > 0.8"
+      input_data:
+        message: "This is amazing!"
+      expected_output:
+        sentiment: "positive"
+        confidence: 0.95
+      # Grader checks path="confidence", condition="ge", expected_value=0.8
+
+  # ---------------------------------------------------------------------------
+
+  - id: contains_keyword
+    name: Contains Keyword
+    description: Checks if output contains a specific word or phrase
+    icon: "🔍"
+    difficulty: easy
+    use_case: Verify output mentions required elements (names, IDs, keywords)
+
+    default_config:
+      trials: 3
+      difficulty: 0  # EASY
+      pattern_type: null
+      graders_config:
+        - name: keyword_check
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: output_check
+            condition: contains
+            expected_value: ""  # User fills: e.g., "order_id" or "Thank you"
+
+    example:
+      task_name: "Email contains 'Thank you'"
+      input_data:
+        user_name: "Alice"
+        action: "purchase"
+      expected_output: {}
+      # Grader checks output contains "Thank you"
+
+  # ---------------------------------------------------------------------------
+
+  - id: multi_grader_quality
+    name: Multi-Grader Quality Check
+    description: Combines format check + AI quality assessment
+    icon: "⭐"
+    difficulty: hard
+    use_case: Production-ready quality gates (format + content)
+
+    default_config:
+      trials: 5
+      difficulty: 2  # HARD
+      pattern_type: null
+      graders_config:
+        - name: has_required_fields
+          grader_type: 0  # DETERMINISTIC
+          weight: 0.3
+          config:
+            check_type: output_check
+            condition: is_not_empty
+            expected_value: null
+
+        - name: content_quality
+          grader_type: 1  # MODEL_BASED
+          weight: 0.7
+          config:
+            model_id: "claude-sonnet-4.5"
+            rubric: ""  # User fills
+            passing_score: 0.8
+
+    example:
+      task_name: "Product description quality"
+      input_data:
+        product: "Wireless headphones"
+      expected_output: {}
+      # First grader checks output exists
+      # Second grader (70% weight) checks quality with AI
+
+  # ---------------------------------------------------------------------------
+
+  - id: routing_validation
+    name: Routing Pattern Validation
+    description: Validates conditional routing with branch verification
+    icon: "🔀"
+    difficulty: medium
+    use_case: Test IF-based routing workflows
+
+    default_config:
+      trials: 3
+      difficulty: 1  # MEDIUM
+      pattern_type: 0  # ROUTING
+      graders_config:
+        - name: correct_branch
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: state_check
+            path: "branch"
+            condition: eq
+            expected_value: null  # User fills: "positive" or "negative"
+
+    example:
+      task_name: "Routes positive sentiment correctly"
+      input_data:
+        message: "I love this!"
+      expected_output:
+        branch: "positive"
+      # Pattern validator checks IF component was used
+      # Grader checks output.branch == "positive"
+
+  # ---------------------------------------------------------------------------
+
+  - id: chaining_validation
+    name: Chaining Pattern Validation
+    description: Validates multi-step sequential processing
+    icon: "⛓️"
+    difficulty: medium
+    use_case: Test workflows with sequential steps (summarize → translate → format)
+
+    default_config:
+      trials: 3
+      difficulty: 1  # MEDIUM
+      pattern_type: 1  # CHAINING
+      graders_config:
+        - name: final_output_check
+          grader_type: 1  # MODEL_BASED (often needed for chaining)
+          weight: 1.0
+          config:
+            model_id: "claude-sonnet-4.5"
+            rubric: "Output shows evidence of sequential processing (summarized then translated)"
+            passing_score: 0.7
+
+    example:
+      task_name: "Summarize and translate article"
+      input_data:
+        article: "Long English article..."
+        target_language: "Spanish"
+      expected_output: {}
+      # Pattern validator checks ≥2 sequential components
+      # Model-based grader checks quality
+
+  # ---------------------------------------------------------------------------
+
+  - id: json_schema_validation
+    name: JSON Schema Validation
+    description: Validates output structure with code-based grader
+    icon: "{ }"
+    difficulty: hard
+    use_case: Ensure output matches a specific JSON schema
+
+    default_config:
+      trials: 3
+      difficulty: 2  # HARD
+      pattern_type: null
+      graders_config:
+        - name: schema_validator
+          grader_type: 2  # CODE_BASED
+          weight: 1.0
+          config:
+            function_name: grade
+            code: |
+              import json
+              def grade(trace, expected):
+                  """Validates JSON structure"""
+                  output = trace.get("final_output", "")
+
+                  # Parse JSON
+                  try:
+                      if isinstance(output, str):
+                          data = json.loads(output)
+                      else:
+                          data = output
+                  except:
+                      return {"passed": False, "score": 0.0}
+
+                  # Check required fields
+                  required = ["id", "name", "email"]
+                  missing = [f for f in required if f not in data]
+
+                  if missing:
+                      return {
+                          "passed": False,
+                          "score": 0.0,
+                          "feedback": f"Missing fields: {missing}"
+                      }
+
+                  # Check types
+                  if not isinstance(data.get("id"), (int, str)):
+                      return {"passed": False, "score": 0.0}
+
+                  return {"passed": True, "score": 1.0}
+
+    example:
+      task_name: "User object has required fields"
+      input_data:
+        user_id: 123
+      expected_output:
+        id: 123
+        name: "Alice"
+        email: "alice@example.com"
+      # Code grader validates structure
+
+  # ---------------------------------------------------------------------------
+
+  - id: not_empty_check
+    name: Not Empty Check
+    description: Simply checks that output exists and is not empty
+    icon: "📝"
+    difficulty: easy
+    use_case: Smoke test - verify workflow produces any output
+
+    default_config:
+      trials: 1
+      difficulty: 0  # EASY
+      pattern_type: null
+      graders_config:
+        - name: output_not_empty
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: output_check
+            condition: is_not_empty
+            expected_value: null
+
+    example:
+      task_name: "Workflow produces output"
+      input_data:
+        prompt: "Say hello"
+      expected_output: {}
+      # Just checks that output is not null/empty
+
+  # ---------------------------------------------------------------------------
+
+  - id: latency_check
+    name: Latency Performance Check
+    description: Ensures execution completes within time limit
+    icon: "⚡"
+    difficulty: easy
+    use_case: Performance testing, SLA validation
+
+    default_config:
+      trials: 5
+      difficulty: 0  # EASY
+      pattern_type: null
+      timeout_seconds: 5  # Fail if >5 seconds
+      graders_config:
+        - name: produces_output
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: output_check
+            condition: is_not_empty
+            expected_value: null
+
+    example:
+      task_name: "Search completes in <5s"
+      input_data:
+        query: "weather today"
+      expected_output: {}
+      # Timeout check happens at harness level
+      # Grader just verifies output exists
+
+  # ---------------------------------------------------------------------------
+
+  - id: regression_test
+    name: Regression Test Template
+    description: Compare current output to known-good baseline
+    icon: "🔄"
+    difficulty: medium
+    use_case: Ensure changes don't break existing behavior
+
+    default_config:
+      trials: 3
+      difficulty: 1  # MEDIUM
+      pattern_type: null
+      tags: ["regression"]
+      graders_config:
+        - name: matches_baseline
+          grader_type: 0  # DETERMINISTIC
+          weight: 1.0
+          config:
+            check_type: output_check
+            condition: eq
+            expected_value: null  # Copy from known-good run
+
+    example:
+      task_name: "Calculator regression - add 100+200"
+      input_data:
+        a: 100
+        b: 200
+      expected_output:
+        result: 300
+      # Expected output copied from previous passing run
+
+---
+
+# Implementation Notes
+
+## Frontend Usage
+
+```typescript
+// frontend/src/constants/taskTemplates.ts
+import templatesYAML from './TASK_TEMPLATES.yaml';
+
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  use_case: string;
+  default_config: {
+    trials: number;
+    difficulty: number;
+    pattern_type: number | null;
+    graders_config: any[];
+    tags?: string[];
+    timeout_seconds?: number;
+  };
+  example: {
+    task_name: string;
+    input_data: any;
+    expected_output: any;
+  };
+}
+
+export const TASK_TEMPLATES: TaskTemplate[] = parseYAML(templatesYAML);
+```
+
+## UI Integration
+
+```tsx
+// In TaskEditorDialog.tsx
+
+const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+
+// Show template selector as first step
+<TemplateSelector
+  templates={TASK_TEMPLATES}
+  onSelect={(templateId) => {
+    const template = TASK_TEMPLATES.find(t => t.id === templateId);
+    if (template) {
+      // Pre-fill form with template defaults
+      setTrials(template.default_config.trials);
+      setGradersConfig(template.default_config.graders_config);
+      setPatternType(template.default_config.pattern_type);
+      // ... etc
+    }
+  }}
+/>
+```
+
+## Template Selector UI
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Choose a starting template                             │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │    ✓     │  │    🎯    │  │    🤖    │            │
+│  │  Simple  │  │  Field   │  │ Quality  │            │
+│  │  Output  │  │  Value   │  │ AI Judge │            │
+│  │  Check   │  │  Check   │  │          │            │
+│  │ [Easy]   │  │ [Easy]   │  │ [Medium] │            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│                                                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│  │    🔧    │  │    📊    │  │    🔍    │            │
+│  │   Tool   │  │ Numeric  │  │ Contains │            │
+│  │  Usage   │  │Threshold │  │ Keyword  │            │
+│  │          │  │          │  │          │            │
+│  │ [Medium] │  │  [Easy]  │  │  [Easy]  │            │
+│  └──────────┘  └──────────┘  └──────────┘            │
+│                                                         │
+│  [Show Advanced Templates]  [Start from Scratch]       │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+*Last Updated: 2026-04-23*
+*Version: 1.0*

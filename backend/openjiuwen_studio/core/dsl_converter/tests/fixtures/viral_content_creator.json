@@ -1,0 +1,510 @@
+{
+    "edges": [
+        {
+            "sourceNodeID": "1_3ab1876e",
+            "targetNodeID": "10_df3c3ea8"
+        },
+        {
+            "sourceNodeID": "21_c8bb4298",
+            "targetNodeID": "10_a9687e81"
+        },
+        {
+            "sourceNodeID": "10_a9687e81",
+            "sourcePortID": "0",
+            "targetNodeID": "10_fc1a903c"
+        },
+        {
+            "sourceNodeID": "21_7571b62b",
+            "targetNodeID": "10_fc1a903c"
+        },
+        {
+            "sourceNodeID": "21_c8bb4298",
+            "targetNodeID": "10_fc1a903c"
+        },
+        {
+            "sourceNodeID": "10_fc1a903c",
+            "sourcePortID": "0",
+            "targetNodeID": "2_7f0c04f8"
+        },
+        {
+            "sourceNodeID": "10_df3c3ea8",
+            "sourcePortID": "0",
+            "targetNodeID": "21_8d0876ae"
+        },
+        {
+            "sourceNodeID": "21_8d0876ae",
+            "targetNodeID": "21_c8bb4298"
+        },
+        {
+            "sourceNodeID": "21_c8bb4298",
+            "targetNodeID": "21_7571b62b"
+        }
+    ],
+    "nodes": [
+        {
+            "data": {
+                "outputs": {
+                    "properties": {
+                        "topic": {
+                            "default": "",
+                            "description": "Enter your content topic",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "topic"
+                    ],
+                    "type": "object"
+                },
+                "title": "Start: Topic Input1"
+            },
+            "id": "1_3ab1876e",
+            "meta": {
+                "position": {
+                    "x": 180,
+                    "y": 33
+                }
+            },
+            "type": "1"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 2,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import re\n    import json\n    from collections import Counter\n    \n    topic = args.params.get('topic', '')\n    blog_post = args.params.get('blog_post', '')\n    \n    # Extract keywords from blog post\n    words = re.findall(r'\\b[a-zA-Z]{4,}\\b', blog_post.lower())\n    \n    # Common stop words to exclude\n    stop_words = {'that', 'this', 'with', 'from', 'have', 'they', 'will', 'your', 'about', \n                  'what', 'when', 'where', 'which', 'their', 'there', 'these', 'those', \n                  'would', 'could', 'should', 'more', 'very', 'been', 'were', 'than'}\n    \n    # Filter out stop words\n    keywords = [w for w in words if w not in stop_words]\n    \n    # Count frequency\n    word_freq = Counter(keywords)\n    top_keywords = word_freq.most_common(15)\n    \n    # Generate hashtags\n    hashtags = []\n    \n    # Add topic-based hashtag\n    topic_tag = ''.join(word.capitalize() for word in topic.split()[:3])\n    hashtags.append(f'#{topic_tag}')\n    \n    # Add trending generic hashtags\n    generic_tags = ['#Trending', '#Viral', '#MustRead', '#Innovation', '#Technology']\n    hashtags.extend(generic_tags[:3])\n    \n    # Add keyword-based hashtags (top 8)\n    for word, count in top_keywords[:8]:\n        if len(word) >= 4:\n            hashtags.append(f'#{word.capitalize()}')\n    \n    # Calculate SEO metrics\n    word_count = len(blog_post.split())\n    \n    # Check for SEO elements\n    has_numbers = bool(re.search(r'\\d+', blog_post[:200]))  # Numbers in first 200 chars\n    has_question = '?' in blog_post[:300]  # Question in first 300 chars\n    has_list = bool(re.search(r'(\\d+\\.|•|\\-\\s)', blog_post))  # Lists\n    \n    seo_score = 0\n    if 800 <= word_count <= 2000: seo_score += 25\n    if has_numbers: seo_score += 20\n    if has_question: seo_score += 15\n    if has_list: seo_score += 20\n    if len(top_keywords) >= 10: seo_score += 20\n    \n    # Generate meta description\n    first_sentences = '. '.join(blog_post.split('.')[:2])[:155] + '...'\n    \n    result = {\n        'hashtags': hashtags[:12],  # Top 12 hashtags\n        'seo_score': min(seo_score, 100),\n        'word_count': word_count,\n        'top_keywords': [kw for kw, _ in top_keywords[:10]],\n        'meta_description': first_sentences,\n        'recommendations': [\n            f'✓ Word count: {word_count} words' if word_count >= 800 else f'⚠ Consider expanding (current: {word_count} words)',\n            '✓ Contains data/numbers' if has_numbers else '⚠ Add statistics for credibility',\n            '✓ Engaging questions present' if has_question else '⚠ Add questions to boost engagement',\n            '✓ Formatted with lists' if has_list else '⚠ Use bullet points for readability'\n        ]\n    }\n    \n    return {'analysis': json.dumps(result, indent=2)}",
+                    "inputParameters": {
+                        "blog_post": {
+                            "content": [
+                                "21_c8bb4298",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "topic": {
+                            "content": [
+                                "10_df3c3ea8",
+                                "topic_out"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "analysis": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "analysis"
+                    ],
+                    "type": "object"
+                },
+                "title": "Hashtag & SEO Optimizer"
+            },
+            "id": "10_a9687e81",
+            "meta": {
+                "position": {
+                    "x": 2020,
+                    "y": 16
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 0,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n    \n    topic = args.params.get('topic', 'Content')\n    blog_post = args.params.get('blog_post', '')\n    social_posts_raw = args.params.get('social_posts', '{}')\n    analysis_raw = args.params.get('analysis', '{}')\n    \n    # Parse JSON inputs\n    try:\n        if isinstance(social_posts_raw, str):\n            # Try to extract JSON from markdown code blocks\n            cleaned = social_posts_raw.replace('```json', '').replace('```', '').strip()\n            social_posts = json.loads(cleaned) if '{' in cleaned else {}\n        else:\n            social_posts = social_posts_raw\n    except:\n        social_posts = {'twitter': 'N/A', 'linkedin': 'N/A', 'instagram': 'N/A'}\n    \n    try:\n        analysis = json.loads(analysis_raw) if isinstance(analysis_raw, str) else analysis_raw\n    except:\n        analysis = {'hashtags': [], 'seo_score': 0, 'recommendations': []}\n    \n    # Build beautiful formatted output\n    output = f\"\"\"\n╔═════════════════════════════════════╗\n║ 🚀 VIRAL CONTENT PACKAGE READY 🚀  ║\n║  Topic: {topic.upper()[:45]:^45}    ║\n╚═════════════════════════════════════╝\n\n━━━━━━━━━━━━━━━━━━━━\n📝 BLOG POST\n━━━━━━━━━━━━━━━━━━━━\n\n{blog_post}\n\n\n━━━━━━━━━━━━━━━━━━━━\n📱 SOCIAL MEDIA POSTS\n━━━━━━━━━━━━━━━━━━━━\n\n🐦 TWITTER/X:\n{'-' * 7}\n{social_posts.get('twitter', 'N/A')}\n\n💼 LINKEDIN:\n{'-' * 7}\n{social_posts.get('linkedin', 'N/A')}\n\n📸 INSTAGRAM:\n{'-' * 7}\n{social_posts.get('instagram', 'N/A')}\n\n\n━━━━━━━━━━━━━━━━━━━━\n#️⃣ HASHTAG STRATEGY\n━━━━━━━━━━━━━━━━━━━━\n\n{' '.join(analysis.get('hashtags', [])[:12])}\n\n\n━━━━━━━━━━━━━━━━━━━━\n📊 SEO ANALYSIS\n━━━━━━━━━━━━━━━━━━━━\n\n📈 SEO Score: {analysis.get('seo_score', 0)}/100\n📝 Word Count: {analysis.get('word_count', 0)} words\n🔑 Top Keywords: {', '.join(analysis.get('top_keywords', [])[:5])}\n\n📋 Meta Description:\n{analysis.get('meta_description', 'N/A')}\n\n✅ Recommendations:\n\"\"\"\n    \n    for rec in analysis.get('recommendations', []):\n        output += f\"   {rec}\\n\"\n    \n    output += \"\"\"\n\n━━━━━━━━━━━━━━━━━━━━\n🎯 NEXT STEPS\n━━━━━━━━━━━━━━━━━━━━\n\n1. 📝 Publish blog post to your website/Medium\n2. 🐦 Schedule Twitter thread for maximum engagement time\n3. 💼 Post on LinkedIn during business hours\n4. 📸 Create visual for Instagram post\n5. 🔗 Cross-promote across all platforms\n6. 📊 Track engagement metrics\n7. 💬 Respond to comments within first hour\n\n✨ Content package generated with AI-powered workflow ✨\n\"\"\"\n    \n    return {'final_package': output}",
+                    "inputParameters": {
+                        "analysis": {
+                            "content": [
+                                "10_a9687e81",
+                                "analysis"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "blog_post": {
+                            "content": [
+                                "21_c8bb4298",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "social_posts": {
+                            "content": [
+                                "21_7571b62b",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "ref"
+                        },
+                        "topic": {
+                            "content": [
+                                "10_df3c3ea8",
+                                "topic_out"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "final_package": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "final_package"
+                    ],
+                    "type": "object"
+                },
+                "title": "Content Package Builder"
+            },
+            "id": "10_fc1a903c",
+            "meta": {
+                "position": {
+                    "x": 2480,
+                    "y": 15
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "content": {
+                        "content": "{{result}}",
+                        "type": "template"
+                    },
+                    "inputParameters": {
+                        "result": {
+                            "content": [
+                                "10_fc1a903c",
+                                "final_package"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    }
+                },
+                "title": "End: Content Package"
+            },
+            "id": "2_7f0c04f8",
+            "meta": {
+                "position": {
+                    "x": 2940,
+                    "y": 33
+                }
+            },
+            "type": "2"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 1,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import re\n    import json\n    from collections import Counter\n    \n    topic = args.params.get('topic', '')\n    blog_post = args.params.get('blog_post', '')\n    \n    # Extract keywords from blog post\n    words = re.findall(r'\\b[a-zA-Z]{4,}\\b', blog_post.lower())\n    \n    # Common stop words to exclude\n    stop_words = {'that', 'this', 'with', 'from', 'have', 'they', 'will', 'your', 'about', \n                  'what', 'when', 'where', 'which', 'their', 'there', 'these', 'those', \n                  'would', 'could', 'should', 'more', 'very', 'been', 'were', 'than'}\n    \n    # Filter out stop words\n    keywords = [w for w in words if w not in stop_words]\n    \n    # Count frequency\n    word_freq = Counter(keywords)\n    top_keywords = word_freq.most_common(15)\n    \n    # Generate hashtags\n    hashtags = []\n    \n    # Add topic-based hashtag\n    topic_tag = ''.join(word.capitalize() for word in topic.split()[:3])\n    hashtags.append(f'#{topic_tag}')\n    \n    # Add trending generic hashtags\n    generic_tags = ['#Trending', '#Viral', '#MustRead', '#Innovation', '#Technology']\n    hashtags.extend(generic_tags[:3])\n    \n    # Add keyword-based hashtags (top 8)\n    for word, count in top_keywords[:8]:\n        if len(word) >= 4:\n            hashtags.append(f'#{word.capitalize()}')\n    \n    # Calculate SEO metrics\n    word_count = len(blog_post.split())\n    \n    # Check for SEO elements\n    has_numbers = bool(re.search(r'\\d+', blog_post[:200]))  # Numbers in first 200 chars\n    has_question = '?' in blog_post[:300]  # Question in first 300 chars\n    has_list = bool(re.search(r'(\\d+\\.|•|\\-\\s)', blog_post))  # Lists\n    \n    seo_score = 0\n    if 800 <= word_count <= 2000: seo_score += 25\n    if has_numbers: seo_score += 20\n    if has_question: seo_score += 15\n    if has_list: seo_score += 20\n    if len(top_keywords) >= 10: seo_score += 20\n    \n    # Generate meta description\n    first_sentences = '. '.join(blog_post.split('.')[:2])[:155] + '...'\n    \n    result = {\n        'hashtags': hashtags[:12],  # Top 12 hashtags\n        'seo_score': min(seo_score, 100),\n        'word_count': word_count,\n        'top_keywords': [kw for kw, _ in top_keywords[:10]],\n        'meta_description': first_sentences,\n        'recommendations': [\n            f'✓ Word count: {word_count} words' if word_count >= 800 else f'⚠ Consider expanding (current: {word_count} words)',\n            '✓ Contains data/numbers' if has_numbers else '⚠ Add statistics for credibility',\n            '✓ Engaging questions present' if has_question else '⚠ Add questions to boost engagement',\n            '✓ Formatted with lists' if has_list else '⚠ Use bullet points for readability'\n        ]\n    }\n    \n    return {'topic_out': json.dumps(result, indent=2)}",
+                    "inputParameters": {
+                        "topic": {
+                            "content": [
+                                "1_3ab1876e",
+                                "topic"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "topic_out": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "topic_out"
+                    ],
+                    "type": "object"
+                },
+                "title": "Topic Passthrough"
+            },
+            "id": "10_df3c3ea8",
+            "meta": {
+                "position": {
+                    "x": 640,
+                    "y": 16
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_df3c3ea8",
+                                "topic_out"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Research this topic thoroughly: {{topic}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are an expert researcher. Search for the latest trends, statistics, and insights about the given topic. Find at least 5 key facts, recent news, and expert opinions. Output your findings in a structured format with sources.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-search-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 5,
+                "output_format": "text",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "output"
+                    ],
+                    "type": "object"
+                },
+                "title": "Research Agent"
+            },
+            "id": "21_8d0876ae",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 0
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "21_8d0876ae",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "topic": {
+                            "content": [
+                                "10_df3c3ea8",
+                                "topic_out"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Topic: {{topic}}\n\nResearch findings:\n{{research}}\n\nWrite a compelling blog post.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a viral content writer.\n\nYour task:\n- Write a blog post of MAX 1000 WORDS.\n- It must summarize the research provided.\n- It must include:\n  - A catchy title\n  - A strong hook\n  - 1–2 key insights\n  - A short CTA\n\nFormatting rules:\n- Use \"-\" for bullet points only.\n- Never use \"*\" inside bullet points.\n- Keep tone conversational and authoritative.\n",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 3,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "blog_post"
+                    ],
+                    "type": "object"
+                },
+                "title": "Blog Post Generator"
+            },
+            "id": "21_c8bb4298",
+            "meta": {
+                "position": {
+                    "x": 1560,
+                    "y": 0
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "21_c8bb4298",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "topic": {
+                            "content": [
+                                "10_df3c3ea8",
+                                "topic_out"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Topic: {{topic}}\n\nBlog content:\n{{blog_post}}\n\nCreate viral social media posts for all platforms.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a viral social media expert.\n\nYour task:\nCreate THREE platform-optimized posts based on the provided input JSON.\n\nGLOBAL RULES:\n- Each post MUST be a typical post for this platform.\n- Use the input hashtags only at the END of each post (optional).\n\n1. TWITTER/X POST:\n   - Strong hook in first line\n   - Emoji required\n   - Thread-worthy insight\n   - Punchy, high-energy tone\n\n2. LINKEDIN POST:\n   - Professional, concise insight\n   - Industry relevance\n   - Ends with an engagement question\n   - No emojis at the start\n\n3. INSTAGRAM CAPTION:\n   - Visual storytelling\n   - Emoji-rich\n   - Lifestyle angle\n   - Clear call-to-action\n\nOUTPUT FORMAT:\nReturn ONLY valid JSON with keys: twitter, linkedin, instagram.\n",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 3,
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "social_posts"
+                    ],
+                    "type": "object"
+                },
+                "title": "Social Media Generator"
+            },
+            "id": "21_7571b62b",
+            "meta": {
+                "position": {
+                    "x": 2020,
+                    "y": 240
+                }
+            },
+            "type": "21"
+        }
+    ]
+}

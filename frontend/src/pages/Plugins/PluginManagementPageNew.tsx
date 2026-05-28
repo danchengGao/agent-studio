@@ -7,7 +7,8 @@ import { usePluginManagementViewMode } from '../../stores/useUIStore'
 import { ENV_CONFIG } from '../../config/environment'
 import CloudPluginFormDialog from '../../components/Plugins/CloudPluginFormDialog'
 import IDEPluginFormDialog from '../../components/Plugins/IDEPluginFormDialog'
-import MCPPluginFormDialog, { MCP_TRANSPORT_OPTIONS, MCP_TRANSPORT_DEFAULT } from '../../components/Plugins/MCPPluginFormDialog'
+import MCPPluginFormDialog, { MCP_TRANSPORT_OPTIONS } from '../../components/Plugins/MCPPluginFormDialog'
+import { useMCPPluginForm } from '../../hooks/useMCPPluginForm'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../Common/UnifiedSnackbar'
 import ReactMarkdown from 'react-markdown'
 import {
@@ -16,11 +17,9 @@ import {
   Upload,
   Trash2,
   Eye,
-  Edit,
   RefreshCw,
   Cloud,
   Code,
-  Cpu,
 } from 'lucide-react'
 import { Button, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Typography, CircularProgress } from '@mui/material'
 import { CommonPageLayout, SearchInput } from '../../components/Common/common-page'
@@ -28,6 +27,7 @@ import type { ViewType } from '../../components/Common/common-page'
 import { ConfigCard, type EditingState } from '../../components/Common/common-grid'
 import { ConfigTable, type TableColumn } from '../../components/Common/common-table'
 import { Empty } from '../../components/Common/Empty'
+import { resolvePluginIconUrl, getExternalPluginTypeDisplayName, getExternalPluginTypeMeta } from '../../utils/pluginConfig'
 
 interface Plugin {
   space_id: string
@@ -41,8 +41,25 @@ interface Plugin {
   url?: string
   icon_uri: string
   status?: 'active' | 'inactive' | 'error' | 'updating'
-  config?: Record<string, unknown>
   mcp_transport?: number
+  external_plugin_type?: string
+  category_name?: string
+}
+
+const getPluginIconFallback = (pluginType?: number, externalPluginType?: string) => {
+  const meta = getExternalPluginTypeMeta(externalPluginType)
+  if (meta) return meta.icon
+
+  switch (pluginType) {
+    case 1:
+      return '☁️'
+    case 2:
+      return '💻'
+    case 3:
+      return '🔌'
+    default:
+      return '📦'
+  }
 }
 
 interface CloudPluginFormState {
@@ -51,6 +68,13 @@ interface CloudPluginFormState {
   desc_mk?: string
   url: string
   authMethod: string
+  apiKeyLocation: 'header' | 'query'
+  apiKeyParamName: string
+  apiKeyValue: string
+  oauthEndpointUrl: string
+  oauthClientId: string
+  oauthClientSecret: string
+  oauthScope?: string
 }
 
 interface IDEPluginFormState {
@@ -59,13 +83,26 @@ interface IDEPluginFormState {
   desc_mk?: string
 }
 
-interface MCPPluginFormState {
-  name: string
-  description: string
-  desc_mk?: string
-  url: string
-  transport: number
-}
+const parseArgsText = (argsText: string): string[] =>
+  argsText
+    .split(/\r?\n/)
+    .map(item => item.trim())
+    .filter(Boolean)
+
+const parseEnvText = (envText: string): Record<string, string> =>
+  Object.fromEntries(
+    envText
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => {
+        const separatorIndex = line.indexOf('=')
+        const key = line.slice(0, separatorIndex).trim()
+        const value = line.slice(separatorIndex + 1)
+        return [key, value]
+      })
+      .filter(([key]) => Boolean(key)),
+  )
 
 const PluginManagementPageNew: React.FC = () => {
   const { t } = useTranslation()
@@ -97,8 +134,6 @@ const PluginManagementPageNew: React.FC = () => {
   const [cloudPluginDialogOpen, setCloudPluginDialogOpen] = useState(false)
   const [idePluginDialogOpen, setIdePluginDialogOpen] = useState(false)
   const [mcpPluginDialogOpen, setMcpPluginDialogOpen] = useState(false)
-  const [editingPlugin, setEditingPlugin] = useState<Plugin | null>(null)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   // 编辑状态（用于 ConfigCard）
   const [editingState] = useState<EditingState>({
@@ -113,22 +148,33 @@ const PluginManagementPageNew: React.FC = () => {
   const deletePluginMutation = useDeletePlugin()
 
   // 表单状态
+  const [plugins, setPlugins] = useState<Plugin[]>([])
+
+  // 表单状态
   const [cloudPluginForm, setCloudPluginForm] = useState<CloudPluginFormState>({
     name: '',
     description: '',
+    desc_mk: '',
     url: '',
     authMethod: 'none',
+    apiKeyLocation: 'header',
+    apiKeyParamName: '',
+    apiKeyValue: '',
+    oauthEndpointUrl: '',
+    oauthClientId: '',
+    oauthClientSecret: '',
+    oauthScope: '',
   })
   const [idePluginForm, setIdePluginForm] = useState<IDEPluginFormState>({
     name: '',
     description: '',
   })
-  const [mcpPluginForm, setMcpPluginForm] = useState<MCPPluginFormState>({
-    name: '',
-    description: '',
-    url: '',
-    transport: MCP_TRANSPORT_DEFAULT,
-  })
+  const {
+    form: mcpPluginForm,
+    handleFormChange: handleMcpPluginFormChange,
+    resetForm: resetMcpForm,
+    validateForm: validateMcpForm,
+  } = useMCPPluginForm()
 
   // 表单处理函数
   const handleCloudPluginFormChange = (field: string, value: unknown) => {
@@ -141,31 +187,35 @@ const PluginManagementPageNew: React.FC = () => {
     setCloudPluginForm({
       name: plugin?.name || '',
       description: plugin?.desc || '',
+      desc_mk: plugin?.desc_mk || '',
       url: plugin?.url || '',
       authMethod: 'none',
+      apiKeyLocation: 'header',
+      apiKeyParamName: '',
+      apiKeyValue: '',
+      oauthEndpointUrl: '',
+      oauthClientId: '',
+      oauthClientSecret: '',
+      oauthScope: '',
     })
   }
   const resetIDEForm = () => {
     setIdePluginForm({ name: '', description: '' })
-  }
-  const handleMCPPluginFormChange = (field: string, value: unknown) => {
-    setMcpPluginForm(prev => ({ ...prev, [field]: value }))
-  }
-  const resetMCPForm = () => {
-    setMcpPluginForm({ name: '', description: '', url: '', transport: MCP_TRANSPORT_DEFAULT })
-  }
-  const validateMCPForm = () => {
-    const errors: string[] = []
-    if (!mcpPluginForm.name.trim()) errors.push(t('plugins.dialog.mcpPluginForm.validation.nameRequired', 'Plugin name is required'))
-    if (!mcpPluginForm.description.trim()) errors.push(t('plugins.dialog.mcpPluginForm.validation.descRequired', 'Description is required'))
-    if (!mcpPluginForm.url.trim()) errors.push(t('plugins.dialog.mcpPluginForm.validation.urlRequired', 'MCP server URL is required'))
-    return { isValid: errors.length === 0, errors }
   }
   const validateForm = () => {
     const errors: string[] = []
     if (!cloudPluginForm.name.trim()) errors.push(t('plugins.dialog.cloudPluginForm.validation.nameRequired'))
     if (!cloudPluginForm.description.trim()) errors.push(t('plugins.dialog.cloudPluginForm.validation.descRequired'))
     if (!cloudPluginForm.url.trim()) errors.push(t('plugins.dialog.cloudPluginForm.validation.urlRequired'))
+    if (cloudPluginForm.authMethod === 'api_key') {
+      if (!cloudPluginForm.apiKeyParamName.trim()) errors.push('Parameter name 不能为空')
+      if (!cloudPluginForm.apiKeyValue.trim()) errors.push('Service token / API key 不能为空')
+    }
+    if (cloudPluginForm.authMethod === 'oauth2') {
+      if (!cloudPluginForm.oauthEndpointUrl.trim()) errors.push('OAuth2 Endpoint URL 不能为空')
+      if (!cloudPluginForm.oauthClientId.trim()) errors.push('OAuth2 Client ID 不能为空')
+      if (!cloudPluginForm.oauthClientSecret.trim()) errors.push('OAuth2 Client Secret 不能为空')
+    }
     return { isValid: errors.length === 0, errors }
   }
   const validateIDEForm = () => {
@@ -205,9 +255,17 @@ const PluginManagementPageNew: React.FC = () => {
     plugin_type: Number(pluginInfo.plugin_type || 1),
     published: Boolean(pluginInfo.published),
     url: String(pluginInfo.url || ''),
-    icon_uri: String(pluginInfo.icon_uri || '📦'),
+    icon_uri:
+      typeof pluginInfo.icon_uri === 'string' && pluginInfo.icon_uri.trim()
+        ? pluginInfo.icon_uri
+        : getPluginIconFallback(
+            Number(pluginInfo.plugin_type || 1),
+            typeof (pluginInfo as any).external_plugin_type === 'string' ? (pluginInfo as any).external_plugin_type : undefined,
+          ),
     status: 'active',
     mcp_transport: pluginInfo.mcp_transport,
+    external_plugin_type: typeof (pluginInfo as any).external_plugin_type === 'string' ? (pluginInfo as any).external_plugin_type : undefined,
+    category_name: typeof (pluginInfo as any).category_name === 'string' ? (pluginInfo as any).category_name : undefined,
   })
 
   // 分页信息
@@ -216,8 +274,6 @@ const PluginManagementPageNew: React.FC = () => {
   const totalPages = pagination?.total_pages || 1
 
   // 插件列表
-  const [plugins, setPlugins] = useState<Plugin[]>([])
-
   useEffect(() => {
     if (pluginListData?.data?.plugin_infos) {
       setPlugins(pluginListData.data.plugin_infos.map(transformPluginData))
@@ -242,9 +298,16 @@ const PluginManagementPageNew: React.FC = () => {
     }
   }
 
+  const getInstalledPluginTypeText = (plugin: Plugin) => {
+    const mapped = getExternalPluginTypeDisplayName(plugin.external_plugin_type, plugin.category_name)
+    if (mapped) return mapped
+    return getPluginTypeText(plugin.plugin_type)
+  }
+
+  const installedPluginTypeCategories = Array.from(new Set(plugins.map(plugin => getInstalledPluginTypeText(plugin))))
+
   // 分类选项
-  const pluginTypeCategories = [t('plugins.types.cloud'), t('plugins.types.ide'), t('plugins.types.mcp')]
-  const categories = ['all', ...pluginTypeCategories]
+  const categories = ['all', ...installedPluginTypeCategories]
 
   // 过滤插件
   const filteredPlugins = plugins.filter(plugin => {
@@ -252,7 +315,7 @@ const PluginManagementPageNew: React.FC = () => {
     const matchesSearch =
       (plugin.name?.toLowerCase() || '').includes((searchTerm || '').toLowerCase()) ||
       (plugin.desc?.toLowerCase() || '').includes((searchTerm || '').toLowerCase())
-    const matchesCategory = categoryFilter === 'all' || getPluginTypeText(plugin.plugin_type) === categoryFilter
+    const matchesCategory = categoryFilter === 'all' || getInstalledPluginTypeText(plugin) === categoryFilter
     return matchesSearch && matchesCategory
   })
 
@@ -268,21 +331,27 @@ const PluginManagementPageNew: React.FC = () => {
   }, [hasSearchOrFilter, filteredPlugins.length, pageSize])
 
   // 插件图标渲染
-  const renderPluginIcon = (icon: string) => {
-    const isUrl = typeof icon === 'string' && (icon.startsWith('http://') || icon.startsWith('https://') || icon.startsWith('/') || icon.includes('.'))
+  const renderPluginIcon = (icon: string, fallbackIcon = '📦') => {
+    const resolvedIcon = resolvePluginIconUrl(icon)
+    const isUrl = typeof resolvedIcon === 'string' && (resolvedIcon.startsWith('http://') || resolvedIcon.startsWith('https://') || resolvedIcon.startsWith('/'))
     if (isUrl) {
       return (
-        <img
-          src={icon}
-          alt="Plugin icon"
-          className="w-full h-full object-cover rounded-lg"
-          onError={e => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
+        <>
+          <img
+            src={resolvedIcon}
+            alt="Plugin icon"
+            className="w-full h-full object-cover rounded-lg"
+            onError={e => {
+              const fallback = e.currentTarget.nextElementSibling as HTMLElement | null
+              e.currentTarget.style.display = 'none'
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+          <div className="w-full h-full items-center justify-center text-2xl hidden">{fallbackIcon}</div>
+        </>
       )
     }
-    return icon
+    return resolvedIcon || fallbackIcon
   }
 
   // 插件操作
@@ -303,12 +372,6 @@ const PluginManagementPageNew: React.FC = () => {
         setDeleteDialog({ isOpen: true, plugin })
         break
     }
-  }
-
-  const handleEditPlugin = (plugin: Plugin) => {
-    setEditingPlugin(plugin)
-    setIsEditDialogOpen(true)
-    resetForm(plugin)
   }
 
   const handleDeletePlugin = async () => {
@@ -334,9 +397,10 @@ const PluginManagementPageNew: React.FC = () => {
           showSuccess(t('plugins.messages.pluginDeleted', { name: deleteDialog.plugin.name }))
           return
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error(t('plugins.messages.deleteFailed'), error)
-        showError(t('plugins.messages.deleteFailed'))
+        const errorMessage = error?.response?.data?.message || error?.response?.data?.detail || error?.message || t('plugins.errors.unknownError')
+        showError(`${t('plugins.messages.deleteFailed')}: ${errorMessage}`)
       } finally {
         if (deleteDialog.isOpen) {
           setDeleteDialog({ isOpen: false, plugin: null })
@@ -345,40 +409,60 @@ const PluginManagementPageNew: React.FC = () => {
     }
   }
 
-  const handlePluginSubmit = async (isEditing: boolean = false) => {
+  const handlePluginSubmit = async () => {
     const validation = validateForm()
     if (!validation.isValid) {
       showError(validation.errors[0])
       return
     }
 
-    if (isEditing && editingPlugin) {
-      refetchPluginList()
-      showSuccess(t('plugins.messages.updateSuccess', { name: cloudPluginForm.name.trim() }))
-      setIsEditDialogOpen(false)
-      setEditingPlugin(null)
-    } else {
-      try {
-        const response = await createPluginMutation.mutateAsync({
-          name: cloudPluginForm.name.trim(),
-          desc: cloudPluginForm.description.trim(),
-          space_id: getDefaultSpaceId(),
-          plugin_type: 1,
-          url: cloudPluginForm.url.trim(),
-          icon_uri: '☁️',
-        })
-        if (response.code === 200) {
-          refetchPluginList()
-          showSuccess(t('plugins.messages.cloudPluginInstallSuccess', { name: cloudPluginForm.name.trim() }))
-          setCloudPluginDialogOpen(false)
-        } else {
-          showError(t('plugins.messages.createFailed', { message: response.message || t('plugins.messages.unknownError') }))
+    try {
+      const normalizedAuthMethod = (cloudPluginForm.authMethod || 'none').toLowerCase()
+      let authPayload: Record<string, unknown> | undefined
+
+      if (normalizedAuthMethod === 'api_key') {
+        const isHeaderLocation = cloudPluginForm.apiKeyLocation === 'header'
+        const paramName = cloudPluginForm.apiKeyParamName.trim()
+        authPayload = {
+          type: 'SERVICE',
+          headers: isHeaderLocation ? { [paramName]: cloudPluginForm.apiKeyValue } : {},
+          query: isHeaderLocation ? {} : { [paramName]: cloudPluginForm.apiKeyValue },
         }
-      } catch (error) {
-        console.error(t('plugins.messages.createPluginFailed'), error)
-        showError(t('plugins.messages.createPluginError'))
+      } else if (normalizedAuthMethod === 'oauth2') {
+        authPayload = {
+          type: 'OAUTH',
+          endpoint_url: cloudPluginForm.oauthEndpointUrl.trim(),
+          client_id: cloudPluginForm.oauthClientId.trim(),
+          client_secret: cloudPluginForm.oauthClientSecret.trim(),
+        }
+        if (cloudPluginForm.oauthScope?.trim()) {
+          authPayload.scope = cloudPluginForm.oauthScope.trim()
+        }
       }
+
+      const createRequest: Record<string, unknown> = {
+        name: cloudPluginForm.name.trim(),
+        desc: cloudPluginForm.description.trim(),
+        desc_mk: cloudPluginForm.desc_mk?.trim() || '',
+        space_id: getDefaultSpaceId(),
+        plugin_type: 1,
+        url: cloudPluginForm.url.trim(),
+        icon_uri: '☁️',
+        auth: authPayload,
+      }
+      const response = await createPluginMutation.mutateAsync(createRequest as any)
+      if (response.code === 200) {
+        refetchPluginList()
+        showSuccess(t('plugins.messages.cloudPluginInstallSuccess', { name: cloudPluginForm.name.trim() }))
+        setCloudPluginDialogOpen(false)
+      } else {
+        showError(t('plugins.messages.createFailed', { message: response.message || t('plugins.messages.unknownError') }))
+      }
+    } catch (error) {
+      console.error(t('plugins.messages.createPluginFailed'), error)
+      showError(t('plugins.messages.createPluginError'))
     }
+
     resetForm()
   }
 
@@ -411,37 +495,6 @@ const PluginManagementPageNew: React.FC = () => {
     }
   }
 
-  const handleMCPPluginSubmit = async () => {
-    const validation = validateMCPForm()
-    if (!validation.isValid) {
-      showError(validation.errors[0])
-      return
-    }
-    try {
-      const pluginResponse = await createPluginMutation.mutateAsync({
-        space_id: getDefaultSpaceId(),
-        plugin_type: 3,
-        name: mcpPluginForm.name.trim(),
-        desc: mcpPluginForm.description.trim(),
-        desc_mk: mcpPluginForm.desc_mk?.trim(),
-        url: mcpPluginForm.url.trim(),
-        icon_uri: '🔌',
-        mcp_transport: mcpPluginForm.transport,
-      })
-      if (pluginResponse.code !== 200) {
-        showError(t('plugins.messages.createFailed') + ': ' + (pluginResponse.message || t('plugins.errors.unknownError')))
-        return
-      }
-      setMcpPluginDialogOpen(false)
-      resetMCPForm()
-      refetchPluginList()
-      showSuccess(t('plugins.messages.mcpPluginCreated', { name: mcpPluginForm.name.trim() }))
-    } catch (error: any) {
-      console.error('MCP plugin creation failed', error)
-      showError(t('plugins.messages.mcpCreateFailedRetry'))
-    }
-  }
-
   const handleRefresh = () => {
     refetchPluginList()
   }
@@ -469,7 +522,7 @@ const PluginManagementPageNew: React.FC = () => {
             title={plugin.name}
             description={plugin.desc || t('plugins.noDescription')}
             tags={[
-              { label: getPluginTypeText(plugin.plugin_type), color: '#3B82F6' },
+              { label: getInstalledPluginTypeText(plugin), color: '#3B82F6' },
             ]}
             editingState={editingState}
             actions={[
@@ -479,12 +532,6 @@ const PluginManagementPageNew: React.FC = () => {
                 icon: <Settings className="w-4 h-4" />,
                 onClick: () => handlePluginAction('configure', plugin),
               },
-              ...(plugin.plugin_id?.startsWith('cloud_') ? [{
-                key: 'edit',
-                label: t('plugins.actions.edit'),
-                icon: <Edit className="w-4 h-4" />,
-                onClick: () => handleEditPlugin(plugin),
-              }] : []),
               {
                 key: 'delete',
                 label: t('plugins.actions.delete'),
@@ -546,7 +593,7 @@ const PluginManagementPageNew: React.FC = () => {
         width: 150,
         render: ({ row }) => (
           <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-            {getPluginTypeText(row.plugin_type)}
+            {getInstalledPluginTypeText(row)}
           </span>
         ),
       },
@@ -757,16 +804,15 @@ const PluginManagementPageNew: React.FC = () => {
               </div>
             </Button>
             <Button
-              style={{ display: "none" }}
               variant="outlined"
               fullWidth
-              startIcon={<Cpu className="w-4 h-4 text-gray-500" />}
+              startIcon={<Code className="w-4 h-4" />}
               onClick={() => { setMcpPluginDialogOpen(true); setInstallDialogOpen(false) }}
-              className="justify-start p-3 text-gray-700 border-gray-300 hover:bg-gray-50"
+              className="justify-start p-3"
             >
               <div className="text-left">
-                <Typography variant="subtitle1" className="text-gray-900">{t('plugins.types.mcp')}-{t('plugins.cloudPlugin.createFromMCP')}</Typography>
-                <Typography variant="body2" color="text.secondary" className="text-gray-500">{t('plugins.cloudPlugin.createFromMCPDescription')}</Typography>
+                <Typography variant="subtitle1">{t('plugins.types.mcp')}-{t('plugins.cloudPlugin.createFromMCP')}</Typography>
+                <Typography variant="body2" color="text.secondary">{t('plugins.cloudPlugin.createFromMCPDescription')}</Typography>
               </div>
             </Button>
           </div>
@@ -778,16 +824,15 @@ const PluginManagementPageNew: React.FC = () => {
 
       {/* 云插件表单对话框 */}
       <CloudPluginFormDialog
-        open={cloudPluginDialogOpen || isEditDialogOpen}
-        isEditing={isEditDialogOpen}
+        open={cloudPluginDialogOpen}
+        isEditing={false}
         loading={createPluginMutation.isLoading}
         form={cloudPluginForm}
         editingPlugin={null}
         onFormChange={handleCloudPluginFormChange}
         onSubmit={handlePluginSubmit}
         onCancel={() => {
-          if (cloudPluginDialogOpen) setCloudPluginDialogOpen(false)
-          if (isEditDialogOpen) { setIsEditDialogOpen(false); setEditingPlugin(null) }
+          setCloudPluginDialogOpen(false)
           resetForm()
         }}
       />
@@ -804,16 +849,71 @@ const PluginManagementPageNew: React.FC = () => {
         onCancel={() => { setIdePluginDialogOpen(false); resetIDEForm() }}
       />
 
-      {/* MCP插件表单对话框 */}
       <MCPPluginFormDialog
         open={mcpPluginDialogOpen}
         isEditing={false}
         loading={createPluginMutation.isLoading}
         form={mcpPluginForm}
         editingPlugin={null}
-        onFormChange={handleMCPPluginFormChange}
-        onSubmit={() => handleMCPPluginSubmit()}
-        onCancel={() => { setMcpPluginDialogOpen(false); resetMCPForm() }}
+        onFormChange={handleMcpPluginFormChange}
+        onSubmit={async () => {
+          const validation = validateMcpForm()
+          if (!validation.isValid) {
+            showError(validation.errors[0])
+            return
+          }
+          try {
+            const isStdio = Number(mcpPluginForm.transport) === 1
+            const normalizedAuthMethod = (mcpPluginForm.authMethod || 'none').toLowerCase()
+            let authPayload: Record<string, unknown> | undefined
+            if (!isStdio && normalizedAuthMethod === 'api_key') {
+              const isHeaderLocation = mcpPluginForm.apiKeyLocation === 'header'
+              const paramName = mcpPluginForm.apiKeyParamName.trim()
+              authPayload = {
+                type: 'SERVICE',
+                headers: isHeaderLocation ? { [paramName]: mcpPluginForm.apiKeyValue } : {},
+                query: isHeaderLocation ? {} : { [paramName]: mcpPluginForm.apiKeyValue },
+              }
+            } else if (!isStdio && normalizedAuthMethod === 'oauth2') {
+              authPayload = {
+                type: 'OAUTH',
+                endpoint_url: mcpPluginForm.oauthEndpointUrl.trim(),
+                client_id: mcpPluginForm.oauthClientId.trim(),
+                client_secret: mcpPluginForm.oauthClientSecret.trim(),
+              }
+              if (mcpPluginForm.oauthScope?.trim()) {
+                authPayload.scope = mcpPluginForm.oauthScope.trim()
+              }
+            }
+
+            const result = await createPluginMutation.mutateAsync({
+              space_id: getDefaultSpaceId(),
+              plugin_type: 3,
+              name: mcpPluginForm.name.trim(),
+              desc: mcpPluginForm.description.trim(),
+              desc_mk: mcpPluginForm.desc_mk?.trim(),
+              icon_uri: '🔌',
+              mcp_transport: Number(mcpPluginForm.transport),
+              url: isStdio ? '' : mcpPluginForm.url.trim(),
+              command: isStdio ? mcpPluginForm.command.trim() : undefined,
+              args: isStdio ? parseArgsText(mcpPluginForm.argsText) : undefined,
+              env: isStdio ? parseEnvText(mcpPluginForm.envText) : undefined,
+              auth: authPayload,
+            })
+            if (result.code === 200) {
+              refetchPluginList()
+              showSuccess(t('plugins.messages.createSuccess'))
+              setMcpPluginDialogOpen(false)
+              resetMcpForm()
+            } else {
+              showError(t('plugins.messages.createFailed') + ': ' + (result.message || t('plugins.errors.unknownError')))
+            }
+          } catch (error) {
+            console.error(t('plugins.messages.createPluginFailed'), error)
+            showError(t('plugins.messages.createPluginError'))
+          }
+        }}
+        onCancel={() => { setMcpPluginDialogOpen(false); resetMcpForm() }}
       />
 
       {/* 删除确认对话框 */}

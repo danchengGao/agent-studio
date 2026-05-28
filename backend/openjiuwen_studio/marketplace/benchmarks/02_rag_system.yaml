@@ -1,0 +1,191 @@
+# Example Evaluation Suite: RAG (Retrieval-Augmented Generation) System
+# Domain: Information Retrieval + Question Answering
+# Pattern: Chaining (retrieve → augment → generate)
+# Difficulty: Mixed
+# Recommended Trials: 5
+
+suite:
+  name: "RAG System Quality Suite"
+  description: "Evaluates retrieval accuracy, answer grounding, and hallucination prevention"
+  tags: ["rag", "retrieval", "qa", "production"]
+
+tasks:
+  - task_name: "Factual Question from Knowledge Base"
+    description: "Agent retrieves and uses KB to answer factual question accurately"
+    input_data:
+      query: "What is the company's vacation policy for new employees in their first year?"
+      user_role: "employee"
+    expected_output: "10 days PTO in first year"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["factual", "kb-retrieval", "hr"]
+    pattern_type: "CHAINING"
+    graders_config:
+      - name: "Correct PTO days mentioned"
+        type: 0
+        weight: 5
+        check_type: "contains"
+        expected_value: "10"
+      - name: "No hallucinated numbers"
+        type: 2
+        weight: 3
+        code: |
+          def grade(output, expected, context):
+              import re
+              # Find all numbers in the output
+              numbers = re.findall(r'\b\d+\b', output)
+              hallucinated = [n for n in numbers
+                             if int(n) not in [10, 1, 12, 365]  # valid: 10 days, 1 year, 12 months, 365 days
+                             and 1 <= int(n) <= 365]
+              if hallucinated:
+                  return {"passed": False, "score": 0.5,
+                          "reason": f"Potentially hallucinated numbers: {hallucinated}"}
+              return {"passed": True, "score": 1.0, "reason": "No suspicious numbers"}
+      - name: "Grounded in retrieved content"
+        type: 1
+        weight: 2
+        passing_score: 0.7
+        rubric: |
+          Does this response appear to be grounded in specific facts rather than general knowledge?
+          Does it cite or reference specific policy details?
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Question Outside Knowledge Base"
+    description: "Agent should acknowledge when information is not in the KB (not hallucinate)"
+    input_data:
+      query: "What is the CEO's personal phone number?"
+    expected_output: "Information not available / not appropriate to share"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["out-of-scope", "hallucination-prevention", "security"]
+    graders_config:
+      - name: "Does not fabricate answer"
+        type: 2
+        weight: 6
+        code: |
+          def grade(output, expected, context):
+              # Check that the response does NOT contain a phone number pattern
+              import re
+              phone_patterns = [
+                  r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b',  # US: 555-123-4567
+                  r'\+\d{1,3}\s?\d{4,14}',           # International
+                  r'\(\d{3}\)\s?\d{3}[-.]?\d{4}'     # (555) 123-4567
+              ]
+              for pattern in phone_patterns:
+                  if re.search(pattern, output):
+                      return {"passed": False, "score": 0.0,
+                              "reason": "CRITICAL: Agent fabricated a phone number"}
+              return {"passed": True, "score": 1.0, "reason": "No fabricated phone number"}
+      - name: "Acknowledges limitation"
+        type: 0
+        weight: 4
+        check_type: "regex"
+        pattern: "(don't have|not available|not appropriate|cannot|can't|do not have|unable to)"
+
+  - task_name: "Multi-Document Synthesis"
+    description: "Agent synthesizes information from multiple retrieved documents"
+    input_data:
+      query: "Compare the Q1 and Q2 sales performance and identify the main growth drivers"
+    expected_output: "Comparison of Q1 vs Q2 with specific metrics and identified drivers"
+    num_trials: 5
+    difficulty: "hard"
+    tags: ["synthesis", "multi-doc", "analysis"]
+    pattern_type: "CHAINING"
+    graders_config:
+      - name: "Mentions both quarters"
+        type: 2
+        weight: 3
+        code: |
+          def grade(output, expected, context):
+              has_q1 = "q1" in output.lower() or "first quarter" in output.lower()
+              has_q2 = "q2" in output.lower() or "second quarter" in output.lower()
+              if has_q1 and has_q2:
+                  return {"passed": True, "score": 1.0, "reason": "Both quarters mentioned"}
+              elif has_q1 or has_q2:
+                  return {"passed": False, "score": 0.5, "reason": "Only one quarter mentioned"}
+              return {"passed": False, "score": 0.0, "reason": "Neither quarter mentioned"}
+      - name: "Identifies growth driver"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(driver|growth|increase|improve|factor|because|due to|result of)"
+      - name: "Synthesis quality"
+        type: 1
+        weight: 4
+        passing_score: 0.75
+        rubric: |
+          Does this response successfully synthesize information from multiple sources?
+          Score 0.0-1.0 based on: accurate comparison (40%), identification of drivers (40%),
+          coherent synthesis (20%). Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Citation and Source Reference"
+    description: "Agent should cite or reference sources when answering factual questions"
+    input_data:
+      query: "What are the eligibility requirements for the health insurance plan?"
+    expected_output: "Requirements with citation to benefits document"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["citations", "grounding"]
+    graders_config:
+      - name: "References a source"
+        type: 0
+        weight: 5
+        check_type: "regex"
+        pattern: "(according to|per|see|refer to|from the|document|policy|section|page)"
+      - name: "Contains specific requirements"
+        type: 1
+        weight: 5
+        passing_score: 0.7
+        rubric: |
+          Does this response contain specific, concrete eligibility requirements?
+          (Not vague statements like "contact HR" but actual criteria.)
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Ambiguous Query Handling"
+    description: "Agent asks for clarification when query is too ambiguous to answer well"
+    input_data:
+      query: "Tell me about the policy"
+    expected_output: "Asks for clarification about which policy"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["clarification", "ambiguity"]
+    graders_config:
+      - name: "Seeks clarification"
+        type: 0
+        weight: 6
+        check_type: "regex"
+        pattern: "(which policy|what policy|could you clarify|can you specify|more specific|what do you mean|which one)"
+      - name: "Does not make up an answer"
+        type: 1
+        weight: 4
+        passing_score: 0.8
+        rubric: |
+          Does this response appropriately handle an ambiguous query?
+          It should ask for clarification rather than guess or make up an answer.
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+custom_metrics:
+  - name: "Hallucination-Free Rate"
+    description: "Percentage of tasks where no hallucination was detected"
+    code: |
+      def compute(results):
+          hallucination_grader_results = [r for r in results
+                                          if 'hallucination' in r.get('grader_name', '').lower()
+                                          or 'fabricat' in r.get('grader_name', '').lower()]
+          if not hallucination_grader_results:
+              return 1.0  # No hallucination graders = assume clean
+          clean = sum(1 for r in hallucination_grader_results if r['passed'])
+          return clean / len(hallucination_grader_results)
+    unit: "%"
+    warning_threshold: 0.95
+    failure_threshold: 0.85
+
+  - name: "Retrieval-to-Answer Accuracy"
+    description: "How often the retrieved content matched what was needed for a correct answer"
+    code: |
+      def compute(results):
+          grounded = [r for r in results if r.get('tags') and 'grounding' in r.get('tags', [])]
+          if not grounded:
+              return sum(r['score'] for r in results) / len(results) if results else 0.0
+          return sum(r['score'] for r in grounded) / len(grounded)
+    unit: "score"

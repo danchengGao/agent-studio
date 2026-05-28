@@ -11,6 +11,8 @@ namespace:
   uts: True
   cgroup: True
 
+allow_internal_network_access: False
+
 mount:
   [
     {src: '/lib', dst: '/lib', mode: 'read'},

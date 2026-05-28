@@ -12,6 +12,7 @@ from openjiuwen.core.foundation.tool import RestfulApiCard, RestfulApi
 from openjiuwen_studio.core.common.dsl import PluginCodeConfig as DlPluginCodeConfig
 from openjiuwen_studio.core.common.dsl import RestfulApiSchema as DlRestfulApiSchema, Param
 from openjiuwen_studio.core.common.dsl import McpConfig as DlMcpConfig, McpTransport
+from openjiuwen_studio.core.common.mcp_transport_utils import merge_mcp_server_url_query_params
 
 from openjiuwen_studio.core.executor.component.component_impl.code_comp import CodeComponent
 from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException
@@ -232,17 +233,7 @@ class PluginMcpTool(Tool):
         return cls(card=card, conf=conf)
 
     def _build_auth_headers(self, inputs: Input) -> Dict[str, str]:
-        """Collect header-typed parameters from card.input_params and merge with conf.headers.
-
-        card.input_params is the JSON-Schema dict produced by convert_params_to_json_schema().
-        Each property carries a "location" key (== param.method).  Properties whose location
-        is "header" contribute an auth/custom header entry; their value is taken from the
-        runtime inputs first, falling back to the stored default.
-
-        The result is then merged on top of conf.headers so that explicitly configured
-        headers (e.g. set during plugin creation) are always present.
-        """
-        # Start from the headers already stored on the tool config.
+        """Collect tool-level headers and let runtime header inputs override them."""
         merged: Dict[str, str] = dict(self.conf.headers or {})
 
         properties: Dict[str, Any] = (self.card.input_params or {}).get("properties", {})
@@ -251,7 +242,6 @@ class PluginMcpTool(Tool):
                 continue
             if prop.get("location") != "header":
                 continue
-            # Prefer the runtime value supplied by the caller; fall back to the stored default.
             value = str((inputs or {}).get(name) or prop.get("default") or "").strip()
             if value:
                 merged[name] = value
@@ -304,11 +294,21 @@ class PluginMcpTool(Tool):
 
             mcp_params = dict(conf.params or {})
             if conf.transport == McpTransport.STDIO:
-                mcp_params.setdefault("command", sys.executable)
-                mcp_params.setdefault("args", [conf.url])
+                cmd = mcp_params.get("command") or conf.url or ""
+                extra_args = list(mcp_params.get("args") or [])
+                # If command is a bare Python script (.py), run it via the interpreter.
+                # Otherwise (command is already an executable/interpreter), use it directly.
+                if cmd.endswith(".py"):
+                    mcp_params["command"] = sys.executable
+                    mcp_params["args"] = [cmd] + extra_args
+                else:
+                    mcp_params["command"] = cmd
+                    mcp_params["args"] = extra_args
                 mcp_params.setdefault("env", None)
                 mcp_params.setdefault("cwd", os.getcwd())
                 mcp_params.setdefault("encoding_error_handler", "strict")
+                server_url = conf.url or ""
+                url_auth_query: Dict[str, str] = {}
             elif not conf.url:
                 raise JiuWenExecuteException(
                     StatusCode.PLUGIN_CODE_TOOL_INVOKE_ERROR.code,
@@ -316,13 +316,16 @@ class PluginMcpTool(Tool):
                         msg=f"MCP {conf.transport} transport requires 'url'"),
                     node_id=conf.tool_id
                 )
+            else:
+                server_url, url_auth_query = merge_mcp_server_url_query_params(conf.url, None)
 
             server_config = McpServerConfig(
                 server_name=server_name,
-                server_path=conf.url or "",
+                server_path=(conf.url or "") if conf.transport == McpTransport.STDIO else server_url,
                 client_type=client_type,
                 params=mcp_params,
                 auth_headers=auth_headers or {},
+                auth_query_params=url_auth_query if conf.transport != McpTransport.STDIO else {},
             )
 
             if conf.transport == McpTransport.STDIO:

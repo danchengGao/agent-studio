@@ -4,26 +4,39 @@
 
 from typing import Any, Dict, Optional, List, TYPE_CHECKING
 from openjiuwen.core.workflow.components.llm.react import ReActAgentCompConfig
-from openjiuwen.core.foundation.llm import ModelRequestConfig, ModelClientConfig, SystemMessage, UserMessage
+from openjiuwen.core.foundation.llm import (
+    ModelRequestConfig,
+    ModelClientConfig,
+    SystemMessage,
+    UserMessage,
+)
 from openjiuwen.core.context_engine import ContextEngineConfig
 from openjiuwen.core.runner import Runner
 from openjiuwen.core.common.logging import logger
 
-from openjiuwen_studio.core.common.dsl import ReactAgentConfig as ReactAgentConfigDL, PluginSchema, WorkflowSchema
+from openjiuwen_studio.core.common.dsl import (
+    ReactAgentConfig as ReactAgentConfigDL,
+    PluginSchema,
+    WorkflowSchema,
+)
 from openjiuwen_studio.core.executor.component.compile.base_comp_compiler import BaseCompCompiler
-from openjiuwen_studio.core.executor.component.component_impl.react_agent_comp import ReActAgentCompWithTools
+from openjiuwen_studio.core.executor.component.component_impl.react_agent_comp import (
+    ReActAgentCompWithTools,
+)
 
 if TYPE_CHECKING:
     from openjiuwen_studio.core.executor.plugin.plugin_mgr import PluginManager
     from openjiuwen_studio.core.executor.workflow.workflow_runner import WorkflowRunner
 
 client_provider_mapping = {
-    'siliconflow': "SiliconFlow",
-    'openai': "OpenAI",
+    "siliconflow": "SiliconFlow",
+    "openai": "OpenAI",
 }
 
 
-def parse_model_config(comp_config_dict: Dict[str, Any]) -> tuple[ModelRequestConfig, ModelClientConfig, str]:
+def parse_model_config(
+    comp_config_dict: Dict[str, Any],
+) -> tuple[ModelRequestConfig, ModelClientConfig, str]:
     """
     Parse model configuration and return ModelRequestConfig, ModelClientConfig, and model_id
     Args:
@@ -45,8 +58,7 @@ def parse_model_config(comp_config_dict: Dict[str, Any]) -> tuple[ModelRequestCo
     # Create ModelClientConfig
     model_client_config = ModelClientConfig(
         client_provider=client_provider_mapping.get(
-            base_model_client_config.client_provider,
-            base_model_client_config.client_provider
+            base_model_client_config.client_provider, base_model_client_config.client_provider
         ),
         api_key=base_model_client_config.api_key,
         api_base=base_model_client_config.api_base,
@@ -87,12 +99,12 @@ def parse_template_content(template_content: list) -> tuple[SystemMessage, UserM
 
 class ReactAgentCompCompiler(BaseCompCompiler):
     def __init__(
-        self, 
+        self,
         react_agent_config_dict: Dict[str, Any],
         plugin_mgr: Optional["PluginManager"] = None,
         workflow_mgr: Optional["WorkflowRunner"] = None,
         space_id: Optional[str] = None,
-        current_user: Optional[Dict[str, Any]] = None
+        current_user: Optional[Dict[str, Any]] = None,
     ) -> None:
         super().__init__()
         self.config_dict = react_agent_config_dict
@@ -145,10 +157,10 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                     tool_id=plugin_schema.id,
                     space_id=self.space_id,
                     version=plugin_schema.version,
-                    current_user=self.current_user
+                    current_user=self.current_user,
                 )
 
-                tool_name = compiled_tool.card.name if hasattr(compiled_tool, 'card') else 'unknown'
+                tool_name = compiled_tool.card.name if hasattr(compiled_tool, "card") else "unknown"
 
                 # Skip if a tool with this name has already been compiled
                 if tool_name in seen_tool_names:
@@ -159,7 +171,9 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                 compiled_tools.append(compiled_tool)
                 logger.debug(f"Compiled tool: {tool_name}")
             except Exception as e:
-                logger.error(f"Failed to compile plugin tool {plugin_schema.id}: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to compile plugin tool {plugin_schema.id}: {e}", exc_info=True
+                )
 
         return compiled_tools
 
@@ -194,7 +208,7 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                     tool_id=plugin_schema.id,
                     space_id=self.space_id,
                     version=plugin_schema.version,
-                    current_user=self.current_user
+                    current_user=self.current_user,
                 )
 
                 # Register with Runner.resource_mgr
@@ -203,7 +217,9 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                 registered_tool_ids.append(tool_id)
                 logger.debug(f"Registered tool: {tool_id}")
             except Exception as e:
-                logger.error(f"Failed to register plugin tool {plugin_schema.id}: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to register plugin tool {plugin_schema.id}: {e}", exc_info=True
+                )
 
         return registered_tool_ids
 
@@ -226,7 +242,9 @@ class ReactAgentCompCompiler(BaseCompCompiler):
 
                 # Skip if this workflow has already been processed
                 if workflow_key in seen_workflow_keys:
-                    logger.warning(f"Skipping duplicate workflow in selected_workflows: {workflow_key}")
+                    logger.warning(
+                        f"Skipping duplicate workflow in selected_workflows: {workflow_key}"
+                    )
                     continue
                 seen_workflow_keys.add(workflow_key)
 
@@ -235,7 +253,7 @@ class ReactAgentCompCompiler(BaseCompCompiler):
                     id=workflow_schema.id,
                     version=workflow_schema.version,
                     space_id=self.space_id,
-                    current_user=self.current_user
+                    current_user=self.current_user,
                 )
 
                 # Register with Runner.resource_mgr
@@ -266,22 +284,20 @@ class ReactAgentCompCompiler(BaseCompCompiler):
         logger.debug(f"  plugin_mgr: {self.plugin_mgr}")
         logger.debug(f"  workflow_mgr: {self.workflow_mgr}")
         logger.debug(f"  space_id: {self.space_id}")
-        
+
         plugin_count = len(self.config.selected_plugins) if self.config.selected_plugins else 0
-        workflow_count = len(self.config.selected_workflows) if self.config.selected_workflows else 0
+        workflow_count = (
+            len(self.config.selected_workflows) if self.config.selected_workflows else 0
+        )
         logger.debug(f"  selected_plugins count: {plugin_count}")
         logger.debug(f"  selected_workflows count: {workflow_count}")
-        
+
         if self.config.selected_plugins:
             for p in self.config.selected_plugins:
-                logger.debug(
-                    f"    Plugin: id={p.id}, plugin_id={p.plugin_id}, version={p.version}"
-                )
+                logger.debug(f"    Plugin: id={p.id}, plugin_id={p.plugin_id}, version={p.version}")
         if self.config.selected_workflows:
             for w in self.config.selected_workflows:
-                logger.debug(
-                    f"    Workflow: id={w.id}, version={w.version}"
-                )
+                logger.debug(f"    Workflow: id={w.id}, version={w.version}")
 
         # Compile plugin tools
         # Note: Workflows are registered in agent.py's compile() method via invokable_agent.add_workflows()
@@ -289,9 +305,7 @@ class ReactAgentCompCompiler(BaseCompCompiler):
         compiled_tools = await self._compile_plugin_tools()
 
         # Log compiled tools
-        logger.debug(
-            f"ReAct Agent Component: compiled {len(compiled_tools)} tools"
-        )
+        logger.debug(f"ReAct Agent Component: compiled {len(compiled_tools)} tools")
         if compiled_tools:
             tool_names = [t.card.name for t in compiled_tools]
             logger.debug(f"  Tool names: {tool_names}")
@@ -299,13 +313,10 @@ class ReactAgentCompCompiler(BaseCompCompiler):
         # Parse model configuration
         model_request_config, model_client_config, model_id = parse_model_config(self.config_dict)
 
-        # Parse prompt templates
-        system_prompt_template, user_prompt_template = parse_template_content(self.config.prompt_template)
-
         # Build context engine config
         context_engine_config = ContextEngineConfig(
             max_context_message_num=self.config.max_context_message_num or 200,
-            default_window_round_num=self.config.default_window_round_num or 10
+            default_window_round_num=self.config.default_window_round_num or 10,
         )
 
         # Create ReActAgentCompConfig

@@ -1,6 +1,18 @@
+import type { ChartMessage, InferMessage } from '@/pages/Apps/types'
+import { cleanReportContent, insertVLMChartsIntoReportContent } from '@/utils/reportUtils'
+
 /**
  * 文件下载工具
  */
+
+export interface MarkdownBundleOptions {
+  content: string
+  markdownFilename: string
+  archiveFilename: string
+  rawContent?: string
+  chartMessages?: ChartMessage[] | null
+  inferMessages?: InferMessage[] | null
+}
 
 /**
  * 下载文本文件
@@ -15,24 +27,8 @@ export function downloadTextFile(
   mimeType: string = 'text/markdown'
 ): void {
   try {
-    // 创建 Blob 对象
     const blob = new Blob([content], { type: mimeType })
-
-    // 创建临时 URL
-    const url = URL.createObjectURL(blob)
-
-    // 创建下载链接
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-
-    // 触发下载
-    document.body.appendChild(link)
-    link.click()
-
-    // 清理资源
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
   } catch (error) {
     console.error('[downloadHelper] 下载文件失败:', error)
     throw new Error('下载文件失败')
@@ -52,35 +48,136 @@ export function downloadBase64File(
   mimeType: string = 'application/octet-stream'
 ): void {
   try {
-    // 解码 Base64
-    const binaryString = atob(base64Content)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    // 创建 Blob 对象
+    const bytes = decodeBase64ToBytes(base64Content)
     const blob = new Blob([bytes], { type: mimeType })
-
-    // 创建临时 URL
-    const url = URL.createObjectURL(blob)
-
-    // 创建下载链接
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-
-    // 触发下载
-    document.body.appendChild(link)
-    link.click()
-
-    // 清理资源
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
   } catch (error) {
     console.error('[downloadHelper] 下载 Base64 文件失败:', error)
     throw new Error('下载文件失败')
   }
+}
+
+async function downloadZipFile(blob: Blob, filename: string): Promise<void> {
+  downloadBlob(blob, filename)
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function decodeBase64ToBytes(base64Content: string): Uint8Array {
+  const normalizedBase64 = base64Content.includes(',')
+    ? base64Content.split(',', 2)[1]
+    : base64Content
+  const binaryString = atob(normalizedBase64.trim())
+  const bytes = new Uint8Array(binaryString.length)
+
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+
+  return bytes
+}
+
+function sanitizeFilenamePart(value: string): string {
+  return value
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'chart'
+}
+
+function decodeBase64ToText(base64Content: string): string {
+  const bytes = decodeBase64ToBytes(base64Content)
+  return new TextDecoder('utf-8').decode(bytes)
+}
+
+function replaceInferenceLinks(
+  content: string,
+  inferPathById: Map<number, string>
+): string {
+  return content.replace(
+    /\[([^\]]*)\]\(#inference:(\d+)\)/g,
+    (match, text, rawId) => {
+      const inferenceId = Number(rawId)
+      const relativePath = inferPathById.get(inferenceId)
+
+      if (!relativePath) {
+        return match
+      }
+
+      return `[${text}](./${relativePath})`
+    }
+  )
+}
+
+export async function downloadMarkdownBundle(options: MarkdownBundleOptions): Promise<void> {
+  const { content, markdownFilename, archiveFilename, rawContent, chartMessages, inferMessages } = options
+
+  const validCharts = chartMessages.filter(
+    chart => typeof chart.chart_id === 'string' && chart.chart_id.trim() && chart.base64?.trim()
+  )
+  const validInferences = (inferMessages || []).filter(
+    inferMessage => typeof inferMessage.id === 'number' && !!inferMessage.html_base64?.trim()
+  )
+
+  if (!validCharts.length && !validInferences.length) {
+    downloadTextFile(content, markdownFilename)
+    return
+  }
+
+  const zip = new (await import('jszip')).default()
+  const chartPathById = new Map<string, string>()
+  const inferPathById = new Map<number, string>()
+  const usedNames = new Set<string>()
+
+  validCharts.forEach((chart, index) => {
+    const rawName = sanitizeFilenamePart(chart.chart_id || `chart_${index + 1}`)
+    let fileName = `${rawName}.png`
+    let suffix = 1
+
+    while (usedNames.has(fileName)) {
+      fileName = `${rawName}_${suffix}.png`
+      suffix += 1
+    }
+
+    usedNames.add(fileName)
+    const relativePath = `images/${fileName}`
+    chartPathById.set(chart.chart_id, relativePath)
+    zip.file(relativePath, decodeBase64ToBytes(chart.base64 || ''))
+  })
+
+  for (const inferMessage of validInferences) {
+    const relativePath = `inference/inference_${inferMessage.id}.html`
+    inferPathById.set(inferMessage.id, relativePath)
+    zip.file(relativePath, decodeBase64ToText(inferMessage.html_base64))
+  }
+
+  const markdownSource = replaceInferenceLinks(
+    cleanReportContent(rawContent || content),
+    inferPathById
+  )
+  const markdownWithCharts = insertVLMChartsIntoReportContent(
+    markdownSource,
+    validCharts,
+    chart => {
+      const relativePath = chartPathById.get(chart.chart_id)
+      return relativePath ? `./${relativePath}` : null
+    }
+  )
+
+  zip.file(markdownFilename, markdownWithCharts)
+
+  const blob = await zip.generateAsync({ type: 'blob' })
+  await downloadZipFile(blob, archiveFilename)
 }
 
 /**

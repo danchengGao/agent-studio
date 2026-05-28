@@ -1,3 +1,5 @@
+import type { CanonicalDocument } from '@/pages/Apps/components/ReportPanel/editor/canonical'
+
 /**
  * Apps 页面共享类型定义
  */
@@ -36,8 +38,18 @@ export interface InferMessage {
   inference: string
   /** 结论 */
   conclusion: string
-  /** 推理图 ID（对应 Markdown 中的 #inference:id） */
+  /** 推理图 ID，对应 Markdown 中的 #inference:id */
   id: number
+}
+
+/**
+ * VLM 图表消息
+ */
+export interface ChartMessage {
+  chart_id: string
+  chart_title?: string
+  description?: string
+  base64?: string
 }
 
 /**
@@ -50,6 +62,8 @@ export interface DeepSearchResult {
   citation_messages: CitationMessages | null
   /** 推理图谱列表 */
   infer_messages: InferMessage[]
+  /** VLM 图表结果 */
+  chart_messages?: ChartMessage[]
   /** 异常信息 */
   exception_info?: string
 }
@@ -65,12 +79,19 @@ export interface Report {
   citations?: CitationMessages | null
   /** 推理图谱消息列表（原始数据，保留完整信息） */
   inferMessages?: InferMessage[]
+  /** VLM 图表结果 */
+  chartMessages?: ChartMessage[]
   /** 原始响应内容（未清理，用于 offsets 基线） */
   rawContent?: string
+  /** canonical 快照种子（供编辑态初始化使用） */
+  canonicalDocument?: CanonicalDocument
 }
 
-/** 报告局部改写操作类型 */
-export type ReportRewriteAction = 'expand' | 'polish' | 'shorten'
+/** 报告改写/同步操作类型 */
+export type ReportRewriteAction = 'expand' | 'polish' | 'shorten' | 'supplementary_search' | 'sync'
+
+/** 报告改写范围类型 */
+export type RewriteScope = 'selected_only' | 'selected_and_related'
 
 /** AI 改写状态类型 */
 export type RewriteStatus = 'idle' | 'thinking' | 'writing' | 'error'
@@ -80,7 +101,9 @@ export type RewriteStatus = 'idle' | 'thinking' | 'writing' | 'error'
  */
 export interface ReportRewriteParams {
   /** 改写操作类型 */
-  action: 'polish' | 'expand' | 'shorten'
+  action: ReportRewriteAction
+  /** 改写范围 */
+  rewrite_scope?: RewriteScope
   /** 选中的文本 */
   selectedText: string
   /** 起始偏移量（code point） */
@@ -103,6 +126,8 @@ export interface ReportRewriteParams {
   onEnd?: () => void
   /** 错误回调 */
   onError?: (error: string) => void
+  /** 静默请求：不在聊天流中追加可见用户消息 */
+  silent?: boolean
 }
 
 /**
@@ -116,4 +141,3 @@ export interface Message {
   modelName?: string
   report?: Report
 }
-

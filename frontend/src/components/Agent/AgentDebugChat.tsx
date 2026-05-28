@@ -62,6 +62,10 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
   const lastErrorSigRef = useRef<string | null>(null)
   const cancelStreamRef = useRef<(() => void) | null>(null)
   const userCancelRequestedRef = useRef(false)
+  // 用于跟踪输出组件的流式消息，key为nodeId，value为消息的timestamp
+  const outputComponentMsgTsRef = useRef<Map<string, number>>(new Map())
+  // 用于跟踪已处理的输出组件的完整内容，防止重复显示
+  const processedOutputContentRef = useRef<Map<string, string>>(new Map())
 
   // 从 saveAgentRequest 读取所有数据（统一数据源）
   const openingRemarks = saveAgentRequest.opening_remarks || ''
@@ -137,23 +141,92 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
     return ts
   }
 
-  // 添加一个新的函数，用于创建输出组件的独立消息
-  const appendOutputComponentMessage = (content: string, nodeId?: string, nodeName?: string) => {
-    const ts = Date.now()
-    const msg: ChatMessage = {
-      role: 'assistant',
-      content,
-      timestamp: ts,
-      kind: 'normal',
-      detailInfo: { 
-        streaming: false,
-        isOutputComponent: true,
-        nodeId,
-        nodeName
-      },
+  // 添加一个新的函数，用于创建或更新输出组件的独立消息
+  const appendOrUpdateOutputComponentMessage = (content: string, nodeId?: string, nodeName?: string) => {
+    console.log('[DEBUG] appendOrUpdateOutputComponentMessage called:', { nodeId, contentLength: content.length })
+
+    // 如果有nodeId，检查是否已经存在该输出组件的消息
+    if (nodeId) {
+      const existingTs = outputComponentMsgTsRef.current.get(nodeId)
+      console.log('[DEBUG] existingTs:', existingTs, 'for nodeId:', nodeId)
+
+      if (existingTs !== undefined) {
+        // 🔑 已存在该节点的消息：拼接内容（流式和非流式统一逻辑）
+        console.log('[DEBUG] Appending to existing message')
+        setChatHistory(prev => {
+          const idx = prev.findIndex(m => m.timestamp === existingTs && m.role === 'assistant')
+          if (idx === -1) return prev
+          const updated = [...prev]
+          const msg = updated[idx]
+          updated[idx] = {
+            ...msg,
+            content: (msg.content || '') + content,
+            detailInfo: {
+              ...msg.detailInfo,
+              streaming: true,  // 持续流式状态
+            }
+          }
+          return updated
+        })
+        return existingTs
+      } else {
+        // 🔑 不存在该节点的消息：创建新消息
+        console.log('[DEBUG] Creating new message for nodeId:', nodeId)
+        const ts = Date.now()
+        const msg: ChatMessage = {
+          role: 'assistant',
+          content,
+          timestamp: ts,
+          kind: 'normal',
+          detailInfo: {
+            streaming: true,  // 初始状态为流式，等待后续更新或结束
+            isOutputComponent: true,
+            nodeId,
+            nodeName
+          },
+        }
+        setChatHistory(prev => [...prev, msg])
+        outputComponentMsgTsRef.current.set(nodeId, ts)
+        return ts
+      }
+    } else {
+      // 没有nodeId，创建新消息
+      console.log('[DEBUG] Creating new message without nodeId')
+      const ts = Date.now()
+      const msg: ChatMessage = {
+        role: 'assistant',
+        content,
+        timestamp: ts,
+        kind: 'normal',
+        detailInfo: {
+          streaming: false,
+          isOutputComponent: false,
+        },
+      }
+      setChatHistory(prev => [...prev, msg])
+      return ts
     }
-    setChatHistory(prev => [...prev, msg])
-    return ts
+  }
+
+  // 结束输出组件的流式输出
+  const finalizeOutputComponentMessage = (nodeId: string) => {
+    const ts = outputComponentMsgTsRef.current.get(nodeId)
+    if (ts !== undefined) {
+      setChatHistory(prev => {
+        const idx = prev.findIndex(m => m.timestamp === ts && m.role === 'assistant')
+        if (idx === -1) return prev
+        const updated = [...prev]
+        const msg = updated[idx]
+        updated[idx] = {
+          ...msg,
+          detailInfo: {
+            ...msg.detailInfo,
+            streaming: false,
+          }
+        }
+        return updated
+      })
+    }
   }
 
   const normalizeStreamEvent = (
@@ -163,7 +236,6 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
     type: string
     nodeId?: string
     nodeName?: string
-    index?: number
   } | null => {
     if (!raw || typeof raw !== 'object') return null
 
@@ -171,23 +243,49 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
     const eventType = typeof event.type === 'string' ? event.type : undefined
     console.log('[DEBUG] normalizeStreamEvent eventType:', eventType)
 
+    // 🔑 只处理 agent 类型的事件，忽略 trace 和其他类型
+    if (eventType !== 'agent') {
+      console.log('[DEBUG] Ignoring non-agent event type:', eventType)
+      return null
+    }
+
+    // 首先检查是否有 _streamPayload
     const streamPayload = (event as any)._streamPayload
     console.log('[DEBUG] normalizeStreamEvent streamPayload:', JSON.stringify(streamPayload))
     if (streamPayload) {
-      const nodeIdRaw = streamPayload?.node_id ?? streamPayload?.nodeId
+      // 后端可能使用不同的字段名来存储 node_id: node_id, nodeId, 或 id
+      const nodeIdRaw = streamPayload?.node_id ?? streamPayload?.nodeId ?? streamPayload?.id
       const nodeId = nodeIdRaw != null && String(nodeIdRaw).trim() ? String(nodeIdRaw) : undefined
       const nodeNameRaw = streamPayload?.node_name ?? streamPayload?.nodeName ?? streamPayload?.name
       const nodeName = nodeNameRaw != null && String(nodeNameRaw).trim() ? String(nodeNameRaw) : undefined
-      const index = typeof streamPayload?.index === 'number' ? streamPayload.index : undefined
       const text = extractTextFromOutput(streamPayload?.output ?? streamPayload?.answer ?? streamPayload?.output_text)
       console.log('[DEBUG] normalizeStreamEvent text:', text)
       if (!text) return null
       // 检查是否为输出组件，如果是，使用特殊的 type
       const componentType = streamPayload?.component_type
       console.log('[DEBUG] normalizeStreamEvent componentType:', componentType)
-      const finalType = componentType === 'output' ? 'output' : (eventType || 'workflow')
+      const finalType = componentType === 'output' ? 'output' : 'agent'
       console.log('[DEBUG] normalizeStreamEvent finalType:', finalType)
-      return { text, type: finalType, nodeId, nodeName, index }
+      return { text, type: finalType, nodeId, nodeName }
+    }
+
+    // 检查是否有 payload（后端返回的格式）
+    if (event.payload && typeof event.payload === 'object') {
+      const payload = event.payload
+      // 后端可能使用不同的字段名来存储 node_id: node_id, nodeId, 或 id
+      const nodeIdRaw = payload.node_id ?? payload.nodeId ?? payload.id
+      const nodeId = nodeIdRaw != null && String(nodeIdRaw).trim() ? String(nodeIdRaw) : undefined
+      const nodeNameRaw = payload.node_name ?? payload.nodeName ?? payload.name
+      const nodeName = nodeNameRaw != null && String(nodeNameRaw).trim() ? String(nodeNameRaw) : undefined
+      const text = extractTextFromOutput(payload.output ?? payload.answer ?? payload.output_text)
+      console.log('[DEBUG] normalizeStreamEvent from payload text:', text)
+      if (!text) return null
+      // 检查是否为输出组件，如果是，使用特殊的 type
+      const componentType = payload.component_type
+      console.log('[DEBUG] normalizeStreamEvent from payload componentType:', componentType)
+      const finalType = componentType === 'output' ? 'output' : 'agent'
+      console.log('[DEBUG] normalizeStreamEvent from payload finalType:', finalType)
+      return { text, type: finalType, nodeId, nodeName }
     }
 
     const outputText = event.output_text
@@ -196,7 +294,7 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
       const nodeId = nodeIdRaw != null && String(nodeIdRaw).trim() ? String(nodeIdRaw) : undefined
       const nodeNameRaw = event.node_name ?? event.nodeName ?? event.name
       const nodeName = nodeNameRaw != null && String(nodeNameRaw).trim() ? String(nodeNameRaw) : undefined
-      return { text: outputText, type: eventType || 'agent', nodeId, nodeName }
+      return { text: outputText, type: 'agent', nodeId, nodeName }
     }
 
     // 如果事件本身带有 type 和 output 字段，也按原样透传
@@ -205,7 +303,7 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
       const nodeId = nodeIdRaw != null && String(nodeIdRaw).trim() ? String(nodeIdRaw) : undefined
       const nodeNameRaw = event.node_name ?? event.nodeName ?? event.name
       const nodeName = nodeNameRaw != null && String(nodeNameRaw).trim() ? String(nodeNameRaw) : undefined
-      return { text: event.output, type: eventType, nodeId, nodeName }
+      return { text: event.output, type: 'agent', nodeId, nodeName }
     }
 
     return null
@@ -214,7 +312,7 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
   const updateAssistantStreamingContent = (
     ts: number | null,
     incoming: string,
-    meta?: { type: string; nodeId?: string; nodeName?: string; index?: number },
+    meta?: { type: string; nodeId?: string; nodeName?: string },
   ) => {
     if (!ts) return
     setChatHistory(prev => {
@@ -226,20 +324,16 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
       const safeType = meta?.type || 'agent'
       const safeNodeId = meta?.nodeId
       const safeNodeName = meta?.nodeName
-      const safeIndex = meta?.index
 
       let nextChunks = msg.chunks ? [...msg.chunks] : []
 
+      // 🔑 基于nodeId查找已有的chunk，不再使用index判断
       let existingIdx = -1
-      // If index is 0, we force creating a new chunk, so skip searching for existing one.
-      if (safeIndex !== 0) {
-        // Search from end to find the latest matching chunk
-        for (let i = nextChunks.length - 1; i >= 0; i--) {
-          const c = nextChunks[i]
-          if (c.type === safeType && c.nodeId === safeNodeId) {
-            existingIdx = i
-            break
-          }
+      for (let i = nextChunks.length - 1; i >= 0; i--) {
+        const c = nextChunks[i]
+        if (c.type === safeType && c.nodeId === safeNodeId) {
+          existingIdx = i
+          break
         }
       }
 
@@ -253,7 +347,6 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
           nodeName: existing.nodeName || safeNodeName,
           content: newContent,
           status: 'streaming',
-          index: safeIndex ?? existing.index,
         }
       } else {
         nextChunks.push({
@@ -263,7 +356,6 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
           nodeName: safeNodeName,
           content: incoming,
           status: 'streaming',
-          index: safeIndex,
         })
       }
 
@@ -310,6 +402,10 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
       return prev.filter(m => !(m.timestamp === ts && m.role === 'assistant'))
     })
     streamingMsgTsRef.current = null
+    // 清空输出组件的消息引用
+    outputComponentMsgTsRef.current.clear()
+    // 清空已处理的输出内容引用
+    processedOutputContentRef.current.clear()
   }
 
   const normalizeErrorSignature = (content: string) => {
@@ -340,10 +436,18 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
     setIsProcessing(true)
     streamingMsgTsRef.current = appendAssistantStreaming('')
     lastErrorSigRef.current = null
+    // 清空输出组件的消息引用
+    outputComponentMsgTsRef.current.clear()
+    // 清空已处理的输出内容引用
+    processedOutputContentRef.current.clear()
   }
 
   const endStreamCycle = () => {
     finalizeAssistantStreaming(streamingMsgTsRef.current)
+    // 结束所有输出组件的流式输出
+    outputComponentMsgTsRef.current.forEach((ts, nodeId) => {
+      finalizeOutputComponentMessage(nodeId)
+    })
     setIsProcessing(false)
     streamingMsgTsRef.current = null
     cancelStreamRef.current = null
@@ -370,18 +474,23 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
     if (!normalized) return {}
     const ignoreTokens = ['tool_call']
     if (normalized.text && !ignoreTokens.some(t => normalized.text.includes(t))) {
-      // 如果是输出组件的内容，单独创建一个消息气泡
+      // 如果是输出组件的内容，使用统一逻辑：基于nodeId拼接或创建
       console.log('[DEBUG] Checking normalized.type:', normalized.type)
-      if (normalized.type === 'output') {
-        console.log('[DEBUG] Creating output component message:', normalized.text)
-        appendOutputComponentMessage(normalized.text, normalized.nodeId, normalized.nodeName)
+      if (normalized.type === 'output' && normalized.nodeId) {
+        console.log('[DEBUG] Updating output component message:', normalized.text.substring(0, 50), '..., nodeId:', normalized.nodeId)
+        // 统一逻辑：基于nodeId判断，有就拼接，没有就创建
+        const resultTs = appendOrUpdateOutputComponentMessage(normalized.text, normalized.nodeId, normalized.nodeName)
+        console.log('[DEBUG] appendOrUpdateOutputComponentMessage returned:', resultTs)
+      } else if (normalized.type === 'output' && !normalized.nodeId) {
+        // 如果没有nodeId，创建一个新的非流式消息（这种情况不应该发生，但作为容错处理）
+        console.log('[DEBUG] Creating output component message without nodeId:', normalized.text)
+        appendOrUpdateOutputComponentMessage(normalized.text, normalized.nodeId, normalized.nodeName)
       } else {
         console.log('[DEBUG] Updating streaming content:', normalized.text)
         updateAssistantStreamingContent(streamingMsgTsRef.current, normalized.text, {
           type: normalized.type,
           nodeId: normalized.nodeId,
           nodeName: normalized.nodeName,
-          index: normalized.index,
         })
       }
     }
@@ -766,44 +875,49 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
   }
 
   return (
-    <Paper elevation={0} className="flex flex-col bg-gradient-to-br h-full overflow-x-hidden overflow-y-hidden">
-      {/* 头部区域 */}
-      <div className="flex items-center justify-between">
-        <ActionSlotMount name="debug-title-actions">
-          <div className="flex items-center space-x-2">
-            {!hideMemoryButton && <MemoryButton userId={userIdForMem} groupId={groupIdForMem} enableLongTerm={enableLongTerm} />}
-            <Switch
-              checked={showDebugInfo}
-              onChange={() => {
-                const next = !showDebugInfo
-                setShowDebugInfo(next)
-                onDebugInfoChange?.(next)
-              }}
-              size="small"
-              color="primary"
-              sx={{
-                '& .MuiSwitch-switchBase.Mui-checked': {
-                  color: '#6366F1',
-                },
-                '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                  backgroundColor: '#818CF8',
-                },
-              }}
-            />
-            <span className="text-sm text-gray-600">{t('header.debugInfo')}</span>
-          </div>
-        </ActionSlotMount>
+    <Paper 
+      elevation={0} 
+      className="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl"
+      sx={{
+        '& .MuiSwitch-root': {
+          '& .MuiSwitch-switchBase.Mui-checked': {
+            color: '#818CF8',
+          },
+          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+            backgroundColor: '#818CF8',
+          },
+        },
+      }}
+    >
+      <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('title')}</span>
+          <ActionSlotMount name="debug-title-actions">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={showDebugInfo}
+                onChange={e => {
+                  const newOpen = e.target.checked
+                  setShowDebugInfo(newOpen)
+                  onDebugInfoChange?.(newOpen)
+                }}
+                size="small"
+              />
+              <span className="text-sm text-gray-600 dark:text-gray-400">{t('header.debugInfo')}</span>
+            </div>
+          </ActionSlotMount>
+        </div>
       </div>
-      {/* 主体区域 - 根据showDebugInfo状态决定布局 */}
+      {/* 主体区域 - 根据 showDebugInfo 状态决定布局 */}
       <div className={`flex-1 flex ${showDebugInfo ? 'gap-4' : ''} min-h-0`}>
         {/* 聊天消息区域 */}
         <div className={`${showDebugInfo ? 'flex-1' : 'w-full'} flex flex-col min-w-0 min-h-0`}>
           {/* 未配置模型的提示 */}
           {modelNotConfigured && (
-            <div className="mx-4 mt-4 mb-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="mx-4 mt-4 mb-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-amber-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="w-5 h-5 text-amber-400 dark:text-amber-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path
                       fillRule="evenodd"
                       d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
@@ -812,18 +926,18 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-amber-800">{t('tips.modelNotConfiguredTitle')}</h3>
-                  <p className="mt-1 text-sm text-amber-700">{t('tips.modelNotConfiguredDescription')}</p>
+                  <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">{t('tips.modelNotConfiguredTitle')}</h3>
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">{t('tips.modelNotConfiguredDescription')}</p>
                 </div>
               </div>
             </div>
           )}
           {/* 模型已被禁用的提示 */}
           {modelDisabled && !modelNotConfigured && (
-            <div className="mx-4 mt-4 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="mx-4 mt-4 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-red-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="w-5 h-5 text-red-400 dark:text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path
                       fillRule="evenodd"
                       d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -832,13 +946,13 @@ const AgentDebugChat = ({ agentId, mdbId, onDebugInfoChange, enableLongTerm, hid
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">{t('tips.modelDisabledTitle')}</h3>
-                  <p className="mt-1 text-sm text-red-700">{t('tips.modelDisabledDescription')}</p>
+                  <h3 className="text-sm font-medium text-red-800 dark:text-red-300">{t('tips.modelDisabledTitle')}</h3>
+                  <p className="mt-1 text-sm text-red-700 dark:text-red-400">{t('tips.modelDisabledDescription')}</p>
                 </div>
               </div>
             </div>
           )}
-          <div ref={chatContainerRef} className="flex-1 bg-white p-4 mb-4 overflow-y-auto overflow-x-hidden">
+          <div ref={chatContainerRef} className="flex-1 bg-white dark:bg-gray-800 p-4 mb-4 overflow-y-auto overflow-x-hidden">
             <ChatMessageList
               messages={chatHistory}
               onSubmitInteraction={handleInlineInteractionSubmit}
@@ -986,11 +1100,12 @@ const ChatMessageItem = memo(
             inputFocused={inputFocused}
           />
 
-          {message.role === 'user' && (
-            <div className="flex items-center justify-end space-x-2 mt-2">
-              <div className="w-5 h-5 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">{t('messages.userLabel')}</span>
+          {message.role === 'assistant' && (
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">AI</span>
               </div>
+              <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">{agentName || t('messages.assistantLabel')}</span>
             </div>
           )}
         </div>

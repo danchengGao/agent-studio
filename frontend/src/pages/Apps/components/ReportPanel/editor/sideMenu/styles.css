@@ -1,0 +1,320 @@
+/**
+ * SideMenu 动画样式
+ */
+
+/* AI Button 悬停文字淡入 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* 块级文本高亮 - 处理中状态 */
+.block-processing {
+  outline: 2px solid #3b82f6;
+  outline-offset: 4px;
+  background-color: rgba(59, 130, 246, 0.08);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+/* 原文本淡出 */
+.block-fade-out {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.3s ease-out;
+}
+
+/* 新文本淡入 */
+.block-fade-in {
+  opacity: 0;
+  animation: fadeInSlide 0.4s ease-out forwards;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* AIRewritePanel 快捷按钮选中状态 */
+.action-btn-selected {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+/* AI 块悬停高亮 - 使用类名控制 */
+.ai-block-hover {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  border-radius: 6px !important;
+  outline: 2px solid rgba(59, 130, 246, 0.4) !important;
+  outline-offset: -2px;
+  transition: all 0.2s ease;
+}
+
+.ai-block-hover .bn-inline-content {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  border-radius: 4px !important;
+}
+
+/**
+ * BlockNote 编辑器标题样式调整
+ * 减小各级标题的字体大小，使其更适合报告阅读
+ */
+.blocknote-editor-wrapper .bn-block-content[data-content-type="heading"] h1 {
+  font-size: 1.25rem !important;
+  line-height: 1.4 !important;
+}
+
+.blocknote-editor-wrapper .bn-block-content[data-content-type="heading"] h2 {
+  font-size: 1.1rem !important;
+  line-height: 1.4 !important;
+}
+
+.blocknote-editor-wrapper .bn-block-content[data-content-type="heading"] h3 {
+  font-size: 1rem !important;
+  line-height: 1.4 !important;
+}
+
+/* 段落文本基础样式 */
+.blocknote-editor-wrapper .bn-block-content[data-content-type="paragraph"] {
+  line-height: 1.6 !important;
+}
+
+/* ==================== AI 改写状态指示器动画 ==================== */
+
+/* 状态指示器入场动画 */
+@keyframes status-slide-down {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px) scale(0.985);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* 状态指示器退场动画 */
+@keyframes status-slide-up {
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.985);
+    filter: blur(1.5px);
+  }
+}
+
+/* 思考状态脉冲动画 */
+@keyframes thinking-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+/* 撰写状态打字点动画 */
+@keyframes writing-dots {
+  0%, 20% {
+    content: '.';
+  }
+  40% {
+    content: '..';
+  }
+  60%, 100% {
+    content: '...';
+  }
+}
+
+/* 撰写状态波浪动画 */
+@keyframes writing-wave {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-3px);
+  }
+}
+
+/* ==================== AI 改写块内容过渡动画 ==================== */
+
+/* 块正在改写 - 高亮状态 */
+.block-rewriting {
+  background-color: rgba(59, 130, 246, 0.12) !important;
+  border-radius: 4px !important;
+  outline: 2px dashed rgba(59, 130, 246, 0.5) !important;
+  outline-offset: 2px;
+  transition: all 0.3s ease;
+}
+
+/* 内容淡出动画 */
+.content-fade-out {
+  animation: contentFadeOut 0.3s ease-out forwards;
+}
+
+@keyframes contentFadeOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0.3;
+    transform: scale(0.98);
+    filter: blur(1px);
+  }
+}
+
+/* 内容淡入动画 */
+.content-fade-in {
+  animation: contentFadeIn 0.4s ease-out forwards;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* 成功闪烁效果 */
+.content-replace-success {
+  animation: successFlash 0.6s ease-out;
+}
+
+@keyframes successFlash {
+  0% {
+    background-color: rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    background-color: rgba(34, 197, 94, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* 错误闪烁效果 */
+.content-replace-error {
+  animation: errorFlash 0.6s ease-out;
+}
+
+@keyframes errorFlash {
+  0% {
+    background-color: rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    background-color: rgba(239, 68, 68, 0.15);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* ==================== Rewrite Motion Refinement ==================== */
+
+.rewrite-snapshot-overlay,
+.rewrite-diff-overlay {
+  position: fixed;
+  pointer-events: none;
+  z-index: 40;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+
+.rewrite-snapshot-overlay {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.72));
+  box-shadow:
+    0 12px 24px rgba(15, 23, 42, 0.06),
+    inset 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+.rewrite-snapshot-overlay--writing {
+  opacity: 0.96;
+  filter: blur(0.6px);
+  transform: translateY(-1px);
+}
+
+.rewrite-snapshot-overlay--morphing {
+  animation: rewriteOverlayExit 0.42s ease-out forwards;
+}
+
+.rewrite-snapshot-overlay--reduced {
+  filter: none !important;
+  transform: none !important;
+  animation: none !important;
+  opacity: 0.72;
+}
+
+@keyframes rewriteOverlayExit {
+  from {
+    opacity: 0.92;
+    filter: blur(0.8px);
+    transform: translateY(-1px);
+  }
+  to {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(-6px);
+  }
+}
+
+.rewrite-diff-overlay {
+  animation: rewriteDiffSettle 1.6s ease-out forwards;
+  text-shadow: 0 0 0 transparent;
+}
+
+.rewrite-diff-overlay--reduced {
+  animation: none;
+}
+
+.rewrite-diff-overlay mark[data-rewrite-diff="true"] {
+  background: rgba(34, 197, 94, 0.22);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.12);
+  color: inherit;
+  padding: 0 1px;
+}
+
+@keyframes rewriteDiffSettle {
+  0% {
+    opacity: 0.96;
+    transform: translateY(1px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+}

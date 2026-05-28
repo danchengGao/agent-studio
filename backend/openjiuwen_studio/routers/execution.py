@@ -20,7 +20,9 @@ from openjiuwen_studio.routers.common import handle_response, validate_request
 from openjiuwen_studio.core.manager.repositories.trace_summary_repository import trace_summary_repository
 from openjiuwen_studio.core.manager.login_manager.space import check_user_space
 from openjiuwen_studio.schemas.trace_summary import (TraceSummaryListRequest, TraceSummaryByTraceIdRequest,
-                                       TraceSummaryLatestRequest, TraceSummaryBrief)
+                                       TraceSummaryLatestRequest, TraceSummaryBrief,
+                                       TraceSummaryListBySpaceRequest, TraceSummaryBriefWithStatus,
+                                       ActiveExecutionInfo)
 from openjiuwen_studio.schemas.execution_log import ExecutionLogSummary
 from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, UpdateLongtermMem, UpdateVariable, \
     GetUserVar, \
@@ -28,7 +30,8 @@ from openjiuwen_studio.schemas.memory import DeleteLongtermMem, DeleteVariable, 
 from openjiuwen_studio.core.manager.memory import delete_user_variable, delete_longterm_mem, update_user_variable, \
     update_longterm_mem, get_longterm_mem, get_user_variable, delete_longterm_mem_by_scope_id
 
-from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, WorkflowErrorData, ErrorNodeInfo
+from openjiuwen_studio.core.common.exceptions import JiuWenExecuteException, WorkflowFailedResponse, \
+                                                WorkflowErrorData, ErrorNodeInfo
 from openjiuwen_studio.core.common.exceptions import JiuWenComponentException
 from openjiuwen_studio.core.common.message import ExecuteResponseType
 from openjiuwen_studio.core.executor.workflow.workflow_execution_manager import workflow_execution_manager
@@ -445,6 +448,87 @@ async def get_latest_trace_summary(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed") from e
 
 
+@execution_router.post("/get_all_trace_summaries", response_model=ResponseModel[list[TraceSummaryBriefWithStatus]],
+                       response_model_by_alias=False)
+async def get_all_trace_summaries(
+        request: Dict,
+        current_user: dict = Depends(get_current_user)
+):
+    try:
+        req = validate_request(request, TraceSummaryListBySpaceRequest)
+        _ = check_user_space(req.space_id, current_user)
+        res = trace_summary_repository.get_trace_summary_list_by_space(
+            req.space_id, req.business_type, req.limit
+        )
+        return handle_response(res)
+    except ValidationError as e:
+        logger.error(f"Get all trace summaries failed, error: {e.errors()}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed") from e
+
+
+@execution_router.post("/list_active_executions", response_model=ResponseModel[list[ActiveExecutionInfo]],
+                       response_model_by_alias=False)
+async def list_active_executions(
+        request: Dict,
+        current_user: dict = Depends(get_current_user)
+):
+    try:
+        space_id = request.get("space_id") or request.get("spaceId", "")
+        if space_id:
+            _ = check_user_space(space_id, current_user)
+        executions = workflow_execution_manager.list_executions()
+        data = []
+        workflow_ids = []
+        for conv_id, info in executions.items():
+            if space_id and info.space_id != space_id:
+                continue
+            data.append({
+                "conversation_id": info.conversation_id,
+                "workflow_id": info.workflow_id,
+                "workflow_version": info.workflow_version,
+                "space_id": info.space_id,
+                "start_time": info.start_time,
+            })
+            workflow_ids.append(info.workflow_id)
+
+        # Enrich with workflow names
+        if workflow_ids:
+            try:
+                from openjiuwen_studio.models.workflow import WorkflowBaseDB
+                from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
+                from sqlalchemy import select
+                with get_db_jw() as db:
+                    stmt = select(WorkflowBaseDB.workflow_id, WorkflowBaseDB.name).where(
+                        WorkflowBaseDB.workflow_id.in_(workflow_ids)
+                    )
+                    name_map = {row.workflow_id: row.name for row in db.execute(stmt).all()}
+                for item in data:
+                    item["workflow_name"] = name_map.get(item["workflow_id"])
+            except Exception as e:
+                logger.warning(f"Failed to look up workflow names for active executions: {e}")
+
+        return ResponseModel(code=status.HTTP_200_OK, message="Active executions retrieved", data=data)
+    except Exception as e:
+        logger.error(f"List active executions failed: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list active executions") from e
+
+
+@execution_router.post("/get_running_traces")
+async def get_running_traces(
+        request: Dict,
+        current_user: dict = Depends(get_current_user)
+):
+    """Find running executions by checking TraceDetail for traces without a completed TraceSummary."""
+    try:
+        req = validate_request(request, TraceSummaryListBySpaceRequest)
+        _ = check_user_space(req.space_id, current_user)
+        res = trace_summary_repository.get_running_traces_by_space(req.space_id, req.business_type)
+        return handle_response(res)
+    except ValidationError as e:
+        logger.error(f"Get running traces failed, error: {e.errors()}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Request validation failed") from e
+
+
 @execution_router.post("/memory/get_user_variable", response_model=ResponseModel[dict])
 async def search_variable_memory(
         request: dict, current_user: dict = Depends(get_current_user)
@@ -532,8 +616,10 @@ async def delete_longterm_memory(
 @execution_router.post("/memory/delete_longterm_mem_by_scope", response_model=ResponseModel[dict])
 async def delete_longterm_mem_by_scope(
     request: dict,
+    current_user: dict = Depends(get_current_user)
 ) -> ResponseModel[Dict[str, Any]]:
     req = DeleteScopeLongtermMem(**request)
+    _ = check_user_space(req.user_id, current_user)
     try:
         data = await delete_longterm_mem_by_scope_id(req)
         return ResponseModel(

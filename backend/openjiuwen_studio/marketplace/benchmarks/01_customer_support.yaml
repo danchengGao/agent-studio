@@ -1,0 +1,201 @@
+# Example Evaluation Suite: Customer Support Agent
+# Domain: Customer Service
+# Pattern: Routing (directs to correct department/response type)
+# Difficulty: Mixed
+# Recommended Trials: 5
+
+suite:
+  name: "Customer Support Quality Suite"
+  description: "Evaluates customer support agent on tone, accuracy, routing, and problem resolution"
+  tags: ["customer-support", "production", "routing"]
+
+tasks:
+  - task_name: "Returns Policy Question"
+    description: "Agent should explain returns policy clearly and politely"
+    input_data:
+      query: "I bought a jacket 3 weeks ago and it doesn't fit. Can I return it?"
+    expected_output: "30-day return policy with receipt"
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["returns", "policy", "routing"]
+    pattern_type: "ROUTING"
+    graders_config:
+      - name: "Mentions return window"
+        type: 0
+        weight: 4
+        check_type: "contains"
+        expected_value: "30"
+      - name: "Mentions receipt or proof"
+        type: 0
+        weight: 3
+        check_type: "contains"
+        expected_value: "receipt"
+      - name: "Polite and helpful tone"
+        type: 1
+        weight: 3
+        passing_score: 0.75
+        rubric: |
+          Evaluate the customer service quality of this response.
+          Score 0.0-1.0 based on:
+          - Empathy and acknowledgment of the customer's issue: 30%
+          - Clarity of the information provided: 40%
+          - Professional and polite tone: 30%
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Urgent Technical Issue"
+    description: "Agent should escalate or prioritize urgent technical problems"
+    input_data:
+      query: "My account has been compromised! Someone is making purchases I didn't authorize!"
+    expected_output: "Immediate account security action, escalation to security team"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["security", "escalation", "urgent"]
+    pattern_type: "ROUTING"
+    graders_config:
+      - name: "Expresses urgency"
+        type: 0
+        weight: 3
+        check_type: "contains"
+        expected_value: "immediately"
+        case_sensitive: false
+      - name: "Provides actionable step"
+        type: 1
+        weight: 4
+        passing_score: 0.8
+        rubric: |
+          Does this response provide a clear, immediate action for a security breach?
+          The response should: suspend account, change password, or contact security team.
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+      - name: "Does not dismiss the issue"
+        type: 2
+        weight: 3
+        code: |
+          def grade(output, expected, context):
+              dismissive_phrases = [
+                  "not our problem", "can't help", "contact your bank",
+                  "nothing we can do", "that's not possible"
+              ]
+              output_lower = output.lower()
+              for phrase in dismissive_phrases:
+                  if phrase in output_lower:
+                      return {"passed": False, "score": 0.0, "reason": f"Dismissive phrase detected: '{phrase}'"}
+              return {"passed": True, "score": 1.0, "reason": "No dismissive language detected"}
+
+  - task_name: "Billing Dispute"
+    description: "Agent should handle billing dispute professionally and offer resolution path"
+    input_data:
+      query: "I was charged twice for my last order. The order number is #12345. Please fix this."
+      order_id: "12345"
+    expected_output: "Acknowledge charge, investigate, offer refund or credit"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["billing", "dispute", "refund"]
+    graders_config:
+      - name: "Acknowledges the double charge"
+        type: 0
+        weight: 3
+        check_type: "contains"
+        expected_value: "charge"
+      - name: "References the order number"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "12345"
+      - name: "Offers resolution"
+        type: 1
+        weight: 5
+        passing_score: 0.8
+        rubric: |
+          Does this response offer a concrete resolution (refund, credit, or investigation)?
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Simple FAQ - Store Hours"
+    description: "Quick lookup for store hours"
+    input_data:
+      query: "What time do you close on Sundays?"
+    expected_output: "Sunday hours or direction to find hours"
+    num_trials: 3
+    difficulty: "easy"
+    tags: ["faq", "hours"]
+    graders_config:
+      - name: "Provides time information"
+        type: 0
+        weight: 7
+        check_type: "regex"
+        pattern: "(\\d{1,2}(:\\d{2})?\\s*(am|pm|AM|PM)|hours|closed)"
+      - name: "Response is concise"
+        type: 2
+        weight: 3
+        code: |
+          def grade(output, expected, context):
+              words = len(output.split())
+              if words <= 50:
+                  return {"passed": True, "score": 1.0, "reason": f"Concise: {words} words"}
+              elif words <= 100:
+                  return {"passed": True, "score": 0.7, "reason": f"Acceptable length: {words} words"}
+              else:
+                  return {"passed": False, "score": 0.3, "reason": f"Too verbose: {words} words for simple FAQ"}
+
+  - task_name: "Negative Feedback Handling"
+    description: "Agent must handle angry customer gracefully without becoming defensive"
+    input_data:
+      query: "Your service is absolutely terrible! I've been waiting 3 weeks for my order and no one can tell me where it is. This is unacceptable!"
+    expected_output: "Empathetic, apologetic, and solution-focused response"
+    num_trials: 5
+    difficulty: "hard"
+    tags: ["angry-customer", "empathy", "escalation"]
+    graders_config:
+      - name: "Apologizes"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "sorry"
+        case_sensitive: false
+      - name: "Does not become defensive"
+        type: 2
+        weight: 4
+        code: |
+          def grade(output, expected, context):
+              defensive_phrases = [
+                  "not our fault", "you should have", "it's not our responsibility",
+                  "we did everything right", "that's incorrect"
+              ]
+              output_lower = output.lower()
+              for phrase in defensive_phrases:
+                  if phrase in output_lower:
+                      return {"passed": False, "score": 0.0, "reason": f"Defensive phrase: '{phrase}'"}
+              return {"passed": True, "score": 1.0, "reason": "No defensive language"}
+      - name: "De-escalation quality"
+        type: 1
+        weight: 4
+        passing_score: 0.8
+        rubric: |
+          Rate this response on de-escalation quality (handling an angry customer).
+          Score 0.0-1.0 based on: empathy (40%), clear next step (40%), professional tone (20%).
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+custom_metrics:
+  - name: "Critical Issue Resolution Rate"
+    description: "Pass rate for tasks tagged 'urgent' or 'security'"
+    code: |
+      def compute(results):
+          critical = [r for r in results
+                      if any(t in r.get('tags', []) for t in ['urgent', 'security', 'escalation'])]
+          if not critical:
+              return 0.0
+          passed = sum(1 for r in critical if r['passed'])
+          return passed / len(critical)
+    unit: "%"
+    warning_threshold: 0.85
+    failure_threshold: 0.7
+
+  - name: "Average Response Quality"
+    description: "Average score across all model-graded quality checks"
+    code: |
+      def compute(results):
+          quality_scores = [r['score'] for r in results
+                           if r.get('grader_name', '').lower().find('quality') >= 0]
+          return sum(quality_scores) / len(quality_scores) if quality_scores else 0.0
+    unit: "score"
+    warning_threshold: 0.75
+    failure_threshold: 0.6

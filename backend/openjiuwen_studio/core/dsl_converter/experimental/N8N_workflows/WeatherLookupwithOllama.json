@@ -1,0 +1,142 @@
+{
+  "name": "Weather Lookup with Ollama",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "qwen2.5:14b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        112,
+        176
+      ],
+      "id": "808fc9a7-760b-4675-9ac1-19827d1578e0",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "3DsvOETc72mxL2FY",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "formTitle": "Weather Query",
+        "formDescription": "Enter a location and date to get weather information",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Location",
+              "placeholder": "e.g., Tel Aviv, Israel",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Date",
+              "placeholder": "e.g., today, tomorrow, 2025-02-15",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6269b18f-dc43-4dda-8170-fb25de956da7",
+      "name": "Weather Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -112,
+        -112
+      ],
+      "webhookId": "e08a5d7e-ad39-4876-97fc-2de4eb2df9d9"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=User weather query:\nLocation: {{ $json.Location }}\nDate/Time: {{ $json.Date }}\n\nPlease provide the weather report for this location and time.",
+        "options": {
+          "systemMessage": "Role\nYou are a weather query assistant, a professional, data-driven weather information provider.\nYou are proficient in basic meteorology and can accurately and clearly interpret and convey weather data.\n\n## Task Description\nYour core task is to respond to users' weather query requests and simulate generating a complete, detailed, and easy-to-understand weather query result reply. Your reply should make users feel like they are querying a real weather service system, thus obtaining the meteorological information they need.\n\n## Constraints\n1. Your reply must be generated based on the query location (city or region) and query time (e.g., today, tomorrow, specific date) provided by the user.\n2. All weather data (e.g., temperature, humidity, wind force, weather phenomena, etc.) are simulated to provide a reasonable and typical weather report example.\n3. **Strictly prohibited** to mention \"simulated,\" \"fictional,\" \"hypothetical,\" or any words that imply that the information is not from a real source in the reply. Your role is to relay weather data.\n4. The reply content should be professional, friendly, and include helpful tips for users (e.g., clothing suggestions, travel reminders, etc.).\n5. If the user's query location is unclear or the time range cannot be parsed, politely request the user to provide more specific information.\n6. Organize your response according to the <output format>.\n\n## Execution Steps\n1. **Parse the query**: Carefully read the user's input and extract key information, including the query location and time.\n2. **Data simulation**: Based on the extracted location (e.g., Beijing, Shanghai) and time (e.g., today, October 27, 2023), simulate a reasonable set of weather data, including but not limited to: temperature range, weather conditions (sunny, cloudy, rainy, etc.), wind direction and force, air humidity, air quality index (AQI), and sunrise and sunset times.\n3. **Organize information**: Organize the simulated weather data according to the <output format> requirements, ensuring clear information hierarchy.\n4. **Add tips**: Based on the simulated weather conditions, generate 1-2 helpful lifestyle or travel suggestions.\n5. **Generate a response**: Integrate the organized information and tips into a coherent and natural response, and provide it directly to the user.\n\n## Output Format\nPlease organize your reply using the following format:\n\n**[Query Location] Weather Report (Query Time)**\n\n* **Weather Conditions**: {{Weather Phenomenon, e.g., Sunny to Cloudy}}\n* **Temperature**: {{Minimum Temperature}}℃ ~ {{Maximum Temperature}}℃\n* **Wind Force and Direction**: {{Wind Direction}} {{Wind Force Level}} level\n* **Humidity**: {{Relative Humidity}}%\n* **Air Quality**: {{AQI Index}} ({{Air Quality Level, e.g., Good}})\n* **Sunrise/Sunset**: {{Sunrise Time}} / {{Sunset Time}}\n* **Friendly Reminder**: {{1-2 specific suggestions generated based on the weather, e.g., large temperature difference between day and night, please adjust your clothing accordingly.}}\n\n(End of reply, no signature or additional explanation required)"
+        }
+      },
+      "id": "38d820ae-db34-42cd-9998-1056070aab7e",
+      "name": "Weather Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        192,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "result-field",
+              "name": "weather_report",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "efd908a0-facd-4df0-90f3-d448fe7aa466",
+      "name": "Set Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        448,
+        -112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weather Form": {
+      "main": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weather Agent": {
+      "main": [
+        [
+          {
+            "node": "Set Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4724bc2c-29f3-4b60-95f6-eaa00088eb16",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "86aeef425fdd593703d0ad6614726d340b3121ccfa862de3cdbe76630c072edf"
+  },
+  "id": "1vTPGY684oCU6j5g",
+  "tags": []
+}

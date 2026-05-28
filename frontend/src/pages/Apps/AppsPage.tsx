@@ -5,13 +5,19 @@ import { MentionItem, DEFAULT_AGENTS, DEFAULT_RESOURCES } from './components/Men
 import AgentConfigDialog, { DeepSearchConfig } from './components/AgentConfigDialog'
 import ChatInputArea from './components/ChatInputArea'
 import ModelPicker from './components/ModelPicker'
-import { useModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
+import { useModels, useVLMModels, getToken, deepsearchHeartbeatService } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useConversationStore, MessageType, TaskStatus, AgentType, DeepsearchExecutionMethod, isTaskOngoing,
   type MessageItems, OUTLINE_INTERACTION_MAX_ROUNDS, MESSAGE_TITLES } from '../../stores/useConversationStore'
+import { DeepsearchAgentType } from '../../stores/handlers/deepsearchSSETypes'
 import { getDefaultSpaceId } from '../../utils/spaceUtils'
-import SSERecorder from '../../utils/sseRecorder'
-import PlaybackPanel from '../../components/Conversation/PlaybackPanel'
+import {
+  type DeepSearchRecordingHandle,
+  type SSEData,
+  useDeepSearchRecordingBridge,
+  useRecordingStore,
+} from '../../modules/recording';
+import RecordingPanel from '../../components/Conversation/RecordingPanel'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../Common/UnifiedSnackbar'
 import ConversationLimitDialog from '../../components/Common/ConversationLimitDialog'
 import { conversationEventEmitter, conversationDB } from '../../utils/conversationDB'
@@ -32,14 +38,56 @@ import { TopToolbar, ViewType } from '../../components/Conversation'
 // 在 .env 中设置 VITE_ENABLE_SSE_DEBUG=true 来启用
 const ENABLE_SSE_DEBUG = import.meta.env.VITE_ENABLE_SSE_DEBUG === 'true'
 
-// AI 改写操作标签映射
-const REWRITE_ACTION_LABELS: Record<string, string> = {
-  polish: '润色',
-  expand: '扩写',
-  shorten: '缩写',
+const REWRITE_ACTION_LABEL_KEYS: Record<string, string> = {
+  polish: 'apps.report.aiPolish',
+  expand: 'apps.report.aiExpand',
+  shorten: 'apps.report.aiShrink',
+  supplementary_search: 'apps.report.aiSupplementarySearch',
+}
+
+const SUPPLEMENTARY_SEARCH_SCOPE_LABEL_KEYS: Record<string, string> = {
+  selected_only: 'apps.report.supplementarySearch.selectedOnly',
+  selected_and_related: 'apps.report.supplementarySearch.selectedAndRelated',
+}
+
+const buildRewriteUserMessage = (t: (key: string, options?: Record<string, unknown>) => string, action: string, selectedText: string, userInstruction?: string, scope?: string): string => {
+  let actionLabel = REWRITE_ACTION_LABEL_KEYS[action] ? t(REWRITE_ACTION_LABEL_KEYS[action]) : action
+  if (action === 'supplementary_search' && scope && SUPPLEMENTARY_SEARCH_SCOPE_LABEL_KEYS[scope]) {
+    actionLabel = `${actionLabel}（${t(SUPPLEMENTARY_SEARCH_SCOPE_LABEL_KEYS[scope])}）`
+  }
+  const displayText = selectedText.length > 100
+    ? `${selectedText.slice(0, 100)}...`
+    : selectedText
+  return userInstruction
+    ? t('apps.report.rewriteHelpText', { actionLabel, displayText, userInstruction })
+    : t('apps.report.rewriteHelpTextShort', { actionLabel, displayText })
 }
 
 // ==================== 主页面组件 ====================
+
+const normalizeMaxRewriteInteractions = (value?: number): number => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 3
+  }
+
+  return Math.max(0, value)
+}
+
+const getRewriteRoundState = (
+  maxInteractionsValue: number | undefined,
+  originalRemainingRewriteRounds: number | undefined
+) => {
+  const maxInteractions = normalizeMaxRewriteInteractions(maxInteractionsValue)
+  const isFirstRewrite = originalRemainingRewriteRounds === undefined
+  const newRemaining = isFirstRewrite
+    ? Math.max(0, maxInteractions - 1)
+    : Math.max(0, (originalRemainingRewriteRounds ?? 0) - 1)
+
+  return {
+    maxInteractions,
+    newRemaining,
+  }
+}
 
 const AppsPage: React.FC = () => {
   const { user } = useAuthStore()
@@ -65,7 +113,14 @@ const AppsPage: React.FC = () => {
   // ===== MindMap 思维链面板状态 =====
   const [showMindMap, setShowMindMap] = useState(false)
   const [mindMapMessageItemsId, setMindMapMessageItemsId] = useState<string | null>(null)
-  
+
+  // ===== 录制模块 =====
+  const {
+    createMainFlowRecording,
+    createRewriteRecording,
+    tryMockRewrite,
+  } = useDeepSearchRecordingBridge()
+
   // ===== 右侧面板状态管理 =====
   const [currentMessageItemsId, setCurrentMessageItemsId] = useState<string | null>(null)
   const [lastSelectedReportId, setLastSelectedReportId] = useState<string | null>(null)
@@ -102,6 +157,7 @@ const AppsPage: React.FC = () => {
   const selectedResultMessageId = useConversationStore(state => state.selectedResultMessageId)
   const isLoading = useConversationStore(state => state.isLoading)
   const sseProcessingQueue = useConversationStore(state => state.sseProcessingQueue)
+  const playbackStatus = useRecordingStore(state => state.playbackStatus)
   const SESSION_CONVERSATION_ID = useConversationStore(state => state.SESSION_CONVERSATION_ID)
   const getMessageItemsByConversationId = useConversationStore(state => state.getMessageItemsByConversationId)
   const mindMapManagersMap = useConversationStore(state => state.mindMapManagersMap)
@@ -115,7 +171,8 @@ const AppsPage: React.FC = () => {
   // isSending: 发起请求时的状态
   // isLoading: 从 store 读取的加载状态
   // sseProcessingQueue: SSE 事件队列是否正在处理
-  const isStreaming = isSending || isLoading || sseProcessingQueue
+  const isPlaybackReplaying = playbackStatus === 'playing' || playbackStatus === 'paused'
+  const isStreaming = isSending || isLoading || (!isPlaybackReplaying && sseProcessingQueue)
 
   // 订阅 messageItemsMap 来触发 messageItemsList 重新计算
   const messageItemsMap = useConversationStore(state => state.messageItemsMap)
@@ -209,6 +266,7 @@ const AppsPage: React.FC = () => {
         } catch (error) {
           console.error('[AppsPage] Failed to delete oldest conversation:', error)
         }
+
       }
 
       // 创建新对话
@@ -259,6 +317,12 @@ const AppsPage: React.FC = () => {
     size: 100,
   })
 
+  const { data: vlmModelsData, isLoading: vlmModelsLoading } = useVLMModels({
+    spaceId: user?.spaceId || getDefaultSpaceId(),
+    is_active: true,
+    size: 100,
+  })
+
   // 提取模型名称列表和 ID 映射
   const models = modelsData?.items?.map(model => model.name) || []
   const modelIdMap = React.useMemo(() => {
@@ -292,6 +356,27 @@ const AppsPage: React.FC = () => {
       model_from: model.is_system_model ? 'config' : 'db',
     }))
   }, [modelsData])
+
+  const availableVLMModels = React.useMemo(() => {
+    if (!vlmModelsData?.items) return []
+    return vlmModelsData.items.map(model => ({
+      tags: model.tags || [],
+      icon: '',
+      openModel: {
+        model_id: model.id,
+        name: model.name,
+        desc: model.description || '',
+        workspace_id: '',
+        param_config: { param_schemas: [] },
+      },
+      series: {
+        icon: '',
+        name: model.modelId || '',
+        vendor: model.provider || '',
+      },
+      model_from: 'db',
+    }))
+  }, [vlmModelsData])
 
   // 从 localStorage 恢复对话状态和智能体配置
   useEffect(() => {
@@ -347,6 +432,7 @@ const AppsPage: React.FC = () => {
         if (modelName) {
           setSelectedModel(modelName)
         }
+
       }
     }
   }, [agentConfigs['deepsearch']?.generalModelId, modelIdMap, selectedModelId])
@@ -427,6 +513,7 @@ const AppsPage: React.FC = () => {
         if (matchedAgent) {
           setSelectedAgent(matchedAgent)
         }
+
       }
     }
   }, [currentConversationId])
@@ -567,23 +654,6 @@ const AppsPage: React.FC = () => {
       backend_message: backendMessage,
     })
   }, [pendingOutlineInteraction])
-
-  // ===== SSE 回放事件监听 =====
-  useEffect(() => {
-    const handlePlaybackEvent = (event: Event) => {
-      const customEvent = event as CustomEvent<{ data: any; conversationId: string }>
-      const { data, conversationId } = customEvent.detail
-
-      // 将回放的 SSE 事件转发到 ConversationStore
-      useConversationStore.getState().handleSSEMessage(data, conversationId)
-    }
-
-    window.addEventListener('sse-playback-event', handlePlaybackEvent)
-
-    return () => {
-      window.removeEventListener('sse-playback-event', handlePlaybackEvent)
-    }
-  }, [])
 
   // ===== 监听 IndexDB 存储警告和删除确认事件 =====
   useEffect(() => {
@@ -737,256 +807,667 @@ const AppsPage: React.FC = () => {
     setInputValue(suggestion)
     chatInputRef.current?.focus()
   }
-
   /**
    * 报告局部改写处理函数
    * 复用 DeepSearch 配置，通过 SSE 流处理改写结果
    * 将改写请求和结果集成到对话流中
-   */
+  */
+  const supplementarySearchTitle = t('apps.report.aiSupplementarySearch')
   const handleReportRewrite = async (params: ReportRewriteParams) => {
-    const { action, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError } = params
+    const { action, rewrite_scope, selectedText, startOffset, endOffset, userInstruction, conversationId, onStatusChange, onDelta, onSnapshot, onEnd, onError, silent } = params
 
-    // 获取配置
     const config = agentConfigs['deepsearch'] || DEFAULT_DEEPSEARCH_CONFIG
+    const rewriteSessionUnavailableMessage = t('apps.report.rewriteSessionUnavailable')
+    const isSyncAction = action === 'sync'
 
     if (config.userFeedbackProcessorEnable === false) {
       onStatusChange?.('error')
-      onError?.('用户反馈优化已关闭，当前报告不可编辑')
+      onError?.(t('apps.report.feedbackProcessorDisabled'))
       return
     }
 
     const token = getToken()
+    const conversationStore = useConversationStore.getState()
 
-    if (!token) {
-      onError('无法获取认证信息，请重新登录')
-      return
-    }
-
-    // 获取带 session 的 conversation_id（与主 DeepSearch 流程一致）
-    const sessionConversationId = useConversationStore.getState().SESSION_CONVERSATION_ID
-    const backendConversationId = sessionConversationId || conversationId
-
-    // 【重要】在处理 rewrite 之前，先获取当前报告的剩余改写次数
-    // 这样才能正确计算递减，而不是每次都从新消息的 undefined 开始
-    const currentSelectedResultMessageId = useConversationStore.getState().selectedResultMessageId
-    const currentMessagesMap = useConversationStore.getState().messagesMap
-    const currentMessageItemsMap = useConversationStore.getState().messageItemsMap
-
-    let originalRemainingRewriteRounds: number | undefined = undefined
-    let originalMaxRewriteRounds: number | undefined = undefined
-
-    if (currentSelectedResultMessageId) {
-      const currentMessage = currentMessagesMap.get(currentSelectedResultMessageId)
-      if (currentMessage?.messageItemsId) {
-        const currentMessageItems = currentMessageItemsMap.get(currentMessage.messageItemsId)
-        originalRemainingRewriteRounds = currentMessageItems?.remainingRewriteRounds
-        originalMaxRewriteRounds = currentMessageItems?.maxRewriteRounds
+    // For sync: immediately write the edited markdown to the store and IndexDB.
+    // The backend only returns {"action_category":"sync","synced":true} — no final_result —
+    // so we cannot rely on applyRewriteFinalResult to do this update.
+    if (isSyncAction) {
+      const syncMsgId = conversationStore.selectedResultMessageId
+      if (syncMsgId) {
+        const syncMsg = conversationStore.messagesMap.get(syncMsgId)
+        if (syncMsg?.messageItemsId) {
+          try {
+            const rawContent = typeof syncMsg.content === 'string'
+              ? syncMsg.content
+              : JSON.stringify(syncMsg.content)
+            const existingContent = JSON.parse(rawContent || '{}')
+            conversationStore.updateMessage(
+              syncMsg.messageItemsId,
+              syncMsgId,
+              {
+                content: JSON.stringify({ ...existingContent, response_content: selectedText }),
+                status: TaskStatus.COMPLETED,
+                isStreaming: false,
+              }
+            )
+            void conversationStore.saveConversationToDB(conversationId)
+          } catch (err) {
+            console.error('[handleReportRewrite] sync local save failed:', err)
+          }
+        }
       }
     }
 
-    // 1. 添加用户消息到对话流
-    const actionLabel = REWRITE_ACTION_LABELS[action] || action
-    const userMessageContent = userInstruction
-      ? `请帮我${actionLabel}这段文字：\n\n"${selectedText.slice(0, 100)}${selectedText.length > 100 ? '...' : ''}"\n\n${userInstruction}`
-      : `请帮我${actionLabel}这段文字：\n\n"${selectedText.slice(0, 100)}${selectedText.length > 100 ? '...' : ''}"`
-
-    addUserMessage(conversationId, userMessageContent)
-
-    // 构建改写消息 payload（参考 test_feedback1.py 格式）
-    const messagePayload = {
-      action,
-      selected_text: selectedText,
-      start_offset: startOffset,
-      end_offset: endOffset,
-      user_instruction: userInstruction || '',
+    if (!token) {
+      onError?.(t('apps.errors.unableToGetAuthToken'))
+      return
     }
 
-    // 构建 local_search_config
-    const local_search_config = (config.searchMode === 'local' || config.searchMode === 'all')
-      ? {
-          local_search_config_ids: config.selectedKnowledgeBaseIds || [],
-          max_local_search_results: config.localSearchResultCount,
-          recall_threshold: config.recallThreshold,
-        }
-      : undefined
+    const sessionConversationId = conversationStore.SESSION_CONVERSATION_ID
+    if (!sessionConversationId) {
+      onStatusChange?.('error')
+      onError?.(rewriteSessionUnavailableMessage)
+      return
+    }
+    const backendConversationId = sessionConversationId
+    const currentSelectedResultMessageId = conversationStore.selectedResultMessageId
 
-    // 构建 web_search_config
-    const web_search_config = (config.searchMode === 'web' || config.searchMode === 'all')
-      ? {
-          web_search_config_id: config.selectedWebSearchEngineId!,
-          max_web_search_results: config.webSearchResultCount,
+    type RewriteRoundContext = {
+      originalRemainingRewriteRounds: number | undefined
+      originalMaxRewriteRounds: number | undefined
+    }
+    const getOriginalRewriteRoundContext = (): RewriteRoundContext => {
+      if (!conversationStore.selectedResultMessageId) {
+        return {
+          originalRemainingRewriteRounds: undefined,
+          originalMaxRewriteRounds: undefined,
         }
-      : undefined
+      }
 
-    // 续写请求：复用 DeepSearch 配置，message 为 JSON 格式的改写指令
-    // 参考 test_feedback1.py 的 build_next_payload，续写时保留所有基础配置
-    try {
+      const currentMessage = conversationStore.messagesMap.get(conversationStore.selectedResultMessageId)
+      const currentMessageItems = currentMessage?.messageItemsId
+        ? conversationStore.messageItemsMap.get(currentMessage.messageItemsId)
+        : undefined
+
+      return {
+        originalRemainingRewriteRounds: currentMessageItems?.remainingRewriteRounds,
+        originalMaxRewriteRounds: currentMessageItems?.maxRewriteRounds,
+      }
+    }
+    const { originalRemainingRewriteRounds, originalMaxRewriteRounds } = getOriginalRewriteRoundContext()
+
+    if (!silent) {
+      const userMessageContent = buildRewriteUserMessage(t, action, selectedText, userInstruction, rewrite_scope)
+      addUserMessage(conversationId, userMessageContent)
+    }
+
+    type RewriteRequestContext = {
+      messagePayload: {
+        action: ReportRewriteParams['action']
+        rewrite_scope: ReportRewriteParams['rewrite_scope']
+        selected_text: string
+        start_offset: number
+        end_offset: number
+        user_instruction: string
+      }
+      rewriteRequest: {
+        action: ReportRewriteParams['action']
+        rewrite_scope: ReportRewriteParams['rewrite_scope']
+        selectedText: string
+        startOffset: number
+        endOffset: number
+        userInstruction?: string
+      }
+      local_search_config: {
+        local_search_config_ids: string[]
+        max_local_search_results: number
+        recall_threshold: number
+      } | undefined
+      web_search_config: {
+        web_search_config_id: number
+        max_web_search_results: number
+      } | undefined
+    }
+    const createRewriteRequestContext = (): RewriteRequestContext => ({
+      messagePayload: {
+        action,
+        rewrite_scope: rewrite_scope,
+        selected_text: selectedText,
+        start_offset: startOffset,
+        end_offset: endOffset,
+        user_instruction: userInstruction || '',
+      },
+      rewriteRequest: {
+        action,
+        rewrite_scope: rewrite_scope,
+        selectedText,
+        startOffset,
+        endOffset,
+        userInstruction,
+      },
+      local_search_config: (config.searchMode === 'local' || config.searchMode === 'all')
+        ? {
+            local_search_config_ids: config.selectedKnowledgeBaseIds || [],
+            max_local_search_results: config.localSearchResultCount,
+            recall_threshold: config.recallThreshold,
+          }
+        : undefined,
+      web_search_config: (config.searchMode === 'web' || config.searchMode === 'all')
+        ? {
+            web_search_config_id: config.selectedWebSearchEngineId!,
+            max_web_search_results: config.webSearchResultCount,
+          }
+        : undefined,
+    })
+    const { messagePayload, rewriteRequest, local_search_config, web_search_config } = createRewriteRequestContext()
+    const rewriteFeedbackAgent = 'user_feedback_processor'
+    type RewriteRuntimeState = {
+      finalResultMessageId: string | null
+      hasReceivedContent: boolean
+      collectorTaskMessageId: string | null
+      collectorTaskMessageItemsId: string | null
+    }
+    type RewriteProcessResult = {
+      status: 'continue' | 'completed' | 'error'
+      error?: string
+    }
+    type RewriteHandleOptions = {
+      stop?: () => Promise<void>
+      logError?: boolean
+    }
+    type RewriteEventConsumer = (events: RewriteEventData[]) => Promise<boolean>
+    type RewriteEventData = {
+      agent?: string
+      content?: unknown
+    }
+    type RewriteFinalResult = {
+      response_content: string
+      citation_messages?: unknown
+      infer_messages?: unknown[]
+      chart_messages?: unknown[]
+    }
+    type RewriteReportMessage = {
+      id: string
+      messageItemsId: string
+    }
+    type RewriteAgentContent = {
+      error?: string
+      rewritten_text?: string
+      original_start_offset?: number
+      original_end_offset?: number
+      final_result?: RewriteFinalResult
+    }
+    type RewriteChunkParseResult = {
+      events: RewriteEventData[]
+      remainingBuffer: string
+    }
+    type RewriteChunkConsumeResult = {
+      handled: boolean
+      remainingBuffer: string
+    }
+    type LiveRewriteRuntime = {
+      stop: () => Promise<void>
+      consumeEvents: RewriteEventConsumer
+    }
+    const parseRewriteAgentContent = (rawContent: string): RewriteAgentContent | null => {
+      try {
+        return JSON.parse(rawContent) as RewriteAgentContent
+      } catch {
+        return null
+      }
+    }
+    const parseRewriteEventData = (rawData: string): RewriteEventData | null => {
+      try {
+        return JSON.parse(rawData) as RewriteEventData
+      } catch {
+        return null
+      }
+    }
+    const buildRewriteReportContent = (finalResult: RewriteFinalResult) => ({
+      response_content: finalResult.response_content,
+      citation_messages: finalResult.citation_messages || null,
+      infer_messages: finalResult.infer_messages || [],
+      chart_messages: finalResult.chart_messages || [],
+    })
+    const createRewriteReportMessage = (reportContent: ReturnType<typeof buildRewriteReportContent>): RewriteReportMessage | null => {
+      const newMessage = addSystemMessage(
+        conversationId,
+        MessageType.REPORT,
+        JSON.stringify(reportContent),
+        undefined,
+        MESSAGE_TITLES.FINAL_REPORT,
+        'deepsearch'
+      )
+
+      return newMessage
+        ? { id: newMessage.id, messageItemsId: newMessage.messageItemsId }
+        : null
+    }
+    const finalizeRewriteReportMessage = (message: RewriteReportMessage) => {
+      setSelectedResultMessageId(message.id)
+
+      const { maxInteractions, newRemaining } = getRewriteRoundState(
+        config.userFeedbackProcessorMaxInteractions,
+        originalRemainingRewriteRounds
+      )
+      const remainingRewriteRounds = isSyncAction
+        ? originalRemainingRewriteRounds ?? maxInteractions
+        : newRemaining
+
+      conversationStore.updateMessage(
+        message.messageItemsId,
+        message.id,
+        { status: TaskStatus.COMPLETED, isStreaming: false }
+      )
+
+      conversationStore.updateMessageItems(
+        message.messageItemsId,
+        {
+          status: TaskStatus.COMPLETED,
+          remainingRewriteRounds,
+          maxRewriteRounds: originalMaxRewriteRounds ?? maxInteractions
+        }
+      )
+    }
+    const updateCurrentRewriteReportMessage = (reportContent: ReturnType<typeof buildRewriteReportContent>) => {
+      if (!currentSelectedResultMessageId) {
+        return false
+      }
+
+      const currentMessage = conversationStore.messagesMap.get(currentSelectedResultMessageId)
+      if (!currentMessage?.messageItemsId) {
+        return false
+      }
+
+      conversationStore.updateMessage(
+        currentMessage.messageItemsId,
+        currentSelectedResultMessageId,
+        {
+          content: JSON.stringify(reportContent),
+          status: TaskStatus.COMPLETED,
+          isStreaming: false,
+        }
+      )
+      return true
+    }
+    const applyRewriteFinalResult = (finalResult: RewriteFinalResult, state: Pick<RewriteRuntimeState, 'finalResultMessageId'>) => {
+      onSnapshot?.({ response_content: finalResult.response_content })
+      const reportContent = buildRewriteReportContent(finalResult)
+
+      if (isSyncAction && updateCurrentRewriteReportMessage(reportContent)) {
+        return
+      }
+
+      if (!state.finalResultMessageId) {
+        const newMessage = createRewriteReportMessage(reportContent)
+        if (newMessage) {
+          state.finalResultMessageId = newMessage.id
+          finalizeRewriteReportMessage(newMessage)
+        }
+      }
+    }
+    const applyRewriteContent = (
+      content: RewriteAgentContent,
+      state: RewriteRuntimeState
+    ): RewriteProcessResult => {
+      if (content.error) {
+        return { status: 'error', error: content.error }
+      }
+
+      if (typeof content.rewritten_text === 'string') {
+        if (!state.hasReceivedContent) {
+          state.hasReceivedContent = true
+          onStatusChange?.('writing')
+        }
+
+        onDelta?.({
+          rewritten_text: content.rewritten_text,
+          original_start_offset: content.original_start_offset ?? 0,
+          original_end_offset: content.original_end_offset ?? content.rewritten_text.length,
+        })
+      }
+
+      if (content.final_result && typeof content.final_result.response_content === 'string') {
+        applyRewriteFinalResult(content.final_result, state)
+      }
+
+      return { status: 'continue' }
+    }
+    const processRewriteEvent = (
+      data: RewriteEventData,
+      state: RewriteRuntimeState
+    ): RewriteProcessResult => {
+      // 处理结束
+      if (data.agent === 'end' && data.content === 'ALL END') {
+        return { status: 'completed' }
+      }
+
+      // 处理 collector_info_retrieval 事件
+      if (data.agent === 'collector_info_retrieval' && typeof data.content === 'string') {
+        // 创建或获取根任务
+        if (!state.collectorTaskMessageId) {
+          const taskMessage = addSystemMessage(
+            conversationId,
+            MessageType.TASK,
+            '',
+            undefined,
+            supplementarySearchTitle,
+            'deepsearch'
+          )
+          if (taskMessage) {
+            state.collectorTaskMessageId = taskMessage.id
+            state.collectorTaskMessageItemsId = taskMessage.messageItemsId
+            conversationStore.updateMessage(
+              taskMessage.messageItemsId,
+              taskMessage.id,
+              { status: TaskStatus.IN_PROGRESS, isStreaming: false }
+            )
+          }
+        }
+
+        // 添加 link 子消息
+        if (state.collectorTaskMessageId && state.collectorTaskMessageItemsId) {
+          try {
+            const linkContent = JSON.parse(data.content)
+            const childMessage = conversationStore.addMessageAsChild(
+              state.collectorTaskMessageItemsId,
+              state.collectorTaskMessageId,
+              MessageType.LINK,
+              linkContent,
+              `collector_info_retrieval: ${linkContent.title || t('apps.deepSearch.searchResults')}`
+            )
+            if (childMessage) {
+              conversationStore.updateMessage(
+                childMessage.messageItemsId,
+                childMessage.id,
+                { status: TaskStatus.COMPLETED, isStreaming: false }
+              )
+            }
+          } catch (e) {
+            console.error('[handleReportRewrite] Failed to parse collector_info_retrieval content:', e)
+          }
+        }
+        return { status: 'continue' }
+      }
+
+      // 处理 collector_summary 事件
+      if (data.agent === 'collector_summary' && typeof data.content === 'string') {
+        if (state.collectorTaskMessageId && state.collectorTaskMessageItemsId) {
+          const childMessage = conversationStore.addMessageAsChild(
+            state.collectorTaskMessageItemsId,
+            state.collectorTaskMessageId,
+            MessageType.TEXT,
+            data.content,
+            t('apps.deepSearch.informationSummary')
+          )
+          if (childMessage) {
+            conversationStore.updateMessage(
+              childMessage.messageItemsId,
+              childMessage.id,
+              { status: TaskStatus.COMPLETED, isStreaming: false }
+            )
+            // 更新根任务状态为完成
+            conversationStore.updateMessage(
+              childMessage.messageItemsId,
+              state.collectorTaskMessageId,
+              { status: TaskStatus.COMPLETED }
+            )
+          }
+        }
+        return { status: 'continue' }
+      }
+
+      // 处理 user_feedback_processor 事件（最终报告）
+      if (data.agent !== rewriteFeedbackAgent || typeof data.content !== 'string') {
+        return { status: 'continue' }
+      }
+
+      const content = parseRewriteAgentContent(data.content)
+      if (content) {
+        return applyRewriteContent(content, state)
+      }
+
+      return { status: 'continue' }
+    }
+    const createRewriteState = (): RewriteRuntimeState => ({
+      finalResultMessageId: null,
+      hasReceivedContent: false,
+      collectorTaskMessageId: null,
+      collectorTaskMessageItemsId: null,
+    })
+    const finishRewrite = () => {
+      useConversationStore.getState().stopSSETimeoutMonitor()
+      onStatusChange?.('idle')
+      onEnd?.()
+    }
+    const failRewrite = async (
+      error: string | undefined,
+      options?: RewriteHandleOptions
+    ) => {
+      const errorMessage = error || t('apps.errors.requestFailed')
+      if (options?.logError) {
+        console.error('[handleReportRewrite] Backend error:', errorMessage)
+      }
+      await options?.stop?.()
+      useConversationStore.getState().stopSSETimeoutMonitor()
+      onStatusChange?.('error')
+      onError?.(errorMessage)
+    }
+    const handleRewriteResult = async (
+      result: RewriteProcessResult,
+      options?: RewriteHandleOptions
+    ) => {
+      if (result.status === 'completed') {
+        await options?.stop?.()
+        finishRewrite()
+        return true
+      }
+
+      if (result.status === 'error') {
+        await failRewrite(result.error, options)
+        return true
+      }
+
+      return false
+    }
+    const handleRewriteData = async (
+      data: RewriteEventData,
+      state: RewriteRuntimeState,
+      options?: RewriteHandleOptions
+    ) => handleRewriteResult(processRewriteEvent(data, state), options)
+    const consumeRewriteEvents = async (
+      events: RewriteEventData[],
+      state: RewriteRuntimeState,
+      options?: RewriteHandleOptions,
+      beforeHandle?: (data: RewriteEventData) => void
+    ) => {
+      for (const data of events) {
+        beforeHandle?.(data)
+        const handled = await handleRewriteData(data, state, options)
+        if (handled) {
+          return true
+        }
+      }
+
+      return false
+    }
+    const createRewriteEventConsumer = (
+      state: RewriteRuntimeState,
+      options?: RewriteHandleOptions,
+      beforeHandle?: (data: RewriteEventData) => void
+    ): RewriteEventConsumer => {
+      return (events) => consumeRewriteEvents(events, state, options, beforeHandle)
+    }
+    const createMockedRewriteEventConsumer = (): RewriteEventConsumer => createRewriteEventConsumer(
+      createRewriteState()
+    )
+    const runRewriteEventSequence = async (
+      events: RewriteEventData[],
+      consumeEvents: RewriteEventConsumer,
+      onUnhandled?: () => void | Promise<void>
+    ) => {
+      const handled = await consumeEvents(events)
+      if (!handled) {
+        await onUnhandled?.()
+      }
+
+      return handled
+    }
+    const collectMockedRewriteEvents = async () => {
+      const mockedEvents: RewriteEventData[] = []
+      const mocked = await tryMockRewrite(rewriteRequest, (event) => {
+        mockedEvents.push(event.data)
+      })
+
+      return { mocked, mockedEvents }
+    }
+    const parseRewriteChunkEvents = (
+      chunk: Uint8Array,
+      decoder: TextDecoder,
+      currentBuffer: string
+    ): RewriteChunkParseResult => {
+      const nextBuffer = currentBuffer + decoder.decode(chunk, { stream: true })
+      const lines = nextBuffer.split('\n')
+      const remainingBuffer = lines.pop() || ''
+      const events: RewriteEventData[] = []
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+
+        const data = parseRewriteEventData(line.slice(6))
+        if (data) {
+          events.push(data)
+        }
+      }
+
+      return { events, remainingBuffer }
+    }
+    const runMockedRewriteEvents = async (events: RewriteEventData[]) => {
+      const consumeMockedRewriteEvents = createMockedRewriteEventConsumer()
+      await runRewriteEventSequence(events, consumeMockedRewriteEvents, finishRewrite)
+      return true
+    }
+    const runMockedRewrite = async () => {
+      const { mocked, mockedEvents } = await collectMockedRewriteEvents()
+
+      if (!mocked) {
+        return false
+      }
+
+      return runMockedRewriteEvents(mockedEvents)
+    }
+
+    if (await runMockedRewrite()) {
+      return
+    }
+
+    const createLiveRewriteRuntime = (): LiveRewriteRuntime => {
+      const rewriteRecording = createRewriteRecording({
+        enabled: ENABLE_SSE_DEBUG,
+        request: rewriteRequest,
+      })
+      const stop = async () => {
+        await rewriteRecording?.stop()
+      }
+
+      return {
+        stop,
+        consumeEvents: createRewriteEventConsumer(
+          createRewriteState(),
+          { stop, logError: true },
+          (data) => rewriteRecording?.record(data as SSEData)
+        ),
+      }
+    }
+    const buildLiveRewriteRequestBody = () => ({
+      space_id: user?.spaceId || getDefaultSpaceId(),
+      general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
+      message: JSON.stringify(messagePayload),
+      conversation_id: backendConversationId,
+      search_mode: 'research',
+      web_search_config,
+      local_search_config,
+      user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
+      user_feedback_processor_max_interactions: normalizeMaxRewriteInteractions(config.userFeedbackProcessorMaxInteractions),
+      execution_method: config.execution_method ?? DEFAULT_DEEPSEARCH_CONFIG.execution_method,
+    })
+    const requestLiveRewriteStream = async () => {
       const response = await fetch('/api/v1/agent/deepsearch/run', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          space_id: user?.spaceId || getDefaultSpaceId(),
-          general_model_config_id: config.generalModelId ? parseInt(config.generalModelId) : selectedModelId,
-          message: JSON.stringify(messagePayload),
-          conversation_id: backendConversationId,
-          // 保留搜索配置（续写时后端会根据 conversation_id 恢复 workflow 状态）
-          search_mode: 'research',
-          web_search_config,
-          local_search_config,
-          // 报告局部改写配置
-          user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
-          user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
-          execution_method: config.execution_method ?? DEFAULT_DEEPSEARCH_CONFIG.execution_method,
-        }),
+        body: JSON.stringify(buildLiveRewriteRequestBody()),
       })
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // 处理 SSE 流
       const reader = response.body?.getReader()
       if (!reader) {
         throw new Error('No response body')
       }
 
+      return reader
+    }
+    const consumeLiveRewriteChunk = async (
+      chunk: Uint8Array,
+      decoder: TextDecoder,
+      currentBuffer: string,
+      consumeEvents: RewriteEventConsumer
+    ): Promise<RewriteChunkConsumeResult> => {
+      const parsedChunk = parseRewriteChunkEvents(chunk, decoder, currentBuffer)
+      const handled = await runRewriteEventSequence(parsedChunk.events, consumeEvents)
+
+      return {
+        handled,
+        remainingBuffer: parsedChunk.remainingBuffer,
+      }
+    }
+    const finishLiveRewriteStream = async (stop: () => Promise<void>) => {
+      await stop()
+      onEnd?.()
+    }
+    const consumeLiveRewriteStream = async (
+      reader: ReadableStreamDefaultReader<Uint8Array>,
+      runtime: LiveRewriteRuntime
+    ) => {
       const decoder = new TextDecoder()
       let buffer = ''
-      const FEEDBACK_AGENT = 'user_feedback_processor'
-      let finalResultMessageId: string | null = null
-      let hasReceivedContent = false  // 用于追踪是否已收到内容
-
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          onEnd()
+          await finishLiveRewriteStream(runtime.stop)
           break
         }
 
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
+        useConversationStore.getState().updateLastSSEEventTime()
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
+        const chunkResult = await consumeLiveRewriteChunk(value, decoder, buffer, runtime.consumeEvents)
+        buffer = chunkResult.remainingBuffer
 
-          const raw = line.slice(6)
-          try {
-            const data = JSON.parse(raw)
-
-            // 处理 ALL END
-            if (data.agent === 'end' && data.content === 'ALL END') {
-              onStatusChange?.('idle')
-              onEnd()
-              return
-            }
-
-            // 处理 agent 响应
-            if (data.agent === FEEDBACK_AGENT && typeof data.content === 'string') {
-              try {
-                const content = JSON.parse(data.content)
-
-                // 处理错误信息
-                if (content.error) {
-                  console.error('[handleReportRewrite] Backend error:', content.error)
-                  onStatusChange?.('error')
-                  onError(content.error)
-                  return
-                }
-
-                // 后端同时返回 rewritten_text（增量）和 final_result.response_content（完整快照）
-                // 参考: user_feedback_processor.py 构建的 content_payload
-
-                // 1. 处理增量 delta（选中文本的改写结果）
-                if (typeof content.rewritten_text === 'string') {
-                  // 第一次收到内容时，切换状态为 writing
-                  if (!hasReceivedContent) {
-                    hasReceivedContent = true
-                    onStatusChange?.('writing')
-                  }
-
-                  onDelta({
-                    rewritten_text: content.rewritten_text,
-                    original_start_offset: content.original_start_offset,
-                    original_end_offset: content.original_end_offset,
-                  })
-                }
-
-                // 2. 处理完整快照（在 final_result 中），添加到对话流
-                if (content.final_result && typeof content.final_result.response_content === 'string') {
-                  onSnapshot({ response_content: content.final_result.response_content })
-
-                  // 添加 REPORT 消息到对话流（FINAL_REPORT 类型）
-                  const reportContent = {
-                    response_content: content.final_result.response_content,
-                    citation_messages: content.final_result.citation_messages || null,
-                    infer_messages: content.final_result.infer_messages || [],
-                  }
-
-                  // 如果还没有创建过 final_result 消息，创建一个新的
-                  if (!finalResultMessageId) {
-                    const newMessage = addSystemMessage(
-                      conversationId,
-                      MessageType.REPORT,
-                      JSON.stringify(reportContent),
-                      undefined,
-                      MESSAGE_TITLES.FINAL_REPORT,
-                      'deepsearch'
-                    )
-                    if (newMessage) {
-                      finalResultMessageId = newMessage.id
-                      // 自动选中新创建的报告
-                      setSelectedResultMessageId(newMessage.id)
-
-                      // user_feedback_processor 返回 final_result 后可能还会等待用户下一次输入
-                      // 所以需要在这里就更新状态为 COMPLETED，而不是等 ALL END
-
-                      // 计算剩余改写次数
-                      // 逻辑：最大3次时，第一次完成显示2/3，第二次显示1/3，第三次显示0/3（已用完）
-                      // 【重要】使用函数开头捕获的原始报告的 remainingRewriteRounds
-                      // 而不是新消息的值（新消息始终是 undefined）
-                      const maxInteractions = config.userFeedbackProcessorMaxInteractions ?? 3
-
-                      // 第一次改写时 originalRemainingRewriteRounds 为 undefined
-                      const isFirstRewrite = originalRemainingRewriteRounds === undefined
-                      const newRemaining = isFirstRewrite
-                        ? maxInteractions - 1  // 第一次完成后剩余 max-1
-                        : Math.max(0, (originalRemainingRewriteRounds ?? 0) - 1)
-
-                      useConversationStore.getState().updateMessage(
-                        newMessage.messageItemsId,
-                        newMessage.id,
-                        { status: TaskStatus.COMPLETED, isStreaming: false }
-                      )
-                      useConversationStore.getState().updateMessageItems(
-                        newMessage.messageItemsId,
-                        {
-                          status: TaskStatus.COMPLETED,
-                          remainingRewriteRounds: newRemaining,
-                          // 保持原始的最大次数，如果是第一次则使用配置值
-                          maxRewriteRounds: originalMaxRewriteRounds ?? maxInteractions
-                        }
-                      )
-                    }
-                  }
-                }
-              } catch {
-                // content 不是 JSON，忽略
-              }
-            }
-          } catch {
-            // JSON 解析失败，忽略
-          }
+        if (chunkResult.handled) {
+          return
         }
       }
+    }
+    const liveRewriteRuntime = createLiveRewriteRuntime()
+    const runLiveRewrite = async () => {
+      const reader = await requestLiveRewriteStream()
+      await consumeLiveRewriteStream(reader, liveRewriteRuntime)
+    }
+
+    try {
+      await runLiveRewrite()
     } catch (err) {
-      onError(err instanceof Error ? err.message : '请求失败')
+      await failRewrite(err instanceof Error ? err.message : undefined, {
+        stop: liveRewriteRuntime.stop,
+      })
     }
   }
-
   // 处理智能体选择（首次配置弹出配置弹窗，非首次配置直接选中）
   const handleAgentSelect = (agent: MentionItem) => {
     // 如果是 DeepSearch 智能体，总是检查服务状态
@@ -1375,7 +1856,7 @@ const AppsPage: React.FC = () => {
     // 标记SSE是否正常完成（收到正常结束信号）
     // 需要在 try 块外定义，这样 finally 块也能访问
     let sseCompletedNormally = false
-    let recordingId: string | undefined
+    let mainFlowRecording: DeepSearchRecordingHandle | null = null
 
     // 如果没有 conversation，先创建一个
     let conversationId = currentConversationId
@@ -1461,6 +1942,12 @@ const AppsPage: React.FC = () => {
 
       // ===== HITL 判断逻辑：判断是否是回复 HITL interrupt 消息 =====
       let interrupt_feedback = options?.interrupt_feedback ?? ''  // 默认为空
+      let continuationInteraction: {
+        kind: 'hitl' | 'outline'
+        feedback: string
+        userMessage: string
+        backendMessage?: string
+      } | null = null
 
       const messageItemsList = useConversationStore.getState().getCurrentMessageItemsList()
 
@@ -1512,9 +1999,19 @@ const AppsPage: React.FC = () => {
               if (lastMessage.type === MessageType.OUTLINE_INTERACTION) {
                 // 大纲交互：用户在输入框输入的是修改意见
                 interrupt_feedback = 'revise_comment'
+                continuationInteraction = {
+                  kind: 'outline',
+                  feedback: 'revise_comment',
+                  userMessage: content,
+                }
               } else {
                 // 普通 INTERRUPT：用户反馈
                 interrupt_feedback = 'accepted'
+                continuationInteraction = {
+                  kind: 'hitl',
+                  feedback: 'accepted',
+                  userMessage: content,
+                }
               }
             } else {
               // Agent 不匹配：更新 interrupt 消息状态为 CANCELLED
@@ -1558,17 +2055,16 @@ const AppsPage: React.FC = () => {
       // ===== SSE 录制：开始录制（仅开发模式） =====
       if (ENABLE_SSE_DEBUG) {
         try {
-          // 从 localStorage 读取压缩配置
-          const COMPRESSION_STORAGE_KEY = 'sse_recording_compression_enabled'
-          const enableCompression = localStorage.getItem(COMPRESSION_STORAGE_KEY) !== 'false'
-
-          recordingId = await SSERecorder.startRecording(content, {
-            agentType: 'deepsearch',
-            modelConfigId: selectedModelId,
-            conversationId: backendConversationId, // 使用带 session 的 conversation_id
-            spaceId: user?.spaceId || getDefaultSpaceId(),
-          }, {
-            enableCompression,
+            mainFlowRecording = await createMainFlowRecording({
+              enabled: true,
+              query: content,
+              continueSession: !isNewDeepSearchRun,
+              metadata: {
+                agentType: 'deepsearch',
+              modelConfigId: selectedModelId,
+              conversationId: backendConversationId,
+              spaceId: user?.spaceId || getDefaultSpaceId(),
+            },
           })
         } catch (error) {
           console.warn('[DeepSearch] Failed to start SSE recording:', error)
@@ -1578,10 +2074,30 @@ const AppsPage: React.FC = () => {
       // 获取认证 token
       const token = getToken()
       if (!token) {
-        throw new Error('无法获取认证信息，请重新登录')
+        throw new Error(t('apps.errors.unableToGetAuthToken'))
       }
 
       const messageToBackend = options?.backend_message ?? content
+      const vlmChartGeneratorEnable = config.vlmChartGeneratorEnable ?? DEFAULT_DEEPSEARCH_CONFIG.vlmChartGeneratorEnable
+      const vlmChartGeneratorMaxIterations = config.vlmChartGeneratorMaxIterations ?? DEFAULT_DEEPSEARCH_CONFIG.vlmChartGeneratorMaxIterations
+
+      if (!continuationInteraction && !isNewDeepSearchRun) {
+        continuationInteraction = {
+          kind: interrupt_feedback === 'revise_comment' ? 'outline' : 'hitl',
+          feedback: interrupt_feedback || 'accepted',
+          userMessage: content,
+          backendMessage: messageToBackend,
+        }
+      } else if (continuationInteraction) {
+        continuationInteraction = {
+          ...continuationInteraction,
+          backendMessage: messageToBackend,
+        }
+      }
+
+      if (mainFlowRecording?.isActive() && continuationInteraction) {
+        mainFlowRecording.recordInteraction(continuationInteraction)
+      }
 
       // ===== 提取并保存配置参数 =====
       const agentConfig = {
@@ -1607,7 +2123,12 @@ const AppsPage: React.FC = () => {
         ...(config.writingCheckingModelId && { writing_checking_model_id: parseInt(config.writingCheckingModelId) }),
         // 用户反馈优化配置
         user_feedback_processor_enable: config.userFeedbackProcessorEnable ?? true,
-        user_feedback_processor_max_interactions: config.userFeedbackProcessorMaxInteractions ?? 3,
+        user_feedback_processor_max_interactions: normalizeMaxRewriteInteractions(config.userFeedbackProcessorMaxInteractions),
+        vlm_chart_generator_enable: vlmChartGeneratorEnable,
+        vlm_chart_generator_max_iterations: vlmChartGeneratorMaxIterations,
+        ...(vlmChartGeneratorEnable && vlmChartGeneratorMaxIterations > 0 && config.vlmChartModelId && {
+          vlm_model_config_id: parseInt(config.vlmChartModelId),
+        }),
         // 联网搜索QPS限制，0表示不限流
         web_search_max_qps: config.webSearchMaxQps ?? 0,
       };
@@ -1671,9 +2192,10 @@ const AppsPage: React.FC = () => {
           // 这样可以避免覆盖正常的完成状态
 
           // ===== SSE 录制：停止录制 =====
-          if (recordingId) {
+          if (mainFlowRecording?.isActive()) {
             try {
-              await SSERecorder.stopRecording()
+              await mainFlowRecording.stop()
+              mainFlowRecording = null
             } catch (error) {
               console.warn('[DeepSearch] Failed to save SSE recording:', error)
             }
@@ -1701,14 +2223,14 @@ const AppsPage: React.FC = () => {
               const data = JSON.parse(jsonStr)
 
               // 检测是否收到正常结束信号
-              if (data.agent === 'end' && data.content === 'ALL END') {
+              if (data.agent === DeepsearchAgentType.END && data.content === 'ALL END') {
                 sseCompletedNormally = true
               }
 
               // ===== SSE 录制：录制事件 =====
-              if (recordingId) {
+              if (mainFlowRecording?.isActive()) {
                 try {
-                  await SSERecorder.recordEvent(data)
+                  mainFlowRecording.record(data)
                 } catch (error) {
                   console.warn('[DeepSearch] Failed to record SSE event:', error)
                 }
@@ -1730,9 +2252,10 @@ const AppsPage: React.FC = () => {
       }
 
       // ===== SSE 录制：错误时也要停止录制 =====
-      if (typeof recordingId !== 'undefined' && recordingId && SSERecorder.isRecording()) {
+      if (mainFlowRecording?.isActive()) {
         try {
-          await SSERecorder.stopRecording()
+          await mainFlowRecording.stop()
+          mainFlowRecording = null
         } catch (error) {
           console.warn('[DeepSearch] Failed to stop SSE recording on error:', error)
         }
@@ -1824,19 +2347,20 @@ const AppsPage: React.FC = () => {
     }
   }
 
-
   return (
     <div className={`${FONT_FAMILY} flex flex-col h-full w-full min-h-0`}>
       {/* SSE 回放浮动按钮（仅开发模式） */}
-      {ENABLE_SSE_DEBUG && (
-        <button
-          onClick={() => setShowPlaybackPanel(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
-          title={t('apps.chat.openSSEPanel')}
-        >
-          <History className="w-4 h-4" />
-          <span>{t('apps.chat.replayHistory')}</span>
-        </button>
+      {ENABLE_SSE_DEBUG && !showPlaybackPanel && (
+        <div className="fixed bottom-6 right-6 z-40 w-[140px] rounded-2xl border border-slate-200 bg-white/96 p-2 shadow-xl backdrop-blur">
+          <button
+            onClick={() => setShowPlaybackPanel(true)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-2.5 py-2 text-white text-xs font-medium shadow-sm transition-all duration-200 hover:from-blue-700 hover:to-purple-700"
+            title={t('apps.chat.openSSEPanel')}
+          >
+            <History className="w-4 h-4" />
+            <span>{t('apps.chat.replayHistory')}</span>
+          </button>
+        </div>
       )}
 
       {/* 主内容区 - 使用 flex 布局 */}
@@ -2054,6 +2578,8 @@ const AppsPage: React.FC = () => {
         isFirstConfig={isFirstConfigMode}
         availableModels={availableModels}
         modelsLoading={modelsLoading}
+        availableVLMModels={availableVLMModels}
+        vlmModelsLoading={vlmModelsLoading}
       />
 
       {/* 模型选择弹窗 */}
@@ -2070,19 +2596,17 @@ const AppsPage: React.FC = () => {
 
       {/* SSE 回放面板（仅开发模式） */}
       {ENABLE_SSE_DEBUG && showPlaybackPanel && (
-        <PlaybackPanel
+        <RecordingPanel
           onClose={() => setShowPlaybackPanel(false)}
-          onPlaybackStart={async (conversationId) => {
-            // conversationId 是回放对话的 ID（由 PlaybackPanel 通过 getOrCreatePlaybackConversation 获取）
-            // 直接切换到回放对话，不再创建新对话
-            await switchConversation(conversationId)
+          onPlaybackStart={async conversationId => {
+            await switchConversation(conversationId);
             // 切换到 DeepSearch 模式
-            const deepsearchAgent = DEFAULT_AGENTS.find(a => a.id === 'deepsearch')
+            const deepsearchAgent = DEFAULT_AGENTS.find(a => a.id === 'deepsearch');
             if (deepsearchAgent) {
-              setSelectedAgent(deepsearchAgent)
+              setSelectedAgent(deepsearchAgent);
             }
             // 返回 conversationId（回放对话的 ID）
-            return conversationId
+            return conversationId;
           }}
         />
       )}
@@ -2106,7 +2630,7 @@ const AppsPage: React.FC = () => {
         onCancel={handleLimitDialogCancel}
       />
     </div>
-  )
+  );
 }
 
 export default AppsPage
