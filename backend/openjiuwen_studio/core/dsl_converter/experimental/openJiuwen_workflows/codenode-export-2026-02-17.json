@@ -1,0 +1,115 @@
+{
+  "nodes": [
+    {
+      "id": "start_EpfpK",
+      "type": "1",
+      "meta": {
+        "position": {
+          "x": -211,
+          "y": 1
+        }
+      },
+      "data": {
+        "title": "开始",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "default": "你好，请帮我分析一下这个问题。"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "end_EpfpK",
+      "type": "2",
+      "meta": {
+        "position": {
+          "x": 609,
+          "y": 1
+        }
+      },
+      "data": {
+        "title": "结束",
+        "inputs": {
+          "inputParameters": {
+            "result": {
+              "type": "ref",
+              "content": [
+                "code_otq9O",
+                "result"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          }
+        },
+        "streaming": false
+      }
+    },
+    {
+      "id": "code_otq9O",
+      "type": "10",
+      "meta": {
+        "position": {
+          "x": 199,
+          "y": -16
+        }
+      },
+      "data": {
+        "title": "代码",
+        "inputs": {
+          "inputParameters": {
+            "input": {
+              "type": "constant",
+              "content": "hello",
+              "schema": {
+                "type": "string"
+              },
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "language": "python",
+          "code": "def main(args: Args):\n  import time\n  time.sleep(3)\n  return {'result': args.params['input']}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string",
+              "description": "代码执行结果"
+            }
+          },
+          "required": [
+            "result"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 3,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": {
+            "defaultStep": "0",
+            "errorStep": "1"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeID": "start_EpfpK",
+      "targetNodeID": "code_otq9O"
+    },
+    {
+      "sourceNodeID": "code_otq9O",
+      "targetNodeID": "end_EpfpK",
+      "sourcePortID": "0"
+    }
+  ]
+}

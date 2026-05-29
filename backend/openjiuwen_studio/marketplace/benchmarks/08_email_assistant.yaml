@@ -1,0 +1,185 @@
+# Example Evaluation Suite: Email Assistant Agent
+# Domain: Productivity / Communication
+# Pattern: Simple + Chaining (draft → refine)
+# Difficulty: Easy-Medium
+# Recommended Trials: 5
+
+suite:
+  name: "Email Assistant Quality Suite"
+  description: "Evaluates email drafting quality, tone appropriateness, and task completion"
+  tags: ["email", "productivity", "writing", "assistant"]
+
+tasks:
+  - task_name: "Meeting Request Email"
+    description: "Draft a professional meeting request email"
+    input_data:
+      instruction: "Write a professional email requesting a 30-minute meeting with a client to discuss Q4 project status"
+      recipient: "Sarah Chen, VP of Product at Acme Corp"
+      sender_name: "Alex"
+      tone: "professional"
+    expected_output: "Professional meeting request with subject, greeting, purpose, proposed times, and sign-off"
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["meeting", "professional", "outreach"]
+    graders_config:
+      - name: "Has subject line"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(Subject:|RE:|subject line|SUBJECT)"
+      - name: "Mentions meeting purpose"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(Q4|project|status|update|discuss|review)"
+      - name: "Has proper greeting"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(Dear|Hello|Hi).*(Sarah|Ms\\.?|Mrs\\.?)"
+      - name: "Mentions 30 minutes"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(30.?minute|half.?hour|30 min|brief)"
+      - name: "Professional quality"
+        type: 1
+        weight: 2
+        passing_score: 0.8
+        rubric: |
+          Rate this email on professionalism and effectiveness.
+          Score 0.0-1.0 based on: professional tone (30%), clarity of request (30%),
+          completeness (20%), appropriate length (20%).
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Email Summary"
+    description: "Summarize a long email thread into key points"
+    input_data:
+      instruction: "Summarize this email thread and extract action items"
+      email_thread: |
+        From: John to Team (Mon): "We need to finalize the marketing budget for Q1.
+        Current proposal is $50k but Sarah thinks we need $75k for the digital campaign."
+
+        From: Sarah to Team (Mon): "Yes, I've run the numbers. $75k is minimum for the
+        reach we need. The ROI from last year's $60k campaign was 3.2x."
+
+        From: Mike to Team (Tue): "I can approve up to $65k. We'll need sign-off from
+        CFO for anything above that. Can someone schedule a meeting with CFO by Friday?"
+
+        From: John to Team (Tue): "I'll reach out to CFO's office today. Sarah, can you
+        prepare a one-pager on the campaign plan to share with CFO?"
+    expected_output: "Summary with: budget range $50k-$75k, approval ceiling $65k, action items (CFO meeting, one-pager)"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["summary", "action-items", "thread"]
+    graders_config:
+      - name: "Mentions budget figures"
+        type: 2
+        weight: 3
+        code: |
+          def grade(output, expected, context):
+              amounts = ["50", "65", "75"]
+              found = [a for a in amounts if a in output]
+              score = len(found) / len(amounts)
+              return {"passed": score >= 0.67, "score": score,
+                      "reason": f"Found {len(found)}/3 key amounts: {found}"}
+      - name: "Identifies action items"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(action item|next step|to.do|will|schedule|prepare|reach out|contact)"
+      - name: "Mentions CFO requirement"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "CFO"
+      - name: "Summary quality"
+        type: 1
+        weight: 2
+        passing_score: 0.75
+        rubric: |
+          Is this a clear, accurate summary of the email thread?
+          Does it capture the key decision (budget approval) and action items?
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Tone Adjustment - Formal to Casual"
+    description: "Rewrite a formal email in a casual, friendly tone"
+    input_data:
+      instruction: "Rewrite this email in a casual, friendly tone appropriate for a close colleague"
+      original_email: "Dear Mr. Thompson, I am writing to inquire whether you would be available to review the aforementioned documentation at your earliest convenience. Your prompt attention to this matter would be greatly appreciated."
+      target_tone: "casual, friendly"
+    expected_output: "Casual, friendly version that keeps the same meaning but drops formality"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["tone", "rewriting", "casual"]
+    graders_config:
+      - name: "Removes overly formal phrases"
+        type: 2
+        weight: 4
+        code: |
+          def grade(output, expected, context):
+              formal_phrases = [
+                  "I am writing to", "aforementioned", "at your earliest convenience",
+                  "Your prompt attention", "would be greatly appreciated", "Dear Mr."
+              ]
+              retained = [p for p in formal_phrases if p.lower() in output.lower()]
+              if len(retained) == 0:
+                  return {"passed": True, "score": 1.0, "reason": "All formal phrases removed"}
+              elif len(retained) <= 1:
+                  return {"passed": True, "score": 0.8, "reason": f"Mostly casual, minor formality: {retained}"}
+              return {"passed": False, "score": max(0, 1 - len(retained)/len(formal_phrases)),
+                      "reason": f"Too many formal phrases retained: {retained}"}
+      - name: "Preserves core meaning"
+        type: 1
+        weight: 4
+        passing_score: 0.8
+        rubric: |
+          Does this rewritten email preserve the original meaning (asking someone to review
+          a document when they have time) while using a casual, friendly tone?
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+      - name: "Is actually casual"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(Hey|Hi|Thanks|Cheers|Appreciate|Can you|could you|would you mind|whenever you|no rush)"
+
+  - task_name: "Response to Complaint Email"
+    description: "Respond professionally to a customer complaint email"
+    input_data:
+      instruction: "Write a professional response to this customer complaint"
+      complaint_email: "I ordered a laptop 2 weeks ago and it still hasn't arrived. Your tracking page just says 'In Transit'. This is completely unacceptable! I need this for work and you've completely let me down. I want a full refund NOW."
+      company_name: "TechStore"
+    expected_output: "Professional, empathetic response with apology, concrete next steps, and resolution offer"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["complaint", "customer-service", "empathy"]
+    graders_config:
+      - name: "Apologizes"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(sorry|apologize|apologi|regret|understand your frustration)"
+      - name: "Offers concrete action"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(investigate|track|escalate|expedite|refund|replacement|resolve|follow up|contact)"
+      - name: "Does not dismiss"
+        type: 2
+        weight: 2
+        code: |
+          def grade(output, expected, context):
+              dismissive = ["not our fault", "contact shipping", "nothing we can do",
+                           "read the terms", "wait longer", "be patient"]
+              found_dismissive = [p for p in dismissive if p in output.lower()]
+              if found_dismissive:
+                  return {"passed": False, "score": 0.0, "reason": f"Dismissive: {found_dismissive}"}
+              return {"passed": True, "score": 1.0, "reason": "No dismissive language"}
+      - name: "Response quality"
+        type: 1
+        weight: 3
+        passing_score: 0.8
+        rubric: |
+          Rate this complaint response on: empathy (25%), concrete resolution path (50%),
+          professional tone (25%). Score 0.0-1.0.
+          Return: {"score": float, "passed": bool, "reasoning": string}

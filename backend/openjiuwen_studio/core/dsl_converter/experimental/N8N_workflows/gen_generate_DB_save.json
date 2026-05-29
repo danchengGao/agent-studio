@@ -1,0 +1,127 @@
+{
+  "name": "Simple User Filter Workflow",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": {}
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Generate Users",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": {
+        "jsCode": "const users = [\n  { name: 'Alice', age: 30, active: true },\n  { name: 'Bob', age: 25, active: false },\n  { name: 'Charlie', age: 28, active: true }\n];\n\nreturn users.map(user => ({ json: user }));"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
+      "name": "Filter Active",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [750, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.active }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
+      "name": "Convert to JSON File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\nconst jsonString = JSON.stringify(items, null, 2);\nconst binaryData = Buffer.from(jsonString, 'utf-8');\n\nreturn [\n  {\n    json: { fileName: 'active_users.json' },\n    binary: {\n      data: await this.helpers.prepareBinaryData(binaryData, 'active_users.json', 'application/json')\n    }\n  }\n];"
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
+      "name": "Write File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "parameters": {
+        "operation": "write",
+        "fileName": "active_users.json",
+        "dataPropertyName": "data"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Users",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Users": {
+      "main": [
+        [
+          {
+            "node": "Filter Active",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Active": {
+      "main": [
+        [
+          {
+            "node": "Convert to JSON File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to JSON File": {
+      "main": [
+        [
+          {
+            "node": "Write File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}

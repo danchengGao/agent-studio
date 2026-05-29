@@ -16,7 +16,7 @@ from openjiuwen_studio.core.manager.login_manager.session_auth import (create_ac
                                                          create_refresh_token,
                                                          refresh_access_token,
                                                          verify_refresh_token)
-from openjiuwen_studio.core.manager.login_manager.user import create_user_db
+from openjiuwen_studio.core.manager.login_manager.user import create_user_db, create_space_db
 from openjiuwen_studio.core.manager.repositories.user_repository import user_repository
 from openjiuwen_studio.core.manager.model_manager.utils import SecurityUtils
 from openjiuwen_studio.core.manager.login_manager.user import get_user_email
@@ -29,29 +29,6 @@ from openjiuwen_studio.schemas.user import RefreshTokenRequest, RoleType, UserDB
 
 auth_router = APIRouter()
 security_utils = SecurityUtils()
-
-
-def create_space_db(user_db: UserDBPd) -> SpaceDBPd:
-    space_id = ''.join(random.sample(string.digits, 8))
-    user_id_str = user_db.user_id_str
-    creator_id_str = user_id_str
-    spacename = "Personal Space"
-    description = "This is your personal space"
-    role_type = user_db.role_type
-    current_time = milliseconds()
-
-    space_db = {
-        "space_id": space_id,
-        "user_id_str": user_id_str,
-        "creator_id_str": creator_id_str,
-        "spacename": spacename,
-        "description": description,
-        "role_type": role_type,
-        "space_create_time": current_time,
-        "space_update_time": current_time,
-    }
-    space = SpaceDBPd(**space_db)
-    return space
 
 
 @auth_router.post("/login")
@@ -242,6 +219,17 @@ async def register(request: Request, form_data: OAuth2PasswordRequestForm = Depe
     except Exception as e:
         logger.error(f"Registration process failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error") from e
+
+
+@auth_router.get("/verify_access_token", response_model=ResponseModel[dict])
+async def verify_access_token(token: str = Depends(oauth2_scheme)):
+    from openjiuwen_studio.core.manager.login_manager.auth_service import AuthService
+    result = await AuthService.verify_access_token(token)
+    return ResponseModel(
+        code=200,
+        message="token 校验成功",
+        data=result
+    )
 
 
 @auth_router.post("/logout", response_model=ResponseModel[dict])

@@ -2,7 +2,7 @@
  * Markdown 组件类型定义
  */
 
-import type { CitationMessages, InferMessage } from '@/pages/Apps/types'
+import type { ChartMessage, CitationMessages, InferMessage } from '@/pages/Apps/types'
 
 // ============ Markdown 组件 Props 类型 ============
 
@@ -17,6 +17,8 @@ export interface MarkdownProps {
   instanceId?: string | null
   /** 推理图数据 */
   inferMessages?: InferMessage[]
+  /** VLM 图表数据 */
+  chartMessages?: ChartMessage[]
 }
 
 /** MermaidChart 组件属性 */

@@ -1,0 +1,203 @@
+# Example Evaluation Suite: Data Extraction Agent
+# Domain: Information Extraction / ETL
+# Pattern: Simple (single-step extraction) + Chaining (multi-field)
+# Difficulty: Mixed
+# Recommended Trials: 5
+
+suite:
+  name: "Data Extraction Quality Suite"
+  description: "Evaluates accuracy and completeness of structured data extraction from unstructured text"
+  tags: ["extraction", "nlp", "structured-data", "etl"]
+
+tasks:
+  - task_name: "Entity Extraction - Person Names"
+    description: "Extract all person names from a text passage"
+    input_data:
+      query: "Extract all person names from this text: 'The meeting was attended by Sarah Johnson, Mike Chen, and Dr. Amara Osei. The report was prepared by James Wilson.'"
+      output_format: "JSON array"
+    expected_output: '["Sarah Johnson", "Mike Chen", "Dr. Amara Osei", "James Wilson"]'
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["ner", "names", "extraction"]
+    graders_config:
+      - name: "Valid JSON array"
+        type: 0
+        weight: 3
+        check_type: "json_schema"
+        schema:
+          type: "array"
+          items:
+            type: "string"
+      - name: "Contains all 4 names"
+        type: 2
+        weight: 7
+        code: |
+          def grade(output, expected, context):
+              import json
+              expected_names = ["Sarah Johnson", "Mike Chen", "Amara Osei", "James Wilson"]
+              try:
+                  # Try to parse as JSON
+                  extracted = json.loads(output) if isinstance(output, str) else output
+                  if isinstance(extracted, list):
+                      found = [name for name in expected_names
+                               if any(name.lower() in str(item).lower() for item in extracted)]
+                      score = len(found) / len(expected_names)
+                      passed = score == 1.0
+                      return {"passed": passed, "score": score,
+                              "reason": f"Found {len(found)}/{len(expected_names)} names: {found}"}
+              except:
+                  pass
+              # Fallback: check raw string
+              found = [name for name in expected_names if name.lower() in output.lower()]
+              score = len(found) / len(expected_names)
+              return {"passed": score == 1.0, "score": score,
+                      "reason": f"Found {len(found)}/{len(expected_names)} names in output"}
+
+  - task_name: "Date and Number Extraction"
+    description: "Extract dates and numerical values from financial text"
+    input_data:
+      query: "Extract key figures from: 'Revenue grew 23% YoY to $4.2 billion in Q3 2024. Operating margin improved to 18.5% from 15.2% last year. The company hired 1,247 new employees.'"
+      output_format: "JSON object with fields: revenue, growth_rate, margin_current, margin_previous, employees_hired, quarter, year"
+    expected_output: |
+      {
+        "revenue": "4.2 billion",
+        "growth_rate": "23%",
+        "margin_current": "18.5%",
+        "margin_previous": "15.2%",
+        "employees_hired": 1247,
+        "quarter": "Q3",
+        "year": 2024
+      }
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["financial", "numbers", "dates", "extraction"]
+    graders_config:
+      - name: "Valid JSON object"
+        type: 0
+        weight: 2
+        check_type: "json_schema"
+        schema:
+          type: "object"
+          required: ["revenue", "growth_rate"]
+      - name: "Contains key numbers"
+        type: 2
+        weight: 6
+        code: |
+          def grade(output, expected, context):
+              required_values = ["4.2", "23", "18.5", "15.2", "1247", "1,247", "2024", "Q3"]
+              found = [v for v in required_values if v in str(output)]
+              score = len(found) / len(required_values)
+              return {"passed": score >= 0.7, "score": score,
+                      "reason": f"Found {len(found)}/{len(required_values)} key values"}
+      - name: "No hallucinated numbers"
+        type: 2
+        weight: 2
+        code: |
+          def grade(output, expected, context):
+              import re
+              output_nums = set(re.findall(r'\d+(?:\.\d+)?', output))
+              source_nums = {"4.2", "23", "18.5", "15.2", "1247", "2024", "3", "18", "15"}
+              hallucinated = [n for n in output_nums
+                             if n not in source_nums and float(n) > 1 and float(n) < 10000]
+              if len(hallucinated) > 2:  # Allow some flexibility
+                  return {"passed": False, "score": 0.5,
+                          "reason": f"Possibly hallucinated numbers: {hallucinated[:5]}"}
+              return {"passed": True, "score": 1.0, "reason": "Numbers look grounded"}
+
+  - task_name: "Contact Information Extraction"
+    description: "Extract contact details from business card text"
+    input_data:
+      query: "Extract contact information from: 'Dr. Emily Rodriguez, PhD | Chief Technology Officer | TechCorp Inc. | emily.rodriguez@techcorp.com | +1 (415) 555-0192 | www.techcorp.com | 100 Silicon Valley Blvd, San Jose, CA 95110'"
+      output_format: "JSON with fields: name, title, company, email, phone, website, address"
+    expected_output: |
+      {
+        "name": "Dr. Emily Rodriguez",
+        "title": "Chief Technology Officer",
+        "company": "TechCorp Inc.",
+        "email": "emily.rodriguez@techcorp.com",
+        "phone": "+1 (415) 555-0192",
+        "website": "www.techcorp.com"
+      }
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["contact", "business-card", "extraction"]
+    graders_config:
+      - name: "Valid JSON with required fields"
+        type: 0
+        weight: 3
+        check_type: "json_schema"
+        schema:
+          type: "object"
+          required: ["name", "email"]
+          properties:
+            email:
+              type: "string"
+              pattern: ".*@.*\\..*"
+      - name: "Email correctly extracted"
+        type: 0
+        weight: 3
+        check_type: "contains"
+        expected_value: "emily.rodriguez@techcorp.com"
+      - name: "Name correctly extracted"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "Emily Rodriguez"
+      - name: "Phone correctly extracted"
+        type: 0
+        weight: 2
+        check_type: "contains"
+        expected_value: "415"
+
+  - task_name: "Table Data Extraction"
+    description: "Extract and structure data from a markdown table"
+    input_data:
+      query: |
+        Convert this table to JSON array:
+        | Name | Department | Salary |
+        |------|-----------|--------|
+        | Alice | Engineering | $95,000 |
+        | Bob | Marketing | $72,000 |
+        | Carol | Engineering | $88,000 |
+      output_format: "JSON array of objects"
+    expected_output: '[{"name": "Alice", "department": "Engineering", "salary": 95000}, ...]'
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["table", "structured-data", "json"]
+    graders_config:
+      - name: "Returns JSON array"
+        type: 0
+        weight: 3
+        check_type: "json_schema"
+        schema:
+          type: "array"
+          minItems: 3
+          items:
+            type: "object"
+      - name: "All three employees present"
+        type: 2
+        weight: 5
+        code: |
+          def grade(output, expected, context):
+              names = ["alice", "bob", "carol"]
+              output_lower = output.lower()
+              found = [name for name in names if name in output_lower]
+              score = len(found) / len(names)
+              return {"passed": score == 1.0, "score": score,
+                      "reason": f"Found {len(found)}/3 employees: {found}"}
+      - name: "Salary parsed as number"
+        type: 2
+        weight: 2
+        code: |
+          def grade(output, expected, context):
+              import json, re
+              try:
+                  data = json.loads(output)
+                  for item in data:
+                      salary = item.get('salary', item.get('Salary', None))
+                      if salary is not None and not isinstance(salary, (int, float)):
+                          return {"passed": False, "score": 0.5,
+                                  "reason": f"Salary is string not number: {salary}"}
+                  return {"passed": True, "score": 1.0, "reason": "Salaries are numeric"}
+              except:
+                  return {"passed": False, "score": 0.0, "reason": "Not valid JSON"}

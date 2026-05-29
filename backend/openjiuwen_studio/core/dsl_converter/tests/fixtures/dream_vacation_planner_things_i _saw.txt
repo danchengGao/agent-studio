@@ -1,0 +1,10 @@
+- React agent - needs query
+- you can use only "output" property of prev.
+- max run time of workflow by default 300 sec - not enough
+- react - you can use plugin but not specific apis
+- no output as markdown or html, so line breaks not preserved
+- no path through node
+- sandbox on windows - you can't run with large inputs or large code
+- output to Telegram is only 4096 chars
+- workflow never finishes
+- output result in GUI is limited by num of chars

@@ -10,6 +10,7 @@ RUN echo "INDEX_URL: ${INDEX_URL}"
 
 WORKDIR /app
 COPY backend .
+COPY connect /app/connect
 RUN pip install uv -i ${INDEX_URL}
 RUN sed -i "s#url = \"[^\"]*\"#url = \"${INDEX_URL}\"#g" pyproject.toml
 
@@ -43,7 +44,9 @@ COPY --from=builder /app/dist/${WHL_NAME} /app/dist
 RUN pip3 install /app/dist/${WHL_NAME} --trusted-host ${TRUSTED_HOST} --index-url ${INDEX_URL} --target=/app/site-packages --retries=5 --timeout=120
 
 USER root
-ENV PYTHONPATH=/app/site-packages/openjiuwen_studio:/app/site-packages
+ENV PYTHONPATH=/app/site-packages/openjiuwen_studio:/app/site-packages:/app/connect
+COPY --from=builder /app/connect /app/connect
+RUN chown -R app:app /app/connect
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 COPY backend/openjiuwen_studio/examples /app/examples

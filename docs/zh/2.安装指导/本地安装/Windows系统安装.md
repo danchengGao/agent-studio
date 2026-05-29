@@ -13,6 +13,16 @@
 
 * 操作系统：Windows10及以上
 
+* 软件（具体安装方式见下文）：
+  * Git：2.40 及以上
+  * Node.js：20.0 及以上
+  * npm：9.0 及以上
+  * Python：3.11.4 及以上
+  * uv：0.5.0 及以上
+  * MySQL：8.0 及以上
+  * Milvus：2.6.2 及以上
+  * PowerShell：5.1 及以上（可在 PowerShell 中执行 `$PSVersionTable.PSVersion` 查看版本）
+
 ## 二、安装方法
 
 ### 方法一：使用一键安装部署脚本
@@ -295,15 +305,13 @@ Runtime（`agent-runtime`）提供 Agent 运行态能力，为独立仓库。
    | **HOST**            | 服务监听主机（`0.0.0.0` 表示允许所有网络地址访问）                       | `0.0.0.0`                                     |
    | **PORT**            | 服务启动端口号                                                           | `8186`                                        |
 
-##### 2.3. 运行 `deploy.bat` 安装依赖并启动服务
+##### 2.3. 运行 `run-server.ps1` 安装依赖并启动服务
 
-* **前置条件**：已安装 **Python 3.11**、**Git**，且可在终端执行 **`uv`**。`deploy.bat` 通常依赖 **`uv`** 创建虚拟环境并同步依赖。
-
-* 在 **`server`** 目录打开 **cmd** 或 **PowerShell**，执行仓库提供的部署脚本（路径按你的克隆位置替换）：
+* 打开**PowerShell**，执行部署脚本：
 
   ```powershell
-  cd \path\to\agent-runtime\server
-  .\deploy.bat
+  cd \path\to\agent-runtime\
+  .\scripts\run-server.ps1
   ```
 
 
@@ -619,7 +627,7 @@ Windows 上运行 Docker Desktop 推荐使用 WSL 2（Windows Subsystem for Linu
 
 2. **启动沙箱服务**
 
-   目前在 MacOS 平台上仅支持 local 执行模式，即代码在宿主机上直接执行。参考 `sandbox_server\sandbox\.env.example`，在 `sandbox_server\sandbox` 目录下创建 `.env` 文件，示例：
+   目前在 Windows 平台上仅支持 local 执行模式，即代码在宿主机上直接执行。参考 `sandbox_server\sandbox\.env.example`，在 `sandbox_server\sandbox` 目录下创建 `.env` 文件，示例：
 
    ```env
    HOST=0.0.0.0

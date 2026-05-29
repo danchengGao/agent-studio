@@ -7,7 +7,6 @@ import { Field } from '@flowgram.ai/free-layout-editor'
 
 import { useIsSidebar } from '../../../hooks'
 import { FormItem } from '../../../form-components'
-import { IFlowConstantRefValue } from '../../../form-materials'
 import { useTranslation } from '../../../i18n'
 import { KeyValueEditor } from './key-value-editor'
 
@@ -20,23 +19,23 @@ export function HeadersConfig() {
   }
 
   return (
-    <Field<IFlowConstantRefValue> name="inputs.inputParameters.headers">
+    <Field<Record<string, string>> name="inputs.httpRequestParam.headers">
       {({ field }) => {
-        const rawContent = field.value?.content
-        const content = (typeof rawContent === 'object' && rawContent !== null ? rawContent : {}) as Record<string, string>
+        const content = 
+          (typeof field.value === 'object' && field.value !== null ? field.value : {}) as Record<string, string>
 
         const handleChange = (val: Record<string, string>) => {
-          field.onChange({
-            ...field.value,
-            type: 'constant',
-            content: val,
-            schema: (field.value as any)?.schema || { type: 'object' },
-          } as IFlowConstantRefValue)
+          field.onChange(val)
         }
 
         return (
           <FormItem name={t('workflowCanvas.nodes.httpRequest.headersSection.title') || 'Headers'}>
-            <KeyValueEditor value={content} onChange={handleChange} keyPlaceholder="Header name" valuePlaceholder="Header value" addLabel="Add Header" />
+            <KeyValueEditor 
+              value={content} 
+              onChange={handleChange} 
+              keyPlaceholder="Header name" 
+              valuePlaceholder="Header value" 
+              addLabel="Add Header" />
           </FormItem>
         )
       }}

@@ -39,7 +39,7 @@ class LazyDeepSearchHttpClient:
                     connect=10.0
                 ),
                 limits=httpx.Limits(max_connections=50),
-                follow_redirects=True,
+                follow_redirects=False,
                 verify=False
             )
 
@@ -132,7 +132,7 @@ class DeepSearchAgentClient:
 
     async def run_deepsearch_stream(self, payload: Dict[str, Any]) -> AsyncGenerator[str, None]:
         """流式运行深度搜索"""
-        async with (await self._http.stream("POST", "/api/v1/agent/deepsearch/run", json=payload)) as resp:
+        async with (await self._http.stream("POST", "/api/v1/agent/deepsearch/run/", json=payload)) as resp:
             resp.raise_for_status()
             async for line in resp.aiter_lines():
                 yield line

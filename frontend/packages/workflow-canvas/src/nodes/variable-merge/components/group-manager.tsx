@@ -7,7 +7,7 @@ import { useAvailableVariables } from '@flowgram.ai/free-layout-editor'
 import { Button } from '@douyinfe/semi-ui'
 import { Plus } from 'lucide-react'
 
-import { VariableGroupManagerProps, VariableGroup } from '../types'
+import { VariableGroupManagerProps, VariableGroup, MergeMode } from '../types'
 import { GroupCard } from './group-card'
 import { inferVariableType } from './type-inference'
 import { useTranslation } from '../../../i18n'
@@ -79,6 +79,7 @@ export const VariableGroupManager = ({ groups, onGroupsChange, onNodeStructureCh
       name: generateUniqueGroupName(groups),
       items: [''],
       type: 'string',
+      mode: MergeMode.FIRST_NON_NULL,
     }
     const newGroups = [...groups, newGroup]
     onGroupsChange(newGroups)

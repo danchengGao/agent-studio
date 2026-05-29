@@ -5,14 +5,18 @@
  * 使用 BlockNote 提供 Notion 风格的块级编辑体验
  */
 
-import React, { useEffect, useState, useRef, useMemo } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { FileText, AlertCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Report, ReportRewriteParams } from '@/pages/Apps/types'
-import { BlockNoteEditor } from './BlockNoteEditor'
+import {
+  ReportEditorRuntime,
+  type ReportEditorRuntimeHandle,
+} from './editor/ReportEditorRuntime'
 import { useReducedMotion } from '../shared/hooks/usePreferences'
 import { LOADING_DELAY, LOADING_TIMEOUT } from './constants'
-import { preprocessMarkdown } from '@/utils/markdownCleaner'
+import { planReportEditLoadingTransition } from './loadingStatePolicy'
+import type { RecoveryState, RewriteOverlayState } from '@/pages/Apps/components/ReportPanel/editor/session'
 
 type LoadingState = 'loading' | 'loaded' | 'empty' | 'timeout'
 
@@ -23,41 +27,75 @@ export interface ReportEditViewProps {
   conversationId?: string
   /** 报告局部改写回调 */
   onReportRewrite?: (params: ReportRewriteParams) => Promise<void>
+  /** 编辑器草稿 Markdown 变化回调 */
+  onDraftChange?: (markdown: string) => void
+  /** 编辑器历史状态变化回调 */
+  onHistoryStateChange?: (state: {
+    canUndo: boolean
+    canRedo: boolean
+    undo: () => void
+    redo: () => void
+  }) => void
+  onSessionStateChange?: (state: {
+    rewriteOverlayState: RewriteOverlayState
+    recoveryState: RecoveryState
+  }) => void
 }
 
-export const ReportEditView: React.FC<ReportEditViewProps> = ({
+export type ReportEditViewHandle = {
+  getCurrentMarkdown: () => Promise<string>
+}
+
+export const ReportEditView = forwardRef<ReportEditViewHandle, ReportEditViewProps>(({
   report,
   className = '',
   conversationId,
   onReportRewrite,
-}) => {
+  onDraftChange,
+  onHistoryStateChange,
+  onSessionStateChange,
+}, ref) => {
   const { t } = useTranslation()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const editorRuntimeRef = useRef<ReportEditorRuntimeHandle | null>(null)
   const prefersReducedMotion = useReducedMotion()
 
   const [loadingState, setLoadingState] = useState<LoadingState>('loading')
   const loadingStateRef = useRef<LoadingState>('loading')
+  const previousReportIdRef = useRef<string | null>(null)
 
   const rawContent = report.rawContent || report.content || ''
 
-  const { cleaned: cleanedContent, offsetMap, blockOffsets } = useMemo(() => {
-    return preprocessMarkdown(rawContent)
-  }, [rawContent])
+  useImperativeHandle(
+    ref,
+    () => ({
+      getCurrentMarkdown: async () =>
+        (await editorRuntimeRef.current?.getCurrentMarkdown()) ?? rawContent,
+    }),
+    [rawContent],
+  )
 
   useEffect(() => {
+    const hasContent = rawContent.trim()
+    const { shouldEnterLoading, settledState } = planReportEditLoadingTransition({
+      previousReportId: previousReportIdRef.current,
+      nextReportId: report.id,
+      hasContent: Boolean(hasContent),
+    })
+    previousReportIdRef.current = report.id
+
+    if (!shouldEnterLoading) {
+      setLoadingState(settledState)
+      loadingStateRef.current = settledState
+      return
+    }
+
     setLoadingState('loading')
     loadingStateRef.current = 'loading'
 
-    const hasContent = cleanedContent?.trim()
-
     const normalTimer = setTimeout(() => {
-      if (hasContent) {
-        setLoadingState('loaded')
-        loadingStateRef.current = 'loaded'
-      } else {
-        setLoadingState('empty')
-        loadingStateRef.current = 'empty'
-      }
+      setLoadingState(settledState)
+      loadingStateRef.current = settledState
     }, LOADING_DELAY)
 
     const timeoutTimer = setTimeout(() => {
@@ -71,7 +109,7 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
       clearTimeout(normalTimer)
       clearTimeout(timeoutTimer)
     }
-  }, [report.id, cleanedContent])
+  }, [report.id, rawContent])
 
   return (
     <div className={`relative h-full flex flex-col ${className}`}>
@@ -116,19 +154,23 @@ export const ReportEditView: React.FC<ReportEditViewProps> = ({
               <p className="text-gray-500 text-sm text-center">{t('apps.report.timeoutMessage')}</p>
             </div>
           ) : (
-            <BlockNoteEditor
-              content={cleanedContent}
+            <ReportEditorRuntime
+              ref={editorRuntimeRef}
               rawContent={rawContent}
-              offsetMap={offsetMap}
-              blockOffsets={blockOffsets}
+              canonicalDocument={report.canonicalDocument}
               readonly={false}
               scrollContainerRef={scrollContainerRef}
               conversationId={conversationId}
               onReportRewrite={onReportRewrite}
+              onDraftChange={onDraftChange}
+              onHistoryStateChange={onHistoryStateChange}
+              onSessionStateChange={onSessionStateChange}
             />
           )}
         </article>
       </div>
     </div>
   )
-}
+})
+
+ReportEditView.displayName = 'ReportEditView'

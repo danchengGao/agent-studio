@@ -1,7 +1,7 @@
 import Typography from '@mui/material/Typography'
 import { AgentPlugin } from '@test-agentstudio/api-client'
 import { Trash2, Plug } from 'lucide-react'
-import React, { useState } from 'react'
+import { useState } from 'react'
 import DeleteConfirmationDialog from '@/components/Common/DeleteConfirmationDialog'
 import { useScopedTranslation } from '@/i18n'
 
@@ -12,17 +12,17 @@ const PluginList = ({
   disabled = false,
 }: {
   pluginObjects: AgentPlugin[]
-  onClick: (operate: 'delete', pluginId: string, toolId: string) => void
+  onClick: (operate: 'delete', pluginId: string, version?: string) => void
   disabled?: boolean
 }) => {
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [pendingDelete, setPendingDelete] = useState<{ pluginId: string; toolId: string; name: string } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ pluginId: string; version?: string; name: string } | null>(null)
   const { t } = useScopedTranslation('agents.agentEditor.orchestration.pluginSetting')
   return (
     <div className="space-y-3">
       {pluginObjects.map(plugin => (
         <div
-          key={plugin.tool_id}
+          key={`${plugin.plugin_id}:${plugin.plugin_version || 'draft'}`}
           className="flex items-center justify-between py-2 px-3 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-sm transition-all duration-200"
         >
           <div className="flex items-center space-x-3">
@@ -31,7 +31,7 @@ const PluginList = ({
             </div>
             <div>
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem' }}>{plugin.plugin_name}</Typography>
-              <Typography sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>{plugin.tool_name}</Typography>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.875rem' }}>{plugin.plugin_version || 'draft'}</Typography>
             </div>
           </div>
           <div className="flex space-x-4">
@@ -40,7 +40,7 @@ const PluginList = ({
               onClick={e => {
                 e.stopPropagation()
                 if (!disabled) {
-                  setPendingDelete({ pluginId: plugin.plugin_id, toolId: plugin.tool_id, name: plugin.plugin_name || '' })
+                  setPendingDelete({ pluginId: plugin.plugin_id, version: plugin.plugin_version || 'draft', name: plugin.plugin_name || '' })
                   setConfirmOpen(true)
                 }
               }}
@@ -60,7 +60,7 @@ const PluginList = ({
           setPendingDelete(null)
         }}
         onConfirm={() => {
-          if (pendingDelete) onClick('delete', pendingDelete.pluginId, pendingDelete.toolId)
+          if (pendingDelete) onClick('delete', pendingDelete.pluginId, pendingDelete.version)
           setConfirmOpen(false)
           setPendingDelete(null)
         }}

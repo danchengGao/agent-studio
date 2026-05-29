@@ -164,9 +164,11 @@ export interface MessageItems {
 
   // ===== 配置信息 =====
   isUser: boolean;             // 是否用户消息
-  agentType?: AgentType;       // Agent类型，用于HITL场景判断agent匹配
-  llm?: string;                // 大模型名称
+  agentType?: AgentType;       // Agent类型，用于HITL场景判断agent匹配；todo: 后续增加studio后端存储时，删除此字段，相应的功能使用agentConfig.agentType
+  llm?: string;                // 大模型名称；todo: 后续增加studio后端存储时，删除此字段，相应的功能使用agentConfig.llm
   agentConfig?: { 
+    agentType?: AgentType;       // todo: 将上面的agentType字段挪至agentConfig中
+    llm?: string;                // todo: 将上面的llm字段挪至agentConfig中
     remainingRewriteRounds?: number;  // 剩余 AI 改写次数（用于显示提示）
     maxRewriteRounds?: number;        // 最大 AI 改写次数（用于显示提示）
     [key: string]: any

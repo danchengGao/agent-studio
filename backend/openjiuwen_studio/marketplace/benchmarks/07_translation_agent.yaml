@@ -1,0 +1,160 @@
+# Example Evaluation Suite: Translation Agent
+# Domain: Language / Localization
+# Pattern: Simple (single-step translation)
+# Difficulty: Mixed
+# Recommended Trials: 5
+
+suite:
+  name: "Translation Quality Suite"
+  description: "Evaluates translation accuracy, cultural appropriateness, and preservation of tone"
+  tags: ["translation", "localization", "multilingual"]
+
+tasks:
+  - task_name: "Simple Sentence Translation EN→ES"
+    description: "Translate a simple English sentence to Spanish"
+    input_data:
+      text: "The meeting is scheduled for 3 PM on Thursday."
+      source_language: "English"
+      target_language: "Spanish"
+    expected_output: "La reunión está programada para las 3 PM el jueves."
+    num_trials: 5
+    difficulty: "easy"
+    tags: ["en-es", "formal", "business"]
+    graders_config:
+      - name: "Contains Spanish 'reunion' or 'reunión'"
+        type: 0
+        weight: 4
+        check_type: "regex"
+        pattern: "(reuni[oó]n|junta|encuentro)"
+      - name: "Contains day reference"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "(jueves|Thursday)"
+      - name: "Translation quality"
+        type: 1
+        weight: 3
+        passing_score: 0.8
+        rubric: |
+          Rate this Spanish translation of "The meeting is scheduled for 3 PM on Thursday."
+          Score 0.0-1.0 based on: accuracy (50%), natural phrasing (30%), completeness (20%).
+          Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Technical Content Translation"
+    description: "Translate technical content preserving terminology"
+    input_data:
+      text: "The API endpoint requires a Bearer token in the Authorization header for authentication."
+      source_language: "English"
+      target_language: "Japanese"
+    expected_output: "Japanese translation preserving API, Bearer token, Authorization as technical terms"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["en-ja", "technical", "api"]
+    graders_config:
+      - name: "Preserves technical terms"
+        type: 2
+        weight: 5
+        code: |
+          def grade(output, expected, context):
+              # Technical terms that should NOT be translated (kept in English or standard form)
+              preserve_terms = ["API", "Bearer", "Authorization", "token"]
+              found_preserved = [term for term in preserve_terms if term in output]
+              score = len(found_preserved) / len(preserve_terms)
+              return {"passed": score >= 0.75, "score": score,
+                      "reason": f"Preserved {len(found_preserved)}/{len(preserve_terms)} technical terms: {found_preserved}"}
+      - name: "Contains Japanese characters"
+        type: 0
+        weight: 3
+        check_type: "regex"
+        pattern: "[\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FFF]"
+      - name: "Translation quality"
+        type: 1
+        weight: 2
+        passing_score: 0.75
+        rubric: |
+          Rate this Japanese translation for technical accuracy.
+          Does it preserve technical terminology while being fluent Japanese?
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Idiomatic Expression Translation"
+    description: "Translate idiom with cultural equivalent, not literal translation"
+    input_data:
+      text: "The new CEO really hit the ground running."
+      source_language: "English"
+      target_language: "French"
+      instruction: "Translate naturally, preserving meaning. Do not translate literally."
+    expected_output: "French equivalent of starting strongly/immediately (not literal 'frapper le sol en courant')"
+    num_trials: 5
+    difficulty: "hard"
+    tags: ["idiom", "cultural", "en-fr"]
+    graders_config:
+      - name: "Does not literally translate the idiom"
+        type: 2
+        weight: 5
+        code: |
+          def grade(output, expected, context):
+              # Check that it did NOT do a word-for-word literal translation
+              literal_phrases = [
+                  "frapper le sol", "toucher le sol", "courant", "running ground"
+              ]
+              output_lower = output.lower()
+              for phrase in literal_phrases:
+                  if phrase in output_lower:
+                      return {"passed": False, "score": 0.3,
+                              "reason": f"Possibly literal translation detected: '{phrase}'"}
+              return {"passed": True, "score": 1.0, "reason": "No literal translation detected"}
+      - name: "Contains French"
+        type: 0
+        weight: 2
+        check_type: "regex"
+        pattern: "(le|la|les|de|du|des|un|une|PDG|directeur|nouveau)"
+      - name: "Semantic equivalence"
+        type: 1
+        weight: 3
+        passing_score: 0.75
+        rubric: |
+          The English idiom "hit the ground running" means to start working very effectively
+          immediately. Does this French translation convey the same meaning naturally?
+          Score 0.0-1.0. Return: {"score": float, "passed": bool, "reasoning": string}
+
+  - task_name: "Formal vs Informal Register"
+    description: "Use appropriate formal register for business context"
+    input_data:
+      text: "Can you send me the report when you get a chance?"
+      source_language: "English"
+      target_language: "German"
+      context: "Professional business email between colleagues"
+    expected_output: "Formal German (Sie form, not du form)"
+    num_trials: 5
+    difficulty: "medium"
+    tags: ["register", "formal", "en-de"]
+    graders_config:
+      - name: "Uses formal Sie form"
+        type: 0
+        weight: 6
+        check_type: "regex"
+        pattern: "\\bSie\\b|\\bIhnen\\b|\\bIhr\\b"
+      - name: "Does not use informal du"
+        type: 2
+        weight: 4
+        code: |
+          def grade(output, expected, context):
+              informal_forms = [" du ", " dir ", " dich ", " dein "]
+              output_with_spaces = f" {output} "
+              used_informal = [f for f in informal_forms if f in output_with_spaces]
+              if used_informal:
+                  return {"passed": False, "score": 0.0,
+                          "reason": f"Informal form used in business context: {used_informal}"}
+              return {"passed": True, "score": 1.0, "reason": "No informal 'du' form detected"}
+
+custom_metrics:
+  - name: "Technical Term Preservation Rate"
+    description: "How well technical terms are preserved across all translations"
+    code: |
+      def compute(results):
+          technical_tasks = [r for r in results if 'technical' in r.get('tags', [])]
+          if not technical_tasks:
+              return 1.0
+          return sum(r['score'] for r in technical_tasks) / len(technical_tasks)
+    unit: "score"
+    warning_threshold: 0.9

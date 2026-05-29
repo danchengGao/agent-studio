@@ -35,6 +35,7 @@ class PluginDBMixin:
     # 通用 JSON，MySQL/PostgreSQL/SQLite 均支持
     tools: Mapped[list[dict] | None] = mapped_column(JSON, default=None, nullable=True)
     inputs: Mapped[list[dict] | None] = mapped_column(JSON, default=None, nullable=True, name="inputs")
+    auth: Mapped[dict | None] = mapped_column(JSON, default=None, nullable=True, name="auth")
     _rest_: Mapped[dict | None] = mapped_column(JSON, default=None, nullable=True)
 
     create_time: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

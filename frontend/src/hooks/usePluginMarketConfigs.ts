@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePluginGetMarket } from '@test-agentstudio/api-client'
 import { useAuthStore } from '../stores/useAuthStore'
 import { ENV_CONFIG } from '../config/environment'
-import { getAvailablePluginsFromMarket, transformConfigToMarketPlugin, clearPluginConfigCache, loadPluginConfigs } from '../utils/pluginConfig'
+import { getAvailablePluginsFromMarket, loadPluginConfigs, transformConfigToMarketPlugin } from '../utils/pluginConfig'
 
 interface Plugin {
   space_id: string
@@ -20,19 +20,39 @@ interface Plugin {
   original_market_plugin_id?: string
 }
 
+interface MarketCategory {
+  key: string
+  name: string
+  icon?: string
+  total?: number
+}
+
 interface UsePluginMarketConfigsReturn {
   marketPlugins: Plugin[]
+  marketCategories: MarketCategory[]
   loading: boolean
   error: string | null
   refreshMarketPlugins: () => Promise<void>
-  marketConfigUrl: string | null
 }
 
-export const usePluginMarketConfigs = (): UsePluginMarketConfigsReturn => {
+export const usePluginMarketConfigs = (
+  marketSource: 'local' | 'agent-tools' = 'local',
+  page = 1,
+  size = 100,
+  fetchAll = false,
+): UsePluginMarketConfigsReturn => {
   const [marketPlugins, setMarketPlugins] = useState<Plugin[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [marketConfigUrl, setMarketConfigUrl] = useState<string | null>(null)
+  const [marketCategories, setMarketCategories] = useState<MarketCategory[]>([])
+  const hasLoadedRef = useRef(false)
+  const loadedMarketSourceRef = useRef<'local' | 'agent-tools' | null>(null)
+  const requestKeyRef = useRef('')
+  const hasData = marketPlugins.length > 0
+  const isInitialLoad = !hasLoadedRef.current && !hasData
+  const shouldKeepPreviousData = hasLoadedRef.current && hasData && loadedMarketSourceRef.current === marketSource
+  const requestKey = `${marketSource}:${page}:${size}:${fetchAll}`
+  requestKeyRef.current = requestKey
 
   const getPluginMarketMutation = usePluginGetMarket()
   const { user } = useAuthStore()
@@ -42,66 +62,107 @@ export const usePluginMarketConfigs = (): UsePluginMarketConfigsReturn => {
   }
 
   const loadMarketPlugins = async () => {
+    const activeRequestKey = requestKey
     setLoading(true)
     setError(null)
 
     try {
-      // First try to get market data from API
+      const requestPage = marketSource === 'agent-tools' && fetchAll ? 1 : page
+      const requestSize = marketSource === 'agent-tools' && fetchAll ? 100 : size
+
       const marketResponse = await getPluginMarketMutation.mutateAsync({
         space_id: getDefaultSpaceId(),
-        page: 1,
-        size: 100,
+        page: requestPage,
+        size: requestSize,
+        market_source: marketSource,
       })
 
-      if (marketResponse.code === 200 && marketResponse.data) {
-        // Parse market data and transform it
-        const pluginConfigs = await getAvailablePluginsFromMarket(marketResponse.data)
-        const transformedPlugins = Object.entries(pluginConfigs).map(([key, config]) => transformConfigToMarketPlugin(config, key))
-        setMarketPlugins(transformedPlugins)
-
-        // Extract the market config URL from the market data
-        try {
-          const configData = JSON.parse(marketResponse.data)
-          if (configData.VITE_PLUGIN_SERVICE_URL) {
-            setMarketConfigUrl(configData.VITE_PLUGIN_SERVICE_URL)
-          } else {
-            // Fallback to environment variable if market doesn't have the URL
-            setMarketConfigUrl(ENV_CONFIG.PLUGIN_SERVICE_URL)
-          }
-        } catch (parseError) {
-          console.warn('Failed to parse market data for config URL, using environment variable')
-          setMarketConfigUrl(ENV_CONFIG.PLUGIN_SERVICE_URL)
-        }
-      } else {
+      if (marketResponse.code !== 200 || !marketResponse.data) {
         throw new Error(marketResponse.message || 'Failed to fetch market data')
       }
-    } catch (marketError) {
-      console.warn('Failed to load market plugins from API, falling back to local config:', marketError)
 
-      // Fallback to local config if market API fails
+      const pluginConfigs = await getAvailablePluginsFromMarket(marketResponse.data)
+      const transformedPlugins = Object.entries(pluginConfigs).map(([key, config]) => transformConfigToMarketPlugin(config, key))
+
+      if (requestKeyRef.current !== activeRequestKey) {
+        return
+      }
+
+      setMarketPlugins(transformedPlugins)
+      hasLoadedRef.current = true
+      loadedMarketSourceRef.current = marketSource
+
       try {
-        clearPluginConfigCache()
-        const pluginConfigs = await getAvailablePlugins()
-        const transformedPlugins = pluginConfigs.map(config =>
-          transformConfigToMarketPlugin(config, Object.keys(pluginConfigs).find(key => pluginConfigs[key as keyof typeof pluginConfigs] === config) || ''),
-        )
-        setMarketPlugins(transformedPlugins)
-        // Use environment variable as fallback for local config
-        setMarketConfigUrl(ENV_CONFIG.PLUGIN_SERVICE_URL)
-      } catch (localError) {
-        console.error('Failed to load plugin configurations from both market API and local config:', localError)
-        setError('加载插件市场失败，请稍后重试')
-        setMarketPlugins([])
-        setMarketConfigUrl(ENV_CONFIG.PLUGIN_SERVICE_URL)
+        const configData = JSON.parse(marketResponse.data)
+        const categories = Object.entries(configData.categories || {}).map(([key, value]) => {
+          const category = value as Record<string, unknown>
+          return {
+            key,
+            name: String(category.name || key),
+            icon: typeof category.icon === 'string' ? category.icon : undefined,
+            total: typeof category.total === 'number' ? category.total : undefined,
+          }
+        })
+        setMarketCategories(categories)
+      } catch (parseError) {
+        console.warn('Failed to parse market data for config URL, using environment variable')
+        if (requestKeyRef.current !== activeRequestKey) {
+          return
+        }
+        setMarketCategories([])
+      }
+    } catch (marketError) {
+      if (requestKeyRef.current !== activeRequestKey) {
+        return
+      }
+
+      if (marketSource === 'agent-tools') {
+        console.error('Failed to load agent-tools market plugins:', marketError)
+        setError('加载 Agent Tools 插件市场失败，请稍后重试')
+        if (!shouldKeepPreviousData) {
+          setMarketPlugins([])
+          setMarketCategories([])
+        }
+      } else {
+        console.warn('Failed to load local market plugins from API, falling back to local config:', marketError)
+        try {
+          const pluginConfigs = await loadPluginConfigs()
+          const transformedPlugins = Object.entries(pluginConfigs.plugins || {}).map(([key, config]) =>
+            transformConfigToMarketPlugin(config, key),
+          )
+
+          if (requestKeyRef.current !== activeRequestKey) {
+            return
+          }
+
+          setMarketPlugins(transformedPlugins)
+          hasLoadedRef.current = true
+          loadedMarketSourceRef.current = marketSource
+        } catch (localError) {
+          console.error('Failed to load plugin configurations from both market API and local config:', localError)
+          setError('加载插件市场失败，请稍后重试')
+          if (!shouldKeepPreviousData) {
+            setMarketPlugins([])
+            setMarketCategories([])
+          }
+        }
       }
     } finally {
-      setLoading(false)
+      if (requestKeyRef.current === activeRequestKey) {
+        setLoading(false)
+      }
     }
   }
 
   useEffect(() => {
+    if (isInitialLoad) {
+      setLoading(true)
+    }
+  }, [isInitialLoad])
+
+  useEffect(() => {
     loadMarketPlugins()
-  }, [])
+  }, [fetchAll, marketSource, page, size])
 
   const refreshMarketPlugins = async () => {
     await loadMarketPlugins()
@@ -109,9 +170,9 @@ export const usePluginMarketConfigs = (): UsePluginMarketConfigsReturn => {
 
   return {
     marketPlugins,
+    marketCategories,
     loading,
     error,
     refreshMarketPlugins,
-    marketConfigUrl,
   }
 }

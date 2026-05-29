@@ -520,7 +520,9 @@
       "switchToChinese": "中文",
       "switchToNewVersion": "Try New Version",
       "switchToOldVersion": "Back to Old Version",
-      "beta": "Beta"
+      "beta": "Beta",
+      "darkMode": "Dark Mode",
+      "lightMode": "Light Mode"
     },
     "sidebar": {
       "toggleCollapse": "Toggle sidebar",
@@ -533,6 +535,7 @@
       "apps": "Task Space",
       "agents": "Agent Development",
       "workflows": "Workflows",
+      "executions": "Executions",
       "promptManagement": "Prompt Management",
       "promptTemplates": "Prompt Templates",
       "promptOptimization": "Prompt Optimization",
@@ -547,6 +550,7 @@
       "models": "Models",
       "knowledgeBases": "Knowledge Bases",
       "memoryBase": "Memory Bases",
+      "triggers": "Triggers",
       "plugins": "Plugins",
       "pluginManagement": "Plugin Management",
       "pluginMarket": "Plugin Market",
@@ -554,7 +558,8 @@
         "appDevelopment": "App Development",
         "promptEngineering": "Prompt",
         "modelsAndData": "Resource Management",
-        "plugins": "Plugins"
+        "plugins": "Plugins",
+        "evaluation": "Benchmarks"
       }
     }
   },
@@ -818,6 +823,15 @@
       "renderFailed": "Chart rendering failed",
       "viewCode": "View code"
     },
+    "conversation": {
+      "linkMessage": {
+        "unknownLink": "Unknown Link",
+        "searchQuery": "Search Query",
+        "search": "Search",
+        "web": "Web",
+        "knowledgeBase": "Knowledge Base"
+      }
+    },
     "report": {
       "toolbar": "Report actions toolbar",
       "closePanel": "Close panel",
@@ -829,22 +843,42 @@
       "loadingTimeout": "Loading timeout",
       "timeoutMessage": "Report content is taking too long to load, please try again later",
       "viewToggle": {
-        "thinkingChain": "Thinking Chain",
+        "thinkingChain": "Mind Map",
         "reportView": "Report",
         "ariaLabel": "View toggle",
         "comingSoon": "Feature coming soon..."
       },
-      "edit": "Edit",
-      "exitEdit": "Exit Edit",
-      "aiRewrite": "AI Rewrite",
-      "aiPolish": "Polish",
-      "aiExpand": "Expand",
-      "aiShrink": "Shrink",
-      "howToRewrite": "How would you like to rewrite?",
-      "send": "Send",
-      "thinking": "Thinking...",
-      "writing": "Writing..."
-    },
+        "edit": "Edit",
+        "exitEdit": "Exit Edit",
+        "aiRewrite": "AI Rewrite",
+        "aiPolish": "Polish",
+        "aiExpand": "Expand",
+        "aiShrink": "Shrink",
+        "aiSupplementarySearch": "Supplementary Search",
+        "supplementarySearch": {
+          "selectedOnly": "Selected Only",
+          "selectedAndRelated": "Smart Related Rewrite"
+        },
+        "howToRewrite": "How would you like to rewrite?",
+        "send": "Send",
+        "thinking": "Thinking...",
+        "writing": "Writing...",
+        "rewriteFailed": "Rewrite failed",
+        "recoveryNeeded": "Recovery needed",
+        "rewriteHelpText": "Please {{actionLabel}} this text:\n\n\"{{displayText}}\"\n\n{{userInstruction}}",
+        "rewriteHelpTextShort": "Please {{actionLabel}} this text:\n\n\"{{displayText}}\"",
+        "rewriteSessionUnavailable": "The rewrite session for this report has expired. Please ask again before attempting to rewrite.",
+        "feedbackProcessorDisabled": "User feedback optimization is disabled. The current report cannot be edited.",
+        "syncSynced": "Synced",
+        "syncPending": "Pending sync",
+        "syncing": "Syncing",
+        "syncFailed": "Sync failed",
+        "undo": "Undo",
+        "redo": "Redo",
+        "manualSync": "Manual sync report",
+        "sync": "Sync",
+        "rewriteRoundsExhausted": "Rewrite rounds exhausted, cannot continue rewriting"
+      },
     "user": {
       "defaultUsername": "User"
     },
@@ -871,6 +905,7 @@
         "generalDesc": "Interaction and planning settings",
         "searchDesc": "Online enhancement engine and result settings",
         "templateDesc": "Report template management",
+        "modelDesc": "Model configuration management",
         "needsConfig": "Needs Config"
       },
       "model": {
@@ -902,12 +937,22 @@
           "description": "",
           "recommendation": "Recommended to use models with strong programming and math capabilities"
         },
+        "vlmChart": {
+          "label": "VLM Chart",
+          "description": "",
+          "recommendation": "Choose a multimodal model that supports image input"
+        },
         "useGeneral": "Not Selected",
         "selectModel": "Select Model",
         "clear": "Clear",
         "test": {
           "success": "Model {{modelName}} test successful",
-          "failed": "Model {{modelName}} test failed, model unavailable"
+          "failed": "Model {{modelName}} test failed, model unavailable",
+          "missingSpaceId": "Missing spaceId, unable to test model",
+          "prompt": "Hello",
+          "validationPassed": "Model availability validation passed",
+          "unavailable": "Model unavailable: {{error}}",
+          "testFailed": "Model test failed"
         }
       },
       "general": {
@@ -925,7 +970,16 @@
         "userFeedbackProcessorEnable": "Enable User Feedback Optimization",
         "userFeedbackProcessorEnableDesc": "Support AI optimization based on user feedback",
         "chapterCount": "Chapter Count",
-        "chapterCountDesc": "Control maximum report chapter count"
+        "chapterCountDesc": "Control maximum report chapter count",
+        "vlmChart": {
+          "title": "VLM Chart Generation",
+          "enable": "Enable VLM chart generation",
+          "enableDesc": "Use a vision model to iterate on charts generated by DeepSearch",
+          "maxIterations": "Max iterations",
+          "maxIterationsDesc": "0 disables iteration;",
+          "model": "VLM model",
+          "modelDesc": "Synced with the VLM model in model settings"
+        }
       },
       "search": {
         "mode": "Search Mode",
@@ -959,7 +1013,9 @@
         "localModeRequires": "Local search mode requires at least one knowledge base",
         "webResultCountRange": "Online enhancement result count must be between 1-10",
         "localResultCountRange": "Local search result count must be between 1-10",
-        "generalModelRequired": "General model is required, please select a model"
+        "generalModelRequired": "General model is required, please select a model",
+        "vlmChartIterationsRange": "VLM chart max iterations must be between 0 and 3",
+        "vlmChartModelRequired": "Select a VLM model when VLM chart generation is enabled with iterations greater than 0"
       },
       "engine": {
         "select": "Select Online Enhancement Engine",
@@ -1034,8 +1090,10 @@
           "testFailed": "Test Failed",
           "testResult": "Test Result",
           "noResults": "Test successful, but no search results found",
-          "networkError": "Network connection failed, please check network settings and try again"
-        }
+          "networkError": "Network connection failed, please check network settings and try again",
+          "resultCountUnit": " results"
+        },
+        "toggleStatusFailed": "Failed to toggle status"
       },
       "knowledge": {
         "select": "Configure Knowledge Base",
@@ -1076,6 +1134,7 @@
         "uploading": "Uploading...",
         "uploadError": "Missing required configuration information",
         "uploadFailed": "Failed to upload template",
+        "uploadFailedRetry": "Failed to upload template, please try again",
         "delete": "Delete Template",
         "deleteConfirm": "Are you sure you want to delete template \"{{name}}\"? This action cannot be undone.",
         "confirmDelete": "Delete Template",
@@ -1102,7 +1161,8 @@
         "emptyDescription": "Upload templates to use",
         "uploadButton": "Upload Template",
         "invalidFileType": "Unsupported file type. Please upload files in {{formats}} format",
-        "fileTypeChanged": "Mode switched. The previous file type is no longer supported. Please select a new file"
+        "fileTypeChanged": "Mode switched. The previous file type is no longer supported. Please select a new file",
+        "nameInvalidChars": "Template name can only contain Chinese/English letters, numbers, underscore (_), hyphen (-), and dots (.)"
       }
     },
     "time": {
@@ -1133,7 +1193,8 @@
       "uploadTemplateFailed": "Failed to upload template",
       "deleteTemplateFailed": "Failed to delete template",
       "requestTimeout": "Request timeout, please try again later",
-      "networkError": "Network connection failed, please check your network"
+      "networkError": "Network connection failed, please check your network",
+      "requestFailed": "Request failed"
     },
     "deepSearch": {
       "informationCollection": "Task {{sectionId}}.{{planIndex}}",
@@ -1159,6 +1220,9 @@
       "conversationCancelledTip": "DeepSearch conversation has been manually interrupted",
       "collapseContent": "Collapse Content",
       "expandContent": "Expand Content",
+      "remainingRewriteRounds": "Rewrites remaining",
+      "times": "times",
+      "noRewriteRoundsLeft": "No rewrite rounds left",
       "status": {
         "pending": "Pending",
         "inProgress": "In Progress",
@@ -1189,6 +1253,7 @@
         "viewMindMap": "Mind Map",
         "noData": "No thought chain data",
         "relayout": "Re-layout",
+        "nodeStats": "Nodes: {{nodes}} | Edges: {{edges}}",
         "researchTopic": "Research Topic",
         "researchCompleted": "Research Completed",
         "finalReport": {
@@ -1220,11 +1285,45 @@
         "noDataError": "Report generation failed: No final report data received. Possible reasons include: Network connection interrupted, server error, or task was terminated prematurely. https://gitcode.com/openJiuwen/deepsearch/blob/main/docs/zh/5.FAQ/README.md"
       },
       "playback": {
-        "panelTitle": "Debug Panel",
+        "panelTitle": "Recording & Playback",
         "tabPlayback": "SSE Playback",
         "tabDebug": "Report Debug",
+        "searchPlaceholder": "Search recordings...",
+        "recordingSessions": "Recording Sessions",
+        "debugReports": "Debug Reports",
+        "noMatchingRecordings": "No matching recordings",
+        "noRecordings": "No recordings",
+        "noReports": "No reports",
+        "events": "events",
+        "eventsCount": "{{count}} events",
+        "rewrites": "rewrites",
+        "rewritesCount": "{{count}} rewrites",
+        "importMarkdown": "Import Markdown",
+        "duration": "Duration",
+        "mainFlow": "Main Flow",
+        "mockMode": "Mock Mode",
+        "mockModeHint": "Mock mode enabled. Rewrite operations during playback will be intercepted and responded with recorded data.",
+        "on": "On",
+        "off": "Off",
+        "pause": "Pause",
+        "resume": "Resume",
+        "stop": "Stop",
+        "playRecording": "Play Recording",
+        "playing": "▶ Playing",
+        "paused": "⏸ Paused",
+        "rewriteHistory": "AI Rewrite History",
+        "rewriteCount": "{{count}} times",
+        "matched": "Matched",
+        "pending": "Pending",
+        "notMatched": "Not Matched",
+        "selectedText": "Selected Text",
+        "exportJson": "Export JSON",
+        "exportAll": "Export All",
+        "selectRecordingHint": "Select a recording to view details",
+        "selectRecordingHintDesc": "Choose a recording from the list, or start a new conversation to record",
         "playbackSpeed": "Playback Speed:",
         "compressionEnabled": "Compression:",
+        "mockRewriteEnabled": "Mock AI Rewrite:",
         "status": {
           "playing": "Playing...",
           "completed": "✓ Playback Completed",
@@ -1242,10 +1341,8 @@
           "viewReport": "View Report"
         },
         "loading": "Loading...",
-        "noRecordings": "No recordings available",
         "noRecordingsDesc": "SSE event streams will be automatically recorded after sending DeepSearch messages",
         "noRecordingsToDownload": "No recordings available to download",
-        "events": "events",
         "seconds": "seconds",
         "compression": "Compression",
         "confirmDelete": "Are you sure you want to delete this recording?",
@@ -1261,7 +1358,31 @@
         "noDebugReports": "No debug reports available",
         "noDebugReportsDesc": "Import markdown report files to view",
         "finalReport": "Final Report",
-        "tip": "💡 Tip: Playback creates a new conversation. Speed can be adjusted above. Compression ratio indicates saved storage space."
+        "tip": "💡 Tip: Playback creates a new conversation. With Mock mode enabled, rewrite operations will be responded with recorded data.",
+        "playbackConversation": "Playback Conversation",
+        "showPanel": "Show Playback Panel",
+        "hidePanel": "Hide Playback Panel",
+        "interactionCount": "{{count}} interactions",
+        "interaction": "Interaction",
+        "interactionTrack": "Interaction Track",
+        "hitlOutlineCount": "{{count}} HITL / Outline interactions",
+        "noInteractionDesc": "No replayable HITL / Outline interactions in this recording. It may be from an older version or the session had no interactions.",
+        "afterMainFlowEvent": "After the {{count}}th main flow event",
+        "outlineInteraction": "Outline Interaction",
+        "acceptedContinue": "Accepted & Continue",
+        "reviseComment": "Revise Comment",
+        "mismatchAction": "Action Type",
+        "mismatchSelectedText": "Selected Text",
+        "mismatchOffset": "Text Position",
+        "mismatchUserInstruction": "Additional Instruction",
+        "mismatchInconsistent": " Mismatch",
+        "mismatchReason": "Mismatch Reason",
+        "sequenceHintDesc": "An earlier rewrite needs to be replayed first. Currently waiting for rewrite #{{expectedOrder}}, but this trigger resembles rewrite #{{attemptedOrder}}.",
+        "closestAction": "Closest Action",
+        "closestOffset": "Closest Position",
+        "closestSelectedText": "Closest Selected Text",
+        "closestUserInstruction": "Closest Additional Instruction",
+        "empty": "Empty"
       }
     }
   },
@@ -2326,12 +2447,16 @@
     "subtitle": "Configure and manage your LLM models, including API keys, parameter settings, and performance monitoring",
     "tabs": {
       "llm": "LLM Models",
-      "embedding": "Embedding Models"
+      "embedding": "Embedding Models",
+      "vlm": "VLM Models"
     },
     "addModel": "Add Model",
     "saveModel": "Save Model",
     "editModel": "Edit Model",
     "testModel": "Test Model",
+    "vlmTestNotice": "VLM testing automatically sends the prompt together with the fixed test image below.",
+    "vlmTestImageTitle": "Fixed Test Image",
+    "vlmTestImageDescription": "This preview is the built-in image that will be encoded in the browser and sent to the backend for multimodal VLM testing.",
     "commonTestPrompts": "Common Prompts",
     "introducePrompt": "Introduce Yourself",
     "aiConceptsPrompt": "Please explain the basic concepts of artificial intelligence",
@@ -2357,6 +2482,7 @@
       "title": "Model List",
       "noModels": "No models available",
       "searchPlaceholder": "Search model names or providers...",
+      "searchPlaceholderNoTags": "Search model names or providers...",
       "name": "Model Name",
       "provider": "Provider",
       "type": "Model Type",
@@ -2424,7 +2550,9 @@
         "topp": "Top P",
         "toppDesc": "Top-p Sampling: Select the smallest set of words whose cumulative probability reaches p for sampling. Dynamically adjusts the number of candidate words to balance output diversity and quality. Typically set to 0.9-0.95. When used with temperature sampling, it is recommended to adjust only one of them.",
         "timeout": "Timeout(s)",
-        "timeoutDesc": "Timeout range: 1-3600 seconds (out-of-range values will be automatically adjusted)"
+        "timeoutDesc": "Timeout range: 1-3600 seconds (out-of-range values will be automatically adjusted)",
+        "retryCount": "Retry Count",
+        "retryCountDesc": "Retry count range: 0-10 (out-of-range values will be automatically adjusted)"
       },
       "actions": {
         "save": "Save",
@@ -2818,8 +2946,8 @@
         "urlPlaceholder": "Enter the MCP server URL (e.g.: http://localhost:3000/sse)",
         "urlHelper": "Provide the MCP server address including protocol (http) ({{current}}/{{max}} bytes)",
         "openApiFileLabel": "OpenAPI specification file",
-        "openApiFilePlaceholder": "Enter path to OpenAPI spec file (e.g.: /path/to/openapi.yaml)",
-        "openApiFileHelper": "Provide the file system path to your OpenAPI specification file (YAML or JSON)",
+        "openApiFilePlaceholder": "File path or URL (e.g.: /path/to/openapi.yaml or https://api.com/openapi.json)",
+        "openApiFileHelper": "Provide a local file path (/path/to/openapi.yaml, ./openapi.yaml) or remote URL (https://api.com/openapi.json)",
         "stdioPathLabel": "STDIO Server Runnable Path",
         "stdioPathPlaceholder": "Enter path to STDIO server executable (e.g.: /usr/local/bin/mcp-server)",
         "stdioPathHelper": "Provide the file system path to your STDIO server executable or script",
@@ -3203,7 +3331,7 @@
       "createFromServiceDescription": "Quickly create plugins based on cloud services",
       "createFromIDE": "Create in IDE",
       "createFromIDEDescription": "Create plugins in integrated development environment",
-      "createFromMCP": "MCP Plugin",
+      "createFromMCP": "Create plugin based on existing MCP service",
       "createFromMCPDescription": "Connect to an MCP (Model Context Protocol) server"
     },
     "confirmDelete": "Confirm Delete",
@@ -5051,6 +5179,93 @@
     "policy": {
       "paragraph1": "This platform is <bold>for trial and demonstration purposes only</bold>. Please do not upload, enter, or submit real personal information (including but not limited to name, ID number, phone number, bank card information, address, social media accounts, sensitive business data, etc.).",
       "paragraph2": "The platform will <bold>periodically clean up</bold> usage data. Please <bold>make good use of the export function to back up and properly save important data</bold> during use, to avoid data loss or inability to recover due to data cleanup, or service adjustments."
+    }
+  },
+  "triggers": {
+    "title": "Triggers",
+    "create": "New Trigger",
+    "empty": "No triggers yet. Create one to start automating.",
+    "types": {
+      "cron": "Cron",
+      "webhook": "Webhook",
+      "polling": "Polling"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "executionStatus": {
+      "success": "Success",
+      "error": "Error",
+      "skipped": "Skipped",
+      "running": "Running"
+    },
+    "firedBy": {
+      "scheduler": "Scheduler",
+      "webhook": "Webhook",
+      "poll": "Poll",
+      "manual": "Manual"
+    },
+    "form": {
+      "name": "Name",
+      "description": "Description",
+      "status": "Status",
+      "targetType": "Target Type",
+      "target": "Target",
+      "targetVersion": "Version",
+      "targetVersionHint": "Use 'draft' for the latest unpublished version",
+      "inputPayload": "Input Payload",
+      "addInputRow": "Add Input",
+      "triggerType": "Trigger Type",
+      "cronExpression": "Cron Expression",
+      "cronExpressionInvalid": "Invalid cron expression",
+      "cronPreview": "Runs: {{preview}}",
+      "webhookUrl": "Inbound URL",
+      "webhookUrlPending": "URL available after saving",
+      "webhookUrlPendingHint": "Save the trigger first to get the inbound URL.",
+      "webhookCopy": "Copy URL",
+      "webhookCopied": "Copied!",
+      "webhookSecret": "HMAC Secret (optional)",
+      "webhookSecretHint": "Leave empty to accept all POST requests",
+      "pollUrl": "Poll URL",
+      "pollInterval": "Check every",
+      "pollLastChecked": "Last checked",
+      "pollLastHash": "Last content hash",
+      "pollNeverChecked": "Never checked",
+      "saveAndActivate": "Save & Activate",
+      "save": "Save"
+    },
+    "executionHistory": {
+      "title": "Execution History",
+      "startedAt": "Started",
+      "duration": "Duration",
+      "status": "Status",
+      "firedBy": "Fired By",
+      "viewTrace": "View Trace",
+      "noLogs": "No executions yet"
+    },
+    "messages": {
+      "created": "Trigger created",
+      "updated": "Trigger updated",
+      "deleted": "Trigger deleted",
+      "activated": "Trigger activated",
+      "deactivated": "Trigger deactivated",
+      "runQueued": "Execution queued",
+      "deleteFailed": "Failed to delete trigger",
+      "saveFailed": "Failed to save trigger"
+    },
+    "deleteConfirm": {
+      "title": "Delete Trigger",
+      "message": "Are you sure you want to delete \"{{name}}\"? This will also delete all execution history."
+    },
+    "intervals": {
+      "60": "1 minute",
+      "300": "5 minutes",
+      "900": "15 minutes",
+      "1800": "30 minutes",
+      "3600": "1 hour",
+      "21600": "6 hours",
+      "86400": "24 hours"
     }
   }
 }

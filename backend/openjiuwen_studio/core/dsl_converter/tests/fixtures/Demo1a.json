@@ -1,0 +1,271 @@
+{
+  "nodes": [
+    {
+      "id": "21_9c462056",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 640,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "Stock Data Agent",
+        "max_iterations": 5,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "Fetch 25 days of 1D OHLCV bars for the ticker. Output ONLY the raw JSON response from the tool. No markdown, no prose."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "{{query}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "query": {
+              "type": "ref",
+              "content": [
+                "1_74106444",
+                "input"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "d4259814-2064-450c-8968-b4e47ae0f7e9",
+                "plugin_id": "0a720f44-ea94-4205-bb42-862f88addf97",
+                "version": "draft",
+                "name": "Alpaca Data",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "output": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "output"
+          ]
+        }
+      }
+    },
+    {
+      "id": "10_852fdf07",
+      "type": "10",
+      "meta": {
+        "position": {
+          "x": 1100,
+          "y": 15
+        }
+      },
+      "data": {
+        "title": "Quant Engine",
+        "inputs": {
+          "inputParameters": {
+            "input": {
+              "type": "ref",
+              "content": [
+                "21_9c462056",
+                "output"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import json\n    import math\n\n    # --- Hidden Math Utilities ---\n    def mean(v): \n        return sum(v) / len(v) if v else 0\n    \n    def get_rsi(closes, p=14):\n        if len(closes) < p + 1: return 50\n        diffs = [closes[i] - closes[i-1] for i in range(1, len(closes))]\n        avg_g = mean([d for d in diffs[-p:] if d > 0])\n        avg_l = mean([-d for d in diffs[-p:] if d < 0])\n        if avg_l == 0: return 100\n        return 100 - (100 / (1 + (avg_g / avg_l)))\n\n    def get_hurst(ts):\n        lags = range(2, 20)\n        tau = []\n        for lag in lags:\n            diffs = [ts[j] - ts[j-lag] for j in range(lag, len(ts))]\n            if not diffs: \n                tau.append(0)\n                continue\n            m = mean(diffs)\n            v = sum((x - m)**2 for x in diffs) / len(diffs)\n            tau.append(math.sqrt(math.sqrt(v)))\n        log_l = [math.log(l) for l in lags]\n        log_t = [math.log(t) if t > 0 else 0 for t in tau]\n        n = len(log_l)\n        denom = (n * sum(x**2 for x in log_l) - sum(log_l)**2)\n        slope = (n * sum(log_l[i] * log_t[i] for i in range(n)) - sum(log_l) * sum(log_t)) / denom if denom != 0 else 0\n        return slope * 2.0\n\n    def analyze_vibe(closes, highs, lows):\n        h_val = get_hurst(closes)\n        r_val = get_rsi(closes)\n        \n        # Volatility as \"Adrenaline\"\n        tr = [highs[i]-lows[i] for i in range(len(closes))]\n        adr = (mean(tr[-14:]) / closes[-1]) * 100 if closes[-1] else 0\n\n        # Translate Math to Narrative\n        if h_val > 0.6: \n            vibe = \"Locked in a powerful trend\"\n            mood = \"Determined\"\n        elif h_val < 0.45: \n            vibe = \"Snapping back like a rubber band\"\n            mood = \"Elastic\"\n        else: \n            vibe = \"Drifting aimlessly\"\n            mood = \"Indecisive\"\n\n        if r_val > 70: \n            energy = \"Euphoric / Overextended\"\n        elif r_val < 30: \n            energy = \"Exhausted / Depressed\"\n        else: \n            energy = \"Balanced and calm\"\n\n        return {\n            \"ticker\": \"\",\n            \"price\": f\"${closes[-1]:.2f}\",\n            \"market_soul\": {\n                \"vibe\": vibe,\n                \"mood\": mood,\n                \"energy\": energy,\n                \"adrenaline_level\": \"High\" if adr > 2 else \"Chilled\"\n            },\n            \"raw_signal\": \"Bullish\" if (h_val > 0.5 and r_val < 60) else \"Bearish\" if (h_val > 0.5 and r_val > 40) else \"Neutral\"\n        }\n\n    # --- Input Handling & Parsing ---\n    raw_in = args.params.get('input', '{}')\n    raw = {}\n    if isinstance(raw_in, str):\n        # Scrub markdown formatting if present\n        clean = raw_in.replace(\"```json\", \"\").replace(\"```\", \"\").strip()\n        try:\n            raw = json.loads(clean)\n        except:\n            try:\n                import ast\n                raw = ast.literal_eval(clean)\n            except: \n                raw = {}\n    else: \n        raw = raw_in\n\n    # --- Recursive Search for Data ---\n    def find_bars(obj):\n        if not isinstance(obj, dict): return None\n        # Direct check for 'bars' key\n        if \"bars\" in obj and isinstance(obj[\"bars\"], dict): \n            return obj[\"bars\"]\n        # Check if the dictionary itself is a map of tickers to bar lists\n        for k, v in obj.items():\n            if isinstance(v, list) and v and isinstance(v[0], dict) and ('c' in v[0] or 'close' in v[0]): \n                return obj\n            # Dig deeper\n            res = find_bars(v)\n            if res: return res\n        return None\n\n    bars_map = find_bars(raw) or {}\n    results = []\n\n    # --- Processing ---\n    if isinstance(bars_map, dict):\n        for ticker, bars in bars_map.items():\n            if not isinstance(bars, list) or len(bars) < 20: \n                continue\n            try:\n                # Sort by time to ensure calculations are correct\n                b_sorted = sorted(bars, key=lambda x: x.get('t', 0))\n                c = [float(x.get('c', x.get('close', 0))) for x in b_sorted]\n                h = [float(x.get('h', x.get('high', 0))) for x in b_sorted]\n                l = [float(x.get('l', x.get('low', 0))) for x in b_sorted]\n                \n                analysis = analyze_vibe(c, h, l)\n                analysis[\"ticker\"] = ticker\n                results.append(analysis)\n            except: \n                continue\n\n    return {'result': json.dumps(results)}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string",
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "required": [
+            "result"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 3,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": {
+            "defaultStep": "0",
+            "errorStep": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "21_4aea5072",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 1560,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "News Sentiment",
+        "max_iterations": 5,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a sentiment analyst. Analyze search results for the ticker. Output ONLY exact JSON: {\"ticker\": \"string\", \"decision\": \"Buy|Hold|Sell\", \"reason\": \"string\"}"
+            },
+            "prompt": {
+              "type": "template",
+              "content": "{{query}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "query": {
+              "type": "ref",
+              "content": [
+                "10_852fdf07",
+                "result"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "184dc0fa-2937-41b8-877f-270a2a979210",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ],
+            "workflows": []
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "output": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "output"
+          ]
+        }
+      }
+    },
+    {
+      "id": "1_74106444",
+      "type": "1",
+      "meta": {
+        "position": {
+          "x": 180,
+          "y": 32
+        }
+      },
+      "data": {
+        "title": "Start",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "string",
+              "default": "",
+              "description": "Trigger input"
+            }
+          },
+          "required": [
+            "input"
+          ]
+        }
+      }
+    },
+    {
+      "id": "2_e24ac3d4",
+      "type": "2",
+      "meta": {
+        "position": {
+          "x": 2020,
+          "y": 32
+        }
+      },
+      "data": {
+        "title": "End",
+        "inputs": {
+          "inputParameters": {
+            "result": {
+              "type": "ref",
+              "content": [
+                "21_4aea5072",
+                "output"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "content": {
+            "type": "template",
+            "content": "{{result}}"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeID": "1_74106444",
+      "targetNodeID": "21_9c462056"
+    },
+    {
+      "sourceNodeID": "21_9c462056",
+      "targetNodeID": "10_852fdf07"
+    },
+    {
+      "sourceNodeID": "10_852fdf07",
+      "targetNodeID": "21_4aea5072",
+      "sourcePortID": "0"
+    },
+    {
+      "sourceNodeID": "21_4aea5072",
+      "targetNodeID": "2_e24ac3d4"
+    }
+  ],
+  "plugins": [],
+  "model_references": {}
+}

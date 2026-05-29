@@ -1,0 +1,254 @@
+{
+  "name": "Smart Order Processor",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "de85dc88-4fb5-49b2-b346-1158eb221ef6",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "customerName",
+              "value": "Levy Cohen",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "product",
+              "value": "Smart Glasses",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "quantity",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "f4",
+              "name": "unitPrice",
+              "value": 120,
+              "type": "number"
+            },
+            {
+              "id": "f5",
+              "name": "customerTier",
+              "value": "VIP",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0143e329-067f-4dd4-a962-605bdad02143",
+      "name": "Order Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -576,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { customerName, product, quantity, unitPrice, customerTier } = $input.first().json;\n\nconst subtotal = quantity * unitPrice;\nconst isVIP = customerTier === 'VIP';\nconst discountRate = isVIP ? 0.15 : 0;\nconst discount = subtotal * discountRate;\nconst total = subtotal - discount;\n\nreturn [{\n json: {\n customerName,\n product,\n quantity,\n unitPrice,\n customerTier,\n subtotal,\n discountRate: `${discountRate * 100}%`,\n discount,\n total,\n isVIP\n }\n}];"
+      },
+      "id": "a7339e57-80e2-4b6f-b74a-21cc13aadb71",
+      "name": "Calculate Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-vip",
+              "leftValue": "={{ $json.isVIP }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0817f124-4aea-42e3-b064-89dbc73cd5ed",
+      "name": "Is VIP Customer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "vip-1",
+              "name": "status",
+              "value": "✅ Order Confirmed — VIP",
+              "type": "string"
+            },
+            {
+              "id": "vip-2",
+              "name": "message",
+              "value": "={{ 'Dear ' + $json.customerName + ', your order of ' + $json.quantity + 'x ' + $json.product + ' has been confirmed. A 15% VIP discount was applied. Total: $' + $json.total }}",
+              "type": "string"
+            },
+            {
+              "id": "vip-3",
+              "name": "amountCharged",
+              "value": "={{ $json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "vip-4",
+              "name": "discountApplied",
+              "value": "={{ $json.discount }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a006f7e3-1f58-4e72-a8b9-151a1c507977",
+      "name": "VIP Confirmation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "std-1",
+              "name": "status",
+              "value": "✅ Order Confirmed — Standard",
+              "type": "string"
+            },
+            {
+              "id": "std-2",
+              "name": "message",
+              "value": "={{ 'Dear ' + $json.customerName + ', your order of ' + $json.quantity + 'x ' + $json.product + ' has been confirmed. Total: $' + $json.total }}",
+              "type": "string"
+            },
+            {
+              "id": "std-3",
+              "name": "amountCharged",
+              "value": "={{ $json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "std-4",
+              "name": "discountApplied",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bc42e416-e112-4edb-a481-772660902ecd",
+      "name": "Standard Confirmation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        176,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Order Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Details": {
+      "main": [
+        [
+          {
+            "node": "Calculate Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Order": {
+      "main": [
+        [
+          {
+            "node": "Is VIP Customer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is VIP Customer?": {
+      "main": [
+        [
+          {
+            "node": "VIP Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Standard Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ae0cbb1f-3ccc-473b-ab70-956683f9f6e5",
+  "meta": {
+    "instanceId": "86aeef425fdd593703d0ad6614726d340b3121ccfa862de3cdbe76630c072edf"
+  },
+  "id": "wxOSBgYadRAwqkv9",
+  "tags": []
+}

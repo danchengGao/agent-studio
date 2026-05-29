@@ -1,0 +1,108 @@
+# Parallelization Pattern Benchmark
+# Tests concurrent execution of multiple independent tasks.
+# Pattern type: 2 (PARALLELIZATION)
+
+suite:
+  suite_name: "Parallelization Pattern Benchmark"
+  description: "Validates workflows that execute multiple independent tasks concurrently to improve throughput and reduce latency."
+
+tasks:
+  - task_id: "parallelization_multi_analysis"
+    task_name: "Parallel sentiment + keyword + language analysis"
+    description: >
+      Workflow should run sentiment analysis, keyword extraction, and language detection
+      concurrently on the same input text, then merge results.
+    difficulty: 1  # MEDIUM
+    pattern_type: 2  # PARALLELIZATION
+    tags: ["parallelization", "concurrent", "analysis", "merge"]
+    trials: 3
+    input_data:
+      text: "The new electric vehicle model offers impressive range and fast charging capabilities."
+    expected_output:
+      has_sentiment: true
+      has_keywords: true
+      has_language: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "all_analyses_present"
+        config:
+          model_id: null
+          rubric: >
+            The output contains results from all three analyses: sentiment (positive/negative/neutral),
+            keywords (list of key terms like 'electric vehicle', 'range', 'charging'),
+            and language detection (English).
+          passing_score: 0.7
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "output_not_empty"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: ""
+          weight: 0.3
+
+  - task_id: "parallelization_document_processing"
+    task_name: "Parallel processing of multiple documents"
+    description: >
+      Workflow should process multiple documents simultaneously and aggregate results.
+      Each document gets summarized in parallel.
+    difficulty: 1  # MEDIUM
+    pattern_type: 2  # PARALLELIZATION
+    tags: ["parallelization", "batch", "documents", "aggregation"]
+    trials: 3
+    input_data:
+      documents:
+        - id: "doc1"
+          content: "Machine learning is transforming healthcare with predictive diagnostics."
+        - id: "doc2"
+          content: "Renewable energy investments reached record highs in 2024."
+        - id: "doc3"
+          content: "Global supply chains are adapting to new geopolitical realities."
+    expected_output:
+      document_count: 3
+      all_summarized: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "all_docs_summarized"
+        config:
+          model_id: null
+          rubric: >
+            The output contains summaries for all three documents: one about ML in healthcare,
+            one about renewable energy, and one about supply chains. Each summary should be
+            concise and capture the main point of the original document.
+          passing_score: 0.7
+          weight: 1.0
+
+  - task_id: "parallelization_fan_out_merge"
+    task_name: "Fan-out search and merge results"
+    description: >
+      Workflow fans out a query to multiple knowledge domains in parallel,
+      then merges and ranks the combined results.
+    difficulty: 2  # HARD
+    pattern_type: 2  # PARALLELIZATION
+    tags: ["parallelization", "fan-out", "search", "merge", "ranking"]
+    trials: 3
+    input_data:
+      query: "What are the latest advancements in quantum computing?"
+      domains: ["research", "industry", "applications"]
+    expected_output:
+      has_merged_results: true
+      covers_multiple_domains: true
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "comprehensive_coverage"
+        config:
+          model_id: null
+          rubric: >
+            The response covers quantum computing advancements from multiple angles,
+            demonstrating that information was gathered from different domains (research,
+            industry, practical applications) and synthesized into a coherent answer.
+          passing_score: 0.75
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "contains_quantum"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "quantum"
+          weight: 0.5

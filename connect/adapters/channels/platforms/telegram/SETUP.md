@@ -1,0 +1,121 @@
+# Telegram Bot Setup Guide
+
+This guide walks you through creating a Telegram bot from scratch and connecting it to OpenJiuwen.
+
+---
+
+## Prerequisites
+
+- A Telegram account (mobile app or desktop — [telegram.org](https://telegram.org))
+- OpenJiuwen backend running and accessible
+
+---
+
+## Step 1 — Create a bot with BotFather
+
+BotFather is Telegram's official bot for creating and managing bots.
+
+1. Open Telegram and search for **@BotFather** (blue verified checkmark)
+2. Start a conversation: tap **Start**
+3. Send the command:
+   ```
+   /newbot
+   ```
+4. BotFather will ask for a **display name** — this is what users see in chats.
+   Example: `OpenJiuwen Assistant`
+
+5. BotFather will then ask for a **username** — must end in `bot`, no spaces.
+   Example: `openjiuwen_assistant_bot`
+
+6. BotFather replies with your **Bot Token**:
+   ```
+   Done! Use this token to access the HTTP API:
+   123456789:AAFxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   ```
+   **Copy and save this token — you will need it to run the bot.**
+
+---
+
+## Step 2 — (Optional) Configure the bot
+
+Still in the BotFather conversation:
+
+**Set a description** (shown when users open the bot for the first time):
+```
+/setdescription
+```
+Select your bot, then type a description, e.g.:
+> Interact with OpenJiuwen workflows and agents directly from Telegram.
+
+**Set a profile photo**:
+```
+/setuserpic
+```
+Select your bot, then send an image.
+
+**Set the command list** (shows autocomplete in Telegram):
+```
+/setcommands
+```
+Select your bot, then paste:
+```
+login - Log in to OpenJiuwen backend
+logout - Log out
+status - Check login status
+workflows - List all workflows
+workflow_search - Search workflows
+workflow_execute - Run a workflow
+agents - List all agents
+agent_search - Search agents
+agent_execute - Run an agent with a single message
+agent_start_chat - Start interactive chat with an agent
+health - Check backend health
+help - Show all commands
+```
+
+---
+
+## Step 3 — Run the bot
+
+From the project root directory:
+
+```bash
+python -m connect.adapters.channels.run telegram <BOT_TOKEN>
+```
+
+Replace `<BOT_TOKEN>` with the token you copied in Step 1.
+
+**With a custom backend URL:**
+```bash
+python -m connect.adapters.channels.run telegram <BOT_TOKEN> http://your-server:8000
+```
+
+**With a static access token** (all users share one backend session, no per-user login needed):
+```bash
+python -m connect.adapters.channels.run telegram <BOT_TOKEN> http://your-server:8000 <ACCESS_TOKEN>
+```
+
+You should see:
+```
+✅ Connected to OpenJiuwen backend at http://localhost:8000
+🤖 OpenJiuwen Telegram Bot is running!
+```
+
+---
+
+## Step 4 — Test the bot
+
+1. Open Telegram and search for the bot username you chose (e.g. `@openjiuwen_assistant_bot`)
+2. Tap **Start**
+3. Send `/help` — you should see the list of available commands
+4. Send `/health` — the bot should report the backend status
+5. Send `/login` and follow the prompts to authenticate
+
+---
+
+## Notes
+
+- The bot token is sensitive — treat it like a password. Never share it publicly.
+- User sessions are stored locally in `connect/adapters/channels/platforms/telegram/.telegram_bot_tokens.json` (gitignored).
+- The bot must be running for users to interact with it. Stop it with `Ctrl+C`.
+- To get a new token at any time, use `/revoke` in BotFather, then `/newbot` or `/mybots`.

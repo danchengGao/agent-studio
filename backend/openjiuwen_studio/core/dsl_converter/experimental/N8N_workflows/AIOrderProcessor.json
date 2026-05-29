@@ -1,0 +1,349 @@
+{
+  "name": "AIOrderProcessor",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "d168c2a3-8d11-409e-b70c-6cb112242a8f",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2256,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "customerName",
+              "value": "Levy Cohen",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "product",
+              "value": "Smart Glasses Pro",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "quantity",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "f4",
+              "name": "unitPrice",
+              "value": 120,
+              "type": "number"
+            },
+            {
+              "id": "f5",
+              "name": "customerTier",
+              "value": "VIP",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9d98053c-5ebc-4cc0-a9a5-b876619fe847",
+      "name": "Order Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2000,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { customerName, product, quantity, unitPrice, customerTier } = $input.first().json;\n\nconst subtotal = quantity * unitPrice;\nconst isVIP = customerTier === 'VIP';\nconst discountRate = isVIP ? 0.15 : 0;\nconst discount = subtotal * discountRate;\nconst total = subtotal - discount;\n\nconst prompt = `You are a friendly e-commerce assistant. Write a short, warm, personalized order confirmation message.\\n\\nCustomer: ${customerName}\\nProduct: ${product}\\nQty: ${quantity} x $${unitPrice}\\nDiscount: $${discount} (${discountRate * 100}% ${isVIP ? 'VIP' : 'none'})\\nTotal: $${total}\\nTier: ${customerTier}\\n\\nMax 3 sentences. Warm and professional. No subject line.`;\n\nreturn [{ json: { customerName, product, quantity, unitPrice, customerTier, subtotal, discount, total, isVIP, prompt } }];"
+      },
+      "id": "b2cf0f1f-9fee-4be3-9495-a17ecaa91f29",
+      "name": "Calculate Order",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1760,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiMessage = $input.first().json?.output || 'Your order has been confirmed. Thank you!';\nconst prev = $('Calculate Order').first().json;\n\nreturn [{ json: { ...prev, aiMessage } }];"
+      },
+      "id": "64ad8031-30d8-4c94-87e7-24ffe5fb0f98",
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-vip",
+              "leftValue": "={{ $json.isVIP }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "26f7f479-f649-4a88-985a-b3e49b2d6b3e",
+      "name": "Is VIP Customer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "vip-1",
+              "name": "status",
+              "value": "Confirmed — VIP",
+              "type": "string"
+            },
+            {
+              "id": "vip-2",
+              "name": "tier",
+              "value": "VIP",
+              "type": "string"
+            },
+            {
+              "id": "vip-3",
+              "name": "confirmationMessage",
+              "value": "={{ $json.aiMessage }}",
+              "type": "string"
+            },
+            {
+              "id": "vip-4",
+              "name": "amountCharged",
+              "value": "={{ $json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "vip-5",
+              "name": "discountSaved",
+              "value": "={{ $json.discount }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b77e6228-7c39-432b-b32d-bcd4c8c41157",
+      "name": "VIP Final Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -544,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "std-1",
+              "name": "status",
+              "value": "Confirmed — Standard",
+              "type": "string"
+            },
+            {
+              "id": "std-2",
+              "name": "tier",
+              "value": "Standard",
+              "type": "string"
+            },
+            {
+              "id": "std-3",
+              "name": "confirmationMessage",
+              "value": "={{ $json.aiMessage }}",
+              "type": "string"
+            },
+            {
+              "id": "std-4",
+              "name": "amountCharged",
+              "value": "={{ $json.total }}",
+              "type": "number"
+            },
+            {
+              "id": "std-5",
+              "name": "discountSaved",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "954b06c9-c5c9-47ea-be1d-374e2ce04d50",
+      "name": "Standard Final Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -544,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        -1472,
+        144
+      ],
+      "id": "6449a46a-f82e-4617-b4f8-32220e90f61e",
+      "name": "AI Agent",
+      "notes": "You are a friendly e-commerce assistant. Write a short, warm, personalized order confirmation message"
+    },
+    {
+      "parameters": {
+        "model": "qwen3:4b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1696,
+        352
+      ],
+      "id": "dc60384c-629f-4ed5-a401-8de068bfa481",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "3DsvOETc72mxL2FY",
+          "name": "Ollama account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Order Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Details": {
+      "main": [
+        [
+          {
+            "node": "Calculate Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Order": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM Response": {
+      "main": [
+        [
+          {
+            "node": "Is VIP Customer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is VIP Customer?": {
+      "main": [
+        [
+          {
+            "node": "VIP Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Standard Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "0c9dc4ad-57fe-40f2-b024-57dd324e87b6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "86aeef425fdd593703d0ad6614726d340b3121ccfa862de3cdbe76630c072edf"
+  },
+  "id": "EI4d8M0x96vXPPpD",
+  "tags": []
+}

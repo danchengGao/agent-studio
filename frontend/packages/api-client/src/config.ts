@@ -130,6 +130,9 @@ export const API_ENDPOINTS = {
     COMPONENT_CANCEL: '/execution/component/cancel',
     GET_TRACE_SUMMARY_LIST: '/execution/get_trace_summary_list',
     GET_TRACE_SUMMARY_BY_TRACE_ID: '/execution/get_trace_summary_by_trace_id',
+    GET_ALL_TRACE_SUMMARIES: '/execution/get_all_trace_summaries',
+    LIST_ACTIVE_EXECUTIONS: '/execution/list_active_executions',
+    GET_RUNNING_TRACES: '/execution/get_running_traces',
   },
 
   // 运行时部署
@@ -296,6 +299,8 @@ export const API_ENDPOINTS = {
     DELETE: '/plugin/delete',
     LIST: '/plugin/list',
     GET_MARKET: '/plugin/get_market',
+    GET_MARKET_DETAIL: '/plugin/get_market_detail',
+    INSTALL_MARKET_PLUGIN: '/plugin/install_market_plugin',
     PUBLISH: '/plugin/publish',
     PUBLISH_GET: '/plugin/publish_get',
     PUBLISH_LIST: '/plugin/publish_list',
@@ -355,6 +360,20 @@ export const API_ENDPOINTS = {
     LIST: '/deepsearch-knowledge-base/knowledge-base/list',
     EMBEDDING_CONFIGS_LIST: '/deepsearch-knowledge-base/embedding-configs/list',
   },
+  // 触发器管理
+  TRIGGERS: {
+    CREATE: '/triggers/create',
+    LIST: '/triggers/list',
+    GET: '/triggers/get',
+    UPDATE: '/triggers/update',
+    DELETE: '/triggers/delete',
+    ACTIVATE: '/triggers/activate',
+    DEACTIVATE: '/triggers/deactivate',
+    RUN: '/triggers/run',
+    EXECUTION_LOGS: '/triggers/execution_logs',
+    EXECUTION_LOG_DETAIL: '/triggers/execution_log_detail',
+  },
+
   // 记忆库管理
   MEMORY_BASES: {
     CREATE: '/memory/repo/create',
@@ -370,8 +389,8 @@ export const API_ENDPOINTS = {
     STATUS: '/memory-bases/memories/status',
     SEARCH: '/memory/repo/search',
     SETTINGS: '/memory-base/settings',
-    CLEAN_EXPIRED: '/memory-bases/memories/clean-expired'
-  }
+    CLEAN_EXPIRED: '/memory-bases/memories/clean-expired',
+  },
 }
 
 // HTTP状态码常量

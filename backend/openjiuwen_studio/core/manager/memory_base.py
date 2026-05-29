@@ -2,6 +2,7 @@ import asyncio
 from typing import Callable, Any, Awaitable, Optional, Union
 import uuid
 import time
+import os
 from functools import wraps
 from pydantic import ValidationError
 from fastapi import status
@@ -68,7 +69,7 @@ def _get_llm_config_from_db(llm_model_id: int, space_id: str) -> tuple[ModelClie
             api_key=api_key,
             api_base=model_config.base_url,
             timeout=float(model_config.timeout),
-            verify_ssl=False,
+            verify_ssl=os.getenv("LLM_SSL_VERIFY", "true") == "false",
         )
 
         model_request_config = ModelRequestConfig(
@@ -81,11 +82,12 @@ def _get_llm_config_from_db(llm_model_id: int, space_id: str) -> tuple[ModelClie
         return model_client_config, model_request_config
 
 
-def _get_embedding_config_from_db(embedding_model_config_id: int) -> EmbeddingConfig:
+def _get_embedding_config_from_db(embedding_model_config_id: int, space_id: str) -> EmbeddingConfig:
     """
     从数据库读取向量模型配置，解密 API key。
     Args:
         embedding_model_config_id: 向量模型配置ID（必填）
+        space_id: 空间ID（必填）
 
     Returns:
         EmbeddingConfig
@@ -102,6 +104,9 @@ def _get_embedding_config_from_db(embedding_model_config_id: int) -> EmbeddingCo
 
         if not embed_model_config:
             raise ValueError(f"Embedding model config not found (ID: {embedding_model_config_id})")
+
+        if embed_model_config.space_id != space_id:
+            raise ValueError(f"Embedding model config does not belong to this space (ID: {embedding_model_config_id})")
 
         if not embed_model_config.is_active:
             raise ValueError(f"Embedding model config is not active (ID: {embedding_model_config_id})")
@@ -155,7 +160,7 @@ def _parse_to_memory_scope_config(mdb_id: str) -> MemoryScopeConfig:
             raise ValueError(f"Memory base {mdb_id} has no embedding_model_config_id")
 
         # 2. 获取嵌入模型配置
-        embedding_config = _get_embedding_config_from_db(embedding_model_config_id)
+        embedding_config = _get_embedding_config_from_db(embedding_model_config_id, space_id)
 
         # 3. 获取LLM模型配置
         llm_client_config, llm_request_config = _get_llm_config_from_db(llm_model_config_id, space_id)

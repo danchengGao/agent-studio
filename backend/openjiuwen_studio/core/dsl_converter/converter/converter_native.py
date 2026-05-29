@@ -280,12 +280,6 @@ class NativeWorkflowConverter(WorkflowConverter):
         """
         Regenerate all node IDs in canvas to avoid conflicts.
 
-        Node IDs are prefixed with a semantic name derived from the node type
-        (e.g. type "1" → "start", type "2" → "end") rather than the raw numeric
-        type value. Using a numeric prefix (e.g. "1_abc123") caused the engine's
-        completion-detection logic to fail because it identifies the End node by
-        its "end_" ID prefix, not by the type field.
-
         Args:
             schema: Canvas schema dict
 
@@ -300,10 +294,7 @@ class NativeWorkflowConverter(WorkflowConverter):
             if not old_id:
                 continue
 
-            # FIX: resolve a semantic prefix from the numeric type so generated IDs
-            # like "start_abc123" / "end_abc123" are produced instead of "1_abc123" /
-            # "2_abc123". The engine detects workflow completion by checking for an
-            # "end_" prefix on the End node ID; a numeric prefix breaks that check.
+            # Generate new ID based on node type
             node_type = str(node.get("type", "node"))
             prefix = NODE_TYPE_PREFIX_MAP.get(node_type, f"node{node_type}")
             new_id = f"{prefix}_{uuid.uuid4().hex[:8]}"

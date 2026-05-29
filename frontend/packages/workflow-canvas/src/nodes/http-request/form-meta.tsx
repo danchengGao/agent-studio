@@ -25,6 +25,7 @@ export const FormRender = () => {
       <FormContent>
         {isSidebar ? (
           <>
+            <FormInput />
             <MethodSelector />
             <UrlConfig />
             <HeadersConfig />

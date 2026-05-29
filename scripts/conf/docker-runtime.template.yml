@@ -12,12 +12,12 @@ services:
       - http_proxy
       - <<no_proxy_str>>
       - <<NO_PROXY_STR>>
-      - DB_TYPE=<<DB_TYPE>>
-      - DB_HOST=<<DB_HOST>>
-      - DB_PORT=<<DB_PORT>>
-      - DB_USER=<<DB_USER>>
-      - DB_PASSWORD=<<DB_PASSWORD>>
-      - DB_NAME=<<RUNTIME_DB_NAME>>
+      - RUNTIME_DB_TYPE=<<DB_TYPE>>
+      - RUNTIME_DB_HOST=<<DB_HOST>>
+      - RUNTIME_DB_PORT=<<DB_PORT>>
+      - RUNTIME_DB_USER=<<DB_USER>>
+      - RUNTIME_DB_PASSWORD=<<DB_PASSWORD>>
+      - RUNTIME_DB_NAME=<<RUNTIME_DB_NAME>>
       - IP=<<IP>>
       - LOWCODE_IMAGE=<<LOWCODE_IMAGE>>
       - DEPLOY_DIR=/app/deploys

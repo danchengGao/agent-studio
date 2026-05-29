@@ -333,10 +333,45 @@ class TextEditorConfig(BaseModel):
     concatenate_format: Optional[str] = Field(default="")
 
 
+class MergeMode(StrEnum):
+    FIRST_NON_NULL = "firstNonNull"
+    APPEND = "append"
+    COMBINE = "combine"
+    CHOOSE_BRANCH = "chooseBranch"
+    SQL_QUERY = "sqlQuery"
+
+
+class CombineBy(StrEnum):
+    MATCHING_FIELDS = "matchingFields"
+    POSITION = "position"
+    ALL_COMBINATIONS = "allCombinations"
+
+
+class MergeOutputType(StrEnum):
+    KEEP_MATCHES = "keepMatches"       # inner join
+    ENRICH_INPUT1 = "enrichInput1"    # left join
+    KEEP_EVERYTHING = "keepEverything" # full outer join
+
+
 class MergeGroupConfig(BaseModel):
     name: str = Field(default="")
     type: str = Field(default="")
     items: List[str] = Field(default_factory=list)
+    mode: MergeMode = Field(default=MergeMode.FIRST_NON_NULL)
+    # Combine sub-options
+    combine_by: CombineBy = Field(default=CombineBy.MATCHING_FIELDS)
+    match_field1: Optional[str] = Field(default=None)
+    match_field2: Optional[str] = Field(default=None)
+    output_type: MergeOutputType = Field(default=MergeOutputType.KEEP_MATCHES)
+    keep_unpaired: bool = Field(default=False)
+    fuzzy_compare: bool = Field(default=False)
+    clash_when_clash: Optional[str] = Field(default="addInputNumber")
+    clash_merging_nested: Optional[str] = Field(default="shallowMerge")
+    clash_minimize_empty_fields: bool = Field(default=False)
+    # Choose Branch
+    choose_index: Optional[int] = Field(default=0)
+    # SQL Query
+    sql_query: Optional[str] = Field(default=None)
 
 
 class VariMergeConfig(BaseModel):

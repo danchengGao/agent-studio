@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 # 添加项目根目录到 Python 路径，以便直接运行时能找到所有模块
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
+    sys.path.append(backend_dir)
 
 import uvicorn
 from dotenv import load_dotenv
@@ -24,12 +24,43 @@ from openjiuwen_studio.routers import register
 from openjiuwen_studio.core.database import engine
 from openjiuwen_studio.models.db_fun_base import Base
 # Import all models to ensure they are registered with SQLAlchemy
-from openjiuwen_studio.models import ModelConfig, ModelUsageLog, EmbeddingModelConfig, AgentBaseDB, AgentPublishDB, \
-    PromptRelationDB, TagDB, UserDB, SpaceDB, SpaceUserDB, WorkflowBaseDB, WorkflowPublishDB, PluginBaseDB, \
-    PluginPublishDB, ToolBaseDB, \
-    WorkflowExecutionDB, WorkflowExecutionDetailsDB, AgentExecutionDB, AgentExecutionDetailsDB, \
-    AgentWorkflowRelationDB, KnowledgeBaseDB, KnowledgeBaseDocumentDB, ReferenceDB, SystemEmbeddingModelDB, \
-    SystemLLMModelDB, MemoryBaseDB, RuntimeInfoDB
+from openjiuwen_studio.models import (
+    AgentBaseDB,
+    AgentExecutionDB,
+    AgentExecutionDetailsDB,
+    AgentPublishDB,
+    AgentWorkflowRelationDB,
+    EmbeddingModelConfig,
+    EvaluationDB,
+    EvaluationTaskDB,
+    EvaluationRunDB,
+    EvaluationTaskResultDB,
+    KnowledgeBaseDB,
+    KnowledgeBaseDocumentDB,
+    KnowledgeBaseWeblinkDB,
+    MemoryBaseDB,
+    ModelConfig,
+    ModelUsageLog,
+    PluginBaseDB,
+    PluginPublishDB,
+    PromptRelationDB,
+    ReferenceDB,
+    RuntimeInfoDB,
+    SpaceDB,
+    SpaceUserDB,
+    SystemEmbeddingModelDB,
+    SystemLLMModelDB,
+    TagDB,
+    ToolBaseDB,
+    TriggerDB,
+    TriggerExecutionLogDB,
+    UserDB,
+    VLMModelConfig,
+    WorkflowBaseDB,
+    WorkflowExecutionDB,
+    WorkflowExecutionDetailsDB,
+    WorkflowPublishDB,
+)
 # Import alembic version check
 from openjiuwen.core.common.logging import logger, interface_logger
 from openjiuwen_studio.core.common.logging.events import CustomLogEventType
@@ -59,6 +90,7 @@ async def lifespan_func(app: FastAPI):
         ModelConfig.__table__,
         ModelUsageLog.__table__,
         EmbeddingModelConfig.__table__,
+        VLMModelConfig.__table__,
         AgentBaseDB.__table__,
         AgentPublishDB.__table__,
         PromptRelationDB.__table__,
@@ -83,12 +115,21 @@ async def lifespan_func(app: FastAPI):
         # Knowledge Base tables
         KnowledgeBaseDB.__table__,
         KnowledgeBaseDocumentDB.__table__,
+        KnowledgeBaseWeblinkDB.__table__,
         # System model tables
         SystemLLMModelDB.__table__,
         SystemEmbeddingModelDB.__table__,
         # Memory Base tables
         MemoryBaseDB.__table__,
         RuntimeInfoDB.__table__,
+        # Trigger tables
+        TriggerDB.__table__,
+        TriggerExecutionLogDB.__table__,
+        # Evaluation tables
+        EvaluationDB.__table__,
+        EvaluationTaskDB.__table__,
+        EvaluationRunDB.__table__,
+        EvaluationTaskResultDB.__table__
     ]
 
     if engine.url.drivername == "sqlite":
@@ -139,10 +180,28 @@ async def lifespan_func(app: FastAPI):
 
     await Runner.start()
 
+    # Initialize and start trigger scheduler
+    from openjiuwen_studio.core.scheduler.scheduler import init_scheduler
+    from openjiuwen_studio.core.scheduler.sync import sync_triggers_to_scheduler
+    from openjiuwen_studio.core.database import get_database_url
+
+    _scheduler = init_scheduler(get_database_url())
+    await sync_triggers_to_scheduler(_scheduler)
+    _scheduler.start()
+    logger.info("✅ Trigger scheduler started")
+
     yield
 
     # Shutdown
     logger.info("🛑 Shutting down Jiuwen Agent Studio Backend...")
+
+    # Shutdown scheduler
+    from openjiuwen_studio.core.scheduler.scheduler import get_scheduler
+    try:
+        get_scheduler().shutdown(wait=False)
+        logger.info("✅ Trigger scheduler stopped")
+    except Exception as e:
+        logger.warning(f"⚠️ Error shutting down scheduler: {e}")
 
 
 # Create FastAPI app
@@ -166,7 +225,7 @@ app = FastAPI(
 class LogMiddleware:
     """
     纯 ASGI 中间件，兼容 StreamingResponse
-    
+
     不使用 BaseHTTPMiddleware，因为它与 StreamingResponse 有兼容性问题：
     当流式响应过程中发生异常时，会抛出 RuntimeError: Caught handled exception, but response already started
     """
@@ -182,7 +241,7 @@ class LogMiddleware:
         request = Request(scope, receive=receive)
         route_path = self._get_route_path(request)
         endpoint_name = self._truncate_path(route_path, max_parts=3)
-        
+
         status_code = None
         error_occurred = False
 

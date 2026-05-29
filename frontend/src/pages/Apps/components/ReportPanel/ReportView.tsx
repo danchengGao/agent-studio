@@ -141,6 +141,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
               content={report.content}
               citations={report.citations || null}
               inferMessages={report.inferMessages}
+              chartMessages={report.chartMessages}
             />
           )}
         </article>

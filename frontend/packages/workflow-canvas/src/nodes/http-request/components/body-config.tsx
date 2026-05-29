@@ -29,7 +29,7 @@ function BodyField() {
   const { t } = useTranslation()
 
   return (
-    <Field<IFlowConstantRefValue> name="inputs.inputParameters.body">
+    <Field<IFlowConstantRefValue> name="inputs.httpRequestParam.body.content">
       {({ field }) => (
         <FormItem name={t('workflowCanvas.nodes.httpRequest.bodySection.title') || 'Request Body'}>
           <DynamicValueInput

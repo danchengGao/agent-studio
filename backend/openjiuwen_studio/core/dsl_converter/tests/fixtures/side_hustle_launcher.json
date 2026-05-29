@@ -1,0 +1,911 @@
+{
+    "edges": [
+        {
+            "sourceNodeID": "1_skills_input",
+            "targetNodeID": "10_skill_parser"
+        },
+        {
+            "sourceNodeID": "10_skill_parser",
+            "sourcePortID": "0",
+            "targetNodeID": "21_opportunity_scout"
+        },
+        {
+            "sourceNodeID": "21_opportunity_scout",
+            "targetNodeID": "21_monetization_strategist"
+        },
+        {
+            "sourceNodeID": "21_monetization_strategist",
+            "targetNodeID": "21_market_validator"
+        },
+        {
+            "sourceNodeID": "21_opportunity_scout",
+            "targetNodeID": "21_brand_creator"
+        },
+        {
+            "sourceNodeID": "21_brand_creator",
+            "targetNodeID": "21_content_strategist"
+        },
+        {
+            "sourceNodeID": "21_opportunity_scout",
+            "targetNodeID": "21_competitor_spy"
+        },
+        {
+            "sourceNodeID": "21_market_validator",
+            "targetNodeID": "10_aggregator"
+        },
+        {
+            "sourceNodeID": "21_content_strategist",
+            "targetNodeID": "10_aggregator"
+        },
+        {
+            "sourceNodeID": "21_competitor_spy",
+            "targetNodeID": "10_aggregator"
+        },
+        {
+            "sourceNodeID": "10_aggregator",
+            "sourcePortID": "0",
+            "targetNodeID": "21_launch_planner"
+        },
+        {
+            "sourceNodeID": "21_launch_planner",
+            "targetNodeID": "10_package_builder"
+        },
+        {
+            "sourceNodeID": "10_package_builder",
+            "sourcePortID": "0",
+            "targetNodeID": "2_final_output"
+        }
+    ],
+    "nodes": [
+        {
+            "data": {
+                "outputs": {
+                    "properties": {
+                        "skills_and_interests": {
+                            "default": "I'm good at graphic design, social media marketing, and writing. I love travel, food, and technology. I have 3 hours/day to work on this.",
+                            "description": "Tell us your skills, interests, available time, and any resources you have",
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "skills_and_interests"
+                    ],
+                    "type": "object"
+                },
+                "title": "Start: Your Skills & Interests"
+            },
+            "id": "1_skills_input",
+            "meta": {
+                "position": {
+                    "x": 180,
+                    "y": 350
+                }
+            },
+            "type": "1"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 1,
+                    "timeoutSeconds": 15
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import re\n    import json\n    from collections import Counter\n\n    raw = args.params.get('skills_and_interests', '')\n    rl = raw.lower()\n\n    # Extract skills (common keywords)\n    skill_keywords = {\n        'design': ['design', 'graphic', 'ui', 'ux', 'photoshop', 'figma', 'canva', 'illustrator'],\n        'development': ['coding', 'programming', 'python', 'javascript', 'web dev', 'app dev', 'software'],\n        'writing': ['writing', 'content', 'copywriting', 'blogging', 'articles', 'journalist'],\n        'marketing': ['marketing', 'social media', 'seo', 'ads', 'facebook ads', 'instagram', 'tiktok'],\n        'video': ['video', 'editing', 'youtube', 'videography', 'premiere', 'final cut'],\n        'teaching': ['teaching', 'tutoring', 'coaching', 'training', 'mentoring', 'education'],\n        'photography': ['photo', 'photography', 'camera', 'portrait', 'wedding'],\n        'finance': ['finance', 'accounting', 'bookkeeping', 'excel', 'quickbooks'],\n        'fitness': ['fitness', 'personal training', 'yoga', 'nutrition', 'workout'],\n        'music': ['music', 'audio', 'production', 'dj', 'sound design', 'mixing']\n    }\n\n    detected_skills = []\n    for skill_category, keywords in skill_keywords.items():\n        if any(kw in rl for kw in keywords):\n            detected_skills.append(skill_category)\n\n    # Extract time commitment\n    time_match = re.search(r'(\\d+)\\s*(hour|hr)', rl)\n    hours_available = int(time_match.group(1)) if time_match else 5\n\n    # Determine hustle tier\n    if hours_available <= 2:\n        commitment_tier = 'micro-hustle'\n        time_desc = 'Low time commitment (freelance gigs, consulting)'\n    elif hours_available <= 5:\n        commitment_tier = 'side-hustle'\n        time_desc = 'Moderate time (services, content creation)'\n    else:\n        commitment_tier = 'business'\n        time_desc = 'High commitment (product-based, agency)'\n\n    # Extract interests\n    interest_keywords = ['travel', 'food', 'tech', 'gaming', 'fashion', 'fitness', 'music', 'art', 'pets', 'home']\n    detected_interests = [i for i in interest_keywords if i in rl]\n\n    # Generate hustle personality\n    if 'design' in detected_skills or 'video' in detected_skills:\n        hustle_personality = 'Creator'\n        strength = 'Visual content and creativity'\n    elif 'development' in detected_skills:\n        hustle_personality = 'Builder'\n        strength = 'Technical solutions and automation'\n    elif 'teaching' in detected_skills or 'writing' in detected_skills:\n        hustle_personality = 'Educator'\n        strength = 'Knowledge sharing and coaching'\n    elif 'marketing' in detected_skills:\n        hustle_personality = 'Promoter'\n        strength = 'Audience building and sales'\n    else:\n        hustle_personality = 'Generalist'\n        strength = 'Versatile service provider'\n\n    structured = {\n        'raw_input': raw,\n        'detected_skills': detected_skills if detected_skills else ['general'],\n        'detected_interests': detected_interests if detected_interests else ['general'],\n        'hours_per_day': hours_available,\n        'commitment_tier': commitment_tier,\n        'time_description': time_desc,\n        'hustle_personality': hustle_personality,\n        'primary_strength': strength,\n        'summary': f'{hustle_personality} with {hours_available}h/day. Skills: {\", \".join(detected_skills[:3]) if detected_skills else \"general\"}. Interests: {\", \".join(detected_interests[:2]) if detected_interests else \"various\"}.'\n    }\n\n    return {\n        'structured_profile': json.dumps(structured, indent=2),\n        'raw_input': raw,\n        'skills_list': ', '.join(detected_skills if detected_skills else ['general']),\n        'commitment_tier': commitment_tier\n    }",
+                    "inputParameters": {
+                        "skills_and_interests": {
+                            "content": [
+                                "1_skills_input",
+                                "skills_and_interests"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "commitment_tier": {
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "string"
+                        },
+                        "raw_input": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        },
+                        "skills_list": {
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "string"
+                        },
+                        "structured_profile": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "structured_profile",
+                        "raw_input",
+                        "skills_list",
+                        "commitment_tier"
+                    ],
+                    "type": "object"
+                },
+                "title": "Skill Parser & Profiler"
+            },
+            "id": "10_skill_parser",
+            "meta": {
+                "position": {
+                    "x": 640,
+                    "y": 350
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "raw_input"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_profile": {
+                            "content": [
+                                "10_skill_parser",
+                                "structured_profile"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Find side hustle opportunities for this profile:\n\n{{user_profile}}\n\nProfile analysis: {{structured_profile}}\n\nSearch Reddit for real stories of people making money with these skills. Search Tavily for trending side hustles in 2026.",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a side hustle opportunity scout with deep knowledge of the creator economy, gig platforms, and online business models.\n\nYour mission: Find 5-7 REALISTIC side hustle opportunities that match this person's skills and time availability.\n\nFor each opportunity, provide:\n\n1. HUSTLE NAME & DESCRIPTION\n   - Clear, catchy name\n   - What you'll actually do\n   - Why it matches their skills\n\n2. INCOME POTENTIAL\n   - Realistic monthly range for their time commitment\n   - How long to first dollar (days/weeks)\n   - Scalability (can it grow?)\n\n3. STARTUP REQUIREMENTS\n   - Initial investment needed ($0-500)\n   - Tools/platforms required\n   - Skills to learn (if any)\n\n4. MARKET DEMAND\n   - Is this in demand right now? (cite Reddit discussions or trends)\n   - Who are the customers?\n   - Competition level\n\n5. REAL EXAMPLES\n   - Find real people doing this successfully (search Reddit for stories)\n   - What did they do to succeed?\n   - Common mistakes to avoid\n\nPRIORITIZE:\n- Quick to start (can make first $ within 2-4 weeks)\n- Low barrier to entry\n- Proven demand (people are ALREADY paying for this)\n- Matches their available time\n\nSEARCH STRATEGY:\n- Use Reddit to find: \"made $X doing [skill]\" or \"how I started my [hustle] side business\"\n- Use Tavily to find: \"best side hustles 2026\", \"how to make money with [skill]\"\n- Look for recent success stories (2024-2026)\n\nBe SPECIFIC and ACTIONABLE. No generic advice.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-hustle-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-hustle-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 6,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "opportunities"
+                    ],
+                    "type": "object"
+                },
+                "title": "Opportunity Scout Agent"
+            },
+            "id": "21_opportunity_scout",
+            "meta": {
+                "position": {
+                    "x": 1100,
+                    "y": 0
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "opportunities": {
+                            "content": [
+                                "21_opportunity_scout",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "commitment_tier"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Create monetization strategies for these opportunities:\n\n{{opportunities}}\n\nCommitment level: {{commitment_tier}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a monetization strategist specializing in creator economy business models.\n\nFor the TOP 3 opportunities identified, create DETAILED monetization strategies:\n\n1. PRICING STRATEGY\n   - What to charge (be specific with numbers)\n   - Pricing model (hourly, project, subscription, commission)\n   - How to justify your rates\n   - When to raise prices\n\n2. REVENUE STREAMS\n   - Primary income source\n   - Secondary income opportunities\n   - Passive income potential\n   - Upsell/cross-sell opportunities\n\n3. CLIENT ACQUISITION\n   - Where to find first 5 clients (specific platforms)\n   - Pricing for first clients vs. later clients\n   - How to build portfolio with limited experience\n   - Cold outreach templates that work\n\n4. SCALING PATH\n   - Month 1-2: Getting started (realistic goals)\n   - Month 3-6: Building consistency\n   - Month 6-12: Scaling to $2k-5k/month\n   - Beyond 12 months: Premium positioning or productization\n\n5. PLATFORM STACK\n   - Where to sell services (Fiverr, Upwork, direct, etc.)\n   - Payment processing (Stripe, PayPal, Wise)\n   - Portfolio hosting\n   - Client management\n\n6. REAL NUMBERS BREAKDOWN\n   - If charging $X per [unit], how many [units] needed per month?\n   - Example: \"$50/logo × 10 clients = $500/month\" or \"$30/hr × 15hrs/week × 4 weeks = $1,800/month\"\n   - Show realistic ramp-up curve\n\nBe EXTREMELY specific with numbers, platforms, and timelines. This should be copy-paste actionable.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-monetize-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "monetization_strategy"
+                    ],
+                    "type": "object"
+                },
+                "title": "Monetization Strategist"
+            },
+            "id": "21_monetization_strategist",
+            "meta": {
+                "position": {
+                    "x": 1560,
+                    "y": 0
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "monetization": {
+                            "content": [
+                                "21_monetization_strategist",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "skills_list"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Validate market demand for:\n\n{{monetization}}\n\nSkills: {{skills}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a market validation specialist. Your job: prove that people will ACTUALLY PAY for these services.\n\nFor the recommended side hustles, research and provide:\n\n1. DEMAND SIGNALS\n   - Search volume trends (growing/stable/declining)\n   - Job postings on Upwork, Fiverr, Freelancer (how many active gigs?)\n   - Reddit posts of people asking for these services\n   - Facebook groups, Discord servers with buyers\n\n2. REAL BUYER EVIDENCE\n   - Find examples of people paying for this service right now\n   - Screenshot or cite actual job postings with budget ranges\n   - What are common requests/pain points buyers mention?\n\n3. COMPETITION ANALYSIS\n   - How saturated is this niche? (Low/Medium/High)\n   - Average competitor pricing\n   - What makes top sellers successful?\n   - Gaps in current offerings (opportunity areas)\n\n4. RED FLAGS & CHALLENGES\n   - Is this getting harder to break into?\n   - Are buyers price-shopping heavily?\n   - Any negative trends or complaints?\n   - Seasonal fluctuations?\n\n5. VALIDATION VERDICT\n   - GREEN LIGHT: Strong demand, good opportunity\n   - YELLOW LIGHT: Demand exists but competitive\n   - RED LIGHT: Oversaturated or declining demand\n\nProvide EVIDENCE for every claim. Search Reddit for \"looking for [service]\" or \"hire [skill]\". Search Tavily for market reports and gig economy data.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-validate-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-validate-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 5,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "market_validation"
+                    ],
+                    "type": "object"
+                },
+                "title": "Market Validator"
+            },
+            "id": "21_market_validator",
+            "meta": {
+                "position": {
+                    "x": 2020,
+                    "y": 0
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "opportunities": {
+                            "content": [
+                                "21_opportunity_scout",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "skills_list"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Create a personal brand for these side hustles:\n\n{{opportunities}}\n\nSkills: {{skills}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a personal branding expert for creators and freelancers.\n\nFor the TOP side hustle opportunity, create a complete brand identity:\n\n1. BRAND NAME IDEAS (5 options)\n   - Memorable, professional, domain-available\n   - Mix of personal name + descriptor vs. creative brand names\n   - Examples: \"Sarah Designs Studio\", \"Pixel Perfect Co\", \"The Content Lab\"\n\n2. POSITIONING STATEMENT\n   - Who you help: [target customer]\n   - What you do: [specific service]\n   - How you're different: [unique angle]\n   - Format: \"I help [WHO] achieve [WHAT] through [HOW]\"\n\n3. VISUAL IDENTITY SUGGESTIONS\n   - Color palette (3-4 colors with hex codes)\n   - Style/vibe (minimal, bold, playful, corporate, etc.)\n   - Logo direction (icon, wordmark, combination)\n   - Free tools to create it: Canva templates, logo makers\n\n4. SOCIAL MEDIA SETUP\n   - Username ideas (consistent across platforms)\n   - Bio template for Instagram/X/LinkedIn\n   - Profile photo suggestions\n   - Link-in-bio structure\n\n5. PORTFOLIO/WEBSITE STARTER\n   - Best platform for their niche (Framer, Webflow, Carrd, Notion, etc.)\n   - Essential pages (Home, Services, Portfolio, Contact)\n   - Portfolio piece ideas if they have no work yet\n   - How to create case studies from practice projects\n\n6. CONTENT PILLARS (for social media)\n   - 4-5 content themes to post about\n   - Example post ideas for each pillar\n   - Posting frequency recommendation\n\nOutput should be ready-to-implement. Include specific tools, templates, and examples.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-brand-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 3,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "brand_identity"
+                    ],
+                    "type": "object"
+                },
+                "title": "Brand Creator"
+            },
+            "id": "21_brand_creator",
+            "meta": {
+                "position": {
+                    "x": 1560,
+                    "y": 300
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "brand_identity": {
+                            "content": [
+                                "21_brand_creator",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "skills_list"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Create a content strategy for this brand:\n\n{{brand_identity}}\n\nSkills: {{skills}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a content strategist for creators building their personal brands.\n\nCreate a 30-DAY CONTENT CALENDAR to launch their side hustle:\n\n1. PLATFORM PRIORITIZATION\n   - Which 2-3 platforms to focus on (based on their niche)\n   - Why these platforms matter for their business\n   - Posting frequency per platform\n\n2. CONTENT STRATEGY\n   - Value content (educational/helpful): 50%\n   - Personal/behind-the-scenes: 30%\n   - Sales/promotional: 20%\n\n3. 30-DAY CONTENT IDEAS (ready to post)\n   - Week 1: Introduction & credibility building\n     - Post 1: \"Why I started [hustle]\"\n     - Post 2: Quick win tip #1\n     - Post 3: Behind-the-scenes of my process\n     - Post 4: Client result or case study (even if practice project)\n     - Post 5: Myth-busting about [industry]\n   \n   - Week 2: Value delivery\n     - [Continue pattern with specific post ideas]\n   \n   - Week 3: Social proof & engagement\n     - [Continue pattern]\n   \n   - Week 4: Sales activation\n     - [Continue pattern]\n\n4. FIRST CLIENT OUTREACH TEMPLATES\n   - Cold DM template for Instagram/LinkedIn\n   - Upwork/Fiverr gig description\n   - Warm outreach to friends/network\n\n5. CONTENT CREATION SHORTCUTS\n   - Batch creation strategy\n   - Repurposing content across platforms\n   - AI tools for faster creation (ChatGPT prompts, Canva templates)\n   - Time-saving hacks\n\n6. ENGAGEMENT TACTICS\n   - How to find and engage with potential clients\n   - Comment strategy\n   - Collaboration opportunities\n   - Communities to join\n\nMake it ACTIONABLE — each post idea should be specific enough to create immediately.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 3,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "content_strategy"
+                    ],
+                    "type": "object"
+                },
+                "title": "Content Strategist"
+            },
+            "id": "21_content_strategist",
+            "meta": {
+                "position": {
+                    "x": 2020,
+                    "y": 300
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "opportunities": {
+                            "content": [
+                                "21_opportunity_scout",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "skills_list"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Research successful competitors doing this:\n\n{{opportunities}}\n\nSkills: {{skills}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a competitive intelligence specialist for freelancers and creators.\n\nFind and analyze 5-7 successful people already doing these side hustles:\n\n1. COMPETITOR PROFILES\n   - Name, platform, niche\n   - Follower/subscriber count\n   - Estimated monthly income (if available)\n   - Years in business\n\n2. WHAT THEY'RE DOING RIGHT\n   - Pricing strategy\n   - Content themes\n   - Engagement tactics\n   - Unique selling points\n   - Client testimonials/social proof\n\n3. GAPS & OPPORTUNITIES\n   - What are they NOT doing that they should?\n   - Underserved audiences\n   - Content gaps\n   - Pricing opportunities (too high/too low)\n\n4. DIFFERENTIATION STRATEGIES\n   - How to stand out from these competitors\n   - Unique angles to explore\n   - Niches within the niche\n\n5. LESSONS TO STEAL (ethically)\n   - Portfolio structure\n   - Pricing packages\n   - Client onboarding\n   - Social proof display\n   - Call-to-action approaches\n\n6. WHAT TO AVOID\n   - Common mistakes competitors make\n   - Negative reviews or complaints\n   - Over-saturation signals\n\nSearch Instagram, X, LinkedIn, Upwork, Fiverr, YouTube for successful creators in this niche. Prioritize recent success stories (2023-2026).",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [
+                            {
+                                "id": "tavily-competitor-001",
+                                "name": "Tavily",
+                                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                                "type": "plugin",
+                                "version": "draft"
+                            },
+                            {
+                                "id": "reddit-competitor-001",
+                                "name": "Reddit",
+                                "plugin_id": "red00000-0000-0000-0000-000000000001",
+                                "type": "plugin",
+                                "version": "draft"
+                            }
+                        ],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 4,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "competitor_intel"
+                    ],
+                    "type": "object"
+                },
+                "title": "Competitor Spy"
+            },
+            "id": "21_competitor_spy",
+            "meta": {
+                "position": {
+                    "x": 1560,
+                    "y": 600
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 0,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n\n    # Collect all research outputs\n    market_validation = args.params.get('market_validation', 'N/A')\n    content_strategy = args.params.get('content_strategy', 'N/A')\n    competitor_intel = args.params.get('competitor_intel', 'N/A')\n\n    # Create aggregated summary\n    aggregated = {\n        'market_validation': market_validation,\n        'content_strategy': content_strategy,\n        'competitor_intel': competitor_intel,\n        'summary': 'All research completed. Ready for launch planning.'\n    }\n\n    return {\n        'aggregated_research': json.dumps(aggregated, indent=2),\n        'market_validation': market_validation,\n        'content_strategy': content_strategy,\n        'competitor_intel': competitor_intel\n    }",
+                    "inputParameters": {
+                        "competitor_intel": {
+                            "content": [
+                                "21_competitor_spy",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "ref"
+                        },
+                        "content_strategy": {
+                            "content": [
+                                "21_content_strategist",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "market_validation": {
+                            "content": [
+                                "21_market_validator",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "aggregated_research": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        },
+                        "competitor_intel": {
+                            "extra": {
+                                "index": 3
+                            },
+                            "type": "string"
+                        },
+                        "content_strategy": {
+                            "extra": {
+                                "index": 2
+                            },
+                            "type": "string"
+                        },
+                        "market_validation": {
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "aggregated_research",
+                        "market_validation",
+                        "content_strategy",
+                        "competitor_intel"
+                    ],
+                    "type": "object"
+                },
+                "title": "Research Aggregator"
+            },
+            "id": "10_aggregator",
+            "meta": {
+                "position": {
+                    "x": 2480,
+                    "y": 350
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "inputParameters": {
+                        "aggregated_research": {
+                            "content": [
+                                "10_aggregator",
+                                "aggregated_research"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        },
+                        "query": {
+                            "content": [
+                                "10_skill_parser",
+                                "structured_profile"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "llmParam": {
+                        "model": {
+                            "id": "1",
+                            "name": "deepseek",
+                            "type": "deepseek-chat"
+                        },
+                        "prompt": {
+                            "content": "Create a detailed launch plan based on:\n\nUser profile: {{structured_profile}}\n\nAll research: {{aggregated_research}}",
+                            "type": "template"
+                        },
+                        "systemPrompt": {
+                            "content": "You are a launch strategist. Create a DAY-BY-DAY action plan to launch this side hustle.\n\n## 30-DAY LAUNCH ROADMAP\n\n### WEEK 1: FOUNDATION (Days 1-7)\n**Goal: Set up the basics and clarify positioning**\n\n- Day 1: [Specific task]\n- Day 2: [Specific task]\n- Day 3: [Specific task]\n- Day 4: [Specific task]\n- Day 5: [Specific task]\n- Day 6: [Specific task]\n- Day 7: [Specific task + weekly checkpoint]\n\n### WEEK 2: BUILD PRESENCE (Days 8-14)\n**Goal: Create portfolio and start content**\n\n- Day 8: [Specific task]\n- [Continue...]\n- Day 14: [Weekly checkpoint]\n\n### WEEK 3: OUTREACH & ENGAGEMENT (Days 15-21)\n**Goal: Get first clients**\n\n- Day 15: [Specific task]\n- [Continue...]\n- Day 21: [Weekly checkpoint]\n\n### WEEK 4: OPTIMIZATION & SCALING (Days 22-30)\n**Goal: Close first deals and improve**\n\n- Day 22: [Specific task]\n- [Continue...]\n- Day 30: [Final checkpoint & celebration]\n\n## QUICK WINS CHECKLIST\n\nThings you can do in the NEXT 2 HOURS:\n☐ [Immediate action 1]\n☐ [Immediate action 2]\n☐ [Immediate action 3]\n☐ [Immediate action 4]\n☐ [Immediate action 5]\n\n## RESOURCE LIST\n\n**Free Tools:**\n- [Tool name] - [What it does]\n- [Continue...]\n\n**Paid Tools (optional):**\n- [Tool name] - [What it does] - [Cost]\n- [Continue...]\n\n**Communities to Join:**\n- [Community name] - [Why it matters]\n- [Continue...]\n\n**Learning Resources:**\n- [Resource name] - [What to learn]\n- [Continue...]\n\n## SUCCESS METRICS\n\n**Week 1:**\n- ☐ [Measurable goal]\n- ☐ [Measurable goal]\n\n**Week 2:**\n- ☐ [Measurable goal]\n- ☐ [Measurable goal]\n\n**Week 3:**\n- ☐ [Measurable goal]\n- ☐ [Measurable goal]\n\n**Week 4:**\n- ☐ [Measurable goal]\n- ☐ [Measurable goal]\n\n## INCOME PROJECTION\n\n**Conservative Scenario:**\n- Month 1: $[amount]\n- Month 2: $[amount]\n- Month 3: $[amount]\n\n**Optimistic Scenario:**\n- Month 1: $[amount]\n- Month 2: $[amount]\n- Month 3: $[amount]\n\nBe ULTRA-SPECIFIC. Every task should be actionable TODAY. Include links, platform names, exact steps.",
+                            "type": "template"
+                        }
+                    },
+                    "skillsParam": {
+                        "plugins": [],
+                        "workflows": []
+                    }
+                },
+                "max_iterations": 3,
+                "output_format": "markdown",
+                "outputs": {
+                    "properties": {
+                        "output": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "launch_plan"
+                    ],
+                    "type": "object"
+                },
+                "title": "Launch Planner"
+            },
+            "id": "21_launch_planner",
+            "meta": {
+                "position": {
+                    "x": 2940,
+                    "y": 350
+                }
+            },
+            "type": "21"
+        },
+        {
+            "data": {
+                "exceptionConfig": {
+                    "executeStep": {
+                        "defaultStep": "0",
+                        "errorStep": "1"
+                    },
+                    "processType": "break",
+                    "retryTimes": 0,
+                    "timeoutSeconds": 30
+                },
+                "inputs": {
+                    "code": "def main(args):\n    import json\n\n    # Get all components\n    structured_profile = args.params.get('structured_profile', '{}')\n    launch_plan = args.params.get('launch_plan', 'N/A')\n\n    # Parse profile\n    try:\n        profile = json.loads(structured_profile) if isinstance(structured_profile, str) else structured_profile\n    except:\n        profile = {'hustle_personality': 'Creator', 'hours_per_day': 3}\n\n    personality = profile.get('hustle_personality', 'Creator')\n    hours = profile.get('hours_per_day', 3)\n\n    # Build beautiful output package\n    output = f'''\n╔══════════════════════════════════════════╗\n║  🚀 YOUR SIDE HUSTLE LAUNCH PACKAGE 🚀  ║\n╚══════════════════════════════════════════╝\n\n👤 YOUR PROFILE\n{\"━\" * 50}\nHustle Personality: {personality}\nTime Available: {hours} hours/day\nReady to launch: ✅\n\n{\"━\" * 50}\n\n{launch_plan}\n\n{\"━\" * 50}\n\n🎯 FINAL WORDS OF WISDOM\n{\"━\" * 50}\n\n1. 🏃 START BEFORE YOU'RE READY\n   - Your first clients won't be perfect. That's okay.\n   - Done is better than perfect.\n   - You'll learn by doing, not by planning.\n\n2. 💰 CHARGE FOR YOUR WORK\n   - Don't work for free (except 1-2 portfolio pieces)\n   - You're more valuable than you think\n   - If you're scared to share your price, you're probably undercharging\n\n3. 📣 TELL EVERYONE\n   - Post consistently for 90 days minimum\n   - Ego doesn't build businesses — visibility does\n   - The first few posts feel cringe. Post anyway.\n\n4. 🤝 OVERDELIVER EARLY\n   - First 5 clients get VIP treatment\n   - Ask for testimonials and referrals\n   - Case studies > portfolio pieces\n\n5. 📈 TRACK YOUR PROGRESS\n   - Revenue per month\n   - Hours worked vs. income earned\n   - Client acquisition cost\n   - Celebrate small wins!\n\n6. 🔄 ITERATE QUICKLY\n   - If something isn't working after 2 weeks, pivot\n   - Test pricing, messaging, platforms\n   - Talk to your customers — ask what they need\n\n{\"━\" * 50}\n\n✨ THIS IS YOUR MOMENT ✨\n\nYou have everything you need to start.\nThe only thing missing is action.\n\nGo build something amazing. 🔥\n\n{\"━\" * 50}\n\n📅 NEXT STEP: Do the first item on your Quick Wins checklist.\n⏰ TIME: Right now. Not tomorrow.\n\n💪 You got this!\n\n{\"━\" * 50}\n'''\n\n    return {'final_launch_package': output}",
+                    "inputParameters": {
+                        "launch_plan": {
+                            "content": [
+                                "21_launch_planner",
+                                "output"
+                            ],
+                            "extra": {
+                                "index": 1
+                            },
+                            "type": "ref"
+                        },
+                        "structured_profile": {
+                            "content": [
+                                "10_skill_parser",
+                                "structured_profile"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    },
+                    "language": "python"
+                },
+                "outputs": {
+                    "properties": {
+                        "final_launch_package": {
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "final_launch_package"
+                    ],
+                    "type": "object"
+                },
+                "title": "Package Builder"
+            },
+            "id": "10_package_builder",
+            "meta": {
+                "position": {
+                    "x": 3400,
+                    "y": 350
+                }
+            },
+            "type": "10"
+        },
+        {
+            "data": {
+                "inputs": {
+                    "content": {
+                        "content": "{{result}}",
+                        "type": "template"
+                    },
+                    "inputParameters": {
+                        "result": {
+                            "content": [
+                                "10_package_builder",
+                                "final_launch_package"
+                            ],
+                            "extra": {
+                                "index": 0
+                            },
+                            "type": "ref"
+                        }
+                    }
+                },
+                "title": "End: Your Side Hustle Blueprint"
+            },
+            "id": "2_final_output",
+            "meta": {
+                "position": {
+                    "x": 3860,
+                    "y": 350
+                }
+            },
+            "type": "2"
+        }
+    ]
+}

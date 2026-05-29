@@ -1,0 +1,132 @@
+# Evaluator-Optimizer Pattern Benchmark
+# Tests workflows using LOOP components for iterative refinement.
+# Pattern type: 4 (EVALUATOR_OPTIMIZER)
+
+suite:
+  suite_name: "Evaluator-Optimizer Pattern Benchmark"
+  description: "Validates workflows that iteratively generate and refine outputs using evaluator-optimizer loops (LOOP components)."
+
+tasks:
+  - task_id: "evaluator_optimizer_essay_refinement"
+    task_name: "Iterative essay quality improvement"
+    description: >
+      Workflow generates an essay draft, evaluates it against quality criteria,
+      and iteratively improves it until criteria are met or max iterations reached.
+    difficulty: 2  # HARD
+    pattern_type: 4  # EVALUATOR_OPTIMIZER
+    tags: ["evaluator-optimizer", "loop", "refinement", "writing", "iteration"]
+    trials: 3
+    input_data:
+      topic: "The importance of clean energy for future generations"
+      quality_criteria:
+        - "Has a clear introduction with thesis statement"
+        - "Contains at least 3 supporting arguments"
+        - "Has a conclusion that summarizes key points"
+      max_iterations: 3
+    expected_output:
+      has_introduction: true
+      has_arguments: true
+      has_conclusion: true
+      quality_score_above: 0.7
+    graders_config:
+      - type: 1  # MODEL_BASED
+        name: "essay_quality"
+        config:
+          model_id: null
+          rubric: >
+            The final output is a well-structured essay about clean energy that:
+            (1) has a clear introduction with a thesis statement,
+            (2) presents at least 3 distinct supporting arguments with evidence or examples,
+            (3) has a conclusion that effectively summarizes the key points.
+            The essay should demonstrate iterative improvement from the loop structure.
+          passing_score: 0.75
+          weight: 1.0
+      - type: 0  # DETERMINISTIC
+        name: "output_substantial"
+        config:
+          check_type: "output"
+          condition: "is_not_empty"
+          expected_value: ""
+          weight: 0.3
+
+  - task_id: "evaluator_optimizer_code_generation"
+    task_name: "Iterative code correctness optimization"
+    description: >
+      Workflow generates code, tests it against requirements, and iterates
+      until the code passes all test cases or max iterations are reached.
+    difficulty: 2  # HARD
+    pattern_type: 4  # EVALUATOR_OPTIMIZER
+    tags: ["evaluator-optimizer", "loop", "code-generation", "testing"]
+    trials: 3
+    input_data:
+      task: "Write a Python function that returns the nth Fibonacci number"
+      test_cases:
+        - {input: 0, expected: 0}
+        - {input: 1, expected: 1}
+        - {input: 10, expected: 55}
+      max_iterations: 3
+    expected_output:
+      passes_all_tests: true
+      is_valid_python: true
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "output_contains_def"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "def "
+          weight: 0.5
+      - type: 1  # MODEL_BASED
+        name: "fibonacci_correctness"
+        config:
+          model_id: null
+          rubric: >
+            The output contains a Python function that correctly implements the Fibonacci sequence.
+            It should handle edge cases (n=0 returns 0, n=1 returns 1) and correctly compute
+            fibonacci(10)=55. The function should be syntactically valid Python.
+          passing_score: 0.85
+          weight: 1.0
+
+  - task_id: "evaluator_optimizer_prompt_tuning"
+    task_name: "Iterative prompt optimization"
+    description: >
+      Workflow iteratively refines a prompt until it produces the desired output format
+      consistently. Evaluator checks format compliance, optimizer improves the prompt.
+    difficulty: 2  # HARD
+    pattern_type: 4  # EVALUATOR_OPTIMIZER
+    tags: ["evaluator-optimizer", "loop", "prompt-engineering", "optimization"]
+    trials: 3
+    input_data:
+      target_task: "Extract product names and prices from text"
+      sample_input: "The MacBook Pro costs $1299 and the iPad Air is $749."
+      desired_format: "JSON array with name and price fields"
+      max_iterations: 3
+    expected_output:
+      format_is_json: true
+      contains_macbook: true
+      contains_ipad: true
+    graders_config:
+      - type: 0  # DETERMINISTIC
+        name: "json_format"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "["
+          weight: 0.5
+      - type: 0
+        name: "contains_macbook"
+        config:
+          check_type: "output"
+          condition: "contains"
+          expected_value: "MacBook"
+          weight: 0.5
+      - type: 1  # MODEL_BASED
+        name: "extraction_accuracy"
+        config:
+          model_id: null
+          rubric: >
+            The output is a JSON array containing both products: MacBook Pro with price 1299
+            and iPad Air with price 749. Each entry should have name and price fields.
+            The format should be valid JSON.
+          passing_score: 0.85
+          weight: 1.0

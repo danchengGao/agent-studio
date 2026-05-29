@@ -1,0 +1,19 @@
+Slide 1: General Overview Section
+Feature name:
+Feature explanation (one line):
+
+The problem: 4-5 bullets - each with 1 sentence describing the problem. Each bullet should be a different problem.
+
+The solution: 4-5 bullets - each with 1 sentence describing the solution. Each bullet should be a different solution.
+
+How many files where changed (if known)
+How many lines of code were changed (if known)
+How many new API's were added (if known)
+How many new components were added (if known)
+
+Slide 2: Implementation Overview Section
+
+Backend (for example: new endpoints, new database tables, new services, etc.)
+Frontend (for example: new pages, new components, new UI elements, etc.)
+Data Flow (for example: how data flows between the frontend and backend, any new data models, etc.)
+Some additional things you believe is important to mention

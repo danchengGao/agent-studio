@@ -32,7 +32,15 @@ import {
   useToggleEmbeddingModelStatus,
   useTestEmbeddingModel,
 } from '@test-agentstudio/api-client'
-import type { FrontendModelConfig, FrontendEmbeddingModelConfig } from '@test-agentstudio/api-client'
+import {
+  useVLMModels,
+  useCreateVLMModel,
+  useUpdateVLMModel,
+  useDeleteVLMModel,
+  useToggleVLMModelStatus,
+  useTestVLMModel,
+} from '@test-agentstudio/api-client'
+import type { FrontendModelConfig, FrontendEmbeddingModelConfig, FrontendVLMModelConfig } from '@test-agentstudio/api-client'
 import { ModelProvider } from '@test-agentstudio/api-client'
 import DeleteConfirmationDialog from '../../components/Common/DeleteConfirmationDialog'
 import { CommonPageLayout, type TabConfig } from '@/components/Common/common-page'
@@ -43,7 +51,7 @@ import { EmbeddingModelsTable } from './components/EmbeddingModelsTable'
 type ModelConfig = FrontendModelConfig
 
 // 模型类型枚举
-type ModelType = 'LLM' | 'Embedding'
+type ModelType = 'LLM' | 'Embedding' | 'VLM'
 
 // 统一的模型列表项类型（用于渲染列表）
 interface UnifiedModelListItem {
@@ -109,8 +117,65 @@ const initialEmbeddingConfig: Partial<ModelConfig> & { maxBatchSize?: number } =
   maxBatchSize: 5,
 }
 
+const initialVLMConfig: Partial<ModelConfig> = {
+  name: '',
+  provider: ModelProvider.OPENAI,
+  modelId: '',
+  apiKey: '',
+  baseUrl: '',
+  isActive: true,
+  timeout: 60,
+  retryCount: 3,
+  tags: [],
+  description: '',
+}
+
+const VLM_TEST_IMAGE_NAME = 'jiuwen-logo.jpg'
+const VLM_TEST_IMAGE_PATH = `${import.meta.env.BASE_URL}${VLM_TEST_IMAGE_NAME}`
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      const base64 = result.split(',')[1]
+      if (!base64) {
+        reject(new Error('Failed to encode VLM test image'))
+        return
+      }
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('Failed to read VLM test image'))
+    reader.readAsDataURL(blob)
+  })
+
+const loadFixedVLMTestImage = async (): Promise<{ imageBase64: string; mimeType: string }> => {
+  const response = await fetch(VLM_TEST_IMAGE_PATH)
+  if (!response.ok) {
+    throw new Error(`Failed to load VLM test image: ${response.status}`)
+  }
+
+  const blob = await response.blob()
+  return {
+    imageBase64: await blobToBase64(blob),
+    mimeType: blob.type || 'image/jpeg',
+  }
+}
+
 const ModelsPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const isZhLocale = i18n.language.toLowerCase().startsWith('zh')
+  const vlmDefaultPrompt = isZhLocale
+    ? '请描述这张图里的主要内容，并指出你最明显看到的视觉元素。'
+    : 'Describe the main content of this image and point out the most obvious visual elements you see.'
+  const vlmTestNoticeText = t('models.vlmTestNotice', {
+    defaultValue: isZhLocale
+      ? 'VLM 测试会在发送提示词的同时，自动附带下方这张固定测试图片。'
+      : 'VLM testing automatically sends the prompt together with the fixed test image below.',
+  })
+  const vlmCompactTestHintText = isZhLocale
+    ? `固定测试图：${VLM_TEST_IMAGE_NAME}`
+    : `Fixed test image: ${VLM_TEST_IMAGE_NAME}`
   // 使用 hooks 管理模型数据
   const { user } = useAuthStore()
 
@@ -137,7 +202,6 @@ const ModelsPage: React.FC = () => {
     data: embeddingModelsResponse,
     isFetching: isLoadingEmbedding,
     error: errorEmbedding,
-    refetch: refetchEmbedding,
   } = useEmbeddingModels({
     spaceId: user?.spaceId,
     page: 1,
@@ -146,13 +210,22 @@ const ModelsPage: React.FC = () => {
     sort_order: 'desc',
   })
 
+  const {
+    data: vlmModelsResponse,
+    isLoading: isLoadingVLM,
+    error: errorVLM,
+    refetch: refetchVLM,
+  } = useVLMModels({
+    spaceId: user?.spaceId,
+    page: 1,
+    size: 100,
+    sort_by: 'updated_at',
+    sort_order: 'desc',
+  })
+
   // 合并加载状态和错误状态
-  const isLoading = isLoadingLLM || isLoadingEmbedding
-  const error = errorLLM || errorEmbedding
-  const refetch = () => {
-    refetchLLM()
-    refetchEmbedding()
-  }
+  const isLoading = isLoadingLLM || isLoadingEmbedding || isLoadingVLM
+  const error = errorLLM || errorEmbedding || errorVLM
 
   // 当API返回为空时显示空列表
   const displayLLMModels = (modelsResponse?.items || []).map((model: any) => ({
@@ -164,6 +237,12 @@ const ModelsPage: React.FC = () => {
     modelType: 'Embedding' as ModelType,
   }))
 
+  // VLM display models
+  const displayVLMModels = (vlmModelsResponse?.items || []).map((model: any) => ({
+    ...model,
+    modelType: 'VLM' as ModelType,
+  }))
+
   // Tab 状态：改为字符串以适配 CommonPageLayout
   const [activeTab, setActiveTab] = useState<string>('llm')
 
@@ -171,17 +250,17 @@ const ModelsPage: React.FC = () => {
   const [editMode, setEditMode] = useState(false)
   const [showTestDialog, setShowTestDialog] = useState(false)
   const [selectedModel, setSelectedModel] = useState<UnifiedModelListItem | null>(null)
+  const isVLMTestDialog = selectedModel?.modelType === 'VLM'
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' })
   const [searchTerm, setSearchTerm] = useState('')
   const [filterProvider, setFilterProvider] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
 
   // 合并所有模型到一个列表
-  const allModels: UnifiedModelListItem[] = [...displayLLMModels, ...displayEmbeddingModels] as UnifiedModelListItem[]
+  const allModels: UnifiedModelListItem[] = [...displayLLMModels, ...displayEmbeddingModels, ...displayVLMModels] as UnifiedModelListItem[]
   // 根据当前 tab 计算总数和总页数
-  const currentTabTotalItems = activeTab === 'llm' ? modelsResponse?.total || 0 : embeddingModelsResponse?.total || 0
+  const currentTabTotalItems = activeTab === 'llm' ? (modelsResponse?.total || 0) : activeTab === 'embedding' ? (embeddingModelsResponse?.total || 0) : (vlmModelsResponse?.total || 0)
   const totalItems = currentTabTotalItems
-  const totalPages = pageSize > 0 ? Math.ceil(totalItems / pageSize) : 0
 
   // 筛选结果的分页状态
   const [filteredPage, setFilteredPage] = useState(1)
@@ -259,6 +338,19 @@ const ModelsPage: React.FC = () => {
           tags: model.tags || [],
           maxBatchSize: (model as any).maxBatchSize || 8,
         })
+      } else if (model.modelType === 'VLM') {
+        setNewModel({
+          name: model.name,
+          provider: (model.provider as ModelProvider) || ModelProvider.OPENAI,
+          modelId: model.modelId,
+          apiKey: model.apiKey || '',
+          baseUrl: model.baseUrl || '',
+          isActive: model.isActive,
+          tags: model.tags || [],
+          description: model.description || '',
+          timeout: model.timeout || 60,
+          retryCount: model.retryCount ?? 3,
+        })
       } else {
         setNewModel(model as any)
       }
@@ -268,8 +360,8 @@ const ModelsPage: React.FC = () => {
       // Add mode - 根据当前 tab 设置默认模型类型
       setEditMode(false)
       setSelectedModel(null)
-      const defaultType: ModelType = activeTab === 'llm' ? 'LLM' : 'Embedding'
-      setNewModel(defaultType === 'LLM' ? initialModelConfig : initialEmbeddingConfig)
+      const defaultType: ModelType = activeTab === 'llm' ? 'LLM' : activeTab === 'embedding' ? 'Embedding' : 'VLM'
+      setNewModel(defaultType === 'LLM' ? initialModelConfig : defaultType === 'Embedding' ? initialEmbeddingConfig : initialVLMConfig)
       setModelType(defaultType)
     }
     setShowModelDialog(true)
@@ -305,9 +397,14 @@ const ModelsPage: React.FC = () => {
   const deleteEmbeddingModelMutation = useDeleteEmbeddingModel()
   const toggleEmbeddingStatusMutation = useToggleEmbeddingModelStatus()
   const testEmbeddingModelMutation = useTestEmbeddingModel()
+  const createVLMModelMutation = useCreateVLMModel()
+  const updateVLMModelMutation = useUpdateVLMModel()
+  const deleteVLMModelMutation = useDeleteVLMModel()
+  const toggleVLMStatusMutation = useToggleVLMModelStatus()
+  const testVLMModelMutation = useTestVLMModel()
 
   // 根据当前 tab 确定显示的模型类型
-  const currentModelType: ModelType = activeTab === 'llm' ? 'LLM' : 'Embedding'
+  const currentModelType: ModelType = activeTab === 'llm' ? 'LLM' : activeTab === 'embedding' ? 'Embedding' : 'VLM'
 
   // 首先根据当前 tab 过滤模型类型
   const currentTabModels = allModels.filter(model => model.modelType === currentModelType)
@@ -322,7 +419,7 @@ const ModelsPage: React.FC = () => {
         model.name.toLowerCase().includes(searchLower) ||
         model.provider.toLowerCase().includes(searchLower) ||
         model.modelId.toLowerCase().includes(searchLower) ||
-        (currentModelType === 'LLM' && model.tags && model.tags.some(tag => tag.toLowerCase().includes(searchLower)))
+        (currentModelType !== 'Embedding' && model.tags && model.tags.some(tag => tag.toLowerCase().includes(searchLower)))
       const matchesProvider = filterProvider === 'all' || model.provider === filterProvider
       const matchesStatus = filterStatus === 'all' || (filterStatus === 'active' && model.isActive) || (filterStatus === 'inactive' && !model.isActive)
 
@@ -337,7 +434,6 @@ const ModelsPage: React.FC = () => {
 
   // 筛选结果的分页计算
   const filteredTotalItems = filteredModels.length
-  const filteredTotalPages = pageSize > 0 ? Math.ceil(filteredTotalItems / pageSize) : 0
 
   // 非筛选状态下的前端分页
   const paginatedDisplayModels = currentTabModels.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -365,11 +461,23 @@ const ModelsPage: React.FC = () => {
     }
   }, [showTestDialog])
 
+  useEffect(() => {
+    if (!showTestDialog || !selectedModel || isTesting) {
+      return
+    }
+
+    if (selectedModel.modelType === 'VLM' && !testPrompt.trim()) {
+      setTestPrompt(vlmDefaultPrompt)
+    }
+  }, [showTestDialog, selectedModel, isTesting, testPrompt, vlmDefaultPrompt])
+
   // 确定最终显示的模型数据
   const finalModels = hasFilters ? paginatedFilteredModels : paginatedDisplayModels
   const finalTotalItems = hasFilters ? filteredTotalItems : totalItems
-  const finalTotalPages = hasFilters ? filteredTotalPages : totalPages
   const finalCurrentPage = hasFilters ? filteredPage : currentPage
+  const isVLMTimeoutValid = modelType !== 'VLM' || (newModel.timeout !== undefined && newModel.timeout >= 1 && newModel.timeout <= 300)
+  const isVLMRetryCountValid = modelType !== 'VLM' || (newModel.retryCount !== undefined && newModel.retryCount >= 0 && newModel.retryCount <= 10)
+  const canSubmitModel = isFormValid() && isVLMTimeoutValid && isVLMRetryCountValid
 
   const handleSave = async () => {
     // 验证名称长度
@@ -385,13 +493,13 @@ const ModelsPage: React.FC = () => {
     }
 
     // 验证描述长度（仅 LLM 模型）
-    if (modelType === 'LLM' && (newModel.description || '').length > 500) {
+    if (modelType !== 'Embedding' && (newModel.description || '').length > 500) {
       setSnackbar({ open: true, message: t('models.messages.descriptionMaxLength'), severity: 'error' })
       return
     }
 
     // LLM 模型需要验证超时时间范围
-    if (modelType === 'LLM') {
+    if (modelType !== 'Embedding') {
       const timeout = newModel.timeout
       if (timeout === undefined || timeout < 1 || timeout > 3600) {
         setSnackbar({ open: true, message: t('models.messages.timeoutRange'), severity: 'error' })
@@ -400,7 +508,15 @@ const ModelsPage: React.FC = () => {
     }
 
     // 验证必填字段
-    if (!isFormValid()) {
+    if (modelType === 'VLM') {
+      const retryCount = newModel.retryCount
+      if (retryCount === undefined || retryCount < 0 || retryCount > 10) {
+        setSnackbar({ open: true, message: t('models.modelConfig.parameters.retryCountDesc'), severity: 'error' })
+        return
+      }
+    }
+
+    if (!canSubmitModel) {
       setSnackbar({ open: true, message: t('models.messages.fillRequiredFields'), severity: 'error' })
       return
     }
@@ -408,6 +524,8 @@ const ModelsPage: React.FC = () => {
     // 根据模型类型选择不同的保存逻辑
     if (modelType === 'Embedding') {
       await handleSaveEmbeddingModel()
+    } else if (modelType === 'VLM') {
+      await handleSaveVLMModel()
     } else {
       await handleSaveLLMModel()
     }
@@ -687,6 +805,55 @@ const ModelsPage: React.FC = () => {
     }
   }
 
+  const handleSaveVLMModel = async () => {
+    if (!validateBaseUrl(newModel.baseUrl || '')) {
+      setSnackbar({ open: true, message: t('models.messages.invalidBaseUrl'), severity: 'error' })
+      return
+    }
+
+    const vlmModel: Partial<FrontendVLMModelConfig> = {
+      name: newModel.name || '',
+      provider: (newModel.provider as string) || ModelProvider.OPENAI,
+      modelId: newModel.modelId || '',
+      apiKey: editMode && (!newModel.apiKey || newModel.apiKey === selectedModel?.apiKey) ? undefined : newModel.apiKey || '',
+      baseUrl: newModel.baseUrl || '',
+      description: newModel.description || '',
+      tags: newModel.tags || [],
+      timeout: newModel.timeout ?? 60,
+      retryCount: newModel.retryCount ?? 3,
+      isActive: newModel.isActive ?? true,
+    }
+
+    if (editMode && selectedModel) {
+      try {
+        await updateVLMModelMutation.mutateAsync({
+          id: selectedModel.id,
+          model: vlmModel,
+          spaceId: user?.spaceId || '',
+        })
+        setShowModelDialog(false)
+        setCurrentPage(1)
+        setSnackbar({ open: true, message: t('models.messages.updateSuccess'), severity: 'success' })
+      } catch (error: any) {
+        const errorMessage = error?.response?.data?.message || error?.message || t('models.messages.updateFailed')
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' })
+      }
+    } else {
+      try {
+        await createVLMModelMutation.mutateAsync({
+          model: vlmModel,
+          spaceId: user?.spaceId || '',
+        })
+        setShowModelDialog(false)
+        setCurrentPage(1)
+        setSnackbar({ open: true, message: t('models.messages.addSuccess'), severity: 'success' })
+      } catch (error: any) {
+        const errorMessage = error?.response?.data?.message || error?.message || t('models.messages.addFailed')
+        setSnackbar({ open: true, message: errorMessage, severity: 'error' })
+      }
+    }
+  }
+
   const handleDeleteModel = async (modelId: string, modelName: string) => {
     setDeleteDialog({
       isOpen: true,
@@ -702,6 +869,8 @@ const ModelsPage: React.FC = () => {
         // 根据保存的模型类型调用不同的删除 API
         if (deleteDialog.modelType === 'Embedding') {
           await deleteEmbeddingModelMutation.mutateAsync({ id: deleteDialog.modelId, spaceId: user?.spaceId || '' })
+        } else if (deleteDialog.modelType === 'VLM') {
+          await deleteVLMModelMutation.mutateAsync({ id: deleteDialog.modelId, spaceId: user?.spaceId || '' })
         } else {
           await deleteModelMutation.mutateAsync({ id: deleteDialog.modelId, spaceId: user?.spaceId || '' })
         }
@@ -765,7 +934,7 @@ const ModelsPage: React.FC = () => {
       // 格式化测试结果（result 是 EmbeddingModelTestResponse，包含 data, model, usage 等字段）
       const embeddingData = result.data?.[0]
       const dimension = embeddingData?.embedding?.length || 0
-      const usage = result.usage || {}
+      const usage = (result.usage || {}) as { total_tokens?: number }
       const model = result.model || 'unknown'
 
       setSnackbar({
@@ -831,21 +1000,34 @@ const ModelsPage: React.FC = () => {
     testingModelIdRef.current = currentModelId
 
     try {
-      const result = await testModelMutation.mutateAsync({
-        id: currentModelId,
-        prompt: testPrompt,
-        spaceId: user?.spaceId || '',
-        parameters: {
-          temperature: selectedModel.temperature ?? 0.7,
-          top_p: selectedModel.topp ?? 0.9,
-          max_tokens: selectedModel.maxTokens ?? 4096,
-        },
-      })
+      const isVLMTest = selectedModel.modelType === 'VLM'
+      const vlmTestImage = isVLMTest ? await loadFixedVLMTestImage() : null
+      const result = isVLMTest
+        ? await testVLMModelMutation.mutateAsync({
+            id: currentModelId,
+            prompt: testPrompt,
+            spaceId: user?.spaceId || '',
+            imageBase64: vlmTestImage?.imageBase64,
+            mimeType: vlmTestImage?.mimeType,
+          })
+        : await testModelMutation.mutateAsync({
+            id: currentModelId,
+            prompt: testPrompt,
+            spaceId: user?.spaceId || '',
+            parameters: {
+              temperature: selectedModel.temperature ?? 0.7,
+              top_p: selectedModel.topp ?? 0.9,
+              max_tokens: selectedModel.maxTokens ?? 4096,
+            },
+          })
 
       // 只有当代数匹配、对话框仍然打开且模型ID匹配时才设置结果
       if (currentGeneration === testGenerationRef.current && showTestDialog && testingModelIdRef.current === currentModelId) {
+        const configInfo = isVLMTest
+          ? `- ${t('models.modelList.provider')}: ${selectedModel.provider}\n- model_id: ${selectedModel.modelId}\n- ${t('models.modelConfig.parameters.timeout')}: ${selectedModel.timeout}\n- ${t('models.modelConfig.parameters.retryCount')}: ${selectedModel.retryCount}\n- test_image: ${VLM_TEST_IMAGE_NAME}`
+          : `- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- top_p: ${selectedModel.topp}\n- max_tokens: ${selectedModel.maxTokens}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`
         setTestResult(
-          `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n- ${t('models.modelConfig.parameters.temperature')}: ${selectedModel.temperature}\n- top_p: ${selectedModel.topp}\n- max_tokens: ${selectedModel.maxTokens}\n- ${t('models.modelList.provider')}: ${selectedModel.provider}`,
+          `${t('models.testSuccess')}\n${t('models.modelList.name')}: ${selectedModel.name}\n${t('models.testPrompt')}: ${testPrompt}\n\n${t('models.testResponse')}: ${result.response || t('models.testCompletion')}\n\n${t('models.averageResponseTime')}: ${result.latency.toFixed(3)}s\n\n${t('models.configInfo')}: \n${configInfo}`,
         )
       }
     } catch (error: any) {
@@ -888,6 +1070,7 @@ const ModelsPage: React.FC = () => {
         // 后端统一返回英文，按英文匹配后 replace 为当前语言的 i18n
         const localizedError = errorMessage
           .replace(/Model call failed, please check model configuration/gi, t('models.messages.modelTestError.modelCallFailedCheckConfig'))
+          .replace(/Model invocation failed, please check model related configuration/gi, t('models.messages.modelTestError.modelCallFailedCheckConfig'))
           .replace(/API Key or model ID invalid, please check model configuration/gi, t('models.messages.modelTestError.apiKeyOrModelInvalid'))
           .replace(/Model service address unreachable, please check base URL or network configuration/gi, t('models.messages.modelTestError.serviceUnreachable'))
         setTestResult(
@@ -906,7 +1089,11 @@ const ModelsPage: React.FC = () => {
         testingModelIdRef.current = null
       }
       // 无论测试成功还是失败，都刷新模型列表以更新统计信息
-      await Promise.all([refetchLLM(), refetchEmbedding()])
+      if (selectedModel.modelType === 'VLM') {
+        await refetchVLM()
+      } else {
+        await refetchLLM()
+      }
     }
   }
 
@@ -956,28 +1143,13 @@ const ModelsPage: React.FC = () => {
       // 根据当前 tab 的模型类型调用不同的切换状态 API
       if (currentModelType === 'Embedding') {
         await toggleEmbeddingStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
+      } else if (currentModelType === 'VLM') {
+        await toggleVLMStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
       } else {
         await toggleStatusMutation.mutateAsync({ id: modelId, spaceId: user?.spaceId || '' })
       }
     } catch (error) {
       setSnackbar({ open: true, message: t('models.messages.toggleStatusFailed'), severity: 'error' })
-    }
-  }
-
-  const removeTag = async (model: UnifiedModelListItem, tagIndex: number) => {
-    try {
-      const updatedModel = {
-        ...model,
-        tags: model.tags.filter((_, i) => i !== tagIndex),
-      }
-      if (currentModelType === 'Embedding') {
-        await updateEmbeddingModelMutation.mutateAsync({ id: model.id, model: updatedModel, spaceId: user?.spaceId || '' })
-      } else {
-        await updateModelMutation.mutateAsync({ id: model.id, model: updatedModel, spaceId: user?.spaceId || '' })
-        refetch()
-      }
-    } catch (error) {
-      setSnackbar({ open: true, message: t('models.messages.removeTagFailed'), severity: 'error' })
     }
   }
 
@@ -1080,7 +1252,7 @@ const ModelsPage: React.FC = () => {
           onCreateClick={() => handleOpenModelDialog(null)}
         />
       )
-    } else {
+    } else if (activeTab === 'embedding') {
       return (
         <EmbeddingModelsTable
           models={finalModels as unknown as FrontendEmbeddingModelConfig[]}
@@ -1095,6 +1267,25 @@ const ModelsPage: React.FC = () => {
           onCreateClick={() => handleOpenModelDialog(null)}
         />
       )
+    } else {
+      // VLM Models table
+      return (
+        <EmbeddingModelsTable
+          models={finalModels as unknown as FrontendEmbeddingModelConfig[]}
+          loading={isLoading}
+          onEdit={model => handleOpenModelDialog({ ...model, modelType: 'VLM' } as UnifiedModelListItem)}
+          onDelete={model => handleDeleteModel(model.id, model.name)}
+          onToggleStatus={model => toggleModelStatus(model.id)}
+          onTest={model => {
+            setSelectedModel({ ...(model as unknown as FrontendVLMModelConfig), modelType: 'VLM' } as UnifiedModelListItem)
+            setShowTestDialog(true)
+          }}
+          testingModelId={testingModelId}
+          searchTerm={searchTerm}
+          hasFilters={hasFilters}
+          onCreateClick={() => handleOpenModelDialog(null)}
+        />
+      )
     }
   }, [activeTab, finalModels, isLoading, testingModelId, searchTerm, hasFilters])
 
@@ -1102,8 +1293,9 @@ const ModelsPage: React.FC = () => {
     () => [
       { key: 'llm', label: `${t('models.tabs.llm')} (${isLoadingLLM ? '...' : modelsResponse?.total || 0})` },
       { key: 'embedding', label: `${t('models.tabs.embedding')} (${isLoadingEmbedding ? '...' : embeddingModelsResponse?.total || 0})` },
+      { key: 'vlm', label: `${t('models.tabs.vlm')} (${isLoadingVLM ? '...' : vlmModelsResponse?.total || 0})` },
     ],
-    [modelsResponse?.total, embeddingModelsResponse?.total, isLoadingLLM, isLoadingEmbedding, t],
+    [modelsResponse?.total, embeddingModelsResponse?.total, vlmModelsResponse?.total, isLoadingLLM, isLoadingEmbedding, isLoadingVLM, t],
   )
 
   return (
@@ -1204,7 +1396,7 @@ const ModelsPage: React.FC = () => {
                   disabled={modelType === 'Embedding'} // Embedding 只支持 OpenAI
                 >
                   <MenuItem value={ModelProvider.OPENAI}>OpenAI</MenuItem>
-                  {modelType === 'LLM' && <MenuItem value={ModelProvider.SILICONFLOW}>SiliconFlow</MenuItem>}
+                  {modelType !== 'Embedding' && <MenuItem value={ModelProvider.SILICONFLOW}>SiliconFlow</MenuItem>}
                 </Select>
                 <Typography variant="caption" className="text-gray-600 mt-1">
                   {modelType === 'Embedding' ? t('models.modelConfig.basicInfo.embeddingProviderHint') : t('models.modelConfig.basicInfo.providerHint')}
@@ -1314,7 +1506,7 @@ const ModelsPage: React.FC = () => {
               />
             </Grid>
             {/* 标签字段 - 仅 LLM 模型显示 */}
-            {modelType === 'LLM' && (
+            {modelType !== 'Embedding' && (
               <Grid item xs={12}>
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -1398,7 +1590,7 @@ const ModelsPage: React.FC = () => {
               </Grid>
             )}
             {/* 描述字段 - 仅 LLM 模型显示 */}
-            {modelType === 'LLM' && (
+            {modelType !== 'Embedding' && (
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -1615,6 +1807,110 @@ const ModelsPage: React.FC = () => {
                 />
               </Grid>
             )}
+            {modelType === 'VLM' && (
+              <>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    required
+                    label={t('models.modelConfig.parameters.timeout')}
+                    type="number"
+                    placeholder=""
+                    value={newModel.timeout || ''}
+                    error={!isVLMTimeoutValid}
+                    onChange={e => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewModel({ ...newModel, timeout: undefined })
+                        return
+                      }
+
+                      let numValue = parseInt(value, 10)
+                      if (!isNaN(numValue)) {
+                        if (numValue < 1) {
+                          numValue = 1
+                        } else if (numValue > 300) {
+                          numValue = 300
+                        }
+                        setNewModel({ ...newModel, timeout: numValue })
+                      }
+                    }}
+                    inputProps={{
+                      min: 1,
+                      max: 300,
+                    }}
+                    sx={{
+                      '& input[type=number]::-webkit-outer-spin-button': {
+                        WebkitAppearance: 'none',
+                        margin: 0,
+                      },
+                      '& input[type=number]::-webkit-inner-spin-button': {
+                        WebkitAppearance: 'none',
+                        margin: 0,
+                      },
+                      '& input[type=number]': {
+                        MozAppearance: 'textfield',
+                      },
+                      '& .MuiInputLabel-asterisk': {
+                        color: 'red',
+                      },
+                    }}
+                    variant="outlined"
+                    helperText={t('models.modelConfig.parameters.timeoutDesc')}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField
+                    fullWidth
+                    required
+                    label={t('models.modelConfig.parameters.retryCount')}
+                    type="number"
+                    placeholder=""
+                    value={newModel.retryCount ?? ''}
+                    error={!isVLMRetryCountValid}
+                    onChange={e => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewModel({ ...newModel, retryCount: undefined })
+                        return
+                      }
+
+                      let numValue = parseInt(value, 10)
+                      if (!isNaN(numValue)) {
+                        if (numValue < 0) {
+                          numValue = 0
+                        } else if (numValue > 10) {
+                          numValue = 10
+                        }
+                        setNewModel({ ...newModel, retryCount: numValue })
+                      }
+                    }}
+                    inputProps={{
+                      min: 0,
+                      max: 10,
+                    }}
+                    sx={{
+                      '& input[type=number]::-webkit-outer-spin-button': {
+                        WebkitAppearance: 'none',
+                        margin: 0,
+                      },
+                      '& input[type=number]::-webkit-inner-spin-button': {
+                        WebkitAppearance: 'none',
+                        margin: 0,
+                      },
+                      '& input[type=number]': {
+                        MozAppearance: 'textfield',
+                      },
+                      '& .MuiInputLabel-asterisk': {
+                        color: 'red',
+                      },
+                    }}
+                    variant="outlined"
+                    helperText={t('models.modelConfig.parameters.retryCountDesc')}
+                  />
+                </Grid>
+              </>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions className="bg-gray-50 px-6 py-4">
@@ -1627,9 +1923,9 @@ const ModelsPage: React.FC = () => {
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={!isFormValid()}
+            disabled={!canSubmitModel}
             className={`px-6 py-2 rounded-lg font-semibold transform transition-all duration-300 shadow-sm ${
-              !isFormValid()
+              !canSubmitModel
                 ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white hover:scale-105 hover:shadow-xl'
             }`}
@@ -1654,58 +1950,91 @@ const ModelsPage: React.FC = () => {
         disableRestoreFocus
       >
         <DialogTitle className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-              <Play className="w-4 h-4 text-white" />
+          {isVLMTestDialog ? (
+            <div className="space-y-1">
+              <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
+                {t('models.testModel')}: {selectedModel?.name}
+              </Typography>
+              <Typography variant="body2" className="text-gray-600">
+                {vlmCompactTestHintText}
+              </Typography>
             </div>
-            <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
-              {t('models.testModel')}: {selectedModel?.name}
-            </Typography>
-          </div>
+          ) : (
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                <Play className="w-4 h-4 text-white" />
+              </div>
+              <Typography variant="h6" className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800">
+                {t('models.testModel')}: {selectedModel?.name}
+              </Typography>
+            </div>
+          )}
         </DialogTitle>
         <DialogContent>
-          <div className="space-y-4 pt-4">
-            {/* 常用语句 */}
-            <div>
-              <Typography variant="subtitle2" className="text-gray-700 mb-2 font-medium">
-                {t('models.commonTestPrompts')}
-              </Typography>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <Chip
-                  label={t('models.introducePrompt')}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setTestPrompt(t('models.introducePrompt'))}
-                  disabled={isTesting}
-                  className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
-                />
-                <Chip
-                  label={t('models.aiConceptsPrompt')}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setTestPrompt(t('models.aiConceptsPrompt'))}
-                  disabled={isTesting}
-                  className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
-                />
-                <Chip
-                  label={t('models.helloWorldPrompt')}
-                  variant="outlined"
-                  size="small"
-                  onClick={() => setTestPrompt(t('models.helloWorldPrompt'))}
-                  disabled={isTesting}
-                  className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
-                />
+          <div className={`space-y-4 ${isVLMTestDialog ? 'pt-5' : 'pt-4'}`}>
+            {isVLMTestDialog ? (
+              <Alert severity="info" className="rounded-xl border border-blue-200">
+                <div className="space-y-3">
+                  <span>{vlmTestNoticeText}</span>
+                  <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-white/80 px-3 py-2">
+                    <img
+                      src={VLM_TEST_IMAGE_PATH}
+                      alt={isZhLocale ? 'VLM 固定测试图缩略图' : 'VLM fixed test image thumbnail'}
+                      className="h-14 w-14 rounded-md border border-blue-100 object-cover bg-white"
+                    />
+                    <div className="min-w-0">
+                      <Typography variant="caption" className="block font-medium text-gray-700">
+                        {VLM_TEST_IMAGE_NAME}
+                      </Typography>
+                      <Typography variant="caption" className="block text-gray-600">
+                        {vlmCompactTestHintText}
+                      </Typography>
+                    </div>
+                  </div>
+                </div>
+              </Alert>
+            ) : (
+              <div>
+                <Typography variant="subtitle2" className="text-gray-700 mb-2 font-medium">
+                  {t('models.commonTestPrompts')}
+                </Typography>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <Chip
+                    label={t('models.introducePrompt')}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestPrompt(t('models.introducePrompt'))}
+                    disabled={isTesting}
+                    className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
+                  />
+                  <Chip
+                    label={t('models.aiConceptsPrompt')}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestPrompt(t('models.aiConceptsPrompt'))}
+                    disabled={isTesting}
+                    className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
+                  />
+                  <Chip
+                    label={t('models.helloWorldPrompt')}
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setTestPrompt(t('models.helloWorldPrompt'))}
+                    disabled={isTesting}
+                    className={`${isTesting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-50 hover:border-blue-300'}`}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <TextField
               fullWidth
               multiline
-              rows={4}
+              rows={isVLMTestDialog ? 5 : 4}
               label={t('models.testPrompt')}
               value={testPrompt}
               onChange={e => setTestPrompt(e.target.value)}
-              placeholder=""
+              placeholder={isVLMTestDialog ? vlmDefaultPrompt : ''}
               disabled={isTesting}
               helperText={
                 testPrompt.length > 1000 ? t('models.promptLimit', { length: testPrompt.length }) : t('models.promptLength', { length: testPrompt.length })
@@ -1732,7 +2061,7 @@ const ModelsPage: React.FC = () => {
               <Button
                 variant="outlined"
                 onClick={() => {
-                  setTestPrompt('')
+                  setTestPrompt(isVLMTestDialog ? vlmDefaultPrompt : '')
                   setTestResult('')
                 }}
                 disabled={isTesting}
@@ -1744,10 +2073,23 @@ const ModelsPage: React.FC = () => {
 
             {testResult && (
               <div>
-                <Typography variant="h6" className="mb-2 text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800 font-bold">
+                <Typography
+                  variant={isVLMTestDialog ? 'subtitle1' : 'h6'}
+                  className={
+                    isVLMTestDialog
+                      ? 'mb-2 text-gray-900 font-semibold'
+                      : 'mb-2 text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-blue-800 font-bold'
+                  }
+                >
                   {t('models.testResult')}
                 </Typography>
-                <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4">
+                <div
+                  className={
+                    isVLMTestDialog
+                      ? 'rounded-xl border border-gray-200 bg-gray-50 p-3'
+                      : 'bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-blue-200 p-4'
+                  }
+                >
                   <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-white p-3 rounded-lg border border-gray-200">{testResult}</pre>
                 </div>
               </div>
@@ -1779,7 +2121,7 @@ const ModelsPage: React.FC = () => {
         }
         itemType="model"
         itemName={deleteDialog.modelName}
-        isLoading={deleteModelMutation.isLoading || deleteEmbeddingModelMutation.isLoading}
+        isLoading={deleteModelMutation.isLoading || deleteEmbeddingModelMutation.isLoading || deleteVLMModelMutation.isLoading}
         iconType={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? 'warning' : 'danger'}
         title={deleteDialog.knowledgeBases && deleteDialog.knowledgeBases.length > 0 ? t('models.messages.cannotDeleteModel') : undefined}
         message={

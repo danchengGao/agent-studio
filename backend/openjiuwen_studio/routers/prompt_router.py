@@ -55,7 +55,7 @@ def list_prompts(
 @handle_exceptions(response_model=entities.GetPromptResponse)
 def get_prompt(
         prompt_id: int = Path(..., title="Prompt ID"),
-        workspace_id: int = Query(..., title="Space ID"),
+        workspace_id: str = Query(..., title="Space ID"),
         with_draft: bool = Query(True, title="return with draft"),
         with_commit: bool = Query(True, title="return with commit"),
         commit_version: str = Query("-1", title="commit version"),
@@ -73,7 +73,7 @@ def get_prompt(
 @handle_exceptions(response_model=entities.PromptWithVersions)
 def get_prompt_with_version(
         prompt_id: int,
-        workspace_id: int,
+        workspace_id: str,
         service: PromptService = Depends(get_prompt_service),
         current_user: dict = Depends(get_current_user)):
     """ 获取指定 Prompt 及其版本历史 """
@@ -139,7 +139,7 @@ def save_draft(
 @handle_exceptions(response_model=entities.PromptDraftInput)
 def get_draft(
         prompt_id: int = Path(..., title="Prompt ID"),
-        workspace_id: int = Query(..., title="Space ID"),
+        workspace_id: str = Query(..., title="Space ID"),
         service: PromptService = Depends(get_prompt_service),
         current_user: dict = Depends(get_current_user)
 ):
@@ -156,7 +156,7 @@ def get_draft(
 @handle_exceptions(response_model=entities.CommitResponse)
 def commit_draft(
         prompt_id: int = Path(..., title="Prompt ID"),
-        workspace_id: int = Query(..., title="Space ID"),
+        workspace_id: str = Query(..., title="Space ID"),
         commit_request: entities.CommitRequest = Body(...),
         service: PromptService = Depends(get_prompt_service),
         current_user: dict = Depends(get_current_user)
@@ -180,7 +180,7 @@ def commit_draft(
 @handle_exceptions(response_model=entities.CommitListResponse)
 def list_commits(
         prompt_id: int = Path(..., title="Prompt ID"),
-        workspace_id: int = Query(..., title="Space ID"),
+        workspace_id: str = Query(..., title="Space ID"),
         page_size: int = Query(10, title="Page Size"),
         service: PromptService = Depends(get_prompt_service),
         current_user: dict = Depends(get_current_user)
@@ -202,7 +202,7 @@ def list_commits(
 @handle_exceptions(response_model=entities.RevertFromCommitResponse)
 def revert_from_commit(
         prompt_id: int = Path(..., title="Prompt ID"),
-        workspace_id: int = Query(..., title="Space ID"),
+        workspace_id: str = Query(..., title="Space ID"),
         revert_request: entities.RevertFromCommitRequest = Body(...),
         service: PromptService = Depends(get_prompt_service),
         current_user: dict = Depends(get_current_user)

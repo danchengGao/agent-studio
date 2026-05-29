@@ -341,12 +341,17 @@ def validate_variable_merge(node: Node) -> None:
             error_stage="validate"
         )
 
+    _valid_modes = {"firstNonNull", "append", "combine", "chooseBranch", "sqlQuery"}
+    _valid_combine_by = {"matchingFields", "position", "allCombinations"}
+    _valid_output_types = {"keepMatches", "enrichInput1", "keepEverything"}
+    _title = node.data.title or 'Variable-merge component'
+
     for group in variable_merge:
         if group.name is None or group.name.strip() == "":
             raise JiuWenComponentException(
                 code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
                 message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
-                    msg=f"[{node.data.title or 'Variable-merge component'}] group name cannot be empty"),
+                    msg=f"[{_title}] group name cannot be empty"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
@@ -355,13 +360,88 @@ def validate_variable_merge(node: Node) -> None:
             raise JiuWenComponentException(
                 code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
                 message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
-                    msg=f"[{node.data.title or 'Variable-merge component'}] "
-                        f"group {group.name} must contain "
-                        f"at least one variable"),
+                    msg=f"[{_title}] group '{group.name}' must contain at least one variable"),
                 component_id=node.id,
                 component_type=int(node.type),
                 error_stage="validate"
             )
+
+        mode = group.mode or "firstNonNull"
+        if mode not in _valid_modes:
+            raise JiuWenComponentException(
+                code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                    msg=f"[{_title}] group '{group.name}' has unknown mode '{mode}'"),
+                component_id=node.id,
+                component_type=int(node.type),
+                error_stage="validate"
+            )
+
+        if mode == "combine":
+            combine_by = group.combine_by or "matchingFields"
+            if combine_by not in _valid_combine_by:
+                raise JiuWenComponentException(
+                    code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                    message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                        msg=f"[{_title}] group '{group.name}' has unknown combineBy '{combine_by}'"),
+                    component_id=node.id,
+                    component_type=int(node.type),
+                    error_stage="validate"
+                )
+            if combine_by == "matchingFields":
+                if not group.match_field1 or group.match_field1.strip() == "":
+                    raise JiuWenComponentException(
+                        code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                        message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                            msg=f"[{_title}] group '{group.name}' with Matching Fields requires Input 1 Field"),
+                        component_id=node.id,
+                        component_type=int(node.type),
+                        error_stage="validate"
+                    )
+                if not group.match_field2 or group.match_field2.strip() == "":
+                    raise JiuWenComponentException(
+                        code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                        message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                            msg=f"[{_title}] group '{group.name}' with Matching Fields requires Input 2 Field"),
+                        component_id=node.id,
+                        component_type=int(node.type),
+                        error_stage="validate"
+                    )
+                output_type = group.output_type or "keepMatches"
+                if output_type not in _valid_output_types:
+                    raise JiuWenComponentException(
+                        code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                        message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                            msg=f"[{_title}] group '{group.name}' outputType must be one of: "
+                                f"keepMatches, enrichInput1, keepEverything"),
+                        component_id=node.id,
+                        component_type=int(node.type),
+                        error_stage="validate"
+                    )
+
+        if mode == "chooseBranch":
+            idx = group.choose_index if group.choose_index is not None else 0
+            if idx != -1 and (idx < 0 or idx >= len(group.items)):
+                raise JiuWenComponentException(
+                    code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                    message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                        msg=f"[{_title}] group '{group.name}' chooseIndex {idx} is out of range"),
+                    component_id=node.id,
+                    component_type=int(node.type),
+                    error_stage="validate"
+                )
+
+        if mode == "sqlQuery":
+            if not group.sql_query or group.sql_query.strip() == "":
+                raise JiuWenComponentException(
+                    code=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.code,
+                    message=StatusCode.VARIABLE_MERGE_COMPONENT_CONVERT_FAILED.errmsg.format(
+                        msg=f"[{_title}] group '{group.name}' SQL Query mode requires a non-empty query"),
+                    component_id=node.id,
+                    component_type=int(node.type),
+                    error_stage="validate"
+                )
+
 
 
 def validate_intermediate_vars(node: Node) -> None:

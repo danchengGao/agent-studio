@@ -34,6 +34,9 @@ import {
   PluginPublishDeleteResponse,
   PluginGetMarketRequest,
   PluginGetMarketResponse,
+  PluginGetMarketDetailRequest,
+  PluginGetMarketDetailResponse,
+  PluginInstallMarketRequest,
   PluginListMcpToolsRequest,
   PluginMcpInfoResponse,
   PluginDiscoverMcpToolsRequest,
@@ -754,13 +757,34 @@ export const usePluginGetMarket = () => {
     onError: error => {
       console.error('获取插件市场数据失败:', error)
 
-      // 添加错误日志记录，便于调试
       const errorResponse = getErrorResponse(error)
       if (errorResponse?.status === 403) {
         console.warn('没有权限访问插件市场数据')
       } else if (errorResponse?.status === 404) {
         console.warn('插件市场数据不存在')
       }
+    },
+  })
+}
+
+export const usePluginGetMarketDetail = () => {
+  return useMutation((request: PluginGetMarketDetailRequest) => PluginService.getPluginMarketDetail(request), {
+    onError: error => {
+      console.error('获取插件市场详情失败:', error)
+    },
+  })
+}
+
+export const useInstallMarketPlugin = () => {
+  const queryClient = useQueryClient()
+  return useMutation((request: PluginInstallMarketRequest) => PluginService.installMarketPlugin(request), {
+    onSuccess: (response, variables) => {
+      if (response.code === 200) {
+        queryClient.invalidateQueries(['pluginList', variables.space_id])
+      }
+    },
+    onError: error => {
+      console.error('安装市场插件失败:', error)
     },
   })
 }
@@ -789,4 +813,6 @@ export default {
   usePluginPublishList,
   usePluginPublishDelete,
   usePluginGetMarket,
+  usePluginGetMarketDetail,
+  useInstallMarketPlugin,
 }

@@ -15,15 +15,22 @@ from .system_llm_model import SystemLLMModelDB
 from .tag import TagDB
 from .trace_detail import TraceDetailDB
 from .user import SpaceDB, SpaceUserDB, UserDB
+from .vlm_model_config import VLMModelConfig
 from .workflow import WorkflowBaseDB, WorkflowPublishDB
 from .workflow_execution import WorkflowExecutionDB, WorkflowExecutionDetailsDB
 from .memory_base import MemoryBaseDB
 from .runtime_info import RuntimeInfoDB
+from .trigger import TriggerDB, TriggerExecutionLogDB
+from .evaluation import (
+    EvaluationDB, EvaluationTaskDB, EvaluationRunDB,
+    EvaluationTaskResultDB, GraderDB,
+)
 
 __all__ = [
     "ModelConfig",
     "ModelUsageLog",
     "EmbeddingModelConfig",
+    "VLMModelConfig",
     "Base",
     "WorkflowBaseDB",
     "WorkflowPublishDB",
@@ -50,5 +57,12 @@ __all__ = [
     "SystemEmbeddingModelDB",
     "SystemLLMModelDB",
     "MemoryBaseDB",
-    "RuntimeInfoDB"
+    "RuntimeInfoDB",
+    "TriggerDB",
+    "TriggerExecutionLogDB"
+    "EvaluationDB",
+    "EvaluationTaskDB",
+    "EvaluationRunDB",
+    "EvaluationTaskResultDB",
+    "GraderDB"
 ]

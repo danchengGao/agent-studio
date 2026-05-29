@@ -1,0 +1,689 @@
+{
+  "nodes": [
+    {
+      "id": "1_start",
+      "type": "1",
+      "meta": {
+        "position": {
+          "x": 100,
+          "y": 400
+        }
+      },
+      "data": {
+        "title": "Start: Business Idea",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "business_idea": {
+              "type": "string",
+              "default": "AI-powered meal planning app that creates personalized recipes based on dietary restrictions, budget, and available ingredients",
+              "description": "Describe your business idea in detail"
+            }
+          },
+          "required": [
+            "business_idea"
+          ]
+        }
+      }
+    },
+    {
+      "id": "21_market_researcher",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 450,
+          "y": 100
+        }
+      },
+      "data": {
+        "title": "Market Research Agent",
+        "max_iterations": 6,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a market research analyst. Research and analyze:\n\n1. MARKET SIZE & TRENDS:\n   - Total addressable market (TAM)\n   - Current market size and growth rate\n   - Key trends driving the market\n   - Future projections (3-5 years)\n\n2. TARGET AUDIENCE:\n   - Primary customer segments\n   - Demographics and psychographics\n   - Pain points and needs\n   - Buying behavior\n\n3. MARKET GAPS:\n   - Underserved segments\n   - Unmet needs\n   - Opportunities for differentiation\n\nProvide data-backed insights with sources."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Conduct comprehensive market research for: {{business_idea}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "business_idea": {
+              "type": "ref",
+              "content": [
+                "1_start",
+                "business_idea"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-market-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "market_research": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "market_research"
+          ]
+        }
+      }
+    },
+    {
+      "id": "21_competitor_analyst",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 450,
+          "y": 350
+        }
+      },
+      "data": {
+        "title": "Competitive Intelligence",
+        "max_iterations": 6,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a competitive intelligence expert. Analyze:\n\n1. DIRECT COMPETITORS:\n   - Top 5 direct competitors\n   - Their business models\n   - Pricing strategies\n   - Strengths and weaknesses\n   - Market share\n\n2. INDIRECT COMPETITORS:\n   - Alternative solutions\n   - Substitute products/services\n\n3. COMPETITIVE ADVANTAGES:\n   - What makes them successful?\n   - What are their vulnerabilities?\n   - White space opportunities\n\n4. DIFFERENTIATION STRATEGY:\n   - How can this idea stand out?\n   - Unique value propositions\n\nProvide actionable competitive insights."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Analyze competitors and competitive landscape for: {{business_idea}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "business_idea": {
+              "type": "ref",
+              "content": [
+                "1_start",
+                "business_idea"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-competitor-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "competitor_analysis": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "competitor_analysis"
+          ]
+        }
+      }
+    },
+    {
+      "id": "21_feasibility_analyst",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 450,
+          "y": 600
+        }
+      },
+      "data": {
+        "title": "Feasibility & Risk Analyst",
+        "max_iterations": 4,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a business feasibility analyst. Evaluate:\n\n1. TECHNICAL FEASIBILITY:\n   - Technology requirements\n   - Development complexity\n   - Required expertise\n   - Tech stack recommendations\n\n2. OPERATIONAL FEASIBILITY:\n   - Resource requirements (team, infrastructure)\n   - Time to market\n   - Scalability challenges\n\n3. RISK ANALYSIS:\n   - Market risks\n   - Technical risks\n   - Financial risks\n   - Regulatory/legal risks\n   - Competition risks\n\n4. MITIGATION STRATEGIES:\n   - How to address each risk\n   - Contingency plans\n\nProvide honest, critical assessment."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Assess feasibility and risks for: {{business_idea}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "business_idea": {
+              "type": "ref",
+              "content": [
+                "1_start",
+                "business_idea"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-feasibility-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "feasibility_report": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "feasibility_report"
+          ]
+        }
+      }
+    },
+    {
+      "id": "10_financial_model",
+      "type": "10",
+      "meta": {
+        "position": {
+          "x": 800,
+          "y": 200
+        }
+      },
+      "data": {
+        "title": "Financial Model Generator",
+        "inputs": {
+          "inputParameters": {
+            "business_idea": {
+              "type": "ref",
+              "content": [
+                "1_start",
+                "business_idea"
+              ],
+              "extra": {
+                "index": 0
+              }
+            },
+            "market_research": {
+              "type": "ref",
+              "content": [
+                "21_market_researcher",
+                "market_research"
+              ],
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import json\n    import re\n    \n    business_idea = args.params.get('business_idea', '')\n    market_research = args.params.get('market_research', '')\n    \n    # Determine business type and estimate parameters\n    is_saas = any(word in business_idea.lower() for word in ['app', 'software', 'platform', 'saas', 'subscription'])\n    is_ecommerce = any(word in business_idea.lower() for word in ['sell', 'store', 'shop', 'product', 'marketplace'])\n    is_service = any(word in business_idea.lower() for word in ['service', 'consulting', 'agency', 'coaching'])\n    \n    # Base assumptions\n    if is_saas:\n        model_type = 'SaaS (Subscription)'\n        avg_monthly_price = 29\n        customer_acq_cost = 150\n        churn_rate = 0.05  # 5% monthly\n        gross_margin = 0.85\n    elif is_ecommerce:\n        model_type = 'E-commerce'\n        avg_monthly_price = 75  # Average order value\n        customer_acq_cost = 45\n        churn_rate = 0.30  # Repeat purchase rate inverse\n        gross_margin = 0.40\n    elif is_service:\n        model_type = 'Service Business'\n        avg_monthly_price = 150\n        customer_acq_cost = 200\n        churn_rate = 0.10\n        gross_margin = 0.70\n    else:\n        model_type = 'General Business'\n        avg_monthly_price = 50\n        customer_acq_cost = 100\n        churn_rate = 0.08\n        gross_margin = 0.60\n    \n    # 3-year projection\n    projections = []\n    \n    # Year 1: Bootstrap/Launch phase\n    y1_customers_start = 0\n    y1_new_customers_monthly = 50\n    y1_customers = []\n    \n    for month in range(12):\n        new = y1_new_customers_monthly * (1 + month * 0.1)  # 10% growth\n        churned = (y1_customers[-1] if y1_customers else 0) * churn_rate\n        total = (y1_customers[-1] if y1_customers else 0) + new - churned\n        y1_customers.append(total)\n    \n    y1_total_customers = int(y1_customers[-1])\n    y1_revenue = int(sum(y1_customers) * avg_monthly_price)\n    y1_gross_profit = int(y1_revenue * gross_margin)\n    \n    # Year 1 costs\n    y1_cac_spend = int(sum(y1_new_customers_monthly * (1 + m * 0.1) for m in range(12)) * customer_acq_cost)\n    y1_fixed_costs = 180000  # Salaries, office, tools\n    y1_total_costs = y1_cac_spend + y1_fixed_costs\n    y1_net_profit = y1_gross_profit - y1_total_costs\n    \n    projections.append({\n        'year': 1,\n        'customers': y1_total_customers,\n        'revenue': y1_revenue,\n        'gross_profit': y1_gross_profit,\n        'total_costs': y1_total_costs,\n        'net_profit': y1_net_profit,\n        'profit_margin': round((y1_net_profit / y1_revenue * 100), 1) if y1_revenue > 0 else 0\n    })\n    \n    # Year 2: Growth phase\n    y2_customers_start = y1_total_customers\n    y2_new_customers_monthly = y1_new_customers_monthly * 2.5  # 150% growth\n    y2_customers = [y2_customers_start]\n    \n    for month in range(12):\n        new = y2_new_customers_monthly * (1 + month * 0.08)\n        churned = y2_customers[-1] * churn_rate\n        total = y2_customers[-1] + new - churned\n        y2_customers.append(total)\n    \n    y2_total_customers = int(y2_customers[-1])\n    y2_revenue = int(sum(y2_customers[1:]) * avg_monthly_price)\n    y2_gross_profit = int(y2_revenue * gross_margin)\n    \n    y2_cac_spend = int(sum(y2_new_customers_monthly * (1 + m * 0.08) for m in range(12)) * customer_acq_cost * 0.85)  # Better CAC\n    y2_fixed_costs = 350000  # Scaling team\n    y2_total_costs = y2_cac_spend + y2_fixed_costs\n    y2_net_profit = y2_gross_profit - y2_total_costs\n    \n    projections.append({\n        'year': 2,\n        'customers': y2_total_customers,\n        'revenue': y2_revenue,\n        'gross_profit': y2_gross_profit,\n        'total_costs': y2_total_costs,\n        'net_profit': y2_net_profit,\n        'profit_margin': round((y2_net_profit / y2_revenue * 100), 1) if y2_revenue > 0 else 0\n    })\n    \n    # Year 3: Scale phase\n    y3_customers_start = y2_total_customers\n    y3_new_customers_monthly = y2_new_customers_monthly * 2\n    y3_customers = [y3_customers_start]\n    \n    for month in range(12):\n        new = y3_new_customers_monthly * (1 + month * 0.05)\n        churned = y3_customers[-1] * churn_rate * 0.9  # Improved retention\n        total = y3_customers[-1] + new - churned\n        y3_customers.append(total)\n    \n    y3_total_customers = int(y3_customers[-1])\n    y3_revenue = int(sum(y3_customers[1:]) * avg_monthly_price * 1.1)  # Price increase\n    y3_gross_profit = int(y3_revenue * gross_margin)\n    \n    y3_cac_spend = int(sum(y3_new_customers_monthly * (1 + m * 0.05) for m in range(12)) * customer_acq_cost * 0.70)  # Efficient CAC\n    y3_fixed_costs = 600000  # Mature team\n    y3_total_costs = y3_cac_spend + y3_fixed_costs\n    y3_net_profit = y3_gross_profit - y3_total_costs\n    \n    projections.append({\n        'year': 3,\n        'customers': y3_total_customers,\n        'revenue': y3_revenue,\n        'gross_profit': y3_gross_profit,\n        'total_costs': y3_total_costs,\n        'net_profit': y3_net_profit,\n        'profit_margin': round((y3_net_profit / y3_revenue * 100), 1) if y3_revenue > 0 else 0\n    })\n    \n    # Funding requirements\n    max_negative_cashflow = abs(min(y1_net_profit, 0)) + 50000  # Buffer\n    \n    # Unit economics\n    ltv = (avg_monthly_price * 12 / churn_rate) if churn_rate > 0 else avg_monthly_price * 24\n    ltv_cac_ratio = ltv / customer_acq_cost if customer_acq_cost > 0 else 0\n    \n    result = {\n        'business_model': model_type,\n        'assumptions': {\n            'avg_monthly_revenue_per_customer': f'${avg_monthly_price}',\n            'customer_acquisition_cost': f'${customer_acq_cost}',\n            'monthly_churn_rate': f'{churn_rate * 100}%',\n            'gross_margin': f'{gross_margin * 100}%'\n        },\n        'unit_economics': {\n            'customer_lifetime_value': f'${int(ltv)}',\n            'ltv_to_cac_ratio': f'{ltv_cac_ratio:.1f}x',\n            'payback_period_months': int(customer_acq_cost / (avg_monthly_price * gross_margin)) if avg_monthly_price > 0 else 0,\n            'assessment': 'Excellent (>3x)' if ltv_cac_ratio > 3 else 'Good (2-3x)' if ltv_cac_ratio > 2 else 'Needs Improvement (<2x)'\n        },\n        'three_year_projections': projections,\n        'funding_required': {\n            'seed_funding_needed': f'${int(max_negative_cashflow):,}',\n            'use_of_funds': [\n                f'Product Development: ${int(max_negative_cashflow * 0.40):,} (40%)',\n                f'Marketing & Sales: ${int(max_negative_cashflow * 0.35):,} (35%)',\n                f'Operations & Team: ${int(max_negative_cashflow * 0.20):,} (20%)',\n                f'Reserve/Buffer: ${int(max_negative_cashflow * 0.05):,} (5%)'\n            ],\n            'runway_months': 18\n        },\n        'key_metrics': {\n            'break_even_customers': int(y1_fixed_costs / (avg_monthly_price * gross_margin * 12)) if avg_monthly_price > 0 else 0,\n            'year_1_burn_rate': f'${int(abs(y1_net_profit) / 12):,}/month' if y1_net_profit < 0 else '$0/month (profitable)',\n            'projected_profitability': f'Year {2 if y2_net_profit > 0 else 3 if y3_net_profit > 0 else \"3+\"}'\n        }\n    }\n    \n    return {'financial_model': json.dumps(result, indent=2)}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "financial_model": {
+              "type": "string",
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "required": [
+            "financial_model"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 2,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": {
+            "defaultStep": "0",
+            "errorStep": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "21_gtm_strategy",
+      "type": "21",
+      "meta": {
+        "position": {
+          "x": 800,
+          "y": 500
+        }
+      },
+      "data": {
+        "title": "Go-To-Market Strategist",
+        "max_iterations": 4,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a go-to-market strategy expert. Create a comprehensive GTM plan:\n\n1. POSITIONING:\n   - Value proposition\n   - Key messaging\n   - Brand positioning statement\n\n2. MARKETING STRATEGY:\n   - Customer acquisition channels\n   - Content strategy\n   - Social media strategy\n   - SEO/SEM approach\n   - Partnership opportunities\n\n3. SALES STRATEGY:\n   - Sales model (self-service, sales-led, hybrid)\n   - Pricing strategy\n   - Sales funnel\n\n4. LAUNCH PLAN:\n   - Pre-launch activities (90 days before)\n   - Launch day tactics\n   - Post-launch growth strategies\n\n5. SUCCESS METRICS:\n   - KPIs to track\n   - Growth milestones\n\nMake it actionable and specific."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Business idea: {{business_idea}}\n\nMarket research:\n{{market_research}}\n\nCompetitor analysis:\n{{competitor_analysis}}\n\nCreate a detailed go-to-market strategy."
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "business_idea": {
+              "type": "ref",
+              "content": [
+                "1_start",
+                "business_idea"
+              ],
+              "extra": {
+                "index": 0
+              }
+            },
+            "market_research": {
+              "type": "ref",
+              "content": [
+                "21_market_researcher",
+                "market_research"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "competitor_analysis": {
+              "type": "ref",
+              "content": [
+                "21_competitor_analyst",
+                "competitor_analysis"
+              ],
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "skillsParam": {
+            "plugins": []
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "gtm_strategy": {
+              "type": "string",
+              "extra": {
+                "index": 1
+              }
+            }
+          },
+          "required": [
+            "gtm_strategy"
+          ]
+        }
+      }
+    },
+    {
+      "id": "10_validation_score",
+      "type": "10",
+      "meta": {
+        "position": {
+          "x": 1150,
+          "y": 300
+        }
+      },
+      "data": {
+        "title": "Validation Score Calculator",
+        "inputs": {
+          "inputParameters": {
+            "market_research": {
+              "type": "ref",
+              "content": [
+                "21_market_researcher",
+                "market_research"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "competitor_analysis": {
+              "type": "ref",
+              "content": [
+                "21_competitor_analyst",
+                "competitor_analysis"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "feasibility_report": {
+              "type": "ref",
+              "content": [
+                "21_feasibility_analyst",
+                "feasibility_report"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "financial_model": {
+              "type": "ref",
+              "content": [
+                "10_financial_model",
+                "financial_model"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import json\n    import re\n    \n    market_research = args.params.get('market_research', '')\n    competitor_analysis = args.params.get('competitor_analysis', '')\n    feasibility_report = args.params.get('feasibility_report', '')\n    financial_model_raw = args.params.get('financial_model', '{}')\n    \n    # Parse financial model\n    try:\n        financial_model = json.loads(financial_model_raw) if isinstance(financial_model_raw, str) else financial_model_raw\n    except:\n        financial_model = {}\n    \n    # Scoring rubric (0-100)\n    scores = {}\n    \n    # 1. Market Opportunity (0-25 points)\n    market_score = 0\n    market_lower = market_research.lower()\n    \n    # Check for market size indicators\n    if any(word in market_lower for word in ['billion', 'growing', 'large market']):\n        market_score += 8\n    if any(word in market_lower for word in ['trend', 'increasing', 'demand']):\n        market_score += 7\n    if 'underserved' in market_lower or 'gap' in market_lower:\n        market_score += 10\n    \n    scores['market_opportunity'] = min(market_score, 25)\n    \n    # 2. Competitive Position (0-20 points)\n    competitive_score = 0\n    comp_lower = competitor_analysis.lower()\n    \n    if 'differentiation' in comp_lower or 'unique' in comp_lower:\n        competitive_score += 7\n    if 'advantage' in comp_lower or 'better' in comp_lower:\n        competitive_score += 6\n    if 'crowded' in comp_lower or 'saturated' in comp_lower:\n        competitive_score -= 5\n    if 'opportunity' in comp_lower or 'white space' in comp_lower:\n        competitive_score += 7\n    \n    scores['competitive_position'] = max(min(competitive_score, 20), 0)\n    \n    # 3. Financial Viability (0-25 points)\n    financial_score = 0\n    unit_econ = financial_model.get('unit_economics', {})\n    \n    ltv_cac_text = unit_econ.get('ltv_to_cac_ratio', '0x')\n    ltv_cac_ratio = float(re.search(r'([\\d.]+)', ltv_cac_text).group(1)) if re.search(r'([\\d.]+)', ltv_cac_text) else 0\n    \n    if ltv_cac_ratio >= 3:\n        financial_score += 15\n    elif ltv_cac_ratio >= 2:\n        financial_score += 10\n    elif ltv_cac_ratio >= 1:\n        financial_score += 5\n    \n    # Check profitability timeline\n    projections = financial_model.get('three_year_projections', [])\n    if projections:\n        if any(p.get('net_profit', -1) > 0 for p in projections[:2]):\n            financial_score += 10\n    \n    scores['financial_viability'] = min(financial_score, 25)\n    \n    # 4. Feasibility & Risk (0-20 points)\n    feasibility_score = 15  # Start optimistic\n    feas_lower = feasibility_report.lower()\n    \n    # Deduct for risks\n    risk_keywords = ['high risk', 'significant risk', 'major challenge', 'difficult', 'complex']\n    risk_count = sum(1 for keyword in risk_keywords if keyword in feas_lower)\n    feasibility_score -= min(risk_count * 3, 10)\n    \n    # Add for positive indicators\n    if 'feasible' in feas_lower or 'achievable' in feas_lower:\n        feasibility_score += 5\n    \n    scores['feasibility'] = max(min(feasibility_score, 20), 0)\n    \n    # 5. Execution Clarity (0-10 points)\n    # Based on how well-defined the idea is\n    execution_score = 8  # Default moderate score\n    scores['execution_clarity'] = execution_score\n    \n    # Total score\n    total_score = sum(scores.values())\n    \n    # Recommendation\n    if total_score >= 75:\n        recommendation = '🚀 HIGHLY RECOMMENDED - Strong opportunity with clear path to success'\n        color = 'GREEN'\n        action = 'Move forward aggressively. Start building MVP immediately.'\n    elif total_score >= 60:\n        recommendation = '✅ RECOMMENDED - Solid opportunity with manageable risks'\n        color = 'LIGHT_GREEN'\n        action = 'Proceed with validation. Build prototype and test with early users.'\n    elif total_score >= 45:\n        recommendation = '⚠️ PROCEED WITH CAUTION - Opportunity exists but significant challenges'\n        color = 'YELLOW'\n        action = 'Validate assumptions thoroughly. Address key risks before heavy investment.'\n    else:\n        recommendation = '❌ NOT RECOMMENDED - High risk, reconsider or pivot'\n        color = 'RED'\n        action = 'Rethink the idea or pivot significantly. Address fundamental issues.'\n    \n    # Strengths and weaknesses\n    strengths = []\n    weaknesses = []\n    \n    if scores['market_opportunity'] >= 18:\n        strengths.append('✓ Strong market opportunity with clear demand')\n    elif scores['market_opportunity'] < 12:\n        weaknesses.append('✗ Market opportunity unclear or limited')\n    \n    if scores['competitive_position'] >= 15:\n        strengths.append('✓ Differentiated positioning vs competitors')\n    elif scores['competitive_position'] < 10:\n        weaknesses.append('✗ Weak competitive positioning')\n    \n    if scores['financial_viability'] >= 18:\n        strengths.append('✓ Strong unit economics and financial model')\n    elif scores['financial_viability'] < 12:\n        weaknesses.append('✗ Financial viability concerns')\n    \n    if scores['feasibility'] >= 15:\n        strengths.append('✓ Technically and operationally feasible')\n    else:\n        weaknesses.append('✗ Significant execution risks')\n    \n    result = {\n        'validation_score': total_score,\n        'max_score': 100,\n        'grade': 'A' if total_score >= 85 else 'B' if total_score >= 70 else 'C' if total_score >= 55 else 'D' if total_score >= 40 else 'F',\n        'recommendation': recommendation,\n        'recommended_action': action,\n        'score_breakdown': {\n            'Market Opportunity (max 25)': scores['market_opportunity'],\n            'Competitive Position (max 20)': scores['competitive_position'],\n            'Financial Viability (max 25)': scores['financial_viability'],\n            'Feasibility & Risk (max 20)': scores['feasibility'],\n            'Execution Clarity (max 10)': scores['execution_clarity']\n        },\n        'strengths': strengths if strengths else ['✓ Opportunities exist, but require strategic focus'],\n        'weaknesses': weaknesses if weaknesses else ['✗ No major red flags identified'],\n        'critical_success_factors': [\n            '1. Validate product-market fit with real users',\n            '2. Build MVP focusing on core value proposition',\n            '3. Establish efficient customer acquisition channels',\n            '4. Monitor and optimize unit economics',\n            '5. Build strong founding team with complementary skills'\n        ]\n    }\n    \n    return {'validation_score': json.dumps(result, indent=2)}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "validation_score": {
+              "type": "string",
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "required": [
+            "validation_score"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 2,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": {
+            "defaultStep": "0",
+            "errorStep": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "10_master_plan",
+      "type": "10",
+      "meta": {
+        "position": {
+          "x": 1500,
+          "y": 350
+        }
+      },
+      "data": {
+        "title": "Master Launch Plan",
+        "inputs": {
+          "inputParameters": {
+            "business_idea": {
+              "type": "ref",
+              "content": [
+                "1_start",
+                "business_idea"
+              ],
+              "extra": {
+                "index": 0
+              }
+            },
+            "market_research": {
+              "type": "ref",
+              "content": [
+                "21_market_researcher",
+                "market_research"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "competitor_analysis": {
+              "type": "ref",
+              "content": [
+                "21_competitor_analyst",
+                "competitor_analysis"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "feasibility_report": {
+              "type": "ref",
+              "content": [
+                "21_feasibility_analyst",
+                "feasibility_report"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "financial_model": {
+              "type": "ref",
+              "content": [
+                "10_financial_model",
+                "financial_model"
+              ],
+              "extra": {
+                "index": 0
+              }
+            },
+            "gtm_strategy": {
+              "type": "ref",
+              "content": [
+                "21_gtm_strategy",
+                "gtm_strategy"
+              ],
+              "extra": {
+                "index": 1
+              }
+            },
+            "validation_score": {
+              "type": "ref",
+              "content": [
+                "10_validation_score",
+                "validation_score"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import json\n    from datetime import datetime\n    \n    business_idea = args.params.get('business_idea', '')\n    market_research = args.params.get('market_research', '')\n    competitor_analysis = args.params.get('competitor_analysis', '')\n    feasibility_report = args.params.get('feasibility_report', '')\n    financial_model_raw = args.params.get('financial_model', '{}')\n    gtm_strategy = args.params.get('gtm_strategy', '')\n    validation_score_raw = args.params.get('validation_score', '{}')\n    \n    # Parse JSON inputs\n    try:\n        financial_model = json.loads(financial_model_raw) if isinstance(financial_model_raw, str) else financial_model_raw\n    except:\n        financial_model = {}\n    \n    try:\n        validation = json.loads(validation_score_raw) if isinstance(validation_score_raw, str) else validation_score_raw\n    except:\n        validation = {}\n    \n    # Build comprehensive business plan\n    plan = f\"\"\"\n╔═══════════════════════════════════════════════════════════════════════════╗\n║              🚀 BUSINESS VALIDATION & LAUNCH PLAN 🚀                      ║\n║                    Generated: {datetime.now().strftime('%B %d, %Y')}                        ║\n╚═══════════════════════════════════════════════════════════════════════════╝\n\n\n💡 BUSINESS IDEA\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{business_idea}\n\n\n📊 VALIDATION SCORE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎯 OVERALL SCORE: {validation.get('validation_score', 0)}/100 (Grade: {validation.get('grade', 'N/A')})\n\n{validation.get('recommendation', 'Assessment pending')}\n\n📈 SCORE BREAKDOWN:\n\"\"\"\n    \n    for category, score in validation.get('score_breakdown', {}).items():\n        bar_length = int(score / 5)\n        bar = '█' * bar_length + '░' * (20 - bar_length)\n        plan += f\"   {category:.<45} {bar} {score}\\n\"\n    \n    plan += \"\\n✅ STRENGTHS:\\n\"\n    for strength in validation.get('strengths', []):\n        plan += f\"   {strength}\\n\"\n    \n    plan += \"\\n⚠️ AREAS TO ADDRESS:\\n\"\n    for weakness in validation.get('weaknesses', []):\n        plan += f\"   {weakness}\\n\"\n    \n    plan += f\"\"\"\n\n🎬 RECOMMENDED ACTION:\n{validation.get('recommended_action', 'Proceed with careful planning')}\n\n\n🌍 MARKET RESEARCH SUMMARY\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{market_research[:1500]}...\n\n[Full details in appendix]\n\n\n🏆 COMPETITIVE ANALYSIS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{competitor_analysis[:1500]}...\n\n[Full details in appendix]\n\n\n💰 FINANCIAL MODEL\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📋 BUSINESS MODEL: {financial_model.get('business_model', 'General')}\n\n💵 UNIT ECONOMICS:\n\"\"\"\n    \n    unit_econ = financial_model.get('unit_economics', {})\n    for key, value in unit_econ.items():\n        plan += f\"   {key.replace('_', ' ').title():.<50} {value}\\n\"\n    \n    plan += \"\\n📊 3-YEAR FINANCIAL PROJECTIONS:\\n\\n\"\n    plan += f\"{'YEAR':>6} {'CUSTOMERS':>12} {'REVENUE':>15} {'PROFIT':>15} {'MARGIN':>10}\\n\"\n    plan += \"-\" * 65 + \"\\n\"\n    \n    for proj in financial_model.get('three_year_projections', []):\n        year = proj.get('year', 0)\n        customers = proj.get('customers', 0)\n        revenue = proj.get('revenue', 0)\n        profit = proj.get('net_profit', 0)\n        margin = proj.get('profit_margin', 0)\n        plan += f\"{year:>6} {customers:>12,} ${revenue:>14,} ${profit:>14,} {margin:>9}%\\n\"\n    \n    funding = financial_model.get('funding_required', {})\n    plan += f\"\"\"\n\n💸 FUNDING REQUIREMENTS:\n   Seed Funding Needed: {funding.get('seed_funding_needed', 'TBD')}\n   Runway: {funding.get('runway_months', 18)} months\n\n   Use of Funds:\n\"\"\"\n    \n    for use in funding.get('use_of_funds', []):\n        plan += f\"   • {use}\\n\"\n    \n    plan += f\"\"\"\n\n\n🎯 GO-TO-MARKET STRATEGY\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{gtm_strategy[:2000]}...\n\n[Full strategy in appendix]\n\n\n⚠️ RISK ANALYSIS & MITIGATION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{feasibility_report[:1500]}...\n\n[Full risk assessment in appendix]\n\n\n📅 12-MONTH EXECUTION ROADMAP\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🗓️ MONTHS 0-3: VALIDATION & FOUNDATION\n   □ Conduct 50+ customer interviews\n   □ Build landing page and collect emails\n   □ Develop detailed product specs\n   □ Assemble founding team\n   □ Register business entity\n   □ Open business bank account\n   □ Set up basic accounting/legal\n   □ Create brand identity (logo, colors, voice)\n   □ Secure initial funding (angels/friends/family)\n\n🗓️ MONTHS 4-6: MVP DEVELOPMENT\n   □ Build minimum viable product\n   □ Implement core features only\n   □ Set up analytics and tracking\n   □ Develop onboarding flow\n   □ Create help documentation\n   □ Beta test with 20-50 users\n   □ Iterate based on feedback\n   □ Establish pricing model\n   □ Build email/notification system\n\n🗓️ MONTHS 7-9: SOFT LAUNCH\n   □ Launch to limited audience (100-500 users)\n   □ Activate content marketing (blog, SEO)\n   □ Start social media presence\n   □ Implement referral program\n   □ Monitor key metrics daily\n   □ A/B test pricing and messaging\n   □ Gather testimonials and case studies\n   □ Refine product based on usage data\n   □ Build customer support system\n\n🗓️ MONTHS 10-12: SCALE & OPTIMIZE\n   □ Public launch with PR push\n   □ Scale paid acquisition channels\n   □ Launch partnership program\n   □ Implement advanced features\n   □ Hire key team members\n   □ Raise seed/Series A funding\n   □ Expand marketing efforts\n   □ Build community (Slack, Discord, forum)\n   □ Plan Year 2 expansion\n\n\n🎯 CRITICAL SUCCESS FACTORS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\"\"\"\n    \n    for i, factor in enumerate(validation.get('critical_success_factors', []), 1):\n        plan += f\"   {factor}\\n\"\n    \n    plan += \"\"\"\n\n\n📈 KEY METRICS TO TRACK (WEEKLY)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📊 ACQUISITION METRICS:\n   • Website visitors\n   • Sign-up conversion rate\n   • Customer acquisition cost (CAC)\n   • Traffic sources breakdown\n   • Lead-to-customer conversion\n\n💰 REVENUE METRICS:\n   • Monthly recurring revenue (MRR)\n   • Average revenue per user (ARPU)\n   • Customer lifetime value (LTV)\n   • LTV:CAC ratio\n\n📱 ENGAGEMENT METRICS:\n   • Daily/monthly active users\n   • Feature adoption rates\n   • Session length and frequency\n   • User retention (Day 1, 7, 30)\n\n😊 SATISFACTION METRICS:\n   • Net Promoter Score (NPS)\n   • Customer satisfaction score (CSAT)\n   • Churn rate\n   • Support ticket volume\n\n\n🏢 TEAM BUILDING PRIORITIES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nFOUNDING TEAM (Months 0-3):\n   ✓ CEO/Founder (Vision & Strategy)\n   ✓ CTO/Technical Co-founder (Product Development)\n   ✓ Designer/Product Manager (User Experience)\n\nEARLY HIRES (Months 4-9):\n   • Full-stack developer\n   • Marketing/Growth lead\n   • Customer success manager\n\nSCALE HIRES (Months 10-12):\n   • Sales lead\n   • Additional developers\n   • Data analyst\n   • Operations manager\n\n\n💡 QUICK WINS (FIRST 30 DAYS)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n   1. ✓ Set up social media profiles\n   2. ✓ Create simple landing page with email capture\n   3. ✓ Join relevant online communities (Reddit, Facebook groups)\n   4. ✓ Interview 10 potential customers\n   5. ✓ Write down detailed product vision\n   6. ✓ Research domain name and secure it\n   7. ✓ Set up project management tool (Notion, Asana)\n   8. ✓ Create 90-day detailed plan\n   9. ✓ Identify 3 potential advisors/mentors\n   10. ✓ Calculate detailed unit economics\n\n\n📚 RECOMMENDED RESOURCES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📖 BOOKS:\n   • \"The Lean Startup\" by Eric Ries\n   • \"Zero to One\" by Peter Thiel\n   • \"The Mom Test\" by Rob Fitzpatrick\n   • \"Traction\" by Gabriel Weinberg\n\n🎓 COURSES:\n   • Y Combinator Startup School (free)\n   • How to Start a Startup (YC, free on YouTube)\n\n🛠️ TOOLS:\n   • Figma (design)\n   • Notion (planning)\n   • Stripe (payments)\n   • Mixpanel/Amplitude (analytics)\n   • Intercom (customer support)\n\n👥 COMMUNITIES:\n   • Indie Hackers\n   • Product Hunt\n   • Reddit r/startups\n   • Local startup meetups\n\n\n╔═══════════════════════════════════════════════════════════════════════════╗\n║                         🎯 NEXT STEPS 🎯                                  ║\n╚═══════════════════════════════════════════════════════════════════════════╝\n\n1. 🗣️ TALK TO CUSTOMERS (Week 1)\n   → Interview 20+ potential customers this week\n   → Validate problem and solution fit\n   → Document insights\n\n2. 📝 REFINE CONCEPT (Week 2)\n   → Update business model based on feedback\n   → Finalize core features for MVP\n   → Create detailed product specs\n\n3. 🏗️ BUILD MVP (Weeks 3-8)\n   → Start with no-code tools if possible\n   → Focus on core value proposition only\n   → Set weekly milestones\n\n4. 🚀 GET FIRST USERS (Week 9+)\n   → Soft launch to friends/network\n   → Collect feedback ruthlessly\n   → Iterate rapidly\n\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\"The best time to plant a tree was 20 years ago. The second best time is now.\"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✨ Generated by AI Business Validator & Launch Plan Generator ✨\n📧 Share this plan with your co-founders and advisors!\n🔖 Review and update quarterly as you learn!\n\n\n═══════════════════════════════════════════════════════════════════════════════\nAPPENDIX: DETAILED ANALYSIS\n═══════════════════════════════════════════════════════════════════════════════\n\n📄 A. FULL MARKET RESEARCH\n{'-' * 75}\n{market_research}\n\n\n📄 B. FULL COMPETITIVE ANALYSIS\n{'-' * 75}\n{competitor_analysis}\n\n\n📄 C. FULL FEASIBILITY REPORT\n{'-' * 75}\n{feasibility_report}\n\n\n📄 D. FULL GO-TO-MARKET STRATEGY\n{'-' * 75}\n{gtm_strategy}\n\"\"\"\n    \n    return {'master_plan': plan}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "master_plan": {
+              "type": "string",
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "required": [
+            "master_plan"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 2,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": {
+            "defaultStep": "0",
+            "errorStep": "1"
+          }
+        }
+      }
+    },
+    {
+      "id": "2_end",
+      "type": "2",
+      "meta": {
+        "position": {
+          "x": 1850,
+          "y": 400
+        }
+      },
+      "data": {
+        "title": "End: Launch Plan",
+        "inputs": {
+          "inputParameters": {
+            "result": {
+              "type": "ref",
+              "content": [
+                "10_master_plan",
+                "master_plan"
+              ],
+              "extra": {
+                "index": 0
+              }
+            }
+          },
+          "content": {
+            "type": "template",
+            "content": "{{result}}"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeID": "1_start",
+      "targetNodeID": "21_market_researcher"
+    },
+    {
+      "sourceNodeID": "1_start",
+      "targetNodeID": "21_competitor_analyst"
+    },
+    {
+      "sourceNodeID": "1_start",
+      "targetNodeID": "21_feasibility_analyst"
+    },
+    {
+      "sourceNodeID": "1_start",
+      "targetNodeID": "10_financial_model"
+    },
+    {
+      "sourceNodeID": "21_market_researcher",
+      "targetNodeID": "10_financial_model"
+    },
+    {
+      "sourceNodeID": "1_start",
+      "targetNodeID": "21_gtm_strategy"
+    },
+    {
+      "sourceNodeID": "21_market_researcher",
+      "targetNodeID": "21_gtm_strategy"
+    },
+    {
+      "sourceNodeID": "21_competitor_analyst",
+      "targetNodeID": "21_gtm_strategy"
+    },
+    {
+      "sourceNodeID": "21_market_researcher",
+      "targetNodeID": "10_validation_score"
+    },
+    {
+      "sourceNodeID": "21_competitor_analyst",
+      "targetNodeID": "10_validation_score"
+    },
+    {
+      "sourceNodeID": "21_feasibility_analyst",
+      "targetNodeID": "10_validation_score"
+    },
+    {
+      "sourceNodeID": "10_financial_model",
+      "targetNodeID": "10_validation_score",
+      "sourcePortID": "0"
+    },
+    {
+      "sourceNodeID": "1_start",
+      "targetNodeID": "10_master_plan"
+    },
+    {
+      "sourceNodeID": "21_market_researcher",
+      "targetNodeID": "10_master_plan"
+    },
+    {
+      "sourceNodeID": "21_competitor_analyst",
+      "targetNodeID": "10_master_plan"
+    },
+    {
+      "sourceNodeID": "21_feasibility_analyst",
+      "targetNodeID": "10_master_plan"
+    },
+    {
+      "sourceNodeID": "10_financial_model",
+      "targetNodeID": "10_master_plan",
+      "sourcePortID": "0"
+    },
+    {
+      "sourceNodeID": "21_gtm_strategy",
+      "targetNodeID": "10_master_plan"
+    },
+    {
+      "sourceNodeID": "10_validation_score",
+      "targetNodeID": "10_master_plan",
+      "sourcePortID": "0"
+    },
+    {
+      "sourceNodeID": "10_master_plan",
+      "targetNodeID": "2_end",
+      "sourcePortID": "0"
+    }
+  ],
+  "plugins": [],
+  "model_references": {}
+}

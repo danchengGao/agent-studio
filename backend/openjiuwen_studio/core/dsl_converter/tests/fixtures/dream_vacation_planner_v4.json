@@ -1,0 +1,1027 @@
+{
+  "nodes": [
+    {
+      "id": "1_start",
+      "type": "1",
+      "meta": { "position": { "x": 50, "y": 600 } },
+      "data": {
+        "title": "Start: Travel Preferences",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "preferences": {
+              "type": "string",
+              "default": "Budget: $3000, Duration: 7 days, Interests: culture, food, adventure, Travel dates: July 2025",
+              "description": "Enter your travel preferences (budget, duration, interests, travel dates)"
+            }
+          },
+          "required": ["preferences"]
+        }
+      }
+    },
+    {
+      "id": "10_preference_parser",
+      "type": "10",
+      "meta": { "position": { "x": 300, "y": 600 } },
+      "data": {
+        "title": "Preference Parser",
+        "inputs": {
+          "inputParameters": {
+            "preferences": {
+              "type": "ref",
+              "content": ["1_start", "preferences"],
+              "extra": { "index": 0 }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import re\n    import json\n    from datetime import datetime\n\n    raw = args.params.get('preferences', '')\n\n    # Budget\n    budget_match = re.search(r'[Bb]udget[:\\s]*\\$?([\\d,]+)', raw)\n    budget = int(budget_match.group(1).replace(',', '')) if budget_match else 3000\n\n    # Duration\n    dur_match = re.search(r'(\\d+)\\s*days?', raw)\n    days = int(dur_match.group(1)) if dur_match else 7\n\n    # Interests\n    interests_match = re.search(r'[Ii]nterests?[:\\s]+([^,\\n]+(?:,[^,\\n]+)*)', raw)\n    interests = [i.strip() for i in interests_match.group(1).split(',')] if interests_match else ['sightseeing']\n\n    # Travel dates\n    date_match = re.search(r'[Tt]ravel\\s+dates?[:\\s]+([^,\\n]+)', raw)\n    travel_dates = date_match.group(1).strip() if date_match else 'flexible'\n\n    # Travel tier\n    daily_budget = budget / days if days > 0 else 0\n    if daily_budget < 150:\n        tier = 'budget'\n        accommodation_style = 'hostels and budget hotels'\n        dining_style = 'street food and local markets'\n    elif daily_budget < 300:\n        tier = 'mid-range'\n        accommodation_style = 'mid-range hotels and boutique stays'\n        dining_style = 'local restaurants and occasional fine dining'\n    else:\n        tier = 'luxury'\n        accommodation_style = '4-5 star hotels and unique luxury stays'\n        dining_style = 'fine dining and curated culinary experiences'\n\n    structured = {\n        'raw': raw,\n        'budget_usd': budget,\n        'duration_days': days,\n        'daily_budget_usd': round(daily_budget, 0),\n        'travel_tier': tier,\n        'interests': interests,\n        'travel_dates': travel_dates,\n        'accommodation_style': accommodation_style,\n        'dining_style': dining_style,\n        'summary': f'{days}-day {tier} trip with ${budget} budget, focusing on: {\", \".join(interests)}. Dates: {travel_dates}.'\n    }\n\n    return {\n        'structured_preferences': json.dumps(structured, indent=2),\n        'preferences': raw\n    }"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "structured_preferences": { "type": "string", "extra": { "index": 0 } },
+            "preferences": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["structured_preferences", "preferences"]
+        },
+        "exceptionConfig": {
+          "retryTimes": 1,
+          "timeoutSeconds": 15,
+          "processType": "break",
+          "executeStep": { "defaultStep": "0", "errorStep": "1" }
+        }
+      }
+    },
+    {
+      "id": "21_destination_scout",
+      "type": "21",
+      "meta": { "position": { "x": 600, "y": 600 } },
+      "data": {
+        "title": "Destination Scout",
+        "max_iterations": 5,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are an expert travel advisor. Based on the user's structured preferences, research and recommend the TOP 3 destinations that perfectly match their budget, interests, travel tier, and travel style. For each destination:\n- Explain why it's perfect for them\n- Provide cost estimates aligned to their tier\n- Highlight unique experiences matching their interests\n- Note best time to visit\n- Include insider tips\n\nSearch for current travel trends, hidden gems, and authentic experiences."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Find the perfect destinations based on these structured preferences:\n{{structured_preferences}}\n\nRaw preferences: {{preferences}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "structured_preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "structured_preferences"],
+              "extra": { "index": 0 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-travel-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "destinations": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["destinations"]
+        }
+      }
+    },
+    {
+      "id": "21_weather_climate",
+      "type": "21",
+      "meta": { "position": { "x": 980, "y": 50 } },
+      "data": {
+        "title": "Weather & Climate Advisor",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a climate and weather expert. For each recommended destination, research:\n- Current weather patterns and forecasts for the travel dates\n- Best months to visit\n- What to pack for the climate\n- Seasonal events or festivals\n- Weather-related travel tips and warnings\n\nProvide practical, actionable weather advice."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Analyze weather and best visiting times for:\n{{destinations}}\n\nTravel dates: {{travel_dates}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "travel_dates": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-weather-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "weather_info": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["weather_info"]
+        }
+      }
+    },
+    {
+      "id": "21_local_expert",
+      "type": "21",
+      "meta": { "position": { "x": 980, "y": 250 } },
+      "data": {
+        "title": "Local Culture Expert",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a cultural expert and local insider. Research and provide:\n\n1. CULTURAL ETIQUETTE:\n   - Do's and don'ts\n   - Tipping customs\n   - Dress codes\n   - Social norms\n\n2. USEFUL PHRASES:\n   - 10 essential phrases in local language with pronunciation\n\n3. SAFETY TIPS:\n   - Areas to avoid\n   - Common scams targeting tourists\n   - Emergency numbers\n\n4. LOCAL SECRETS:\n   - Hidden gems tourists miss\n   - Best local food spots\n   - Money-saving tips\n\nMake travelers feel like locals!"
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Provide cultural insights and local knowledge for:\n{{destinations}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-culture-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "culture_guide": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["culture_guide"]
+        }
+      }
+    },
+    {
+      "id": "21_visa_requirements",
+      "type": "21",
+      "meta": { "position": { "x": 980, "y": 450 } },
+      "data": {
+        "title": "Visa & Entry Requirements",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a travel documentation and visa specialist. For each recommended destination, research and provide:\n\n1. VISA REQUIREMENTS:\n   - Visa-free / visa-on-arrival / e-visa / embassy visa\n   - Processing time and cost\n   - Required documents checklist\n\n2. PASSPORT REQUIREMENTS:\n   - Minimum validity and blank pages needed\n\n3. HEALTH & VACCINATIONS:\n   - Required and recommended vaccinations\n   - Malaria risk and prophylaxis\n   - Health insurance requirements\n\n4. ENTRY RULES:\n   - Customs allowances\n   - Currency import limits\n   - Prohibited items\n\nAlways advise verifying with official embassy sources."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Research visa, entry, and health requirements for:\n{{destinations}}\n\nTravel preferences: {{preferences}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-visa-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "visa_info": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["visa_info"]
+        }
+      }
+    },
+    {
+      "id": "21_accommodation_scout",
+      "type": "21",
+      "meta": { "position": { "x": 980, "y": 650 } },
+      "data": {
+        "title": "Accommodation Scout",
+        "max_iterations": 4,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a travel accommodation specialist. Research the best places to stay for the given destination and budget. Provide:\n\n1. HOTEL OPTIONS (3 tiers): budget / mid-range / luxury — name, area, price/night, pros/cons\n2. ALTERNATIVE STAYS: Airbnb neighbourhoods, boutique hotels, unique stays\n3. LOCATION ADVICE: best neighbourhoods, areas to avoid, transport links\n4. BOOKING TIPS: best platforms, how far in advance, cancellation policy advice\n\nTailor recommendations precisely to the traveler's budget tier."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Find the best accommodation for:\n{{destinations}}\n\nStructured preferences: {{structured_preferences}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "structured_preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "structured_preferences"],
+              "extra": { "index": 0 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-accommodation-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "accommodation_options": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["accommodation_options"]
+        }
+      }
+    },
+    {
+      "id": "21_event_calendar",
+      "type": "21",
+      "meta": { "position": { "x": 980, "y": 850 } },
+      "data": {
+        "title": "Events & Festivals Calendar",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a local events and entertainment specialist. Research what is happening at the destination during the traveler's visit. Provide:\n\n1. FESTIVALS & CULTURAL EVENTS:\n   - Local festivals and their dates\n   - Religious or national holidays\n   - Traditional ceremonies open to tourists\n\n2. CONCERTS & PERFORMANCES:\n   - Major concerts or music festivals\n   - Theatre, opera, dance performances\n   - Comedy shows and local entertainment\n\n3. SPORTS EVENTS:\n   - Major sporting fixtures during the travel period\n   - How to get tickets\n   - Viewing venues and fan zones\n\n4. SEASONAL HIGHLIGHTS:\n   - What is uniquely special about this destination at this time of year\n   - Limited-time exhibitions or installations\n   - Pop-up markets and seasonal experiences\n\n5. PRACTICAL INFO:\n   - How to book tickets in advance\n   - Price ranges\n   - Dress codes for events\n   - What to avoid during busy event days (crowds, prices, transport)\n\nAlign event suggestions to the traveler's interests."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "What events, festivals, and activities are happening at:\n{{destinations}}\n\nDuring: {{travel_dates}}\n\nTraveler interests: {{preferences}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "travel_dates": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-events-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "event_calendar": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["event_calendar"]
+        }
+      }
+    },
+    {
+      "id": "21_health_safety",
+      "type": "21",
+      "meta": { "position": { "x": 980, "y": 1050 } },
+      "data": {
+        "title": "Health & Safety Briefing",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a travel health and safety expert. For each recommended destination, research and provide:\n\n1. HEALTH RISKS:\n   - Common travel illnesses in this region\n   - Food and water safety\n   - Air quality and environmental hazards\n   - Sun and heat precautions\n\n2. MEDICAL FACILITIES:\n   - Quality of local healthcare\n   - Nearest international-standard hospitals\n   - 24-hour pharmacies and what to find there\n   - Cost of medical treatment (with and without insurance)\n\n3. SAFETY OVERVIEW:\n   - Current travel advisories\n   - Crime levels and types to watch for\n   - Natural disaster risks (earthquakes, floods, etc.)\n   - Safe vs. unsafe neighbourhoods\n\n4. EMERGENCY PREPAREDNESS:\n   - Local emergency numbers (police, ambulance, fire)\n   - Location of nearest embassy/consulate\n   - What to do if your passport is stolen\n   - How to contact your travel insurance in an emergency\n\n5. SOLO & FAMILY TRAVELER TIPS:\n   - Specific advice for solo travelers\n   - Child-safety considerations\n   - Accessibility for travelers with mobility needs\n\nBe factual and balanced — reassure where safe, warn where genuinely risky."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Provide a health and safety briefing for travelers visiting:\n{{destinations}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-safety-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "health_safety_info": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["health_safety_info"]
+        }
+      }
+    },
+    {
+      "id": "21_itinerary_builder",
+      "type": "21",
+      "meta": { "position": { "x": 1400, "y": 600 } },
+      "data": {
+        "title": "Itinerary Architect",
+        "max_iterations": 5,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a master travel planner. Create a detailed DAY-BY-DAY itinerary for the TOP recommended destination, incorporating all available research. Include:\n\nFor EACH DAY:\n- Morning activities (7am-12pm)\n- Afternoon experiences (12pm-5pm)\n- Evening plans (5pm-10pm)\n- Where to stay that night\n- Restaurant recommendations\n- Key events or festivals happening that day\n- Estimated costs\n- Transportation tips\n- Health and safety notes if relevant\n- Pro tips and insider secrets\n\nBalance must-see attractions with local experiences and any events from the calendar. Factor in weather, cultural etiquette, visa/health notes, and available accommodation. Make it realistic and achievable."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Structured preferences:\n{{structured_preferences}}\n\nDestinations researched:\n{{destinations}}\n\nWeather info:\n{{weather_info}}\n\nCultural insights:\n{{culture_guide}}\n\nVisa & entry requirements:\n{{visa_info}}\n\nAccommodation options:\n{{accommodation_options}}\n\nEvents & festivals calendar:\n{{event_calendar}}\n\nHealth & safety briefing:\n{{health_safety_info}}\n\nCreate a perfect day-by-day itinerary incorporating all of the above."
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "structured_preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "structured_preferences"],
+              "extra": { "index": 0 }
+            },
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "weather_info": {
+              "type": "ref",
+              "content": ["21_weather_climate", "weather_info"],
+              "extra": { "index": 1 }
+            },
+            "culture_guide": {
+              "type": "ref",
+              "content": ["21_local_expert", "culture_guide"],
+              "extra": { "index": 1 }
+            },
+            "visa_info": {
+              "type": "ref",
+              "content": ["21_visa_requirements", "visa_info"],
+              "extra": { "index": 1 }
+            },
+            "accommodation_options": {
+              "type": "ref",
+              "content": ["21_accommodation_scout", "accommodation_options"],
+              "extra": { "index": 1 }
+            },
+            "event_calendar": {
+              "type": "ref",
+              "content": ["21_event_calendar", "event_calendar"],
+              "extra": { "index": 1 }
+            },
+            "health_safety_info": {
+              "type": "ref",
+              "content": ["21_health_safety", "health_safety_info"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-itinerary-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "itinerary": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["itinerary"]
+        }
+      }
+    },
+    {
+      "id": "21_restaurant_guide",
+      "type": "21",
+      "meta": { "position": { "x": 1750, "y": 400 } },
+      "data": {
+        "title": "Food & Restaurant Guide",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a culinary travel expert and food critic. Create a comprehensive food guide for the destination. Include:\n\n1. MUST-TRY DISHES: 10 iconic local dishes with descriptions, where to find the best version, average price\n2. RESTAURANT RECOMMENDATIONS by meal: best breakfast spots, casual local lunch, fine dining, street food markets, late-night eats\n3. DIETARY CONSIDERATIONS: vegetarian/vegan, gluten-free, halal/kosher, common allergens\n4. FOOD MARKET & NEIGHBOURHOOD GUIDE: best markets, foodie neighbourhoods, cooking class recommendations\n5. DRINK CULTURE: local beers, wines, spirits, coffee culture, non-alcoholic local drinks, best bar areas\n\nBe specific with restaurant names, neighbourhoods, and price ranges."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Create a detailed food and restaurant guide aligned with this itinerary:\n\n{{itinerary}}\n\nDestinations: {{destinations}}\nDining style preference: {{preferences}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "itinerary": {
+              "type": "ref",
+              "content": ["21_itinerary_builder", "itinerary"],
+              "extra": { "index": 1 }
+            },
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-food-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "restaurant_guide": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["restaurant_guide"]
+        }
+      }
+    },
+    {
+      "id": "21_transport_planner",
+      "type": "21",
+      "meta": { "position": { "x": 1750, "y": 800 } },
+      "data": {
+        "title": "Transport Planner",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a transport and logistics travel expert. Create a comprehensive transport plan. Include:\n\n1. GETTING THERE: best airlines, flight routes, duration, booking platforms, airport transfer options\n2. GETTING AROUND: public transport overview, transport passes/cards with prices, taxi/rideshare apps, bike/scooter rental, walking viability\n3. DAY TRIPS & EXCURSIONS: recommended day trips, best transport for each, cost and time estimates\n4. TRANSPORT APPS & TIPS: local apps to download, ticket validation, rush hour times, luggage storage\n5. GETTING HOME: recommended airport departure time, check-in tips, airport lounges\n\nBe specific with route numbers, prices, and timing."
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Create a comprehensive transport plan for:\n\n{{itinerary}}\n\nDestinations: {{destinations}}\nBudget and duration: {{preferences}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "itinerary": {
+              "type": "ref",
+              "content": ["21_itinerary_builder", "itinerary"],
+              "extra": { "index": 1 }
+            },
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-transport-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "transport_plan": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["transport_plan"]
+        }
+      }
+    },
+    {
+      "id": "10_budget_calculator",
+      "type": "10",
+      "meta": { "position": { "x": 2100, "y": 600 } },
+      "data": {
+        "title": "Budget & Cost Analyzer",
+        "inputs": {
+          "inputParameters": {
+            "structured_preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "structured_preferences"],
+              "extra": { "index": 0 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_preference_parser", "preferences"],
+              "extra": { "index": 1 }
+            },
+            "destinations": {
+              "type": "ref",
+              "content": ["21_destination_scout", "destinations"],
+              "extra": { "index": 1 }
+            },
+            "weather_info": {
+              "type": "ref",
+              "content": ["21_weather_climate", "weather_info"],
+              "extra": { "index": 1 }
+            },
+            "itinerary": {
+              "type": "ref",
+              "content": ["21_itinerary_builder", "itinerary"],
+              "extra": { "index": 1 }
+            },
+            "culture_guide": {
+              "type": "ref",
+              "content": ["21_local_expert", "culture_guide"],
+              "extra": { "index": 1 }
+            },
+            "visa_info": {
+              "type": "ref",
+              "content": ["21_visa_requirements", "visa_info"],
+              "extra": { "index": 1 }
+            },
+            "accommodation_options": {
+              "type": "ref",
+              "content": ["21_accommodation_scout", "accommodation_options"],
+              "extra": { "index": 1 }
+            },
+            "restaurant_guide": {
+              "type": "ref",
+              "content": ["21_restaurant_guide", "restaurant_guide"],
+              "extra": { "index": 1 }
+            },
+            "transport_plan": {
+              "type": "ref",
+              "content": ["21_transport_planner", "transport_plan"],
+              "extra": { "index": 1 }
+            },
+            "event_calendar": {
+              "type": "ref",
+              "content": ["21_event_calendar", "event_calendar"],
+              "extra": { "index": 1 }
+            },
+            "health_safety_info": {
+              "type": "ref",
+              "content": ["21_health_safety", "health_safety_info"],
+              "extra": { "index": 1 }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import re\n    import json\n\n    preferences = args.params.get('preferences', '')\n    structured_raw = args.params.get('structured_preferences', '{}')\n    itinerary = args.params.get('itinerary', '')\n    visa_info = args.params.get('visa_info', '')\n\n    try:\n        sp = json.loads(structured_raw)\n    except:\n        sp = {}\n\n    budget = sp.get('budget_usd', 3000)\n    days = sp.get('duration_days', 7)\n    tier = sp.get('travel_tier', 'mid-range')\n\n    # Fallback parsing from raw preferences if structured missing\n    if not sp:\n        bm = re.search(r'[Bb]udget[:\\s]*\\$?([\\d,]+)', preferences)\n        budget = int(bm.group(1).replace(',', '')) if bm else 3000\n        dm = re.search(r'(\\d+)\\s*days?', preferences)\n        days = int(dm.group(1)) if dm else 7\n        daily = budget / days if days else 0\n        tier = 'budget' if daily < 150 else ('luxury' if daily >= 300 else 'mid-range')\n\n    tier_key = 'budget' if 'budget' in tier else ('luxury' if 'luxury' in tier else 'mid')\n\n    flights       = {'budget': 400,  'mid': 800,  'luxury': 1500}[tier_key]\n    acc_ppn       = {'budget': 50,   'mid': 120,  'luxury': 300}[tier_key]\n    food_ppd      = {'budget': 30,   'mid': 60,   'luxury': 120}[tier_key]\n    activities_ppd= {'budget': 20,   'mid': 50,   'luxury': 100}[tier_key]\n    transport_ppd = {'budget': 10,   'mid': 25,   'luxury': 50}[tier_key]\n    shopping_ppd  = {'budget': 15,   'mid': 40,   'luxury': 100}[tier_key]\n\n    accommodation = acc_ppn * days\n    food          = food_ppd * days\n    activities    = activities_ppd * days\n    transport     = transport_ppd * days\n    shopping      = shopping_ppd * days\n\n    visa_cost = 0\n    if 'visa on arrival' in visa_info.lower() or 'e-visa' in visa_info.lower():\n        visa_cost = 50\n    elif 'visa required' in visa_info.lower() or 'embassy' in visa_info.lower():\n        visa_cost = 100\n\n    insurance = max(50, int(budget * 0.04))\n\n    # Event ticket budget estimate\n    event_budget = {'budget': 30, 'mid': 80, 'luxury': 200}[tier_key]\n\n    subtotal = flights + accommodation + food + activities + transport + shopping + visa_cost + insurance + event_budget\n    emergency = subtotal * 0.10\n    total = subtotal + emergency\n\n    difference = budget - total\n    status = 'UNDER BUDGET ✓' if difference >= 0 else 'OVER BUDGET ⚠'\n\n    packing_essentials = [\n        '✓ Passport & certified copies',\n        '✓ Visa documents (if required)',\n        '✓ Travel insurance documents & emergency number',\n        '✓ Credit/debit cards + emergency cash',\n        '✓ Phone, chargers & travel adapter',\n        '✓ Prescription medications (with doctor note)',\n        '✓ Basic first aid kit'\n    ]\n    packing_clothing = [\n        f'✓ {days} days of casual outfits',\n        '✓ Comfortable walking shoes',\n        '✓ Light jacket/sweater',\n        '✓ Swimwear (if applicable)',\n        '✓ 1 smart/formal outfit for events or fine dining'\n    ]\n    packing_extras = [\n        '✓ Camera & SD cards',\n        '✓ Reusable water bottle',\n        '✓ Portable charger / power bank',\n        '✓ Sunscreen SPF 50+ & sunglasses',\n        '✓ Day backpack',\n        '✓ Toiletries (travel size)',\n        '✓ Padlock for lockers',\n        '✓ Offline map downloaded'\n    ]\n    if 'beach' in itinerary.lower() or 'swim' in itinerary.lower():\n        packing_extras.append('✓ Beach towel & flip flops')\n    if 'hike' in itinerary.lower() or 'trek' in itinerary.lower():\n        packing_extras.append('✓ Hiking boots & moisture-wicking socks')\n    if 'malaria' in visa_info.lower() or 'mosquito' in visa_info.lower():\n        packing_extras.append('✓ DEET mosquito repellent & net')\n    if 'cold' in itinerary.lower() or 'snow' in itinerary.lower():\n        packing_extras.append('✓ Thermal layers & waterproof jacket')\n\n    result = {\n        'budget_breakdown': {\n            '✈️  Flights':                    f'${flights:,.0f}',\n            f'🏨  Accommodation ({days} nights)': f'${accommodation:,.0f}',\n            '🍽️  Food & Dining':               f'${food:,.0f}',\n            '🎯  Activities & Tours':           f'${activities:,.0f}',\n            '🚕  Local Transport':              f'${transport_ppd * days:,.0f}',\n            '🛍️  Shopping & Souvenirs':         f'${shopping:,.0f}',\n            '🎟️  Events & Entertainment':       f'${event_budget:,.0f}',\n            '📄  Visa Fees':                    f'${visa_cost:,.0f}',\n            '🛡️  Travel Insurance':             f'${insurance:,.0f}',\n            '💰  Emergency Buffer (10%)':       f'${emergency:,.0f}',\n            '━━━━━━━━━━━━━━━━━━━': '━━━━━━━━━━',\n            '📊  TOTAL ESTIMATED':              f'${total:,.0f}'\n        },\n        'budget_analysis': {\n            'your_budget':    f'${budget:,.0f}',\n            'estimated_cost': f'${total:,.0f}',\n            'difference':     f'${abs(difference):,.0f}',\n            'status':         status,\n            'daily_spending': f'${total/days:,.0f} per day',\n            'tier':           tier.upper()\n        },\n        'packing_list': {\n            'essentials': packing_essentials,\n            'clothing':   packing_clothing,\n            'extras':     packing_extras\n        },\n        'money_tips': [\n            '💡 Book flights 6-8 weeks in advance for best prices',\n            '💡 Use local public transport instead of taxis',\n            '💡 Eat at local markets for authentic & cheap meals',\n            '💡 Free walking tours are great for orientation',\n            '💡 Get a local SIM card instead of paying for roaming',\n            '💡 Book accommodation with free cancellation first, then lock in once certain',\n            '💡 Buy event tickets in advance — popular shows sell out',\n            '💡 Check if your credit card includes travel insurance'\n        ]\n    }\n\n    return {\n        'budget_data':          json.dumps(result, indent=2),\n        'structured_preferences': args.params.get('structured_preferences', ''),\n        'preferences':          preferences,\n        'destinations':         args.params.get('destinations', ''),\n        'weather_info':         args.params.get('weather_info', ''),\n        'itinerary':            itinerary,\n        'culture_guide':        args.params.get('culture_guide', ''),\n        'visa_info':            visa_info,\n        'accommodation_options':args.params.get('accommodation_options', ''),\n        'restaurant_guide':     args.params.get('restaurant_guide', ''),\n        'transport_plan':       args.params.get('transport_plan', ''),\n        'event_calendar':       args.params.get('event_calendar', ''),\n        'health_safety_info':   args.params.get('health_safety_info', '')\n    }"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "budget_data":           { "type": "string", "extra": { "index": 0 } },
+            "structured_preferences":{ "type": "string", "extra": { "index": 1 } },
+            "preferences":           { "type": "string", "extra": { "index": 2 } },
+            "destinations":          { "type": "string", "extra": { "index": 3 } },
+            "weather_info":          { "type": "string", "extra": { "index": 4 } },
+            "itinerary":             { "type": "string", "extra": { "index": 5 } },
+            "culture_guide":         { "type": "string", "extra": { "index": 6 } },
+            "visa_info":             { "type": "string", "extra": { "index": 7 } },
+            "accommodation_options": { "type": "string", "extra": { "index": 8 } },
+            "restaurant_guide":      { "type": "string", "extra": { "index": 9 } },
+            "transport_plan":        { "type": "string", "extra": { "index": 10 } },
+            "event_calendar":        { "type": "string", "extra": { "index": 11 } },
+            "health_safety_info":    { "type": "string", "extra": { "index": 12 } }
+          },
+          "required": [
+            "budget_data", "structured_preferences", "preferences", "destinations",
+            "weather_info", "itinerary", "culture_guide", "visa_info",
+            "accommodation_options", "restaurant_guide", "transport_plan",
+            "event_calendar", "health_safety_info"
+          ]
+        },
+        "exceptionConfig": {
+          "retryTimes": 2,
+          "timeoutSeconds": 30,
+          "processType": "break",
+          "executeStep": { "defaultStep": "0", "errorStep": "1" }
+        }
+      }
+    },
+    {
+      "id": "21_shopping_guide",
+      "type": "21",
+      "meta": { "position": { "x": 2450, "y": 400 } },
+      "data": {
+        "title": "Shopping & Souvenirs Guide",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a local shopping and retail expert. Create a comprehensive shopping guide. Include:\n\n1. ICONIC SOUVENIRS & LOCAL PRODUCTS:\n   - 10 unique items to bring home\n   - Where to find authentic vs. tourist-trap versions\n   - Fair price ranges\n\n2. SHOPPING DISTRICTS & MARKETS:\n   - Best local markets (street, flea, food, craft)\n   - High-street and mall areas\n   - Boutique and artisan districts\n   - Opening hours and best times to visit\n\n3. BUDGET-TIER RECOMMENDATIONS:\n   - Budget: best bargain spots and haggling tips\n   - Mid-range: quality local brands and boutiques\n   - Luxury: designer stores, bespoke goods, art galleries\n\n4. PRACTICAL SHOPPING TIPS:\n   - VAT/tax refund process for tourists\n   - Haggling etiquette (where appropriate)\n   - Counterfeit goods to avoid\n   - Luggage weight considerations\n   - Best payment methods (cash vs. card)\n\n5. GIFTS FOR DIFFERENT PEOPLE:\n   - Best gift ideas for foodies, kids, parents, colleagues\n   - Local speciality foods to pack\n   - Lightweight/packable souvenir ideas"
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Create a detailed shopping guide for:\n{{destinations}}\n\nBudget tier and preferences: {{preferences}}\n\nContext from itinerary:\n{{itinerary}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "destinations"],
+              "extra": { "index": 3 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "preferences"],
+              "extra": { "index": 2 }
+            },
+            "itinerary": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "itinerary"],
+              "extra": { "index": 5 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-shopping-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "shopping_guide": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["shopping_guide"]
+        }
+      }
+    },
+    {
+      "id": "21_photography_spots",
+      "type": "21",
+      "meta": { "position": { "x": 2450, "y": 800 } },
+      "data": {
+        "title": "Photography & Instagrammable Spots",
+        "max_iterations": 3,
+        "inputs": {
+          "llmParam": {
+            "systemPrompt": {
+              "type": "template",
+              "content": "You are a travel photographer and visual storytelling expert. Create a comprehensive photography guide. Include:\n\n1. TOP 10 PHOTO SPOTS:\n   - Location name and exact area\n   - What makes it visually special\n   - Best angle and framing tips\n   - GPS coordinates or nearest landmark\n\n2. GOLDEN HOUR & LIGHTING GUIDE:\n   - Sunrise and sunset times (approximate for season)\n   - Best spots for golden hour shots\n   - Midday photography tips (avoiding harsh light)\n   - Night photography opportunities\n\n3. INSTAGRAM-WORTHY LOCATIONS:\n   - Colourful streets or buildings\n   - Scenic viewpoints and overlooks\n   - Unique architectural details\n   - Local cafes and restaurants with great aesthetics\n   - Nature and landscape shots\n\n4. PHOTOGRAPHY ETIQUETTE:\n   - Where photography is prohibited\n   - How to ask locals for permission\n   - Drone flying regulations\n   - Respectful photography near religious sites\n\n5. GEAR & PRACTICAL TIPS:\n   - Best lens choices for each type of shot\n   - Apps for planning shots (Golden Hour, PhotoPills)\n   - Best photo editing styles for this destination's aesthetic\n   - How to avoid crowds at popular spots (timing tricks)"
+            },
+            "prompt": {
+              "type": "template",
+              "content": "Create a photography and visual guide for:\n{{destinations}}\n\nWeather context: {{weather_info}}\n\nItinerary context:\n{{itinerary}}"
+            },
+            "model": {
+              "id": "2",
+              "name": "deepseek",
+              "type": "deepseek-chat"
+            }
+          },
+          "inputParameters": {
+            "destinations": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "destinations"],
+              "extra": { "index": 3 }
+            },
+            "weather_info": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "weather_info"],
+              "extra": { "index": 4 }
+            },
+            "itinerary": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "itinerary"],
+              "extra": { "index": 5 }
+            }
+          },
+          "skillsParam": {
+            "plugins": [
+              {
+                "id": "tavily-photography-001",
+                "plugin_id": "9742d56f-433e-4c58-822d-89867be2b69d",
+                "version": "draft",
+                "name": "Tavily",
+                "type": "plugin"
+              }
+            ]
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "photography_guide": { "type": "string", "extra": { "index": 1 } }
+          },
+          "required": ["photography_guide"]
+        }
+      }
+    },
+    {
+      "id": "10_travel_guide",
+      "type": "10",
+      "meta": { "position": { "x": 2800, "y": 600 } },
+      "data": {
+        "title": "Travel Guide Generator",
+        "inputs": {
+          "inputParameters": {
+            "budget_data": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "budget_data"],
+              "extra": { "index": 0 }
+            },
+            "structured_preferences": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "structured_preferences"],
+              "extra": { "index": 1 }
+            },
+            "preferences": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "preferences"],
+              "extra": { "index": 2 }
+            },
+            "destinations": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "destinations"],
+              "extra": { "index": 3 }
+            },
+            "weather_info": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "weather_info"],
+              "extra": { "index": 4 }
+            },
+            "itinerary": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "itinerary"],
+              "extra": { "index": 5 }
+            },
+            "culture_guide": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "culture_guide"],
+              "extra": { "index": 6 }
+            },
+            "visa_info": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "visa_info"],
+              "extra": { "index": 7 }
+            },
+            "accommodation_options": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "accommodation_options"],
+              "extra": { "index": 8 }
+            },
+            "restaurant_guide": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "restaurant_guide"],
+              "extra": { "index": 9 }
+            },
+            "transport_plan": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "transport_plan"],
+              "extra": { "index": 10 }
+            },
+            "event_calendar": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "event_calendar"],
+              "extra": { "index": 11 }
+            },
+            "health_safety_info": {
+              "type": "ref",
+              "content": ["10_budget_calculator", "health_safety_info"],
+              "extra": { "index": 12 }
+            },
+            "shopping_guide": {
+              "type": "ref",
+              "content": ["21_shopping_guide", "shopping_guide"],
+              "extra": { "index": 1 }
+            },
+            "photography_guide": {
+              "type": "ref",
+              "content": ["21_photography_spots", "photography_guide"],
+              "extra": { "index": 1 }
+            }
+          },
+          "language": "python",
+          "code": "def main(args):\n    import json\n    from datetime import datetime\n\n    preferences         = args.params.get('preferences', '')\n    destinations        = args.params.get('destinations', '')\n    weather_info        = args.params.get('weather_info', '')\n    itinerary           = args.params.get('itinerary', '')\n    culture_guide       = args.params.get('culture_guide', '')\n    visa_info           = args.params.get('visa_info', '')\n    accommodation_options = args.params.get('accommodation_options', '')\n    restaurant_guide    = args.params.get('restaurant_guide', '')\n    transport_plan      = args.params.get('transport_plan', '')\n    event_calendar      = args.params.get('event_calendar', '')\n    health_safety_info  = args.params.get('health_safety_info', '')\n    shopping_guide      = args.params.get('shopping_guide', '')\n    photography_guide   = args.params.get('photography_guide', '')\n    budget_data_raw     = args.params.get('budget_data', '{}')\n\n    try:\n        bd = json.loads(budget_data_raw) if isinstance(budget_data_raw, str) else budget_data_raw\n    except:\n        bd = {'budget_breakdown': {}, 'budget_analysis': {}, 'packing_list': {}}\n\n    sep = '━' * 75\n\n    guide = f\"\"\"\n╔═══════════════════════════════════════════════════════════════════════════╗\n║                   ✈️  YOUR DREAM VACATION TRAVEL GUIDE  🌴                ║\n║                     Generated: {datetime.now().strftime('%B %d, %Y at %H:%M')}                  ║\n╚═══════════════════════════════════════════════════════════════════════════╝\n\n🎯 YOUR TRAVEL PROFILE\n{sep}\n{preferences}\n\n\n🌍 RECOMMENDED DESTINATIONS\n{sep}\n{destinations}\n\n\n☀️ WEATHER & CLIMATE GUIDE\n{sep}\n{weather_info}\n\n\n📋 VISA & ENTRY REQUIREMENTS\n{sep}\n{visa_info}\n\n\n🏥 HEALTH & SAFETY BRIEFING\n{sep}\n{health_safety_info}\n\n\n🏨 ACCOMMODATION OPTIONS\n{sep}\n{accommodation_options}\n\n\n📅 YOUR DETAILED DAY-BY-DAY ITINERARY\n{sep}\n{itinerary}\n\n\n🎉 EVENTS & FESTIVALS CALENDAR\n{sep}\n{event_calendar}\n\n\n🍽️ FOOD & RESTAURANT GUIDE\n{sep}\n{restaurant_guide}\n\n\n🚆 TRANSPORT PLAN\n{sep}\n{transport_plan}\n\n\n🛍️ SHOPPING & SOUVENIRS GUIDE\n{sep}\n{shopping_guide}\n\n\n📸 PHOTOGRAPHY & BEST SPOTS\n{sep}\n{photography_guide}\n\n\n🏛️ CULTURAL INSIGHTS & LOCAL TIPS\n{sep}\n{culture_guide}\n\n\n💰 BUDGET BREAKDOWN\n{sep}\n\"\"\"\n\n    for cat, amt in bd.get('budget_breakdown', {}).items():\n        guide += f\"{cat:.<45} {amt:>12}\\n\"\n\n    an = bd.get('budget_analysis', {})\n    guide += f\"\"\"\n\n📊 BUDGET ANALYSIS:\n   Your Budget:      {an.get('your_budget', 'N/A')}\n   Estimated Cost:   {an.get('estimated_cost', 'N/A')}\n   Difference:       {an.get('difference', 'N/A')}\n   Status:           {an.get('status', 'N/A')}\n   Daily Spending:   {an.get('daily_spending', 'N/A')}\n   Travel Tier:      {an.get('tier', 'N/A')}\n\n\"\"\"\n    guide += \"💡 MONEY-SAVING TIPS:\\n\"\n    for tip in bd.get('money_tips', []):\n        guide += f\"   {tip}\\n\"\n\n    guide += f\"\"\"\n\n\n🎒 COMPLETE PACKING LIST\n{sep}\n\n📋 ESSENTIALS:\\n\"\"\"\n    for item in bd.get('packing_list', {}).get('essentials', []):\n        guide += f\"   {item}\\n\"\n    guide += \"\\n👕 CLOTHING:\\n\"\n    for item in bd.get('packing_list', {}).get('clothing', []):\n        guide += f\"   {item}\\n\"\n    guide += \"\\n🎁 EXTRAS & ACCESSORIES:\\n\"\n    for item in bd.get('packing_list', {}).get('extras', []):\n        guide += f\"   {item}\\n\"\n\n    guide += f\"\"\"\n\n\n✅ PRE-DEPARTURE CHECKLIST\n{sep}\n\n8 WEEKS BEFORE:\n   □ Book flights and accommodation\n   □ Check passport validity (6+ months required)\n   □ Apply for visa (if required)\n   □ Book required vaccinations\n   □ Purchase travel insurance\n\n4 WEEKS BEFORE:\n   □ Book major tours, events & activities\n   □ Notify bank of travel dates\n   □ Download offline maps & translation\n   □ Research local SIM card options\n   □ Buy event tickets in advance\n\n1 WEEK BEFORE:\n   □ Online check-in for flights\n   □ Print/save all important documents\n   □ Exchange some local currency\n   □ Pack medications & prescriptions\n   □ Charge all electronics and power bank\n\nDAY BEFORE:\n   □ Final packing check against list above\n   □ Secure home (locks, lights, thermostat)\n   □ Set mail hold & notify neighbours\n   □ Share full itinerary with family/friends\n   □ Set multiple alarms for departure\n\n\n📱 ESSENTIAL APPS TO DOWNLOAD\n{sep}\n   • Google Maps (download offline map for destination)\n   • Google Translate (download offline language pack)\n   • XE Currency Converter\n   • TripAdvisor / Yelp / TheFork\n   • Local rideshare app (Grab, Bolt, Cabify, etc.)\n   • Flightradar24 (flight tracker)\n   • Your airline app\n   • Golden Hour (photography timing)\n\n\n🚨 EMERGENCY CONTACTS\n{sep}\n   • Local Emergency Services: [check destination-specific numbers]\n   • Nearest Embassy/Consulate: [check gov.travel or embassy.gov]\n   • Travel Insurance 24/7 Line: [your provider's emergency number]\n   • Bank/Card Emergency: [keep card company international number]\n   • Trusted Home Contact: [leave this itinerary with someone]\n\n\n╔═══════════════════════════════════════════════════════════════════════════╗\n║                  🌟 BON VOYAGE! HAVE AN AMAZING TRIP! 🌟                  ║\n║                                                                           ║\n║     \"The world is a book, and those who do not travel read only one       ║\n║                            page.\" — St. Augustine                         ║\n╚═══════════════════════════════════════════════════════════════════════════╝\n\n✨ Generated by AI Dream Vacation Planner  ✨\n📧 Share this guide with your travel companions!\n\"\"\"\n\n    return {'travel_guide': guide}"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "travel_guide": { "type": "string", "extra": { "index": 0 } }
+          },
+          "required": ["travel_guide"]
+        },
+        "exceptionConfig": {
+          "retryTimes": 2,
+          "timeoutSeconds": 60,
+          "processType": "break",
+          "executeStep": { "defaultStep": "0", "errorStep": "1" }
+        }
+      }
+    },
+    {
+      "id": "2_end",
+      "type": "2",
+      "meta": { "position": { "x": 3150, "y": 600 } },
+      "data": {
+        "title": "End: Your Dream Vacation Guide",
+        "inputs": {
+          "inputParameters": {
+            "result": {
+              "type": "ref",
+              "content": ["10_travel_guide", "travel_guide"],
+              "extra": { "index": 0 }
+            }
+          },
+          "content": {
+            "type": "template",
+            "content": "{{result}}"
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    { "sourceNodeID": "1_start",               "targetNodeID": "10_preference_parser" },
+    { "sourceNodeID": "10_preference_parser",   "targetNodeID": "21_destination_scout",   "sourcePortID": "0" },
+    { "sourceNodeID": "21_destination_scout",   "targetNodeID": "21_weather_climate" },
+    { "sourceNodeID": "21_destination_scout",   "targetNodeID": "21_local_expert" },
+    { "sourceNodeID": "21_destination_scout",   "targetNodeID": "21_visa_requirements" },
+    { "sourceNodeID": "21_destination_scout",   "targetNodeID": "21_accommodation_scout" },
+    { "sourceNodeID": "21_destination_scout",   "targetNodeID": "21_event_calendar" },
+    { "sourceNodeID": "21_destination_scout",   "targetNodeID": "21_health_safety" },
+    { "sourceNodeID": "21_weather_climate",     "targetNodeID": "21_itinerary_builder" },
+    { "sourceNodeID": "21_local_expert",        "targetNodeID": "21_itinerary_builder" },
+    { "sourceNodeID": "21_visa_requirements",   "targetNodeID": "21_itinerary_builder" },
+    { "sourceNodeID": "21_accommodation_scout", "targetNodeID": "21_itinerary_builder" },
+    { "sourceNodeID": "21_event_calendar",      "targetNodeID": "21_itinerary_builder" },
+    { "sourceNodeID": "21_health_safety",       "targetNodeID": "21_itinerary_builder" },
+    { "sourceNodeID": "21_itinerary_builder",   "targetNodeID": "21_restaurant_guide" },
+    { "sourceNodeID": "21_itinerary_builder",   "targetNodeID": "21_transport_planner" },
+    { "sourceNodeID": "21_restaurant_guide",    "targetNodeID": "10_budget_calculator" },
+    { "sourceNodeID": "21_transport_planner",   "targetNodeID": "10_budget_calculator" },
+    { "sourceNodeID": "10_budget_calculator",   "targetNodeID": "21_shopping_guide",     "sourcePortID": "0" },
+    { "sourceNodeID": "10_budget_calculator",   "targetNodeID": "21_photography_spots",  "sourcePortID": "0" },
+    { "sourceNodeID": "21_shopping_guide",      "targetNodeID": "10_travel_guide" },
+    { "sourceNodeID": "21_photography_spots",   "targetNodeID": "10_travel_guide" },
+    { "sourceNodeID": "10_travel_guide",        "targetNodeID": "2_end",                 "sourcePortID": "0" }
+  ],
+  "plugins": [],
+  "model_references": {}
+}

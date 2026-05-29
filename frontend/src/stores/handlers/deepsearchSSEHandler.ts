@@ -12,6 +12,7 @@ import {
   DeepsearchExecutionMethod
 } from '../useConversationStore';
 import { ThoughtNodeType, EdgeRelationType, ThoughtNode } from './deepsearchMindMapHandler';
+import { DeepsearchEvent, DeepsearchAgentType, SSEData } from './deepsearchSSETypes';
 import i18n from '@/i18n';
 
 /**
@@ -20,18 +21,6 @@ import i18n from '@/i18n';
  * 专门处理 deepsearch agent 类型的 SSE 消息
  */
 
-// ===== 类型定义 =====
-
-// DeepSearch SSE 事件数据类型
-export interface SSEData {
-  event: 'start' | 'message' | 'done' | 'summary_response' | 'waiting_user_input' | 'user_input_ended' | 'error';
-  agent: string;
-  content?: string | JSONObject;
-  section_idx?: string | number;
-  plan_idx?: string | number;
-  step_idx?: string | number;
-  conversation_id?: string;  // 对话的conversationId
-}
 
 interface StoreDependencies {
   getLastMessageItems: () => MessageItems | undefined;
@@ -129,6 +118,12 @@ export class DeepsearchSSEHandler {
   private conversationId: string;
   private messageFindCache: Map<string, Message | null>;
 
+  // 按 conversationId 分组，跨 handler 实例持久化，仅在此模块内使用
+  private static readonly deferredStatuses = new Map<
+    string,
+    Map<number, { messageItemsId: string; childMessageId: string; status: TaskStatus }>
+  >();
+
   constructor(store: StoreDependencies, streamCache: StreamCache, conversationId: string) {
     this.store = store;
     this.streamCache = streamCache;
@@ -136,21 +131,40 @@ export class DeepsearchSSEHandler {
     this.messageFindCache = new Map();
   }
 
+  private setDeferredSubReporterStatus(sectionIdx: number, messageItemsId: string, childMessageId: string, status: TaskStatus): void {
+    if (!DeepsearchSSEHandler.deferredStatuses.has(this.conversationId)) {
+      DeepsearchSSEHandler.deferredStatuses.set(this.conversationId, new Map());
+    }
+    DeepsearchSSEHandler.deferredStatuses.get(this.conversationId)!.set(sectionIdx, { messageItemsId, childMessageId, status });
+  }
+
+  private getDeferredSubReporterStatus(sectionIdx: number): { messageItemsId: string; childMessageId: string; status: TaskStatus } | null {
+    return DeepsearchSSEHandler.deferredStatuses.get(this.conversationId)?.get(sectionIdx) ?? null;
+  }
+
+  private deleteDeferredSubReporterStatus(sectionIdx: number): void {
+    DeepsearchSSEHandler.deferredStatuses.get(this.conversationId)?.delete(sectionIdx);
+  }
+
+  private clearDeferredSubReporterStatuses(): void {
+    DeepsearchSSEHandler.deferredStatuses.delete(this.conversationId);
+  }
+
   /**
    * 将 deepsearch agent 类型映射到消息类型
    */
   private mapAgentToMessageType(agent: string): MessageType {
     const agentTypeMap: Record<string, MessageType> = {
-      'entry': MessageType.TEXT,
-      'generate_questions': MessageType.TEXT,
-      'feedback_handler': MessageType.INTERRUPT,
-      'outline': MessageType.TASK,
-      'outline_interaction': MessageType.OUTLINE_INTERACTION,
-      'plan_reasoning': MessageType.TASK,
-      'sub_reporter': MessageType.REPORT,
-      'collector_info_retrieval': MessageType.LINK,
-      'collector_summary': MessageType.TEXT,
-      'end': MessageType.REPORT,
+      [DeepsearchAgentType.ENTRY]: MessageType.TEXT,
+      [DeepsearchAgentType.GENERATE_QUESTIONS]: MessageType.TEXT,
+      [DeepsearchAgentType.FEEDBACK_HANDLER]: MessageType.INTERRUPT,
+      [DeepsearchAgentType.OUTLINE]: MessageType.TASK,
+      [DeepsearchAgentType.OUTLINE_INTERACTION]: MessageType.OUTLINE_INTERACTION,
+      [DeepsearchAgentType.PLAN_REASONING]: MessageType.TASK,
+      [DeepsearchAgentType.SUB_REPORTER]: MessageType.REPORT,
+      [DeepsearchAgentType.COLLECTOR_INFO_RETRIEVAL]: MessageType.LINK,
+      [DeepsearchAgentType.COLLECTOR_SUMMARY]: MessageType.TEXT,
+      [DeepsearchAgentType.END]: MessageType.REPORT,
     };
     return agentTypeMap[agent] || MessageType.TEXT;
   }
@@ -174,7 +188,7 @@ export class DeepsearchSSEHandler {
     // 因为此时报告已经完成，只是等待用户进行 AI 改写操作
     const isUserFeedbackProcessorEvent =
       sseData.agent === AGENT_NAMES.USER_FEEDBACK_PROCESSOR &&
-      (sseData.event === 'done' || sseData.event === 'waiting_user_input');
+      (sseData.event === DeepsearchEvent.DONE || sseData.event === DeepsearchEvent.WAITING_USER_INPUT);
 
     if (lastMessageItems && !this.store.getMessageItemsIsUser(lastMessageItems)) {
       if (lastMessageItems.status === TaskStatus.COMPLETED && !isUserFeedbackProcessorEvent) {
@@ -188,25 +202,25 @@ export class DeepsearchSSEHandler {
     const stepIdx = parseIndexValue(sseData.step_idx);
 
     switch (sseData.event) {
-      case 'start':
+      case DeepsearchEvent.START:
         this.handleStart(sseData, sectionIdx, planIdx, stepIdx);
         break;
-      case 'message':
+      case DeepsearchEvent.MESSAGE:
         this.handleMessage(sseData, sectionIdx, planIdx, stepIdx);
         break;
-      case 'done':
+      case DeepsearchEvent.DONE:
         this.handleDone(sseData, sectionIdx, planIdx, stepIdx);
         break;
-      case 'summary_response':
+      case DeepsearchEvent.SUMMARY_RESPONSE:
         this.handleSummaryResponse(sseData, sectionIdx, planIdx, stepIdx);
         break;
-      case 'waiting_user_input':
+      case DeepsearchEvent.WAITING_USER_INPUT:
         this.handleWaitingUserInput(sseData);
         break;
-      case 'user_input_ended':
+      case DeepsearchEvent.USER_INPUT_ENDED:
         this.handleUserInputEnded(sseData);
         break;
-      case 'error':
+      case DeepsearchEvent.ERROR:
         this.handleError(sseData, sectionIdx, planIdx, stepIdx);
         break;
     }
@@ -225,14 +239,14 @@ export class DeepsearchSSEHandler {
     const streamKey = this.generateStreamKey(sseData.agent, sectionIdx, planIdx, stepIdx);
 
     // outline: 只初始化缓存，不创建消息卡片
-    if (sseData.agent === 'outline') {
+    if (sseData.agent === DeepsearchAgentType.OUTLINE) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.streamCache.set(streamKey, [content]);
       return;
     }
 
     // plan_reasoning: 初始化缓存，更新对应 section task 的状态和时间
-    if (sseData.agent === 'plan_reasoning') {
+    if (sseData.agent === DeepsearchAgentType.PLAN_REASONING) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.streamCache.set(streamKey, [content]);
 
@@ -301,7 +315,7 @@ export class DeepsearchSSEHandler {
     }
 
     // sub_reporter: 初始化缓存，创建或更新章节报告
-    if (sseData.agent === 'sub_reporter' && sectionIdx !== undefined && sectionIdx > 0) {
+    if (sseData.agent === DeepsearchAgentType.SUB_REPORTER && sectionIdx !== undefined && sectionIdx > 0) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       // 重置流缓存
       this.streamCache.set(streamKey, [content]);
@@ -377,7 +391,7 @@ export class DeepsearchSSEHandler {
     }
 
     // entry 或 generate_questions: 创建占位消息（不使用 streamCache）
-    if (sseData.agent === 'entry' || sseData.agent === 'generate_questions') {
+    if (sseData.agent === DeepsearchAgentType.ENTRY || sseData.agent === DeepsearchAgentType.GENERATE_QUESTIONS) {
       const lastMessage = addSystemMessage(this.conversationId, this.mapAgentToMessageType(sseData.agent), '', undefined, undefined, 'deepsearch', buildIndexPath(sectionIdx, planIdx, stepIdx));
 
       const lastMessageItems = this.store.getLastMessageItems();
@@ -409,7 +423,7 @@ export class DeepsearchSSEHandler {
     }
 
     // outline: 追加内容到缓存，不创建消息
-    if (sseData.agent === 'outline') {
+    if (sseData.agent === DeepsearchAgentType.OUTLINE) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       if (!this.streamCache.get(streamKey)) {
         // 缓存不存在，初始化缓存
@@ -422,14 +436,14 @@ export class DeepsearchSSEHandler {
     }
 
     // plan_reasoning: 追加内容到缓存
-    if (sseData.agent === 'plan_reasoning') {
+    if (sseData.agent === DeepsearchAgentType.PLAN_REASONING) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.addToCache(streamKey, content);
       return;
     }
 
     // sub_reporter: 追加内容到缓存和消息
-    if (sseData.agent === 'sub_reporter' && sectionIdx !== undefined && sectionIdx > 0) {
+    if (sseData.agent === DeepsearchAgentType.SUB_REPORTER && sectionIdx !== undefined && sectionIdx > 0) {
       const content = typeof sseData.content === 'string' ? sseData.content : '';
       this.addToCache(streamKey, content);
 
@@ -477,7 +491,7 @@ export class DeepsearchSSEHandler {
     const lastMessageItems = this.store.getLastMessageItems();
 
 
-    if (sseData.agent === 'outline') {
+    if (sseData.agent === DeepsearchAgentType.OUTLINE) {
       const cachedOutline = this.getCacheContent(streamKey);
       if (cachedOutline) {
         try {
@@ -498,7 +512,7 @@ export class DeepsearchSSEHandler {
     }
 
     // plan_reasoning 完成
-    if (sseData.agent === 'plan_reasoning' && sectionIdx !== undefined && planIdx !== undefined) {
+    if (sseData.agent === DeepsearchAgentType.PLAN_REASONING && sectionIdx !== undefined && planIdx !== undefined) {
       // 使用 indexPath 查找 sectionTask
       const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
       let sectionTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
@@ -666,7 +680,7 @@ export class DeepsearchSSEHandler {
     }
 
     // sub_reporter 完成
-    if (sseData.agent === 'sub_reporter' && sectionIdx !== undefined && sectionIdx > 0) {
+    if (sseData.agent === DeepsearchAgentType.SUB_REPORTER && sectionIdx !== undefined && sectionIdx > 0) {
       const cachedContent = this.getCacheContent(streamKey);
       // 使用 indexPath 查找 sectionTask
       const sectionIndexPath = buildIndexPath(sectionIdx, 0, 0);
@@ -681,11 +695,12 @@ export class DeepsearchSSEHandler {
         if (childMessages.length > 0) {
           const lastChild = childMessages[childMessages.length - 1];
           if (lastChild) {
+            // 先更新内容并停止流式动画，status 延迟到 SECTION_END 时统一更新
             updateMessage(lastMessageItems.id, lastChild.id, {
               content: cachedContent,
-              status: TaskStatus.COMPLETED,
               isStreaming: false,
             });
+            this.setDeferredSubReporterStatus(sectionIdx, lastMessageItems.id, lastChild.id, TaskStatus.COMPLETED);
           }
         }
       }
@@ -695,7 +710,7 @@ export class DeepsearchSSEHandler {
     }
 
     // entry 或 generate_questions 完成
-    if (sseData.agent === 'entry' || sseData.agent === 'generate_questions') {
+    if (sseData.agent === DeepsearchAgentType.ENTRY || sseData.agent === DeepsearchAgentType.GENERATE_QUESTIONS) {
       const lastMessageId = lastMessageItems.messagesIds[lastMessageItems.messagesIds.length - 1];
       const lastMessage = lastMessageId ? this.store.getMessageById(lastMessageId) : undefined;
 
@@ -721,7 +736,7 @@ export class DeepsearchSSEHandler {
     }
 
     // end 完成：保存 DeepSearch 结果，流程不会走到这里
-    if (sseData.agent === 'end') {
+    if (sseData.agent === DeepsearchAgentType.END) {
       try {
         let content: string | JSONObject | undefined = sseData.content;
 
@@ -789,7 +804,7 @@ export class DeepsearchSSEHandler {
     if (!lastMessageItems) return;
 
     // collector_info_retrieval 和 collector_summary
-    if (['collector_info_retrieval', 'collector_summary'].includes(sseData.agent) &&
+    if ([DeepsearchAgentType.COLLECTOR_INFO_RETRIEVAL, DeepsearchAgentType.COLLECTOR_SUMMARY].includes(sseData.agent as DeepsearchAgentType) &&
         sectionIdx !== undefined && planIdx !== undefined && stepIdx !== undefined) {
 
       // 修复：使用 indexPath 查找 sectionTask
@@ -843,7 +858,7 @@ export class DeepsearchSSEHandler {
       }
 
       // 处理 content
-      if (sseData.agent === 'collector_info_retrieval') {
+      if (sseData.agent === DeepsearchAgentType.COLLECTOR_INFO_RETRIEVAL) {
         // collector_info_retrieval: content是JSON对象，包含url、title、query
         let parsedContent: JSONObject;
         if (typeof sseData.content === 'string') {
@@ -909,7 +924,7 @@ export class DeepsearchSSEHandler {
       });
 
       // 如果是 collector_summary，更新 step 状态
-      if (sseData.agent === 'collector_summary' && stepTask.status != TaskStatus.FAILED) {
+      if (sseData.agent === DeepsearchAgentType.COLLECTOR_SUMMARY && stepTask.status != TaskStatus.FAILED) {
         updateMessage(lastMessageItems.id, stepTask.id, {
           status: TaskStatus.COMPLETED,
         });
@@ -929,7 +944,7 @@ export class DeepsearchSSEHandler {
     }
 
     // sub_reporter: 处理章节子报告（summary_response 事件）
-    if (sseData.agent === 'sub_reporter' &&
+    if (sseData.agent === DeepsearchAgentType.SUB_REPORTER &&
         sectionIdx !== undefined &&
         sectionIdx > 0 &&
         planIdx === 0 &&
@@ -963,14 +978,14 @@ export class DeepsearchSSEHandler {
 
       // 4. 判断是创建还是更新：检查最后一个 child 是否是 REPORT 类型
       if (lastChild && lastChild.type === MessageType.REPORT) {
-        // 情况A: 最后一个 child 是 REPORT - 更新现有消息
+        // 情况A: 最后一个 child 是 REPORT - 更新现有消息，status更新 延迟到 SECTION_END
         updateMessage(lastMessageItems.id, lastChild.id, {
           content: sseData.content,
           isStreaming: false,
-          status: TaskStatus.FAILED,
         });
+        this.setDeferredSubReporterStatus(sectionIdx, lastMessageItems.id, lastChild.id, TaskStatus.FAILED);
       } else {
-        // 情况B: 最后一个 child 不是 REPORT 或不存在 - 创建新消息
+        // 情况B: 最后一个 child 不是 REPORT 或不存在 - 创建新消息，status 延迟到 SECTION_END
         // const subTitle = `${i18n.t('deepResearch.handler.chapterReport')}: ${sectionTask.title}`;
         const subTitle = `${sectionTask.title}`;
         const newReport = this.store.addMessageAsChild(
@@ -984,8 +999,8 @@ export class DeepsearchSSEHandler {
 
         updateMessage(lastMessageItems.id, newReport.id, {
           isStreaming: false,
-          status: TaskStatus.FAILED,
         });
+        this.setDeferredSubReporterStatus(sectionIdx, lastMessageItems.id, newReport.id, TaskStatus.FAILED);
       }
 
       // 5. 递归更新倒数第二个 child message（task_x_(N-1)_0_0）
@@ -1005,7 +1020,7 @@ export class DeepsearchSSEHandler {
     }
 
     // end 事件
-    if (sseData.agent === 'end') {
+    if (sseData.agent === DeepsearchAgentType.END) {
       // 使用 indexPath 查找 outlineTask
       const outlineIndexPath = buildIndexPath(0, 0, 0);
       const outlineTask = this.findTaskInMessages(lastMessageItems.messagesIds, msg =>
@@ -1021,6 +1036,15 @@ export class DeepsearchSSEHandler {
         );
 
         if (sectionTask) {
+          // 先将延迟的子报告状态落地，确保后续读取 lastChildMessage.status 时已是最终态
+          const deferred = this.getDeferredSubReporterStatus(sectionIdx);
+          if (deferred) {
+            updateMessage(deferred.messageItemsId, deferred.childMessageId, {
+              status: deferred.status,
+            });
+            this.deleteDeferredSubReporterStatus(sectionIdx);
+          }
+
           // 1. 根据 sectionTask 的最后一个子 Message 的状态来更新 sectionTask
           const sectionChildren = this.store.getChildMessages(sectionTask.id);
           const lastChildMessage = sectionChildren.length > 0 ? sectionChildren[sectionChildren.length - 1] : null;
@@ -1283,7 +1307,10 @@ export class DeepsearchSSEHandler {
           }
         }
 
-        // 4. 更新整个 MessageItems 的状态为 COMPLETED
+        // 4. 清理所有尚未 flush 的 deferred sub-reporter 状态
+        this.clearDeferredSubReporterStatuses();
+
+        // 5. 更新整个 MessageItems 的状态为 COMPLETED
         updateMessageItems(lastMessageItems.id, {
           status: TaskStatus.COMPLETED,
         });
@@ -1318,12 +1345,14 @@ export class DeepsearchSSEHandler {
     const responseContent = actualFinalResult.response_content || '';
     const citationMessages = actualFinalResult.citation_messages || {};
     const inferMessages = actualFinalResult.infer_messages || [];
+    const chartMessages = actualFinalResult.chart_messages || [];
 
     // 构建 content 对象
     const reportContent = {
       response_content: responseContent,
       citation_messages: citationMessages,
       infer_messages: inferMessages,
+      chart_messages: chartMessages,
     };
 
     // 查找是否存在正在进行中的最终报告（由 SECTION END 创建的占位报告）
@@ -1424,7 +1453,7 @@ export class DeepsearchSSEHandler {
     }
 
     // 根据 agent 类型创建不同类型的消息
-    const isOutlineInteraction = sseData.agent === 'outline_interaction';
+    const isOutlineInteraction = sseData.agent === DeepsearchAgentType.OUTLINE_INTERACTION;
     const messageType = isOutlineInteraction ? MessageType.OUTLINE_INTERACTION : MessageType.INTERRUPT;
     const currentRound = isOutlineInteraction ? this.parseOutlineInteractionRound(sseData.content) : undefined;
     const remainingRoundsInfo = this.buildOutlineInteractionRemainingInfo(currentRound);
@@ -1528,7 +1557,7 @@ export class DeepsearchSSEHandler {
     const lastMessageItems = this.store.getLastMessageItems();
 
     // 如果不存在 lastMessageItems 或 不是用户消息且非end， 跳过处理
-    if (!lastMessageItems || (getMessageItemsIsUser(lastMessageItems) && sseData.agent != 'end')) return;
+    if (!lastMessageItems || (getMessageItemsIsUser(lastMessageItems) && sseData.agent != DeepsearchAgentType.END)) return;
 
     // 解析 error content
     let errorData = null;
@@ -1544,7 +1573,7 @@ export class DeepsearchSSEHandler {
 
     if (errorData && errorData.exception_info) {
       // 如果是 end agent 的 error，更新最终报告
-      if (sseData.agent === 'end') {
+      if (sseData.agent === DeepsearchAgentType.END) {
         // 找到最终报告 message（与 outline_task 同级的 REPORT）
         const finalReportMessage = lastMessageItems.messagesIds
           .map(msgId => this.store.getMessageById(msgId))
@@ -1583,7 +1612,7 @@ export class DeepsearchSSEHandler {
     }
 
     // collector_info_retrieval 和 collector_summary 的错误处理
-    if (['collector_info_retrieval', 'collector_summary'].includes(sseData.agent) &&
+    if ([DeepsearchAgentType.COLLECTOR_INFO_RETRIEVAL, DeepsearchAgentType.COLLECTOR_SUMMARY].includes(sseData.agent as DeepsearchAgentType) &&
         sectionIdx !== undefined && planIdx !== undefined && stepIdx !== undefined) {
 
       // 使用 indexPath 查找 sectionTask
@@ -1615,7 +1644,7 @@ export class DeepsearchSSEHandler {
             // 跳过后续处理
           } else {
             // collector_info_retrieval 错误处理
-            if (sseData.agent === 'collector_info_retrieval') {
+            if (sseData.agent === DeepsearchAgentType.COLLECTOR_INFO_RETRIEVAL) {
               // 和正常流程一样，解析 content
               let parsedContent: JSONObject;
               if (typeof sseData.content === 'string') {
@@ -1650,7 +1679,7 @@ export class DeepsearchSSEHandler {
               // 不更新 stepTask 状态
             }
             // collector_summary 错误处理
-            else if (sseData.agent === 'collector_summary') {
+            else if (sseData.agent === DeepsearchAgentType.COLLECTOR_SUMMARY) {
               // 和正常流程一样，content 是字符串
               const summaryContent = typeof sseData.content === 'string'
                 ? sseData.content
@@ -1693,7 +1722,7 @@ export class DeepsearchSSEHandler {
     }
 
     // 如果是 end agent 的 error, 更新 lastMessageItems的状态为COMPLETED，所有未完成的Message标志为FAILED
-    if (sseData.agent === 'end') {
+    if (sseData.agent === DeepsearchAgentType.END) {
       // 先将所有未完成的消息标记为 FAILED
       this.markAllIncompleteMessages(lastMessageItems, TaskStatus.FAILED);
       // 再更新 MessageItems 的状态

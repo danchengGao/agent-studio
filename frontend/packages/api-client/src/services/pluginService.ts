@@ -44,6 +44,9 @@ import {
   PluginPublishDeleteResponse,
   PluginGetMarketRequest,
   PluginGetMarketResponse,
+  PluginGetMarketDetailRequest,
+  PluginGetMarketDetailResponse,
+  PluginInstallMarketRequest,
   PluginListMcpToolsRequest,
   PluginMcpInfoResponse,
   PluginDiscoverMcpToolsRequest,
@@ -186,6 +189,19 @@ export class PluginService {
   static async getPluginMarket(request: PluginGetMarketRequest): Promise<PluginGetMarketResponse> {
     const apiClient = getApiClient()
     const response = await apiClient.post<PluginGetMarketResponse>(API_ENDPOINTS.PLUGINS.GET_MARKET, request)
+    return response.data
+  }
+
+  // 获取插件市场详情
+  static async getPluginMarketDetail(request: PluginGetMarketDetailRequest): Promise<PluginGetMarketDetailResponse> {
+    const apiClient = getApiClient()
+    const response = await apiClient.post<PluginGetMarketDetailResponse>(API_ENDPOINTS.PLUGINS.GET_MARKET_DETAIL, request)
+    return response.data
+  }
+
+  static async installMarketPlugin(request: PluginInstallMarketRequest): Promise<PluginCreateResponse> {
+    const apiClient = getApiClient()
+    const response = await apiClient.post<PluginCreateResponse>(API_ENDPOINTS.PLUGINS.INSTALL_MARKET_PLUGIN, request)
     return response.data
   }
 

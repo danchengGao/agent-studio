@@ -7,7 +7,7 @@ For workflow and agent execution summary data management
 
 import ast
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +19,9 @@ from openjiuwen_studio.core.manager.repositories import JiuwenBaseRepository
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import get_db_jw
 from openjiuwen_studio.models.trace_detail import TraceDetailDB
 from openjiuwen_studio.models.trace_summary import TraceSummaryDB
+from openjiuwen_studio.models.workflow import WorkflowBaseDB
+from openjiuwen_studio.models.workflow_execution import WorkflowExecutionDB
+from openjiuwen_studio.models import agent as agent_models
 from openjiuwen_studio.schemas.common import ResponseModel
 from openjiuwen_studio.schemas.execution_log import ExecutionLogSummary, InvokeExecuteInfo
 from openjiuwen_studio.schemas.trace_summary import TraceSummary
@@ -249,7 +252,8 @@ def _extract_summary_execution_info_from_trace_detail(
             if parent_component.child_invokes_execute_info is None:
                 parent_component.child_invokes_execute_info = []
             # 检查是否已存在该子组件
-            exists = any(child.invoke_id == component_execute_info.invoke_id for child in parent_component.child_invokes_execute_info)
+            exists = any(child.invoke_id == component_execute_info.invoke_id
+                         for child in parent_component.child_invokes_execute_info)
             if not exists:
                 parent_component.child_invokes_execute_info.append(component_execute_info)
         else:
@@ -344,6 +348,7 @@ def _extract_summary_execution_info_from_trace_detail(
 
 def _extract_agent_execution_info_from_trace_detail(
     trace_details: List[Dict[str, Any]],
+    is_live: bool = False,
 ) -> List[InvokeExecuteInfo]:
     execute_info_list: List[InvokeExecuteInfo] = []
     running_components: Dict[str, InvokeExecuteInfo] = {}
@@ -399,11 +404,11 @@ def _extract_agent_execution_info_from_trace_detail(
                     component_execute_info.duration = duration
             component_execute_info.outputs = _normalize_dict_field(detail.get("output"))
         else:
-            component_execute_info.status = "interrupted"
+            component_execute_info.status = "running" if is_live else "interrupted"
 
         # For any workflow component, add its associated studio_agent_workflow components
-        if (detail and 
-            detail.get("platform_type") == "studio_agent" and 
+        if (detail and
+            detail.get("platform_type") == "studio_agent" and
             detail.get("span_type") == "workflow"):
             # Get workflow's time range
             workflow_start = detail.get("start_time_micros")
@@ -777,15 +782,21 @@ class TraceSummaryRepository:
                 execute_info_list = [
                     ag_wrapper.model_dump(exclude_unset=True, exclude_none=True)
                 ]
+                business_version = ag_version
             else:
                 execute_info_models = _extract_summary_execution_info_from_trace_detail(
                     trace_details
                 )
+                wf_version = None
+                for d in trace_details:
+                    if d.get("workflow_version") or d.get("version"):
+                        wf_version = d.get("workflow_version") or d.get("version")
+                        break
                 wf_wrapper = InvokeExecuteInfo(
                     invoke_id=business_id,
                     invoke_type="workflow",
                     invoke_name=None,
-                    invoke_version=None,
+                    invoke_version=wf_version,
                     status=overall_status,
                     inputs=inputs,
                     outputs=outputs,
@@ -796,12 +807,14 @@ class TraceSummaryRepository:
                 execute_info_list = [
                     wf_wrapper.model_dump(exclude_unset=True, exclude_none=True)
                 ]
+                business_version = wf_version
 
             # Create TraceSummary data
             trace_summary_data = TraceSummary(
                 space_id=space_id,
                 business_id=business_id,
                 business_type=business_type,
+                business_version=business_version,
                 trace_id=trace_id,
                 mode=mode,  # Use the passed mode parameter
                 duration=duration,
@@ -823,12 +836,59 @@ class TraceSummaryRepository:
 
             return ResponseModel(
                 code=result.code,
-                message=f"Successfully created TraceSummary from {len(trace_details)} TraceDetail records: {result.message}",
+                message=f"Successfully created TraceSummary from {len(trace_details)}"
+                    f"TraceDetail records: {result.message}",
                 data={
                     "trace_id": trace_id,
                     "detail_count": len(trace_details),
                     "summary": trace_summary_data,
                 },
+            )
+
+    @with_exception_handling
+    def create_trace_summary_from_workflow_execution(self, trace_id: str) -> ResponseModel:
+        """Create TraceSummary from WorkflowExecutionDB data (for workflows that don't write to TraceDetailDB)."""
+        with get_db_jw() as db:
+            from sqlalchemy import select
+            stmt = select(WorkflowExecutionDB).where(WorkflowExecutionDB.trace_id == trace_id)
+            wf_exec = db.execute(stmt).scalar_one_or_none()
+            if not wf_exec:
+                return ResponseModel(
+                    code=status.HTTP_404_NOT_FOUND,
+                    message=f"No WorkflowExecution found for trace_id: {trace_id}",
+                    data=None,
+                )
+
+            trace_summary_data = TraceSummary(
+                space_id=wf_exec.space_id,
+                business_id=wf_exec.workflow_id,
+                business_type="WORKFLOW",
+                business_version=wf_exec.workflow_version,
+                trace_id=trace_id,
+                mode=wf_exec.mode or 0,
+                duration=wf_exec.duration,
+                status=wf_exec.status or "finish",
+                inputs=wf_exec.inputs,
+                outputs=wf_exec.outputs,
+                execute_info_list=wf_exec.execute_info_list,
+                error_code=wf_exec.error_code,
+                fail_reason=wf_exec.fail_reason,
+                input_tokens=wf_exec.input_tokens,
+                output_tokens=wf_exec.output_tokens,
+                create_time=wf_exec.create_time,
+            )
+
+            summary_base_repo = JiuwenBaseRepository(db, TraceSummaryDB)
+            summary_find_id = {"business_id": wf_exec.workflow_id, "trace_id": trace_id}
+            result = summary_base_repo.register_dl_in_sql(
+                find_id=summary_find_id,
+                dl=trace_summary_data.model_dump(exclude_unset=True),
+            )
+
+            return ResponseModel(
+                code=result.code,
+                message=f"Created TraceSummary from WorkflowExecution: {result.message}",
+                data={"trace_id": trace_id},
             )
 
     @with_exception_handling
@@ -868,6 +928,303 @@ class TraceSummaryRepository:
                 data=data_list,
             )
 
+    @staticmethod
+    def _enrich_with_business_names(data_list: list, db) -> list:
+        """Look up workflow/agent names and versions for a list of trace dicts."""
+        if not data_list:
+            return data_list
+
+        workflow_ids = list({d["business_id"] for d in data_list if d.get("business_type") == "WORKFLOW"})
+        agent_ids = list({d["business_id"] for d in data_list if d.get("business_type") == "AGENT"})
+
+        name_map = {}
+        wf_version_map = {}
+        ag_version_map = {}
+        try:
+            if workflow_ids:
+                from sqlalchemy import select
+                stmt = select(WorkflowBaseDB.workflow_id, WorkflowBaseDB.name, WorkflowBaseDB.workflow_version).where(
+                    WorkflowBaseDB.workflow_id.in_(workflow_ids)
+                )
+                for row in db.execute(stmt).all():
+                    name_map[row.workflow_id] = row.name
+                    # Prefer non-draft version
+                    if row.workflow_id not in wf_version_map or (
+                        row.workflow_version and row.workflow_version != "draft"
+                    ):
+                        wf_version_map[row.workflow_id] = row.workflow_version
+
+            if agent_ids:
+                from sqlalchemy import select
+                stmt = select(agent_models.AgentBaseDB.agent_id, 
+                              agent_models.AgentBaseDB.agent_name, agent_models.AgentBaseDB.agent_version).where(
+                    agent_models.AgentBaseDB.agent_id.in_(agent_ids)
+                )
+                for row in db.execute(stmt).all():
+                    name_map[row.agent_id] = row.agent_name
+                    if row.agent_id not in ag_version_map or (row.agent_version and row.agent_version != "draft"):
+                        ag_version_map[row.agent_id] = row.agent_version
+        except Exception as e:
+            logger.warning(f"Failed to look up business names: {e}")
+
+        for d in data_list:
+            d["business_name"] = name_map.get(d["business_id"])
+            if d.get("business_type") == "WORKFLOW" and not d.get("business_version"):
+                d["business_version"] = wf_version_map.get(d["business_id"])
+            elif d.get("business_type") == "AGENT" and not d.get("business_version"):
+                d["business_version"] = ag_version_map.get(d["business_id"])
+
+        return data_list
+
+    @with_exception_handling
+    def get_trace_summary_list_by_space(
+        self, space_id: str, business_type: str = None, limit: int = 50
+    ) -> ResponseModel:
+        """Get trace summaries for all workflows/agents in a space.
+
+        Args:
+            space_id: Space ID
+            business_type: Optional filter - 'WORKFLOW' or 'AGENT'
+            limit: Maximum number of records to return
+
+        Returns:
+            ResponseModel: list of trace summary briefs with status
+        """
+        with get_db_jw() as db:
+            base_repo = JiuwenBaseRepository(db, TraceSummaryDB)
+
+            find_id = {"space_id": space_id}
+            if business_type:
+                find_id["business_type"] = business_type
+
+            result = base_repo.get_dl_in_sql_with_cols(
+                find_id=find_id,
+                cols_find=["trace_id", "business_id", "business_type", 
+                           "business_version", "create_time", "duration", "status"],
+                order_cols_desc=["create_time"],
+                return_range=[limit],
+            )
+
+            if result.code != status.HTTP_200_OK:
+                return result
+
+            data_list = [
+                {
+                    "trace_id": d.get("trace_id"),
+                    "business_id": d.get("business_id"),
+                    "business_type": d.get("business_type"),
+                    "business_version": d.get("business_version"),
+                    "create_time": d.get("create_time"),
+                    "duration": d.get("duration"),
+                    "status": d.get("status"),
+                }
+                for d in (result.data or [])
+            ]
+
+            self._enrich_with_business_names(data_list, db)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Retrieved {len(data_list)} trace summary records for space",
+                data=data_list,
+            )
+
+    @with_exception_handling
+    def get_running_traces_by_space(
+        self, space_id: str, business_type: str = None
+    ) -> ResponseModel:
+        """Find traces that are currently running (exist in TraceDetail but have no
+        completed TraceSummary with status 'finish').
+
+        Returns trace_ids with business_id, business_type, and earliest start time.
+        """
+        from sqlalchemy import select, func, distinct, and_, not_, exists
+
+        with get_db_jw() as db:
+            # Subquery: trace_ids that have a completed TraceSummary
+            completed_subq = (
+                select(TraceSummaryDB.trace_id)
+                .where(TraceSummaryDB.status.in_(["finish", "error", "interrupted"]))
+            ).correlate(TraceDetailDB)
+
+            # Main query: distinct trace_ids from TraceDetail that are NOT in completed
+            conditions = [TraceDetailDB.space_id == space_id]
+            if business_type:
+                conditions.append(TraceDetailDB.business_type == business_type)
+
+            stmt = (
+                select(
+                    TraceDetailDB.trace_id,
+                    TraceDetailDB.business_id,
+                    TraceDetailDB.business_type,
+                    func.min(TraceDetailDB.start_time_micros).label("start_time_micros"),
+                )
+                .where(
+                    and_(
+                        *conditions,
+                        ~TraceDetailDB.trace_id.in_(completed_subq),
+                    )
+                )
+                .group_by(
+                    TraceDetailDB.trace_id,
+                    TraceDetailDB.business_id,
+                    TraceDetailDB.business_type,
+                )
+                .order_by(func.min(TraceDetailDB.start_time_micros).desc())
+                .limit(20)
+            )
+
+            rows = db.execute(stmt).all()
+            now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+            data_list = []
+            for row in rows:
+                start_micros = row.start_time_micros
+                create_time = None
+                elapsed_ms = None
+                if start_micros:
+                    create_time = datetime.fromtimestamp(start_micros / 1_000_000, tz=timezone.utc)
+                    elapsed_ms = now_ms - int(start_micros // 1000)
+                data_list.append({
+                    "trace_id": row.trace_id,
+                    "business_id": row.business_id,
+                    "business_type": row.business_type,
+                    "create_time": create_time,
+                    "elapsed_ms": elapsed_ms,
+                    "duration": None,
+                    "status": "running",
+                })
+
+            self._enrich_with_business_names(data_list, db)
+
+            return ResponseModel(
+                code=status.HTTP_200_OK,
+                message=f"Found {len(data_list)} running traces",
+                data={"traces": data_list, "server_time_ms": now_ms},
+            )
+
+    @staticmethod
+    def _build_live_summary_from_trace_detail(trace_id: str, db) -> ResponseModel:
+        """Build an ExecutionLogSummary from TraceDetailDB for a running (incomplete) trace.
+
+        Read-only — does not write to TraceSummaryDB.
+        """
+        detail_base_repo = JiuwenBaseRepository(db, TraceDetailDB)
+        detail_result = detail_base_repo.get_dl_in_sql_with_cols(
+            find_id={"trace_id": trace_id}, order_cols_asc=["start_time_micros"]
+        )
+        if detail_result.code != status.HTTP_200_OK or not detail_result.data:
+            return ResponseModel(
+                code=status.HTTP_404_NOT_FOUND,
+                message="Trace summary record not found",
+                data=None,
+            )
+
+        trace_details = detail_result.data
+        first_detail = trace_details[0]
+        business_id = first_detail.get("business_id")
+        business_type = first_detail.get("business_type")
+
+        start_time = None
+        end_time = None
+        for d in trace_details:
+            if start_time is None and d.get("start_time_micros"):
+                start_time = d.get("start_time_micros")
+            if d.get("end_time_micros"):
+                try:
+                    de_int = int(d["end_time_micros"])
+                    et_int = int(end_time) if end_time else None
+                    if et_int is None or de_int > et_int:
+                        end_time = d["end_time_micros"]
+                except (ValueError, TypeError):
+                    pass
+        duration = _calc_duration_ms(start_time, end_time)
+
+        span_status_map: Dict[str, set] = {}
+        for d in trace_details:
+            sid = d.get("span_id")
+            sc = d.get("status_code")
+            if sc is None or sc == "":
+                sc = "start"
+            elif sc == "0":
+                sc = "finish"
+            s = span_status_map.setdefault(sid, set())
+            s.add(sc)
+
+        has_error = any(
+            any(x not in ("start", "finish", "interrupted") for x in v)
+            for v in span_status_map.values()
+        )
+        has_interrupted = any("interrupted" in v for v in span_status_map.values())
+        if has_error:
+            overall_status = "error"
+        elif has_interrupted:
+            overall_status = "interrupted"
+        else:
+            all_finished = all("finish" in v for v in span_status_map.values()) if span_status_map else False
+            if all_finished:
+                overall_status = "finish"
+            else:
+                has_any_finish = any("finish" in v for v in span_status_map.values())
+                overall_status = "running" if has_any_finish else "start"
+
+        if business_type == "AGENT":
+            execute_info_models = _extract_agent_execution_info_from_trace_detail(trace_details, is_live=True)
+            inputs = None
+            outputs = None
+            for d in trace_details:
+                if d.get("platform_type") == "studio_agent":
+                    if inputs is None:
+                        inputs = _normalize_dict_field(d.get("input"))
+                    break
+            for d in reversed(trace_details):
+                if d.get("platform_type") == "studio_agent" and d.get("output") is not None:
+                    outputs = _normalize_dict_field(d.get("output"))
+                    break
+            ag_version = None
+            for d in trace_details:
+                if d.get("platform_type") == "studio_agent":
+                    ag_version = d.get("agent_version") or d.get("version")
+                    break
+            wrapper = InvokeExecuteInfo(
+                invoke_id=business_id, invoke_type="agent", invoke_name="agent",
+                invoke_version=ag_version, status=overall_status,
+                inputs=inputs, outputs=outputs, duration=duration, start_timestamp=0,
+            )
+            wrapper.child_invokes_execute_info = execute_info_models
+            execute_info_list_raw = [wrapper]
+        else:
+            execute_info_models = _extract_summary_execution_info_from_trace_detail(trace_details)
+            inputs = _normalize_dict_field(first_detail.get("input"))
+            outputs = _normalize_dict_field(trace_details[-1].get("output"))
+            wf_version = None
+            for d in trace_details:
+                if d.get("workflow_version") or d.get("version"):
+                    wf_version = d.get("workflow_version") or d.get("version")
+                    break
+            wrapper = InvokeExecuteInfo(
+                invoke_id=business_id, invoke_type="workflow", invoke_name=None,
+                invoke_version=wf_version, status=overall_status,
+                inputs=inputs, outputs=outputs, duration=duration, start_timestamp=0,
+            )
+            wrapper.child_invokes_execute_info = execute_info_models
+            execute_info_list_raw = [wrapper]
+
+        summary = ExecutionLogSummary(
+            trace_id=trace_id,
+            create_time=_to_datetime(start_time),
+            duration=duration,
+            status=overall_status,
+            inputs=inputs,
+            outputs=outputs,
+            execute_info_list=execute_info_list_raw or None,
+        )
+        _normalize_start_timestamp(summary.execute_info_list)
+        return ResponseModel(
+            code=status.HTTP_200_OK,
+            message="Live trace summary built from TraceDetail",
+            data=summary.model_dump(),
+        )
+
     @with_exception_handling
     def get_trace_summary_by_trace_id(self, trace_id: str) -> ResponseModel:
         """Query record by trace_id
@@ -888,11 +1245,9 @@ class TraceSummaryRepository:
                 return result
 
             if not result.data:
-                return ResponseModel(
-                    code=status.HTTP_404_NOT_FOUND,
-                    message="Trace summary record not found",
-                    data=None,
-                )
+                # No completed TraceSummary — fall back to live data from TraceDetail
+                # (handles running/in-progress traces)
+                return self._build_live_summary_from_trace_detail(trace_id, db)
             row = result.data[0]
             exec_infos = []
             for item in row.get("execute_info_list") or []:

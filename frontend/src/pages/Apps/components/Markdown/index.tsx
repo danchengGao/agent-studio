@@ -2,10 +2,9 @@
  * ReportMarkdown 组件主入口
  */
 
-import React, { useLayoutEffect } from 'react'
+import React from 'react'
 import type { MarkdownProps } from './types'
 import { MarkdownRenderer } from './MarkdownRenderer'
-import { resetLinkIndexCounter } from '../CitationPanel/CitationLink'
 
 /**
  * ReportMarkdown 组件
@@ -26,17 +25,8 @@ export const ReportMarkdown: React.FC<MarkdownProps> = ({
   content,
   citations,
   inferMessages,
+  chartMessages,
 }) => {
-  /**
-   * 每次渲染前重置 linkIndex 计数器
-   * 使用 useLayoutEffect 确保在渲染前同步执行
-   */
-  useLayoutEffect(() => {
-    if (instanceId) {
-      resetLinkIndexCounter(instanceId)
-    }
-  })
-
   return (
     <div
       className={`markdown-content prose max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-blue-600 ${className}`}
@@ -46,6 +36,7 @@ export const ReportMarkdown: React.FC<MarkdownProps> = ({
         content={content}
         citations={citations}
         inferMessages={inferMessages}
+        chartMessages={chartMessages}
       />
     </div>
   )

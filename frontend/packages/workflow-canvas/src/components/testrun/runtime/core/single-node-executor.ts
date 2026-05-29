@@ -46,7 +46,9 @@ export class SingleNodeExecutor {
 
       if (result.code === 200 && eventHandling.enableNodeReport) {
         let outputData = null
-        if (result.data?.output?.result) {
+        if (result.data?.payload?.output !== undefined) {
+          outputData = result.data.payload.output
+        } else if (result.data?.output?.result) {
           outputData = result.data.output.result
         } else if (result.data?.response) {
           outputData = result.data.response

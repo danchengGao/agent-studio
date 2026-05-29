@@ -1,0 +1,262 @@
+# Connect — Webhook
+
+The webhook server exposes OpenJiuwen workflows and agents as plain HTTP endpoints.
+Any tool that can make an HTTP request — n8n, Zapier, Make, curl, CI pipelines, custom scripts —
+can trigger them without a bot account.
+
+## Prerequisites
+
+- OpenJiuwen backend running and accessible
+
+## Installation
+
+### For Direct Run (Local Development)
+
+If running the backend directly on your machine, install dependencies first:
+
+```bash
+pip install -r connect/adapters/channels/requirements.txt
+```
+
+### For Docker Run (Production)
+
+If running OpenJiuwen in Docker, dependencies are already installed via `pyproject.toml` — skip to Step 1.
+
+## Step 1 — Start the Server
+
+**Direct Run:**
+```bash
+python -m connect.adapters.channels.run webhook
+```
+
+**Docker Run:**
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run webhook
+```
+
+Replace `<container_id>` with your actual container ID (find it with `docker ps`).
+
+The server starts on `http://0.0.0.0:8080` by default:
+
+```
+Connected to OpenJiuwen backend at http://localhost:8000
+OpenJiuwen Webhook Server running on http://0.0.0.0:8080
+   Docs: http://0.0.0.0:8080/docs
+```
+
+**Note:** All examples below show Direct Run commands. For Docker, prefix each command with:
+```bash
+docker exec -it <container_id> python -m connect.adapters.channels.run ...
+```
+
+### Common options
+
+```bash
+# Custom port
+python -m connect.adapters.channels.run webhook --port 9000
+
+# Custom backend URL
+python -m connect.adapters.channels.run webhook --backend-url http://my-server:8000
+
+# Static backend token (callers don't need to supply their own)
+python -m connect.adapters.channels.run webhook --token eyJhbGci...
+
+# Protect the server with an API key
+python -m connect.adapters.channels.run webhook --api-key mysecret
+
+# All together
+python -m connect.adapters.channels.run webhook \
+  --port 9000 \
+  --backend-url http://my-server:8000 \
+  --token eyJhbGci... \
+  --api-key mysecret
+```
+
+### Environment variables
+
+| Option | Env var |
+|--------|---------|
+| `--host` | `WEBHOOK_HOST` |
+| `--port` | `WEBHOOK_PORT` |
+| `--backend-url` | `BACKEND_URL` |
+| `--token` | `ACCESS_TOKEN` |
+| `--api-key` | `WEBHOOK_API_KEY` |
+
+## Step 2 — Explore the API
+
+Open **http://localhost:8080/docs** in your browser.
+
+FastAPI generates interactive Swagger UI documentation automatically. You can read request/response
+schemas and try every endpoint directly from the browser.
+
+## Step 3 — Authenticate
+
+The server resolves the backend token from (highest priority first):
+
+1. **`X-Token` header**: `curl -H "X-Token: eyJhbGci..."`
+2. **`Authorization: Bearer` header**: `curl -H "Authorization: Bearer eyJhbGci..."`
+3. **Static token** configured at startup via `--token` / `ACCESS_TOKEN`
+
+### Login via API
+
+If you don't have a token, call `/auth/login` once to get one:
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "you@example.com", "password": "yourpassword"}'
+```
+
+```json
+{
+  "success": true,
+  "token": "eyJhbGci...",
+  "space_id": "your-space-id",
+  "refresh_token": "...",
+  "error": null
+}
+```
+
+## Step 4 — Make Requests
+
+### Health check
+
+```bash
+curl http://localhost:8080/health
+```
+
+```json
+{"webhook": "ok", "backend": {"status": "healthy"}}
+```
+
+### Workflows
+
+**List all workflows:**
+```bash
+curl http://localhost:8080/workflows/list -H "X-Token: eyJhbGci..."
+```
+
+**Search workflows:**
+```bash
+curl "http://localhost:8080/workflows/search?keyword=weather" -H "X-Token: eyJhbGci..."
+```
+
+**Get workflow details:**
+```bash
+curl "http://localhost:8080/workflows/get?workflow_id=your-workflow-id" -H "X-Token: eyJhbGci..."
+```
+
+**Execute a workflow:**
+```bash
+curl -X POST http://localhost:8080/workflows/execute \
+  -H "Content-Type: application/json" \
+  -H "X-Token: eyJhbGci..." \
+  -d '{"workflow_id": "your-workflow-id", "inputs": {"param1": "value1"}}'
+```
+
+Response:
+```json
+{"success": true, "outputs": {"result": "..."}, "error": null}
+```
+
+### Agents
+
+**List all agents:**
+```bash
+curl http://localhost:8080/agents/list -H "X-Token: eyJhbGci..."
+```
+
+**Search agents:**
+```bash
+curl "http://localhost:8080/agents/search?keyword=support" -H "X-Token: eyJhbGci..."
+```
+
+**Send a single message to an agent:**
+```bash
+curl -X POST http://localhost:8080/agents/execute \
+  -H "Content-Type: application/json" \
+  -H "X-Token: eyJhbGci..." \
+  -d '{"agent_id": "your-agent-id", "message": "Hello, how can you help me?"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "text": "I can help you with...",
+  "conversation_id": "3f2a1b4c-...",
+  "error": null
+}
+```
+
+**Continue a conversation** (pass `conversation_id` from the previous response):
+```bash
+curl -X POST http://localhost:8080/agents/execute \
+  -H "Content-Type: application/json" \
+  -H "X-Token: eyJhbGci..." \
+  -d '{"agent_id": "your-agent-id", "message": "Tell me more", "conversation_id": "3f2a1b4c-..."}'
+```
+
+## All Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Webhook server and backend health |
+| `POST` | `/auth/login` | Exchange credentials for a token |
+| `GET` | `/workflows/list` | List all workflows |
+| `GET` | `/workflows/search?keyword=...` | Search workflows by name |
+| `GET` | `/workflows/get?workflow_id=...` | Get workflow details |
+| `POST` | `/workflows/execute` | Execute a workflow and return outputs |
+| `GET` | `/agents/list` | List all agents |
+| `GET` | `/agents/search?keyword=...` | Search agents by name |
+| `POST` | `/agents/execute` | Send a message to an agent and get a reply |
+
+## Protecting the Server with an API Key
+
+If started with `--api-key`, every request must include the `X-API-Key` header:
+
+```bash
+curl -X POST http://localhost:8080/workflows/execute \
+  -H "X-API-Key: mysecret" \
+  -H "X-Token: eyJhbGci..." \
+  -H "Content-Type: application/json" \
+  -d '{"workflow_id": "xyz", "inputs": {}}'
+```
+
+## Connecting from External Tools
+
+### n8n
+
+1. Add an **HTTP Request** node
+2. Method: `POST`, URL: `http://your-server:8080/workflows/execute`
+3. Body (JSON): `{"workflow_id": "{{ $json.workflow_id }}", "inputs": {{ $json.inputs }}}`
+4. Add header `X-Token: <your-token>` (and `X-API-Key` if using API key protection)
+
+### curl / scripts
+
+```bash
+#!/bin/bash
+RESULT=$(curl -s -X POST http://localhost:8080/workflows/execute \
+  -H "Content-Type: application/json" \
+  -H "X-Token: $BACKEND_TOKEN" \
+  -d "{\"workflow_id\": \"$WORKFLOW_ID\", \"inputs\": {}}")
+echo $RESULT | python3 -m json.tool
+```
+
+### GitHub Actions
+
+```yaml
+- name: Run OpenJiuwen workflow
+  run: |
+    curl -X POST ${{ secrets.WEBHOOK_URL }}/workflows/execute \
+      -H "X-API-Key: ${{ secrets.WEBHOOK_API_KEY }}" \
+      -H "X-Token: ${{ secrets.BACKEND_TOKEN }}" \
+      -H "Content-Type: application/json" \
+      -d '{"workflow_id": "${{ vars.WORKFLOW_ID }}", "inputs": {}}'
+```
+
+## Notes
+
+- The server blocks per request until the workflow/agent completes. Set generous HTTP timeouts for long-running workflows.
+- There is no per-user session management — all requests use the same backend token.
+- To expose the server publicly (e.g. for Zapier webhooks), put it behind a reverse proxy (nginx, Caddy) with HTTPS, and always use `--api-key`.

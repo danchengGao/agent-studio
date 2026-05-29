@@ -4,6 +4,11 @@
 from typing import Literal, List, Optional, Any
 from pydantic import BaseModel, Field
 
+MAX_TEMPLATE_CONTENT_LENGTH = 5 * 1000 * 1000
+MAX_TEMPLATE_DESC_LENGTH = 2000
+MAX_TEMPLATE_FILE_NAME_LENGTH = 255
+MAX_TEMPLATE_NAME_LENGTH = 255
+
 
 class WebSearchConfig(BaseModel):
     web_search_config_id: int = Field(description="Web搜索引擎ID")
@@ -52,6 +57,12 @@ class DeepSearchRequest(BaseModel):
     plan_understanding_model_id: Optional[int] = Field(default=None, description="计划理解模型ID（可选）")
     info_collecting_model_id: Optional[int] = Field(default=None, description="信息收集模型ID（可选）")
     writing_checking_model_id: Optional[int] = Field(default=None, description="写作检查模型ID（可选）")
+    vlm_model_config_id: Optional[int] = Field(default=None, description="VLM图表生成模型ID（可选）")
+    vlm_chart_generator_enable: bool = Field(default=False, description="是否启用VLM图表生成")
+    vlm_chart_generator_max_iterations: int = Field(
+        default=1,
+        description="VLM图表生成最大迭代次数，0表示不进行VLM迭代",
+    )
     execution_method: Literal["parallel", "dependency_driving"] = Field(default="parallel",
                                                                          description="执行方法："
                                                                                      "parallel: 并行工作流执行"
@@ -64,11 +75,23 @@ class DeepSearchRequest(BaseModel):
 class TemplateImportRequest(BaseModel):
     """Request for importing a template"""
     space_id: str = Field(..., description="Space ID")
-    file_name: str = Field(..., description="File name with extension")
-    file_stream: str = Field(..., description="Base64 encoded file content")
+    file_name: str = Field(
+        ..., min_length=1, max_length=MAX_TEMPLATE_FILE_NAME_LENGTH,
+        description="File name with extension"
+    )
+    file_stream: str = Field(
+        ..., min_length=1, max_length=MAX_TEMPLATE_CONTENT_LENGTH,
+        description="Base64 encoded file content"
+    )
     is_template: bool = Field(..., description="Whether it's a template or sample report")
-    template_name: str = Field(..., description="Template name")
-    template_desc: str = Field(..., description="Template description")
+    template_name: str = Field(
+        ..., min_length=1, max_length=MAX_TEMPLATE_NAME_LENGTH,
+        description="Template name"
+    )
+    template_desc: str = Field(
+        ..., max_length=MAX_TEMPLATE_DESC_LENGTH,
+        description="Template description"
+    )
     model_config_id: int = Field(..., description="Model configuration ID")
 
 
@@ -76,9 +99,18 @@ class TemplateUpdateRequest(BaseModel):
     """Request for updating a specific template"""
     space_id: str = Field(..., description="Space ID")
     template_id: int = Field(..., description="Template ID")
-    template_content: str = Field(..., description="Base64 encoded template content")
-    template_name: str = Field(..., description="Template name")
-    template_desc: str = Field(..., description="Template description")
+    template_content: str = Field(
+        ..., min_length=1, max_length=MAX_TEMPLATE_CONTENT_LENGTH,
+        description="Base64 encoded template content"
+    )
+    template_name: str = Field(
+        ..., min_length=1, max_length=MAX_TEMPLATE_NAME_LENGTH,
+        description="Template name"
+    )
+    template_desc: str = Field(
+        ..., max_length=MAX_TEMPLATE_DESC_LENGTH,
+        description="Template description"
+    )
 
 
 # Response Models

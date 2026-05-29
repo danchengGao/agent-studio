@@ -4,8 +4,9 @@
 
 import asyncio
 import threading
+import time
 from typing import Dict, Optional, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from builtins import id as builtinid
 from openjiuwen.core.common.logging import logger
 from openjiuwen.core.workflow import Session
@@ -20,6 +21,7 @@ class WorkflowExecutionRegistration:
     space_id: str
     session: Optional[Session] = None
     task: Optional[asyncio.Task] = None
+    start_time: Optional[float] = None
 
 
 @dataclass
@@ -48,6 +50,7 @@ class WorkflowExecutionManager:
                 space_id=registration.space_id,
                 session=registration.session,
                 task=registration.task,
+                start_time=registration.start_time or time.time(),
                 thread_id=thread_id
             )
             # 初始化取消标志

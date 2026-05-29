@@ -19,6 +19,7 @@ import { deepsearchTemplateService, PromptModel } from '@test-agentstudio/api-cl
 import DeleteConfirmationDialog from '../../../components/Common/DeleteConfirmationDialog'
 import UnifiedSnackbar, { useUnifiedSnackbar } from '../../../Common/UnifiedSnackbar'
 import { DEFAULT_DEEPSEARCH_CONFIG } from '../utils/deepsearchConstants'
+import type { Model } from '@/types/promptType'
 
 // 导入新的配置标签系统
 import { ConfigRegistryManager, ConfigTabId } from './config/ConfigRegistry'
@@ -49,6 +50,8 @@ export interface DeepSearchConfig {
   enableSourceTracerInfer: boolean // 溯源推理功能开关
   userFeedbackProcessorEnable: boolean // 报告改写功能开关，默认开启
   userFeedbackProcessorMaxInteractions: number // 用户反馈优化最大交互次数，默认 3（隐藏配置）
+  vlmChartGeneratorEnable: boolean
+  vlmChartGeneratorMaxIterations: number
 
   // 搜索配置
   searchMode: 'local' | 'web' | 'all'
@@ -70,6 +73,7 @@ export interface DeepSearchConfig {
   planUnderstandingModelId?: string // 计划理解模型ID
   infoCollectingModelId?: string // 信息收集模型ID
   writingCheckingModelId?: string // 写作检查模型ID
+  vlmChartModelId?: string // VLM图表生成模型ID
   execution_method?: string,   // DeepSearch执行模式："parallel", "dependency_driving"
 }
 
@@ -89,6 +93,8 @@ export interface AgentConfigDialogProps {
   // 模型配置相关
   availableModels?: PromptModel[]
   modelsLoading?: boolean
+  availableVLMModels?: Model[]
+  vlmModelsLoading?: boolean
 }
 
 // ==================== 辅助组件 ====================
@@ -165,6 +171,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
   isFirstConfig = false,
   availableModels = [],
   modelsLoading = false,
+  availableVLMModels = [],
+  vlmModelsLoading = false,
 }) => {
   const { t } = useTranslation()
   const { snackbar, closeSnackbar, showError } = useUnifiedSnackbar()
@@ -272,33 +280,33 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     manager.registerAll([
       {
         id: 'general',
-        label: '通用配置',
+        label: t('apps.config.tabs.general'),
         icon: <Settings className="w-5 h-5" />,
-        description: '交互、规划等基础设置',
+        description: t('apps.config.tabs.generalDesc'),
         component: GeneralConfigTab,
         order: 1,
       },
       {
         id: 'search',
-        label: '搜索配置',
+        label: t('apps.config.tabs.search'),
         icon: <Search className="w-5 h-5" />,
-        description: '搜索引擎与结果设置',
+        description: t('apps.config.tabs.searchDesc'),
         component: SearchConfigTab,
         order: 2,
       },
       {
         id: 'template',
-        label: '模板配置',
+        label: t('apps.config.tabs.template'),
         icon: <FileText className="w-5 h-5" />,
-        description: '报告模板管理',
+        description: t('apps.config.tabs.templateDesc'),
         component: TemplateConfigTab,
         order: 3,
       },
       {
         id: 'model',
-        label: '模型配置',
+        label: t('apps.config.tabs.model'),
         icon: <Cpu className="w-5 h-5" />,
-        description: '模型配置管理',
+        description: t('apps.config.tabs.modelDesc'),
         component: ModelConfigTab,
         order: 4,
       },
@@ -348,6 +356,14 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
     // 规划章节数量验证
     if (config.planChapterCount < 1 || config.planChapterCount > 10) {
       errors.push(t('apps.config.validation.chapterCountRange'))
+    }
+
+    if (config.vlmChartGeneratorMaxIterations < 0 || config.vlmChartGeneratorMaxIterations > 3) {
+      errors.push(t('apps.config.validation.vlmChartIterationsRange', { defaultValue: 'VLM 图表生成最大迭代次数必须在 0 到 3 之间' }))
+    }
+
+    if (config.vlmChartGeneratorEnable && config.vlmChartGeneratorMaxIterations > 0 && !config.vlmChartModelId) {
+      errors.push(t('apps.config.validation.vlmChartModelRequired', { defaultValue: '启用 VLM 图表生成且迭代次数大于 0 时，需要选择 VLM 模型' }))
     }
 
     // 通用模型验证（必选项）
@@ -619,7 +635,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
       setEngineListRefreshTrigger(prev => prev + 1)
     } catch (err) {
       console.error('切换搜索引擎状态失败:', err)
-      const errorMessage = err instanceof Error ? err.message : '切换状态失败'
+      const errorMessage = err instanceof Error ? err.message : t('apps.config.engine.toggleStatusFailed')
       // 使用 UnifiedSnackbar 替代 alert
       const event = new CustomEvent('global-snackbar', {
         detail: { message: errorMessage, severity: 'error' as const }
@@ -789,6 +805,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                       disabled: false,
                       ToggleSwitch,
                       RangeSlider,
+                      availableVLMModels,
+                      vlmModelsLoading,
                   } : activeTab === 'search' ? {
                         config,
                         updateConfig,
@@ -827,6 +845,8 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                           disabled: false,
                           availableModels,
                           modelsLoading,
+                          availableVLMModels,
+                          vlmModelsLoading,
                           spaceId: spaceId || '',
                         }
               }
@@ -1127,7 +1147,7 @@ const AgentConfigDialog: React.FC<AgentConfigDialogProps> = ({
                   {testResults !== null && !testError && (
                     <>
                       <h3 className="text-sm font-medium text-gray-900 mb-3">
-                        {t('apps.config.engine.test.testResult')} {testResults.length > 0 && `(${testResults.length}条)`}
+                        {t('apps.config.engine.test.testResult')} {testResults.length > 0 && `(${testResults.length}${t('apps.config.engine.test.resultCountUnit')})`}
                       </h3>
                       {testResults.length === 0 ? (
                         <p className="text-sm text-gray-500 text-center py-4">{t('apps.config.engine.test.noResults')}</p>

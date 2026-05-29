@@ -2,6 +2,7 @@ from .base_repository import BaseRepository
 from .model_config_repository import ModelConfigRepository
 from .model_usage_repository import ModelUsageRepository
 from .embedding_model_config_repository import EmbeddingModelConfigRepository
+from .vlm_model_config_repository import VLMModelConfigRepository
 from openjiuwen_studio.core.manager.repositories.jiuwen_base_repository import JiuwenBaseRepository
 from .agent_repository import AgentRepository
 from .prompt_relation_repository import PromptRelationRepository
@@ -16,6 +17,7 @@ __all__ = [
     "ModelConfigRepository", 
     "ModelUsageRepository",
     "EmbeddingModelConfigRepository",
+    "VLMModelConfigRepository",
     "JiuwenBaseRepository",
     "AgentRepository",
     "PromptRelationRepository",

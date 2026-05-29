@@ -41,10 +41,11 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "@n8n/n8n-nodes-langchain.mcpTrigger": ComponentType.COMPONENT_TYPE_START,
 
     # =========================================================================
-    # AI/LLM NODES → LLM
+    # AI/LLM NODES → LLM / ReAct Agent
     # =========================================================================
-    "n8n-nodes-langchain.agent": ComponentType.COMPONENT_TYPE_LLM,
-    "@n8n/n8n-nodes-langchain.agent": ComponentType.COMPONENT_TYPE_LLM,
+    # Agent nodes map to ReAct Agent (has tools support)
+    "n8n-nodes-langchain.agent": ComponentType.COMPONENT_TYPE_REACT_AGENT,
+    "@n8n/n8n-nodes-langchain.agent": ComponentType.COMPONENT_TYPE_REACT_AGENT,
     "n8n-nodes-langchain.chainLlm": ComponentType.COMPONENT_TYPE_LLM,
     "@n8n/n8n-nodes-langchain.chainLlm": ComponentType.COMPONENT_TYPE_LLM,
     "n8n-nodes-langchain.chainRetrievalQa": ComponentType.COMPONENT_TYPE_LLM,
@@ -125,9 +126,9 @@ N8N_TO_OPENJIUWEN: Dict[str, ComponentType] = {
     "@n8n/n8n-nodes-langchain.code": ComponentType.COMPONENT_TYPE_CODE,
 
     # =========================================================================
-    # HTTP/API → Plugin
+    # HTTP/API → HTTP Request
     # =========================================================================
-    "n8n-nodes-base.httpRequest": ComponentType.COMPONENT_TYPE_PLUGIN,
+    "n8n-nodes-base.httpRequest": ComponentType.COMPONENT_TYPE_HTTP_REQUEST,
     "n8n-nodes-langchain.openAi": ComponentType.COMPONENT_TYPE_PLUGIN,
     "@n8n/n8n-nodes-langchain.openAi": ComponentType.COMPONENT_TYPE_PLUGIN,
     "n8n-nodes-langchain.mcpClient": ComponentType.COMPONENT_TYPE_PLUGIN,

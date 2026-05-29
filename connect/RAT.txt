@@ -1,0 +1,34 @@
+Requirements Analysis Template:
+
+Source of demand:
+- Market Project / [XXX Product Line + XXX Product / XXXX Site + XXX Project (Select this option first)
+- Product Requirements + XXX Product + XXXX Requirements (Select this option for product requirements with no commercial background)
+- Proactive Planning + Technological Innovation/Architecture Evolution/New Features/DFX Improvement/Performance Enhancement/...
+- Industry Requirements + Security/Trustworthiness/…
+- Other/…
+
+Demand background:
+- WHY:Regarding the business background or technology-driven aspects, we need the source (preferably the original requester or someone closer to the front end) to explain why they raised this requirement, in what scenario, what project encountered what problems, or what they hope to achieve. Product scale (users/sites/servers/sales)? Growth? Assess product value. Technical value?
+If it's a development project requirement, which technical requirement did it originate from?
+If it's a technical project requirement, in which development project will it be implemented? When is it planned for implementation? On which products will it be implemented?
+
+- WHEN: When does the requester hope to deliver this requirement, including the release date of the version containing this requirement?
+
+- WHAT: What does the R&D team need to do to meet this requirement, and what goals/metrics need to be achieved (translated into R&D content and objectives)?
+What needs to be done:
+What functions need to be implemented: ...
+Performance: ...
+
+Requirement type	
+■Functionality (excluding Trust) ■ Performance and Specifications ■ Resource Consumption ■ Operation and Maintenance Methods ■ Trust (Reliability/Availability) ■ Trust (Resilience) ■ Trust (Reconfiguration) ■ Trust (Security) ■ Trust (Privacy) ■ Trust (Safety) ■ Other
+
+Needs Assessment:	
+- Requirement Decomposition and Workload Distribution: (Requirements with a small workload, less than or equal to 1 person-month, do not require further decomposition)
+Assess the workload for quality hardening and testing of newly referenced open-source features.
+Requirements for first-time commercial use or those transitioning to commercial use require pre-meeting review by version SE and test SE.
+
+- Constraints: (Constraints that users must be aware of regarding functionality, performance, specifications, etc.)
+
+- Impact of Requirement Implementation on Existing Systems: (Impacts on architecture, functionality, performance, specifications, reliability, security, maintainability, and multi-product interactions)
+
+- External Dependencies: (Dependencies on open-source and third-party components, management systems, products, chips, materials, etc.; Advance notification to downstream partners regarding potential cooperation with other components is recommended.

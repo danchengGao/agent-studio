@@ -59,18 +59,72 @@ class PluginCreate(BaseModel):
     plugin_type: PluginType = Field(..., alias="plugin_type")
     url: Optional[str] = Field("", alias="url")
     icon_uri: Optional[str] = Field("", alias="icon_uri")
+    auth: Optional[Any] = Field(None, alias="auth")
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
     header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
+    external_plugin_type: Optional[str] = Field(None, alias="external_plugin_type")
+    category: Optional[str] = Field(None, alias="category")
+    category_name: Optional[str] = Field(None, alias="category_name")
+    market_source: Optional[str] = Field(None, alias="market_source")
+    original_market_plugin_id: Optional[str] = Field(None, alias="original_market_plugin_id")
     # stdio transport fields
     command: Optional[str] = Field("", alias="command")
     args: Optional[List[str]] = Field(default_factory=list, alias="args")
     env: Optional[Dict[str, str]] = Field(None, alias="env")
 
-    @field_validator("url")
+    @staticmethod
+    def _is_local_file_path(value: str) -> bool:
+        """Return True if *value* looks like a local filesystem path rather than a URL."""
+        if value.startswith("/") or value.startswith("./") or value.startswith("../"):
+            return True
+        if value.startswith("~/"):
+            return True
+        return len(value) > 2 and value[1] == ":"  # Windows drive letter, e.g. C:\
+
+    @field_validator("url", mode="after")
     @classmethod
     def check_url_ssrf(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        # Allow file paths (absolute or relative) for local files
+        # Examples: /Users/..., ./file.yaml, ~/file.yaml, C:\path\file.yaml
+        if isinstance(v, str) and cls._is_local_file_path(v):
+            return v
         return validate_plugin_url(v)
+
+    def model_post_init(self, __context) -> None:
+        """Validate MCP plugin requirements after model initialization"""
+        # Constants matching PluginMcpTransport enum (defined later in this file)
+        openapi = 4
+        sse = 2
+        streamable_http = 3
+
+        # For MCP plugins with OPENAPI transport, URL/path is required
+        if self.plugin_type == PluginType.PLUGIN_TYPE_CLOUD_MCP and self.mcp_transport == openapi:
+            if not self.url:
+                raise ValueError(
+                    "For MCP plugins with OPENAPI transport (external_plugin_type='openai'), "
+                    "a URL or file path is required. Provide either:\n"
+                    "  - URL: 'https://api.openai.com/v1'\n"
+                    "  - Local file: '/path/to/openapi.yaml' or './openapi.yaml'"
+                )
+
+        # For MCP plugins with SSE/HTTP transports, URL is required (not local file)
+        if (self.plugin_type == PluginType.PLUGIN_TYPE_CLOUD_MCP and
+            self.mcp_transport in [sse, streamable_http]):
+            if not self.url:
+                raise ValueError(
+                    f"For MCP plugins with transport type {self.mcp_transport}, "
+                    "a valid URL is required."
+                )
+            # SSE/HTTP transports require URL (not local file path)
+            if isinstance(self.url, str) and not self.url.startswith("http"):
+                raise ValueError(
+                    f"For MCP plugins with transport type {self.mcp_transport}, "
+                    "a URL with http/https scheme is required (local file paths are not supported). "
+                    f"Received: {self.url}"
+                )
 
 
 class PluginId(BaseModel):
@@ -87,6 +141,22 @@ class PluginList(BaseModel):
     space_id: str = Field(alias="space_id")
     page: Optional[int] = Field(1, ge=1, alias="page")
     size: Optional[int] = Field(10, ge=1, le=100, alias="size")
+    market_source: Optional[str] = Field("local", alias="market_source")
+
+
+class PluginMarketDetailRequest(BaseModel):
+    space_id: str = Field(alias="space_id")
+    plugin_id: str = Field(alias="plugin_id")
+    plugin_version: Optional[str] = Field("", alias="plugin_version")
+    market_source: Optional[str] = Field("local", alias="market_source")
+    include_contract: Optional[bool] = Field(False, alias="include_contract")
+
+
+class PluginMarketInstallRequest(BaseModel):
+    space_id: str = Field(alias="space_id")
+    plugin_id: str = Field(alias="plugin_id")
+    plugin_version: Optional[str] = Field("", alias="plugin_version")
+    market_source: Optional[str] = Field("local", alias="market_source")
 
 
 class PluginPublish(PluginId):
@@ -101,18 +171,52 @@ class PluginApiHeader(BaseModel):
 
 
 class PluginInfo(PluginBase):
+    @staticmethod
+    def _is_local_file_path(value: str) -> bool:
+        if value.startswith("/") or value.startswith("./") or value.startswith("../"):
+            return True
+        if value.startswith("~/"):
+            return True
+        return len(value) > 2 and value[1] == ":"
+
     name: str = Field(..., alias="name")
     desc: str = Field(..., alias="desc")
     desc_mk: Optional[str] = Field("", alias="desc_mk")
     published: bool = Field(False, alias="published")
     url: Optional[str] = Field("", alias="url")
     icon_uri: Optional[str] = Field("", alias="icon_uri")
+    auth: Optional[Any] = Field(None, alias="auth")
     request_params: Optional[List[PluginToolParam]] = Field([], alias="request_params")
+    header_configuration: Optional[Any] = Field(None, alias="header_configuration")
     mcp_transport: Optional[int] = Field(None, alias="mcp_transport")
+    command: Optional[str] = Field("", alias="command")
+    args: Optional[List[str]] = Field(default_factory=list, alias="args")
+    env: Optional[Dict[str, str]] = Field(None, alias="env")
+    external_plugin_type: Optional[str] = Field(None, alias="external_plugin_type")
+    original_market_plugin_id: Optional[str] = Field(None, alias="original_market_plugin_id")
+    category: Optional[str] = Field(None, alias="category")
+    category_name: Optional[str] = Field(None, alias="category_name")
+    category_icon: Optional[str] = Field(None, alias="category_icon")
+    market_source: Optional[str] = Field(None, alias="market_source")
+    ready: Optional[bool] = Field(None, alias="ready")
+    tags: Optional[List[str]] = Field(None, alias="tags")
+    status: Optional[str] = Field(None, alias="status")
+    config: Optional[Dict[str, Any]] = Field(None, alias="config")
+    original_data: Optional[Dict[str, Any]] = Field(None, alias="original_data")
+    market_detail_snapshot: Optional[Dict[str, Any]] = Field(None, alias="market_detail_snapshot")
+    author: Optional[str] = Field(None, alias="author")
+    detail_desc: Optional[str] = Field(None, alias="detail_desc")
+    plugin_version: Optional[str] = Field("", alias="plugin_version")
+    space_id: Optional[str] = Field(None, alias="space_id")
+    plugin_id: Optional[str] = Field(None, alias="plugin_id")
 
     @field_validator("url")
     @classmethod
     def check_url_ssrf(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return v
+        if isinstance(v, str) and cls._is_local_file_path(v):
+            return v
         return validate_plugin_url(v)
 
     class Config:
@@ -133,10 +237,90 @@ class PluginInfo(PluginBase):
         if "inputs" in data_dict and data_dict["inputs"] is not None:
             data_dict["request_params"] = data_dict.pop("inputs")
 
-        # Extract mcp_transport from _rest_ if present
+        # Extract extra metadata from _rest_ if present
         rest = data_dict.get("_rest_")
-        if isinstance(rest, dict) and "mcp_transport" in rest:
-            data_dict["mcp_transport"] = rest["mcp_transport"]
+        if isinstance(rest, dict) and isinstance(rest.get("_rest_"), dict):
+            rest = rest.get("_rest_")
+            data_dict["_rest_"] = rest
+        if isinstance(rest, dict):
+            if "mcp_transport" in rest:
+                data_dict["mcp_transport"] = rest["mcp_transport"]
+            mcp_params = rest.get("params") or {}
+            if isinstance(mcp_params, dict):
+                if "command" in mcp_params and data_dict.get("command") in (None, ""):
+                    data_dict["command"] = mcp_params["command"]
+                if "args" in mcp_params and not data_dict.get("args"):
+                    data_dict["args"] = mcp_params["args"]
+                if "env" in mcp_params and not data_dict.get("env"):
+                    data_dict["env"] = mcp_params["env"]
+            for key in (
+                "auth",
+                "external_plugin_type",
+                "original_market_plugin_id",
+                "category",
+                "category_name",
+                "category_icon",
+                "market_source",
+                "ready",
+                "tags",
+                "status",
+                "config",
+                "original_data",
+                "market_detail_snapshot",
+                "author",
+                "detail_desc",
+            ):
+                if key not in rest:
+                    continue
+                current_value = data_dict.get(key)
+                if current_value in (None, "", [], {}):
+                    data_dict[key] = rest[key]
+
+            data_market_detail_snapshot = data_dict.get("market_detail_snapshot") or {}
+            data_market_detail_config = data_market_detail_snapshot.get("config") or {}
+            data_config = data_dict.get("config") or {}
+            original_data = data_dict.get("original_data") or {}
+            original_market_detail_snapshot = original_data.get("market_detail_snapshot") or {}
+            original_market_detail_config = original_market_detail_snapshot.get("config") or {}
+            original_config = original_data.get("config") or {}
+            rest_market_detail_snapshot = rest.get("market_detail_snapshot") or {}
+            rest_market_detail_config = rest_market_detail_snapshot.get("config") or {}
+            rest_config = rest.get("config") or {}
+            header_config_candidates = (
+                data_market_detail_snapshot.get("header_configuration"),
+                data_market_detail_config.get("header_configuration"),
+                data_config.get("header_configuration"),
+                original_market_detail_snapshot.get("header_configuration"),
+                original_market_detail_config.get("header_configuration"),
+                original_config.get("header_configuration"),
+                rest.get("header_configuration"),
+                rest_market_detail_snapshot.get("header_configuration"),
+                rest_market_detail_config.get("header_configuration"),
+                rest_config.get("header_configuration"),
+            )
+            header_configuration = next(
+                (candidate for candidate in header_config_candidates if candidate),
+                None,
+            )
+            if header_configuration:
+                data_dict["header_configuration"] = header_configuration
+
+            if not data_dict.get("auth"):
+                auth_candidates = (
+                    data_market_detail_snapshot.get("auth"),
+                    data_market_detail_config.get("auth"),
+                    data_config.get("auth"),
+                    original_market_detail_snapshot.get("auth"),
+                    original_market_detail_config.get("auth"),
+                    original_config.get("auth"),
+                    rest.get("auth"),
+                    rest_market_detail_snapshot.get("auth"),
+                    rest_market_detail_config.get("auth"),
+                    rest_config.get("auth"),
+                )
+                auth_data = next((candidate for candidate in auth_candidates if candidate), None)
+                if auth_data:
+                    data_dict["auth"] = auth_data
 
         return cls(**data_dict)
 
